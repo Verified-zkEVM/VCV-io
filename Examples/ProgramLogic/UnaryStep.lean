@@ -340,7 +340,7 @@ example [SampleableType α] (post : α → ℝ≥0∞) :
 
 example (impl : QueryImpl spec (OracleComp spec))
     (hImpl : ∀ (t : spec.Domain),
-      evalDist (impl t) = evalDist (query t : OracleComp spec (spec.Range t)))
+      𝒟[impl t] = 𝒟[(query t : OracleComp spec (spec.Range t))])
     (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp⟦simulateQ impl oa⟧ post = wp⟦oa⟧ post := by
   simpa using OracleComp.ProgramLogic.wp_simulateQ_eq impl hImpl oa post
@@ -430,7 +430,7 @@ section LiftComp
 
 variable {ι' : Type} {superSpec : OracleSpec ι'}
 variable [superSpec.Fintype] [superSpec.Inhabited]
-variable [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+variable [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
 example (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp⟦liftComp oa superSpec⟧ post = wp⟦oa⟧ post := by

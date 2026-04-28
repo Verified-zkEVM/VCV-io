@@ -178,13 +178,13 @@ noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalP
   support_eq mx := by
     ext x
     rw [ExceptT.mem_support_iff, SPMF.mem_support_iff, toSPMF'_apply_eq]
-    change Except.ok x ∈ support mx.run ↔ evalDist mx.run (Except.ok x) ≠ 0
+    change Except.ok x ∈ support mx.run ↔ 𝒟[mx.run] (Except.ok x) ≠ 0
     exact mem_support_iff_evalDist_apply_ne_zero mx.run (Except.ok x)
 
 variable [HasEvalPMF m]
 
 lemma evalDist_eq (mx : ExceptT ε m α) :
-    evalDist mx = ExceptT.toSPMF' mx := rfl
+    𝒟[mx] = ExceptT.toSPMF' mx := rfl
 
 @[grind =]
 lemma probOutput_eq (mx : ExceptT ε m α) (x : α) :
@@ -197,7 +197,7 @@ lemma probFailure_eq (mx : ExceptT ε m α) :
     Pr[⊥ | mx] = Pr[⊥ | mx.run] +
       Pr[ (fun r => match r with | Except.error _ => True | Except.ok _ => False) | mx.run] := by
   simp only [probFailure_def, probEvent_eq_tsum_indicator, probOutput_def]
-  rw [show evalDist mx = (HasEvalSPMF.toSPMF mx.run >>= fun r =>
+  rw [show 𝒟[mx] = (HasEvalSPMF.toSPMF mx.run >>= fun r =>
       match r with | Except.ok a => pure a | Except.error _ => failure : SPMF α) from rfl]
   simp only [SPMF.run_eq_toPMF, SPMF.toPMF_bind, Option.elimM, PMF.monad_bind_eq_bind,
     PMF.bind_apply, ENNReal.summable, tsum_option, Option.elim_none, PMF.pure_apply, ↓reduceIte,
@@ -212,7 +212,7 @@ lemma probOutput_liftM [LawfulMonad m] (mx : m α) (x : α) :
   exact probOutput_map_injective mx (fun a b h => by cases h; rfl) x
 
 private lemma evalDist_liftM [LawfulMonad m] (mx : m α) :
-    evalDist (liftM mx : ExceptT ε m α) = evalDist mx :=
+    𝒟[(liftM mx : ExceptT ε m α)] = 𝒟[mx] :=
   SPMF.ext fun x => probOutput_liftM mx x
 
 lemma probFailure_liftM [LawfulMonad m] (mx : m α) :

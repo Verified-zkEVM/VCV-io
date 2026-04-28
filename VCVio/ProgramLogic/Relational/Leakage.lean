@@ -64,7 +64,7 @@ different oracle specs to be compared. -/
 def ProbLeakFree [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
     (oa₁ : OracleComp spec₁ (α × ω))
     (oa₂ : OracleComp spec₂ (β × ω)) : Prop :=
-  evalDist (Prod.snd <$> oa₁) = evalDist (Prod.snd <$> oa₂)
+  𝒟[Prod.snd <$> oa₁] = 𝒟[Prod.snd <$> oa₂]
 
 /-! ### LeakageBound -/
 
@@ -74,7 +74,7 @@ leakage discrepancy. -/
 def LeakageBound [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
     (ε : ℝ) (oa₁ : OracleComp spec₁ (α × ω))
     (oa₂ : OracleComp spec₂ (β × ω)) : Prop :=
-  SPMF.tvDist (evalDist (Prod.snd <$> oa₁)) (evalDist (Prod.snd <$> oa₂)) ≤ ε
+  SPMF.tvDist (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₂]) ≤ ε
 
 /-! ### Bridge Lemmas -/
 
@@ -96,7 +96,7 @@ theorem probLeakFree_iff_leakageBound_zero
   constructor
   · intro h; rw [h]; simp [SPMF.tvDist_self]
   · intro h
-    have h0 := SPMF.tvDist_nonneg (evalDist (Prod.snd <$> oa₁)) (evalDist (Prod.snd <$> oa₂))
+    have h0 := SPMF.tvDist_nonneg (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₂])
     have := le_antisymm h h0
     rwa [SPMF.tvDist_eq_zero_iff, SPMF.toPMF_inj] at this
 
@@ -112,9 +112,9 @@ theorem leakageBound_triangle
     (h₁₂ : LeakageBound ε₁ oa₁ oa₂) (h₂₃ : LeakageBound ε₂ oa₂ oa₃) :
     LeakageBound (ε₁ + ε₂) oa₁ oa₃ := by
   unfold LeakageBound at *
-  calc SPMF.tvDist (evalDist (Prod.snd <$> oa₁)) (evalDist (Prod.snd <$> oa₃))
-      ≤ SPMF.tvDist (evalDist (Prod.snd <$> oa₁)) (evalDist (Prod.snd <$> oa₂)) +
-        SPMF.tvDist (evalDist (Prod.snd <$> oa₂)) (evalDist (Prod.snd <$> oa₃)) :=
+  calc SPMF.tvDist (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₃])
+      ≤ SPMF.tvDist (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₂]) +
+        SPMF.tvDist (𝒟[Prod.snd <$> oa₂]) (𝒟[Prod.snd <$> oa₃]) :=
           SPMF.tvDist_triangle _ _ _
     _ ≤ ε₁ + ε₂ := add_le_add h₁₂ h₂₃
 
@@ -280,8 +280,8 @@ theorem leakageBound_bind_of_trace_only
     LeakageBound ε (oa₁ >>= fun z => f z.2) (oa₂ >>= fun z => g z.2) := by
   unfold LeakageBound ProbLeakFree at *
   rw [snd_map_bind_snd _ f, snd_map_bind_snd _ g, evalDist_bind, evalDist_bind]
-  rw [show (fun w => evalDist (Prod.snd <$> f w)) =
-      fun w => evalDist (Prod.snd <$> g w) from funext hfg]
+  rw [show (fun w => 𝒟[Prod.snd <$> f w]) =
+      fun w => 𝒟[Prod.snd <$> g w] from funext hfg]
   exact le_trans (SPMF.tvDist_bind_right_le _ _ _) h
 
 end OracleComp.Leakage

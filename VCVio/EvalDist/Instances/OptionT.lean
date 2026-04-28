@@ -139,7 +139,7 @@ instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
 variable [HasEvalSPMF m]
 
 lemma evalDist_eq (mx : OptionT m α) :
-    evalDist mx = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
+    𝒟[mx] = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
 
 @[grind =]
 lemma probOutput_eq (mx : OptionT m α) (x : α) :
@@ -170,7 +170,7 @@ lemma probEvent_eq (mx : OptionT m α) (p : α → Prop) [DecidablePred p] :
 lemma probFailure_eq (mx : OptionT m α) :
     Pr[⊥ | mx] = Pr[⊥ | mx.run] + Pr[= none | mx.run] := by
   simp only [probFailure_def, probOutput_def]
-  rw [show evalDist mx = (HasEvalSPMF.toSPMF mx.run >>= fun y =>
+  rw [show 𝒟[mx] = (HasEvalSPMF.toSPMF mx.run >>= fun y =>
       match y with | some a => pure a | none => failure : SPMF α) from rfl]
   simp [SPMF.toPMF_bind, Option.elimM, PMF.bind_apply, tsum_option,
     SPMF.toPMF_failure, SPMF.toPMF_pure, SPMF.apply_eq_toPMF_some, evalDist_def]

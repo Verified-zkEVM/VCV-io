@@ -129,7 +129,7 @@ The bound includes:
 
 The collision coefficient drops from `2 · qS · (qS + qH)` (loose chain
 decomposition, matching `FiatShamir.collisionSlack qS qH β`) to
-`qS · (qS + qH)` by using the HeapSSP joint-coupling theorem.
+`qS · (qS + qH)` by using the stateful joint-coupling theorem.
 
 Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss
 vanishes and the simulation overhead reduces to

@@ -176,8 +176,8 @@ to manually simplify the traced computation into its concrete form. -/
 lemma evalDist_fst_runObs [LawfulMonad m] [HasEvalSPMF m]
     (base : QueryImpl spec m) (encode : Ev → ω)
     (oa : OracleComp (spec + ObsSpec Ev) α) :
-    evalDist ((fun z : α × ω => z.1) <$> runObs base encode oa) =
-      evalDist (eraseObs base oa) := by
+    𝒟[(fun z : α × ω => z.1) <$> runObs base encode oa] =
+      𝒟[eraseObs base oa] := by
   rw [fst_map_runObs]
 
 lemma probOutput_fst_runObs [LawfulMonad m] [HasEvalSPMF m]

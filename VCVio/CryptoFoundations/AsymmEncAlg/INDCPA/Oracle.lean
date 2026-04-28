@@ -299,8 +299,8 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
     (budget : ℕ)
     (hbound : comp.IsQueryBoundP (· matches .inr _) budget)
     (cache : (M × M →ₒ C).QueryCache) (n : ℕ) (hn : n + budget ≤ q) :
-    evalDist ((simulateQ (implCounted pk b q) comp).run' (cache, n)) =
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl' pk b) comp).run' cache) := by
+    𝒟[(simulateQ (implCounted pk b q) comp).run' (cache, n)] =
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl' pk b) comp).run' cache] := by
   have hbound : comp.IsQueryBoundP (fun t => Sum.isRight t = true) budget :=
     (OracleComp.isQueryBoundP_congr_pred (fun t => by cases t <;> simp)).mp hbound
   set canQuery : encAlg'.IND_CPA_oracleSpec.Domain → ℕ → Prop :=
@@ -309,8 +309,8 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
     fun t n => if Sum.isRight t = true then n - 1 else n with hcost
   have hbound' : comp.IsQueryBound budget canQuery cost := hbound
   have hrun :
-      evalDist ((simulateQ (implCounted pk b q) comp).run (cache, n)) =
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl'_counted pk b) comp).run (cache, n)) := by
+      𝒟[(simulateQ (implCounted pk b q) comp).run (cache, n)] =
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl'_counted pk b) comp).run (cache, n)] := by
     apply evalDist_ext
     intro z
     exact OracleComp.ProgramLogic.Relational.probOutput_simulateQ_run_eq_of_impl_eq_queryBound
@@ -351,17 +351,16 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
             simpa [cost] using hle')
       (s := (cache, n)) (hs := hn) (z := z)
   have hcounted_run' :
-      evalDist ((simulateQ (implCounted pk b q) comp).run' (cache, n)) =
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl'_counted pk b) comp).run'
-        (cache, n)) := by
+      𝒟[(simulateQ (implCounted pk b q) comp).run' (cache, n)] =
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl'_counted pk b) comp).run'
+        (cache, n)] := by
     simp only [StateT.run']
     simpa [evalDist_map] using congrArg (fun p => Prod.fst <$> p) hrun
   have hreal_run' :
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl'_counted pk b) comp).run'
-        (cache, n)) =
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl' pk b) comp).run' cache) := by
-    simpa using congrArg evalDist
-      (OracleComp.run'_simulateQ_eq_of_query_map_eq
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl'_counted pk b) comp).run'
+        (cache, n)] =
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl' pk b) comp).run' cache] := by
+    simpa using congrArg evalDist (OracleComp.run'_simulateQ_eq_of_query_map_eq
         (impl₁ := encAlg'.IND_CPA_queryImpl'_counted pk b)
         (impl₂ := encAlg'.IND_CPA_queryImpl' pk b)
         (proj := Prod.fst)
@@ -390,8 +389,8 @@ theorem IND_CPA_countedGame_eq_game_of_MakesAtMostQueries
     (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal := by
   congr 1
   have hinner : ∀ (pk : PK) (b : Bool),
-      evalDist ((simulateQ (implCounted pk b q) (adversary pk)).run' (∅, 0)) =
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅) := by
+      𝒟[(simulateQ (implCounted pk b q) (adversary pk)).run' (∅, 0)] =
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅] := by
     intro pk b
     exact IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
       (encAlg' := encAlg')
@@ -420,13 +419,12 @@ variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 /-- The `leftUntil = 0` LR-hybrid is the all-right endpoint game. -/
 theorem IND_CPA_LR_hybridGame_zero_evalDist_eq_right
     (adversary : encAlg'.IND_CPA_adversary) :
-    evalDist (encAlg'.IND_CPA_LR_hybridGame adversary 0) =
-      evalDist (encAlg'.IND_CPA_LR_experiment adversary false) := by
+    𝒟[encAlg'.IND_CPA_LR_hybridGame adversary 0] =
+      𝒟[encAlg'.IND_CPA_LR_experiment adversary false] := by
   simp only [IND_CPA_LR_hybridGame, IND_CPA_LR_experiment, evalDist_bind]
   congr 1
   funext ⟨pk, _sk⟩
-  simpa using congrArg evalDist
-    (OracleComp.run'_simulateQ_eq_of_query_map_eq
+  simpa using congrArg evalDist (OracleComp.run'_simulateQ_eq_of_query_map_eq
       (impl₁ := encAlg'.IND_CPA_queryImpl_hybridLR_counted pk 0)
       (impl₂ := encAlg'.IND_CPA_queryImpl' pk false)
       (proj := Prod.fst)
@@ -438,8 +436,8 @@ all-left endpoint game. -/
 theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
-    evalDist (encAlg'.IND_CPA_LR_hybridGame adversary q) =
-      evalDist (encAlg'.IND_CPA_LR_experiment adversary true) := by
+    𝒟[encAlg'.IND_CPA_LR_hybridGame adversary q] =
+      𝒟[encAlg'.IND_CPA_LR_experiment adversary true] := by
   simp only [IND_CPA_LR_hybridGame, IND_CPA_LR_experiment, evalDist_bind]
   congr 1
   funext ⟨pk, _sk⟩

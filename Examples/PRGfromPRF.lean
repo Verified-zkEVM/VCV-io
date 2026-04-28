@@ -176,14 +176,14 @@ omit [DecidableEq S] [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O
 the real PRF experiment for the reduction adversary, provided the PRF key
 distribution is uniform. -/
 theorem prgRealExp_eq_prfRealExp
-    (hkey : evalDist prf.keygen = evalDist ($ᵗ K))
+    (hkey : 𝒟[prf.keygen] = 𝒟[$ᵗ K])
     (adv : PRGAdversary (List.Vector O n)) :
-    evalDist (PRGScheme.prgRealExp (streamPRG prf n) adv) =
-      evalDist (PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)) := by
+    𝒟[PRGScheme.prgRealExp (streamPRG prf n) adv] =
+      𝒟[PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)] := by
   simp only [PRGScheme.prgRealExp, PRFScheme.prfRealExp, prfReduction, streamPRG]
   simp_rw [simulateQ_prfReal_reduction]
-  change evalDist ((·, ·) <$> ($ᵗ K) <*> ($ᵗ S) >>=
-    fun ks => adv (streamOutputs (prf.eval ks.1) n ks.2)) = _
+  change 𝒟[(·, ·) <$> ($ᵗ K) <*> ($ᵗ S) >>=
+    fun ks => adv (streamOutputs (prf.eval ks.1) n ks.2)] = _
   simp only [seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def]
   rw [evalDist_bind, evalDist_bind, hkey]
 
@@ -218,7 +218,7 @@ omit [DecidableEq O] in
 bounded by the PRF advantage of the reduction plus the collision probability in the
 ideal random-function world. -/
 theorem security
-    (hkey : evalDist prf.keygen = evalDist ($ᵗ K))
+    (hkey : 𝒟[prf.keygen] = 𝒟[$ᵗ K])
     (adv : PRGAdversary (List.Vector O n)) :
     PRGScheme.prgAdvantage (streamPRG prf n) adv ≤
       PRFScheme.prfAdvantage prf (prfReduction (S := S) (O := O) n adv) +

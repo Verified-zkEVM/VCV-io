@@ -129,15 +129,15 @@ lemma runtimeWithCache_evalDist_bind_liftComp
     {α β : Type} (oa : ProbComp α)
     (rest : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β) :
     (runtimeWithCache M cache).evalDist (liftM oa >>= rest) =
-      evalDist oa >>= fun x => (runtimeWithCache M cache).evalDist (rest x) := by
+      𝒟[oa] >>= fun x => (runtimeWithCache M cache).evalDist (rest x) := by
   classical
   let ro : QueryImpl (M × Commit →ₒ Chal)
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
   let impl : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := unifFwdImpl (M × Commit →ₒ Chal) + ro
   unfold runtimeWithCache ProbCompRuntime.evalDist SPMFSemantics.evalDist SemanticsVia.denote
-  change evalDist ((simulateQ impl (liftM oa >>= rest)).run' cache) =
-      evalDist oa >>= fun x => evalDist ((simulateQ impl (rest x)).run' cache)
+  change 𝒟[(simulateQ impl (liftM oa >>= rest)).run' cache] =
+      𝒟[oa] >>= fun x => 𝒟[(simulateQ impl (rest x)).run' cache]
   rw [simulateQ_bind]
   rw [roSim.run'_liftM_bind (ro := ro) (oa := oa)
     (rest := fun x => simulateQ impl (rest x)) (s := cache)]
@@ -164,7 +164,7 @@ lemma runtime_evalDist_bind_liftComp
     {α β : Type} (oa : ProbComp α)
     (rest : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β) :
     (runtime M).evalDist (liftM oa >>= rest) =
-      evalDist oa >>= fun x => (runtime M).evalDist (rest x) :=
+      𝒟[oa] >>= fun x => (runtime M).evalDist (rest x) :=
   runtimeWithCache_evalDist_bind_liftComp M ∅ oa rest
 
 end semantics
@@ -457,13 +457,13 @@ theorem perfectlyCorrect [SampleableType Chal]
           (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).sign pk sk msg
       (FiatShamir
         (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify pk msg sig) =
-        evalDist (do
+        𝒟[do
           let (pk, sk) ← hr.gen
           let (c, e) ← σ.commit pk sk
           let r ← $ᵗ Chal
           let s ← σ.respond pk sk e r
-          pure (σ.verify pk c r s)) by
-    change evalDist (StateT.run' (simulateQ impl (do
+          pure (σ.verify pk c r s)] by
+    change 𝒟[StateT.run' (simulateQ impl (do
         let (pk, sk) ←
           (FiatShamir
             (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).keygen
@@ -472,7 +472,7 @@ theorem perfectlyCorrect [SampleableType Chal]
             (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).sign pk sk msg
         (FiatShamir
           (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify
-            pk msg sig)) ∅) = _
+            pk msg sig)) ∅] = _
     dsimp only [FiatShamir]
     simp only [simulateQ_bind, simulateQ_pure, hSimQuery]
     have hpeel : ∀ {α β : Type} (oa : ProbComp α)

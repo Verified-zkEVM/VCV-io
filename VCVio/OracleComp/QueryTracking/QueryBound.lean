@@ -343,6 +343,44 @@ lemma isQueryBoundP_bind {oa : OracleComp spec α} {ob : α → OracleComp spec 
         · omega
       · simp only [if_neg hpt]; omega
 
+/-- Transfer a predicate-targeted query bound through a `StateT` simulation
+whose handler step consumes at most one target-side predicate query exactly when
+the source query satisfies the source predicate.
+
+This is the scalar `IsQueryBoundP` analogue of the more general vector-budget
+`IsQueryBound.simulateQ_run_of_step`. It is useful for logging and forwarding
+handlers whose state updates do not make additional oracle queries. -/
+theorem IsQueryBoundP.simulateQ_run_StateT_of_step
+    {ι' : Type u} {spec' : OracleSpec ι'} {σ : Type u}
+    {p : ι → Prop} [DecidablePred p]
+    {q : ι' → Prop} [DecidablePred q]
+    {impl : QueryImpl spec (StateT σ (OracleComp spec'))}
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : IsQueryBoundP oa p n)
+    (hstep : ∀ t s, IsQueryBoundP ((impl t).run s) q (if p t then 1 else 0))
+    (s : σ) :
+    IsQueryBoundP ((simulateQ impl oa).run s) q n := by
+  induction oa using OracleComp.inductionOn generalizing n s with
+  | pure x =>
+      simp [simulateQ_pure]
+  | query_bind t mx ih =>
+      rw [isQueryBoundP_query_bind_iff] at h
+      rw [simulateQ_query_bind, StateT.run_bind]
+      have hrest : ∀ x ∈ support ((impl t).run s),
+          IsQueryBoundP ((simulateQ impl (mx x.1)).run x.2) q
+            (if p t then n - 1 else n) := by
+        intro x hx
+        exact ih x.1 (h.2 x.1) x.2
+      have hbind := isQueryBoundP_bind (hstep t s) hrest
+      refine hbind.mono ?_
+      by_cases ht : p t
+      · simp only [if_pos ht]
+        rcases h.1 with hnot | hpos
+        · exact absurd ht hnot
+        · omega
+      · simp only [if_neg ht]
+        omega
+
 /-- Predicate-extensionality: replacing `p` with an equivalent predicate does not change the
 bound. -/
 lemma isQueryBoundP_congr_pred {oa : OracleComp spec α} {p p' : ι → Prop}

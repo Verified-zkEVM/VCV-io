@@ -49,23 +49,23 @@ theorem relTriple_prod
     (hQ : ∀ b ∈ support ob, Q b) :
     RelTriple oa ob (fun a b => P a ∧ Q b) := by
   rw [relTriple_iff_relWP, relWP_iff_couplingPost]
-  have hp : (evalDist oa).toPMF none = 0 := by
+  have hp : (𝒟[oa]).toPMF none = 0 := by
     change Pr[⊥ | oa] = 0; exact probFailure_eq_zero (mx := oa)
-  have hq : (evalDist ob).toPMF none = 0 := by
+  have hq : (𝒟[ob]).toPMF none = 0 := by
     change Pr[⊥ | ob] = 0; exact probFailure_eq_zero (mx := ob)
   refine ⟨_root_.SPMF.Coupling.prod hp hq, ?_⟩
   intro z hz
-  rcases (mem_support_bind_iff (evalDist oa)
-    (fun a => evalDist ob >>= fun b => (pure (a, b) : SPMF (α × β))) z).1 hz with
+  rcases (mem_support_bind_iff (𝒟[oa])
+    (fun a => 𝒟[ob] >>= fun b => (pure (a, b) : SPMF (α × β))) z).1 hz with
     ⟨a, ha, hz'⟩
   have ha_supp : a ∈ support oa :=
     (mem_support_iff (mx := oa) (x := a)).2
-      (by simpa [probOutput_def] using (mem_support_iff (mx := evalDist oa) (x := a)).1 ha)
-  rcases (mem_support_bind_iff (evalDist ob)
+      (by simpa [probOutput_def] using (mem_support_iff (mx := 𝒟[oa]) (x := a)).1 ha)
+  rcases (mem_support_bind_iff (𝒟[ob])
     (fun b => (pure (a, b) : SPMF (α × β))) z).1 hz' with ⟨b, hb, hz''⟩
   have hb_supp : b ∈ support ob :=
     (mem_support_iff (mx := ob) (x := b)).2
-      (by simpa [probOutput_def] using (mem_support_iff (mx := evalDist ob) (x := b)).1 hb)
+      (by simpa [probOutput_def] using (mem_support_iff (mx := 𝒟[ob]) (x := b)).1 hb)
   have : z = (a, b) := by
     simpa [support_pure, Set.mem_singleton_iff] using hz''
   subst this

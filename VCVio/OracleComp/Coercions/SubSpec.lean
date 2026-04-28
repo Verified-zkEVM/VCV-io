@@ -154,10 +154,14 @@ class LawfulSubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w}
   onResponse_bijective (t : spec.Domain) :
     Function.Bijective (h.onResponse t)
 
+/-- Lawful oracle-spec inclusion: a `SubSpec` whose response translation is
+bijective on every fiber. -/
+macro:50 lhs:term " ˡ⊂ₒ " rhs:term : term => `(LawfulSubSpec $lhs $rhs)
+
 namespace LawfulSubSpec
 
 variable {ι : Type u} {τ : Type v} {spec : OracleSpec ι} {superSpec : OracleSpec τ}
-    [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+    [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
 /-- The lens-level statement of `LawfulSubSpec`: the underlying
 `PFunctor.Lens` is cartesian. This makes the dictionary between the
@@ -180,6 +184,25 @@ lemma evalDist_liftM_query [superSpec.Fintype] [superSpec.Inhabited]
   exact PMF.uniformOfFintype_map_of_bijective _ (onResponse_bijective t)
 
 end LawfulSubSpec
+
+/-- Two oracle-spec inclusions into the same ambient spec have disjoint query
+images.
+
+This is stronger than `LawfulSubSpec`: lawfulness preserves the distribution of
+responses under lifting, while disjointness says the two lifted query namespaces
+do not overlap inside the ambient interface. -/
+class DisjointSubSpec
+    {ι₁ : Type u} {ι₂ : Type v} {τ : Type w'}
+    (spec₁ : OracleSpec.{u, w} ι₁) (spec₂ : OracleSpec.{v, w} ι₂)
+    (superSpec : OracleSpec.{w', w} τ)
+    [h₁ : SubSpec spec₁ superSpec] [h₂ : SubSpec spec₂ superSpec] : Prop where
+  /-- The two forward query maps have disjoint images. -/
+  disjoint_onQuery (t₁ : spec₁.Domain) (t₂ : spec₂.Domain) :
+    h₁.onQuery t₁ ≠ h₂.onQuery t₂
+
+/-- Oracle-spec inclusions with disjoint query images in an ambient interface. -/
+macro:50 lhs:term " ⊥ₒ[" ambient:term "] " rhs:term : term =>
+  `(DisjointSubSpec $lhs $rhs $ambient)
 
 end OracleSpec
 
@@ -218,6 +241,15 @@ lemma liftComp_bind (mx : OracleComp spec α) (ob : α → OracleComp spec β) :
   grind
 
 @[simp]
+lemma liftComp_self (mx : OracleComp spec α) :
+    liftComp mx spec = mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x =>
+      rfl
+  | query_bind t k ih =>
+      simp [liftComp_bind, liftComp_query, ih]
+
+@[simp]
 lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
     liftComp (f <$> mx) superSpec = f <$> liftComp mx superSpec := by
   simp [liftComp]
@@ -239,10 +271,10 @@ section liftComp_evalDist
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α : Type w}
 variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited]
-    [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+    [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
 @[simp] lemma evalDist_liftComp (mx : OracleComp spec α) :
-    evalDist (liftComp mx superSpec) = evalDist mx := by
+    𝒟[liftComp mx superSpec] = 𝒟[mx] := by
   induction mx using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t mx ih =>

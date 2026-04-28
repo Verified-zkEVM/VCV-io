@@ -34,6 +34,7 @@ import ToMathlib.Data.ENNReal.AbsDiff
 import ToMathlib.Data.ENNReal.Gauss
 import ToMathlib.Data.ENNReal.SumSquares
 import ToMathlib.Data.ENNReal.TsumDistrib
+import ToMathlib.Data.Heap
 import ToMathlib.Data.IndexedBinaryTree.Basic
 import ToMathlib.Data.IndexedBinaryTree.Equiv
 import ToMathlib.Data.IndexedBinaryTree.Lemmas
@@ -59,6 +60,7 @@ import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Free
 import ToMathlib.PFunctor.Lens.Basic
 import ToMathlib.PFunctor.Lens.Cartesian
+import ToMathlib.PFunctor.Lens.State
 import ToMathlib.PFunctor.MFacts
 import ToMathlib.PFunctor.Trace
 import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence

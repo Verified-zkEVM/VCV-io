@@ -11,8 +11,8 @@ import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 /-!
 # CMA-to-NMA reduction for Fiat-Shamir on Σ-protocols
 
-This file contains the managed-RO NMA adversary construction shared by the
-HeapSSP Fiat-Shamir theorem chain and the public Sigma security theorem.
+This file contains the managed-RO NMA adversary construction used by the
+stateful Fiat-Shamir theorem chain and the public Sigma security theorem.
 
 The construction is the standard "simulated CMA" adversary: run the CMA
 adversary's main computation, replace signing queries with simulator
@@ -23,7 +23,7 @@ adversary's live hash queries; simulator-programmed signing queries are
 absorbed into the managed cache.
 
 The quantitative CMA-to-NMA theorem itself lives in
-`Sigma/HeapSSP/Chain.lean`, so the public proof path has a single HeapSSP
+`Sigma/Stateful/Chain.lean`, so the public proof path has a single stateful
 source of truth.
 -/
 

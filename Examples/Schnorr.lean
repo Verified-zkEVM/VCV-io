@@ -163,7 +163,7 @@ theorem sigma_simCommitPredictability (g : G)
   have hbij_c : ∀ c : F, Function.Bijective (fun z : F => z • g - c • pk) := fun c =>
     (Equiv.subRight (c • pk)).bijective.comp hg
   have h_commit_uniform :
-      evalDist (Prod.fst <$> simTranscript F G g pk) = evalDist ($ᵗ G) := by
+      𝒟[Prod.fst <$> simTranscript F G g pk] = 𝒟[$ᵗ G] := by
     apply evalDist_ext
     intro x
     have h_rewrite : (Prod.fst <$> simTranscript F G g pk) =
@@ -204,7 +204,7 @@ theorem sigma_simChalUniformGivenCommit (g : G) :
     let r ← $ᵗ F
     let c ← $ᵗ F
     pure (r • g, c, r + c * sk) with hind_def
-  have hSimEqIndep : evalDist (simTranscript F G g pk) = evalDist ind := by
+  have hSimEqIndep : 𝒟[simTranscript F G g pk] = 𝒟[ind] := by
     rw [← hHVZK, hReal]
   rw [probEvent_congr' (fun _ _ => Iff.rfl) hSimEqIndep,
       probEvent_congr' (fun _ _ => Iff.rfl) hSimEqIndep]

@@ -22,6 +22,8 @@ TV-distance content, and so live at the `SimSemantics` layer alongside `StateT.l
   the full simulation does too.
 - `OracleComp.run'_simulateQ_eq_of_query_map_eq` (and variants): the `run'` (output-only)
   projection corollaries.
+- `QueryImpl.StateOrnament`: a package for the recurring pattern where one
+  stateful handler refines another by carrying extra bookkeeping state.
 - `QueryImpl.fixSndStateT` + `OracleComp.simulateQ_run_eq_of_snd_invariant`: support-based
   decomposition for product state spaces where one component is invariant.
 - `QueryImpl.extendState` + `OracleComp.extendState_run_proj_eq`: auxiliary-state lift, the
@@ -251,6 +253,62 @@ theorem run'_simulateQ_eq_of_query_map_eq_inv'
 
 end OracleComp
 
+namespace QueryImpl
+
+/-- A state ornament packages the data needed to project a decorated stateful
+query implementation onto a base implementation.
+
+The decorated implementation may carry extra bookkeeping state. The projection
+only needs to commute with each query on states satisfying `inv`, and `inv` must
+be preserved by each query step. -/
+structure StateOrnament
+    {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    {σ τ : Type _}
+    (decorated : QueryImpl spec (StateT σ (OracleComp spec')))
+    (base : QueryImpl spec (StateT τ (OracleComp spec'))) where
+  inv : σ → Prop
+  proj : σ → τ
+  preserves_inv :
+    ∀ t s, inv s →
+      ∀ y ∈ support (m := OracleComp spec') ((decorated t).run s), inv y.2
+  project_step :
+    ∀ t s, inv s →
+      Prod.map id proj <$> (decorated t).run s = (base t).run (proj s)
+
+namespace StateOrnament
+
+variable {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+variable {σ τ : Type _}
+variable {decorated : QueryImpl spec (StateT σ (OracleComp spec'))}
+variable {base : QueryImpl spec (StateT τ (OracleComp spec'))}
+
+/-- A state ornament projects full simulations of the decorated implementation
+onto simulations of the base implementation. -/
+theorem run_eq {α : Type}
+    (orn : StateOrnament decorated base)
+    (oa : OracleComp spec α) (s : σ) (hs : orn.inv s) :
+    Prod.map id orn.proj <$> (simulateQ decorated oa).run s =
+      (simulateQ base oa).run (orn.proj s) :=
+  OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'
+    decorated base orn.inv orn.proj
+    (fun t s hs => orn.preserves_inv t s hs)
+    (fun t s hs => orn.project_step t s hs)
+    oa s hs
+
+/-- Output-only corollary of `QueryImpl.StateOrnament.run_eq`. -/
+theorem run'_eq {α : Type}
+    (orn : StateOrnament decorated base)
+    (oa : OracleComp spec α) (s : σ) (hs : orn.inv s) :
+    (simulateQ decorated oa).run' s =
+      (simulateQ base oa).run' (orn.proj s) := by
+  have h := orn.run_eq oa s hs
+  have hmap := congrArg (fun p => Prod.fst <$> p) h
+  simpa [StateT.run'] using hmap
+
+end StateOrnament
+
+end QueryImpl
+
 /-! ## Fixing one component of a product state -/
 
 namespace QueryImpl
@@ -346,6 +404,26 @@ def extendState
     (extendState so aux t).run s =
       ((so t).run s.1 >>= fun p => pure (p.1, (p.2, aux t s.1 p.1 p.2 s.2))) := rfl
 
+/-- Extend a stateful query implementation with an auxiliary component on the
+left of the product state. This is the same construction as `extendState`, but
+it matches handlers whose state is ordered as `(auxiliary, baseState)`. -/
+def extendStateLeft
+    {ι : Type u} {spec : OracleSpec ι} {σ Q : Type u} {m : Type u → Type v} [Monad m]
+    (so : QueryImpl spec (StateT σ m))
+    (aux : (t : spec.Domain) → σ → spec.Range t → σ → Q → Q) :
+    QueryImpl spec (StateT (Q × σ) m) :=
+  fun t => StateT.mk fun s => do
+    let (u, s') ← (so t).run s.2
+    pure (u, (aux t s.2 u s' s.1, s'))
+
+@[simp] lemma extendStateLeft_apply
+    {ι : Type u} {spec : OracleSpec ι} {σ Q : Type u} {m : Type u → Type v} [Monad m]
+    (so : QueryImpl spec (StateT σ m))
+    (aux : (t : spec.Domain) → σ → spec.Range t → σ → Q → Q)
+    (t : spec.Domain) (s : Q × σ) :
+    (extendStateLeft so aux t).run s =
+      ((so t).run s.2 >>= fun p => pure (p.1, (aux t s.2 p.1 p.2 s.1, p.2))) := rfl
+
 end QueryImpl
 
 namespace OracleComp
@@ -390,6 +468,41 @@ theorem extendState_run'_eq
     (simulateQ (QueryImpl.extendState so aux) oa).run' (s, q) =
       (simulateQ so oa).run' s := by
   have h := extendState_run_proj_eq so aux oa s q
+  have hmap := congrArg (fun p => Prod.fst <$> p) h
+  simpa [StateT.run'] using hmap
+
+/-- Forgetting the left auxiliary `Q` component commutes with the full
+simulation. This is the left-product analogue of `extendState_run_proj_eq`. -/
+theorem extendStateLeft_run_proj_eq
+    {ι : Type u} {spec : OracleSpec ι} {σ Q : Type u}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m]
+    (so : QueryImpl spec (StateT σ m))
+    (aux : (t : spec.Domain) → σ → spec.Range t → σ → Q → Q)
+    (oa : OracleComp spec α) (s : σ) (q : Q) :
+    Prod.map id Prod.snd <$> (simulateQ (QueryImpl.extendStateLeft so aux) oa).run (q, s) =
+      (simulateQ so oa).run s := by
+  refine map_run_simulateQ_eq_of_query_map_eq
+    (impl₁ := QueryImpl.extendStateLeft so aux) (impl₂ := so)
+    (proj := Prod.snd) ?_ oa (q, s)
+  intro t ⟨q', s'⟩
+  change Prod.map id Prod.snd <$>
+      ((so t).run s' >>= fun p => pure (p.1, (aux t s' p.1 p.2 q', p.2))) =
+      (so t).run s'
+  rw [map_bind]
+  conv_rhs => rw [← bind_pure ((so t).run s')]
+  refine bind_congr fun ⟨u, s''⟩ => ?_
+  simp
+
+/-- `run'` projection corollary of `extendStateLeft_run_proj_eq`. -/
+theorem extendStateLeft_run'_eq
+    {ι : Type u} {spec : OracleSpec ι} {σ Q : Type u}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m]
+    (so : QueryImpl spec (StateT σ m))
+    (aux : (t : spec.Domain) → σ → spec.Range t → σ → Q → Q)
+    (oa : OracleComp spec α) (s : σ) (q : Q) :
+    (simulateQ (QueryImpl.extendStateLeft so aux) oa).run' (q, s) =
+      (simulateQ so oa).run' s := by
+  have h := extendStateLeft_run_proj_eq so aux oa s q
   have hmap := congrArg (fun p => Prod.fst <$> p) h
   simpa [StateT.run'] using hmap
 
