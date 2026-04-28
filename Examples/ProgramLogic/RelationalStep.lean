@@ -252,7 +252,7 @@ example (t : spec.Domain) (post : spec.Range t → spec.Range t → ℝ≥0∞) 
       (query t : OracleComp spec (spec.Range t)) ≈ₑ
       (query t : OracleComp spec (spec.Range t))
     ⦃post⦄ := by
-  rvcstep
+  exact OracleComp.ProgramLogic.Relational.Loom.relTriple_query_refl t post
 
 /-! ## Iteration rules -/
 
@@ -279,7 +279,7 @@ example {xs : List α} {ys : List β}
     (hxy : List.Forall₂ S xs ys)
     (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
     ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
-  rvcstep
+  rvcstep using S
 
 example {σ₁ σ₂ : Type}
     {xs : List α}
@@ -303,7 +303,7 @@ example {σ₁ σ₂ : Type}
     (hxy : List.Forall₂ Rin xs ys)
     (hfg : ∀ a b, Rin a b → ∀ t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ b | S⟫) :
     ⟪xs.foldlM f s₁ ~ ys.foldlM g s₂ | S⟫ := by
-  rvcstep
+  rvcstep using Rin
 
 /-! ## Pure / ite rules -/
 

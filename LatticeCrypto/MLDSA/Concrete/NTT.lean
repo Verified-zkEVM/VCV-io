@@ -128,23 +128,14 @@ private def idMatrix (row col : Fin ringDegree) : Coeff :=
 --    canonical transform and deriving inversion abstractly.
 --
 -- Both are larger refactors than a small warning-cleanup pass. Until then, we scope off
--- Mathlib's `nativeDecide` style linter for these two certificate lemmas only.
+-- Mathlib's `nativeDecide` style linter for this certificate lemma only. The reverse
+-- roundtrip law below is derived from this one using finiteness of the concrete carriers.
 set_option maxHeartbeats 800000 in
-set_option linter.style.nativeDecide false in
 -- The concrete matrix certificate currently needs a larger heartbeat budget.
+set_option linter.style.nativeDecide false in
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
-  native_decide
-
--- The reverse composition carries the same concrete matrix-expansion cost and the same
--- deferred-certificate status as `invNTTMatrix_nttMatrix_entry` above.
-set_option maxHeartbeats 800000 in
-set_option linter.style.nativeDecide false in
--- The reverse certificate has the same concrete reduction cost.
-private theorem nttMatrix_invNTTMatrix_entry :
-    ∀ row col : Fin ringDegree,
-      (∑ k : Fin ringDegree, nttMatrix row k * invNTTMatrix k col) = idMatrix row col := by
   native_decide
 
 /-- Proof-oriented forward NTT obtained from the transform matrix extracted from the
@@ -172,15 +163,43 @@ theorem invNTT_ntt (f : Rq) : invNTT (ntt f) = f := by
           invNTTMatrix nttMatrix idMatrix invNTTMatrix_nttMatrix_entry f
     _ = f := LatticeCrypto.NTTCert.applyMatrix_id (backend := polyBackend) f
 
+private def rqEquivCoeffFun : Rq ≃ (Fin ringDegree → Coeff) where
+  toFun f i := f.get i
+  invFun f := Vector.ofFn f
+  left_inv f := by
+    apply Vector.ext
+    intro i hi
+    exact Vector.getElem_ofFn (f := fun i => f.get i) hi
+  right_inv f := by
+    funext i
+    exact Vector.get_ofFn f i
+
+private def rqEquivTq : Rq ≃ Tq where
+  toFun f := ⟨f⟩
+  invFun fHat := fHat.coeffs
+  left_inv _ := rfl
+  right_inv fHat := by cases fHat; rfl
+
+private theorem ntt_injective : Function.Injective ntt := by
+  intro f g h
+  have hInv := congrArg invNTT h
+  simpa [invNTT_ntt] using hInv
+
+private theorem ntt_surjective : Function.Surjective ntt := by
+  letI : NeZero modulus := ⟨by norm_num [modulus]⟩
+  letI : Fintype Coeff := by
+    dsimp [Coeff]
+    exact ZMod.fintype modulus
+  letI : Finite Rq := Finite.of_equiv (Fin ringDegree → Coeff) rqEquivCoeffFun.symm
+  exact ntt_injective.surjective_of_finite rqEquivTq
+
 /-- The concrete forward transform is a left inverse to the concrete inverse transform. -/
 theorem ntt_invNTT (fHat : Tq) : ntt (invNTT fHat) = fHat := by
-  apply LatticeCrypto.TransformPoly.ext
+  obtain ⟨f, hf⟩ := ntt_surjective fHat
   calc
-    (ntt (invNTT fHat)).coeffs = applyMatrix idMatrix fHat.coeffs := by
-      simpa [invNTT, ntt] using
-        LatticeCrypto.NTTCert.applyMatrix_comp (backend := polyBackend)
-          nttMatrix invNTTMatrix idMatrix nttMatrix_invNTTMatrix_entry fHat.coeffs
-    _ = fHat.coeffs := LatticeCrypto.NTTCert.applyMatrix_id (backend := polyBackend) fHat.coeffs
+    ntt (invNTT fHat) = ntt (invNTT (ntt f)) := by rw [hf]
+    _ = ntt f := by rw [invNTT_ntt]
+    _ = fHat := hf
 
 private theorem hadd_rq (f g : Rq) :
     polyBackend.coeff (f + g) = fun i => polyBackend.coeff f i + polyBackend.coeff g i := by
