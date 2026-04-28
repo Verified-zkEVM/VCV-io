@@ -11,6 +11,14 @@
 - `VCVio.ProgramLogic.Unary.StdDoBridge` is a narrow unary bridge for almost-sure correctness in the `.pure`
   `Std.Do` view. It is not the main engine for quantitative or relational VCGen.
 
+## In-Tree Walkthroughs
+
+- `Examples/ProgramLogic/UnaryStep.lean`: unary `vcstep` / `vcgen` examples.
+- `Examples/ProgramLogic/RelationalStep.lean`: step-by-step relational tactic examples.
+- `Examples/ProgramLogic/RelationalDerived.lean`: derived relational patterns and automation examples.
+- `Examples/ProgramLogic/ProofMode.lean`: proof-mode entry points and small end-to-end examples.
+- `VCVio/ProgramLogic/Relational/Examples.lean`: compact API examples for the relational layer.
+
 ## Tactic Quick Reference
 
 ### Proof Mode Entry
@@ -36,6 +44,9 @@ before generating the remaining subgoals.
 | `rvcstep` | `g₁ ≡ₚ g₂`, `evalDist g₁ = evalDist g₂`, `⟪oa ~ ob \| R⟫`, or `⦃f⦄ oa ≈ₑ ob ⦃g⦄` | Lowers into relational mode if needed, then applies one obvious relational step |
 | `rvcstep using t` | same | Supplies the explicit witness needed by the current shape (bind cut relation, bijection, traversal input relation, or simulation state relation) |
 | `rvcstep with thm` | same | Force one explicit relational theorem/assumption step |
+| `rvcstep left` / `rvcstep right` | raw `Std.Do'.rwp` or folded `Std.Do'.RelTriple` goals | Exposes a controlled one-sided bind step |
+| `rvcstep sym` | qualitative `RelTriple` goals | Swaps the two sides and the relational postcondition |
+| `rvcstep upto R` | qualitative `RelTriple` goals | Changes the current postcondition to an explicit intermediate relation |
 | `rvcstep?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint, `with theorem`, or `as ⟨...⟩` clause |
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
@@ -532,8 +543,8 @@ in two registry files rather than a framework rewrite.
 
 | File | Attribute | Role |
 |------|-----------|------|
-| `Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / quantitative `Std.Do'.RelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
-| `Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites, indexed by a `Sym.Pattern` on `oa` and consulted by `runWpStepRules` via `TacticM` rewriting (`rw` then `simp only`). The `Sym.Simp.Theorem` bundle for an eventual `SymM`-side rewriter is *not* eagerly built; `Sym.Simp.mkTheoremFromDecl` can rebuild it on demand from `getAllWpStepEntries` |
+| `VCVio/ProgramLogic/Tactics/Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / quantitative `Std.Do'.RelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
+| `VCVio/ProgramLogic/Tactics/Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites, indexed by a `Sym.Pattern` on `oa` and consulted by `runWpStepRules` via `TacticM` rewriting (`rw` then `simp only`). The `Sym.Simp.Theorem` bundle for an eventual `SymM`-side rewriter is *not* eagerly built; `Sym.Simp.mkTheoremFromDecl` can rebuild it on demand from `getAllWpStepEntries` |
 
 Each entry carries a `SpecProof` (reusing the core-Lean type from
 `Lean.Elab.Tactic.Do.SpecAttr`) so origins can be distinguished between a
@@ -542,8 +553,8 @@ from the attribute's optional priority argument (`@[vcspec (prio := 200)]`).
 
 ### Dispatch flow
 
-1. **Unary / relational VC-gen** (`Unary/Internals.lean`,
-   `Relational/Internals.lean`): on a `Triple`/`wp`/`RelTriple`/`RelWP`/quantitative
+1. **Unary / relational VC-gen** (`VCVio/ProgramLogic/Tactics/Unary/Internals.lean`,
+   `VCVio/ProgramLogic/Tactics/Relational/Internals.lean`): on a `Triple`/`wp`/`RelTriple`/`RelWP`/quantitative
    `Std.Do'.RelTriple`
    goal, the planner extracts the computation slot(s), `whnfReducible`s them,
    asks the registry for candidate `VCSpecEntry`s via
@@ -552,7 +563,7 @@ from the attribute's optional priority argument (`@[vcspec (prio := 200)]`).
    shared `runUnaryVCSpecRule` / `runRelationalVCSpecRule` helpers which call
    the `runVCGenStepWithTheoremDirect` / `runRVCGenStepWithTheoremDirect`
    applicators), and picks the best plan.
-2. **`wp`-rewrite driver** (`Common/WpStepDispatch.lean`): on any goal
+2. **`wp`-rewrite driver** (`VCVio/ProgramLogic/Tactics/Common/WpStepDispatch.lean`): on any goal
    containing `wp _ _`, `runWpStepRules` pulls the `oa` argument out of the
    first matching `wp` application, `whnfReducible`s it, asks
    `getRegisteredWpStepEntries` for hits on the `oa`-keyed `Sym.DiscrTree`,
@@ -638,6 +649,7 @@ registry files and the `runWpStepRules` docstring. If a bump breaks us,
 the fastest recovery path is: (1) open the failing file, (2) check that
 `Sym.mkPatternFromDeclWithKey`, `Sym.insertPattern`, `Sym.getMatch`, and
 `Sym.Simp.mkTheoremFromDecl` still have matching signatures, (3) rebuild
-the single `Common/Registry.lean` or `Common/WpStepRegistry.lean`
-target, and (4) regenerate the full library. No user-visible tactic
+the single `VCVio/ProgramLogic/Tactics/Common/Registry.lean` or
+`VCVio/ProgramLogic/Tactics/Common/WpStepRegistry.lean` target, and
+(4) regenerate the full library. No user-visible tactic
 surface changes.

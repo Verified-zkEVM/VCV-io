@@ -15,7 +15,7 @@
 
 3. **Probability equals a specific value** (`Pr[= x | oa] = ...`):
    → Start with `vcstep` if the goal should lower or decompose automatically
-  → Use `vcstep?` when you want the explicit script, binder names, rewrite form, or an
+   → Use `vcstep?` when you want the explicit script, binder names, rewrite form, or an
     explicit `using` / `inv` / `with` step surfaced
    → Otherwise use `probOutput_bind_eq_tsum` to decompose binds manually
    → Use `simp` with project simp lemmas
@@ -92,14 +92,16 @@ def OTP_encrypt (k m : Fin n → Bool) : ProbComp (Fin n → Bool) := pure (k + 
 
 ## Worked Example: ElGamal IND-CPA
 
-From `Examples/ElGamal/Basic.lean` — multi-query security via DDH.
+From `Examples/ElGamal/Basic.lean` — multi-query security via the generic one-time DDH lift.
 
 **Key patterns used**:
-- Hybrid argument indexed by query count `k`
-- `StateT` for oracle implementations that track query counter + cache
-- `vcstep` to close common probability-equality swaps
-- `vcstep rw congr'` to expose common random-sampling prefixes without support noise
-- Telescope bound: `IND_CPA_advantage ≤ q * 2ε`
+- Define ElGamal correctness and the one-time DDH bridge.
+- Prove the one-time signed advantage identity against DDH.
+- Instantiate `AsymmEncAlg.IND_CPA_advantage_toReal_le_q_mul_of_oneTime_signedAdvantageReal_bound`.
+- Final bound: `IND_CPA_advantage ≤ q * 2ε`.
+
+For tactic-heavy hybrid proofs, use the generic recipe above or the focused
+examples under `Examples/ProgramLogic/`.
 
 ## Annotated Tactic Usage
 

@@ -32,9 +32,13 @@ The repo also includes a first-class lattice cryptography library under `Lattice
 ## Repo Map
 
 - `VCVio/`: generic oracle-computation framework, program logic, crypto abstractions, and generic reductions.
+- `ToMathlib/`: local Mathlib-facing utilities and lemmas intended to remain below the framework layer.
+- `FFI/`: shared Lean FFI bindings used by concrete implementations.
 - `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
 - `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
-- `Examples/`: compact framework examples such as OneTimePad, ElGamal, and Schnorr.
+- `VCVioTest/`: framework smoke tests and test support modules.
+- `VCVioWidgets/`: optional widget experiments and visualizations.
+- `Examples/`: compact framework examples such as OneTimePad, ElGamal, Schnorr, and program-logic tactic walkthroughs.
 - `Interop/`: experimental bridges to Rust verification frontends (hax, aeneas). **Strict TCB isolation**: nothing in core VCVio depends on it. See `docs/agents/interop.md`.
 - `csrc/`: C FFI shims used for differential testing against native ML-DSA, ML-KEM, and Falcon code.
 - `third_party/`: vendored native backends used by the FFI and test harnesses.
@@ -97,7 +101,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 ## Canonical Examples
 
 - Compact modern crypto proof: `Examples/OneTimePad/Basic.lean`
-- ElGamal IND-CPA via DDH (hybrid argument): `Examples/ElGamal/Basic.lean`
+- ElGamal IND-CPA via the generic one-time DDH lift: `Examples/ElGamal/Basic.lean`
 - Schnorr sigma protocol (completeness, soundness, HVZK): `Examples/Schnorr.lean`
 - Oracle computation core: `VCVio/OracleComp/OracleComp.lean`
 - Probability lemmas: `VCVio/EvalDist/Monad/Basic.lean`
@@ -128,6 +132,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - End-to-end UC `CompEmulates 0` at a three-port boundary: `Examples/OneTimePad/UC.lean`
 - Interaction examples: `VCVio/Interaction/TwoParty/Examples.lean`, `VCVio/Interaction/Multiparty/Examples.lean`, `VCVio/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
+- Program logic tactic walkthroughs: `Examples/ProgramLogic/`
 - Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
 - ML-DSA proof-level IDS: `LatticeCrypto/MLDSA/Scheme.lean`
 - ML-DSA FIPS signing layer: `LatticeCrypto/MLDSA/Signature.lean`
