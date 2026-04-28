@@ -355,10 +355,6 @@ def runRelBindRule : TacticM Bool := do
   tryNormalizeRelBindStructure
   if (← getGoals).isEmpty then
     return true
-  if let some shape ← currentRelGoalShape? then
-    if isPureExpr shape.oa && isPureExpr shape.ob then
-      if ← tryCloseRelGoalImmediate then
-        return true
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind
         (R := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_)) then
@@ -889,6 +885,8 @@ private inductive RelGoalKind where
   | relTripleBind
   | relTripleSpec
   | relWP
+  | stdDoRelTriple
+  | rawRWP
   | couplingPost
   | oneSidedCandidate
   | unknown
@@ -899,7 +897,9 @@ private def RelGoalKind.canTryImmediateClose : RelGoalKind → Bool
   | _ => false
 
 private def classifyRelGoalKind (target : Expr) : TacticM RelGoalKind := do
-  if isRawStdDoRelWPGoal target || (relWPGoalParts? target).isSome then
+  if isRawStdDoRelWPGoal target then
+    return .rawRWP
+  if (relWPGoalParts? target).isSome then
     return .relWP
   if (findAppWithHead? ``OracleComp.ProgramLogic.Relational.CouplingPost target).isSome then
     return .couplingPost
@@ -924,6 +924,8 @@ private def classifyRelGoalKind (target : Expr) : TacticM RelGoalKind := do
     return .oneSidedCandidate
   if ← relCompsDefEq oa ob then
     return .relTripleRefl
+  if shape.isStdDo then
+    return .stdDoRelTriple
   return .relTripleSpec
 
 private def tryCloseRelGoalAtCoreGateway : TacticM Bool := do

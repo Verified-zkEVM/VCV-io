@@ -144,12 +144,11 @@ one specific theorem/assumption step manually.
 head-pair lookup on the relational side.
 This is especially useful for automation-oriented `simulateQ` transport lemmas whose outer
 computation heads are stable but whose inner invariants or projection arguments still come from
-the local context. The default registry already covers the structural relational rules
-(`relTriple_pure_pure`, `relTriple_bind`, `relTriple_map`, `relTriple_if`, the `replicate` /
-`mapM` / `foldlM` / `uniformSample_bij` families, the quantitative
-`Std.Do'.RelTriple` pure / bind / uniform-sampling families, and the two `simulateQ`
-transport rules),
-so user-defined rules slot into the same lookup pipeline without further wiring.
+the local context. Relational registered rules are tiered internally:
+plain `rvcstep` / `rvcgen` use default-safe structural and leaf entries, while
+rules that choose cuts, bijections, or broad theorem search are reached through
+`rvcstep with thm`, `rvcstep using t`, `rvcfinish`, or `rvcgen!`.
+This keeps ordinary rule ordering stable when new `@[vcspec]` lemmas are added.
 
 ### Handler Normalization
 
@@ -202,6 +201,10 @@ cheap leaf finish at the end of `rvcgen`) tries, in order:
 Consequence/search closing is opt-in through `rvcfinish` or `rvcgen!`; plain
 `rvcgen` keeps to structural steps plus cheap leaf closure so rule-order changes
 stay predictable.
+
+**Explicit relational strategies**: `rvcstep sym` and `rvcstep upto R` are strategy commands,
+not default automation. A future `rvcstep trans mid` should wait for a semantic transitivity
+lemma and a settled goal shape; do not emulate it with broad theorem search.
 
 **Pass budget**: exhaustive `vcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
