@@ -16,13 +16,14 @@ This file validates one-step relational tactic behavior.
 open ENNReal OracleSpec OracleComp
 open OracleComp.ProgramLogic
 open OracleComp.ProgramLogic.Relational
+open Lean.Order
 open scoped OracleComp.ProgramLogic
 
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
-variable {α β γ : Type}
+variable {α β γ δ : Type}
 
 /-! ## Basic relational stepping -/
 
@@ -56,6 +57,17 @@ example (t : spec.Domain) :
      | EqRel (spec.Range t)⟫ := by
   rvcstep
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_map` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R : RelPost γ δ} {f : α → γ} {g : β → δ}
+    (h : ⟪oa ~ ob | fun a b => R (f a) (g b)⟫) :
+    ⟪f <$> oa ~ g <$> ob | R⟫ := by
+  rvcstep
+
 /-! ## Bijective random sampling -/
 
 example [SampleableType α]
@@ -74,26 +86,37 @@ example [SampleableType α]
   · intro x
     rfl
 
+example [SampleableType α] (post : α → α → ℝ≥0∞) :
+    ⦃∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a a⦄
+      ($ᵗ α : ProbComp α) ≈ₑ ($ᵗ α : ProbComp α)
+    ⦃post⦄ := by
+  rvcstep
+
+example (t : spec.Domain) (post : spec.Range t → spec.Range t → ℝ≥0∞) :
+    ⦃∑' a : spec.Range t,
+      Pr[= a | (query t : OracleComp spec (spec.Range t))] * post a a⦄
+      (query t : OracleComp spec (spec.Range t)) ≈ₑ
+      (query t : OracleComp spec (spec.Range t))
+    ⦃post⦄ := by
+  rvcstep
+
 /-! ## Iteration rules -/
 
 example {oa₁ oa₂ : OracleComp spec α} (n : ℕ)
     (h : ⟪oa₁ ~ oa₂ | EqRel α⟫) :
     ⟪oa₁.replicate n ~ oa₂.replicate n | EqRel (List α)⟫ := by
   rvcstep
-  exact h
 
 example {oa : OracleComp spec α} {ob : OracleComp spec β} (n : ℕ)
     {R : RelPost α β}
     (h : ⟪oa ~ ob | R⟫) :
     ⟪oa.replicate n ~ ob.replicate n | List.Forall₂ R⟫ := by
   rvcstep
-  exact h
 
 example {xs : List α} {f : α → OracleComp spec β} {g : α → OracleComp spec β}
     (hfg : ∀ a, ⟪f a ~ g a | EqRel β⟫) :
     ⟪xs.mapM f ~ xs.mapM g | EqRel (List β)⟫ := by
   rvcstep
-  exact hfg
 
 example {xs : List α} {ys : List β}
     {S : α → β → Prop}
@@ -102,9 +125,7 @@ example {xs : List α} {ys : List β}
     (hxy : List.Forall₂ S xs ys)
     (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
     ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
-  rvcstep using S
-  · exact hxy
-  · exact hfg
+  rvcstep
 
 example {σ₁ σ₂ : Type}
     {xs : List α}
@@ -116,8 +137,6 @@ example {σ₁ σ₂ : Type}
     (hfg : ∀ a t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ a | S⟫) :
     ⟪xs.foldlM f s₁ ~ xs.foldlM g s₂ | S⟫ := by
   rvcstep
-  · exact hs
-  · exact hfg
 
 example {σ₁ σ₂ : Type}
     {xs : List α} {ys : List β}
@@ -130,25 +149,30 @@ example {σ₁ σ₂ : Type}
     (hxy : List.Forall₂ Rin xs ys)
     (hfg : ∀ a b, Rin a b → ∀ t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ b | S⟫) :
     ⟪xs.foldlM f s₁ ~ ys.foldlM g s₂ | S⟫ := by
-  rvcstep using Rin
-  · exact hs
-  · exact hxy
-  · exact hfg
+  rvcstep
 
 /-! ## Pure / ite rules -/
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_pure_pure` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
 example (a : α) :
     ⟪(pure a : OracleComp spec α) ~ (pure a : OracleComp spec α) | EqRel α⟫ := by
   rvcstep
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_if` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
 example {c : Prop} [Decidable c]
     {oa₁ oa₂ ob₁ ob₂ : OracleComp spec α}
     (h1 : ⟪oa₁ ~ ob₁ | EqRel α⟫)
     (h2 : ⟪oa₂ ~ ob₂ | EqRel α⟫) :
     ⟪(if c then oa₁ else oa₂) ~ (if c then ob₁ else ob₂) | EqRel α⟫ := by
   rvcstep
-  · exact h1
-  · exact h2
 
 /-! ## Auto relational hint consumption -/
 
@@ -216,3 +240,104 @@ example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
   rvcstep
   · intro a₁ a₂ h; subst h; exact hf a₁
   · rvcstep
+
+/-! ## Quantitative `Std.Do'.RelTriple` path -/
+
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.Loom.relTriple_pure` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
+example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    ⦃post a b⦄
+      (pure a : OracleComp spec α) ≈ₑ (pure b : OracleComp spec β)
+    ⦃post⦄ := by
+  rvcstep
+
+example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    post a b ⊑
+      rwp⟦(pure a : OracleComp spec α) ~ (pure b : OracleComp spec β) |
+        post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ) (g : β → OracleComp spec δ)
+    (post : γ → δ → ℝ≥0∞) :
+    rwp⟦f a ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          f x)
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          g y)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcgen
+
+example [DecidableEq γ] [DecidableEq δ] (a : α) (b : β)
+    (f : α → γ) (g : β → δ)
+    (post : γ → δ → ℝ≥0∞) :
+    post (f a) (g b) ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          pure (f x))
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          pure (g y))
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcgen
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ)
+    (post : γ → β → ℝ≥0∞) :
+    rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          f x)
+        ~
+        (pure b : OracleComp spec β)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep left
+  rvcgen
+
+example (a : α) (b : β)
+    (g : β → OracleComp spec δ)
+    (post : α → δ → ℝ≥0∞) :
+    rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (pure a : OracleComp spec α)
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          g y)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep right
+  rvcgen
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ)
+    (post : γ → β → ℝ≥0∞) :
+    ⦃rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧⦄
+      (do
+        let x ← (pure a : OracleComp spec α)
+        f x) ≈ₑ (pure b : OracleComp spec β)
+    ⦃post⦄ := by
+  rvcstep left
+  rvcgen
+
+example (a : α) (b : β)
+    (g : β → OracleComp spec δ)
+    (post : α → δ → ℝ≥0∞) :
+    ⦃rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧⦄
+      (pure a : OracleComp spec α) ≈ₑ
+      (do
+        let y ← (pure b : OracleComp spec β)
+        g y)
+    ⦃post⦄ := by
+  rvcstep right
+  rvcgen
+

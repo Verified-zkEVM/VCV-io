@@ -56,7 +56,7 @@ namespace OracleComp.ProgramLogic.Relational.Loom
 variable {ι₁ ι₂ : Type u}
 variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
 variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
-variable {α β : Type}
+variable {α β γ δ : Type}
 
 /-- Quantitative `Std.Do'.RelWP` interpretation of pairs of `OracleComp`
 programs valued in `ℝ≥0∞`.
@@ -103,12 +103,116 @@ theorem rwp_eq_eRelWP
     Std.Do'.rwp oa ob post Lean.Order.bot Lean.Order.bot =
       OracleComp.ProgramLogic.Relational.eRelWP oa ob post := rfl
 
-/-- `Std.Do'.RelTriple` agrees with `eRelTriple` propositionally. -/
-theorem relTriple_iff_eRelTriple
+/-- `Std.Do'.RelTriple` agrees with the raw quantitative lower-bound form. -/
+theorem relTriple_iff_eRelWP_le
     (pre : ℝ≥0∞) (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (post : α → β → ℝ≥0∞) :
     Std.Do'.RelTriple pre oa ob post Lean.Order.bot Lean.Order.bot ↔
-      OracleComp.ProgramLogic.Relational.eRelTriple pre oa ob post :=
+      pre ≤ OracleComp.ProgramLogic.Relational.eRelWP oa ob post :=
   Iff.rfl
+
+/-! ## Quantitative `RelTriple` rules -/
+
+/-- Pure rule for the default quantitative `Std.Do'.RelTriple` carrier. -/
+theorem relTriple_pure (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    Std.Do'.RelTriple (post a b)
+      (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) post
+      Lean.Order.bot Lean.Order.bot := by
+  change post a b ≤
+    OracleComp.ProgramLogic.Relational.eRelWP
+      (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) post
+  exact OracleComp.ProgramLogic.Relational.eRelWP_pure_le
+    (spec₁ := spec₁) (spec₂ := spec₂) a b post
+
+/-- Consequence rule for the default quantitative `Std.Do'.RelTriple` carrier. -/
+theorem relTriple_conseq {pre pre' : ℝ≥0∞}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {post post' : α → β → ℝ≥0∞}
+    (hpre : pre' ≤ pre) (hpost : ∀ a b, post a b ≤ post' a b)
+    (h : Std.Do'.RelTriple pre oa ob post Lean.Order.bot Lean.Order.bot) :
+    Std.Do'.RelTriple pre' oa ob post' Lean.Order.bot Lean.Order.bot := by
+  change pre' ≤ OracleComp.ProgramLogic.Relational.eRelWP oa ob post'
+  exact OracleComp.ProgramLogic.Relational.eRelWP_conseq
+    (spec₁ := spec₁) (spec₂ := spec₂) hpre hpost h
+
+/-- Bind rule for the default quantitative `Std.Do'.RelTriple` carrier. -/
+theorem relTriple_bind
+    {pre : ℝ≥0∞}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
+    {cut : α → β → ℝ≥0∞} {post : γ → δ → ℝ≥0∞}
+    (hxy : Std.Do'.RelTriple pre oa ob cut Lean.Order.bot Lean.Order.bot)
+    (hfg : ∀ a b, Std.Do'.RelTriple (cut a b) (fa a) (fb b) post
+      Lean.Order.bot Lean.Order.bot) :
+    Std.Do'.RelTriple pre (oa >>= fa) (ob >>= fb) post
+      Lean.Order.bot Lean.Order.bot := by
+  change pre ≤ OracleComp.ProgramLogic.Relational.eRelWP (oa >>= fa) (ob >>= fb) post
+  exact OracleComp.ProgramLogic.Relational.eRelWP_bind_rule
+    (spec₁ := spec₁) (spec₂ := spec₂)
+    (pre := pre) (oa := oa) (ob := ob) (fa := fa) (fb := fb)
+    (cut := cut) (post := post) hxy hfg
+
+/-- Uniform sampling under a bijection for the default quantitative
+`Std.Do'.RelTriple` carrier. -/
+theorem relTriple_uniformSample_bij [SampleableType α]
+    {f : α → α} (hf : Function.Bijective f) (post : α → α → ℝ≥0∞)
+    {pre : ℝ≥0∞}
+    (hpre : pre ≤ ∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a (f a)) :
+    Std.Do'.RelTriple pre ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post
+      Lean.Order.bot Lean.Order.bot := by
+  change pre ≤ OracleComp.ProgramLogic.Relational.eRelWP
+    ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post
+  exact OracleComp.ProgramLogic.Relational.eRelWP_uniformSample_bij hf post hpre
+
+/-- Identity coupling for uniform sampling under the default quantitative
+`Std.Do'.RelTriple` carrier. -/
+theorem relTriple_uniformSample_refl [SampleableType α]
+    (post : α → α → ℝ≥0∞) :
+    Std.Do'.RelTriple
+      (∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a a)
+      ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post
+      Lean.Order.bot Lean.Order.bot := by
+  exact relTriple_uniformSample_bij Function.bijective_id post le_rfl
+
+/-- Oracle query under a bijection for the default quantitative
+`Std.Do'.RelTriple` carrier. -/
+theorem relTriple_query_bij (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    (hf : Function.Bijective f)
+    (post : spec₁.Range t → spec₁.Range t → ℝ≥0∞)
+    {pre : ℝ≥0∞}
+    (hpre : pre ≤ ∑' a : spec₁.Range t,
+        Pr[= a |
+          (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+            OracleComp spec₁ (spec₁.Range t))] * post a (f a)) :
+    Std.Do'.RelTriple pre
+      (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+        OracleComp spec₁ (spec₁.Range t))
+      (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+        OracleComp spec₁ (spec₁.Range t)) post
+      Lean.Order.bot Lean.Order.bot := by
+  change pre ≤ OracleComp.ProgramLogic.Relational.eRelWP
+    (spec₁ := spec₁) (spec₂ := spec₁)
+    (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+      OracleComp spec₁ (spec₁.Range t))
+    (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+      OracleComp spec₁ (spec₁.Range t)) post
+  exact OracleComp.ProgramLogic.Relational.eRelWP_query_bij t hf post hpre
+
+/-- Identity coupling for oracle queries under the default quantitative
+`Std.Do'.RelTriple` carrier. -/
+theorem relTriple_query_refl (t : spec₁.Domain)
+    (post : spec₁.Range t → spec₁.Range t → ℝ≥0∞) :
+    Std.Do'.RelTriple
+      (∑' a : spec₁.Range t,
+        Pr[= a |
+          (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+            OracleComp spec₁ (spec₁.Range t))] * post a a)
+      (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+        OracleComp spec₁ (spec₁.Range t))
+      (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+        OracleComp spec₁ (spec₁.Range t)) post
+      Lean.Order.bot Lean.Order.bot := by
+  exact relTriple_query_bij t Function.bijective_id post le_rfl
 
 end OracleComp.ProgramLogic.Relational.Loom

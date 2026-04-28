@@ -8,6 +8,7 @@ import Lean
 import Lean.Meta.Sym.Pattern
 import Lean.Meta.Sym.Simp.DiscrTree
 import Lean.Elab.Tactic.Do.Attr
+import ToMathlib.Control.Monad.RelWP
 import VCVio.ProgramLogic.Tactics.Common.SpecIR
 
 /-!
@@ -18,9 +19,9 @@ program-logic tactics.
 
 The registry indexes each registered theorem by the *computation* sub-expression
 of its conclusion: for unary triples / `wp` goals this is the `OracleComp` argument,
-and for relational triples / `RelWP` / `eRelTriple` goals this is the left-hand
-computation. A separate constant-name filter on the right-hand head keeps relational
-lookups precise without paying for two structural matches.
+and for relational triples / `RelWP` goals this is the left-hand computation. A separate
+constant-name filter on the right-hand head keeps relational lookups precise without
+paying for two structural matches.
 
 ## Implementation notes
 
@@ -157,6 +158,28 @@ initialize vcSpecRegistry :
     initial := {}
   }
 
+/-! ### `vcspec_simp` simp set
+
+Auxiliary simp set used internally by the unary and relational tactics for
+transformer-layer normalization (peeling `apply_wp`, running monadic `*.run`
+projections, normalizing lifts, and so on). Mirror of `Loom.Tactic.lspecSimpExt`.
+
+Users should write `@[vcspec]`; the attribute first tries to register the
+declaration as a spec theorem and on failure falls back to inserting it into
+`vcspec_simp`. This lets a single attribute handle both spec lemmas and the
+normalization rewrites needed to massage a goal into spec-applicable shape.
+
+This attribute is not intended to be used directly. -/
+initialize vcSpecSimpExt : Meta.SimpExtension ←
+  Meta.registerSimpAttr `vcspec_simp
+    "simp theorems internally used by VCVio program-logic tactics"
+
+/-- The accumulated simp set behind the `vcspec_simp` fallback layer of
+`@[vcspec]`. Used by `runVCSpecSimp` to normalize transformer-stack `wp` goals
+before spec dispatch. -/
+def getVCSpecSimpTheorems : CoreM Meta.SimpTheorems :=
+  vcSpecSimpExt.getTheorems
+
 /-! ### Preprocessed-body head matchers
 
 `Sym.preprocessType` aggressively unfolds reducible abbreviations (including our
@@ -175,15 +198,13 @@ private def unaryWpHeadNames : Array Name :=
   #[``OracleComp.ProgramLogic.wp, ``MAlgOrdered.wp, ``Std.Do'.wp]
 
 private def relTripleHeadNames : Array Name :=
-  #[``OracleComp.ProgramLogic.Relational.RelTriple, ``MAlgRelOrdered.Triple]
+  #[``OracleComp.ProgramLogic.Relational.RelTriple, ``MAlgRelOrdered.Triple, ``Std.Do'.RelTriple]
 
 private def relWpHeadNames : Array Name :=
   #[``OracleComp.ProgramLogic.Relational.RelWP,
     ``MAlgRelOrdered.RelWP,
-    ``MAlgRelOrdered.rwp]
-
-private def eRelTripleHeadNames : Array Name :=
-  #[``OracleComp.ProgramLogic.Relational.eRelTriple]
+    ``MAlgRelOrdered.rwp,
+    ``Std.Do'.rwp]
 
 /-- Head check that tolerates varying numbers of implicit / instance arguments.
 Each `@[vcspec]` target has a fixed number of *explicit* trailing arguments
@@ -236,16 +257,19 @@ private def wpBodyParts? (body : Expr) : Option (Expr × Expr) := do
 unfolded `MAlgOrdered.wp` head under `≤`. Returns `(pre, oa, post)`. -/
 private def rawWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   let body := body.consumeMData
-  unless body.isAppOfArity ``LE.le 4 do none
+  unless body.isAppOfArity ``LE.le 4 || body.isAppOfArity ``Lean.Order.PartialOrder.rel 4 do
+    none
   let pre := body.getArg! 2
   let rhs := body.getArg! 3
   let (oa, post) ← wpBodyParts? rhs
   some (pre, oa, post)
 
 /-- Preprocessed-body variant of `relTripleGoalParts?` that also matches the
-unfolded `MAlgRelOrdered.Triple` head. The folded `RelTriple` has three
-explicit trailing args `(oa, ob, post)`; the unfolded `MAlgRelOrdered.Triple`
-has four `(pre, oa, ob, post)`. Returns `(oa, ob, post)` in both cases. -/
+unfolded `MAlgRelOrdered.Triple` head and Loom2's `Std.Do'.RelTriple`.
+The folded `RelTriple` has three explicit trailing args `(oa, ob, post)`;
+the unfolded `MAlgRelOrdered.Triple` has four `(pre, oa, ob, post)`;
+`Std.Do'.RelTriple` has six `(pre, oa, ob, post, epost₁, epost₂)`.
+Returns `(oa, ob, post)` in all cases. -/
 private def relTripleBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   let body := body.consumeMData
   let fn := body.getAppFn
@@ -257,6 +281,10 @@ private def relTripleBodyParts? (body : Expr) : Option (Expr × Expr × Expr) :=
     let args ← trailingArgsN? body 4
     let #[_pre, oa, ob, post] := args | none
     some (oa, ob, post)
+  else if fn.isConstOf ``Std.Do'.RelTriple then
+    let args ← trailingArgsN? body 6
+    let #[_pre, oa, ob, post, _epost₁, _epost₂] := args | none
+    some (oa, ob, post)
   else
     none
 
@@ -265,18 +293,24 @@ unfolded `MAlgRelOrdered.rwp` head. Returns `(oa, ob, post)`. -/
 private def relWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   let body := body.consumeMData
   unless headIsOneOf body relWpHeadNames do none
-  let args ← trailingArgsN? body 3
-  let #[oa, ob, post] := args | none
-  some (oa, ob, post)
+  let n := if body.getAppFn.isConstOf ``Std.Do'.rwp then 5 else 3
+  let args ← trailingArgsN? body n
+  if n == 5 then
+    let #[oa, ob, post, _epost₁, _epost₂] := args | none
+    some (oa, ob, post)
+  else
+    let #[oa, ob, post] := args | none
+    some (oa, ob, post)
 
-/-- Preprocessed-body variant of `eRelTripleGoalParts?`. Returns
-`(pre, oa, ob, post)`. `eRelTriple` is a `def` rather than an `abbrev`, so its
-name is preserved through `Sym.preprocessType`. -/
-private def eRelTripleBodyParts? (body : Expr) : Option (Expr × Expr × Expr × Expr) := do
+/-- Preprocessed-body variant of a raw relational WP goal under `≤` / `⊑`.
+Returns `(pre, oa, ob, post)`. -/
+private def rawRelWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr × Expr) := do
   let body := body.consumeMData
-  unless headIsOneOf body eRelTripleHeadNames do none
-  let args ← trailingArgsN? body 4
-  let #[pre, oa, ob, post] := args | none
+  unless body.isAppOfArity ``LE.le 4 || body.isAppOfArity ``Lean.Order.PartialOrder.rel 4 do
+    none
+  let pre := body.getArg! 2
+  let rhs := body.getArg! 3
+  let (oa, ob, post) ← relWpBodyParts? rhs
   some (pre, oa, ob, post)
 
 /-- Selector fed to `Sym.mkPatternFromDeclWithKey`. Given the preprocessed body
@@ -331,10 +365,10 @@ private def selectVCSpecKey (body : Expr) :
       compPattern := classifyRelationalCompPattern oa ob
     }
     return (oa, spec, some rightHead)
-  if let some (_pre, oa, ob, _post) := eRelTripleBodyParts? body then
+  if let some (_pre, oa, ob, _post) := rawRelWpBodyParts? body then
     let (leftHead, rightHead) ← relationalHeads oa ob
     let spec : NormalizedVCSpec := {
-      kind := .eRelTriple
+      kind := .relWP
       lookupKey := .relational leftHead rightHead
       compPattern := classifyRelationalCompPattern oa ob
     }
@@ -345,7 +379,6 @@ private def selectVCSpecKey (body : Expr) :
     - a unary raw `wp` goal\n\
     - a relational `RelTriple`\n\
     - a relational raw `RelWP`\n\
-    - an `eRelTriple`\n\
     got:{indentExpr body}"
 where
   /-- Extract the head constant of a preprocessed computation expression,
@@ -380,11 +413,27 @@ private def buildVCSpecEntry (decl : Name) (priority : Nat) : MetaM VCSpecEntry 
 
 initialize registerBuiltinAttribute {
   name := `vcspec
-  descr := "Register a unary or relational program-logic theorem for vcgen/rvcgen lookup."
+  descr := "Register a unary or relational program-logic theorem for vcgen/rvcgen \
+    lookup, or a normalization simp lemma for the internal `vcspec_simp` set."
+  applicationTime := AttributeApplicationTime.afterCompilation
   add := fun decl stx kind => MetaM.run' do
     let prio ← getAttrParamOptPrio stx[1]
-    let entry ← buildVCSpecEntry decl prio
-    vcSpecRegistry.add entry kind
+    try
+      let entry ← buildVCSpecEntry decl prio
+      vcSpecRegistry.add entry kind
+    catch specErr =>
+      let env ← getEnv
+      match getAttributeImpl env `vcspec_simp with
+      | .error _ => throw specErr
+      | .ok impl =>
+          try
+            let newStx ← `(attr| vcspec_simp)
+            let newStx := newStx.raw.setArg 3 stx[1]
+            impl.add decl newStx kind
+          catch simpErr =>
+            throwError "@[vcspec] failed to register `{decl}`:\n\
+              - as a spec theorem: {specErr.toMessageData}\n\
+              - as a `vcspec_simp` lemma: {simpErr.toMessageData}"
 }
 
 private def headOfWhnf (e : Expr) : MetaM (Option Name) := do
@@ -394,6 +443,16 @@ private def headOfWhnf (e : Expr) : MetaM (Option Name) := do
 def getRegisteredUnaryVCSpecEntries (comp : Expr) : MetaM (Array VCSpecEntry) := do
   let comp ← instantiateMVars comp
   let comp ← whnfReducible comp
+  let registry := vcSpecRegistry.getState (← getEnv)
+  return Lean.Meta.Sym.getMatch registry.unary comp
+
+/-- Retrieve unary `@[vcspec]` entries without reducible `whnf` on the computation.
+
+This is only for raw `wp` structural dispatch, where the syntactic head is already
+the surface we want to step and reducing zero/nil iterator terms can unfold into
+larger monadic expressions. -/
+def getRegisteredUnaryVCSpecEntriesNoWhnf (comp : Expr) : MetaM (Array VCSpecEntry) := do
+  let comp ← instantiateMVars comp
   let registry := vcSpecRegistry.getState (← getEnv)
   return Lean.Meta.Sym.getMatch registry.unary comp
 
