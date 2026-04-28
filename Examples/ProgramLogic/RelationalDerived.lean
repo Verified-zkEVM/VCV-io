@@ -57,8 +57,8 @@ example (oa : OracleComp spec α) :
 
 @[local vcspec] theorem relTriple_wrappedTruePair :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
-  simpa [wrappedTrueLeft, wrappedTrueRight] using
-    (relTriple_refl (pure true : OracleComp spec Bool))
+  unfold wrappedTrueLeft wrappedTrueRight
+  rvcstep
 
 example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
@@ -73,8 +73,8 @@ example :
 
 @[local vcspec] theorem relTriple_wrappedAuxPairStep (_haux : True) :
     ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | EqRel Bool⟫ := by
-  simpa [wrappedAuxLeft, wrappedAuxRight] using
-    (relTriple_refl (pure true : OracleComp spec Bool))
+  unfold wrappedAuxLeft wrappedAuxRight
+  rvcstep
 
 example :
     ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | EqRel Bool⟫ := by
@@ -88,12 +88,8 @@ example :
     (1 : ℝ≥0∞) ⊑
       rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
         (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
-  simpa [wrappedTrueLeft, wrappedTrueRight] using
-    (Std.Do'.RelWP.rwp_pure
-      (m₁ := OracleComp spec) (m₂ := OracleComp spec)
-      (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-      true true (fun x y => if x = y then (1 : ℝ≥0∞) else 0)
-      epost⟨⟩ epost⟨⟩)
+  unfold wrappedTrueLeft wrappedTrueRight
+  rvcstep
 
 example :
     (1 : ℝ≥0∞) ⊑
@@ -108,12 +104,8 @@ example :
     (1 : ℝ≥0∞) ⊑
       rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
         (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
-  simpa [rawAuxLeft, rawAuxRight] using
-    (Std.Do'.RelWP.rwp_pure
-      (m₁ := OracleComp spec) (m₂ := OracleComp spec)
-      (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-      true true (fun x y => if x = y then (1 : ℝ≥0∞) else 0)
-      epost⟨⟩ epost⟨⟩)
+  unfold rawAuxLeft rawAuxRight
+  rvcstep
 
 example :
     (1 : ℝ≥0∞) ⊑
