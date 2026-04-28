@@ -345,4 +345,152 @@ theorem withCachingTrackingPolicy_run'_eq
       (simulateQ so.withCaching oa).run' cache :=
   withCachingTrackingPolicy_run'_eq' so policy oa cache bad
 
+/-! ### Forward query bounds for `withCachingTrackingPolicy`
+
+The bad-flag overlay projects away to `withCaching` (via `withCachingTrackingPolicy_run_proj_eq'`)
+and makes no underlying queries, so the `withCaching` bounds transfer directly. -/
+
+theorem isTotalQueryBound_run_simulateQ_withCachingTrackingPolicy
+    {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound oa n)
+    (hstep : ∀ t, OracleComp.IsTotalQueryBound (so t) 1)
+    (cache : spec.QueryCache) (bad : Bool) :
+    OracleComp.IsTotalQueryBound
+      ((simulateQ (so.withCachingTrackingPolicy policy) oa).run (cache, bad)) n :=
+  (OracleComp.isQueryBound_iff_of_map_eq
+      (withCachingTrackingPolicy_run_proj_eq' so policy oa cache bad) _ _).mpr
+    (OracleComp.IsTotalQueryBound.simulateQ_run_withCaching
+      (spec := spec) (spec' := spec') so h hstep cache)
+
+theorem isQueryBoundP_run_simulateQ_withCachingTrackingPolicy
+    {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
+    {oa : OracleComp spec α}
+    {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP oa p n)
+    (hstep_p : ∀ t, p t → OracleComp.IsQueryBoundP (so t) q 1)
+    (hstep_np : ∀ t, ¬ p t → OracleComp.IsQueryBoundP (so t) q 0)
+    (cache : spec.QueryCache) (bad : Bool) :
+    OracleComp.IsQueryBoundP
+      ((simulateQ (so.withCachingTrackingPolicy policy) oa).run (cache, bad)) q n :=
+  (OracleComp.isQueryBoundP_iff_of_map_eq
+      (withCachingTrackingPolicy_run_proj_eq' so policy oa cache bad)).mpr
+    (OracleComp.IsQueryBoundP.simulateQ_run_withCaching so h hstep_p hstep_np cache)
+
+theorem isPerIndexQueryBound_run_simulateQ_withCachingTrackingPolicy
+    {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
+    (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound oa qb)
+    (hstep : ∀ t, OracleComp.IsPerIndexQueryBound (so t) (Function.update 0 t 1))
+    (cache : spec.QueryCache) (bad : Bool) :
+    OracleComp.IsPerIndexQueryBound
+      ((simulateQ (so.withCachingTrackingPolicy policy) oa).run (cache, bad)) qb :=
+  (OracleComp.isPerIndexQueryBound_iff_of_map_eq
+      (withCachingTrackingPolicy_run_proj_eq' so policy oa cache bad)).mpr
+    (OracleComp.IsPerIndexQueryBound.simulateQ_run_withCaching so h hstep cache)
+
+/-! ### Forward query bounds for `withProgramming`
+
+A wrapped step makes ≤ 1 underlying query (zero on a cache hit or programmed value, one on
+a true miss). Unlike `withCachingTrackingPolicy`, the policy can short-circuit on cache
+miss, so the proof case-splits on cache × policy rather than reusing the `withCaching`
+projection. -/
+
+section WithProgrammingBounds
+
+variable {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+
+private lemma isTotalQueryBound_run_withProgramming
+    (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
+    (t : spec.Domain) {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound (so t) n) (s : spec.QueryCache × Bool) :
+    OracleComp.IsTotalQueryBound ((so.withProgramming policy t).run s) n := by
+  rw [QueryImpl.withProgramming_apply]
+  obtain ⟨cache, bad⟩ := s
+  simp only [StateT.run_mk]
+  cases hcache : cache t with
+  | some v => trivial
+  | none =>
+      cases hpol : policy t with
+      | some v => exact (OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr trivial
+      | none =>
+          exact (OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr
+            ((OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr h)
+
+private lemma isQueryBoundP_run_withProgramming
+    (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
+    (t : spec.Domain) {q : ι' → Prop} [DecidablePred q] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP (so t) q n) (s : spec.QueryCache × Bool) :
+    OracleComp.IsQueryBoundP ((so.withProgramming policy t).run s) q n := by
+  rw [QueryImpl.withProgramming_apply]
+  obtain ⟨cache, bad⟩ := s
+  simp only [StateT.run_mk]
+  cases hcache : cache t with
+  | some v => trivial
+  | none =>
+      cases hpol : policy t with
+      | some v => exact (OracleComp.isQueryBoundP_map_iff (p := q) _ _ _).mpr trivial
+      | none =>
+          exact (OracleComp.isQueryBoundP_map_iff (p := q) _ _ _).mpr
+            ((OracleComp.isQueryBoundP_map_iff (p := q) _ _ _).mpr h)
+
+private lemma isPerIndexQueryBound_run_withProgramming
+    (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
+    (t : spec.Domain) {qb : ι → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound (so t) qb) (s : spec.QueryCache × Bool) :
+    OracleComp.IsPerIndexQueryBound ((so.withProgramming policy t).run s) qb := by
+  rw [QueryImpl.withProgramming_apply]
+  obtain ⟨cache, bad⟩ := s
+  simp only [StateT.run_mk]
+  cases hcache : cache t with
+  | some v => trivial
+  | none =>
+      cases hpol : policy t with
+      | some v => exact (OracleComp.isPerIndexQueryBound_map_iff _ _ _).mpr trivial
+      | none =>
+          exact (OracleComp.isPerIndexQueryBound_map_iff _ _ _).mpr
+            ((OracleComp.isPerIndexQueryBound_map_iff _ _ _).mpr h)
+
+theorem isTotalQueryBound_run_simulateQ_withProgramming
+    (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound oa n)
+    (hstep : ∀ t, OracleComp.IsTotalQueryBound (so t) 1)
+    (cache : spec.QueryCache) (bad : Bool) :
+    OracleComp.IsTotalQueryBound
+      ((simulateQ (so.withProgramming policy) oa).run (cache, bad)) n :=
+  OracleComp.IsTotalQueryBound.simulateQ_run_of_step h
+    (fun t s => isTotalQueryBound_run_withProgramming so policy t (hstep t) s) (cache, bad)
+
+theorem isQueryBoundP_run_simulateQ_withProgramming
+    (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
+    {oa : OracleComp spec α}
+    {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP oa p n)
+    (hstep_p : ∀ t, p t → OracleComp.IsQueryBoundP (so t) q 1)
+    (hstep_np : ∀ t, ¬ p t → OracleComp.IsQueryBoundP (so t) q 0)
+    (cache : spec.QueryCache) (bad : Bool) :
+    OracleComp.IsQueryBoundP
+      ((simulateQ (so.withProgramming policy) oa).run (cache, bad)) q n :=
+  OracleComp.IsQueryBoundP.simulateQ_run_of_step h
+    (fun t hp s => isQueryBoundP_run_withProgramming so policy t (hstep_p t hp) s)
+    (fun t hnp s => isQueryBoundP_run_withProgramming so policy t (hstep_np t hnp) s)
+    (cache, bad)
+
+theorem isPerIndexQueryBound_run_simulateQ_withProgramming
+    (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound oa qb)
+    (hstep : ∀ t, OracleComp.IsPerIndexQueryBound (so t) (Function.update 0 t 1))
+    (cache : spec.QueryCache) (bad : Bool) :
+    OracleComp.IsPerIndexQueryBound
+      ((simulateQ (so.withProgramming policy) oa).run (cache, bad)) qb :=
+  OracleComp.IsPerIndexQueryBound.simulateQ_run_of_uniform_step h
+    (fun t s => isPerIndexQueryBound_run_withProgramming so policy t (hstep t) s) (cache, bad)
+
+end WithProgrammingBounds
+
 end OracleComp.ProgramLogic.Relational

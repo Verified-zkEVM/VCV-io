@@ -52,6 +52,7 @@ import ToMathlib.ITree.Sim.Defs
 import ToMathlib.ITree.Sim.Facts
 import ToMathlib.OrderEnrichedCategory
 import ToMathlib.PFunctor.Basic
+import ToMathlib.PFunctor.Bound
 import ToMathlib.PFunctor.Category
 import ToMathlib.PFunctor.Chart.Basic
 import ToMathlib.PFunctor.Cofree

@@ -50,7 +50,112 @@ lemma withPregen_apply (so : QueryImpl spec m) (t : spec.Domain) :
       | u :: us => pure (u, Function.update seed t us)
       | [] => (·, seed) <$> so t := rfl
 
+/-- Seed-hit: `withPregen` returns the head of the seed list without invoking `so`. -/
+lemma withPregen_run_cons (so : QueryImpl spec m) {t : spec.Domain}
+    {seed : QuerySeed spec} {u : spec.Range t} {us : List (spec.Range t)}
+    (h : seed t = u :: us) :
+    (so.withPregen t).run seed = pure (u, Function.update seed t us) := by
+  rw [withPregen_apply, StateT.run_mk, h]; rfl
+
+/-- Seed-miss: `withPregen` falls back to a single call of `so`, threading the seed unchanged. -/
+lemma withPregen_run_nil (so : QueryImpl spec m) {t : spec.Domain}
+    {seed : QuerySeed spec} (h : seed t = []) :
+    (so.withPregen t).run seed = (·, seed) <$> so t := by
+  rw [withPregen_apply, StateT.run_mk, h]
+
+/-! ## Forward query bounds for `withPregen`
+
+A wrapped step makes ≤ 1 underlying query (zero on a seed-hit, one on a seed-miss), so any
+bound on `so t` transfers to `(so.withPregen t).run seed`. -/
+
+section QueryBound
+
+variable {ι' : Type u} {spec' : OracleSpec ι'}
+
+lemma isQueryBoundP_run_withPregen
+    (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain)
+    {p : ι' → Prop} [DecidablePred p] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP (so t) p n) (seed : QuerySeed spec) :
+    OracleComp.IsQueryBoundP ((so.withPregen t).run seed) p n := by
+  cases hseed : seed t with
+  | nil =>
+      rw [withPregen_run_nil _ hseed]
+      exact (OracleComp.isQueryBoundP_map_iff (p := p) _ _ _).mpr h
+  | cons u us =>
+      rw [withPregen_run_cons _ hseed]
+      trivial
+
+lemma isTotalQueryBound_run_withPregen
+    (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain) {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound (so t) n) (seed : QuerySeed spec) :
+    OracleComp.IsTotalQueryBound ((so.withPregen t).run seed) n := by
+  cases hseed : seed t with
+  | nil =>
+      rw [withPregen_run_nil _ hseed]
+      exact (OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr h
+  | cons u us =>
+      rw [withPregen_run_cons _ hseed]
+      trivial
+
+lemma isPerIndexQueryBound_run_withPregen
+    (so : QueryImpl spec (OracleComp spec)) (t : spec.Domain) {qb : ι → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound (so t) qb) (seed : QuerySeed spec) :
+    OracleComp.IsPerIndexQueryBound ((so.withPregen t).run seed) qb := by
+  cases hseed : seed t with
+  | nil =>
+      rw [withPregen_run_nil _ hseed]
+      exact (OracleComp.isPerIndexQueryBound_map_iff _ _ _).mpr h
+  | cons u us =>
+      rw [withPregen_run_cons _ hseed]
+      trivial
+
+end QueryBound
+
 end QueryImpl
+
+/-! ### Parametric `simulateQ` lifts for `withPregen` -/
+
+namespace OracleComp
+
+variable {ι' : Type u} {spec' : OracleSpec ι'} {α : Type u}
+
+theorem IsQueryBoundP.simulateQ_run_withPregen
+    {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
+    (so : QueryImpl spec (OracleComp spec'))
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : IsQueryBoundP oa p n)
+    (hstep_p : ∀ t, p t → IsQueryBoundP (so t) q 1)
+    (hstep_np : ∀ t, ¬ p t → IsQueryBoundP (so t) q 0)
+    (seed : QuerySeed spec) :
+    IsQueryBoundP ((simulateQ so.withPregen oa).run seed) q n :=
+  IsQueryBoundP.simulateQ_run_of_step h
+    (fun t hp s' => QueryImpl.isQueryBoundP_run_withPregen so t (hstep_p t hp) s')
+    (fun t hnp s' => QueryImpl.isQueryBoundP_run_withPregen so t (hstep_np t hnp) s')
+    seed
+
+theorem IsTotalQueryBound.simulateQ_run_withPregen
+    (so : QueryImpl spec (OracleComp spec))
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : IsTotalQueryBound oa n)
+    (hstep : ∀ t, IsTotalQueryBound (so t) 1)
+    (seed : QuerySeed spec) :
+    IsTotalQueryBound ((simulateQ so.withPregen oa).run seed) n :=
+  IsTotalQueryBound.simulateQ_run_of_step h
+    (fun t s' => QueryImpl.isTotalQueryBound_run_withPregen so t (hstep t) s')
+    seed
+
+theorem IsPerIndexQueryBound.simulateQ_run_withPregen
+    (so : QueryImpl spec (OracleComp spec))
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb)
+    (hstep : ∀ t, IsPerIndexQueryBound (so t) (Function.update 0 t 1))
+    (seed : QuerySeed spec) :
+    IsPerIndexQueryBound ((simulateQ so.withPregen oa).run seed) qb :=
+  IsPerIndexQueryBound.simulateQ_run_of_uniform_step h
+    (fun t s' => QueryImpl.isPerIndexQueryBound_run_withPregen so t (hstep t) s')
+    seed
+
+end OracleComp
 
 /-- Use pregenerated oracle responses for queries, falling back to the real oracle
 when the seed is exhausted. Seed consumption is tracked via `StateT`. -/
@@ -59,6 +164,22 @@ def OracleSpec.seededOracle :
   (QueryImpl.ofLift spec (OracleComp spec)).withPregen
 
 namespace seededOracle
+
+/-- Definitional unfold of `seededOracle` as the pregen handler over the lifting handler. -/
+lemma eq_withPregen :
+    (spec.seededOracle : QueryImpl spec (StateT (QuerySeed spec) (OracleComp spec))) =
+      (QueryImpl.ofLift spec (OracleComp spec)).withPregen := rfl
+
+/-- Seed-hit: `seededOracle t` returns the head of the seed list with no underlying query. -/
+lemma run_cons {t : spec.Domain} {seed : QuerySeed spec} {u : spec.Range t}
+    {us : List (spec.Range t)} (h : seed t = u :: us) :
+    (seededOracle t).run seed = pure (u, Function.update seed t us) :=
+  QueryImpl.withPregen_run_cons _ h
+
+/-- Seed-miss: `seededOracle t` falls back to a single underlying `query t`. -/
+lemma run_nil {t : spec.Domain} {seed : QuerySeed spec} (h : seed t = []) :
+    (seededOracle t).run seed = (·, seed) <$> (liftM (query t) : OracleComp spec _) := by
+  rw [eq_withPregen, QueryImpl.withPregen_run_nil _ h, QueryImpl.ofLift_apply]
 
 /-- The probability that a lifted uniform sample equals a fixed value is `(card α)⁻¹`. -/
 lemma probEvent_liftComp_uniformSample_eq_of_eq
@@ -1046,5 +1167,64 @@ theorem isPerIndexQueryBound_run'_takeAtIndex_addValue
   · simp [QuerySeed.addValue, QuerySeed.addValues, ht, hcover t]
 
 end queryBounds
+
+/-! ### Forward query bounds for `seededOracle`
+
+Forward only — the reverse fails because pregenerated values strictly reduce the count. -/
+
+theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    {α : Type} {oa : OracleComp spec₀ α} {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound oa n) (seed : QuerySeed spec₀) :
+    OracleComp.IsTotalQueryBound ((simulateQ spec₀.seededOracle oa).run seed) n := by
+  rw [eq_withPregen]
+  exact OracleComp.IsTotalQueryBound.simulateQ_run_withPregen _ h
+    (fun t => (OracleComp.isQueryBound_query_iff t 1 _ _).mpr Nat.one_pos) seed
+
+theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    {α : Type} {oa : OracleComp spec₀ α}
+    {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP oa p n) (seed : QuerySeed spec₀) :
+    OracleComp.IsQueryBoundP ((simulateQ spec₀.seededOracle oa).run seed) p n := by
+  rw [eq_withPregen]
+  exact OracleComp.IsQueryBoundP.simulateQ_run_withPregen _ h
+    (fun t _ => (OracleComp.isQueryBoundP_query_iff p t 1).mpr (fun _ => Nat.one_pos))
+    (fun t hnp => (OracleComp.isQueryBoundP_query_iff p t 0).mpr (fun hpt => absurd hpt hnp))
+    seed
+
+theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    {α : Type} {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound oa qb) (seed : QuerySeed spec₀) :
+    OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.seededOracle oa).run seed) qb := by
+  rw [eq_withPregen]
+  refine OracleComp.IsPerIndexQueryBound.simulateQ_run_withPregen _ h ?_ seed
+  intro t
+  rw [QueryImpl.ofLift_apply]
+  exact (OracleComp.isPerIndexQueryBound_query_iff t (Function.update 0 t 1)).mpr (by
+    simp [Function.update_self])
+
+/-- State-preserving variant of `isPerIndexQueryBound_run'_zero`: when the seed covers `qb`
+at every index, the simulation makes zero further queries even with the seed in scope. -/
+theorem isPerIndexQueryBound_run_simulateQ_zero
+    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} {α : Type}
+    {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ} {seed : QuerySeed spec₀}
+    (hqb : OracleComp.IsPerIndexQueryBound oa qb)
+    (hseed : ∀ t, qb t ≤ (seed t).length) :
+    OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.seededOracle oa).run seed) 0 := by
+  have h := isPerIndexQueryBound_run'_zero (oa := oa) (qb := qb) (seed := seed) hqb hseed
+  rw [StateT.run'] at h
+  exact (OracleComp.isPerIndexQueryBound_map_iff _ Prod.fst 0).mp h
+
+/-- State-preserving variant of `isPerIndexQueryBound_run'_of_seedCoverage`: any uncovered
+suffix of the seed becomes the residual budget in the result spec. -/
+theorem isPerIndexQueryBound_run_simulateQ_of_seedCoverage
+    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} {α : Type}
+    {oa : OracleComp spec₀ α} {qb residual : ι₀ → ℕ} {seed : QuerySeed spec₀}
+    (hqb : OracleComp.IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t - residual t ≤ (seed t).length) :
+    OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.seededOracle oa).run seed) residual := by
+  have h := isPerIndexQueryBound_run'_of_seedCoverage (oa := oa) (qb := qb)
+    (residual := residual) (seed := seed) hqb hcover
+  rw [StateT.run'] at h
+  exact (OracleComp.isPerIndexQueryBound_map_iff _ Prod.fst residual).mp h
 
 end seededOracle
