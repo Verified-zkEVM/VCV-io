@@ -127,9 +127,10 @@ private def idMatrix (row col : Fin ringDegree) : Coeff :=
 -- 2. a more algebraic NTT correctness development showing the loop kernels implement the
 --    canonical transform and deriving inversion abstractly.
 --
--- Both are larger refactors than the current warning-cleanup pass, so we leave this as an
--- explicit deferred follow-up rather than papering over it with linter suppression.
+-- Both are larger refactors than a small warning-cleanup pass. Until then, we scope off
+-- Mathlib's `nativeDecide` style linter for these two certificate lemmas only.
 set_option maxHeartbeats 800000 in
+set_option linter.style.nativeDecide false in
 -- The concrete matrix certificate currently needs a larger heartbeat budget.
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
@@ -139,6 +140,7 @@ private theorem invNTTMatrix_nttMatrix_entry :
 -- The reverse composition carries the same concrete matrix-expansion cost and the same
 -- deferred-certificate status as `invNTTMatrix_nttMatrix_entry` above.
 set_option maxHeartbeats 800000 in
+set_option linter.style.nativeDecide false in
 -- The reverse certificate has the same concrete reduction cost.
 private theorem nttMatrix_invNTTMatrix_entry :
     ∀ row col : Fin ringDegree,
