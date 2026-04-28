@@ -346,7 +346,7 @@ theorem esIdeal_eq_half
     let y ← ($ᵗ F)
     let h ← ($ᵗ M)
     adv.distinguish st (y • g, h + if b then m₁ else m₂)
-  have hf : ∀ hk, evalDist (f hk true) = evalDist (f hk false) := by
+  have hf : ∀ hk, 𝒟[f hk true] = 𝒟[f hk false] := by
     intro hk
     unfold f
     rw [evalDist_bind, evalDist_bind]

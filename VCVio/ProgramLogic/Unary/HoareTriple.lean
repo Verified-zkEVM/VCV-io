@@ -547,22 +547,22 @@ theorem triple_list_mapM {I : ℝ≥0∞}
     Triple pre (l.mapM f) post :=
   triple_conseq hpre hpost (triple_list_mapM_inv hstep)
 
-/-! ## Congruence under evalDist equality -/
+/-! ## Congruence under `evalDist` equality -/
 
 lemma probOutput_congr_evalDist {oa ob : OracleComp spec α}
-    (h : evalDist oa = evalDist ob) (x : α) :
+    (h : 𝒟[oa] = 𝒟[ob]) (x : α) :
     Pr[= x | oa] = Pr[= x | ob] := by
-  change evalDist oa x = evalDist ob x
+  change 𝒟[oa] x = 𝒟[ob] x
   rw [h]
 
 lemma μ_congr_evalDist {oa ob : OracleComp spec ℝ≥0∞}
-    (h : evalDist oa = evalDist ob) :
+    (h : 𝒟[oa] = 𝒟[ob]) :
     μ oa = μ ob := by
   unfold μ
   exact tsum_congr fun x => by rw [probOutput_congr_evalDist h]
 
 lemma wp_congr_evalDist {oa ob : OracleComp spec α}
-    (h : evalDist oa = evalDist ob) (post : α → ℝ≥0∞) :
+    (h : 𝒟[oa] = 𝒟[ob]) (post : α → ℝ≥0∞) :
     wp oa post = wp ob post := by
   change μ (oa >>= fun a => pure (post a)) = μ (ob >>= fun a => pure (post a))
   exact μ_congr_evalDist (by simp [h])
@@ -570,11 +570,11 @@ lemma wp_congr_evalDist {oa ob : OracleComp spec α}
 lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
     [spec'.Fintype] [spec'.Inhabited]
     {oa : OracleComp spec' ℝ≥0∞} {ob : OracleComp spec ℝ≥0∞}
-    (h : evalDist oa = evalDist ob) :
+    (h : 𝒟[oa] = 𝒟[ob]) :
     @μ _ spec' _ _ oa = μ ob := by
   simp only [μ]
   exact tsum_congr fun x => by
-    change evalDist oa x * x = evalDist ob x * x
+    change 𝒟[oa] x * x = 𝒟[ob] x * x
     rw [h]
 
 end OracleComp.ProgramLogic

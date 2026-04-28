@@ -62,7 +62,7 @@ every query falls through to fresh uniform sampling with no state change.
 This is a faithful simulation (preserves `evalDist`). -/
 theorem evalDist_simulateQ_run'_empty [spec₀.Fintype] [spec₀.Inhabited]
     {α : Type} (oa : OracleComp spec₀ α) :
-    evalDist ((simulateQ (eagerRandomOracle (spec := spec₀)) oa).run' ∅) = evalDist oa := by
+    𝒟[(simulateQ (eagerRandomOracle (spec := spec₀)) oa).run' ∅] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure a => simp [simulateQ_pure, evalDist_pure]
   | query_bind t f ih =>
@@ -136,9 +136,9 @@ theorem eagerRandomOracle_evalDist_generateSeed_bind {ι₀ : Type} [DecidableEq
     [spec₀.Fintype] [spec₀.Inhabited]
     {α : Type} (oa : OracleComp spec₀ α)
     (qc : ι₀ → ℕ) (js : List ι₀) :
-    evalDist (do
+    𝒟[do
       let seed ← generateSeed spec₀ qc js
-      (simulateQ (eagerRandomOracle (spec := spec₀)) oa).run' seed) = evalDist oa := by
+      (simulateQ (eagerRandomOracle (spec := spec₀)) oa).run' seed] = 𝒟[oa] := by
   classical
   revert qc js
   induction oa using OracleComp.inductionOn with

@@ -121,8 +121,8 @@ lemma run_simulateQ_withTraceBefore_const_one [LawfulMonad m]
 
 lemma evalDist_fst_run_withTraceBefore [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    evalDist (Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run) =
-      evalDist (simulateQ so mx) :=
+    𝒟[Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run] =
+      𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTraceBefore so traceFn mx)
 
 lemma probOutput_fst_run_withTraceBefore [LawfulMonad m] [HasEvalSPMF m]
@@ -201,8 +201,8 @@ lemma run_simulateQ_withTrace_const_one [LawfulMonad m]
 lemma evalDist_fst_run_withTrace [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
-    evalDist (Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run) =
-      evalDist (simulateQ so mx) :=
+    𝒟[Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run] =
+      𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTrace so traceFn mx)
 
 lemma probOutput_fst_run_withTrace [LawfulMonad m] [HasEvalSPMF m]
@@ -269,8 +269,8 @@ lemma NeverFail_run_simulateQ_withTraceAppendBefore_iff [LawfulMonad m]
 
 lemma evalDist_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [HasEvalSPMF m]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    evalDist (Prod.fst <$> (simulateQ (so.withTraceAppendBefore traceFn) mx).run) =
-      evalDist (simulateQ so mx) :=
+    𝒟[Prod.fst <$> (simulateQ (so.withTraceAppendBefore traceFn) mx).run] =
+      𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTraceAppendBefore so traceFn mx)
 
 lemma probOutput_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [HasEvalSPMF m]
@@ -338,8 +338,8 @@ lemma NeverFail_run_simulateQ_withTraceAppend_iff [LawfulMonad m]
 lemma evalDist_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [HasEvalSPMF m]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
-    evalDist (Prod.fst <$> (simulateQ (so.withTraceAppend traceFn) mx).run) =
-      evalDist (simulateQ so mx) :=
+    𝒟[Prod.fst <$> (simulateQ (so.withTraceAppend traceFn) mx).run] =
+      𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTraceAppend so traceFn mx)
 
 lemma probOutput_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [HasEvalSPMF m]

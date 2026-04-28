@@ -138,7 +138,7 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
     let b ← ($ᵗ Bool)
     let z ← if b then left else right
     pure (b == z)
-  have hbranch : evalDist game = evalDist branchGame := by
+  have hbranch : 𝒟[game] = 𝒟[branchGame] := by
     apply evalDist_ext
     intro x
     calc

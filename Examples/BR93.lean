@@ -230,7 +230,7 @@ omit [Fintype Rand] [Fintype M] [DecidableEq M] in
 /-- Uniform masking step: once the challenge hash output is replaced by a fresh uniform mask,
 adding either challenge message yields the same ciphertext distribution. -/
 theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
-    evalDist (game1 tdp adv) = evalDist (game2 tdp adv) := by
+    𝒟[game1 tdp adv] = 𝒟[game2 tdp adv] := by
   sorry
 
 omit [Fintype Rand] [Inhabited M] [Fintype M] [DecidableEq M] [AddCommGroup M] in

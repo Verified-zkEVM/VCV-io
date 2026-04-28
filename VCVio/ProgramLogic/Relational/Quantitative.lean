@@ -55,18 +55,18 @@ variable {α β γ δ : Type}
 
 private lemma coupling_probFailure_eq_zero
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    (c : SPMF.Coupling (evalDist oa) (evalDist ob)) :
+    (c : SPMF.Coupling (𝒟[oa]) (𝒟[ob])) :
     Pr[⊥ | c.1] = 0 := by
   have h1 : Pr[⊥ | Prod.fst <$> c.1] = Pr[⊥ | c.1] :=
     probFailure_map (f := Prod.fst) (mx := c.1)
   rw [c.2.map_fst] at h1
   rw [← h1]
-  change (evalDist oa).toPMF none = 0
+  change (𝒟[oa]).toPMF none = 0
   exact probFailure_eq_zero (mx := oa)
 
 private lemma coupling_tsum_probOutput_eq_one
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    (c : SPMF.Coupling (evalDist oa) (evalDist ob)) :
+    (c : SPMF.Coupling (𝒟[oa]) (𝒟[ob])) :
     ∑' z : α × β, Pr[= z | c.1] = 1 := by
   rw [tsum_probOutput_eq_sub, coupling_probFailure_eq_zero c, tsub_zero]
 
@@ -101,19 +101,19 @@ lemma spmf_bind_bind_const_of_no_failure {α' β' γ' : Type w}
 lemma probFailure_evalDist_eq_zero
     {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
     {α : Type u} (mx : m α) :
-    Pr[⊥ | evalDist mx] = 0 := by
-  change (evalDist (evalDist mx)).run none = 0
+    Pr[⊥ | 𝒟[mx]] = 0 := by
+  change (𝒟[evalDist mx]).run none = 0
   simp [HasEvalPMF.evalDist_of_hasEvalPMF_def]
 
 private lemma nonempty_spmf_coupling
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β} :
-    Nonempty (SPMF.Coupling (evalDist oa) (evalDist ob)) := by
-  let p := evalDist oa
-  let q := evalDist ob
+    Nonempty (SPMF.Coupling (𝒟[oa]) (𝒟[ob])) := by
+  let p := 𝒟[oa]
+  let q := 𝒟[ob]
   have hp : Pr[⊥ | p] = 0 := by
-    change (evalDist oa).toPMF none = 0; exact probFailure_eq_zero (mx := oa)
+    change (𝒟[oa]).toPMF none = 0; exact probFailure_eq_zero (mx := oa)
   have hq : Pr[⊥ | q] = 0 := by
-    change (evalDist ob).toPMF none = 0; exact probFailure_eq_zero (mx := ob)
+    change (𝒟[ob]).toPMF none = 0; exact probFailure_eq_zero (mx := ob)
   let c : SPMF (α × β) := p >>= fun (a : α) => q >>= fun (b : β) => pure (a, b)
   refine ⟨⟨c, ?_, ?_⟩⟩
   · change Prod.fst <$> c = p
@@ -306,10 +306,9 @@ theorem ofReal_tvDist_map_private_right_bad_le
   let p : PMF α := HasEvalPMF.toPMF oa
   let q : PMF β := HasEvalPMF.toPMF ob
   let K : β → PMF γ := PMF.mapKernelWithFallback p pub fa fb
-  have hstep : ∀ b, ¬ bad b → evalDist (K b) = evalDist (pure (fb b) : PMF γ) := by
+  have hstep : ∀ b, ¬ bad b → 𝒟[K b] = 𝒟[(pure (fb b) : PMF γ)] := by
     intro b hb
-    exact congrArg evalDist
-      (PMF.mapKernelWithFallback_eq_pure_of p pub fa fb bad h_eq b hb)
+    exact congrArg evalDist (PMF.mapKernelWithFallback_eq_pure_of p pub fa fb bad h_eq b hb)
   have h :=
     ofReal_tvDist_bind_event_right_le
       (m := PMF) (mx := PMF.map pub p) (my := q)
@@ -415,8 +414,8 @@ theorem evalDist_bind_ignore
     {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
     {α β γ : Type u}
     (mx : m α) (noise : α → m β) (f : α → γ) :
-    evalDist (mx >>= fun a => noise a >>= fun _ => pure (f a)) =
-      evalDist (f <$> mx) := by
+    𝒟[mx >>= fun a => noise a >>= fun _ => pure (f a)] =
+      𝒟[f <$> mx] := by
   rw [evalDist_bind, evalDist_map]
   congr 1
   funext a
@@ -428,9 +427,9 @@ theorem evalDist_bind_const_of_no_failure
     {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
     {α β : Type u}
     (mx : m α) (my : m β) :
-    evalDist (mx >>= fun _ => my) = evalDist my := by
+    𝒟[mx >>= fun _ => my] = 𝒟[my] := by
   rw [evalDist_bind]
-  exact spmf_bind_const_of_no_failure (HasEvalPMF.probFailure_eq_zero mx) (evalDist my)
+  exact spmf_bind_const_of_no_failure (HasEvalPMF.probFailure_eq_zero mx) (𝒟[my])
 
 namespace SPMF
 
@@ -455,7 +454,7 @@ into a coupling of the full left computation with the right one. -/
 noncomputable def liftLeftMapCoupling
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (f : α → β)
-    (c : SPMF.Coupling (evalDist (f <$> oa)) (evalDist ob)) : SPMF (α × β) :=
+    (c : SPMF.Coupling (𝒟[f <$> oa]) (𝒟[ob])) : SPMF (α × β) :=
   c.1 >>= fun z =>
     (fun a => (a, z.2)) <$>
       (liftM (PMF.condOnMap (HasEvalPMF.toPMF oa) f z.1) : SPMF α)
@@ -463,8 +462,8 @@ noncomputable def liftLeftMapCoupling
 theorem liftLeftMapCoupling_isCoupling
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (f : α → β)
-    (c : SPMF.Coupling (evalDist (f <$> oa)) (evalDist ob)) :
-    SPMF.IsCoupling (liftLeftMapCoupling f c) (evalDist oa) (evalDist ob) := by
+    (c : SPMF.Coupling (𝒟[f <$> oa]) (𝒟[ob])) :
+    SPMF.IsCoupling (liftLeftMapCoupling f c) (𝒟[oa]) (𝒟[ob]) := by
   constructor
   · unfold liftLeftMapCoupling
     calc
@@ -483,10 +482,10 @@ theorem liftLeftMapCoupling_isCoupling
       _ = (Prod.fst <$> c.1) >>= fun b =>
             (liftM (PMF.condOnMap (HasEvalPMF.toPMF oa) f b) : SPMF α) := by
             rw [bind_map_left]
-      _ = evalDist (f <$> oa) >>= fun b =>
+      _ = 𝒟[f <$> oa] >>= fun b =>
             (liftM (PMF.condOnMap (HasEvalPMF.toPMF oa) f b) : SPMF α) := by
             rw [c.2.map_fst]
-      _ = evalDist oa := by
+      _ = 𝒟[oa] := by
             rw [HasEvalPMF.evalDist_of_hasEvalPMF_def (f <$> oa)]
             rw [HasEvalPMF.evalDist_of_hasEvalPMF_def oa]
             have hmap : HasEvalPMF.toPMF (f <$> oa) =
@@ -510,7 +509,7 @@ theorem liftLeftMapCoupling_isCoupling
               (PMF.condOnMap (HasEvalPMF.toPMF oa) f z.1) z.2
       _ = Prod.snd <$> c.1 := by
             rfl
-      _ = evalDist ob := c.2.map_snd
+      _ = 𝒟[ob] := c.2.map_snd
 
 private lemma Finset_sum_iSup_le_iSup_sum {ι : Type*} {J : ι → Type*}
     [hne : ∀ i, Nonempty (J i)]
@@ -556,7 +555,7 @@ theorem relTriple'_iff_couplingPost
     letI : DecidableEq α := Classical.decEq α
     letI : DecidableEq β := Classical.decEq β
     unfold RelTriple' at h
-    by_cases hne : Nonempty (SPMF.Coupling (evalDist oa) (evalDist ob))
+    by_cases hne : Nonempty (SPMF.Coupling (𝒟[oa]) (𝒟[ob]))
     · let A := {a // a ∈ finSupport oa}
       let B := {b // b ∈ finSupport ob}
       letI : DecidableEq A := Classical.decEq A
@@ -571,40 +570,40 @@ theorem relTriple'_iff_couplingPost
       let packB : β → B := fun b => if hb : b ∈ finSupport ob then ⟨b, hb⟩ else b₀
       let packPair : α × β → A × B := fun z => (packA z.1, packB z.2)
       let valPair : A × B → α × β := fun z => (z.1.1, z.2.1)
-      let pa : SPMF A := packA <$> evalDist oa
-      let pb : SPMF B := packB <$> evalDist ob
-      have hvalA : Subtype.val <$> pa = evalDist oa := by
+      let pa : SPMF A := packA <$> 𝒟[oa]
+      let pb : SPMF B := packB <$> 𝒟[ob]
+      have hvalA : Subtype.val <$> pa = 𝒟[oa] := by
         apply SPMF.ext
         intro x
-        change Pr[= x | Subtype.val <$> pa] = Pr[= x | evalDist oa]
+        change Pr[= x | Subtype.val <$> pa] = Pr[= x | 𝒟[oa]]
         calc
           Pr[= x | Subtype.val <$> pa] = Pr[ fun a : A => a.1 = x | pa] := by
             simpa using
               (probEvent_map (mx := pa) (f := Subtype.val) (q := fun y : α => y = x))
-          _ = Pr[ ((fun a : A => a.1 = x) ∘ packA) | evalDist oa] := by
-                rw [show pa = packA <$> evalDist oa by rfl]
-                exact probEvent_map (mx := evalDist oa) (f := packA) (q := fun a : A => a.1 = x)
-          _ = Pr[ fun y : α => (packA y).1 = x | evalDist oa] := rfl
-          _ = Pr[ fun y : α => y = x | evalDist oa] := by
+          _ = Pr[ ((fun a : A => a.1 = x) ∘ packA) | 𝒟[oa]] := by
+                rw [show pa = packA <$> 𝒟[oa] by rfl]
+                exact probEvent_map (mx := 𝒟[oa]) (f := packA) (q := fun a : A => a.1 = x)
+          _ = Pr[ fun y : α => (packA y).1 = x | 𝒟[oa]] := rfl
+          _ = Pr[ fun y : α => y = x | 𝒟[oa]] := by
                 refine probEvent_ext fun y hy => ?_
                 simp [packA, mem_finSupport_of_mem_support_evalDist (oa := oa) (x := y) hy]
-          _ = Pr[= x | evalDist oa] := by simp
-      have hvalB : Subtype.val <$> pb = evalDist ob := by
+          _ = Pr[= x | 𝒟[oa]] := by simp
+      have hvalB : Subtype.val <$> pb = 𝒟[ob] := by
         apply SPMF.ext
         intro y
-        change Pr[= y | Subtype.val <$> pb] = Pr[= y | evalDist ob]
+        change Pr[= y | Subtype.val <$> pb] = Pr[= y | 𝒟[ob]]
         calc
           Pr[= y | Subtype.val <$> pb] = Pr[ fun b : B => b.1 = y | pb] := by
             simpa using
               (probEvent_map (mx := pb) (f := Subtype.val) (q := fun x : β => x = y))
-          _ = Pr[ ((fun b : B => b.1 = y) ∘ packB) | evalDist ob] := by
-                rw [show pb = packB <$> evalDist ob by rfl]
-                exact probEvent_map (mx := evalDist ob) (f := packB) (q := fun b : B => b.1 = y)
-          _ = Pr[ fun x : β => (packB x).1 = y | evalDist ob] := rfl
-          _ = Pr[ fun x : β => x = y | evalDist ob] := by
+          _ = Pr[ ((fun b : B => b.1 = y) ∘ packB) | 𝒟[ob]] := by
+                rw [show pb = packB <$> 𝒟[ob] by rfl]
+                exact probEvent_map (mx := 𝒟[ob]) (f := packB) (q := fun b : B => b.1 = y)
+          _ = Pr[ fun x : β => (packB x).1 = y | 𝒟[ob]] := rfl
+          _ = Pr[ fun x : β => x = y | 𝒟[ob]] := by
                 refine probEvent_ext fun x hx => ?_
                 simp [packB, mem_finSupport_of_mem_support_evalDist (oa := ob) (x := x) hx]
-          _ = Pr[= y | evalDist ob] := by simp
+          _ = Pr[= y | 𝒟[ob]] := by simp
       have hsub_nonempty : Nonempty (SPMF.Coupling pa pb) := by
         rcases hne with ⟨c₀⟩
         refine ⟨⟨packPair <$> c₀.1, ?_⟩⟩
@@ -612,12 +611,12 @@ theorem relTriple'_iff_couplingPost
         · calc
             Prod.fst <$> (packPair <$> c₀.1) = packA <$> (Prod.fst <$> c₀.1) := by
               simp [packPair]
-            _ = packA <$> evalDist oa := by rw [c₀.2.map_fst]
+            _ = packA <$> 𝒟[oa] := by rw [c₀.2.map_fst]
             _ = pa := rfl
         · calc
             Prod.snd <$> (packPair <$> c₀.1) = packB <$> (Prod.snd <$> c₀.1) := by
               simp [packPair]
-            _ = packB <$> evalDist ob := by rw [c₀.2.map_snd]
+            _ = packB <$> 𝒟[ob] := by rw [c₀.2.map_snd]
             _ = pb := rfl
       let fSub : Option (A × B) → ℝ≥0∞
         | none => 0
@@ -643,7 +642,7 @@ theorem relTriple'_iff_couplingPost
         · rfl
         · simp [hR]
       have hlift_obj :
-          ∀ c : SPMF.Coupling (evalDist oa) (evalDist ob),
+          ∀ c : SPMF.Coupling (𝒟[oa]) (𝒟[ob]),
             Pr[ fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] =
               Pr[ fun z : α × β => R z.1 z.2 | c.1] := by
         intro c
@@ -664,14 +663,14 @@ theorem relTriple'_iff_couplingPost
           exact mem_finSupport_of_mem_support_evalDist (oa := ob) (x := z.2) hzsnd
         simp [packPair, packA, packB, hzfst', hzsnd']
       have hpush :
-          SPMF.IsCoupling (valPair <$> cMaxSub.1) (evalDist oa) (evalDist ob) := by
+          SPMF.IsCoupling (valPair <$> cMaxSub.1) (𝒟[oa]) (𝒟[ob]) := by
         constructor
         · simpa [valPair] using
             (congrArg (fun p : SPMF A => Subtype.val <$> p) cMaxSub.2.map_fst).trans hvalA
         · simpa [valPair] using
             (congrArg (fun p : SPMF B => Subtype.val <$> p) cMaxSub.2.map_snd).trans hvalB
       let cMaxSub' : SPMF.Coupling pa pb := ⟨cMaxSub.1, cMaxSub.2⟩
-      let cMax : SPMF.Coupling (evalDist oa) (evalDist ob) := ⟨valPair <$> cMaxSub.1, hpush⟩
+      let cMax : SPMF.Coupling (𝒟[oa]) (𝒟[ob]) := ⟨valPair <$> cMaxSub.1, hpush⟩
       have hpush_obj :
           Pr[ fun z : α × β => R z.1 z.2 | cMax.1] =
             Pr[ fun z : A × B => R z.1.1 z.2.1 | cMaxSub'.1] := by
@@ -706,12 +705,12 @@ theorem relTriple'_iff_couplingPost
           · calc
               Prod.fst <$> (packPair <$> c.1) = packA <$> (Prod.fst <$> c.1) := by
                 simp [packPair]
-              _ = packA <$> evalDist oa := by rw [c.2.map_fst]
+              _ = packA <$> 𝒟[oa] := by rw [c.2.map_fst]
               _ = pa := rfl
           · calc
               Prod.snd <$> (packPair <$> c.1) = packB <$> (Prod.snd <$> c.1) := by
                 simp [packPair]
-              _ = packB <$> evalDist ob := by rw [c.2.map_snd]
+              _ = packB <$> 𝒟[ob] := by rw [c.2.map_snd]
               _ = pb := rfl⟩
         calc
           ∑' z, Pr[= z | c.1] * RelPost.indicator R z.1 z.2
@@ -730,7 +729,7 @@ theorem relTriple'_iff_couplingPost
       exact ⟨cMax,
         (probEvent_eq_one_iff (mx := cMax.1) (p := fun z : α × β => R z.1 z.2)).1 hmax_eq |>.2⟩
     · exfalso
-      haveI : IsEmpty (SPMF.Coupling (evalDist oa) (evalDist ob)) := not_nonempty_iff.mp hne
+      haveI : IsEmpty (SPMF.Coupling (𝒟[oa]) (𝒟[ob])) := not_nonempty_iff.mp hne
       rw [eRelWP, iSup_of_empty] at h
       exact not_le_of_gt zero_lt_one h
   · intro ⟨c, hc⟩
@@ -760,7 +759,7 @@ lemma evalDist_map_eq_of_relTriple' {σ : Type}
     {f : α → σ} {g : β → σ}
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (h : RelTriple' oa ob (fun a b => f a = g b)) :
-    evalDist (f <$> oa) = evalDist (g <$> ob) :=
+    𝒟[f <$> oa] = 𝒟[g <$> ob] :=
   evalDist_map_eq_of_relTriple (relTriple'_iff_relTriple.mp h)
 
 /-! ## Quantitative relational WP rules -/
@@ -770,7 +769,7 @@ theorem eRelWP_pure_le (a : α) (b : β) (post : α → β → ℝ≥0∞) :
     post a b ≤ eRelWP (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) post := by
   unfold eRelWP
   have hc : SPMF.IsCoupling (pure (a, b) : SPMF (α × β))
-      (evalDist (pure a : OracleComp spec₁ α)) (evalDist (pure b : OracleComp spec₂ β)) := by
+      (𝒟[(pure a : OracleComp spec₁ α)]) (𝒟[(pure b : OracleComp spec₂ β)]) := by
     simpa only [evalDist_pure] using SPMF.IsCoupling.pure_iff.mpr rfl
   apply le_iSup_of_le ⟨pure (a, b), hc⟩
   have key : ∑' z, Pr[= z | (pure (a, b) : SPMF (α × β))] * post z.1 z.2 = post a b := by
@@ -794,7 +793,7 @@ theorem eRelWP_conseq {pre pre' : ℝ≥0∞}
   refine iSup_le fun c => ?_
   exact le_trans
     (ENNReal.tsum_le_tsum fun z : α × β => mul_le_mul' le_rfl (hpost z.1 z.2))
-    (le_iSup (f := fun c' : SPMF.Coupling (evalDist oa) (evalDist ob) =>
+    (le_iSup (f := fun c' : SPMF.Coupling (𝒟[oa]) (𝒟[ob]) =>
       ∑' z : α × β, Pr[= z | c'.1] * post' z.1 z.2) c)
 
 /-- Bind/sequential composition rule for quantitative relational WP. -/
@@ -813,30 +812,30 @@ theorem eRelWP_bind_rule
     eRelWP (oa >>= fa) (ob >>= fb) post
   unfold eRelWP
   refine iSup_le fun c => ?_
-  have hne : ∀ a b, Nonempty (SPMF.Coupling (evalDist (fa a)) (evalDist (fb b))) :=
+  have hne : ∀ a b, Nonempty (SPMF.Coupling (𝒟[fa a]) (𝒟[fb b])) :=
     fun a b => nonempty_spmf_coupling
   calc ∑' z, Pr[= z | c.1] *
-        (⨆ d : SPMF.Coupling (evalDist (fa z.1)) (evalDist (fb z.2)),
+        (⨆ d : SPMF.Coupling (𝒟[fa z.1]) (𝒟[fb z.2]),
           ∑' w, Pr[= w | d.1] * post w.1 w.2)
-      = ∑' z, ⨆ d : SPMF.Coupling (evalDist (fa z.1)) (evalDist (fb z.2)),
+      = ∑' z, ⨆ d : SPMF.Coupling (𝒟[fa z.1]) (𝒟[fb z.2]),
           Pr[= z | c.1] * (∑' w, Pr[= w | d.1] * post w.1 w.2) := by
         congr 1; ext z; exact ENNReal.mul_iSup ..
     _ ≤ ⨆ (D : ∀ z : α × β,
-            SPMF.Coupling (evalDist (fa z.1)) (evalDist (fb z.2))),
+            SPMF.Coupling (𝒟[fa z.1]) (𝒟[fb z.2])),
           ∑' z, Pr[= z | c.1] * (∑' w, Pr[= w | (D z).1] * post w.1 w.2) :=
         ENNReal_tsum_iSup_le _
-    _ ≤ ⨆ c' : SPMF.Coupling (evalDist (oa >>= fa)) (evalDist (ob >>= fb)),
+    _ ≤ ⨆ c' : SPMF.Coupling (𝒟[oa >>= fa]) (𝒟[ob >>= fb]),
           ∑' w, Pr[= w | c'.1] * post w.1 w.2 := by
         refine iSup_le fun D => ?_
         let d : α → β → SPMF (γ × δ) := fun a b => (D (a, b)).1
         have hd : ∀ a b, c.1.1 (some (a, b)) ≠ 0 →
-            SPMF.IsCoupling (d a b) (evalDist (fa a)) (evalDist (fb b)) :=
+            SPMF.IsCoupling (d a b) (𝒟[fa a]) (𝒟[fb b]) :=
           fun a b _ => (D (a, b)).2
         have hglue : SPMF.IsCoupling (c.1 >>= fun p => d p.1 p.2)
-            (evalDist oa >>= fun a => evalDist (fa a))
-            (evalDist ob >>= fun b => evalDist (fb b)) :=
+            (𝒟[oa] >>= fun a => 𝒟[fa a])
+            (𝒟[ob] >>= fun b => 𝒟[fb b]) :=
           SPMF.IsCoupling.bind c d hd
-        let c' : SPMF.Coupling (evalDist (oa >>= fa)) (evalDist (ob >>= fb)) :=
+        let c' : SPMF.Coupling (𝒟[oa >>= fa]) (𝒟[ob >>= fb]) :=
           ⟨c.1 >>= fun p => d p.1 p.2, by rwa [evalDist_bind, evalDist_bind]⟩
         apply le_iSup_of_le c'
         suffices h : ∑' z, Pr[= z | c.1] * (∑' w, Pr[= w | d z.1 z.2] * post w.1 w.2) =
@@ -907,7 +906,7 @@ theorem relTriple'_eqRel_of_eq {oa ob : OracleComp spec₁ α}
 
 /-- Equality of evaluation distributions lifts to a `RelTriple'` on `EqRel`. -/
 theorem relTriple'_eqRel_of_evalDist_eq {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
-    (h : evalDist oa = evalDist ob) :
+    (h : 𝒟[oa] = 𝒟[ob]) :
     RelTriple' oa ob (EqRel α) :=
   relTriple'_iff_relTriple.mpr (relTriple_eqRel_of_evalDist_eq h)
 
@@ -1066,8 +1065,8 @@ end Sampling
 
 private lemma probOutput_diag_le_min_marginals
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
-    (c : SPMF.Coupling (evalDist oa) (evalDist ob)) (a : α) :
-    Pr[= (a, a) | c.1] ≤ min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) := by
+    (c : SPMF.Coupling (𝒟[oa]) (𝒟[ob])) (a : α) :
+    Pr[= (a, a) | c.1] ≤ min (Pr[= a | 𝒟[oa]]) (Pr[= a | 𝒟[ob]]) := by
   refine le_min ?_ ?_
   · have := c.2.map_fst; grind [probEvent_mono]
   · have := c.2.map_snd; grind [probEvent_mono]
@@ -1075,7 +1074,7 @@ private lemma probOutput_diag_le_min_marginals
 private lemma eRelWP_indicator_eqRel_le
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α} :
     eRelWP oa ob (RelPost.indicator (EqRel α)) ≤
-      ∑' a, min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) := by
+      ∑' a, min (Pr[= a | 𝒟[oa]]) (Pr[= a | 𝒟[ob]]) := by
   letI : DecidableEq α := Classical.decEq α
   unfold eRelWP
   refine iSup_le fun c => ?_
@@ -1090,7 +1089,7 @@ private lemma eRelWP_indicator_eqRel_le
         congr 1; ext a
         rw [tsum_eq_single a (fun b hb => if_neg (Ne.symm hb))]
         simp
-    _ ≤ ∑' a, min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) :=
+    _ ≤ ∑' a, min (Pr[= a | 𝒟[oa]]) (Pr[= a | 𝒟[ob]]) :=
         ENNReal.tsum_le_tsum fun a => probOutput_diag_le_min_marginals c a
 
 private lemma min_add_tsub (a b : ℝ≥0∞) : min a b + (a - b) = a := by
@@ -1140,10 +1139,10 @@ private lemma tsum_min_eq_one_sub_etvDist
 
 private lemma tsum_min_probOutput_eq_one_sub_etvDist
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α} :
-    ∑' a, min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) =
-      1 - (evalDist oa).toPMF.etvDist (evalDist ob).toPMF := by
-  simp_rw [show ∀ a, min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) =
-      min ((evalDist oa).toPMF (some a)) ((evalDist ob).toPMF (some a))
+    ∑' a, min (Pr[= a | 𝒟[oa]]) (Pr[= a | 𝒟[ob]]) =
+      1 - (𝒟[oa]).toPMF.etvDist (𝒟[ob]).toPMF := by
+  simp_rw [show ∀ a, min (Pr[= a | 𝒟[oa]]) (Pr[= a | 𝒟[ob]]) =
+      min ((𝒟[oa]).toPMF (some a)) ((𝒟[ob]).toPMF (some a))
       from fun a => by simp [probOutput_def, SPMF.apply_eq_toPMF_some]]
   exact tsum_min_eq_one_sub_etvDist
     (probFailure_eq_zero (mx := oa))
@@ -1151,10 +1150,10 @@ private lemma tsum_min_probOutput_eq_one_sub_etvDist
 
 private lemma tsum_min_le_eRelWP
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α} :
-    ∑' a, min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) ≤
+    ∑' a, min (Pr[= a | 𝒟[oa]]) (Pr[= a | 𝒟[ob]]) ≤
       eRelWP oa ob (RelPost.indicator (EqRel α)) := by
   letI : DecidableEq α := Classical.decEq α
-  set pa := evalDist oa; set pb := evalDist ob
+  set pa := 𝒟[oa]; set pb := 𝒟[ob]
   set P := fun a => Pr[= a | pa]; set Q := fun a => Pr[= a | pb]
   set rP := fun a => P a - min (P a) (Q a)
   set rQ := fun a => Q a - min (Q a) (P a)
@@ -1274,17 +1273,17 @@ private lemma tsum_min_le_eRelWP
 Uses `SPMF.tvDist` directly to handle cross-spec comparison. -/
 theorem spmf_tvDist_eq_one_sub_eRelWP_eqRel
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α} :
-    SPMF.tvDist (evalDist oa) (evalDist ob) =
+    SPMF.tvDist (𝒟[oa]) (𝒟[ob]) =
       (1 - eRelWP oa ob (RelPost.indicator (EqRel α))).toReal := by
-  set p := (evalDist oa).toPMF
-  set q := (evalDist ob).toPMF
+  set p := (𝒟[oa]).toPMF
+  set q := (𝒟[ob]).toPMF
   have htmin := tsum_min_probOutput_eq_one_sub_etvDist (oa := oa) (ob := ob)
   have hle : eRelWP oa ob (RelPost.indicator (EqRel α)) ≤ 1 - p.etvDist q :=
     htmin ▸ eRelWP_indicator_eqRel_le
   have hge : 1 - p.etvDist q ≤ eRelWP oa ob (RelPost.indicator (EqRel α)) :=
     htmin ▸ tsum_min_le_eRelWP
   have heq : eRelWP oa ob (RelPost.indicator (EqRel α)) =
-      1 - (evalDist oa).toPMF.etvDist (evalDist ob).toPMF := le_antisymm hle hge
+      1 - (𝒟[oa]).toPMF.etvDist (𝒟[ob]).toPMF := le_antisymm hle hge
   simp only [heq, SPMF.tvDist, PMF.tvDist,
     ENNReal.sub_sub_cancel one_ne_top (PMF.etvDist_le_one _ _)]
 
@@ -1316,7 +1315,7 @@ theorem approxRelTriple_eqRel_of_ofReal_tvDist_le
 theorem gameEquiv_of_relTriple'_eqRel
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : RelTriple' oa ob (EqRel α)) :
-    evalDist oa = evalDist ob :=
+    𝒟[oa] = 𝒟[ob] :=
   evalDist_eq_of_relTriple_eqRel (relTriple'_iff_relTriple.mp h)
 
 /-! ## Relational algebra instance -/
@@ -1388,24 +1387,24 @@ noncomputable instance instAnchored_eRelWP :
     apply le_antisymm
     · -- (≤): every coupling collapses to the marginal expectation by `tsum_pure_left`.
       refine iSup_le fun c => ?_
-      have hcPure : SPMF.IsCoupling c.1 (pure a) (evalDist y) := by
+      have hcPure : SPMF.IsCoupling c.1 (pure a) (𝒟[y]) := by
         simpa [evalDist_pure] using c.2
       have heq := hcPure.tsum_pure_left post
       change ∑' z, c.1 z * post z.1 z.2 ≤ ∑' b, Pr[= b | y] * post a b
       simp only [probOutput_def]
       exact le_of_eq heq
     · -- (≥): the canonical Dirac coupling exhibits this expectation.
-      have hnf : (evalDist y).toPMF none = 0 := probFailure_eq_zero (mx := y)
-      have hcPure : SPMF.IsCoupling (((a, ·) : β → α × β) <$> evalDist y) (pure a) (evalDist y) :=
+      have hnf : (𝒟[y]).toPMF none = 0 := probFailure_eq_zero (mx := y)
+      have hcPure : SPMF.IsCoupling (((a, ·) : β → α × β) <$> 𝒟[y]) (pure a) (𝒟[y]) :=
         SPMF.IsCoupling.dirac_left a hnf
-      have hCoupling : SPMF.IsCoupling (((a, ·) : β → α × β) <$> evalDist y)
-          (evalDist (pure a : OracleComp spec₁ α)) (evalDist y) := by
+      have hCoupling : SPMF.IsCoupling (((a, ·) : β → α × β) <$> 𝒟[y])
+          (𝒟[(pure a : OracleComp spec₁ α)]) (𝒟[y]) := by
         simpa [evalDist_pure] using hcPure
-      let c : SPMF.Coupling (evalDist (pure a : OracleComp spec₁ α)) (evalDist y) :=
-        ⟨((a, ·) : β → α × β) <$> evalDist y, hCoupling⟩
+      let c : SPMF.Coupling (𝒟[(pure a : OracleComp spec₁ α)]) (𝒟[y]) :=
+        ⟨((a, ·) : β → α × β) <$> 𝒟[y], hCoupling⟩
       have heq := hcPure.tsum_pure_left post
       change ∑' b, Pr[= b | y] * post a b ≤
-        ⨆ c : SPMF.Coupling (evalDist (pure a : OracleComp spec₁ α)) (evalDist y),
+        ⨆ c : SPMF.Coupling (𝒟[(pure a : OracleComp spec₁ α)]) (𝒟[y]),
           ∑' z, Pr[= z | c.1] * post z.1 z.2
       apply le_iSup_of_le c
       simp only [probOutput_def]
@@ -1416,23 +1415,23 @@ noncomputable instance instAnchored_eRelWP :
     rw [wp_eq_tsum]
     apply le_antisymm
     · refine iSup_le fun c => ?_
-      have hcPure : SPMF.IsCoupling c.1 (evalDist x) (pure b) := by
+      have hcPure : SPMF.IsCoupling c.1 (𝒟[x]) (pure b) := by
         simpa [evalDist_pure] using c.2
       have heq := hcPure.tsum_pure_right post
       change ∑' z, c.1 z * post z.1 z.2 ≤ ∑' a, Pr[= a | x] * post a b
       simp only [probOutput_def]
       exact le_of_eq heq
-    · have hnf : (evalDist x).toPMF none = 0 := probFailure_eq_zero (mx := x)
-      have hcPure : SPMF.IsCoupling (((·, b) : α → α × β) <$> evalDist x) (evalDist x) (pure b) :=
+    · have hnf : (𝒟[x]).toPMF none = 0 := probFailure_eq_zero (mx := x)
+      have hcPure : SPMF.IsCoupling (((·, b) : α → α × β) <$> 𝒟[x]) (𝒟[x]) (pure b) :=
         SPMF.IsCoupling.dirac_right b hnf
-      have hCoupling : SPMF.IsCoupling (((·, b) : α → α × β) <$> evalDist x)
-          (evalDist x) (evalDist (pure b : OracleComp spec₂ β)) := by
+      have hCoupling : SPMF.IsCoupling (((·, b) : α → α × β) <$> 𝒟[x])
+          (𝒟[x]) (𝒟[(pure b : OracleComp spec₂ β)]) := by
         simpa [evalDist_pure] using hcPure
-      let c : SPMF.Coupling (evalDist x) (evalDist (pure b : OracleComp spec₂ β)) :=
-        ⟨((·, b) : α → α × β) <$> evalDist x, hCoupling⟩
+      let c : SPMF.Coupling (𝒟[x]) (𝒟[(pure b : OracleComp spec₂ β)]) :=
+        ⟨((·, b) : α → α × β) <$> 𝒟[x], hCoupling⟩
       have heq := hcPure.tsum_pure_right post
       change ∑' a, Pr[= a | x] * post a b ≤
-        ⨆ c : SPMF.Coupling (evalDist x) (evalDist (pure b : OracleComp spec₂ β)),
+        ⨆ c : SPMF.Coupling (𝒟[x]) (𝒟[(pure b : OracleComp spec₂ β)]),
           ∑' z, Pr[= z | c.1] * post z.1 z.2
       apply le_iSup_of_le c
       simp only [probOutput_def]
@@ -1498,9 +1497,9 @@ right tool whenever a proof can exhibit a specific coupling. -/
 theorem eRelWP_ge_of_isCoupling
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (post : α → β → ℝ≥0∞)
-    (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (evalDist oa) (evalDist ob)) :
+    (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (𝒟[oa]) (𝒟[ob])) :
     (∑' z, Pr[= z | c] * post z.1 z.2) ≤ eRelWP oa ob post :=
-  le_iSup (f := fun c' : SPMF.Coupling (evalDist oa) (evalDist ob) =>
+  le_iSup (f := fun c' : SPMF.Coupling (𝒟[oa]) (𝒟[ob]) =>
     ∑' z, Pr[= z | c'.1] * post z.1 z.2) ⟨c, hc⟩
 
 /-- A witness coupling whose score dominates the precondition discharges a
@@ -1509,7 +1508,7 @@ theorem eRelWP_of_isCoupling
     {pre : ℝ≥0∞}
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (post : α → β → ℝ≥0∞)
-    (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (evalDist oa) (evalDist ob))
+    (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (𝒟[oa]) (𝒟[ob]))
     (hpre : pre ≤ ∑' z, Pr[= z | c] * post z.1 z.2) :
     pre ≤ eRelWP oa ob post :=
   hpre.trans (eRelWP_ge_of_isCoupling post c hc)
@@ -1528,19 +1527,19 @@ theorem eRelWP_uniformSample_bij_ge
     {f : α → α} (hf : Function.Bijective f) (post : α → α → ℝ≥0∞) :
     (∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a (f a))
       ≤ eRelWP ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post := by
-  set c : SPMF (α × α) := evalDist ($ᵗ α : ProbComp α) >>= fun a => pure (a, f a)
-  have hc : SPMF.IsCoupling c (evalDist ($ᵗ α : ProbComp α))
-      (evalDist ($ᵗ α : ProbComp α)) := by
+  set c : SPMF (α × α) := 𝒟[($ᵗ α : ProbComp α)] >>= fun a => pure (a, f a)
+  have hc : SPMF.IsCoupling c (𝒟[($ᵗ α : ProbComp α)])
+      (𝒟[($ᵗ α : ProbComp α)]) := by
     constructor
     · simp [c]
     · simp only [c, map_bind, map_pure]
       calc
         (do
-            let a ← evalDist ($ᵗ α : ProbComp α)
-            pure (f a)) = f <$> evalDist ($ᵗ α : ProbComp α) := rfl
-        _ = evalDist (f <$> ($ᵗ α : ProbComp α)) :=
+            let a ← 𝒟[($ᵗ α : ProbComp α)]
+            pure (f a)) = f <$> 𝒟[($ᵗ α : ProbComp α)] := rfl
+        _ = 𝒟[f <$> ($ᵗ α : ProbComp α)] :=
           (evalDist_map ($ᵗ α : ProbComp α) f).symm
-        _ = evalDist ($ᵗ α : ProbComp α) := by
+        _ = 𝒟[($ᵗ α : ProbComp α)] := by
           apply evalDist_ext
           intro x
           obtain ⟨x', rfl⟩ := hf.surjective x
@@ -1552,7 +1551,7 @@ theorem eRelWP_uniformSample_bij_ge
     have hbind : ∀ z : α × α,
         Pr[= z | c] = ∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] *
           Pr[= z | (pure (a, f a) : SPMF (α × α))] :=
-      fun z => probOutput_bind_eq_tsum (evalDist _) (fun a => pure (a, f a)) z
+      fun z => probOutput_bind_eq_tsum (𝒟[_]) (fun a => pure (a, f a)) z
     calc ∑' z : α × α, Pr[= z | c] * post z.1 z.2
         = ∑' z : α × α, (∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] *
             Pr[= z | (pure (a, f a) : SPMF (α × α))]) * post z.1 z.2 := by
@@ -1603,8 +1602,8 @@ theorem eRelWP_query_bij_ge (t : spec₁.Domain)
           (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
           (liftM (query t) : OracleComp spec₁ (spec₁.Range t)) post := by
   set oq : OracleComp spec₁ (spec₁.Range t) := liftM (query t)
-  set c : SPMF (spec₁.Range t × spec₁.Range t) := evalDist oq >>= fun a => pure (a, f a)
-  have hc : SPMF.IsCoupling c (evalDist oq) (evalDist oq) := by
+  set c : SPMF (spec₁.Range t × spec₁.Range t) := 𝒟[oq] >>= fun a => pure (a, f a)
+  have hc : SPMF.IsCoupling c (𝒟[oq]) (𝒟[oq]) := by
     constructor
     · simp [c]
     · simp only [c, map_bind, map_pure, oq, evalDist_query]
@@ -1619,7 +1618,7 @@ theorem eRelWP_query_bij_ge (t : spec₁.Domain)
     have hbind : ∀ z : spec₁.Range t × spec₁.Range t,
         Pr[= z | c] = ∑' a : spec₁.Range t, Pr[= a | oq] *
           Pr[= z | (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))] :=
-      fun z => probOutput_bind_eq_tsum (evalDist oq) (fun a => pure (a, f a)) z
+      fun z => probOutput_bind_eq_tsum (𝒟[oq]) (fun a => pure (a, f a)) z
     calc ∑' z, Pr[= z | c] * post z.1 z.2
         = ∑' z, (∑' a : spec₁.Range t, Pr[= a | oq] *
             Pr[= z | (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))]) *
