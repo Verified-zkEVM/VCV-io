@@ -432,10 +432,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
       exact simulatedNmaUnifSim_fsUniform_run_for_cma (M := M)
         (Commit := Commit) (Chal := Chal) (oa := simT pk) (cache := advCache)
     rw [hleft]
-    simp only [simulatedNmaImpl, QueryImpl.add_apply_inr, simulatedNmaSigSim,
-      StateT.run_modifyGet, StateT.run_bind, simulateQ_bind,
-      map_eq_bind_pure_comp, bind_pure_comp, bind_assoc, Function.comp_apply,
-      pure_bind]
+    simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp_apply, pure_bind]
     conv_rhs =>
       lhs
       change simulateQ (fsUniformImpl (M := M) (Commit := Commit) (Chal := Chal))
@@ -450,8 +447,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
     | none =>
         simp only [htarget, QueryCache.cacheQuery, pure_bind, Function.comp_apply,
           add_apply_inl, add_apply_inr, advCache]
-        simp only [simulateQ_pure, pure_inj,
-          Prod.mk.injEq, and_true, true_and]
+        simp only [pure_inj, Prod.mk.injEq, and_true, true_and]
         ext t
         cases t
         · simp only [add_apply_inl, reduceCtorEq, Function.update, ↓reduceDIte]
@@ -547,45 +543,29 @@ private lemma cmaSimLoggedLeftImpl_preserves_fixedKey
         simp [hxinner]
 
 omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] in
-private lemma cmaSimLoggedLeftImpl_project_run
+private def cmaSimLoggedLeftOrnament
     [Finite Chal]
-    {α : Type}
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
-    (pk : Stmt) (sk : Wit)
-    (oa : OracleComp (cmaOracleSpec M Commit Chal Resp) α)
-    (st : List M × CmaState M Commit Chal Stmt Wit)
-    (hst : cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
-      (Stmt := Stmt) (Wit := Wit) pk sk st) :
-    Prod.map id (cmaSimLoggedProj (M := M) (Commit := Commit)
-      (Chal := Chal) (Stmt := Stmt) (Wit := Wit)) <$>
-        (simulateQ (cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
-          (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-          hr simT) oa).run st =
-      (simulateQ (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) simT pk) oa).run
-        (cmaSimLoggedProj (M := M) (Commit := Commit)
-        (Chal := Chal) (Stmt := Stmt) (Wit := Wit) st) := by
-  letI : Fintype Chal := Fintype.ofFinite Chal
-  exact OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'
-    (impl₁ := cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
+    (pk : Stmt) (sk : Wit) :
+    QueryImpl.StateOrnament
+      (cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
+        hr simT)
+      (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) simT pk) where
+  inv := cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
+    (Stmt := Stmt) (Wit := Wit) pk sk
+  proj := cmaSimLoggedProj (M := M) (Commit := Commit)
+    (Chal := Chal) (Stmt := Stmt) (Wit := Wit)
+  preserves_inv := fun t s hs =>
+    cmaSimLoggedLeftImpl_preserves_fixedKey (M := M) (Commit := Commit)
       (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-      hr simT)
-    (impl₂ := simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) simT pk)
-    (inv := cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
-      (Stmt := Stmt) (Wit := Wit) pk sk)
-    (proj := cmaSimLoggedProj (M := M) (Commit := Commit)
-      (Chal := Chal) (Stmt := Stmt) (Wit := Wit))
-    (hinv := fun t s hs =>
-      cmaSimLoggedLeftImpl_preserves_fixedKey (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-        hr simT pk sk t s hs)
-    (hproj := fun t s hs =>
-      cmaSimLoggedLeftImpl_project_step (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-        hr simT pk sk t s hs)
-    oa st hst
+      hr simT pk sk t s hs
+  project_step := fun t s hs =>
+    cmaSimLoggedLeftImpl_project_step (M := M) (Commit := Commit)
+      (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
+      hr simT pk sk t s hs
 
 omit [DecidableEq M] [DecidableEq Commit] [SampleableType Stmt] [SampleableType Wit]
   [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
@@ -1342,37 +1322,22 @@ private lemma forkLoggedProbImpl_preserves_liveCacheAdvCacheInv
           simpa [htarget] using hadv_old'
 
 omit [SampleableType Stmt] in
-private lemma forkLoggedProbImpl_project_run
+private def forkLoggedProbOrnament
     [Fintype Chal]
-    {α : Type}
-    (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt)
-    (oa : OracleComp (cmaOracleSpec M Commit Chal Resp) α) :
-    Prod.map id (forkLoggedProj (M := M) (Commit := Commit)
-      (Chal := Chal)) <$>
-        (simulateQ (forkLoggedProbImpl (M := M) (Commit := Commit)
-          (Chal := Chal) (Resp := Resp) simT pk) oa).run
-          (forkInitialState M Commit Chal) =
-      (simulateQ (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) simT pk) oa).run
-        ((∅ : (fsRoSpec M Commit Chal).QueryCache), ([] : List M)) := by
-  have hrun := OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'
-    (impl₁ := forkLoggedProbImpl (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) simT pk)
-    (impl₂ := simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) simT pk)
-    (inv := forkLiveCacheAdvCacheInv (M := M) (Commit := Commit)
-      (Chal := Chal))
-    (proj := forkLoggedProj (M := M) (Commit := Commit) (Chal := Chal))
-    (hinv := fun t s hs =>
-      forkLoggedProbImpl_preserves_liveCacheAdvCacheInv (M := M)
-        (Commit := Commit) (Chal := Chal) (Resp := Resp) simT pk t s hs)
-    (hproj := fun t s hs =>
-      forkLoggedProbImpl_project_step (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) simT pk t s hs)
-    oa (forkInitialState M Commit Chal)
-    (forkInitialState_liveCacheAdvCacheInv (M := M) (Commit := Commit)
-      (Chal := Chal))
-  simpa [forkLoggedProj, forkInitialState] using hrun
+    (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) :
+    QueryImpl.StateOrnament
+      (forkLoggedProbImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) simT pk)
+      (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) simT pk) where
+  inv := forkLiveCacheAdvCacheInv (M := M) (Commit := Commit) (Chal := Chal)
+  proj := forkLoggedProj (M := M) (Commit := Commit) (Chal := Chal)
+  preserves_inv := fun t s hs =>
+    forkLoggedProbImpl_preserves_liveCacheAdvCacheInv (M := M)
+      (Commit := Commit) (Chal := Chal) (Resp := Resp) simT pk t s hs
+  project_step := fun t s hs =>
+    forkLoggedProbImpl_project_step (M := M) (Commit := Commit)
+      (Chal := Chal) (Resp := Resp) simT pk t s hs
 
 omit [Finite Chal] in
 private lemma evalDist_simulateQ_forkWrappedUniformImpl [Fintype Chal]
@@ -1893,8 +1858,21 @@ private lemma nma_runProb_shiftLeft_signedFreshAdv_eq_forkH5Body
           ((∅ : (fsRoSpec M Commit Chal).QueryCache), ([] : List M)) >>= fun x =>
         simLoggedVerifyFreshComp (M := M) (Commit := Commit) (Chal := Chal)
           (Resp := Resp) σ ps.1 x.1 x.2) := by
-          rw [forkLoggedProbImpl_project_run (M := M) (Commit := Commit)
-            (Chal := Chal) (Resp := Resp) simT ps.1 (adv.main ps.1)]
+          rw [show
+            Prod.map id (forkLoggedProj (M := M) (Commit := Commit)
+              (Chal := Chal)) <$>
+                (simulateQ (forkLoggedProbImpl (M := M) (Commit := Commit)
+                  (Chal := Chal) (Resp := Resp) simT ps.1) (adv.main ps.1)).run
+                  (forkInitialState M Commit Chal) =
+              (simulateQ (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
+                (Chal := Chal) (Resp := Resp) simT ps.1) (adv.main ps.1)).run
+                ((∅ : (fsRoSpec M Commit Chal).QueryCache), ([] : List M)) by
+            have hrun := (forkLoggedProbOrnament (M := M) (Commit := Commit)
+              (Chal := Chal) (Resp := Resp) simT ps.1).run_eq (adv.main ps.1)
+              (forkInitialState M Commit Chal)
+              (forkInitialState_liveCacheAdvCacheInv (M := M) (Commit := Commit)
+                (Chal := Chal))
+            simpa [forkLoggedProj, forkInitialState, forkLoggedProbOrnament] using hrun]
   rw [hfork]
   let st0 : List M × CmaState M Commit Chal Stmt Wit :=
     cmaSimFixedKeyInitialState (M := M) (Commit := Commit)
@@ -1922,10 +1900,11 @@ private lemma nma_runProb_shiftLeft_signedFreshAdv_eq_forkH5Body
           (Commit := Commit) (Chal := Chal) (Resp := Resp) simT ps.1)
           (adv.main ps.1)).run
           ((∅ : (fsRoSpec M Commit Chal).QueryCache), ([] : List M)) := by
-    simpa [hproj0] using
-      cmaSimLoggedLeftImpl_project_run (M := M) (Commit := Commit)
+    letI : Fintype Chal := Fintype.ofFinite Chal
+    simpa [hproj0, cmaSimLoggedLeftOrnament] using
+      (cmaSimLoggedLeftOrnament (M := M) (Commit := Commit)
         (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-        hr simT ps.1 ps.2 (adv.main ps.1) st0 hfixed
+        hr simT ps.1 ps.2).run_eq (adv.main ps.1) st0 hfixed
   have hrunExpanded :
       (simulateQ (QueryImpl.Stateful.linkWith
           (cmaFrame M Commit Chal Stmt Wit)
