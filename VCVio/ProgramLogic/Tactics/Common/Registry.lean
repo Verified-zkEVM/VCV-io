@@ -158,6 +158,28 @@ initialize vcSpecRegistry :
     initial := {}
   }
 
+/-! ### `vcspec_simp` simp set
+
+Auxiliary simp set used internally by the unary and relational tactics for
+transformer-layer normalization (peeling `apply_wp`, running monadic `*.run`
+projections, normalizing lifts, and so on). Mirror of `Loom.Tactic.lspecSimpExt`.
+
+Users should write `@[vcspec]`; the attribute first tries to register the
+declaration as a spec theorem and on failure falls back to inserting it into
+`vcspec_simp`. This lets a single attribute handle both spec lemmas and the
+normalization rewrites needed to massage a goal into spec-applicable shape.
+
+This attribute is not intended to be used directly. -/
+initialize vcSpecSimpExt : Meta.SimpExtension ←
+  Meta.registerSimpAttr `vcspec_simp
+    "simp theorems internally used by VCVio program-logic tactics"
+
+/-- The accumulated simp set behind the `vcspec_simp` fallback layer of
+`@[vcspec]`. Used by `runVCSpecSimp` to normalize transformer-stack `wp` goals
+before spec dispatch. -/
+def getVCSpecSimpTheorems : CoreM Meta.SimpTheorems :=
+  vcSpecSimpExt.getTheorems
+
 /-! ### Preprocessed-body head matchers
 
 `Sym.preprocessType` aggressively unfolds reducible abbreviations (including our
@@ -391,11 +413,27 @@ private def buildVCSpecEntry (decl : Name) (priority : Nat) : MetaM VCSpecEntry 
 
 initialize registerBuiltinAttribute {
   name := `vcspec
-  descr := "Register a unary or relational program-logic theorem for vcgen/rvcgen lookup."
+  descr := "Register a unary or relational program-logic theorem for vcgen/rvcgen \
+    lookup, or a normalization simp lemma for the internal `vcspec_simp` set."
+  applicationTime := AttributeApplicationTime.afterCompilation
   add := fun decl stx kind => MetaM.run' do
     let prio ← getAttrParamOptPrio stx[1]
-    let entry ← buildVCSpecEntry decl prio
-    vcSpecRegistry.add entry kind
+    try
+      let entry ← buildVCSpecEntry decl prio
+      vcSpecRegistry.add entry kind
+    catch specErr =>
+      let env ← getEnv
+      match getAttributeImpl env `vcspec_simp with
+      | .error _ => throw specErr
+      | .ok impl =>
+          try
+            let newStx ← `(attr| vcspec_simp)
+            let newStx := newStx.raw.setArg 3 stx[1]
+            impl.add decl newStx kind
+          catch simpErr =>
+            throwError "@[vcspec] failed to register `{decl}`:\n\
+              - as a spec theorem: {specErr.toMessageData}\n\
+              - as a `vcspec_simp` lemma: {simpErr.toMessageData}"
 }
 
 private def headOfWhnf (e : Expr) : MetaM (Option Name) := do

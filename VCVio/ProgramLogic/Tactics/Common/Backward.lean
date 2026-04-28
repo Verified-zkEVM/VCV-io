@@ -597,4 +597,30 @@ def runVCSpecEntryCachedBackward (entry : VCSpecEntry) : TacticM Bool := do
           setGoals (subgoals ++ rest)
           return true
 
+/-! ## VCSpec simp dispatch -/
+
+/-- Run the cached `vcspec_simp` simp set on the main goal target, swallowing
+errors and unchanged-goal failures.
+
+This is the single replacement for the previous open-coded `simp only [...]`
+blocks that peeled transformer `wp` layers (`apply_wp`, `*.run`, lifts,
+`Std.Do'.EPost.cons.push*`, `MAlgOrdered.wp_*`, the `Loom.wp_eq_mAlgOrdered_wp`
+bridges, and the assorted monad/algebra rewrites). Tag a new normalization
+lemma with `@[vcspec_simp]` (or rely on the `@[vcspec]` fallback) instead of
+appending it to a tactic-local simp list. -/
+def runVCSpecSimp : TacticM Unit := withMainContext do
+  let goal ← getMainGoal
+  let thms ← liftMetaM getVCSpecSimpTheorems
+  let ctx ← Simp.mkContext
+    (config := { failIfUnchanged := false })
+    (simpTheorems := #[thms])
+    (congrTheorems := (← getSimpCongrTheorems))
+  try
+    let (result?, _) ← Lean.Meta.simpTarget goal ctx
+    match result? with
+    | none => replaceMainGoal []
+    | some goal' => replaceMainGoal [goal']
+  catch _ =>
+    pure ()
+
 end OracleComp.ProgramLogic
