@@ -116,20 +116,20 @@ def sample_cbd1 (b : u8) : RustM i32 := do
 Each of the four `b &&& 3` patterns reduces `sample_cbd1 b` to a
 `RustM.ok` constructor with a concrete `i32` value. These are the
 only `sample_cbd1` evaluations `sampleRandomCbd1` ever encounters.
-Proof is `decide`; the concrete `u8` inputs let the bitwise ops,
-shift, cast, and subtraction all reduce. -/
+The concrete `u8` inputs let the bitwise ops, shift, cast, and
+subtraction all reduce definitionally. -/
 
 @[simp] theorem sample_cbd1_val_0 :
-    sample_cbd1 (0 : u8) = (RustM.ok (0 : i32)) := by decide
+    sample_cbd1 (0 : u8) = (RustM.ok (0 : i32)) := rfl
 
 @[simp] theorem sample_cbd1_val_1 :
-    sample_cbd1 (1 : u8) = (RustM.ok (1 : i32)) := by decide
+    sample_cbd1 (1 : u8) = (RustM.ok (1 : i32)) := rfl
 
 @[simp] theorem sample_cbd1_val_2 :
-    sample_cbd1 (2 : u8) = (RustM.ok (-1 : i32)) := by decide
+    sample_cbd1 (2 : u8) = (RustM.ok (-1 : i32)) := rfl
 
 @[simp] theorem sample_cbd1_val_3 :
-    sample_cbd1 (3 : u8) = (RustM.ok (0 : i32)) := by decide
+    sample_cbd1 (3 : u8) = (RustM.ok (0 : i32)) := rfl
 
 set_option linter.style.nativeDecide false in
 /-- Total-correctness statement: every `u8` input yields an `ok`
@@ -208,21 +208,83 @@ rather than `4⁻¹`, so collapse the cast + sum before pattern-matching
 on `4⁻¹`. -/
 private lemma three_add_one_ennreal : ((3 : ℕ) + 1 : ℝ≥0∞) = 4 := by norm_num
 
+private abbrev cbdOutputZero : Option (Except Interop.Rust.Error i32) :=
+  some (Except.ok (0 : i32))
+
+private abbrev cbdOutputPosOne : Option (Except Interop.Rust.Error i32) :=
+  some (Except.ok (1 : i32))
+
+private abbrev cbdOutputNegOne : Option (Except Interop.Rust.Error i32) :=
+  some (Except.ok (-1 : i32))
+
+private lemma probOutput_pure_cbd_zero_zero :
+    Pr[= cbdOutputZero | (pure cbdOutputZero : OracleComp unifSpec _)] = 1 :=
+  probOutput_pure_self cbdOutputZero
+
+private lemma probOutput_pure_cbd_zero_pos :
+    Pr[= cbdOutputZero | (pure cbdOutputPosOne : OracleComp unifSpec _)] = 0 := by
+  rw [probOutput_pure]
+  have h : cbdOutputZero ≠ cbdOutputPosOne := by decide
+  simp [h]
+
+private lemma probOutput_pure_cbd_zero_neg :
+    Pr[= cbdOutputZero | (pure cbdOutputNegOne : OracleComp unifSpec _)] = 0 := by
+  rw [probOutput_pure]
+  have h : cbdOutputZero ≠ cbdOutputNegOne := by decide
+  simp [h]
+
+private lemma probOutput_pure_cbd_pos_zero :
+    Pr[= cbdOutputPosOne | (pure cbdOutputZero : OracleComp unifSpec _)] = 0 := by
+  rw [probOutput_pure]
+  have h : cbdOutputPosOne ≠ cbdOutputZero := by decide
+  simp [h]
+
+private lemma probOutput_pure_cbd_pos_pos :
+    Pr[= cbdOutputPosOne | (pure cbdOutputPosOne : OracleComp unifSpec _)] = 1 :=
+  probOutput_pure_self cbdOutputPosOne
+
+private lemma probOutput_pure_cbd_pos_neg :
+    Pr[= cbdOutputPosOne | (pure cbdOutputNegOne : OracleComp unifSpec _)] = 0 := by
+  rw [probOutput_pure]
+  have h : cbdOutputPosOne ≠ cbdOutputNegOne := by decide
+  simp [h]
+
+private lemma probOutput_pure_cbd_neg_zero :
+    Pr[= cbdOutputNegOne | (pure cbdOutputZero : OracleComp unifSpec _)] = 0 := by
+  rw [probOutput_pure]
+  have h : cbdOutputNegOne ≠ cbdOutputZero := by decide
+  simp [h]
+
+private lemma probOutput_pure_cbd_neg_pos :
+    Pr[= cbdOutputNegOne | (pure cbdOutputPosOne : OracleComp unifSpec _)] = 0 := by
+  rw [probOutput_pure]
+  have h : cbdOutputNegOne ≠ cbdOutputPosOne := by decide
+  simp [h]
+
+private lemma probOutput_pure_cbd_neg_neg :
+    Pr[= cbdOutputNegOne | (pure cbdOutputNegOne : OracleComp unifSpec _)] = 1 :=
+  probOutput_pure_self cbdOutputNegOne
+
 /-- `Pr[output = 0] = 1/2` under `sampleRandomCbd1`. The two
 bit-patterns `00` (`n = 0`) and `11` (`n = 3`) both map to `0`, so
 exactly half the four equiprobable inputs yield the zero output.
 
 The proof peels the `$[0..3]` draw, evaluates each of the four `pure`
 branches against the zero target, and closes the resulting `4⁻¹ + 4⁻¹
-= 2⁻¹` via `ennreal_inv_four_add_inv_four`. `simp +decide only` is
-used so that Int32 equality decisions (`(0 : i32) = 1`, etc.) fire via
-`decide` rather than unreferenceable simprocs. -/
+= 2⁻¹` via `ennreal_inv_four_add_inv_four`. The concrete
+`probOutput_pure_cbd_*` lemmas keep this proof from repeatedly
+synthesizing large decidable equality instances for `i32` outputs. -/
 theorem sampleRandomCbd1_prob_zero :
     Pr[= some (Except.ok (0 : i32)) | sampleRandomCbd1.run.run] = 2⁻¹ := by
   rw [sampleRandomCbd1_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype,
     Fin.sum_univ_four]
-  simp +decide only [ProbComp.probOutput_uniformFin, three_add_one_ennreal,
-    probOutput_pure, ↓reduceIte, mul_one, mul_zero, add_zero]
+  change _ * Pr[= cbdOutputZero | (pure cbdOutputZero : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputZero | (pure cbdOutputPosOne : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputZero | (pure cbdOutputNegOne : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputZero | (pure cbdOutputZero : OracleComp unifSpec _)] = _
+  simp only [ProbComp.probOutput_uniformFin, three_add_one_ennreal,
+    probOutput_pure_cbd_zero_zero, probOutput_pure_cbd_zero_pos,
+    probOutput_pure_cbd_zero_neg, mul_one, mul_zero, add_zero]
   exact ennreal_inv_four_add_inv_four
 
 /-- `Pr[output = +1] = 1/4` under `sampleRandomCbd1`. Only `n = 1`
@@ -232,8 +294,13 @@ theorem sampleRandomCbd1_prob_pos_one :
     Pr[= some (Except.ok (1 : i32)) | sampleRandomCbd1.run.run] = 4⁻¹ := by
   rw [sampleRandomCbd1_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype,
     Fin.sum_univ_four]
-  simp +decide only [ProbComp.probOutput_uniformFin, three_add_one_ennreal,
-    probOutput_pure, ↓reduceIte, mul_one, mul_zero, add_zero, zero_add]
+  change _ * Pr[= cbdOutputPosOne | (pure cbdOutputZero : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputPosOne | (pure cbdOutputPosOne : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputPosOne | (pure cbdOutputNegOne : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputPosOne | (pure cbdOutputZero : OracleComp unifSpec _)] = _
+  simp only [ProbComp.probOutput_uniformFin, three_add_one_ennreal,
+    probOutput_pure_cbd_pos_zero, probOutput_pure_cbd_pos_pos,
+    probOutput_pure_cbd_pos_neg, mul_one, mul_zero, add_zero, zero_add]
 
 /-- `Pr[output = -1] = 1/4` under `sampleRandomCbd1`. Only `n = 2`
 contributes (bit pattern `10`, `a = 0`, `c = 1`), one of four
@@ -242,7 +309,12 @@ theorem sampleRandomCbd1_prob_neg_one :
     Pr[= some (Except.ok (-1 : i32)) | sampleRandomCbd1.run.run] = 4⁻¹ := by
   rw [sampleRandomCbd1_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype,
     Fin.sum_univ_four]
-  simp +decide only [ProbComp.probOutput_uniformFin, three_add_one_ennreal,
-    probOutput_pure, ↓reduceIte, mul_one, mul_zero, add_zero, zero_add]
+  change _ * Pr[= cbdOutputNegOne | (pure cbdOutputZero : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputNegOne | (pure cbdOutputPosOne : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputNegOne | (pure cbdOutputNegOne : OracleComp unifSpec _)] +
+      _ * Pr[= cbdOutputNegOne | (pure cbdOutputZero : OracleComp unifSpec _)] = _
+  simp only [ProbComp.probOutput_uniformFin, three_add_one_ennreal,
+    probOutput_pure_cbd_neg_zero, probOutput_pure_cbd_neg_pos,
+    probOutput_pure_cbd_neg_neg, mul_one, mul_zero, add_zero, zero_add]
 
 end Interop.Hax.Examples.CenteredBinomial

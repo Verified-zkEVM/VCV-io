@@ -11,6 +11,14 @@
 - `VCVio.ProgramLogic.Unary.StdDoBridge` is a narrow unary bridge for almost-sure correctness in the `.pure`
   `Std.Do` view. It is not the main engine for quantitative or relational VCGen.
 
+## In-Tree Walkthroughs
+
+- `Examples/ProgramLogic/UnaryStep.lean`: unary `vcstep` / `vcgen` examples.
+- `Examples/ProgramLogic/RelationalStep.lean`: step-by-step relational tactic examples.
+- `Examples/ProgramLogic/RelationalDerived.lean`: derived relational patterns and automation examples.
+- `Examples/ProgramLogic/ProofMode.lean`: proof-mode entry points and small end-to-end examples.
+- `VCVio/ProgramLogic/Relational/Examples.lean`: compact API examples for the relational layer.
+
 ## Tactic Quick Reference
 
 ### Proof Mode Entry
@@ -36,10 +44,19 @@ before generating the remaining subgoals.
 | `rvcstep` | `g₁ ≡ₚ g₂`, `evalDist g₁ = evalDist g₂`, `⟪oa ~ ob \| R⟫`, or `⦃f⦄ oa ≈ₑ ob ⦃g⦄` | Lowers into relational mode if needed, then applies one obvious relational step |
 | `rvcstep using t` | same | Supplies the explicit witness needed by the current shape (bind cut relation, bijection, traversal input relation, or simulation state relation) |
 | `rvcstep with thm` | same | Force one explicit relational theorem/assumption step |
+| `rvcstep left` / `rvcstep right` | raw `Std.Do'.rwp` or folded `Std.Do'.RelTriple` goals | Exposes a controlled one-sided bind step |
+| `rvcstep sym` | qualitative `RelTriple` goals | Swaps the two sides and the relational postcondition |
+| `rvcstep upto R` | qualitative `RelTriple` goals | Changes the current postcondition to an explicit intermediate relation |
+| `rvcstep trans mid` | qualitative `RelTriple` goals | Splits through an explicit intermediate computation using an `EqRel` transport side |
+| `rvcstep swap left` / `rvcstep swap right` | qualitative `RelTriple` goals | Commutes two adjacent independent binds on one side through `EqRel` transport |
+| `rvcstep swap left using R` / `rvcstep swap right using R` | qualitative `RelTriple` goals | Commutes the binds, then immediately decomposes the aligned residual bind using cut relation `R` |
 | `rvcstep?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint, `with theorem`, or `as ⟨...⟩` clause |
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
+| `rvcgen using [t₁, t₂, ...]` | same | Applies explicit cut hints in sequence, introducing and substituting EqRel continuation equalities between cuts |
 | `rvcgen with thm` | same | Uses `thm` for the first step on the main goal, then continues with ordinary `rvcgen` |
+| `rvcfinish` | residual relational VCs | Runs the opt-in consequence/search finishing pass |
+| `rvcgen!` | same | Runs `rvcgen`, then `rvcfinish` |
 | `rvcgen?` | same | Runs `rvcgen` and emits the corresponding explicit script |
 | `rel_conseq` | `⟪oa ~ ob \| R'⟫` | Weakens/strengthens postcondition |
 | `rel_inline foo` | `⟪... ~ ... \| R⟫` | Unfolds definitions, simplifies |
@@ -79,6 +96,7 @@ probability goals, automatically lowering `Pr[...]` into the quantitative engine
 | `vcstep inv I` | Explicit loop invariant for `replicate`/`foldlM`/`mapM` |
 | `vcstep rw` | One explicit top-level bind-swap rewrite on a `Pr[...] = Pr[...]` goal |
 | `vcstep rw under n` | One bind-swap rewrite under `n` shared outer bind prefixes |
+| `vcstep rw normalize` | Run the bounded probability-equality planner explicitly |
 | `vcstep rw congr` | Expose one or more shared binds plus their support hypotheses |
 | `vcstep rw congr'` | Expose one or more shared binds without support hypotheses |
 | `exp_norm` | Normalize indicator (`propInd`) and expectation (`wp`) arithmetic |
@@ -100,6 +118,7 @@ classes of probability goals:
      `bind_assoc`), then preview-selects the best bounded swap/congruence plan from the fast path
    - `vcstep rw` performs exactly one top-level bind-swap rewrite
    - `vcstep rw under n` rewrites one swap beneath `n` shared outer bind prefixes
+   - `vcstep rw normalize` runs the deeper bounded planner used for explicit suggestions
    - `vcstep rw congr` / `vcstep rw congr'` expose one or more shared binds explicitly
 
 4. **Other general `Pr[...]` goals** → rewrite to raw `wp` form and keep stepping structurally
@@ -131,12 +150,11 @@ one specific theorem/assumption step manually.
 head-pair lookup on the relational side.
 This is especially useful for automation-oriented `simulateQ` transport lemmas whose outer
 computation heads are stable but whose inner invariants or projection arguments still come from
-the local context. The default registry already covers the structural relational rules
-(`relTriple_pure_pure`, `relTriple_bind`, `relTriple_map`, `relTriple_if`, the `replicate` /
-`mapM` / `foldlM` / `uniformSample_bij` families, the quantitative
-`Std.Do'.RelTriple` pure / bind / uniform-sampling families, and the two `simulateQ`
-transport rules),
-so user-defined rules slot into the same lookup pipeline without further wiring.
+the local context. Relational registered rules are tiered internally:
+plain `rvcstep` / `rvcgen` use default-safe structural and leaf entries, while
+rules that choose cuts, bijections, or broad theorem search are reached through
+`rvcstep with thm`, `rvcstep using t`, `rvcfinish`, or `rvcgen!`.
+This keeps ordinary rule ordering stable when new `@[vcspec]` lemmas are added.
 
 ### Handler Normalization
 
@@ -172,8 +190,8 @@ relational goal before deciding which structural rule to apply. This flattens ne
 strips pure-bind layers so that the bind decomposition rule fires on aligned shapes, and so that
 goals that simplify to pure-pure or refl close immediately.
 
-**Augmented leaf closure**: the relational leaf closer (`tryCloseRelGoalImmediate`, plus its
-`rvcgen` finishing pass) tries, in order:
+**Augmented leaf closure**: the relational leaf closer (`tryCloseRelGoalImmediate`, plus the
+cheap leaf finish at the end of `rvcgen`) tries, in order:
 1. `assumption`
 2. `relTriple_true _ _` (the postcondition is structurally `fun _ _ => True`, discharged via
    the universal product coupling, since `OracleComp` has no failure mass);
@@ -185,6 +203,22 @@ goals that simplify to pure-pure or refl close immediately.
    values unified by local equality hypotheses);
 6. a symmetric `relTriple_pure_pure ∘ symm` step for postconditions written in the swapped
    direction.
+
+Consequence/search closing is opt-in through `rvcfinish` or `rvcgen!`; plain
+`rvcgen` keeps to structural steps plus cheap leaf closure so rule-order changes
+stay predictable.
+
+**Explicit relational strategies**: `rvcstep sym`, `rvcstep upto R`,
+`rvcstep trans mid`, and `rvcstep swap left/right` are strategy commands, not
+default automation.
+The initial `trans` support is the equality-transport shape: it splits
+`⟪oa ~ ob | R⟫` into either `⟪oa ~ mid | EqRel _⟫` / `⟪mid ~ ob | R⟫`
+or the dual `⟪oa ~ mid | R⟫` / `⟪mid ~ ob | EqRel _⟫`.
+The `swap` variants use that EqRel transport shape with the independent-bind
+commutativity lemma, then leave the aligned relational goal. The `using R`
+variants immediately take the next aligned bind step with cut relation `R`.
+Do not emulate stronger coupling transitivity with broad theorem search until
+the full semantic gluing lemma and goal shape are added.
 
 **Pass budget**: exhaustive `vcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
@@ -209,6 +243,7 @@ All probability-equality control now lives under `vcstep`.
 | `vcstep` | Fast dispatcher for common `Pr[...] = Pr[...]` steps: syntax normalization, swap, congruence, and bounded compositions chosen by preview |
 | `vcstep rw` | Rewrites one top-level bind swap without trying to close the goal |
 | `vcstep rw under n` | Rewrites one bind swap under `n` shared outer bind prefixes on one side |
+| `vcstep rw normalize` | Runs the bounded probability-equality planner explicitly, without broadening plain `vcstep` |
 | `vcstep rw congr` | Reduces `Pr[... \| mx >>= f₁] = Pr[... \| mx >>= f₂]` to a pointwise goal, auto-introducing `x` and `hx : x ∈ support mx`; the explicit `as ⟨...⟩` form can peel multiple shared binds at once |
 | `vcstep rw congr'` | Same, but without the support restriction; the explicit `as ⟨...⟩` form can peel multiple shared binds at once |
 
@@ -216,7 +251,8 @@ All probability-equality control now lives under `vcstep`.
 
 | Tactic | What it does |
 |--------|--------------|
-| `rvcgen` | Exhaustive relational VCGen over all open goals, with automatic lowering from `GameEquiv` / `evalDist` equality |
+| `rvcgen` | Exhaustive relational VCGen over all open goals, with automatic lowering from `GameEquiv` / `evalDist` equality and cheap leaf closure |
+| `rvcfinish` / `rvcgen!` | Opt-in residual search and consequence closing |
 | `rel_dist` | Turns `RelTriple oa ob (EqRel α)` into `evalDist oa = evalDist ob` |
 
 ## Probability Equality Guide
@@ -236,6 +272,7 @@ On `Pr[...] = Pr[...]` goals, plain `vcstep` already tries the common
 
 - **Need to keep going after a swap**: use `vcstep rw`
 - **Need to swap below shared outer binds**: use `vcstep rw under n`
+- **Need the bounded planner to choose a swap/congruence chain now**: use `vcstep rw normalize`
 - **Need to expose one or more common outer binds with support information**: use `vcstep rw congr`
 - **Need the support-free congruence variant**: use `vcstep rw congr'`
 - **Need the full explicit replay for a bounded nested swap**: use `vcstep?`
@@ -263,6 +300,11 @@ vcstep rw
 **Rewrite under one shared bind**:
 ```lean
 vcstep rw under 1
+```
+
+**Run the bounded probability-equality planner explicitly**:
+```lean
+vcstep rw normalize
 ```
 
 **Expose one common bind with support information**:
@@ -525,8 +567,8 @@ in two registry files rather than a framework rewrite.
 
 | File | Attribute | Role |
 |------|-----------|------|
-| `Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / quantitative `Std.Do'.RelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
-| `Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites, indexed by a `Sym.Pattern` on `oa` and consulted by `runWpStepRules` via `TacticM` rewriting (`rw` then `simp only`). The `Sym.Simp.Theorem` bundle for an eventual `SymM`-side rewriter is *not* eagerly built; `Sym.Simp.mkTheoremFromDecl` can rebuild it on demand from `getAllWpStepEntries` |
+| `VCVio/ProgramLogic/Tactics/Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / quantitative `Std.Do'.RelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
+| `VCVio/ProgramLogic/Tactics/Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites, indexed by a `Sym.Pattern` on `oa` and consulted by `runWpStepRules` via `TacticM` rewriting (`rw` then `simp only`). The `Sym.Simp.Theorem` bundle for an eventual `SymM`-side rewriter is *not* eagerly built; `Sym.Simp.mkTheoremFromDecl` can rebuild it on demand from `getAllWpStepEntries` |
 
 Each entry carries a `SpecProof` (reusing the core-Lean type from
 `Lean.Elab.Tactic.Do.SpecAttr`) so origins can be distinguished between a
@@ -535,8 +577,8 @@ from the attribute's optional priority argument (`@[vcspec (prio := 200)]`).
 
 ### Dispatch flow
 
-1. **Unary / relational VC-gen** (`Unary/Internals.lean`,
-   `Relational/Internals.lean`): on a `Triple`/`wp`/`RelTriple`/`RelWP`/quantitative
+1. **Unary / relational VC-gen** (`VCVio/ProgramLogic/Tactics/Unary/Internals.lean`,
+   `VCVio/ProgramLogic/Tactics/Relational/Internals.lean`): on a `Triple`/`wp`/`RelTriple`/`RelWP`/quantitative
    `Std.Do'.RelTriple`
    goal, the planner extracts the computation slot(s), `whnfReducible`s them,
    asks the registry for candidate `VCSpecEntry`s via
@@ -545,7 +587,7 @@ from the attribute's optional priority argument (`@[vcspec (prio := 200)]`).
    shared `runUnaryVCSpecRule` / `runRelationalVCSpecRule` helpers which call
    the `runVCGenStepWithTheoremDirect` / `runRVCGenStepWithTheoremDirect`
    applicators), and picks the best plan.
-2. **`wp`-rewrite driver** (`Common/WpStepDispatch.lean`): on any goal
+2. **`wp`-rewrite driver** (`VCVio/ProgramLogic/Tactics/Common/WpStepDispatch.lean`): on any goal
    containing `wp _ _`, `runWpStepRules` pulls the `oa` argument out of the
    first matching `wp` application, `whnfReducible`s it, asks
    `getRegisteredWpStepEntries` for hits on the `oa`-keyed `Sym.DiscrTree`,
@@ -631,6 +673,7 @@ registry files and the `runWpStepRules` docstring. If a bump breaks us,
 the fastest recovery path is: (1) open the failing file, (2) check that
 `Sym.mkPatternFromDeclWithKey`, `Sym.insertPattern`, `Sym.getMatch`, and
 `Sym.Simp.mkTheoremFromDecl` still have matching signatures, (3) rebuild
-the single `Common/Registry.lean` or `Common/WpStepRegistry.lean`
-target, and (4) regenerate the full library. No user-visible tactic
+the single `VCVio/ProgramLogic/Tactics/Common/Registry.lean` or
+`VCVio/ProgramLogic/Tactics/Common/WpStepRegistry.lean` target, and
+(4) regenerate the full library. No user-visible tactic
 surface changes.

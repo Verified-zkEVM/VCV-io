@@ -15,7 +15,7 @@
 
 3. **Probability equals a specific value** (`Pr[= x | oa] = ...`):
    → Start with `vcstep` if the goal should lower or decompose automatically
-  → Use `vcstep?` when you want the explicit script, binder names, rewrite form, or an
+   → Use `vcstep?` when you want the explicit script, binder names, rewrite form, or an
     explicit `using` / `inv` / `with` step surfaced
    → Otherwise use `probOutput_bind_eq_tsum` to decompose binds manually
    → Use `simp` with project simp lemmas
@@ -92,14 +92,16 @@ def OTP_encrypt (k m : Fin n → Bool) : ProbComp (Fin n → Bool) := pure (k + 
 
 ## Worked Example: ElGamal IND-CPA
 
-From `Examples/ElGamal/Basic.lean` — multi-query security via DDH.
+From `Examples/ElGamal/Basic.lean` — multi-query security via the generic one-time DDH lift.
 
 **Key patterns used**:
-- Hybrid argument indexed by query count `k`
-- `StateT` for oracle implementations that track query counter + cache
-- `vcstep` to close common probability-equality swaps
-- `vcstep rw congr'` to expose common random-sampling prefixes without support noise
-- Telescope bound: `IND_CPA_advantage ≤ q * 2ε`
+- Define ElGamal correctness and the one-time DDH bridge.
+- Prove the one-time signed advantage identity against DDH.
+- Instantiate `AsymmEncAlg.IND_CPA_advantage_toReal_le_q_mul_of_oneTime_signedAdvantageReal_bound`.
+- Final bound: `IND_CPA_advantage ≤ q * 2ε`.
+
+For tactic-heavy hybrid proofs, use the generic recipe above or the focused
+examples under `Examples/ProgramLogic/`.
 
 ## Annotated Tactic Usage
 
@@ -129,12 +131,15 @@ rvcgen                      -- auto-selects hf as the bind-cut relation
 If there are 0 or ≥ 2 viable hints, the tactic keeps ambiguity explicit and
 falls back to `EqRel`. Use `using` to disambiguate.
 
-The relational finish pass also handles postcondition weakening automatically:
+The opt-in relational finish pass also handles postcondition weakening:
 
 ```lean
 -- Goal: ⟪oa ~ ob | R'⟫ with h : ⟪oa ~ ob | R⟫ and hpost : ∀ x y, R x y → R' x y
-rvcgen                      -- closes via relTriple_post_mono + assumption
+rvcgen!                     -- runs rvcgen, then rvcfinish
 ```
+
+Use plain `rvcgen` when you only want structural steps plus cheap leaf closure;
+use `rvcfinish` or `rvcgen!` when residual consequence/search is intended.
 
 ```lean
 -- Same workflow, but ask the tactic to surface the explicit script:

@@ -86,37 +86,61 @@ private def relCompsDefEq (oa ob : Expr) : TacticM Bool := do
   saved.restore
   return ok
 
+private def propClosesByTrivial (prop : Expr) : TacticM Bool := do
+  let saved ← saveState
+  let goal ← mkFreshExprMVar prop
+  let goalId := goal.mvarId!
+  setGoals [goalId]
+  let ok ← tryEvalTacticSyntax (← `(tactic| trivial))
+  let closed := ok && (← getGoals).isEmpty
+  saved.restore
+  return closed
+
+private def relPostIsVacuous (post : Expr) : TacticM Bool := do
+  let post ← instantiateMVars post
+  let postTy ← whnf (← inferType post)
+  let .forallE _ α body _ := postTy.consumeMData
+    | return false
+  let body ← whnf body
+  let .forallE _ β _ _ := body.consumeMData
+    | return false
+  withLocalDeclD `a α fun a => do
+    withLocalDeclD `b β fun b => do
+      let prop ← whnfReducible (← instantiateMVars (mkApp2 post a b))
+      if prop.isConstOf ``True then
+        return true
+      propClosesByTrivial prop
+
 /-- Attempt to close the current relational/eRHL leaf goal with the canonical fast paths.
 
 Tries, in order:
 * `assumption` (catches a hypothesis matching the relational triple verbatim);
-* `relTriple_true _ _` (vacuous postcondition `fun _ _ => True`, via the product coupling);
-* `relTriple_post_const` together with `intros; trivial` (postcondition reduces to a
-  trivially provable proposition such as `() = ()`);
+* quantitative `Std.Do'.RelTriple` pure-pure leaves;
 * `relTriple_refl` (identical computations, equality coupling);
 * `relTriple_eqRel_of_eq rfl` (syntactically identical computations);
 * `relTriple_pure_pure rfl` (`pure x ⨯ pure x` with reflexive postcondition);
 * `relTriple_pure_pure` together with `assumption` (`pure a ⨯ pure b` with `R a b` in scope);
-* quantitative `Std.Do'.RelTriple` pure-pure leaves;
+* a small proof-search variant of `relTriple_pure_pure` using `rfl`, `assumption`, or
+  a symmetric assumption for the value-level relation;
 * the same closers after `subst_vars` (resolves goals where the pure values are
   syntactically distinct but unified via local equality hypotheses);
-* `relTriple_pure_pure ∘ symm` (`pure a ⨯ pure b` with `R b a` in scope). -/
+* `relTriple_true _ _` / `relTriple_post_const` only when the postcondition has first
+  been classified as vacuous.
+
+The vacuous-postcondition rules are intentionally last and guarded. Applying them blindly to
+non-vacuous pure leaves can create expensive failed elaboration attempts and obscure the
+predictable pure/reflexive close path. -/
 def tryCloseRelGoalImmediate : TacticM Bool := do
   if ← tryEvalTacticSyntax (← `(tactic| assumption)) then
     return true
+  let target ← instantiateMVars (← getMainTarget)
+  let relTriplePost? := relTripleGoalParts? target |>.map (fun (_, _, post) => post)
   let some shape ← currentRelGoalShape? | return false
   if shape.isStdDo then
     if isPureExpr shape.oa && isPureExpr shape.ob then
       return (← tryEvalTacticSyntax (← `(tactic|
         exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _)))
     return false
-  if ← tryEvalTacticSyntax (← `(tactic|
-      exact OracleComp.ProgramLogic.Relational.relTriple_true _ _)) then
-    return true
-  if ← tryEvalTacticSyntax (← `(tactic|
-      refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-      intros; trivial)) then
-    return true
   if ← relCompsDefEq shape.oa shape.ob then
     if ← tryEvalTacticSyntax (← `(tactic|
         exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) then
@@ -132,19 +156,26 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
         apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
+        refine OracleComp.ProgramLogic.Relational.relTriple_pure_pure ?_ <;>
+          first | rfl | assumption | symm; assumption)) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
         (try subst_vars
          first
-           | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
            | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
            | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
            | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)
-           | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-              intros; trivial)))) then
+           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)))) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
         apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> (symm; assumption))) then
       return true
+  if let some post := relTriplePost? then
+    if ← relPostIsVacuous post then
+      if ← tryEvalTacticSyntax (← `(tactic|
+          exact OracleComp.ProgramLogic.Relational.relTriple_post_const
+            (fun _ _ => by trivial))) then
+        return true
   let saved ← saveState
   if ← tryEvalTacticSyntax (← `(tactic| subst_vars)) then
     let some shape ← currentRelGoalShape? | saved.restore; return false
@@ -161,6 +192,10 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
         return true
       if ← tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) then
+        return true
+      if ← tryEvalTacticSyntax (← `(tactic|
+          refine OracleComp.ProgramLogic.Relational.relTriple_pure_pure ?_ <;>
+            first | rfl | assumption | symm; assumption)) then
         return true
     if shape.isStdDo && isPureExpr shape.oa && isPureExpr shape.ob then
       if ← tryEvalTacticSyntax (← `(tactic|
@@ -182,6 +217,29 @@ private def relationalGoalParts? (target : Expr) : Option (Expr × Expr × Expr)
 
 private def isStdDoRelTripleGoal (target : Expr) : Bool :=
   (stdDoRelTripleGoalParts? target).isSome
+
+private def sameMVarId (x y : MVarId) : Bool :=
+  x.name == y.name
+
+private def stripSuffix? (xs suffix : List MVarId) : Option (List MVarId) :=
+  if xs.length < suffix.length then
+    none
+  else
+    let splitAt := xs.length - suffix.length
+    let pref := xs.take splitAt
+    let tail := xs.drop splitAt
+    if (tail.zip suffix).all fun (x, y) => sameMVarId x y then
+      some pref
+    else
+      none
+
+private def ownedSubgoalsAfterMainStep (before after : List MVarId) : List MVarId × List MVarId :=
+  match before with
+  | [] => (after, [])
+  | _ :: rest =>
+      match stripSuffix? after rest with
+      | some owned => (owned, rest)
+      | none => (after, [])
 
 def tryLowerRelGoal : TacticM Bool := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -210,6 +268,12 @@ def tryNormalizeRelBindStructure : TacticM Unit := do
 def runERelPureRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _))
+
+def runERelRndRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.Loom.relTriple_query_refl)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_refl))
 
 def runERelBindRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
@@ -252,6 +316,72 @@ def tryFlattenRelBindGoal : TacticM Bool := do
     simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
       OracleComp.bind_pure_comp]))
 
+private def tryCloseRelOwnedGoal : TacticM Bool := do
+  let ok ← tryCloseRelGoalImmediate
+  if ok then
+    return (← getGoals).isEmpty
+  let ok ← tryEvalTacticSyntax (← `(tactic|
+      first
+        | assumption
+        | trivial
+        | (intro _; assumption)
+        | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)))
+  if ok then
+    return (← getGoals).isEmpty
+  let target ← instantiateMVars (← getMainTarget)
+  if (relationalGoalParts? target).isSome || (findAppWithHead? ``Std.Do'.rwp target).isSome then
+    return false
+  let ok ← tryEvalTacticSyntax (← `(tactic|
+      first
+        | simp only [Lean.Order.PartialOrder.rel]
+        | (repeat intro; split_ifs <;> simp only [Lean.Order.PartialOrder.rel])))
+  return ok && (← getGoals).isEmpty
+
+private def closeOwnedRelSubgoals (owned : List MVarId) : TacticM (List MVarId) := do
+  let mut remaining : List MVarId := []
+  for goal in owned do
+    if ← goal.isAssigned then
+      continue
+    setGoals [goal]
+    unless ← tryCloseRelOwnedGoal do
+      remaining := remaining ++ (← getGoals)
+  return remaining
+
+/-- Cheap owned-goal closer used after explicit user-guided decomposition.
+
+This avoids the heavier relational leaf closer and its fallback simplification. In particular,
+`rvcstep using R` should close the sample side of a bind and close only trivial continuations
+such as `intros; assumption`, otherwise leaving the continuation for the user's proof script. -/
+private def tryCloseRelOwnedGoalCheap : TacticM Bool := do
+  let ok ← tryEvalTacticSyntax (← `(tactic|
+      first
+        | assumption
+        | trivial
+        | (intros; assumption)
+        | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;>
+            first | rfl | assumption | symm; assumption)
+        | (intros
+           subst_vars
+           first
+             | assumption
+             | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+             | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;>
+                first | rfl | assumption | symm; assumption))
+        | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)))
+  return ok && (← getGoals).isEmpty
+
+/-- Run `tryCloseRelOwnedGoalCheap` on exactly the listed owned goals, preserving failures. -/
+private def closeOwnedRelSubgoalsCheap (owned : List MVarId) : TacticM (List MVarId) := do
+  let mut remaining : List MVarId := []
+  for goal in owned do
+    if ← goal.isAssigned then
+      continue
+    setGoals [goal]
+    unless ← tryCloseRelOwnedGoalCheap do
+      remaining := remaining ++ (← getGoals)
+  return remaining
+
 /-- After `relTriple_bind ?_ ?_` produces `[sample, continuation, …pre-existing]`,
 this helper tries to auto-close the sample subgoal (typically `RelTriple oa oa
 (EqRel _)` closes via `relTriple_refl`) and the continuation subgoal in isolation,
@@ -268,18 +398,28 @@ def closeSampleAndReorderBindGoals : TacticM Unit := do
   let goalsBefore ← getGoals
   match goalsBefore with
   | sample :: continuation :: rest =>
-      setGoals [sample]
-      let _ ← tryCloseRelGoalImmediate
-      let postSample ← getGoals
-      setGoals [continuation]
-      let _ ← tryCloseRelGoalImmediate
-      let postCont ← getGoals
+      let postSample ← closeOwnedRelSubgoals [sample]
+      let postCont ← closeOwnedRelSubgoals [continuation]
+      setGoals (postCont ++ postSample ++ rest)
+  | _ => pure ()
+
+/-- Close the bind sample subgoal normally and the continuation only by cheap closers.
+
+This is the explicit-cut variant of `closeSampleAndReorderBindGoals`, used by
+`rvcstep using R`. Supplying `R` is already the strategic choice, so the tactic should not
+run the full continuation closer and accidentally search through the user-owned continuation. -/
+private def closeSampleAndCheapContinuation : TacticM Unit := do
+  let goalsBefore ← getGoals
+  match goalsBefore with
+  | sample :: continuation :: rest =>
+      let postSample ← closeOwnedRelSubgoals [sample]
+      let postCont ← closeOwnedRelSubgoalsCheap [continuation]
       setGoals (postCont ++ postSample ++ rest)
   | _ => pure ()
 
 def runRelBindRule : TacticM Bool := do
   tryNormalizeRelBindStructure
-  if ← tryCloseRelGoalImmediate then
+  if (← getGoals).isEmpty then
     return true
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind
@@ -310,10 +450,8 @@ def runRelBindRule : TacticM Bool := do
 of a bind start with a uniform sample / query.
 
 Given a goal `RelTriple ((⋯ : OracleComp _ α) >>= fa) ((⋯ : OracleComp _ α) >>= fb) S`,
-applies `relTriple_bind` with the cut `R := fun a b => b = f a`, closes the sample
-subgoal via `relTriple_uniformSample_bij` (or `relTriple_query_bij`), and on the
-continuation introduces the coupled values together with the equality witness and
-substitutes it.
+applies a specialized bind-bijection rule when possible. The continuation then
+mentions only the left sample, with the right sample already rewritten to `f a`.
 
 Resulting goal order:
 1. The continuation `RelTriple (fa a) (fb (f a)) S` for an arbitrary fresh `a`.
@@ -326,6 +464,28 @@ def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
   let saved ← saveState
   -- Best-effort normalization so `<$>` / `bind_pure_comp` shapes are also
   -- recognized as bind-on-both-sides for the purposes of the recipe.
+  let _ ← tryEvalTacticSyntax (← `(tactic|
+    try simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure,
+      map_bind, OracleComp.bind_pure_comp]))
+  if ← tryEvalTacticSyntax (← `(tactic|
+      first
+        | refine OracleComp.ProgramLogic.Relational.relTriple_bind_uniformSample_bij
+            (f := $f) ?_ ?_
+        | refine OracleComp.ProgramLogic.Relational.relTriple_bind_query_bij
+            _ (f := $f) ?_ ?_)) then
+    match ← getGoals with
+    | cont :: bijGoals =>
+        setGoals [cont]
+        let _ ← tryEvalTacticSyntax (← `(tactic| intro x))
+        discard <| tryCloseRelOwnedGoalCheap
+        let contGoals ← getGoals
+        setGoals (contGoals ++ bijGoals)
+        return true
+    | _ =>
+        saved.restore
+        return false
+  saved.restore
+  let saved ← saveState
   let _ ← tryEvalTacticSyntax (← `(tactic|
     try simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure,
       map_bind, OracleComp.bind_pure_comp]))
@@ -350,6 +510,7 @@ def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
       let bijGoals ← getGoals
       setGoals [cont]
       let _ ← tryEvalTacticSyntax (← `(tactic| intro _ _ heq; subst heq))
+      discard <| tryCloseRelOwnedGoalCheap
       let contGoals ← getGoals
       setGoals (contGoals ++ bijGoals ++ rest)
       return true
@@ -360,14 +521,14 @@ def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
 def runRelBindRuleUsing (R : TSyntax `term) : TacticM Bool := do
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_)) then
-    closeSampleAndReorderBindGoals
+    closeSampleAndCheapContinuation
     return true
   -- Fallback 1: flatten nested binds and retry with the explicit cut.
   if ← tryEvalTacticSyntax (← `(tactic|
       (simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
         OracleComp.bind_pure_comp]
        refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_))) then
-    closeSampleAndReorderBindGoals
+    closeSampleAndCheapContinuation
     return true
   -- Fallback 2: hint may be a bijection `f : α → α` (not a relation).
   -- Try the bijection-coupling recipe used when both sides bind a uniform sample.
@@ -392,18 +553,18 @@ def runRelMapMRule : TacticM Bool := do
     refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
       (Rin := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_))
 
-private def closeRelAssumptionSideGoals : TacticM Unit := do
-  discard <| tryEvalTacticSyntax (← `(tactic|
-    all_goals first
-      | assumption
-      | trivial
-      | (intro _; assumption)))
+private def closeRelAssumptionSideGoals (before : List MVarId) : TacticM Unit := do
+  let after ← getGoals
+  let (owned, rest) := ownedSubgoalsAfterMainStep before after
+  let remainingOwned ← closeOwnedRelSubgoals owned
+  setGoals (remainingOwned ++ rest)
 
 def runRelMapMRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  let before ← getGoals
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
         (Rin := $R) ?_ ?_)) then
-    closeRelAssumptionSideGoals
+    closeRelAssumptionSideGoals before
     return true
   return false
 
@@ -412,10 +573,11 @@ def runRelFoldlMRule : TacticM Bool := do
     apply OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same))
 
 def runRelFoldlMRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  let before ← getGoals
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_list_foldlM
         (Rin := $R) ?_ ?_ ?_)) then
-    closeRelAssumptionSideGoals
+    closeRelAssumptionSideGoals before
     return true
   return false
 
@@ -448,16 +610,61 @@ def runRelRndRule : TacticM Bool := do
     apply OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij <;> skip))
 
 def runRelCondRule : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_if <;> intro _)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    (simp only [game_rule]
-     apply OracleComp.ProgramLogic.Relational.relTriple_if <;> intro _)))
+  let before ← getGoals
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply OracleComp.ProgramLogic.Relational.relTriple_if <;> intro _)) <||>
+      tryEvalTacticSyntax (← `(tactic|
+        (simp only [game_rule]
+         apply OracleComp.ProgramLogic.Relational.relTriple_if <;> intro _))) then
+    let after ← getGoals
+    let (owned, rest) := ownedSubgoalsAfterMainStep before after
+    let remainingOwned ← closeOwnedRelSubgoals owned
+    setGoals (remainingOwned ++ rest)
+    return true
+  return false
 
 def runByUptoRule (bad : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.tvDist_simulateQ_le_probEvent_bad
       (bad := $bad)))
+
+def runRelSymmRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_symm))
+
+def runRelTransRule (mid : TSyntax `term) : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_trans_eqRel_left
+      (mid := $mid) ?_ ?_)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_trans_eqRel_right
+      (mid := $mid) ?_ ?_))
+
+def runRelSwapLeftRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_trans_eqRel_left
+      (hleft := OracleComp.ProgramLogic.Relational.relTriple_bind_bind_swap_eqRel) ?_))
+
+def runRelSwapRightRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_trans_eqRel_right
+      (hright := OracleComp.ProgramLogic.Relational.relTriple_bind_bind_swap_eqRel) ?_))
+
+def runRelSwapLeftRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  if ← runRelSwapLeftRule then
+    if ← runRelBindRuleUsing R then
+      return true
+  saved.restore
+  return false
+
+def runRelSwapRightRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  if ← runRelSwapRightRule then
+    if ← runRelBindRuleUsing R then
+      return true
+  saved.restore
+  return false
 
 def runRelSimRule : TacticM Bool := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -646,18 +853,17 @@ private def runRawRelWPTheoremConseq (thm : TSyntax `term)
   let saved ← saveState
   let ok ←
     match ← observing? do
+      let before ← getGoals
       evalTactic (← `(tactic|
         refine Std.Do'.RelWP.rwp_consequence_rel _ _ _ _ _ _
           (by
             intro a b
             by_cases h : a = b <;> simp [h, Lean.Order.PartialOrder.rel])
           $thm))
-      discard <| tryEvalTacticSyntax (← `(tactic|
-        all_goals first
-          | assumption
-          | trivial
-          | simp [Lean.Order.PartialOrder.rel]
-          | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
+      let after ← getGoals
+      let (owned, rest) := ownedSubgoalsAfterMainStep before after
+      let remainingOwned ← closeOwnedRelSubgoals owned
+      setGoals (remainingOwned ++ rest)
     with
     | some _ => pure true
     | none => pure false
@@ -666,26 +872,97 @@ private def runRawRelWPTheoremConseq (thm : TSyntax `term)
   saved.restore
   return false
 
+/-- Registered relational rules that are safe as deterministic structural steps.
+They may decompose the current goal, but they do not choose cuts, bijections, or
+one-sided bind frontiers. -/
+private def structuralRelVCSpecDecls : List Name := [
+  ``OracleComp.ProgramLogic.Relational.relTriple_map,
+  ``OracleComp.ProgramLogic.Relational.relTriple_replicate,
+  ``OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel,
+  ``OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel,
+  ``OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same
+]
+
+/-- Registered relational rules that close deterministic leaves. -/
+private def leafRelVCSpecDecls : List Name := [
+  ``OracleComp.ProgramLogic.Relational.relTriple_pure_pure,
+  ``OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_pure,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_refl,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_query_refl,
+  ``Std.Do'.RelWP.rwp_pure
+]
+
+/-- Registered relational rules that require an explicit user choice. -/
+private def explicitRelVCSpecDecls : List Name := [
+  ``OracleComp.ProgramLogic.Relational.relTriple_bind,
+  ``OracleComp.ProgramLogic.Relational.relTriple_list_mapM,
+  ``OracleComp.ProgramLogic.Relational.relTriple_list_foldlM,
+  ``OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij,
+  ``OracleComp.ProgramLogic.Relational.relTriple_query_bij,
+  ``OracleComp.ProgramLogic.Relational.relTriple_bind_uniformSample_bij,
+  ``OracleComp.ProgramLogic.Relational.relTriple_bind_query_bij,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_bind,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_bij,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_query_bij
+]
+
+private inductive RelVCSpecTier where
+  | structural
+  | leaf
+  | explicit
+  | fallback
+  deriving BEq
+
+private def relVCSpecEntryDeclIn (entry : VCSpecEntry) (decls : List Name) : Bool :=
+  match entry.declName? with
+  | some declName => decls.contains declName
+  | none => false
+
+private def relVCSpecTier (entry : VCSpecEntry) : RelVCSpecTier :=
+  if relVCSpecEntryDeclIn entry structuralRelVCSpecDecls then
+    .structural
+  else if relVCSpecEntryDeclIn entry leafRelVCSpecDecls then
+    .leaf
+  else if relVCSpecEntryDeclIn entry explicitRelVCSpecDecls then
+    .explicit
+  else
+    .fallback
+
+private def RelVCSpecTier.canRunInDefaultDirect : RelVCSpecTier → Bool
+  | .explicit => false
+  | _ => true
+
+private def RelVCSpecTier.canRunInDefaultStructural : RelVCSpecTier → Bool
+  | .structural | .leaf => true
+  | _ => false
+
+private def RelVCSpecTier.canRunInFallbackSearch : RelVCSpecTier → Bool
+  | .fallback => true
+  | _ => false
+
 private def runRawRelWPVCSpecBackward : TacticM Bool := do
   withVCGenRegisteredTiming do
     let target ← instantiateMVars (← getMainTarget)
     let some (oa, ob, _) := rawRelWPGoalParts? target | return false
     let entries ← getRegisteredRelationalVCSpecEntries oa ob
     let entries :=
-      entries.filter (·.kind == .relWP) ++ entries.filter (·.kind == .relTriple)
+      (entries.filter fun entry =>
+        entry.kind == .relWP && (relVCSpecTier entry).canRunInDefaultDirect) ++
+      (entries.filter fun entry =>
+        entry.kind == .relTriple && (relVCSpecTier entry).canRunInDefaultDirect)
     for entry in entries.toList.take 8 do
       let saved ← saveState
       if entry.kind == .relWP then
         let ok ←
           match ← observing? do
+            let before ← getGoals
             unless ← runVCSpecEntryRawRelConsequence entry do
               throwError "raw relational consequence rule did not apply"
-            discard <| tryEvalTacticSyntax (← `(tactic|
-              all_goals first
-                | assumption
-                | trivial
-                | simp [Lean.Order.PartialOrder.rel]
-                | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
+            let after ← getGoals
+            let (owned, rest) := ownedSubgoalsAfterMainStep before after
+            let remainingOwned ← closeOwnedRelSubgoals owned
+            setGoals (remainingOwned ++ rest)
           with
           | some _ => pure true
           | none => pure false
@@ -703,6 +980,78 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
       saved.restore
     return false
 
+private inductive RelGoalKind where
+  | relTripleVacuous
+  | relTriplePure
+  | relTripleRefl
+  | relTripleBind
+  | relTripleSpec
+  | relWP
+  | stdDoRelTriple
+  | rawRWP
+  | couplingPost
+  | oneSidedCandidate
+  | unknown
+  deriving BEq
+
+private def RelGoalKind.canTryImmediateClose : RelGoalKind → Bool
+  | .relTripleVacuous | .relTriplePure | .relTripleRefl => true
+  | _ => false
+
+private def classifyRelGoalKind (target : Expr) : TacticM RelGoalKind := do
+  if isRawStdDoRelWPGoal target then
+    return .rawRWP
+  if (relWPGoalParts? target).isSome then
+    return .relWP
+  if (findAppWithHead? ``OracleComp.ProgramLogic.Relational.CouplingPost target).isSome then
+    return .couplingPost
+  let some shape := relGoalShape? target | return .unknown
+  let post? :=
+    match relTripleGoalParts? target with
+    | some (_, _, post) => some post
+    | none =>
+        match stdDoRelTripleGoalParts? target with
+        | some (_, _, _, post) => some post
+        | none => none
+  if let some post := post? then
+    if ← relPostIsVacuous post then
+      return .relTripleVacuous
+  let oa ← whnfReducible (← instantiateMVars shape.oa)
+  let ob ← whnfReducible (← instantiateMVars shape.ob)
+  if isPureExpr oa && isPureExpr ob then
+    return .relTriplePure
+  if isBindExpr oa && isBindExpr ob then
+    return .relTripleBind
+  if isBindExpr oa != isBindExpr ob then
+    return .oneSidedCandidate
+  if ← relCompsDefEq oa ob then
+    return .relTripleRefl
+  if shape.isStdDo then
+    return .stdDoRelTriple
+  return .relTripleSpec
+
+private def tryCloseRelGoalAtCoreGateway : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let goalKind ← classifyRelGoalKind target
+  match goalKind with
+  | .relTripleVacuous =>
+      tryEvalTacticSyntax (← `(tactic|
+        first
+          | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+          | exact OracleComp.ProgramLogic.Relational.relTriple_post_const
+              (fun _ _ => by trivial)))
+  | _ =>
+      if goalKind.canTryImmediateClose then
+        tryCloseRelGoalImmediate
+      else
+        -- Fallback for vacuous posts whose elaborated form is easier for Lean's
+        -- theorem application than for syntactic postcondition inspection.
+        tryEvalTacticSyntax (← `(tactic|
+          first
+            | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+            | exact OracleComp.ProgramLogic.Relational.relTriple_post_const
+                (fun _ _ => by trivial)))
+
 /-- Controlled one-sided relational bind step on the left. -/
 def runRVCGenRawBindLeftStep : TacticM Bool := withMainContext do
   runRawRelWPBindLeftRule <||> runStdDoRelTripleBindLeftRule
@@ -713,6 +1062,8 @@ def runRVCGenRawBindRightStep : TacticM Bool := withMainContext do
 
 def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext do
   tryNormalizeRelBindStructure
+  if (← getGoals).isEmpty then
+    return true
   if ← runRawRelWPReflRule then
     return true
   if ← runRawRelWPPureRule then
@@ -722,13 +1073,15 @@ def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext
   if ← runRawRelWPVCSpecBackward then
     return true
   let target ← instantiateMVars (← getMainTarget)
+  if ← tryCloseRelGoalAtCoreGateway then
+    return true
   if let some (pre, oa, ob, _) := stdDoRelTripleGoalParts? target then
     let _ := pre
     let oa ← whnfReducible (← instantiateMVars oa)
     let ob ← whnfReducible (← instantiateMVars ob)
-    if ← tryCloseRelGoalImmediate then
-      return true
     if ← runERelPureRule then
+      return true
+    if ← runERelRndRule then
       return true
     if isBindExpr oa && isBindExpr ob then
       if ← runERelBindRule then
@@ -739,8 +1092,6 @@ def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext
   | some (oa, ob, post) =>
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
-      if ← tryCloseRelGoalImmediate then
-        return true
       if isIfExpr oa && isIfExpr ob then
         if ← runRelCondRule then
           return true
@@ -940,40 +1291,11 @@ def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : Ta
     return true
   return progress
 
-private def closeRelTheoremStepGoals : TacticM Unit := do
-  discard <| tryEvalTacticSyntax (← `(tactic|
-    all_goals try (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
-  discard <| tryEvalTacticSyntax (← `(tactic|
-    all_goals first
-      | assumption
-      | trivial
-      | (intro _; assumption)
-      | simp [Lean.Order.PartialOrder.rel]
-      | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)
-      | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
-      | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
-      | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-         intros; trivial)
-      | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
-      | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
-      | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
-      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; symm; assumption)
-      | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
-      | (try subst_vars
-         first
-           | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
-           | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
-           | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
-           | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-           | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
-           | (intro _; assumption)
-           | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)
-           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
-           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; symm; assumption)
-           | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
-           | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-              intros; trivial))))
+private def closeRelTheoremStepGoals (before : List MVarId) : TacticM Unit := do
+  let after ← getGoals
+  let (owned, rest) := ownedSubgoalsAfterMainStep before after
+  let remainingOwned ← closeOwnedRelSubgoals owned
+  setGoals (remainingOwned ++ rest)
 
 /-- Try to close a relational goal by applying postcondition monotonicity and
 closing both the inner triple and the implication from local hypotheses. -/
@@ -981,13 +1303,18 @@ def tryCloseRelGoalConseq : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.relTriple_post_mono <;> assumption))
 
+def runRelUptoRule (R : TSyntax `term) : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_post_mono (R := $R) ?_ ?_))
+
 private def runRVCGenStepWithTheoremDirect
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
   let saved ← saveState
   let ok ←
     match ← observing? do
+      let before ← getGoals
       evalTactic (← `(tactic| apply $thm))
-      closeRelTheoremStepGoals
+      closeRelTheoremStepGoals before
     with
     | some _ => pure true
     | none => pure false
@@ -1026,8 +1353,9 @@ private def runRVCGenStepWithTheoremConseq
           (stdDoRelTripleGoalParts? target).isSome ||
           isRawStdDoRelWPGoal target do
         throwError "rvcstep with theorem: failed to focus theorem subgoal after consequence rule"
+      let before ← getGoals
       evalTactic (← `(tactic| apply $thm))
-      closeRelTheoremStepGoals
+      closeRelTheoremStepGoals before
     with
     | some _ => pure true
     | none => pure false
@@ -1047,9 +1375,10 @@ private def runRelationalVCSpecRule
     let saved ← saveState
     let ok ←
       match ← observing? do
+        let before ← getGoals
         unless ← runVCSpecEntryRawRelConsequence entry do
           throwError "raw relational consequence rule did not apply"
-        closeRelTheoremStepGoals
+        closeRelTheoremStepGoals before
       with
       | some _ => pure true
       | none => pure false
@@ -1059,9 +1388,10 @@ private def runRelationalVCSpecRule
   let saved ← saveState
   let ok ←
     match ← observing? do
+      let before ← getGoals
       unless ← runVCSpecEntryCachedBackward entry do
         throwError "rvcstep: registered `@[vcspec]` rule did not apply"
-      closeRelTheoremStepGoals
+      closeRelTheoremStepGoals before
     with
     | some _ => pure true
     | none => pure false
@@ -1069,28 +1399,6 @@ private def runRelationalVCSpecRule
     return true
   saved.restore
   return false
-
-/-- Deterministic relational structural rules that are safe to try through the
-cached `@[vcspec]` path. These rules apply a theorem and leave explicit
-subgoals, but they do not choose cuts, bijections, or one-sided bind frontiers. -/
-private def deterministicRelVCSpecDecls : List Name := [
-  ``OracleComp.ProgramLogic.Relational.relTriple_pure_pure,
-  ``OracleComp.ProgramLogic.Relational.relTriple_map,
-  ``OracleComp.ProgramLogic.Relational.relTriple_if,
-  ``OracleComp.ProgramLogic.Relational.relTriple_replicate,
-  ``OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel,
-  ``OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel,
-  ``OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same,
-  ``OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl,
-  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_pure,
-  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_refl,
-  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_query_refl
-]
-
-private def isDeterministicRelVCSpecEntry (entry : VCSpecEntry) : Bool :=
-  match entry.declName? with
-  | some declName => deterministicRelVCSpecDecls.contains declName
-  | none => false
 
 /-- Try deterministic relational structural rules via cached `@[vcspec]`
 before the bespoke structural dispatcher. -/
@@ -1100,7 +1408,30 @@ private def runDeterministicRelVCSpecRule : TacticM Bool := do
     let some (oa, ob, _) := relationalGoalParts? target | return false
     let entries ← getRegisteredRelationalVCSpecEntries oa ob
     for entry in entries do
-      if entry.kind == .relTriple && isDeterministicRelVCSpecEntry entry then
+      if (relVCSpecTier entry).canRunInDefaultStructural then
+        if ← runRelationalVCSpecRule entry then
+          return true
+    return false
+
+/-- Try direct discrimination-tree hits for the current pair of computations.
+This is a default-safe registered-rule tier because it does not scan unrelated
+fallback theorems or choose among broad search candidates. -/
+private def runDirectRelVCSpecRule : TacticM Bool := do
+  withVCGenRegisteredTiming do
+    let target ← instantiateMVars (← getMainTarget)
+    let some kind :=
+      if (relTripleGoalParts? target).isSome then
+        some .relTriple
+      else if (relWPGoalParts? target).isSome || isRawStdDoRelWPGoal target then
+        some .relWP
+      else
+        none
+      | return false
+    let some (oa, ob, _) := relationalGoalParts? target <|> rawRelWPGoalParts? target
+      | return false
+    let entries ← getRegisteredRelationalVCSpecEntries oa ob
+    for entry in entries do
+      if entry.kind == kind && (relVCSpecTier entry).canRunInDefaultDirect then
         if ← runRelationalVCSpecRule entry then
           return true
     return false
@@ -1123,29 +1454,47 @@ private def relationalGoalKind? (target : Expr) : Option VCSpecKind :=
 private def takeCandidatePrefix (entries : Array VCSpecEntry) : Array VCSpecEntry :=
   (entries.toList.take 8).toArray
 
-private def registeredRVCGenRuleCandidateTiers : TacticM (Array (Array VCSpecEntry)) := do
+private def registeredRVCGenRuleCandidateTiers
+    (includeFallbackSearch : Bool := false) : TacticM (Array (Array VCSpecEntry)) := do
   let target ← instantiateMVars (← getMainTarget)
   let some kind := relationalGoalKind? target | return #[]
   let some (oa, ob, _) := relationalGoalParts? target <|> rawRelWPGoalParts? target | return #[]
   let goalPattern := classifyRelationalCompPattern oa ob
   let direct :=
-    (← getRegisteredRelationalVCSpecEntries oa ob).filter (·.kind == kind)
+    (← getRegisteredRelationalVCSpecEntries oa ob).filter fun entry =>
+      entry.kind == kind && (relVCSpecTier entry).canRunInDefaultDirect
   let fallbackAll :=
     (← getVCSpecEntriesOfKind kind).filter fun entry =>
-      !(direct.any fun directEntry => directEntry.theoremName! == entry.theoremName!)
+      includeFallbackSearch &&
+        (relVCSpecTier entry).canRunInFallbackSearch &&
+        !(direct.any fun directEntry => directEntry.theoremName! == entry.theoremName!)
   let fallbackPreferred := fallbackAll.filter (·.spec.compPattern == goalPattern)
   let fallbackFallback := fallbackAll.filter (·.spec.compPattern != goalPattern)
   let mut tiers : Array (Array VCSpecEntry) := #[]
-  for tier in #[direct, fallbackPreferred, fallbackFallback] do
+  let rawTiers :=
+    if includeFallbackSearch then
+      #[direct, fallbackPreferred, fallbackFallback]
+    else
+      #[direct]
+  for tier in rawTiers do
     let tier := takeCandidatePrefix tier
     unless tier.isEmpty do
       tiers := tiers.push tier
   return tiers
 
-/-- Find the registered relational `@[vcspec]` entries whose bounded
-application makes progress on the current goal. Prefers direct
-discrimination-tree hits on `(oa, ob)`, falling back to kind-matched entries
-filtered by structural compatibility. -/
+private def runRelationalVCSpecFallbackSearchStep : TacticM Bool := do
+  withVCGenRegisteredTiming do
+    for tier in ← registeredRVCGenRuleCandidateTiers (includeFallbackSearch := true) do
+      for entry in tier do
+        if (relVCSpecTier entry).canRunInFallbackSearch then
+          if ← runRelationalVCSpecRule entry then
+            return true
+    return false
+
+/-- Find default-safe registered relational `@[vcspec]` entries whose bounded
+application makes progress on the current goal. This uses direct
+discrimination-tree hits only; broad fallback/search tiers are reserved for
+`rvcfinish` / `rvcgen!`. -/
 def findRegisteredRVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
   withVCGenRegisteredTiming do
     for tier in ← registeredRVCGenRuleCandidateTiers do
@@ -1233,6 +1582,8 @@ def runRVCGenStructuralCore : TacticM Bool := do
     return true
   if ← runRVCGenCore then
     return true
+  if (← getGoals).isEmpty then
+    return true
   return progress
 
 /-- Choose one relational VCGen step and remember how to replay it explicitly. -/
@@ -1260,7 +1611,7 @@ def planRVCGenStep? : TacticM (Option PlannedStep) := do
   let closeStep :=
     mkRVCGenPlannedStep
       "rvcgen consequence close"
-      "rvcstep"
+      "rvcfinish"
       (withVCGenCloseTiming tryCloseRelGoalConseq)
   let closePreview ← previewPlannedStepWithGoals closeStep
   if closePreview.ok && closePreview.goalCount == 0 then
@@ -1303,6 +1654,8 @@ def runRVCGenStep : TacticM Bool := do
     let names ← getSuggestedIntroNames 1
     if ← introMainGoalNames names then
       progress := true
+  if ← tryCloseRelGoalImmediate then
+    return true
   if let some hintName ← findUniquePriorityRelHint? then
     if ← runRVCGenCoreUsing (mkIdent hintName) then
       return true
@@ -1310,18 +1663,25 @@ def runRVCGenStep : TacticM Bool := do
     return true
   if ← runRVCGenCore then
     return true
+  if ← runDirectRelVCSpecRule then
+    return true
   if let some hintName ← findUniqueRelHint? then
     if ← runRVCGenCoreUsing (mkIdent hintName) then
       return true
-  if ← withVCGenCloseTiming tryCloseRelGoalConseq then
+  if (← getGoals).isEmpty then
     return true
-  if let some entry := (← findRegisteredRVCGenRuleCandidates).toList.head? then
-    if ← runRelationalVCSpecRule entry then
-      return true
   return progress
 
 def runRVCGenStepUsing (hint : TSyntax `term) : TacticM Bool := do
   runRVCGenExplicitHintStep hint
+
+def runRVCGenStrictStepUsing (hint : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  discard <| tryLowerRelGoal
+  if ← runRVCGenCoreUsing hint then
+    return true
+  saved.restore
+  return false
 
 def runRVCGenPassPlanned : TacticM (Array PlannedStep) := do
   let goals ← getGoals
@@ -1480,7 +1840,28 @@ def runRVCGenCloseConseqPass : TacticM Bool := do
   setGoals newGoals
   return progress
 
-def runRVCGenFinish : TacticM Unit := do
+def runRVCGenFallbackVCSpecPass : TacticM Bool := do
+  let goals ← getGoals
+  if goals.isEmpty then
+    return false
+  let mut progress := false
+  let mut newGoals : Array MVarId := #[]
+  for goal in goals do
+    setGoals [goal]
+    if ← runRelationalVCSpecFallbackSearchStep then
+      progress := true
+      for newGoal in ← getGoals do
+        newGoals := newGoals.push newGoal
+    else
+      newGoals := newGoals.push goal
+  setGoals newGoals.toList
+  return progress
+
+def runRVCGenLeafFinish : TacticM Unit := do
+  let remaining ← closeOwnedRelSubgoals (← getGoals)
+  setGoals remaining
+
+def runRVCGenSearchFinish : TacticM Unit := do
   unless (← getGoals).isEmpty do
     let _ ← tryEvalTacticSyntax
       (← `(tactic| all_goals try simp only [game_rule]))
@@ -1489,8 +1870,8 @@ def runRVCGenFinish : TacticM Unit := do
       (← `(tactic| all_goals first
         | assumption
         | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
-        | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-           intros; trivial)
+        | exact OracleComp.ProgramLogic.Relational.relTriple_post_const
+            (fun _ _ => by trivial)
         | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
         | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
         | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
@@ -1504,10 +1885,15 @@ def runRVCGenFinish : TacticM Unit := do
              | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
              | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
              | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
-             | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-                intros; trivial))))
+             | exact OracleComp.ProgramLogic.Relational.relTriple_post_const
+                (fun _ _ => by trivial))))
+  unless (← getGoals).isEmpty do
+    discard <| runBoundedPasses "rvcgen fallback search" runRVCGenFallbackVCSpecPass
   unless (← getGoals).isEmpty do
     discard <| runBoundedPasses "rvcgen finish" runRVCGenCloseConseqPass
+
+def runRVCGenFinish : TacticM Unit :=
+  runRVCGenLeafFinish
 
 end Relational
 end TacticInternals
