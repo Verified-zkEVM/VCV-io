@@ -129,10 +129,6 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
         exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
-        apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;>
-          simp_all [OracleComp.ProgramLogic.Relational.EqRel])) then
-      return true
-    if ← tryEvalTacticSyntax (← `(tactic|
         apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
@@ -164,10 +160,6 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
           exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) then
         return true
       if ← tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;>
-            simp_all [OracleComp.ProgramLogic.Relational.EqRel])) then
-        return true
-      if ← tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) then
         return true
     if shape.isStdDo && isPureExpr shape.oa && isPureExpr shape.ob then
@@ -176,28 +168,6 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
         return true
     saved.restore
   return false
-
-/-- Expose the postcondition side-condition of a pure/pure relational leaf.
-
-This is deliberately weaker than `tryCloseRelGoalImmediate`: it is allowed to
-make progress and leave the resulting mathematical postcondition goal open. It
-is useful after tactic-chosen cuts, especially bijection couplings, where the
-structural step is clear but the final equality or projection fact belongs to
-the user's proof script. -/
-def peelRelPureGoalToPost : TacticM Bool := do
-  let some shape ← currentRelGoalShape? | return false
-  if shape.isStdDo || !isPureExpr shape.oa || !isPureExpr shape.ob then
-    return false
-  let saved ← saveState
-  unless ← tryEvalTacticSyntax (← `(tactic|
-      apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure)) do
-    saved.restore
-    return false
-  discard <| tryEvalTacticSyntax (← `(tactic|
-    first
-      | rfl
-      | simp_all [OracleComp.ProgramLogic.Relational.EqRel]))
-  return true
 
 private def relationalGoalParts? (target : Expr) : Option (Expr × Expr × Expr) :=
   match relTripleGoalParts? target with
@@ -380,7 +350,6 @@ def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
       let bijGoals ← getGoals
       setGoals [cont]
       let _ ← tryEvalTacticSyntax (← `(tactic| intro _ _ heq; subst heq))
-      let _ ← peelRelPureGoalToPost
       let contGoals ← getGoals
       setGoals (contGoals ++ bijGoals ++ rest)
       return true

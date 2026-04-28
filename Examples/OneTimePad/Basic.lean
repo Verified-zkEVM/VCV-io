@@ -93,8 +93,10 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₁))
   by_equiv
   rvcstep using (fun k : BitVec sp => k ^^^ c)
-  · simp only [show c = msg₀ ^^^ msg₁ from rfl,
+  · apply Relational.relTriple_pure_pure
+    simp only [show c = msg₀ ^^^ msg₁ from rfl,
       BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
+    rfl
   · exact hxor
 
 /-- The one-time pad has equal ciphertext rows: all messages yield the same
