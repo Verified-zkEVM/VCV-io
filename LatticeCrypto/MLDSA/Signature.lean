@@ -188,7 +188,12 @@ private lemma fipsSignAttempt_spec
     polyVecNorm (prims.lowBitsVec (w - cs2)) < p.gamma2 - p.beta ∧
     polyVecNorm ct0 < p.gamma2 ∧
     prims.hintWeight sig.h ≤ p.omega := by
-  sorry
+  unfold fipsSignAttempt at h
+  dsimp only at h
+  split_ifs at h with h_outer h_inner
+  rw [Option.some.injEq] at h
+  subst h
+  exact ⟨rfl, rfl, rfl, h_outer.1, h_outer.2, h_inner.1, h_inner.2⟩
 
 /-- Single-component recovery: `UseHint(MakeHint(-ct₀, r + ct₀), r + ct₀) = HighBits(r + s)`
 when `‖ct₀‖ ≤ γ₂`, `‖LowBits(r)‖ < γ₂ - β`, and `‖s‖ ≤ β`, and `r + s = w`.

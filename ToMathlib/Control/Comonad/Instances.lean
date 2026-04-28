@@ -469,6 +469,14 @@ theorem duplicate_duplicate (l : List α) (c : α) (r : List α) :
   · exact iterateLeft_duplicate l c r
   · exact iterateRight_duplicate l c r
 
+theorem duplicate_map' (f : α → β) (z : Zipper α) :
+    duplicate (map f z) = map (map f) (duplicate z) := by
+  cases z; exact duplicate_map _ _ _ _
+
+theorem duplicate_duplicate' (z : Zipper α) :
+    duplicate (duplicate z) = map duplicate (duplicate z) := by
+  cases z; exact duplicate_duplicate _ _ _
+
 /-- Pair two zippers element-wise, truncating to the shorter side. -/
 def coseq (za : Zipper α) (zb : Zipper β) : Zipper (α × β) :=
   ⟨List.zip za.left zb.left, (za.focus, zb.focus), List.zip za.right zb.right⟩
@@ -540,7 +548,12 @@ instance : LawfulComonad Zipper where
   extract_extend := by
     intro _ _ ⟨l, c, r⟩ f
     simp [Extend.extend, Extract.extract, duplicate, map, extract]
-  extend_assoc := sorry -- Proved conceptually via duplicate_map, duplicate_duplicate, and map_comp
+  extend_assoc := by
+    intro _ _ _ z f g
+    change map g (duplicate (map f (duplicate z))) =
+        map (fun w'a => g (map f (duplicate w'a))) (duplicate z)
+    rw [duplicate_map', duplicate_duplicate', map_comp, map_comp]
+    rfl
 
 end List.Zipper
 

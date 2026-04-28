@@ -192,8 +192,6 @@ def FreeMonad.toFreeContM : FreeMonad f α → FreeContM f α :=
 def FreeContM.toFreeMonad : FreeContM f α → FreeMonad f α :=
   fun x => x FreeMonad.roll FreeMonad.pure
 
-#print FreeContM.toFreeMonad
-
 @[simp]
 lemma FreeMonad.toFreeMonad_toFreeContM (x : FreeMonad f α) :
     FreeContM.toFreeMonad (FreeMonad.toFreeContM x) = x := by
