@@ -129,7 +129,15 @@ display = {
     },
 }
 ordered_labels = ["clean_build", "warm_rebuild", "test_path"]
-repo_prefixes = ("VCVio", "Examples", "ToMathlib", "VCVioWidgets", "VCVioTest")
+repo_prefixes = (
+    "ToMathlib",
+    "VCVio",
+    "FFI",
+    "LatticeCrypto",
+    "Examples",
+    "VCVioWidgets",
+    "Interop",
+)
 
 
 def load_records(path: pathlib.Path) -> dict[str, dict]:

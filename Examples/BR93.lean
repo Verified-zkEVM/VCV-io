@@ -83,13 +83,9 @@ theorem correct (hcorrect : tdp.Correct) :
     simp only [support_pure, Set.mem_singleton_iff] at hc hy
     subst hc; subst hy
     simp [hcorrect pk sk hpksk r]
-  have hnot : ∀ y ≠ true, Pr[= y | mx] = 0 :=
-    fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
-  have hsum : ∑' x, Pr[= x | mx] = Pr[= true | mx] :=
-    tsum_eq_single true hnot
-  have htot := probFailure_add_tsum_probOutput mx
-  rw [NeverFail.probFailure_eq_zero, hsum, zero_add] at htot
-  exact htot
+  change Pr[= true | mx] = 1
+  exact probOutput_eq_one_of_support_subset_singleton
+    (NeverFail.probFailure_eq_zero (mx := mx)) huniq
 
 /-! ## One-time IND-CPA in the random-oracle model -/
 

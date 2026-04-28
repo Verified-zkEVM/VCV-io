@@ -28,10 +28,11 @@ The contract is therefore enforced at three levels:
    so it is fast and never blocks on Mathlib cache or build flakiness.
 3. **Reverse direction**: `Interop/**` may import from `VCVio/**`,
    `ToMathlib/**`, `Hax.…`, and `Aeneas.…`, but **not** from
-   `LatticeCrypto/**`, `Examples/**`, `LatticeCryptoTest/**`, `FFI/**`, or
-   `VCVioWidgets/**`. Those libraries are themselves clients of VCVio, so
-   Interop depending on them would create circular layering and pull
-   user-facing libraries into the Interop TCB.
+   `LatticeCrypto/**`, `Examples/**`, `LatticeCryptoTest/**`, `FFI/**`,
+   `VCVioWidgets/**`, or `VCVioTest/**`.
+   Those libraries are themselves clients of VCVio, so Interop depending on
+   them would create circular layering and pull user-facing libraries into the
+   Interop TCB.
 
 The isolation script accepts no flags besides `--help`; just run
 `bash scripts/check-interop-isolation.sh` from the repo root.
@@ -43,13 +44,17 @@ move the shared piece into `VCVio/` first.
 
 ```
 Interop/
-├── README.md          ← contract summary + quick reference
-├── Rust/              ← framework-side Rust target monad
-│   └── Common.lean    ← `RustOracleComp`, mirrored `Error`, `Std.Do.WP` glue
-├── Hax/               ← bridge to `Hax.RustM` (gated on hax require)
-│   └── README.md      ← design + how to enable
-└── Aeneas/            ← bridge to `Aeneas.Std.Result` (gated on aeneas require)
-    └── README.md      ← design + toolchain blocker
+├── README.md             ← contract summary + quick reference
+├── Rust/                 ← framework-side Rust target monad
+│   ├── Common.lean       ← `RustOracleComp`, mirrored `Error`, `Std.Do.WP` glue
+│   └── Run.lean          ← reusable `.run.run` peel lemmas for the stack
+├── Hax/                  ← bridge to `Hax.RustM` (gated on hax require)
+│   ├── README.md
+│   ├── Bridge.lean       ← `liftRustM`, `errorOfHax`, `@[spec]` bridge lemmas
+│   ├── Examples.lean     ← hand-crafted hax bridge demos
+│   └── *.lean            ← emitted hax examples and proofs
+└── Aeneas/               ← bridge to `Aeneas.Std.Result` (currently disabled)
+    └── README.md
 ```
 
 `Rust/Common.lean` is **self-contained**: it builds without hax or aeneas
@@ -87,13 +92,14 @@ is a deliberate one-line change reviewed alongside any TCB delta. The
 isolation check runs regardless of whether the requires are active, so
 the contract holds even mid-experiment.
 
-**Require-order rule.** `require Hax` (and any future backend require)
-must appear *before* `require "leanprover-community" / "mathlib"`. Hax
-transitively pins `Qq` at `v4.29.0-rc1`, Mathlib pins it at the final
-release. Lake's conflict resolver takes the *last* `require` of each
-package, so Mathlib must be last. Wrong order produces
-`mathlib: failed to fetch cache` on `lake update`, with a clear warning
-from Lake.
+**Require-order rule.** `require Hax` (and any future backend require) must
+appear *before* `require "leanprover-community" / "mathlib"`. The current
+`loom2` require also sits before Mathlib because it is part of the same
+toolchain-sensitive dependency block. Hax transitively pins `Qq` at
+`v4.29.0-rc1`, Mathlib pins it at the final release. Lake's conflict resolver
+takes the *last* `require` of each package, so Mathlib must be last. Wrong
+order produces `mathlib: failed to fetch cache` on `lake update`, with a clear
+warning from Lake.
 
 ## Toolchain Status (empirical, as of 2026-04-17)
 

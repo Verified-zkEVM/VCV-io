@@ -1068,8 +1068,32 @@ private lemma probOutput_diag_le_min_marginals
     (c : SPMF.Coupling (𝒟[oa]) (𝒟[ob])) (a : α) :
     Pr[= (a, a) | c.1] ≤ min (Pr[= a | 𝒟[oa]]) (Pr[= a | 𝒟[ob]]) := by
   refine le_min ?_ ?_
-  · have := c.2.map_fst; grind [probEvent_mono]
-  · have := c.2.map_snd; grind [probEvent_mono]
+  · calc
+      Pr[= (a, a) | c.1] = Pr[fun z : α × α => z = (a, a) | c.1] :=
+        (probEvent_eq_eq_probOutput c.1 (a, a)).symm
+      _ ≤ Pr[fun z : α × α => z.1 = a | c.1] :=
+        _root_.probEvent_mono fun z _ hz => by
+          simp [hz]
+      _ = Pr[fun x : α => x = a | Prod.fst <$> c.1] := by
+        simpa only [Function.comp_apply] using
+          (probEvent_map (mx := c.1) (f := Prod.fst) (q := fun x : α => x = a)).symm
+      _ = Pr[= a | Prod.fst <$> c.1] := by
+        rw [probEvent_eq_eq_probOutput]
+      _ = Pr[= a | 𝒟[oa]] := by
+        rw [c.2.map_fst]
+  · calc
+      Pr[= (a, a) | c.1] = Pr[fun z : α × α => z = (a, a) | c.1] :=
+        (probEvent_eq_eq_probOutput c.1 (a, a)).symm
+      _ ≤ Pr[fun z : α × α => z.2 = a | c.1] :=
+        _root_.probEvent_mono fun z _ hz => by
+          simp [hz]
+      _ = Pr[fun x : α => x = a | Prod.snd <$> c.1] := by
+        simpa only [Function.comp_apply] using
+          (probEvent_map (mx := c.1) (f := Prod.snd) (q := fun x : α => x = a)).symm
+      _ = Pr[= a | Prod.snd <$> c.1] := by
+        rw [probEvent_eq_eq_probOutput]
+      _ = Pr[= a | 𝒟[ob]] := by
+        rw [c.2.map_snd]
 
 private lemma eRelWP_indicator_eqRel_le
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α} :

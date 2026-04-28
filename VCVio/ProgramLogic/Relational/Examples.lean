@@ -75,6 +75,26 @@ example {a : α} {b : β} {R : RelPost α β} (h : R a b) :
       (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) R :=
   relTriple_pure_pure h
 
+example {oa mid : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob R) :
+    RelTriple oa ob R :=
+  relTriple_trans_eqRel_left
+    (spec₁ := spec₁) (spec₂ := spec₁) (spec₃ := spec₂) hleft hright
+
+example {oa : OracleComp spec₁ α} {mid ob : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (hleft : RelTriple oa mid R) (hright : RelTriple mid ob (EqRel β)) :
+    RelTriple oa ob R :=
+  relTriple_trans_eqRel_right
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₂) hleft hright
+
+example {oa mid : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob (EqRel α)) :
+    RelTriple oa ob (EqRel α) :=
+  relTriple_trans_eqRel
+    (spec₁ := spec₁) (spec₂ := spec₁) (spec₃ := spec₂) hleft hright
+
 /-! ### Tactic-mode examples (using `rvcstep`) -/
 
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
@@ -97,18 +117,21 @@ is closed by the leaf closer without intermediate planning. -/
 
 example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) :
     RelTriple oa ob (fun _ _ => True) := by
-  rvcgen
+  rvcstep
 
 example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (fa : α → OracleComp spec₁ γ) (fb : β → OracleComp spec₂ δ) :
     RelTriple (oa >>= fa) (ob >>= fb) (fun _ _ => True) := by
-  rvcgen
+  rvcstep
 
 example (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     RelTriple
       (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₀, ()))
       (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₁, ()))
       (fun z₁ z₂ => z₁.2 = z₂.2) := by
-  rvcgen
+  refine relTriple_bind_uniformSample_bij (f := fun key : BitVec sp => key) ?_ ?_
+  · intro key
+    exact relTriple_pure_pure rfl
+  · exact Function.bijective_id
 
 end OracleComp.ProgramLogic.Relational

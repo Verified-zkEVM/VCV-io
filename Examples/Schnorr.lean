@@ -125,8 +125,7 @@ theorem sigma_hvzk (g : G) [Finite F] :
     rvcstep
     intro c _ hc; subst hc
     rvcstep using (· + c * sk)
-    · rvcgen
-    · exact ⟨fun _ _ h => add_right_cancel h, fun z => ⟨z - c * sk, sub_add_cancel z _⟩⟩
+    exact ⟨fun _ _ h => add_right_cancel h, fun z => ⟨z - c * sk, sub_add_cancel z _⟩⟩
 
 omit [Fintype F] [DecidableEq F] in
 /-- Closed-form for the Schnorr `realTranscript`: the real transcript is the joint

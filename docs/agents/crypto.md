@@ -8,28 +8,25 @@ see [`docs/agents/lattice.md`](lattice.md).
 ### Asymmetric encryption (`AsymmEncAlg`)
 
 ```lean
-structure AsymmEncAlg (m : Type → Type) (M PK SK C : Type)
-    extends ExecutionMethod m where
+structure AsymmEncAlg (m : Type → Type u) [Monad m] (M PK SK C : Type) where
   keygen : m (PK × SK)
-  encrypt : PK → M → m C
-  decrypt : SK → C → Option M
+  encrypt : (pk : PK) → (msg : M) → m C
+  decrypt : (sk : SK) → (c : C) → m (Option M)
 ```
 
 ### Symmetric encryption (`SymmEncAlg`)
 
 ```lean
-structure SymmEncAlg (M K C : ℕ → Type) (Q : Type)
-    extends OracleContext Q ProbComp where
-  keygen (sp : ℕ) : OracleComp spec (K sp)
-  encrypt {sp : ℕ} (k : K sp) (msg : M sp) : OracleComp spec (C sp)
-  decrypt {sp : ℕ} (k : K sp) (c : C sp) : OptionT (OracleComp spec) (M sp)
+structure SymmEncAlg (m : Type → Type u) [Monad m] (M K C : Type) where
+  keygen : m K
+  encrypt : K → M → m C
+  decrypt : K → C → m (Option M)
 ```
 
 ### Signatures (`SignatureAlg`)
 
 ```lean
-structure SignatureAlg (m : Type → Type) (M PK SK S : Type)
-    extends ExecutionMethod m where
+structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type) where
   keygen : m (PK × SK)
   sign (pk : PK) (sk : SK) (msg : M) : m S
   verify (pk : PK) (msg : M) (σ : S) : m Bool
@@ -63,10 +60,11 @@ structure IdenSchemeWithAbort
 The key difference from `SigmaProtocol` is that `respond` returns `Option Resp` (abort on `none`).
 Used by ML-DSA and the Fiat-Shamir with Aborts transform.
 
-### Key difference: `OracleContext` vs `ExecutionMethod`
+### Key difference: monad-parametric algorithm surfaces
 
-- `SymmEncAlg` extends `OracleContext` — operations are `OracleComp spec`, spec comes from context
-- `AsymmEncAlg` / `SignatureAlg` extend `ExecutionMethod` — operations are in abstract `m`, converted via `exec`
+- `SymmEncAlg`, `AsymmEncAlg`, and `SignatureAlg` are plain structures over an abstract monad `m`.
+- Instantiate them with `ProbComp`, `OracleComp spec`, `OptionT (OracleComp spec)`, or another monad at the security surface that needs those effects.
+- Probability and failure semantics are supplied by the surrounding experiment or semantic class, not by parent classes on the algorithm structure.
 
 ### Instantiation pattern
 
@@ -74,18 +72,15 @@ Used by ML-DSA and the Fiat-Shamir with Aborts transform.
 @[simps!] def myAlg : AsymmEncAlg ProbComp M PK SK C where
   keygen := do ...
   encrypt pk msg := do ...
-  decrypt sk c := ...
-  __ := ExecutionMethod.default
+  decrypt sk c := do ...
 ```
-
-For `SymmEncAlg`, use `__ := unifSpec.defaultContext`.
 
 ## Security Experiments
 
 ### `SecExp`
 
 ```lean
-structure SecExp (m : Type → Type) extends ExecutionMethod m where
+structure SecExp (m : Type → Type w) [Monad m] extends SPMFSemantics m where
   main : m Unit
 ```
 
@@ -137,15 +132,13 @@ Defined in `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`.
 ### Hard Relations
 
 ```lean
-structure GenerableRelation (X W : Type) (r : X → W → Bool)
-    [SampleableType X] [SampleableType W] where
+structure GenerableRelation (X W : Type) (r : X → W → Bool) where
   gen : ProbComp (X × W)
   gen_sound (x : X) (w : W) : (x, w) ∈ support gen → r x w
-  gen_uniform_right (x : X) : Pr[= x | Prod.fst <$> gen] = Pr[= x | $ᵗ X]
-  gen_uniform_left (w : W) : Pr[= w | Prod.snd <$> gen] = Pr[= w | $ᵗ W]
 ```
 
-Note: the relation is `r : X → W → Bool` (not `Prop`), and `[SampleableType]` instances are required for both types.
+Note: the relation is `r : X → W → Bool` (not `Prop`). If a reduction needs
+uniform marginal guarantees, state them as separate hypotheses or structure fields.
 
 ## Building a Reduction
 
@@ -168,12 +161,15 @@ def myReduction (adversary : ...) : DDHAdversary F G := fun g A B T => do
 
 ### Hybrid Argument Pattern
 
-For q-query IND-CPA → DDH (as in `Examples/ElGamal/Basic.lean`):
+For a hand-written q-query IND-CPA → DDH hybrid proof:
 
 1. Define `HybridGame adversary k`: first `k` queries use real encryption, rest use random
 2. `HybridGame 0 = IND-CPA random`, `HybridGame q = IND-CPA real`
 3. Per-step reduction: `stepDDHReduction adversary k` maps DDH challenge to hybrid k vs k+1
 4. Telescope: `advantage ≤ q * max_per_step_advantage`
+
+`Examples/ElGamal/Basic.lean` currently obtains its q-query bound by instantiating
+the generic one-time IND-CPA lift in `VCVio/CryptoFoundations/AsymmEncAlg/INDCPA/GenericLift.lean`.
 
 ### Oracle Wiring for Stateful Reductions
 
@@ -264,7 +260,7 @@ Key results: `fst_map_costDist` (instrumentation is transparent),
 
 1. **Avoid `guard`**: use `return (b == b')` or `return decide (r x w)` instead. `guard` requires `OptionT` / `Alternative`.
 
-2. **`SymmEncAlg` vs `AsymmEncAlg`**: different parent classes (`OracleContext` vs `ExecutionMethod`), different oracle access patterns.
+2. **`SymmEncAlg` vs `AsymmEncAlg`**: both are monad-parametric, but symmetric schemes carry a single key type while asymmetric schemes split public and secret keys. Pick the monad at the experiment boundary.
 
 3. **DDH experiment uses `$ᵗ Bool`**: the experiment samples a bit `b`, returns real or random based on `b`, then checks `b == b'`.
 
