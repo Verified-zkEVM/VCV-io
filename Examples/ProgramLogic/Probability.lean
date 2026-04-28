@@ -20,7 +20,7 @@ open OracleComp.ProgramLogic
 open scoped OracleComp.ProgramLogic
 
 variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
-variable {α β γ δ ε : Type}
+variable {α β γ δ ε ζ : Type}
 
 /-! ## Congruence -/
 
@@ -61,6 +61,19 @@ example {mw : OracleComp spec α} {mx : OracleComp spec β}
     Pr[= out | mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z => f w x y z] =
     Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
   vcstep
+
+/-! ## Explicit normalization -/
+
+example {mv : OracleComp spec α} {mw : OracleComp spec β}
+    {mx : OracleComp spec γ} {my : OracleComp spec δ} {mz : OracleComp spec ε}
+    {f : α → β → γ → δ → ε → OracleComp spec ζ} {out : ζ} :
+    Pr[= out |
+      mv >>= fun v => mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z =>
+        f v w x y z] =
+    Pr[= out |
+      mv >>= fun v => mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y =>
+        f v w x y z] := by
+  vcstep rw normalize
 
 example {mw : OracleComp spec α} {mx : OracleComp spec β}
     {my : OracleComp spec γ} {mz : OracleComp spec δ}

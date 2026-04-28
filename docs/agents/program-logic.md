@@ -93,6 +93,7 @@ probability goals, automatically lowering `Pr[...]` into the quantitative engine
 | `vcstep inv I` | Explicit loop invariant for `replicate`/`foldlM`/`mapM` |
 | `vcstep rw` | One explicit top-level bind-swap rewrite on a `Pr[...] = Pr[...]` goal |
 | `vcstep rw under n` | One bind-swap rewrite under `n` shared outer bind prefixes |
+| `vcstep rw normalize` | Run the bounded probability-equality planner explicitly |
 | `vcstep rw congr` | Expose one or more shared binds plus their support hypotheses |
 | `vcstep rw congr'` | Expose one or more shared binds without support hypotheses |
 | `exp_norm` | Normalize indicator (`propInd`) and expectation (`wp`) arithmetic |
@@ -114,6 +115,7 @@ classes of probability goals:
      `bind_assoc`), then preview-selects the best bounded swap/congruence plan from the fast path
    - `vcstep rw` performs exactly one top-level bind-swap rewrite
    - `vcstep rw under n` rewrites one swap beneath `n` shared outer bind prefixes
+   - `vcstep rw normalize` runs the deeper bounded planner used for explicit suggestions
    - `vcstep rw congr` / `vcstep rw congr'` expose one or more shared binds explicitly
 
 4. **Other general `Pr[...]` goals** → rewrite to raw `wp` form and keep stepping structurally
@@ -234,6 +236,7 @@ All probability-equality control now lives under `vcstep`.
 | `vcstep` | Fast dispatcher for common `Pr[...] = Pr[...]` steps: syntax normalization, swap, congruence, and bounded compositions chosen by preview |
 | `vcstep rw` | Rewrites one top-level bind swap without trying to close the goal |
 | `vcstep rw under n` | Rewrites one bind swap under `n` shared outer bind prefixes on one side |
+| `vcstep rw normalize` | Runs the bounded probability-equality planner explicitly, without broadening plain `vcstep` |
 | `vcstep rw congr` | Reduces `Pr[... \| mx >>= f₁] = Pr[... \| mx >>= f₂]` to a pointwise goal, auto-introducing `x` and `hx : x ∈ support mx`; the explicit `as ⟨...⟩` form can peel multiple shared binds at once |
 | `vcstep rw congr'` | Same, but without the support restriction; the explicit `as ⟨...⟩` form can peel multiple shared binds at once |
 
@@ -262,6 +265,7 @@ On `Pr[...] = Pr[...]` goals, plain `vcstep` already tries the common
 
 - **Need to keep going after a swap**: use `vcstep rw`
 - **Need to swap below shared outer binds**: use `vcstep rw under n`
+- **Need the bounded planner to choose a swap/congruence chain now**: use `vcstep rw normalize`
 - **Need to expose one or more common outer binds with support information**: use `vcstep rw congr`
 - **Need the support-free congruence variant**: use `vcstep rw congr'`
 - **Need the full explicit replay for a bounded nested swap**: use `vcstep?`
@@ -289,6 +293,11 @@ vcstep rw
 **Rewrite under one shared bind**:
 ```lean
 vcstep rw under 1
+```
+
+**Run the bounded probability-equality planner explicitly**:
+```lean
+vcstep rw normalize
 ```
 
 **Expose one common bind with support information**:

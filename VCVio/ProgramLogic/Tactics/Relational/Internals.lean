@@ -358,6 +358,16 @@ private def tryCloseRelOwnedGoalCheap : TacticM Bool := do
         | assumption
         | trivial
         | (intros; assumption)
+        | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;>
+            first | rfl | assumption | symm; assumption)
+        | (intros
+           subst_vars
+           first
+             | assumption
+             | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+             | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;>
+                first | rfl | assumption | symm; assumption))
         | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)))
   return ok && (← getGoals).isEmpty
 
@@ -467,6 +477,7 @@ def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
     | cont :: bijGoals =>
         setGoals [cont]
         let _ ← tryEvalTacticSyntax (← `(tactic| intro x))
+        discard <| tryCloseRelOwnedGoalCheap
         let contGoals ← getGoals
         setGoals (contGoals ++ bijGoals)
         return true
@@ -499,6 +510,7 @@ def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
       let bijGoals ← getGoals
       setGoals [cont]
       let _ ← tryEvalTacticSyntax (← `(tactic| intro _ _ heq; subst heq))
+      discard <| tryCloseRelOwnedGoalCheap
       let contGoals ← getGoals
       setGoals (contGoals ++ bijGoals ++ rest)
       return true

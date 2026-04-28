@@ -103,9 +103,6 @@ theorem rvcstep_trans_postprocess_right [SampleableType α] (f : α → β) (g :
       pure (f x))
   · exact relTriple_refl _
   · rvcstep using EqRel α
-    intro x₁ x₂ h
-    subst h
-    rvcfinish
 
 theorem rvcstep_trans_postprocess_left [SampleableType α] (f : β → γ) (g : α → β) :
     ⟪(do
@@ -120,9 +117,6 @@ theorem rvcstep_trans_postprocess_left [SampleableType α] (f : β → γ) (g : 
       let x ← ($ᵗ α : ProbComp α)
       pure (g x))
   · rvcstep using EqRel α
-    intro x₁ x₂ h
-    subst h
-    rvcfinish
   · exact relTriple_refl _
 
 /--
@@ -160,8 +154,7 @@ example [SampleableType α]
      ~ (($ᵗ α : ProbComp α) >>= fun x => pure x)
      | fun x y => y = f x⟫ := by
   rvcstep using f
-  · exact relTriple_pure_pure rfl
-  · exact hf
+  exact hf
 
 example [SampleableType α] (post : α → α → ℝ≥0∞) :
     ⦃∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a a⦄

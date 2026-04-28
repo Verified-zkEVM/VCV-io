@@ -178,16 +178,8 @@ theorem pir_correct (hchar : ∀ x : W, x + x = 0)
       (List.nodup_finRange N) ([], []) ss hss
     simp only [pirResponse, List.foldl_nil, add_zero, List.mem_finRange, ↓reduceIte, zero_add] at h
     exact hy.trans h
-  -- All outputs other than a i₀ have probability 0
-  have hnot : ∀ y ≠ a i₀, Pr[= y | pirMain a i₀] = 0 :=
-    fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
-  -- The total probability collapses to Pr[= a i₀ | ...]
-  have hsum : ∑' x, Pr[= x | pirMain a i₀] = Pr[= a i₀ | pirMain a i₀] :=
-    tsum_eq_single (a i₀) hnot
-  -- ProbComp never fails; combine with total probability = 1
-  have htot := probFailure_add_tsum_probOutput (pirMain a i₀)
-  rw [NeverFail.probFailure_eq_zero, hsum, zero_add] at htot
-  exact htot
+  exact probOutput_eq_one_of_support_subset_singleton
+    (NeverFail.probFailure_eq_zero (mx := pirMain a i₀)) huniq
 
 /-- Privacy of the first server view: the distribution of the first query set `s`
 is independent of which index is being queried. Intuitively, each index `j` appears in `s` with
