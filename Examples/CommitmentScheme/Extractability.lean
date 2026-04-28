@@ -237,7 +237,7 @@ private lemma extractabilityInner_totalBound [Finite C] {t : ℕ}
     have := A.totalBound
     omega)
 
-omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- The tagged inner computation has the same query bound as the untagged one. -/
 private lemma extractabilityInner_tagged_totalBound [Finite C] {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
