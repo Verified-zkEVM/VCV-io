@@ -194,7 +194,7 @@ theorem Skeleton.leafCount_internal (left right : Skeleton) :
 /-- Every skeleton has at least one leaf. -/
 theorem Skeleton.leafCount_pos : ∀ s : Skeleton, 0 < s.leafCount
   | Skeleton.leaf => Nat.zero_lt_one
-  | Skeleton.internal left right =>
+  | Skeleton.internal left _ =>
     Nat.add_pos_left (Skeleton.leafCount_pos left) _
 
 /-- The depth of any leaf index is bounded by the depth of its skeleton. -/
