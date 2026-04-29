@@ -39,6 +39,31 @@ Fiat-Shamir transform → managed-RO NMA → replay forking → DLog), see
 section of the README. The Schnorr-specific σ-protocol facts that feed in
 live in [`Examples/Schnorr.lean`](../../Examples/Schnorr.lean).
 
+### Commitment schemes (`CommitmentScheme`)
+
+```lean
+structure CommitmentScheme (PP M C D : Type) where
+  setup : ProbComp PP
+  commit (pp : PP) (m : M) : ProbComp (C × D)
+  verify (pp : PP) (m : M) (c : C) (d : D) : Bool
+```
+
+Defined in
+[`VCVio/CryptoFoundations/CommitmentScheme.lean`](../../VCVio/CryptoFoundations/CommitmentScheme.lean)
+together with `PerfectlyCorrect`, `PerfectlyHiding`, `hidingExp`,
+`bindingExp`, and `extractExp`. The standard-model `binding ≤ keyed-CR ≤
+birthday` bridge from a `KeyedHashFamily` lives in
+[`VCVio/CryptoFoundations/HashCommitment.lean`](../../VCVio/CryptoFoundations/HashCommitment.lean)
+as `bindingAdvantage_toCommitment_le_keyedCRAdvantage`.
+
+For an end-to-end ROM proof of binding, extractability, and hiding for the
+textbook `Commit(m) = (H(m, s), s)` scheme — exercising `cachingOracle`,
+`loggingOracle`, the birthday bound, and identical-until-bad — see
+[`Examples/CommitmentScheme.lean`](../../Examples/CommitmentScheme.lean)
+and the
+[End-to-end example](../../README.md#end-to-end-example-rom-commitment-scheme)
+section of the README.
+
 ### Sigma protocols (`SigmaProtocol`)
 
 ```lean

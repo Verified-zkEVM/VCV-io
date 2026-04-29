@@ -6,20 +6,66 @@ Authors: James Waters
 import Examples.CommitmentScheme.Common
 import ToMathlib.Data.ENNReal.Gauss
 
+/-!
+# Extractability for the random-oracle commitment scheme
+
+Witness extractability for the textbook ROM commitment scheme
+`Commit(m) = (H(m, s), s)`, with the explicit log-scanning extractor
+`CMExtract`.
+
+## Textbook statement (Lemma cm-extractability)
+
+There exists a deterministic extractor `E` such that for every `t`-query
+two-phase adversary `A = (A_commit, A_open)`,
+
+```
+Pr[Check^H(c, m, s) = 1 ∧ E(c, trace) ≠ (m, s)] ≤ ½ · t² / |C|.
+```
+
+The extractor `E` scans the commit-phase query-answer trace for an entry
+whose answer matches the commitment `c`. The instantiation here is
+`CMExtract`: `List.find?` for the first log entry whose hash output equals
+the commitment.
+
+## Theorem in this file
+
+| Theorem                  | Bound                       | Precondition
+| ------------------------ | --------------------------- | ------------
+| `extractability_bound`   | `(t·(t-1) + 2) / (2·|C|)`   | `t ≥ 3`
+
+The `t ≥ 3` precondition is where the case-split bound
+`max(t + 1, t·(t-1)/2 + 1)` collapses to its `t·(t-1)/2 + 1` branch (see
+`extractability_num_le`); below that, the trivial `t ≤ 2` regime is not
+interesting.
+
+## Proof structure
+
+The decomposition (`extractability_win_le_textbook_bound`) splits into
+
+```
+Pr[extractability win]
+  ≤ Pr[commit cache already has a collision]              -- birthday term
+  + Pr[fresh open/verify query produces commitment value] -- fresh-hit term
+  ≤ t₁·(t₁-1) / (2·|C|) + (t₂ + 1) / |C|.
+```
+
+Maximising the right-hand side over `t₁ + t₂ ≤ t` (using
+`extractability_num_le`) yields `(t·(t-1) + 2) / (2·|C|)` for `t ≥ 3`.
+
+The same shape of bound as `binding_bound` in
+`Examples/CommitmentScheme/Binding.lean`: birthday + single fresh-query
+unpredictability, but here applied to a two-phase adversary with separate
+commit and open phases.
+-/
+
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
   [Fintype M] [Fintype S] [Fintype C]
   [Inhabited M] [Inhabited S] [Inhabited C]
-/-! ## 2. Extractability
 
-**Textbook (Lemma cm-extractability)**: There exists a deterministic extractor E
-such that for every `t`-query two-phase adversary A = (A_commit, A_open):
-  Pr[Check^H(c,m,s) = 1 ∧ E(c, trace) ≠ (m,s)] ≤ ½ · t² / |C|
-
-The extractor E scans the commit-phase query-answer trace for an entry
-whose answer matches the commitment c. -/
+/-! ## Adversary, extractor, and game -/
 
 /-- An extractability adversary with two phases. -/
 structure ExtractAdversary (M : Type) (S : Type) (C : Type) (AUX : Type) (t : ℕ)
@@ -122,6 +168,12 @@ private lemma extractabilityInner_eq_fst_tagged {t : ℕ}
   cases tr.find? (fun entry => decide (entry.2 = cm)) with
   | some entry => simp
   | none => simp
+
+/-! ## Some-case branch: extractor returned, but disagrees with the opening
+
+When `CMExtract` returns an entry `(m', s')` from the commit trace and the
+adversary opens to a *different* `(m, s)`, both inputs hash to the same
+commitment value, which directly witnesses a cache collision. -/
 
 /- The some-case win (extractor found a different opening) implies cache collision.
 
@@ -292,7 +344,13 @@ private def extractabilityRestOa {t : ℕ}
       | some (m', s') => (c == cm) && decide ((m', s') ≠ (m, s))
       | none => (c == cm)
 
-set_option maxHeartbeats 400000 in
+/-! ## None-case branch: extractor returned nothing, fresh open/verify lands on `cm`
+
+If `CMExtract` returns `none`, every accepting opening corresponds to a
+*fresh* post-commit cache entry equal to the commitment value. We bound
+the probability of this by `(t₂ + 1) / |C|` via the per-query
+unpredictability of a fresh random-oracle answer. -/
+
 /- Under a collision-free commit cache, any extractability win must create a fresh
 post-commit cache entry equal to the commitment value. -/
 omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
@@ -442,6 +500,8 @@ private lemma extractability_rest_noCollision_le_inv {t : ℕ}
         (n := A.t₂ + 1) hrest_bound (fun _ => le_refl _)
         cm cache₁ hno
 
+/-! ## Top-level decomposition and main theorem -/
+
 /- The extraction error decomposes into collision in commit trace plus fresh query
 matching `cm`. The commit trace has `≤ t₁` entries (birthday bound `t₁(t₁-1)/(2|C|)`),
 and the open+verify phase has `≤ t₂+1` fresh queries matching `cm` (`(t₂+1)/|C|`).
@@ -506,10 +566,31 @@ private lemma extractability_win_le_textbook_bound {t : ℕ} (ht : 3 ≤ t)
           simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
             add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
 
-/- **Extractability theorem (Lemma cm-extractability)**: for `t ≥ 3`,
-`Pr[win] ≤ (t(t-1)+2) / (2|C|)`. Combines the case-split decomposition
-`extractability_win_le_textbook_bound` with arithmetic. -/
 omit [Fintype M] [Fintype S] in
+/-- **Extractability bound for the ROM commitment scheme (Lemma cm-extractability).**
+
+For every two-phase `t`-query adversary `A = (A_commit, A_open)` with
+`t ≥ 3`, the explicit log-scanning extractor `CMExtract` satisfies
+
+```
+Pr[Check accepts ∧ extractor disagrees with the opening]
+  ≤ (t·(t-1) + 2) / (2·|C|).
+```
+
+Within constants this matches the textbook `½ · t² / |C|`.
+
+Proof: `extractability_win_le_textbook_bound` decomposes the win event into
+a collision in the commit-phase cache (bounded by the tight birthday bound
+`t₁·(t₁-1) / (2·|C|)`) plus a fresh open/verify query landing on the
+commitment value (bounded by `(t₂ + 1) / |C|` via
+`extractability_rest_noCollision_le_inv`). The arithmetic
+`extractability_num_le` then maximises the sum over `t₁ + t₂ ≤ t`; for
+`t ≥ 3` the maximum collapses to the `t·(t-1)/2 + 1` branch, giving the
+displayed bound.
+
+This is the same proof shape as `binding_bound`: birthday collision +
+single fresh-query unpredictability. The `t ≥ 3` hypothesis is precisely
+where the case-split max collapses; the `t ≤ 2` regime is degenerate. -/
 theorem extractability_bound {t : ℕ} (ht : 3 ≤ t)
     (A : ExtractAdversary M S C AUX t) :
     Pr[fun z => z.1 = true | extractabilityGame CMExtract A] ≤

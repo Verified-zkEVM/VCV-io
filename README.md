@@ -94,6 +94,59 @@ where `ε` is the EUF-CMA advantage of an adversary with `qS` signing-oracle
 queries and `qH` random-oracle queries, and `δ_verify` is the verification
 slack supplied by the caller via `SigmaProtocol.verifyChallengePredictability`.
 
+## End-to-end example: ROM commitment scheme
+
+A second end-to-end example, exercising a different axis of the framework
+(caching, logging, identical-until-bad, birthday bounds), lives in
+[`Examples/CommitmentScheme.lean`](Examples/CommitmentScheme.lean). It
+proves binding, extractability, and hiding bounds for the textbook ROM
+commitment scheme
+
+```
+Commit(m) = (H(m, s), s),     s ←$ S,
+Check(c, m, s) = (H(m, s) == c).
+```
+
+Reading order:
+
+1. **Shared ROM definitions:**
+   [`Examples/CommitmentScheme/Common.lean`](Examples/CommitmentScheme/Common.lean)
+   defines the random oracle `CMOracle : (M × S) → C`, the scheme
+   algorithms `CMCommit` and `CMCheck`, and the basic single-fresh-query
+   unpredictability bound `probEvent_from_fresh_query_le_inv` (`1/|C|`)
+   that all three security proofs reduce to.
+2. **Binding:**
+   [`Examples/CommitmentScheme/Binding.lean`](Examples/CommitmentScheme/Binding.lean)
+   proves both a tight bound `binding_bound` (`(t·(t-1) + 2) / (2·|C|)`)
+   by direct case-split on cache collisions versus fresh verification
+   queries, and a looser standard-model-style bound
+   `binding_bound_via_cr_chain` mirroring
+   `bindingAdvantage_toCommitment_le_keyedCRAdvantage` from
+   [`VCVio/CryptoFoundations/HashCommitment.lean`](VCVio/CryptoFoundations/HashCommitment.lean).
+3. **Extractability:**
+   [`Examples/CommitmentScheme/Extractability.lean`](Examples/CommitmentScheme/Extractability.lean)
+   exhibits the explicit log-scanning extractor `CMExtract` and proves
+   `extractability_bound` (`(t·(t-1) + 2) / (2·|C|)`, for `t ≥ 3`).
+4. **Hiding:** the
+   [`Examples/CommitmentScheme/Hiding/`](Examples/CommitmentScheme/Hiding/)
+   subtree builds the identical-until-bad chain. The packaged theorem
+   `hiding_bound_finite` in
+   [`Examples/CommitmentScheme/Hiding/Main.lean`](Examples/CommitmentScheme/Hiding/Main.lean)
+   delivers the bound
+
+```
+tvDist(hidingMixedReal A, hidingMixedSim A)  ≤  t / |S|,
+```
+
+   where the salt is sampled inside the experiment and `t` is the adversary's
+   total query budget. The bound is intrinsically averaged over the salt:
+   the per-salt version is false.
+
+The framework machinery exercised: `cachingOracle`, `loggingOracle`,
+`IsTotalQueryBound`, the birthday bound
+`probEvent_cacheCollision_le_birthday_total_tight`, and the
+identical-until-bad TVD bound `tvDist_simulateQ_le_probEvent_bad_dist`.
+
 ## Acknowledgments
 
 Parts of the current program-logic refactor use an ordered monad-algebra perspective adapted from

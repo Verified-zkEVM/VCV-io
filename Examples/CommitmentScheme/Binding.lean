@@ -6,20 +6,62 @@ Authors: James Waters
 import Examples.CommitmentScheme.Common
 import ToMathlib.Data.ENNReal.Gauss
 
+/-!
+# Binding for the random-oracle commitment scheme
+
+Computational binding for the textbook ROM commitment scheme
+`Commit(m) = (H(m, s), s)`.
+
+## Textbook statement (Lemma cm-binding)
+
+For every `t`-query adversary `A^H` that outputs `(c, m₀, s₀, m₁, s₁)`,
+
+```
+Pr[m₀ ≠ m₁ ∧ Check^H(c, m₀, s₀) = 1 ∧ Check^H(c, m₁, s₁) = 1] ≤ ½ · t² / |C|.
+```
+
+The adversary and `Check` use the *same* random oracle `H`; this is modelled
+by running the whole game (adversary + verification) inside
+`simulateQ cachingOracle` from an empty cache.
+
+## Theorems in this file
+
+* `binding_bound` — tight ROM bound `(t·(t-1) + 2) / (2·|C|)`.
+* `binding_bound_via_cr_chain` — looser bound `(t+2)·(t+1) / (2·|C|)`,
+  obtained by the same proof shape as the standard-model CR chain.
+
+`binding_bound` is the tight bound a reader of the textbook lemma should
+reach for. `binding_bound_via_cr_chain` proves the same shape of bound by
+reduction through the standard-model collision-resistance layer
+(`bindingAdvantage_toCommitment_le_keyedCRAdvantage` in
+`VCVio/CryptoFoundations/HashCommitment.lean` composed with
+`romCRAdvantage_le_birthday`); it is looser by roughly `1 + 4/t²` for large
+`t` but composes directly out of generic primitives.
+
+## Proof structure (for `binding_bound`)
+
+The decomposition (`binding_win_le_advCollision_add_fresh`) is:
+
+```
+Pr[binding win]
+  ≤ Pr[adversary cache already has a collision]      -- birthday term
+  + Pr[fresh verification query matches commitment]  -- unpredictability term
+  ≤ t·(t-1) / (2·|C|) + 1/|C|.
+```
+
+The birthday term uses `probEvent_cacheCollision_le_birthday_total_tight`;
+the unpredictability term uses `probEvent_from_fresh_query_le_inv` from
+`Examples/CommitmentScheme/Common.lean`.
+-/
+
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
   [Fintype M] [Fintype S] [Fintype C]
   [Inhabited M] [Inhabited S] [Inhabited C]
-/-! ## 1. Binding
 
-**Textbook (Lemma cm-binding)**: For every `t`-query adversary A^H that outputs
-`(c, m₀, s₀, m₁, s₁)`:
-  Pr[m₀ ≠ m₁ ∧ Check^H(c, m₀, s₀) = 1 ∧ Check^H(c, m₁, s₁) = 1] ≤ ½ · t² / |C|
-
-The adversary and Check use the **same** random oracle H. We model this by
-running the entire game (adversary + verification) inside `simulateQ cachingOracle`. -/
+/-! ## Adversary, game, and inner computation -/
 
 /-- A binding adversary with query bound `t`. -/
 structure BindingAdversary (M : Type) (S : Type) (C : Type) (t : ℕ)
@@ -111,6 +153,8 @@ private lemma bindingInner_totalBound {t : ℕ} (A : BindingAdversary M S C t) :
   refine ⟨by omega, fun c₀ => ?_⟩
   rw [isTotalQueryBound_query_bind_iff]
   exact ⟨Nat.one_pos, fun _ => trivial⟩
+
+/-! ## Fresh-query branch: bounding the verification-time guess -/
 
 /- In a collision-free cache, a value determines at most one query input. -/
 omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
@@ -227,6 +271,8 @@ private lemma binding_rest_noCollision_le_inv
     rw [hz] at hwin
     simp [hneq] at hwin
 
+/-! ## Top-level decomposition and main theorems -/
+
 /- Winning the binding game either implies a collision in the adversary's cache
  (the cache after `A.run`, before verification) or that a fresh verification query
  matched the commitment `c`. We bound each case separately:
@@ -259,11 +305,29 @@ private lemma binding_win_le_advCollision_add_fresh {t : ℕ}
         rintro ⟨⟨c, m₀, s₀, m₁, s₁⟩, cache₁⟩ _ hno
         simpa [restPart] using binding_rest_noCollision_le_inv c m₀ m₁ s₀ s₁ cache₁ hno))
 
-/- **Binding theorem (Lemma cm-binding)**: `Pr[win] ≤ (t(t-1)+2) / (2|C|)`.
-
-Decomposes via `binding_win_le_advCollision_add_fresh` into birthday bound on the
-adversary's `t` queries (`t(t-1)/(2|C|)`) plus unpredictability (`1/|C|`). -/
 omit [Fintype M] [Fintype S] in
+/-- **Binding bound for the ROM commitment scheme (tight, Lemma cm-binding).**
+
+For every `t`-query binding adversary `A`,
+
+```
+Pr[binding win] ≤ (t·(t-1) + 2) / (2·|C|).
+```
+
+Within constants this is the textbook `½ · t² / |C|`, with the `+ 2` term
+accounting for the two verification queries the game makes after the
+adversary returns.
+
+Proof: the win event is decomposed by `binding_win_le_advCollision_add_fresh`
+into the adversary's cache already containing a collision (bounded by the
+tight birthday bound `t·(t-1) / (2·|C|)` via
+`probEvent_cacheCollision_le_birthday_total_tight`) plus a fresh
+verification query happening to land on the committed value (bounded by
+`1/|C|` via `probEvent_from_fresh_query_le_inv`).
+
+This is the bound a reader of the textbook lemma should reach for; the
+companion `binding_bound_via_cr_chain` produces the same shape of bound by
+factoring through the standard-model collision-resistance reduction. -/
 theorem binding_bound {t : ℕ} (A : BindingAdversary M S C t) :
     Pr[fun z => z.1 = true | bindingGame A] ≤
     ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
@@ -279,24 +343,27 @@ theorem binding_bound {t : ℕ} (A : BindingAdversary M S C t) :
         simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
           add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
 
-/- **Binding bound via CR chain (looser).**
-
-Same `(t+2)(t+1) / (2|C|)` bound that the layered chain
-`binding ≤ keyed-CR ≤ birthday` of [#284] T1 + T2 produces. Derived by treating
-the `t+2` total queries of the binding game as a single ROM-CR experiment: a
-binding-game win implies a collision in the final cache
-(`binding_win_implies_collision`), and the inner game makes at most `t+2` total
-queries (`bindingInner_totalBound`); apply
-`probEvent_cacheCollision_le_birthday_total_tight` at `n = t+2`. This is the
-same proof shape as `romCRAdvantage_le_birthday` (see
-`VCVio/CryptoFoundations/HardnessAssumptions/CollisionResistance.lean`).
-
-Looser than the tight `binding_bound` above by roughly `(t+2)(t+1) / (t(t-1)+2)`
-— about `1 + 4/t²` for large `t` — but composes directly out of the standard-model
-binding-to-CR reduction (`bindingAdvantage_toCommitment_le_keyedCRAdvantage` in
-`VCVio/CryptoFoundations/HashCommitment.lean`) and the ROM CR birthday bound
-(`romCRAdvantage_le_birthday`). -/
 omit [Fintype M] [Fintype S] in
+/-- **Binding bound via the standard-model CR chain (looser).**
+
+For every `t`-query binding adversary `A`,
+
+```
+Pr[binding win] ≤ (t + 2)·(t + 1) / (2·|C|).
+```
+
+Looser than `binding_bound` above by roughly `(t+2)(t+1) / (t(t-1)+2)` —
+about `1 + 4/t²` for large `t` — but produced by the same proof shape as
+the standard-model `binding ≤ keyed-CR ≤ birthday` chain that runs through
+`bindingAdvantage_toCommitment_le_keyedCRAdvantage`
+(`VCVio/CryptoFoundations/HashCommitment.lean`) and
+`romCRAdvantage_le_birthday`
+(`VCVio/CryptoFoundations/HardnessAssumptions/CollisionResistance.lean`).
+
+Proof: a binding-game win implies a collision in the final cache
+(`binding_win_implies_collision`), and the inner game makes at most `t + 2`
+total queries (`bindingInner_totalBound`); apply
+`probEvent_cacheCollision_le_birthday_total_tight` at `n = t + 2`. -/
 theorem binding_bound_via_cr_chain {t : ℕ} (A : BindingAdversary M S C t) :
     Pr[fun z => z.1 = true | bindingGame A] ≤
     (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
