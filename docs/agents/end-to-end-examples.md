@@ -6,11 +6,11 @@ layers compose on concrete schemes.
 ## Schnorr Signature EUF-CMA
 
 An end-to-end EUF-CMA reduction for the Schnorr digital signature lives in
-[`Examples/Signature.lean`](../../Examples/Signature.lean). It is a compact
+[`Examples/Schnorr/Signature.lean`](../../Examples/Schnorr/Signature.lean). It is a compact
 illustration of how the main composition layers of the framework fit together
 on a single concrete scheme. Reading order:
 
-1. **Σ-protocol:** [`Examples/Schnorr.lean`](../../Examples/Schnorr.lean)
+1. **Σ-protocol:** [`Examples/Schnorr/SigmaProtocol.lean`](../../Examples/Schnorr/SigmaProtocol.lean)
    defines `Schnorr.sigma` and proves perfect completeness, special soundness,
    and perfect HVZK, plus the two simulator-distribution facts the
    Fiat-Shamir reduction needs (`sigma_simCommitPredictability` and

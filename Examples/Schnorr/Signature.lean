@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Examples.Schnorr
+import Examples.Schnorr.SigmaProtocol
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 
@@ -14,7 +14,7 @@ An end-to-end EUF-CMA reduction for the Schnorr digital signature, exercising
 the main composition layers of the VCVio framework on a single concrete
 scheme:
 
-* a Σ-protocol (`Examples/Schnorr.lean`),
+* a Σ-protocol (`Examples/Schnorr/SigmaProtocol.lean`),
 * the generic Fiat-Shamir transform
   (`VCVio/CryptoFoundations/FiatShamir/Sigma.lean`),
 * the replay-based forking lemma
@@ -210,5 +210,7 @@ theorem signature_euf_cma (g : G)
   simp only [mul_zero, ENNReal.ofReal_zero, zero_add] at hred ⊢
   exact ⟨fun _ pk => red pk,
     hred.trans (le_of_eq (hardRelationExp_dlogGenerable_eq_dlogExp F G g hg red))⟩
+
+#print axioms signature_euf_cma
 
 end Schnorr
