@@ -173,4 +173,57 @@ instance {s} : LawfulFunctor (fun α => FullData α s) where
 
 end Navigation
 
+/-! ## Skeleton size: depth and leafCount -/
+
+section Size
+
+@[simp]
+theorem Skeleton.depth_leaf : Skeleton.leaf.depth = 0 := rfl
+
+@[simp]
+theorem Skeleton.depth_internal (left right : Skeleton) :
+    (Skeleton.internal left right).depth = max left.depth right.depth + 1 := rfl
+
+@[simp]
+theorem Skeleton.leafCount_leaf : Skeleton.leaf.leafCount = 1 := rfl
+
+@[simp]
+theorem Skeleton.leafCount_internal (left right : Skeleton) :
+    (Skeleton.internal left right).leafCount = left.leafCount + right.leafCount := rfl
+
+/-- Every skeleton has at least one leaf. -/
+theorem Skeleton.leafCount_pos : ∀ s : Skeleton, 0 < s.leafCount
+  | Skeleton.leaf => Nat.zero_lt_one
+  | Skeleton.internal left right =>
+    Nat.add_pos_left (Skeleton.leafCount_pos left) _
+
+/-- The depth of any leaf index is bounded by the depth of its skeleton. -/
+theorem SkeletonLeafIndex.depth_le_skeleton_depth :
+    ∀ {s : Skeleton} (idx : SkeletonLeafIndex s), idx.depth ≤ s.depth
+  | _, SkeletonLeafIndex.ofLeaf => Nat.le_refl 0
+  | Skeleton.internal left right, SkeletonLeafIndex.ofLeft idxLeft => by
+    simp only [SkeletonLeafIndex.depth, Skeleton.depth_internal]
+    exact Nat.succ_le_succ
+      (Nat.le_trans idxLeft.depth_le_skeleton_depth (Nat.le_max_left left.depth right.depth))
+  | Skeleton.internal left right, SkeletonLeafIndex.ofRight idxRight => by
+    simp only [SkeletonLeafIndex.depth, Skeleton.depth_internal]
+    exact Nat.succ_le_succ
+      (Nat.le_trans idxRight.depth_le_skeleton_depth (Nat.le_max_right left.depth right.depth))
+
+/-- The depth of any node index is bounded by the depth of its skeleton. -/
+theorem SkeletonNodeIndex.depth_le_skeleton_depth :
+    ∀ {s : Skeleton} (idx : SkeletonNodeIndex s), idx.depth ≤ s.depth
+  | _, SkeletonNodeIndex.ofLeaf => Nat.le_refl 0
+  | _, SkeletonNodeIndex.ofInternal => Nat.zero_le _
+  | Skeleton.internal left right, SkeletonNodeIndex.ofLeft idxLeft => by
+    simp only [SkeletonNodeIndex.depth, Skeleton.depth_internal]
+    exact Nat.succ_le_succ
+      (Nat.le_trans idxLeft.depth_le_skeleton_depth (Nat.le_max_left left.depth right.depth))
+  | Skeleton.internal left right, SkeletonNodeIndex.ofRight idxRight => by
+    simp only [SkeletonNodeIndex.depth, Skeleton.depth_internal]
+    exact Nat.succ_le_succ
+      (Nat.le_trans idxRight.depth_le_skeleton_depth (Nat.le_max_right left.depth right.depth))
+
+end Size
+
 end BinaryTree

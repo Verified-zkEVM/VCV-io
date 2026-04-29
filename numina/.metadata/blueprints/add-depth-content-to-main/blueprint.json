@@ -3,5 +3,8 @@
   "branch": "numina/add-depth-content-to-main",
   "source_type": "latex",
   "notes": "",
-  "entries": []
+  "entries": [],
+  "settings": {
+    "pr_mode": "draft"
+  }
 }
