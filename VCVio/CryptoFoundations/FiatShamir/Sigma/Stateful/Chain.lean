@@ -1232,36 +1232,6 @@ private lemma forkBase_finalQuery_runTrace_eq
   | none =>
       simp [Fork.roImpl, hcache]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
-/-- Lift `forkBase_finalQuery_runTrace_eq` through the signing-log auxiliary:
-running the source adversary under `forkLoggedImpl` and then issuing the
-verifier-point query via `forkFinalQueryTrace` produces the same distribution
-as `Fork.runTrace` of the verifier-point-wrapped adversary. -/
-private lemma forkLogged_finalQuery_eq_runTrace
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
-    (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) :
-    ((simulateQ (forkLoggedImpl (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) simT pk) (adv.main pk)).run
-      (forkInitialState M Commit Chal) >>= fun z =>
-        forkFinalQueryTrace (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) σ pk z.1 z.2) =
-      Fork.runTrace σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT) pk := by
-  rw [forkBase_finalQuery_runTrace_eq (M := M) (Commit := Commit)
-    (Chal := Chal) (Resp := Resp) σ hr adv simT pk]
-  have hproj := OracleComp.extendState_run_proj_eq
-    (so := forkBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
-      (Resp := Resp) simT pk)
-    (aux := cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
-      (Resp := Resp))
-    (oa := adv.main pk)
-    (s := forkInitialBaseState M Commit Chal)
-    (q := ([] : List M))
-  simp only [forkLoggedImpl, forkInitialState, forkInitialBaseState,
-    map_eq_bind_pure_comp, bind_assoc] at hproj ⊢
-  rw [hproj]
-  simp [bind_assoc]
-
 @[fs_simp] private noncomputable def forkLoggedProbImpl [Fintype Chal]
     (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) :
     QueryImpl (cmaOracleSpec M Commit Chal Resp)
