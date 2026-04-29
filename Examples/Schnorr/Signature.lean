@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Examples.Schnorr
+import Examples.Schnorr.SigmaProtocol
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 
@@ -14,7 +14,7 @@ An end-to-end EUF-CMA reduction for the Schnorr digital signature, exercising
 the main composition layers of the VCVio framework on a single concrete
 scheme:
 
-* a Σ-protocol (`Examples/Schnorr.lean`),
+* a Σ-protocol (`Examples/Schnorr/SigmaProtocol.lean`),
 * the generic Fiat-Shamir transform
   (`VCVio/CryptoFoundations/FiatShamir/Sigma.lean`),
 * the replay-based forking lemma
@@ -43,7 +43,7 @@ most `qS` signing-oracle queries and `qH` random-oracle queries against the
 random-oracle runtime `FiatShamir.runtime`. Define
 
 ```
-ε' := ε  -  qS · (qS + qH) / |F|  -  δ_verify
+ε' := ε  -  qS · (qS + qH) / |F|
 ```
 
 (`ENNReal` subtraction, which truncates at zero; whenever the simulation
@@ -60,12 +60,17 @@ plugged in at `β = 1/|F|` (the Schnorr simulator's commitment is uniform on
 `G` whenever `F` acts simply transitively on `G` via `g`, since
 `Fintype.card G = Fintype.card F`).
 
-The slack `δ_verify` bounds the probability that a uniform fresh challenge
-accepts a fixed `(commit, response)` pair under `σ.verify`; the caller supplies
-it via `SigmaProtocol.verifyChallengePredictability`. For Schnorr this is
-small: the verification equation `z • g = R + c • pk` has at most one solution
-`c ∈ F` for fixed `(R, z, pk)` whenever `pk ≠ 0`, so `δ_verify = 1/|F|` is
-achievable.
+The denominator `qH + 1` is the textbook Pointcheval-Stern denominator for a
+source adversary with `qH` random-oracle queries. The reduction wraps the
+adversary so that the forgery's hash point is always among the forkable
+positions: it appends one explicit `(message, commit)` query for the forgery's
+hash point on top of the source's `qH` queries, and applies the replay-forking
+lemma at fork slot parameter `qH`. The framework's `Fork.forkPoint qH` indexes
+`Fin (qH + 1)`, providing exactly enough slots for the wrapped adversary's
+`qH + 1` total queries (no double-counting). As a result, the bound is
+*unconditional* in `pk`: there is no remaining "verifier guesses a uniform
+challenge" term that would have to be discharged separately for keys on which
+verification is independent of the challenge.
 
 ## Glossary
 
@@ -102,8 +107,7 @@ The Schnorr-specific inputs are exactly:
                                           extractor;
 * `Schnorr.sigma_hvzk`                  — perfect HVZK (`ζ_zk = 0`);
 * `Schnorr.sigma_simCommitPredictability` — the simulator's commit is uniform
-                                          on `G`, giving `β = 1/|F|`;
-* `δ_verify` and `hVerifyGuess`         — caller-supplied verification slack.
+                                          on `G`, giving `β = 1/|F|`.
 -/
 
 
@@ -152,20 +156,22 @@ private theorem hardRelationExp_dlogGenerable_eq_dlogExp
   exact probOutput_bind_congr' _ true fun x =>
     probOutput_bind_congr' _ true fun sk => by simp [hg.1.eq_iff]
 
-/-- **EUF-CMA reduction for Schnorr signatures (Pointcheval-Stern, tight).**
+/-- **EUF-CMA reduction for Schnorr signatures (Pointcheval-Stern).**
 
 The bound is
 
 ```
 ε' · ( ε' / (qH + 1)  -  1 / |F| )   ≤   Pr[ reduction succeeds in dlogExp g ],
-ε' := ε  -  qS · (qS + qH) / |F|  -  δ_verify,
+ε' := ε  -  qS · (qS + qH) / |F|,
 ```
 
-where `ε := adv.advantage (FiatShamir.runtime M)` is the EUF-CMA advantage,
-`qS` and `qH` upper-bound the signing-oracle and random-oracle queries,
-and `δ_verify` is the verification slack supplied through
-`SigmaProtocol.verifyChallengePredictability`. See the module docstring for
-the full chain.
+where `ε := adv.advantage (FiatShamir.runtime M)` is the EUF-CMA advantage and
+`qS`, `qH` upper-bound the signing-oracle and random-oracle queries. This is
+the textbook Pointcheval-Stern denominator: the Fiat-Shamir reduction wraps
+the source adversary so the forgery's hash point is always among the forkable
+positions, and the framework's `Fork.forkPoint qH` indexing in `Fin (qH + 1)`
+provides exactly the right number of slots (source-`qH` queries plus the one
+appended verifier-point query). See the module docstring for the full chain.
 
 Three Schnorr-specific facts feed in:
 
@@ -181,15 +187,13 @@ the conversion `hardRelationExp_dlogGenerable_eq_dlogExp`. -/
 theorem signature_euf_cma (g : G)
     (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
-    (δ_verify : ENNReal)
-    (hVerifyGuess : SigmaProtocol.verifyChallengePredictability (Schnorr.sigma F G g) δ_verify)
     (adv : SignatureAlg.unforgeableAdv (signature F G g M))
     (qS qH : ℕ)
     (hQ : ∀ pk, FiatShamir.signHashQueryBound (M := M) (Commit := G) (Chal := F)
       (S' := G × F) (oa := adv.main pk) qS qH) :
     ∃ reduction : DLogAdversary F G,
       let eps := adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) -
-        ((qS : ENNReal) * (qS + qH) * ((Fintype.card F : ℝ≥0∞)⁻¹) + δ_verify)
+        ((qS : ENNReal) * (qS + qH) * ((Fintype.card F : ℝ≥0∞)⁻¹))
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   haveI : Inhabited F := ⟨0⟩
@@ -202,10 +206,11 @@ theorem signature_euf_cma (g : G)
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
     (β := (Fintype.card F : ℝ≥0∞)⁻¹)
     (Schnorr.sigma_simCommitPredictability F G g hg)
-    δ_verify hVerifyGuess
     adv qS qH hQ
   simp only [mul_zero, ENNReal.ofReal_zero, zero_add] at hred ⊢
   exact ⟨fun _ pk => red pk,
     hred.trans (le_of_eq (hardRelationExp_dlogGenerable_eq_dlogExp F G g hg red))⟩
+
+#print axioms signature_euf_cma
 
 end Schnorr

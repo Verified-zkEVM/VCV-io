@@ -36,7 +36,7 @@ import Examples.ProgramLogic.UnaryProbability
 import Examples.ProgramLogic.UnaryStep
 import Examples.ProgramLogic.UnaryTriple
 import Examples.Regev
-import Examples.Schnorr
+import Examples.Schnorr.SigmaProtocol
+import Examples.Schnorr.Signature
 import Examples.SealedSender.AspectObservation
-import Examples.Signature
 import Examples.SimpleTwoServerPIR

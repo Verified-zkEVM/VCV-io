@@ -6,11 +6,11 @@ layers compose on concrete schemes.
 ## Schnorr Signature EUF-CMA
 
 An end-to-end EUF-CMA reduction for the Schnorr digital signature lives in
-[`Examples/Signature.lean`](../../Examples/Signature.lean). It is a compact
+[`Examples/Schnorr/Signature.lean`](../../Examples/Schnorr/Signature.lean). It is a compact
 illustration of how the main composition layers of the framework fit together
 on a single concrete scheme. Reading order:
 
-1. **Σ-protocol:** [`Examples/Schnorr.lean`](../../Examples/Schnorr.lean)
+1. **Σ-protocol:** [`Examples/Schnorr/SigmaProtocol.lean`](../../Examples/Schnorr/SigmaProtocol.lean)
    defines `Schnorr.sigma` and proves perfect completeness, special soundness,
    and perfect HVZK, plus the two simulator-distribution facts the
    Fiat-Shamir reduction needs (`sigma_simCommitPredictability` and
@@ -40,12 +40,21 @@ Pointcheval-Stern bound
 
 ```
 ε' · ( ε' / (qH + 1)  -  1 / |F| )   ≤   Pr[ B succeeds in dlogExp g ],
-ε' := ε  -  qS · (qS + qH) / |F|  -  δ_verify,
+ε' := ε  -  qS · (qS + qH) / |F|,
 ```
 
 where `ε` is the EUF-CMA advantage of an adversary with `qS` signing-oracle
-queries and `qH` random-oracle queries, and `δ_verify` is the verification
-slack supplied by the caller via `SigmaProtocol.verifyChallengePredictability`.
+queries and `qH` random-oracle queries. The denominator `qH + 1` is the
+textbook Pointcheval-Stern denominator. The Fiat-Shamir reduction wraps the
+source adversary so the forgery's hash point is always among the forkable
+positions: it appends one explicit `(message, commit)` query for the forgery's
+hash point on top of the source's `qH` queries, and applies the replay-forking
+lemma at fork slot parameter `qH`. The framework's
+`Fork.forkPoint qH : Option (Fin (qH + 1))` provides exactly enough slots for
+the wrapped adversary's `qH + 1` total queries (no double-counting). As a
+result, the bound is *unconditional* in `pk`: there is no remaining "verifier
+accepts a uniform challenge" term that would have to be discharged separately
+for keys on which verification is independent of the challenge.
 
 ## ROM Commitment Scheme
 

@@ -29,9 +29,17 @@ variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 /-- CMA-to-NMA reduction for Fiat-Shamir signatures built from a Sigma protocol.
 
 The reduction runs the CMA adversary with simulated signing transcripts and a
-managed random oracle. Its quantitative loss is the HVZK simulation cost, the
-programming-collision term from simulator commit predictability, and the
-fresh-challenge verification slack. -/
+managed random oracle, then appends a single explicit live random-oracle query
+for the forgery's hash point so that the verification challenge is part of the
+forkable transcript (the `nmaAdvFromCmaWithFinalQuery` wrapper). The quantitative
+loss is the HVZK simulation cost plus the programming-collision term from
+simulator commit predictability; no separate verifier-guessing slack is needed.
+
+The bound is stated against `Fork.advantage σ hr M nmaAdv qH`: the wrapped
+adversary issues `qH + 1` random-oracle queries, and `Fork.forkPoint qH`
+indexes `Fin (qH + 1)`, which is exactly the right number of forkable slots
+(the framework's structural `+1` in `Fin (qH + 1)` is precisely the wrapper's
+verifier slot). The replay-forking denominator is therefore `qH + 1`. -/
 theorem cma_to_nma_advantage_bound
     [DecidableEq M] [DecidableEq Commit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
@@ -40,8 +48,6 @@ theorem cma_to_nma_advantage_bound
     (hHVZK : σ.HVZK simTranscript ζ_zk)
     (β : ENNReal)
     (hPredSim : σ.simCommitPredictability simTranscript β)
-    (δ_verify : ENNReal)
-    (hVerifyGuess : SigmaProtocol.verifyChallengePredictability σ δ_verify)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qS qH : ℕ)
@@ -49,30 +55,23 @@ theorem cma_to_nma_advantage_bound
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∃ nmaAdv : SignatureAlg.managedRoNmaAdv
         (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M),
-      (∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-        (oa := nmaAdv.main pk) qH) ∧
       adv.advantage (runtime M) ≤
         Fork.advantage σ hr M nmaAdv qH +
-          ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
-          (qS : ENNReal) * (qS + qH) * β +
-          δ_verify := by
-  refine ⟨Stateful.nmaAdvFromCma σ hr M adv simTranscript, ?_, ?_⟩
-  · exact Stateful.nmaAdvFromCma_nmaHashQueryBound (σ := σ) (hr := hr)
-      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-      adv simTranscript qS qH hQ
-  · exact Stateful.cma_advantage_le_fork_bound_of_h1h2 σ hr M
-      simTranscript ζ_zk hζ_zk hHVZK β hPredSim δ_verify hVerifyGuess adv qS qH hQ
-      (by
-        have hFresh :
-            adv.advantage (_root_.FiatShamir.runtime M) ≤
-              Stateful.statefulPostKeygenFreshAdvantage σ hr M adv := by
-          rw [← Stateful.publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage
-            (σ := σ) (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
-            (Resp := Resp) adv]
-          rfl
-        rwa [Stateful.statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
+          ENNReal.ofReal ((qS : ℝ) * ζ_zk) + (qS : ENNReal) * (qS + qH) * β := by
+  refine ⟨Stateful.nmaAdvFromCmaWithFinalQuery σ hr M adv simTranscript, ?_⟩
+  exact Stateful.cma_advantage_le_fork_bound_of_h1h2 σ hr M
+    simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
+    (by
+      have hFresh :
+          adv.advantage (_root_.FiatShamir.runtime M) ≤
+            Stateful.statefulPostKeygenFreshAdvantage σ hr M adv := by
+        rw [← Stateful.publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage
           (σ := σ) (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) adv] at hFresh)
+          (Resp := Resp) adv]
+        rfl
+      rwa [Stateful.statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
+        (σ := σ) (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) adv] at hFresh)
 
 section evalDistBridge
 
@@ -351,7 +350,14 @@ private theorem perPk_extraction_bound
 
 end nmaToExtraction
 
-/-- NMA-to-extraction via the forking lemma and special soundness. -/
+/-- NMA-to-extraction via the forking lemma and special soundness.
+
+The parameter `qH` is the *fork slot parameter* passed to `Fork.forkPoint qH`,
+i.e., the number of `Fin (qH + 1)` candidate target positions over which the
+replay-forking lemma sums. It is *not* required to be a valid query bound on
+the adversary: callers may supply a wrapped adversary with up to `qH + 1`
+queries (the framework's structural `+1` in `Fin (qH + 1)` accommodates the
+extra slot). -/
 theorem nma_to_hard_relation_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Wit] [SampleableType Chal]
@@ -360,9 +366,7 @@ theorem nma_to_hard_relation_bound
     [Fintype Chal] [Inhabited Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
-    (qH : ℕ)
-    (_hQ : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (oa := nmaAdv.main pk) qH) :
+    (qH : ℕ) :
     ∃ reduction : Stmt → ProbComp Wit,
       (Fork.advantage σ hr M nmaAdv qH *
           (Fork.advantage σ hr M nmaAdv qH / (qH + 1 : ENNReal) -
