@@ -50,6 +50,50 @@ for lattice-specific entry points and workflows.
 External papers and project references cited in this repo are centralized in
 [`REFERENCES.md`](REFERENCES.md).
 
+## End-to-end example: Schnorr signature EUF-CMA
+
+An end-to-end EUF-CMA reduction for the Schnorr digital signature lives in
+[`Examples/Signature.lean`](Examples/Signature.lean). It is a compact
+illustration of how the main composition layers of the framework fit together
+on a single concrete scheme. Reading order:
+
+1. **Σ-protocol:** [`Examples/Schnorr.lean`](Examples/Schnorr.lean) defines
+   `Schnorr.sigma` and proves perfect completeness, special soundness, and
+   perfect HVZK, plus the two simulator-distribution facts the
+   Fiat-Shamir reduction needs (`sigma_simCommitPredictability` and
+   `sigma_simChalUniformGivenCommit`).
+2. **Generic Fiat-Shamir transform:**
+   [`VCVio/CryptoFoundations/FiatShamir/Sigma.lean`](VCVio/CryptoFoundations/FiatShamir/Sigma.lean)
+   builds a signature scheme `FiatShamir σ hr M` from any Σ-protocol `σ` and
+   generable relation `hr`, with a fresh random-oracle runtime
+   `FiatShamir.runtime`.
+3. **Reductions:**
+   [`VCVio/CryptoFoundations/FiatShamir/Sigma/Security.lean`](VCVio/CryptoFoundations/FiatShamir/Sigma/Security.lean)
+   exposes `euf_cma_to_nma` (CMA → managed-RO NMA via HVZK simulation) and
+   `euf_nma_bound` (managed-RO NMA → witness extraction via the replay
+   forking lemma and special soundness), composed in `euf_cma_bound`.
+4. **Forking lemma:** the replay-based forking lemma lives in
+   [`VCVio/CryptoFoundations/ReplayFork.lean`](VCVio/CryptoFoundations/ReplayFork.lean)
+   and is specialized to Fiat-Shamir managed-RO traces in
+   [`VCVio/CryptoFoundations/FiatShamir/Sigma/Fork.lean`](VCVio/CryptoFoundations/FiatShamir/Sigma/Fork.lean)
+   as `Fork.replayForkingBound`.
+5. **Hardness:** the discrete-log assumption and the generable relation lift
+   live in
+   [`VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`](VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean).
+
+The combined statement, `Schnorr.signature_euf_cma`, instantiates
+`FiatShamir.euf_cma_bound` with the Schnorr Σ-protocol facts and delivers
+the Pointcheval-Stern bound
+
+```
+ε' · ( ε' / (qH + 1)  -  1 / |F| )   ≤   Pr[ B succeeds in dlogExp g ],
+ε' := ε  -  qS · (qS + qH) / |F|  -  δ_verify,
+```
+
+where `ε` is the EUF-CMA advantage of an adversary with `qS` signing-oracle
+queries and `qH` random-oracle queries, and `δ_verify` is the verification
+slack supplied by the caller via `SigmaProtocol.verifyChallengePredictability`.
+
 ## Acknowledgments
 
 Parts of the current program-logic refactor use an ordered monad-algebra perspective adapted from

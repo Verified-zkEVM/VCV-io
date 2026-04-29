@@ -32,6 +32,13 @@ structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type) where
   verify (pk : PK) (msg : M) (σ : S) : m Bool
 ```
 
+For an end-to-end EUF-CMA reduction worked through the framework (Σ-protocol →
+Fiat-Shamir transform → managed-RO NMA → replay forking → DLog), see
+[`Examples/Signature.lean`](../../Examples/Signature.lean) and the
+[End-to-end example](../../README.md#end-to-end-example-schnorr-signature-euf-cma)
+section of the README. The Schnorr-specific σ-protocol facts that feed in
+live in [`Examples/Schnorr.lean`](../../Examples/Schnorr.lean).
+
 ### Sigma protocols (`SigmaProtocol`)
 
 ```lean
