@@ -1,0 +1,45 @@
+/-
+Copyright (c) 2024 Anonymized for double-blind review.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Anonymized for double-blind review
+-/
+import VCVio.OracleComp.ProbComp
+
+/-!
+# Executing Computations
+
+This file defines a function `runIO` for executing a `ProbComp` in the `IO` monad.
+We add this embedding as a `MonadLift` instance, so `#eval` notation works.
+-/
+
+open OracleSpec
+
+namespace OracleComp
+
+/-- Represent a `ProbComp` via the `IO` monad, allowing actual execution. -/
+protected def runIO {α : Type} (oa : ProbComp α) : IO α :=
+  simulateQ (spec := unifSpec) (fun n => Fin.ofNat (n + 1) <$> (IO.rand 0 n).toIO) oa
+
+/-- Automatic lifting of probabalistic computations into `IO`. -/
+instance : MonadLift ProbComp IO where monadLift := OracleComp.runIO
+
+def test1 : ProbComp (ℕ × ℕ × ℕ) := do
+  let x ← $[0..1618]
+  let y ← $[0..3141]
+  return (x, y, x + y)
+
+def test2 (n : ℕ) : ProbComp (List ℕ) := do
+  match n with
+  | 0 => return []
+  | n + 1 => return (← $[0..100]) :: (← test2 n)
+
+def test3 (n : ℕ) : ProbComp (List ℕ) := do
+  let mut xs := []
+  for _ in List.range n do
+    xs := (← $[0..100]) :: xs
+  return xs
+
+def test4 (n : ℕ) : ProbComp (List ℕ) := do
+  (List.replicate n ()).mapM (fun () => Fin.val <$> ($[0..100]))
+
+end OracleComp

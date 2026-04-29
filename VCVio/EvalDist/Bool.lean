@@ -1,0 +1,66 @@
+/-
+Copyright (c) 2025 Anonymized for double-blind review.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Anonymized for double-blind review
+-/
+import VCVio.EvalDist.Monad.Map
+import VCVio.EvalDist.Defs.NeverFails
+
+/-!
+# Evaluation Distributions on Boolean-Valued Computations
+
+Specialization lemmas for `HasEvalSPMF` computations returning `Bool`.
+-/
+
+variable {m : Type _ → Type _} [Monad m] [HasEvalSPMF m] {α β : Type _}
+
+@[simp, grind =]
+lemma probOutput_true_add_false (mx : m Bool) :
+    Pr[= true | mx] + Pr[= false | mx] = 1 - Pr[⊥ | mx] := by
+  have h := tsum_probOutput_eq_sub mx
+  rwa [tsum_fintype (L := .unconditional _), Fintype.sum_bool] at h
+
+@[simp, grind =]
+lemma probOutput_false_add_true (mx : m Bool) :
+    Pr[= false | mx] + Pr[= true | mx] = 1 - Pr[⊥ | mx] := by
+  rw [add_comm, probOutput_true_add_false]
+
+lemma probOutput_true_eq_sub (mx : m Bool) :
+    Pr[= true | mx] = 1 - Pr[⊥ | mx] - Pr[= false | mx] := by
+  rw [← probOutput_true_add_false]
+  exact (ENNReal.add_sub_cancel_right probOutput_ne_top).symm
+
+lemma probOutput_false_eq_sub (mx : m Bool) :
+    Pr[= false | mx] = 1 - Pr[⊥ | mx] - Pr[= true | mx] := by
+  rw [← probOutput_false_add_true]
+  exact (ENNReal.add_sub_cancel_right probOutput_ne_top).symm
+
+@[simp]
+lemma probOutput_not_map [LawfulMonad m] (mx : m Bool) :
+    Pr[= true | (! ·) <$> mx] = Pr[= false | mx] :=
+  probOutput_map_injective mx (fun a b h => by cases a <;> cases b <;> simp_all) false
+
+@[simp]
+lemma probOutput_not_map' [LawfulMonad m] (mx : m Bool) :
+    Pr[= false | (! ·) <$> mx] = Pr[= true | mx] :=
+  probOutput_map_injective mx (fun a b h => by cases a <;> cases b <;> simp_all) true
+
+@[grind =]
+lemma probOutput_true_add_false_of_neverFail {mx : m Bool} [NeverFail mx] :
+    Pr[= true | mx] + Pr[= false | mx] = 1 := by simp
+
+@[simp, grind =]
+lemma probEvent_true_eq_probOutput (mx : m Bool) :
+    Pr[ (· = true) | mx] = Pr[= true | mx] := probEvent_eq_eq_probOutput mx true
+
+@[simp, grind =]
+lemma probEvent_not_eq_probOutput (mx : m Bool) :
+    Pr[ (· = false) | mx] = Pr[= false | mx] := probEvent_eq_eq_probOutput mx false
+
+lemma probOutput_true_bind_map_eq_probEvent [LawfulMonad m]
+    (mx : m α) (my : α → m β) (p : α → β → Bool) :
+    Pr[= true | mx >>= fun x => p x <$> my x] =
+      Pr[fun (x, y) => p x y | do let x ← mx; return (x, ← my x)] := by
+  simp only [probOutput_bind_eq_tsum, probOutput_map_eq_tsum_ite, Bool.true_eq, bind_pure_comp,
+    probEvent_bind_eq_tsum, probEvent_map]
+  grind
