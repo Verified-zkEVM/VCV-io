@@ -37,6 +37,6 @@ import Examples.ProgramLogic.UnaryStep
 import Examples.ProgramLogic.UnaryTriple
 import Examples.Regev
 import Examples.Schnorr.SigmaProtocol
-import Examples.SealedSender.AspectObservation
 import Examples.Schnorr.Signature
+import Examples.SealedSender.AspectObservation
 import Examples.SimpleTwoServerPIR
