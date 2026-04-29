@@ -1,0 +1,416 @@
+/-
+Copyright (c) 2024 Anonymized for double-blind review.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Anonymized for double-blind review
+-/
+import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.OracleComp.Constructions.SampleableType
+import VCVio.OracleComp.ProbComp
+import VCVio.EvalDist.Bool
+
+/-!
+# Discrete Logarithm Assumptions (DLog / CDH / DDH)
+
+Standard hardness assumptions for cryptographic groups, formalized using Mathlib's
+`Module F G` for scalar multiplication.
+
+## Mathematical setup
+
+We model a cyclic group as:
+- `F` : the scalar field (exponents), e.g. `ZMod p` for a prime-order group
+- `G` : the group of elements (e.g. elliptic curve points), with `[AddCommGroup G]`
+- `Module F G` : scalar multiplication `a • g` (corresponds to `g^a` in multiplicative notation)
+- `g : G` : a fixed generator (public system parameter)
+
+## Notation correspondence
+
+| Textbook (multiplicative) | This file (additive / EC-style) |
+|---|---|
+| `g^a`                     | `a • g`                         |
+| `g^a · g^b = g^{a+b}`    | `a • g + b • g = (a + b) • g`  |
+| `(g^a)^b = g^{ab}`       | `b • (a • g) = (b * a) • g`    |
+
+## Assumptions
+
+- **DLog**: given `(g, x • g)`, find `x`
+- **CDH**: given `(g, a • g, b • g)`, find `(a * b) • g`
+- **DDH**: distinguish `(g, a • g, b • g, (a * b) • g)` from `(g, a • g, b • g, c • g)`
+-/
+
+
+open OracleComp OracleSpec ENNReal
+
+namespace DiffieHellman
+
+variable {F : Type} [Field F]
+variable {G : Type} [AddCommGroup G] [Module F G]
+
+/-! ## DLog (Discrete Logarithm) -/
+
+/-- A DLog adversary receives a generator and a group element, and tries to find the
+discrete logarithm (scalar). -/
+def DLogAdversary (F G : Type) := G → G → ProbComp F
+
+section DLog
+
+variable [DecidableEq F] [SampleableType F]
+
+/-- DLog experiment: sample a random scalar `x`, give the adversary `(g, x • g)`,
+and check whether the adversary's guess equals `x`. -/
+def dlogExp (g : G) (adversary : DLogAdversary F G) : ProbComp Bool := do
+  let x ← $ᵗ F
+  let x' ← adversary g (x • g)
+  return decide (x' = x)
+
+end DLog
+
+/-! ## CDH (Computational Diffie-Hellman) -/
+
+/-- A CDH adversary receives `(g, a • g, b • g)` and tries to compute `(a * b) • g`.
+`_F` is a phantom type parameter for the scalar field, enabling Lean to infer `F`
+at call sites of `cdhExp`. -/
+def CDHAdversary (_F G : Type) := G → G → G → ProbComp G
+
+section CDH
+
+variable [SampleableType F] [DecidableEq G]
+
+/-- CDH experiment: sample random scalars `a, b`, give the adversary `(g, a • g, b • g)`,
+and check whether the adversary's output equals `(a * b) • g`. -/
+def cdhExp (g : G) (adversary : CDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  let h ← adversary g (a • g) (b • g)
+  return decide (h = (a * b) • g)
+
+end CDH
+
+/-! ## DDH (Decisional Diffie-Hellman) -/
+
+/-- A DDH adversary receives `(g, A, B, T)` and guesses whether `T = (a * b) • g`
+(real) or `T` is a random group element (random).
+`_F` is a phantom type parameter for the scalar field, enabling Lean to infer `F`
+at call sites of `ddhExp` and related definitions. -/
+def DDHAdversary (_F G : Type) := G → G → G → G → ProbComp Bool
+
+section DDH
+
+variable [SampleableType F]
+
+/-- DDH experiment: sample random scalars `a, b` and a bit. If the bit is `true`, set
+`c = a * b` (the real DH scalar); otherwise sample `c ← $ᵗ F` independently. The adversary
+receives `(g, a • g, b • g, c • g)` and wins by guessing the bit.
+
+All sampling is from the scalar field `F`, so the experiment is well-defined for any
+`Module F G` without requiring that `g` generates all of `G`. -/
+def ddhExp (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  let bit ← $ᵗ Bool
+  let c ← if bit then pure (a * b) else $ᵗ F
+  let b' ← adversary g (a • g) (b • g) (c • g)
+  return (bit == b')
+
+/-- DDH advantage: absolute distance from random guessing (1/2).
+Uses `ℝ` with absolute value rather than `ℝ≥0∞` subtraction, which would silently
+saturate at zero for adversaries that guess the wrong bit more often than not. -/
+noncomputable def ddhGuessAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
+  |(Pr[= true | ddhExp g adversary]).toReal - 1 / 2|
+
+/-! ## DDH: Two-game formulation -/
+
+/-- DDH real game: the adversary receives a genuine DH triple `(g, a • g, b • g, (a * b) • g)`. -/
+def ddhExpReal (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  adversary g (a • g) (b • g) ((a * b) • g)
+
+/-- DDH random game: the adversary receives `(g, a • g, b • g, c • g)` with independent
+`c ← $ᵗ F`. -/
+def ddhExpRand (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F; let c ← $ᵗ F
+  adversary g (a • g) (b • g) (c • g)
+
+/-- Two-game DDH advantage: `|Pr[output 1 | real] - Pr[output 1 | random]|`. -/
+noncomputable def ddhDistAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
+  |(Pr[= true | ddhExpReal g adversary]).toReal -
+    (Pr[= true | ddhExpRand g adversary]).toReal|
+
+/-- Baseline success probability for matching an independently uniform DH target sampled from the
+scalar space and mapped into the subgroup generated by `g`. -/
+noncomputable def uniformDHTargetSuccessProb (F : Type) [Fintype F] : ℝ :=
+  ((Fintype.card F : ℝ≥0∞)⁻¹).toReal
+
+end DDH
+
+/-! ## Standard reductions among DLog / CDH / DDH -/
+
+section Reductions
+
+variable [DecidableEq G]
+
+/-- Reduction from CDH solving to DDH distinguishing: compute a candidate DH share and compare it
+with the target group element. This is the concrete reduction underlying the hardness implication
+`DDH ⇒ CDH`. -/
+def cdhToDDHReduction (adversary : CDHAdversary F G) : DDHAdversary F G := fun g A B T => do
+  let h ← adversary g A B
+  return decide (h = T)
+
+/-- Reduction from DLog solving to CDH solving: recover the two exponents separately and rebuild
+the shared DH value. This is the concrete reduction underlying `CDH ⇒ DLog`. -/
+def dlogToCDHReduction (adversary : DLogAdversary F G) : CDHAdversary F G := fun g A B => do
+  let a ← adversary g A
+  let b ← adversary g B
+  return (a * b) • g
+
+/-- Direct DLog-to-DDH reduction obtained by composing the standard DLog-to-CDH and CDH-to-DDH
+reductions. This is the concrete reduction underlying `DDH ⇒ DLog`. -/
+def dlogToDDHReduction (adversary : DLogAdversary F G) : DDHAdversary F G :=
+  cdhToDDHReduction (F := F) (dlogToCDHReduction (F := F) adversary)
+
+end Reductions
+
+section DDHBranch
+
+variable [SampleableType F]
+
+/-- The single-game DDH experiment can be decomposed as a uniform-bit branch over
+the real and random DDH games. -/
+private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G) :
+    Pr[= true | ddhExp g adversary] =
+    Pr[= true | do
+      let bit ← ($ᵗ Bool)
+      let z ← if bit then ddhExpReal g adversary
+               else ddhExpRand g adversary
+      pure (bit == z)] := by
+  unfold ddhExp
+  rw [probOutput_bind_congr fun a _ => probOutput_bind_bind_swap _ _ _ _,
+      probOutput_bind_bind_swap]
+  refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+  intro bit
+  cases bit <;> simp [ddhExpReal, ddhExpRand]
+
+/-- The single-game DDH decomposes: `Pr[win] - 1/2 = (Pr[real=1] - Pr[rand=1]) / 2`. -/
+lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
+    (Pr[= true | ddhExp g adversary]).toReal - 1 / 2 =
+    ((Pr[= true | ddhExpReal g adversary]).toReal -
+      (Pr[= true | ddhExpRand g adversary]).toReal) / 2 := by
+  rw [show (Pr[= true | ddhExp g adversary]).toReal =
+      (Pr[= true | do
+        let bit ← ($ᵗ Bool)
+        let z ← if bit then ddhExpReal g adversary
+                 else ddhExpRand g adversary
+        pure (bit == z)]).toReal from by
+    congr 1; exact ddhExp_probOutput_eq_branch (F := F) g adversary]
+  exact probOutput_uniformBool_branch_toReal_sub_half
+    (ddhExpReal g adversary)
+    (ddhExpRand g adversary)
+
+/-- The two DDH advantage formulations are related by a factor of 2:
+`ddhDistAdvantage = 2 * ddhGuessAdvantage`. -/
+theorem ddhDistAdvantage_eq_two_mul_ddhGuessAdvantage (g : G) (adversary : DDHAdversary F G) :
+    ddhDistAdvantage g adversary = 2 * ddhGuessAdvantage g adversary := by
+  unfold ddhDistAdvantage ddhGuessAdvantage
+  have h := ddhExp_probOutput_sub_half (F := F) g adversary
+  have h2 : (Pr[= true | ddhExpReal g adversary]).toReal -
+      (Pr[= true | ddhExpRand g adversary]).toReal =
+      2 * ((Pr[= true | ddhExp g adversary]).toReal - 1 / 2) := by linarith
+  rw [h2, abs_mul, abs_of_nonneg (by positivity)]
+
+end DDHBranch
+
+section CDHToDDH
+
+variable [SampleableType F] [DecidableEq G]
+
+/-- In the real DDH game, the CDH-to-DDH reduction succeeds exactly when the underlying CDH
+adversary computed the correct shared DH value. -/
+theorem probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp
+    (g : G) (adversary : CDHAdversary F G) :
+    Pr[= true | ddhExpReal g (cdhToDDHReduction (F := F) adversary)] =
+      Pr[= true | cdhExp g adversary] := by
+  simp only [ddhExpReal, cdhToDDHReduction, cdhExp]
+
+private lemma probOutput_decide_smul_eq_inv_card
+    [Fintype F] (g : G) (hg : Function.Bijective (· • g : F → G)) (h : G) :
+    Pr[= true | ($ᵗ F) >>= fun c => pure (decide (h = c • g))] =
+      (Fintype.card F : ℝ≥0∞)⁻¹ := by
+  obtain ⟨c₀, hc₀⟩ := hg.surjective h
+  rw [probOutput_bind_eq_tsum]
+  simp only [probOutput_uniformSample, probOutput_pure]
+  rw [tsum_fintype, Finset.sum_eq_single c₀]
+  · simp [← hc₀]
+  · intro c _ hne
+    simp [show h ≠ c • g from fun heq => hne (hg.injective (hc₀.trans heq)).symm]
+  · exact absurd (Finset.mem_univ c₀)
+
+/-- In the random DDH game, the CDH-to-DDH reduction only matches the target with the uniform
+baseline probability. The bijectivity assumption identifies scalar samples with uniformly sampled
+group elements in the subgroup generated by `g`. -/
+theorem probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar
+    [Fintype F] (g : G) (hg : Function.Bijective (· • g : F → G))
+    (adversary : CDHAdversary F G) :
+    Pr[= true | ddhExpRand g (cdhToDDHReduction (F := F) adversary)] =
+      (Fintype.card F : ℝ≥0∞)⁻¹ := by
+  simp only [ddhExpRand, cdhToDDHReduction]
+  have key : ∀ a b : F,
+      Pr[= true | ($ᵗ F) >>= fun c =>
+        adversary g (a • g) (b • g) >>= fun h =>
+          pure (decide (h = c • g))] =
+        (Fintype.card F : ℝ≥0∞)⁻¹ := by
+    intro a b
+    rw [probOutput_bind_bind_swap]
+    rw [probOutput_bind_of_const _ fun h _ =>
+      probOutput_decide_smul_eq_inv_card g hg h]
+    simp [HasEvalPMF.probFailure_eq_zero]
+  rw [probOutput_bind_of_const _ fun a _ =>
+    probOutput_bind_of_const _ fun b _ => key a b]
+  simp [HasEvalPMF.probFailure_eq_zero]
+
+/-- Concrete form of the hardness implication `DDH ⇒ CDH`: a CDH solver can only beat the uniform
+DH-target baseline by the DDH distinguishing advantage of the associated adversary-map reduction. -/
+theorem cdhSuccess_toReal_le_uniform_add_ddhDistAdvantage
+    [Fintype F] (g : G) (hg : Function.Bijective (· • g : F → G))
+    (adversary : CDHAdversary F G) :
+    (Pr[= true | cdhExp g adversary]).toReal ≤
+      uniformDHTargetSuccessProb F +
+        ddhDistAdvantage g (cdhToDDHReduction (F := F) adversary) := by
+  unfold ddhDistAdvantage uniformDHTargetSuccessProb
+  rw [← probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp g adversary,
+      probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar g hg adversary]
+  linarith [le_abs_self
+    ((Pr[= true | ddhExpReal g (cdhToDDHReduction (F := F) adversary)]).toReal -
+     ((Fintype.card F : ℝ≥0∞)⁻¹).toReal)]
+
+end CDHToDDH
+
+section DLogToCDH
+
+variable [DecidableEq F] [SampleableType F] [DecidableEq G]
+
+/-- Concrete form of the hardness implication `CDH ⇒ DLog`: if a DLog adversary succeeds with
+probability `p`, the induced CDH adversary succeeds with probability at least `p^2`. -/
+theorem dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction
+    (g : G) (adversary : DLogAdversary F G) :
+    (Pr[= true | dlogExp g adversary]).toReal ^ 2 ≤
+      (Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)]).toReal := by
+  rw [← ENNReal.toReal_pow]
+  refine ENNReal.toReal_mono probOutput_ne_top ?_
+  set w : F → ℝ≥0∞ := fun x => Pr[= x | $ᵗ F] with hw
+  set f : F → ℝ≥0∞ := fun x => Pr[= x | adversary g (x • g)] with hff
+  -- Step 1: Pr[dlog] decomposes as ∑'_x w(x) * f(x).
+  have hdlog : Pr[= true | dlogExp g adversary] = ∑' x : F, w x * f x := by
+    unfold dlogExp
+    rw [probOutput_bind_eq_tsum]
+    refine tsum_congr fun x => ?_
+    congr 1
+    rw [probOutput_bind_eq_tsum]
+    refine (tsum_eq_single x ?_).trans ?_
+    · intro x' hx'
+      have : (decide (x' = x) : Bool) = false := by simp [hx']
+      simp [this]
+    · simp [f]
+  -- Step 2: Pr[dlog]^2 expands to a double tsum over independent copies.
+  have h_sq : Pr[= true | dlogExp g adversary] ^ 2 =
+      ∑' (a : F) (b : F), w a * f a * (w b * f b) := by
+    rw [sq, hdlog, ← ENNReal.tsum_mul_right]
+    refine tsum_congr fun _ => ?_
+    rw [← ENNReal.tsum_mul_left]
+  rw [h_sq]
+  -- Step 3: Pr[cdh] expands to a 4-fold tsum, with each weight pushed under the inner tsum.
+  have hcdh : Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)] =
+    ∑' (a : F) (b : F) (a' : F) (b' : F),
+      w a * (w b * (Pr[= a' | adversary g (a • g)] *
+        (Pr[= b' | adversary g (b • g)] *
+          (if (a' * b') • g = (a * b) • g then 1 else 0)))) := by
+    unfold cdhExp dlogToCDHReduction
+    simp only [bind_assoc, pure_bind, probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left]
+    refine tsum_congr fun a => ?_
+    refine tsum_congr fun b => ?_
+    refine tsum_congr fun a' => ?_
+    refine tsum_congr fun b' => ?_
+    by_cases hP : (a' * b') • g = (a * b) • g
+    · simp only [hP, if_true, mul_one, decide_true, probOutput_pure_self]
+      rfl
+    · have hPdec : (decide ((a' * b') • g = (a * b) • g) : Bool) = false := by simp [hP]
+      simp only [if_neg hP, mul_zero, hPdec]
+      rw [show Pr[= true | (pure false : ProbComp Bool)] = 0 from by simp]
+      ring
+  rw [hcdh]
+  -- Step 4: pointwise lower bound — keep only the (a' = a, b' = b) terms.
+  refine ENNReal.tsum_le_tsum fun a => ?_
+  refine ENNReal.tsum_le_tsum fun b => ?_
+  have heq_diag : w a * f a * (w b * f b) =
+      w a * (w b * (Pr[= a | adversary g (a • g)] *
+        (Pr[= b | adversary g (b • g)] *
+          (if (a * b) • g = (a * b) • g then 1 else 0)))) := by
+    change w a * f a * (w b * f b) =
+      w a * (w b * (f a * (f b * (if (a * b) • g = (a * b) • g then 1 else 0))))
+    simp only [if_true, mul_one]; ring
+  calc w a * f a * (w b * f b)
+      = w a * (w b * (Pr[= a | adversary g (a • g)] *
+          (Pr[= b | adversary g (b • g)] *
+            (if (a * b) • g = (a * b) • g then 1 else 0)))) := heq_diag
+    _ ≤ ∑' (b' : F), w a * (w b * (Pr[= a | adversary g (a • g)] *
+          (Pr[= b' | adversary g (b • g)] *
+            (if (a * b') • g = (a * b) • g then 1 else 0)))) :=
+        ENNReal.le_tsum b
+    _ ≤ ∑' (a' : F) (b' : F), w a * (w b * (Pr[= a' | adversary g (a • g)] *
+          (Pr[= b' | adversary g (b • g)] *
+            (if (a' * b') • g = (a * b) • g then 1 else 0)))) :=
+        ENNReal.le_tsum a
+
+/-- Concrete form of the hardness implication `DDH ⇒ DLog`, obtained by composing the previous two
+adversary-map reductions. -/
+theorem dlogSuccess_sq_le_uniform_add_ddhDistAdvantage
+    [Fintype F] (g : G) (hg : Function.Bijective (· • g : F → G))
+    (adversary : DLogAdversary F G) :
+    (Pr[= true | dlogExp g adversary]).toReal ^ 2 ≤
+      uniformDHTargetSuccessProb F +
+        ddhDistAdvantage g (dlogToDDHReduction (F := F) adversary) := by
+  calc (Pr[= true | dlogExp g adversary]).toReal ^ 2
+      ≤ (Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)]).toReal :=
+        dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction g adversary
+    _ ≤ uniformDHTargetSuccessProb F +
+          ddhDistAdvantage g (dlogToDDHReduction (F := F) adversary) :=
+        cdhSuccess_toReal_le_uniform_add_ddhDistAdvantage g hg
+          (dlogToCDHReduction (F := F) adversary)
+
+end DLogToCDH
+
+/-! ## Generable relation for discrete log -/
+
+section DLogGenerable
+
+variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
+variable {G : Type} [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
+variable (g : G)
+
+/-- The discrete log relation is generable by sampling `sk ← $ᵗ F` and returning
+`(sk • g, sk)`. -/
+def dlogGenerable :
+    GenerableRelation G F (fun pk sk => decide (sk • g = pk)) where
+  gen := do let sk ← $ᵗ F; return (sk • g, sk)
+  gen_sound := fun _ _ _ => by grind
+
+end DLogGenerable
+
+/-! ## Cyclic group instantiation helpers -/
+
+section CyclicInstantiation
+
+variable {G : Type} [AddCommGroup G] [Fintype G]
+
+/-- A generator `g` is nondegenerate if `fun a => a.val • g` surjects onto `G`,
+ruling out the trivial case. Uses additive notation consistent with `Module F G`. -/
+def NondegenerateGenerator (g : G) : Prop :=
+  Function.Surjective fun a : Fin (Fintype.card G) => a.val • g
+
+lemma NondegenerateGenerator.ne_zero [Nontrivial G] {g : G}
+    (hg : NondegenerateGenerator (G := G) g) : g ≠ 0 := by
+  intro hg0
+  rcases exists_ne (0 : G) with ⟨x, hx⟩
+  rcases hg x with ⟨a, ha⟩
+  have h0x : (0 : G) = x := by simpa [hg0] using ha
+  exact hx h0x.symm
+
+end CyclicInstantiation
+
+end DiffieHellman

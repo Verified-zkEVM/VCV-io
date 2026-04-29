@@ -1,0 +1,734 @@
+/-
+Copyright (c) 2026 Anonymized for double-blind review.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Anonymized for double-blind review
+-/
+
+import ToMathlib.Control.Monad.Algebra
+import ToMathlib.Control.OptionT
+import ToMathlib.Control.StateT
+import ToMathlib.Control.WriterT
+import VCVio.EvalDist.Monad.Basic
+import VCVio.OracleComp.EvalDist
+import Loom.WP.Basic
+import Loom.Triple.Basic
+
+/-!
+# Quantitative `WP` carrier for `OracleComp` (Loom2 default)
+
+This file is the **home** of the quantitative algebra structure on
+`OracleComp spec` valued in `ℝ≥0∞`, plus its registration as the
+default `Std.Do'.WP (OracleComp spec) ℝ≥0∞ EPost.nil` instance.
+
+It provides three layers:
+
+1. **Expectation algebra** — `μ : OracleComp spec ℝ≥0∞ → ℝ≥0∞` and the
+   legacy `MAlgOrdered (OracleComp spec) ℝ≥0∞` instance. These remain
+   the structural root for `OracleComp.ProgramLogic.wp` / `.Triple` and
+   the relational eRHL stack until the irreversible Commit 8 prunes
+   `MAlgOrdered`.
+2. **`Lean.Order` adapters for `ℝ≥0∞`** — bridges Mathlib's `≤` and
+   `sSup` to Lean core's `Lean.Order.{PartialOrder, CompleteLattice}`,
+   which Loom2 builds on. `Prop` ships with its own adapters in
+   `Loom/LatticeExt.lean`.
+3. **`Std.Do'.WP` instance** — the canonical entry point for new
+   program-logic developments. Its `wpTrans` wraps the existing
+   `MAlgOrdered.wp`, so the keystone alignment lemma
+   `wp_eq_mAlgOrdered_wp` holds by `rfl`.
+
+## Layout
+
+This is one of three `WP` carriers we register on `OracleComp`. Because
+`Std.Do'.WP`'s `Pred` and `EPred` are `outParam`s, only one carrier can
+be *visible* to instance synthesis at a time. We register them
+asymmetrically:
+
+* This file (`Loom/Quantitative.lean`) — the `ℝ≥0∞` carrier as a normal
+  `instance`, always live once the file is imported. This is the default.
+* `Loom/Qualitative.lean` — the `Prop` carrier as a `scoped instance`
+  under `namespace OracleComp.Qualitative`, opt-in via
+  `open OracleComp.Qualitative`.
+* `Loom/Probabilistic.lean` — the `Prob` carrier as a `scoped instance`
+  under `namespace OracleComp.Probabilistic`, opt-in via
+  `open OracleComp.Probabilistic`.
+
+There is no umbrella `Unary/Loom.lean` re-export. Consumers import the
+specific carrier they need. This makes the carrier choice explicit at
+every import site.
+
+## Loom2 vs. Mathlib lattice plumbing
+
+Loom2 builds on `Lean.Order.{PartialOrder, CompleteLattice, CCPO}` from
+`Init.Internal.Order`, a class hierarchy distinct from Mathlib's
+`Order.{PartialOrder, CompleteLattice}`. We provide the narrow `ℝ≥0∞`
+adapters here.
+
+When Volo's PR #12965 lands upstream and the `Std.Do.{WP,…}` API
+stabilizes, this bridge collapses to a re-export and the lattice
+adapters can move to a shared `ToMathlib/Order/LeanOrderAdapter.lean`.
+-/
+
+open ENNReal
+open Lean.Order
+open Std.Do'
+
+universe u v
+
+namespace OracleComp.ProgramLogic
+
+variable {ι : Type u} {spec : OracleSpec ι}
+variable [spec.Fintype] [spec.Inhabited]
+variable {α β : Type}
+
+/-! ## Expectation algebra and the `MAlgOrdered` instance -/
+
+/-- Expectation-style algebra for oracle computations returning `ℝ≥0∞`. -/
+noncomputable def μ (oa : OracleComp spec ℝ≥0∞) : ℝ≥0∞ :=
+  ∑' x, Pr[= x | oa] * x
+
+lemma μ_bind_eq_tsum {α : Type}
+    (oa : OracleComp spec α) (ob : α → OracleComp spec ℝ≥0∞) :
+    μ (oa >>= ob) = ∑' x, Pr[= x | oa] * μ (ob x) := by
+  unfold μ
+  calc
+    (∑' y, Pr[= y | oa >>= ob] * y)
+        = (∑' y, (∑' x, Pr[= x | oa] * Pr[= y | ob x]) * y) := by
+            refine tsum_congr ?_
+            intro y
+            rw [probOutput_bind_eq_tsum]
+    _ = (∑' y, ∑' x, (Pr[= x | oa] * Pr[= y | ob x]) * y) := by
+          refine tsum_congr ?_
+          intro y
+          rw [ENNReal.tsum_mul_right]
+    _ = ∑' x, ∑' y, (Pr[= x | oa] * Pr[= y | ob x]) * y := by
+          rw [ENNReal.tsum_comm]
+    _ = ∑' x, Pr[= x | oa] * ∑' y, Pr[= y | ob x] * y := by
+          refine tsum_congr ?_
+          intro x
+          rw [← ENNReal.tsum_mul_left]
+          refine tsum_congr ?_
+          intro y
+          rw [mul_assoc]
+    _ = ∑' x, Pr[= x | oa] * μ (ob x) := rfl
+
+noncomputable instance instMAlgOrdered :
+    MAlgOrdered (OracleComp spec) ℝ≥0∞ where
+  μ := μ (spec := spec)
+  μ_pure x := by
+    haveI : DecidableEq ℝ≥0∞ := Classical.decEq _
+    simp [μ, probOutput_pure]
+  μ_bind_mono f g hfg x := by
+    rw [μ_bind_eq_tsum (oa := x) (ob := f), μ_bind_eq_tsum (oa := x) (ob := g)]
+    refine ENNReal.tsum_le_tsum ?_
+    intro a
+    simpa [mul_comm] using (mul_le_mul_right (hfg a) (Pr[= a | x]))
+
+end OracleComp.ProgramLogic
+
+/-! ## `Lean.Order` adapters for `ℝ≥0∞`
+
+Loom2's `Std.Do'.WP m Pred EPred` requires `Assertion Pred` (a class
+abbrev for `Lean.Order.CompleteLattice`). We bridge Mathlib's order
+structure on `ℝ≥0∞` to Lean core's lattice hierarchy here. -/
+
+namespace OracleComp.ProgramLogic.Loom
+
+/-- Bridge Mathlib's `≤` on `ℝ≥0∞` to `Lean.Order.PartialOrder`. -/
+instance : Lean.Order.PartialOrder ℝ≥0∞ where
+  rel a b := a ≤ b
+  rel_refl := le_refl _
+  rel_trans h₁ h₂ := le_trans h₁ h₂
+  rel_antisymm := le_antisymm
+
+/-- Bridge Mathlib's `sSup` on `ℝ≥0∞` to `Lean.Order.CompleteLattice`.
+
+`Lean.Order.CompleteLattice.has_sup c` requires a least upper bound for
+the predicate-encoded set `{x | c x}`. We discharge it with Mathlib's
+`sSup` specialization. -/
+instance : Lean.Order.CompleteLattice ℝ≥0∞ where
+  has_sup c := by
+    refine ⟨sSup {x | c x}, fun x => ?_⟩
+    constructor
+    · intro hsup y hcy
+      have hle : y ≤ sSup {x | c x} := le_sSup (a := y) hcy
+      exact le_trans hle hsup
+    · intro h
+      exact sSup_le (fun y hy => h y hy)
+
+end OracleComp.ProgramLogic.Loom
+
+/-! ## `Lean.Order.CCPO` instance for `Std.Do'.EPost.nil`
+
+Loom2's Hoare-triple notation `⦃ pre ⦄ x ⦃ post ⦄` (defined in
+`Loom.Triple.Basic`) expands to `Std.Do'.Triple pre x post ⊥` where
+`⊥` is the `Lean.Order.CCPO`-bottom (`Lean.Order.bot`). For monads
+with no exception layer, the `EPred` is `Std.Do'.EPost.nil`, which
+Loom2 ships only with a `Lean.Order.CompleteLattice` instance, not a
+`CCPO` one. (`CCPO` and `CompleteLattice` are independent sibling
+classes in Lean core's `Init.Internal.Order`.)
+
+We provide the missing `CCPO` instance here. `EPost.nil` is a
+single-element type, so the chain-supremum is trivial: every chain has
+the unique element `EPost.nil.mk` as its least upper bound. -/
+
+namespace Std.Do'
+
+instance : Lean.Order.CCPO EPost.nil where
+  has_csup _ := ⟨EPost.nil.mk, fun _ => ⟨fun _ _ _ => trivial, fun _ => trivial⟩⟩
+
+end Std.Do'
+
+namespace OracleComp.ProgramLogic.Loom
+
+/-! ## `Std.Do'.WP` instance for `OracleComp` -/
+
+variable {ι : Type u} {spec : OracleSpec ι}
+variable [spec.Fintype] [spec.Inhabited]
+variable {α β : Type}
+
+/-- Quantitative `Std.Do'.WP` interpretation of `OracleComp spec` valued in `ℝ≥0∞`.
+
+The `wpTrans` is the existing `MAlgOrdered.wp` (i.e. expectation of
+`post` under `evalDist`); the `EPost.nil` argument is ignored since
+`OracleComp` has no first-class exception slot. The three `WP` axioms
+reduce to the existing `MAlgOrdered.{wp_pure, wp_bind, wp_mono}`
+equalities. -/
+noncomputable instance instWP :
+    Std.Do'.WP (OracleComp spec) ℝ≥0∞ Std.Do'.EPost.nil where
+  wpTrans x := ⟨fun post _epost =>
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x post⟩
+  wp_trans_pure x := by
+    intro post _epost
+    change post x ≤ MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (pure x) post
+    rw [MAlgOrdered.wp_pure]
+  wp_trans_bind x f := by
+    intro post _epost
+    change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x
+            (fun a => MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (f a) post) ≤
+          MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (x >>= f) post
+    rw [MAlgOrdered.wp_bind]
+  wp_trans_monotone x := by
+    intro post post' _epost _epost' _hepost hpost
+    exact MAlgOrdered.wp_mono (m := OracleComp spec) (l := ℝ≥0∞) x hpost
+
+/-! ## Definitional alignment with `MAlgOrdered.wp`
+
+The keystone lemma confirms `Std.Do'.wp` agrees with `MAlgOrdered.wp`
+on the nose, so every existing quantitative `wp_*` theorem in
+`HoareTriple.lean` transports for free when the user rewrites
+`Std.Do'.wp _ _ _ ↦ MAlgOrdered.wp _ _`.
+
+The epost argument is `⊥` to match Loom2's `⦃ _ ⦄ _ ⦃ _ ⦄` notation in
+`Loom.Triple.Basic`. The `WP` instance for `OracleComp` ignores the
+epost argument entirely, so any element of `EPost.nil` would yield the
+same value. -/
+
+theorem wp_eq_mAlgOrdered_wp
+    (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
+    Std.Do'.wp oa post Lean.Order.bot =
+      MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post := rfl
+
+theorem wp_eq_mAlgOrdered_wp_epost
+    (oa : OracleComp spec α) (post : α → ℝ≥0∞) (epost : Std.Do'.EPost.nil) :
+    Std.Do'.wp oa post epost =
+      MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post := rfl
+
+/-! ## `StateT (OracleComp spec)` WP normalization -/
+
+@[simp]
+theorem wp_StateT_bind {σ : Type} (x : StateT σ (OracleComp spec) α)
+    (f : α → StateT σ (OracleComp spec) β) (post : β → σ → ℝ≥0∞) :
+    Std.Do'.wp (StateT.bind x f) post Lean.Order.bot =
+      fun s => Std.Do'.wp x (fun a s' => Std.Do'.wp (f a) post Lean.Order.bot s')
+        Lean.Order.bot s := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((x >>= f).run s)
+      (fun p : β × σ => post p.1 p.2) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (x.run s)
+      (fun p : α × σ =>
+        MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((f p.1).run p.2)
+          (fun q : β × σ => post q.1 q.2))
+  rw [StateT.run_bind, MAlgOrdered.wp_bind]
+
+@[simp]
+theorem wp_StateT_bind' {σ : Type} (x : StateT σ (OracleComp spec) α)
+    (f : α → StateT σ (OracleComp spec) β) (post : β → σ → ℝ≥0∞) :
+    Std.Do'.wp (x >>= f) post Lean.Order.bot =
+      fun s => Std.Do'.wp x (fun a s' => Std.Do'.wp (f a) post Lean.Order.bot s')
+        Lean.Order.bot s := by
+  exact wp_StateT_bind x f post
+
+@[simp]
+theorem wp_StateT_pure {σ : Type} (x : α) (post : α → σ → ℝ≥0∞) :
+    Std.Do'.wp (pure x : StateT σ (OracleComp spec) α) post Lean.Order.bot =
+      fun s => post x s := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (x, s) : OracleComp spec (α × σ))
+      (fun p : α × σ => post p.1 p.2) = post x s
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_StateT_get {σ : Type} (post : σ → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadStateOf.get : StateT σ (OracleComp spec) σ) post Lean.Order.bot =
+      fun s => post s s := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (s, s) : OracleComp spec (σ × σ))
+      (fun p : σ × σ => post p.1 p.2) = post s s
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_StateT_set {σ : Type} (s' : σ) (post : PUnit → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadStateOf.set s' : StateT σ (OracleComp spec) PUnit) post
+      Lean.Order.bot = fun _ => post ⟨⟩ s' := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (PUnit.unit, s') : OracleComp spec (PUnit × σ))
+      (fun p : PUnit × σ => post p.1 p.2) = post ⟨⟩ s'
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_StateT_modifyGet {σ : Type} (f : σ → α × σ) (post : α → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadStateOf.modifyGet f : StateT σ (OracleComp spec) α) post
+      Lean.Order.bot = fun s => post (f s).1 (f s).2 := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (f s) : OracleComp spec (α × σ))
+      (fun p : α × σ => post p.1 p.2) = post (f s).1 (f s).2
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_StateT_monadLift {σ : Type} (oa : OracleComp spec α)
+    (post : α → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadLift.monadLift oa : StateT σ (OracleComp spec) α) post
+      Lean.Order.bot = fun s => Std.Do'.wp oa (fun a => post a s) Lean.Order.bot := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (oa >>= fun a => pure (a, s))
+      (fun p : α × σ => post p.1 p.2) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa (fun a => post a s)
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
+
+/-! ## `OptionT (OracleComp spec)` WP normalization -/
+
+@[simp]
+theorem wp_OptionT_bind (x : OptionT (OracleComp spec) α)
+    (f : α → OptionT (OracleComp spec) β) (post : β → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (x >>= f) post epost =
+      Std.Do'.wp x (fun a => Std.Do'.wp (f a) post epost) epost := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((x >>= f).run)
+      (epost.pushOption post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run
+      (epost.pushOption fun a =>
+        MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (f a).run
+          (epost.pushOption post))
+  simp only [OptionT.run_bind, Option.elimM]
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run) ?_
+  funext o
+  cases o <;> simp [EPost.cons.pushOption]
+
+@[simp]
+theorem wp_OptionT_pure (x : α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (pure x : OptionT (OracleComp spec) α) post epost = post x := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (some x) : OracleComp spec (Option α)) (epost.pushOption post) = post x
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_OptionT_failure (post : α → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (failure : OptionT (OracleComp spec) α) post epost = epost.head := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure none : OracleComp spec (Option α)) (epost.pushOption post) = epost.head
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_OptionT_monadLift (oa : OracleComp spec α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (MonadLift.monadLift oa : OptionT (OracleComp spec) α) post epost =
+      Std.Do'.wp oa post Lean.Order.bot := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (oa >>= fun a => pure (some a)) (epost.pushOption post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_OptionT_lift (oa : OracleComp spec α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (OptionT.lift oa : OptionT (OracleComp spec) α) post epost =
+      Std.Do'.wp oa post Lean.Order.bot :=
+  wp_OptionT_monadLift oa post epost
+
+@[simp]
+theorem wp_OptionT_map (f : α → β) (x : OptionT (OracleComp spec) α)
+    (post : β → ℝ≥0∞) (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (f <$> x) post epost = Std.Do'.wp x (fun a => post (f a)) epost := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((f <$> x).run)
+      (epost.pushOption post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run
+      (epost.pushOption fun a => post (f a))
+  rw [OptionT.run_map, MAlgOrdered.wp_map]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run) ?_
+  funext o
+  cases o <;> rfl
+
+/-! ## `ExceptT (OracleComp spec)` WP normalization -/
+
+@[simp]
+theorem wp_ExceptT_bind {ε : Type} (x : ExceptT ε (OracleComp spec) α)
+    (f : α → ExceptT ε (OracleComp spec) β) (post : β → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (x >>= f) post epost =
+      Std.Do'.wp x (fun a => Std.Do'.wp (f a) post epost) epost := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((x >>= f).run)
+      (epost.pushExcept post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run
+      (epost.pushExcept fun a =>
+        MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (f a).run
+          (epost.pushExcept post))
+  rw [ExceptT.run_bind, MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run) ?_
+  funext ea
+  cases ea <;> simp [EPost.cons.pushExcept, MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ExceptT_pure {ε : Type} (x : α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (pure x : ExceptT ε (OracleComp spec) α) post epost = post x := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (Except.ok x) : OracleComp spec (Except ε α)) (epost.pushExcept post) = post x
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ExceptT_throw {ε : Type} (e : ε) (post : α → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (throw e : ExceptT ε (OracleComp spec) α) post epost = epost.head e := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (Except.error e) : OracleComp spec (Except ε α)) (epost.pushExcept post) =
+    epost.head e
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ExceptT_monadLift {ε : Type} (oa : OracleComp spec α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (MonadLift.monadLift oa : ExceptT ε (OracleComp spec) α) post epost =
+      Std.Do'.wp oa post Lean.Order.bot := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (oa >>= fun a => pure (Except.ok a)) (epost.pushExcept post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
+
+/-! ## `ReaderT (OracleComp spec)` WP normalization -/
+
+@[simp]
+theorem wp_ReaderT_bind {ρ : Type} (x : ReaderT ρ (OracleComp spec) α)
+    (f : α → ReaderT ρ (OracleComp spec) β) (post : β → ρ → ℝ≥0∞) :
+    Std.Do'.wp (x >>= f) post Lean.Order.bot =
+      fun r => Std.Do'.wp x (fun a r' => Std.Do'.wp (f a) post Lean.Order.bot r')
+        Lean.Order.bot r := by
+  funext r
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((x >>= f).run r)
+      (fun b => post b r) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (x.run r)
+      (fun a => MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((f a).run r)
+        (fun b => post b r))
+  rw [ReaderT.run_bind, MAlgOrdered.wp_bind]
+
+@[simp]
+theorem wp_ReaderT_pure {ρ : Type} (x : α) (post : α → ρ → ℝ≥0∞) :
+    Std.Do'.wp (pure x : ReaderT ρ (OracleComp spec) α) post Lean.Order.bot =
+      fun r => post x r := by
+  funext r
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure x : OracleComp spec α) (fun a => post a r) = post x r
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ReaderT_read {ρ : Type} (post : ρ → ρ → ℝ≥0∞) :
+    Std.Do'.wp (MonadReaderOf.read : ReaderT ρ (OracleComp spec) ρ) post Lean.Order.bot =
+      fun r => post r r := by
+  funext r
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure r : OracleComp spec ρ) (fun a => post a r) = post r r
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ReaderT_monadLift {ρ : Type} (oa : OracleComp spec α)
+    (post : α → ρ → ℝ≥0∞) :
+    Std.Do'.wp (MonadLift.monadLift oa : ReaderT ρ (OracleComp spec) α) post
+      Lean.Order.bot = fun r => Std.Do'.wp oa (fun a => post a r) Lean.Order.bot := by
+  funext r
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (oa : OracleComp spec α) (fun a => post a r) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa (fun a => post a r)
+  rfl
+
+/-! ## Generic `WriterT` WP normalization -/
+
+end OracleComp.ProgramLogic.Loom
+
+namespace Std.Do'
+
+instance (priority := low) WriterT.instWP {m : Type → Type v} {Pred EPred ω : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred] :
+    WP (WriterT ω m) (ω → Pred) EPred where
+  wpTrans {γ} x :=
+    ⟨fun post epost w => wp x.run (fun p : γ × ω => post p.1 (w * p.2)) epost⟩
+  wp_trans_pure {γ} x := fun post epost w => by
+    rw [WriterT.run_pure]
+    simpa [mul_one] using
+      (WP.wp_pure (m := m) (x := (x, (1 : ω)))
+        (post := fun p : γ × ω => post p.1 (w * p.2)) (epost := epost))
+  wp_trans_bind {γ δ} x f := fun post epost w => by
+    rw [WriterT.run_bind]
+    apply Lean.Order.PartialOrder.rel_trans
+    · refine WP.wp_consequence (m := m) (x := x.run)
+        (post := fun p : γ × ω =>
+          wp (f p.1).run (fun q : δ × ω => post q.1 ((w * p.2) * q.2)) epost)
+        (post' := fun p : γ × ω =>
+          wp ((fun q : δ × ω => (q.1, p.2 * q.2)) <$> (f p.1).run)
+            (fun p : δ × ω => post p.1 (w * p.2)) epost)
+        (epost := epost) ?_
+      intro p
+      apply Lean.Order.PartialOrder.rel_trans
+      · refine WP.wp_consequence (m := m) (x := (f p.1).run)
+          (post := fun q : δ × ω => post q.1 ((w * p.2) * q.2))
+          (post' := fun q : δ × ω => post q.1 (w * (p.2 * q.2)))
+          (epost := epost) ?_
+        intro q
+        simpa [mul_assoc] using
+          (show Lean.Order.PartialOrder.rel
+              (post q.1 (w * (p.2 * q.2))) (post q.1 (w * (p.2 * q.2))) from
+            Lean.Order.PartialOrder.rel_refl)
+      · exact WP.wp_map (m := m)
+          (fun q : δ × ω => (q.1, p.2 * q.2)) (f p.1).run
+          (fun p : δ × ω => post p.1 (w * p.2)) epost
+    · exact WP.wp_bind (m := m) x.run
+        (fun p : γ × ω =>
+          (fun q : δ × ω => (q.1, p.2 * q.2)) <$> (f p.1).run)
+        (fun p : δ × ω => post p.1 (w * p.2)) epost
+  wp_trans_monotone {γ} x := fun post post' epost epost' hepost hpost w => by
+    apply WP.wp_consequence_econs (m := m) (x := x.run)
+    · intro p
+      exact hpost p.1 (w * p.2)
+    · exact hepost
+
+@[simp, grind =]
+theorem WriterT.apply_wp {m : Type → Type v} {Pred EPred ω α : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (x : WriterT ω m α) (post : α → ω → Pred) (epost : EPred) (w : ω) :
+    wp x post epost w =
+      wp x.run (fun p : α × ω => post p.1 (w * p.2)) epost :=
+  rfl
+
+theorem WriterT.wp_pure {m : Type → Type v} {Pred EPred ω α : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (x : α) (post : α → ω → Pred) (epost : EPred) :
+    (fun w => post x w) ⊑ wp (pure x : WriterT ω m α) post epost := by
+  intro w
+  rw [WriterT.apply_wp, WriterT.run_pure]
+  simpa [mul_one] using
+    (WP.wp_pure (m := m) (x := (x, (1 : ω)))
+      (post := fun p : α × ω => post p.1 (w * p.2)) (epost := epost))
+
+theorem WriterT.wp_bind {m : Type → Type v} {Pred EPred ω α β : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (x : WriterT ω m α) (f : α → WriterT ω m β) (post : β → ω → Pred)
+    (epost : EPred) :
+    (fun w => wp x (fun a w' => wp (f a) post epost w') epost w) ⊑
+      wp (x >>= f) post epost :=
+  WP.wp_bind x f post epost
+
+theorem WriterT.wp_tell {m : Type → Type v} {Pred EPred ω : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (out : ω) (post : PUnit → ω → Pred) (epost : EPred) :
+    (fun w => post PUnit.unit (w * out)) ⊑
+      wp (MonadWriter.tell out : WriterT ω m PUnit) post epost := by
+  intro w
+  rw [WriterT.apply_wp, WriterT.run_tell]
+  exact WP.wp_pure (m := m) (x := (PUnit.unit, out))
+    (post := fun p : PUnit × ω => post p.1 (w * p.2)) (epost := epost)
+
+theorem WriterT.wp_monadLift {m : Type → Type v} {Pred EPred ω α : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (x : m α) (post : α → ω → Pred) (epost : EPred) :
+    (fun w => wp x (fun a => post a w) epost) ⊑
+      wp (MonadLift.monadLift x : WriterT ω m α) post epost := by
+  intro w
+  rw [WriterT.apply_wp]
+  apply Lean.Order.PartialOrder.rel_trans
+  · refine WP.wp_consequence (m := m) (x := x)
+      (post := fun a => post a w)
+      (post' := fun a => post a (w * (1 : ω)))
+      (epost := epost) ?_
+    intro a
+    simpa [mul_one] using
+      (show Lean.Order.PartialOrder.rel (post a w) (post a w) from
+        Lean.Order.PartialOrder.rel_refl)
+  · exact WP.wp_map (m := m) (fun a : α => (a, (1 : ω))) x
+      (fun p : α × ω => post p.1 (w * p.2)) epost
+
+theorem WriterT.wp_map {m : Type → Type v} {Pred EPred ω α β : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (f : α → β) (x : WriterT ω m α) (post : β → ω → Pred) (epost : EPred) :
+    wp x (fun a w => post (f a) w) epost ⊑ wp (f <$> x) post epost := by
+  intro w
+  change wp x.run (fun p : α × ω => post (f p.1) (w * p.2)) epost ⊑
+    wp (WriterT.run (f <$> x)) (fun p : β × ω => post p.1 (w * p.2)) epost
+  rw [WriterT.run_map]
+  exact WP.wp_map (m := m) (fun p : α × ω => (f p.1, p.2)) x.run
+    (fun p : β × ω => post p.1 (w * p.2)) epost
+
+theorem Spec.tell_WriterT {m : Type → Type v} {Pred EPred ω : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (out : ω) (post : PUnit → ω → Pred) (epost : EPred) :
+    Triple (fun w => post PUnit.unit (w * out))
+      (MonadWriter.tell out : WriterT ω m PUnit) post epost :=
+  Triple.iff.mpr (WriterT.wp_tell out post epost)
+
+theorem Spec.monadLift_WriterT {m : Type → Type v} {Pred EPred ω α : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (x : m α) (post : α → ω → Pred) (epost : EPred) :
+    Triple (fun w => wp x (fun a => post a w) epost)
+      (MonadLift.monadLift x : WriterT ω m α) post epost :=
+  Triple.iff.mpr (WriterT.wp_monadLift x post epost)
+
+theorem Spec.mk_WriterT {m : Type → Type v} {Pred EPred ω α : Type}
+    [Monad m] [Monoid ω] [Assertion Pred] [Assertion EPred] [WP m Pred EPred]
+    (x : m (α × ω)) (post : α → ω → Pred) (epost : EPred) :
+    Triple (fun w => wp x (fun p : α × ω => post p.1 (w * p.2)) epost)
+      (WriterT.mk x : WriterT ω m α) post epost :=
+  Triple.iff.mpr (by intro w; rfl)
+
+end Std.Do'
+
+namespace OracleComp.ProgramLogic.Loom
+
+variable {ι : Type u} {spec : OracleSpec ι}
+variable [spec.Fintype] [spec.Inhabited]
+variable {α β : Type}
+
+namespace WriterT
+
+@[simp]
+theorem wp_bind {ω : Type} [Monoid ω] (x : _root_.WriterT ω (OracleComp spec) α)
+    (f : α → _root_.WriterT ω (OracleComp spec) β) (post : β → ω → ℝ≥0∞) :
+    Std.Do'.wp (x >>= f) post Lean.Order.bot =
+      fun w => Std.Do'.wp x
+        (fun a w' => Std.Do'.wp (f a) post Lean.Order.bot w') Lean.Order.bot w := by
+  funext w
+  change Std.Do'.wp ((x >>= f).run) (fun p : β × ω => post p.1 (w * p.2))
+      Lean.Order.bot =
+    Std.Do'.wp x.run
+      (fun p : α × ω =>
+        Std.Do'.wp (f p.1).run (fun q : β × ω => post q.1 ((w * p.2) * q.2))
+          Lean.Order.bot)
+      Lean.Order.bot
+  rw [_root_.WriterT.run_bind]
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (x.run >>= fun p : α × ω =>
+        (fun q : β × ω => (q.1, p.2 * q.2)) <$> (f p.1).run)
+      (fun p : β × ω => post p.1 (w * p.2)) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run
+      (fun p : α × ω =>
+        MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (f p.1).run
+          (fun q : β × ω => post q.1 ((w * p.2) * q.2)))
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run) ?_
+  funext p
+  rw [MAlgOrdered.wp_map]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (f p.1).run) ?_
+  funext q
+  rw [mul_assoc]
+
+@[simp]
+theorem wp_pure {ω : Type} [Monoid ω] (x : α) (post : α → ω → ℝ≥0∞) :
+    Std.Do'.wp (pure x : _root_.WriterT ω (OracleComp spec) α) post Lean.Order.bot =
+      fun w => post x w := by
+  funext w
+  change Std.Do'.wp ((pure x : _root_.WriterT ω (OracleComp spec) α).run)
+      (fun p : α × ω => post p.1 (w * p.2)) Lean.Order.bot = post x w
+  rw [_root_.WriterT.run_pure]
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (x, 1) : OracleComp spec (α × ω))
+      (fun p : α × ω => post p.1 (w * p.2)) = post x w
+  rw [MAlgOrdered.wp_pure, mul_one]
+
+@[simp]
+theorem wp_tell {ω : Type} [Monoid ω] (out : ω) (post : PUnit → ω → ℝ≥0∞) :
+    Std.Do'.wp (MonadWriter.tell out : _root_.WriterT ω (OracleComp spec) PUnit) post
+      Lean.Order.bot = fun w => post ⟨⟩ (w * out) := by
+  funext w
+  change Std.Do'.wp
+    (_root_.WriterT.run (MonadWriter.tell out : _root_.WriterT ω (OracleComp spec) PUnit))
+      (fun p : PUnit × ω => post p.1 (w * p.2)) Lean.Order.bot = post ⟨⟩ (w * out)
+  rw [_root_.WriterT.run_tell]
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (⟨⟩, out) : OracleComp spec (PUnit × ω))
+      (fun p : PUnit × ω => post p.1 (w * p.2)) = post ⟨⟩ (w * out)
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_monadLift {ω : Type} [Monoid ω] (oa : OracleComp spec α)
+    (post : α → ω → ℝ≥0∞) :
+    Std.Do'.wp (MonadLift.monadLift oa : _root_.WriterT ω (OracleComp spec) α) post
+      Lean.Order.bot = fun w => Std.Do'.wp oa (fun a => post a w) Lean.Order.bot := by
+  funext w
+  change Std.Do'.wp ((MonadLift.monadLift oa : _root_.WriterT ω (OracleComp spec) α).run)
+      (fun p : α × ω => post p.1 (w * p.2)) Lean.Order.bot =
+    Std.Do'.wp oa (fun a => post a w) Lean.Order.bot
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((fun a => (a, 1)) <$> oa)
+      (fun p : α × ω => post p.1 (w * p.2)) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa (fun a => post a w)
+  rw [MAlgOrdered.wp_map]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
+  funext a
+  rw [mul_one]
+
+@[simp]
+theorem wp_map {ω : Type} [Monoid ω] (f : α → β)
+    (x : _root_.WriterT ω (OracleComp spec) α) (post : β → ω → ℝ≥0∞) :
+    Std.Do'.wp (f <$> x) post Lean.Order.bot =
+      Std.Do'.wp x (fun a w => post (f a) w) Lean.Order.bot := by
+  funext w
+  change Std.Do'.wp (_root_.WriterT.run (f <$> x))
+      (fun p : β × ω => post p.1 (w * p.2))
+      Lean.Order.bot =
+    Std.Do'.wp (WriterT.run x) (fun p : α × ω => post (f p.1) (w * p.2))
+      Lean.Order.bot
+  rw [_root_.WriterT.run_map]
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      ((fun p : α × ω => (f p.1, p.2)) <$> x.run)
+      (fun p : β × ω => post p.1 (w * p.2)) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run
+      (fun p : α × ω => post (f p.1) (w * p.2))
+  rw [MAlgOrdered.wp_map]
+
+end WriterT
+
+/-- `Std.Do'.Triple` agrees with `MAlgOrdered.Triple` propositionally.
+
+Use as a forward iff: `triple_iff_mAlgOrdered_triple.mp` extracts
+`pre ≤ MAlgOrdered.wp …` from a `Std.Do'.Triple`, and `.mpr` packages
+it back. The two are *not* definitionally equal because `Std.Do'.Triple`
+is an inductive wrapper rather than a `def` over `≤`. -/
+theorem triple_iff_mAlgOrdered_triple
+    (pre : ℝ≥0∞) (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
+    Std.Do'.Triple pre oa post Lean.Order.bot ↔
+      MAlgOrdered.Triple (m := OracleComp spec) (l := ℝ≥0∞) pre oa post :=
+  Std.Do'.Triple.iff
+
+end OracleComp.ProgramLogic.Loom
