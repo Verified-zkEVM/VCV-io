@@ -187,6 +187,7 @@ Before working in a specific area, read the relevant guide in `docs/agents/`:
 - **Query tracking / weighted cost / expected runtime**: [`docs/agents/query-tracking.md`](docs/agents/query-tracking.md)
 - **Probability reasoning (EvalDist, ProbComp)**: [`docs/agents/probability.md`](docs/agents/probability.md)
 - **Crypto primitives and reductions**: [`docs/agents/crypto.md`](docs/agents/crypto.md)
+- **End-to-end crypto examples**: [`docs/agents/end-to-end-examples.md`](docs/agents/end-to-end-examples.md)
 - **Program logic tactics**: [`docs/agents/program-logic.md`](docs/agents/program-logic.md)
 - **All notation**: [`docs/agents/notation.md`](docs/agents/notation.md)
 - **Proof workflows (game-hopping, reductions)**: [`docs/agents/proof-workflows.md`](docs/agents/proof-workflows.md)

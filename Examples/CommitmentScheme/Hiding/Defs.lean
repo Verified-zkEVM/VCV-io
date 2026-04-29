@@ -34,11 +34,9 @@ Bad event: `saltCount ≥ 2`. Since the challenge query always increments
 `saltCount` by `1`, bad means at least one *adversary* query also had salt
 `s`. Three regimes:
 
-| `saltCount` | Meaning
-| ----------- | -------
-| `0`         | before challenge; no salt-`s` queries yet
-| `1`         | only the challenge query has hit salt `s`
-| `≥ 2`       | at least one adversary query also hit salt `s` (BAD)
+* `saltCount = 0`: before the challenge; no salt-`s` queries yet.
+* `saltCount = 1`: only the challenge query has hit salt `s`.
+* `saltCount ≥ 2`: at least one adversary query also hit salt `s` (BAD).
 
 * `hidingImpl₁ s` (real game): standard caching, increment salt counter.
 * `hidingImpl₂ s` (identical-until-bad bridge): like `hidingImpl₁`, but

@@ -29,9 +29,8 @@ the commitment.
 
 ## Theorem in this file
 
-| Theorem                  | Bound                       | Precondition
-| ------------------------ | --------------------------- | ------------
-| `extractability_bound`   | `(t·(t-1) + 2) / (2·|C|)`   | `t ≥ 3`
+* `extractability_bound` — bound `(t·(t-1) + 2) / (2·|C|)`, requires
+  `t ≥ 3`.
 
 The `t ≥ 3` precondition is where the case-split bound
 `max(t + 1, t·(t-1)/2 + 1)` collapses to its `t·(t-1)/2 + 1` branch (see

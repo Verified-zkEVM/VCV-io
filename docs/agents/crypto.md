@@ -35,9 +35,9 @@ structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type) where
 For an end-to-end EUF-CMA reduction worked through the framework (Σ-protocol →
 Fiat-Shamir transform → managed-RO NMA → replay forking → DLog), see
 [`Examples/Signature.lean`](../../Examples/Signature.lean) and the
-[End-to-end example](../../README.md#end-to-end-example-schnorr-signature-euf-cma)
-section of the README. The Schnorr-specific σ-protocol facts that feed in
-live in [`Examples/Schnorr.lean`](../../Examples/Schnorr.lean).
+[Schnorr signature walkthrough](end-to-end-examples.md#schnorr-signature-euf-cma).
+The Schnorr-specific σ-protocol facts that feed in live in
+[`Examples/Schnorr.lean`](../../Examples/Schnorr.lean).
 
 ### Commitment schemes (`CommitmentScheme`)
 
@@ -61,8 +61,7 @@ textbook `Commit(m) = (H(m, s), s)` scheme — exercising `cachingOracle`,
 `loggingOracle`, the birthday bound, and identical-until-bad — see
 [`Examples/CommitmentScheme.lean`](../../Examples/CommitmentScheme.lean)
 and the
-[End-to-end example](../../README.md#end-to-end-example-rom-commitment-scheme)
-section of the README.
+[ROM commitment scheme walkthrough](end-to-end-examples.md#rom-commitment-scheme).
 
 ### Sigma protocols (`SigmaProtocol`)
 
