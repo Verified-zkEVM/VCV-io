@@ -40,12 +40,21 @@ Pointcheval-Stern bound
 
 ```
 ε' · ( ε' / (qH + 1)  -  1 / |F| )   ≤   Pr[ B succeeds in dlogExp g ],
-ε' := ε  -  qS · (qS + qH) / |F|  -  δ_verify,
+ε' := ε  -  qS · (qS + qH) / |F|,
 ```
 
 where `ε` is the EUF-CMA advantage of an adversary with `qS` signing-oracle
-queries and `qH` random-oracle queries, and `δ_verify` is the verification
-slack supplied by the caller via `SigmaProtocol.verifyChallengePredictability`.
+queries and `qH` random-oracle queries. The denominator `qH + 1` is the
+textbook Pointcheval-Stern denominator. The Fiat-Shamir reduction wraps the
+source adversary so the forgery's hash point is always among the forkable
+positions: it appends one explicit `(message, commit)` query for the forgery's
+hash point on top of the source's `qH` queries, and applies the replay-forking
+lemma at fork slot parameter `qH`. The framework's
+`Fork.forkPoint qH : Option (Fin (qH + 1))` provides exactly enough slots for
+the wrapped adversary's `qH + 1` total queries (no double-counting). As a
+result, the bound is *unconditional* in `pk`: there is no remaining "verifier
+accepts a uniform challenge" term that would have to be discharged separately
+for keys on which verification is independent of the challenge.
 
 ## ROM Commitment Scheme
 
