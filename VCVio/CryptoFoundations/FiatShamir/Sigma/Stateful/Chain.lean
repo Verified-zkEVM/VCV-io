@@ -1681,6 +1681,14 @@ private lemma forkLogged_verify_prob_true_le_forkPoint_run
         ≤ Pr[= true | finalRun] := by
     simpa [forkLoggedVerifyBody, loggedRun, finalRun, probEvent_eq_eq_probOutput]
       using hbind
+  have hproj := OracleComp.extendState_run_proj_eq
+    (so := forkBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) simT pk)
+    (aux := cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp))
+    (oa := adv.main pk)
+    (s := forkInitialBaseState M Commit Chal)
+    (q := ([] : List M))
   have hpoint :
       Pr[= true | finalRun] =
         Pr[= true |
@@ -1688,9 +1696,43 @@ private lemma forkLogged_verify_prob_true_le_forkPoint_run
             >>= fun trace =>
               pure ((Fork.forkPoint (M := M) (Commit := Commit)
                 (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
-    simp only [finalRun, ← bind_assoc,
-      forkLogged_finalQuery_eq_runTrace (σ := σ) (hr := hr) (M := M)
-        (Commit := Commit) (Chal := Chal) (Resp := Resp) adv simT pk]
+    calc
+      Pr[= true | finalRun]
+          =
+        Pr[= true |
+          (Prod.map id Prod.fst <$>
+            (simulateQ (QueryImpl.extendState
+              (forkBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
+                (Resp := Resp) simT pk)
+              (cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+                (Resp := Resp))) (adv.main pk)).run
+              (forkInitialBaseState M Commit Chal, ([] : List M))) >>= fun z =>
+            forkFinalQueryTrace (M := M) (Commit := Commit) (Chal := Chal)
+              (Resp := Resp) σ pk z.1 (z.2, ([] : List M)) >>= fun trace =>
+              pure ((Fork.forkPoint (M := M) (Commit := Commit)
+                (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
+          simp [finalRun, loggedRun, forkLoggedImpl, forkInitialState,
+            forkInitialBaseState, map_eq_bind_pure_comp, bind_assoc,
+            forkFinalQueryTrace]
+      _ =
+        Pr[= true |
+          (simulateQ (forkBaseImpl (M := M) (Commit := Commit)
+            (Chal := Chal) (Resp := Resp) simT pk) (adv.main pk)).run
+            (forkInitialBaseState M Commit Chal) >>= fun z =>
+            forkFinalQueryTrace (M := M) (Commit := Commit) (Chal := Chal)
+              (Resp := Resp) σ pk z.1 (z.2, ([] : List M)) >>= fun trace =>
+              pure ((Fork.forkPoint (M := M) (Commit := Commit)
+                (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
+          rw [hproj]
+      _ =
+        Pr[= true |
+          Fork.runTrace σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT) pk
+            >>= fun trace =>
+              pure ((Fork.forkPoint (M := M) (Commit := Commit)
+                (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
+          rw [forkBase_finalQuery_runTrace_eq (M := M) (Commit := Commit)
+            (Chal := Chal) (Resp := Resp) σ hr adv simT pk]
+          simp
   calc
     Pr[= true |
         forkLoggedVerifyBody (σ := σ) (hr := hr) (M := M)
