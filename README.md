@@ -50,6 +50,13 @@ for lattice-specific entry points and workflows.
 External papers and project references cited in this repo are centralized in
 [`REFERENCES.md`](REFERENCES.md).
 
+## End-to-end examples
+
+For compact examples showing how the framework layers compose on concrete
+schemes, see [`docs/agents/end-to-end-examples.md`](docs/agents/end-to-end-examples.md).
+It covers the Schnorr signature EUF-CMA reduction and the ROM commitment scheme
+proofs of binding, extractability, and hiding.
+
 ## Acknowledgments
 
 Parts of the current program-logic refactor use an ordered monad-algebra perspective adapted from

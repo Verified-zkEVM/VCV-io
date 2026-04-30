@@ -1678,11 +1678,10 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Managed-RO replay-fork convenience theorem at a fixed public key, stated at the
 `OracleComp (unifSpec + (Unit →ₒ Chal))` level.
 
-This is the Fiat-Shamir-specific analogue of Firsov-Janku's `forking_lemma_ro` at
-[fsec/proof/ForkingRO.ec:443](../../../fsec/proof/ForkingRO.ec). It packages the replay
-quantitative bound with the distinct-answer and postcondition-transfer facts for the wrapped
-managed random-oracle trace experiment, composing `le_probEvent_isSome_forkReplay`
-(quantitative bound) and `forkReplay_propertyTransfer` (postcondition transfer).
+Packages the replay-forking quantitative bound with the distinct-answer and
+postcondition-transfer facts for the wrapped managed random-oracle trace experiment,
+composing `le_probEvent_isSome_forkReplay` (quantitative bound) and
+`forkReplay_propertyTransfer` (postcondition transfer).
 
 **On the level of the statement.** We state the bound at the `OracleComp` level rather than
 lifting through `simulateQ` to `ProbComp`. Each caller (e.g. `euf_nma_bound`) can bridge to
