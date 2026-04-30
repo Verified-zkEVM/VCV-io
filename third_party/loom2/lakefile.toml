@@ -1,0 +1,13 @@
+name = "loom2"
+version = "0.1.0"
+defaultTargets = ["Loom"]
+
+# Probe: removed `plausible` dep — foundation files do not import it,
+# and main is keeping the dep avoids a chase for a v4.29.0-compatible rev.
+
+[[lean_lib]]
+name = "Loom"
+moreLeanArgs = ["-Dwarn.sorry=false", "-j1"]
+precompileModules = true
+
+# Probe: dropped [[lean_exe]] block; Main.lean used to import Loom.WP.Basic.

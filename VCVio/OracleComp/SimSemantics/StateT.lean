@@ -96,7 +96,7 @@ def flattenStateT {ι : Type _} {spec : OracleSpec ι}
     StateT.run_monadLift, map_eq_bind_pure_comp]
 
 /-- Indexed version of `QueryImpl.parallelStateT`. Note that `m` cannot vary with `t`.
-dtumad: The `Function.update` thing is nice but forces `DecidableEq`. -/
+This uses `Function.update`, which forces `DecidableEq`. -/
 def piStateT {τ : Type} [DecidableEq τ] {ι : τ → Type _}
     {spec : (t : τ) → OracleSpec (ι t)}
     {m : Type _ → Type _} [Monad m] {σ : τ → Type _}

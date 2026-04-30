@@ -135,7 +135,7 @@
 --   else
 --     return none
 
--- -- -- DEVON: made this an `OracleComp` so you can fail explicitly with guard
+-- -- -- Note: this is an `OracleComp` so it can fail explicitly with `guard`.
 -- -- def verify_message_package
 -- --     (package : MessagePackage) : OracleComp unifSpec SecretMessage := do
 -- --   let content := decrypt_message package.encrypted_message package.nonce

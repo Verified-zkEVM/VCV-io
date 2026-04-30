@@ -234,7 +234,7 @@ section sigma
 
 variable {σ ι} (specs : σ → OracleSpec ι)
 
--- dtumad: we could expand this more to lifting a finite sum to the sigma type
+-- TODO: expand this more to lifting a finite sum to the sigma type
 
 instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
     specs j ⊂ₒ OracleSpec.sigma specs where
@@ -257,7 +257,7 @@ end sigma
 
 end instances
 
-@[simp low] -- dtumad: the `simp` tag could be dangerous even at low I think
+@[simp low] -- TODO: reassess whether this `simp` tag is too broad even at low priority.
 lemma liftM_eq_liftM_liftM [spec₁ ⊂ₒ spec₂]
     [MonadLift (OracleQuery spec₂) (OracleQuery spec₃)] (q : OracleQuery spec₁ α) :
     (liftM q : OracleQuery spec₃ α) =

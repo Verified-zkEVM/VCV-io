@@ -30,24 +30,22 @@ Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0). Latest `main` as of
 2026-04-16. Subdirectory: `hax-lib/proof-libs/lean`.
 -/
 require Hax from git
-  "<anonymized-repo-url>" @
+  "https://github.com/cryspen/hax" @
   "492a34e3" / "hax-lib/proof-libs/lean"
 
 /-
-Loom2 (Verse Lab fork): foundation for the Loom-style WP / Triple program-logic
-abstractions used in `VCVio/ProgramLogic/`. Tracks Volo Gladshtein's unmerged
-upstream PR <anonymized-repo-url> in the
+Loom2: foundation for the Loom-style WP / Triple program-logic
+abstractions used in `VCVio/ProgramLogic/`. The artifact vendors a
+Lean-4.29-compatible snapshot of Loom's unmerged
+upstream PR in the
 `Std.Internal.Do.{WPMonad,PredTrans,Triple,Assertion,ExceptPost}` namespace
 (temporarily prefixed `Std.Do'` in Loom2 to avoid clashing once it merges).
 
-Pinned to our `quangvdao/loom2` fork on branch `v4.29.0`, which patches only
-the toolchain (4 config-only commits over upstream `verse-lab/loom2`). When
-upstream Lean ships these foundations in a stable release, drop this require
-and re-import from `Std.Do.…` directly.
+The vendored snapshot patches only the toolchain over the upstream Loom2
+development. When upstream Lean ships these foundations in a stable release,
+drop this require and re-import from `Std.Do.…` directly.
 -/
-require loom2 from git
-  "<anonymized-repo-url>" @
-  "eccaa1eb"
+require loom2 from "./third_party/loom2"
 
 /-
 Aeneas: upstream pins Lean 4.28.0-rc1. Lake happily resolves aeneas against

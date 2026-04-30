@@ -22,7 +22,7 @@ namespace QueryImpl
 /-- Given implementations for oracles in `spec₁` and `spec₂` in terms of reader monads for
 two different contexts `ρ₁` and `ρ₂`, implement the combined set `spec₁ + spec₂` in terms
 of a combined `ρ₁ × ρ₂` state.
-dtumad: should we call this an addition or multiplication operation? -/
+TODO: decide whether this should be called an addition or multiplication operation. -/
 def addReaderT {ι₁ ι₂ : Type _}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
     {m : Type _ → Type _} {ρ₁ ρ₂ : Type _}

@@ -38,7 +38,7 @@ class HasEvalSet (m : Type u → Type v) [Monad m] where
 def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
   SetM.run (HasEvalSet.toSet mx)
 
--- dtumad: not sure if this should actually be in the ruleset?
+-- TODO: decide whether this should actually be in the ruleset.
 @[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
     support mx = SetM.run (HasEvalSet.toSet mx) := rfl
@@ -130,7 +130,7 @@ variable (p : Prop) [Decidable p]
 lemma support_eqRec [HasEvalSet m] (h : α = β) (mx : m α) :
     support (h ▸ mx : m β) = h ▸ support mx := by grind
 
--- dtumad: this is not really useful in this form very often...
+-- TODO: consider replacing this with a more useful form.
 lemma finSupport_eqRec {m} [hm : Monad m] [hms : HasEvalSet m] [hmfs : HasEvalFinset m]
     [hα : DecidableEq α] (h : α = β) (mx : m α) :
     (@finSupport m hm hms hmfs β (h ▸ hα) (h ▸ mx : m β) : Finset β) =

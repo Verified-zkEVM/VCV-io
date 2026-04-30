@@ -13,7 +13,7 @@ This file defines typeclasses `HasEvalSPMF` and `HasEvalPMF` for assigning denot
 probability semantics to monadic computations. We also introduce functions
 `probOutput`, `probEvent`, and `probFailure` with associated notation.
 
--- dtumad: document various probability notation definitions here
+-- TODO: document various probability notation definitions here.
 -/
 
 open ENNReal
@@ -35,7 +35,7 @@ class HasEvalSPMF (m : Type u → Type v) [Monad m]
    } toSPMF
 
 /-- The resulting distribution of running the monadic computation `mx`.
-dtumad: I think we should eventually just deprecate this, just say `toSPMF`. -/
+TODO: consider deprecating this in favor of saying `toSPMF` directly. -/
 def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α :=
   HasEvalSPMF.toSPMF mx
 
@@ -75,7 +75,7 @@ section probOutput
 
 variable [HasEvalSPMF m]
 
--- dtumad: I think maybe we want to simp in the `←` direction here?
+-- TODO: consider whether this should simp in the `←` direction.
 @[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma probOutput_def (mx : m α) (x : α) : Pr[= x | mx] = evalDist mx x := rfl
 

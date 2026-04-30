@@ -87,8 +87,7 @@ Used in:
 
 ### LEANCRYPTO3-REPO
 
-`dtumad/lean-crypto-formalization`.
-Deprecated Lean 3 repository for formalizing cryptography proofs.
+Anonymized predecessor Lean 3 repository for formalizing cryptography proofs.
 GitHub repository: <<anonymized-repo-url>>
 
 Used in:

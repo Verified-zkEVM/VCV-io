@@ -55,7 +55,7 @@ protected def mapM {m : Type u → Type v} {n : Type u → Type w}
 --     cases x <;> simp
 
 /-- Bundled version of `mapM`.
-dtumad: we should probably just pick one of these (probably the hom class non-bundled approach). -/
+TODO: pick one formulation, probably the hom-class non-bundled approach. -/
 protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
     [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
     (f : m →ᵐ n) : OptionT m →ᵐ n where
