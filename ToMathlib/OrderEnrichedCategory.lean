@@ -1,6 +1,7 @@
 module
 
 public import Mathlib.CategoryTheory.Enriched.Basic
+public import Mathlib.CategoryTheory.Monoidal.Braided.Basic
 public import Mathlib.Order.Category.Preord
 public import Mathlib.Order.Monotone.Basic
 
@@ -69,14 +70,42 @@ variable {c : Type u → Type v} [Category.{w} (Bundled c)] [MonoidalCategory (B
 variable (C : Type u₁) (D : Type u₂) [𝒞 : EnrichedCategory V C] [𝒟 : EnrichedCategory V D]
 
 @[simps]
-instance instProduct : EnrichedCategory V (C × D) where
+instance instProduct [BraidedCategory V] : EnrichedCategory V (C × D) where
   Hom X Y := (𝒞.Hom X.1 Y.1) ⊗ (𝒟.Hom X.2 Y.2)
   id X := (λ_ _).inv ≫ ((𝒞.id X.1) ⊗ₘ (𝒟.id X.2))
-  comp X Y Z := by stop simpa using (𝒞.comp X.1 Y.1 Z.1) ⊗ (𝒟.comp X.2 Y.2 Z.2)
-  -- (α_ _ _ _).inv ≫ (
-  -- id_comp X Y := by
-  --   ext ⟨⟨x, y⟩, z⟩
-  --   simp [id_comp]
+  comp X Y Z :=
+    tensorμ _ _ _ _ ≫ ((𝒞.comp X.1 Y.1 Z.1) ⊗ₘ (𝒟.comp X.2 Y.2 Z.2))
+  id_comp X Y := by
+    have h𝒞 : 𝒞.id X.1 ▷ 𝒞.Hom X.1 Y.1 ≫ 𝒞.comp X.1 X.1 Y.1 = (λ_ _).hom := by
+      have := 𝒞.id_comp X.1 Y.1
+      rwa [Iso.inv_comp_eq, Category.comp_id] at this
+    have h𝒟 : 𝒟.id X.2 ▷ 𝒟.Hom X.2 Y.2 ≫ 𝒟.comp X.2 X.2 Y.2 = (λ_ _).hom := by
+      have := 𝒟.id_comp X.2 Y.2
+      rwa [Iso.inv_comp_eq, Category.comp_id] at this
+    rw [comp_whiskerRight_assoc, tensorμ_natural_left_assoc,
+      tensorHom_comp_tensorHom, h𝒞, h𝒟, ← tensor_left_unitality, Iso.inv_hom_id]
+  comp_id X Y := by
+    have h𝒞 : 𝒞.Hom X.1 Y.1 ◁ 𝒞.id Y.1 ≫ 𝒞.comp X.1 Y.1 Y.1 = (ρ_ _).hom := by
+      have := 𝒞.comp_id X.1 Y.1
+      rwa [Iso.inv_comp_eq, Category.comp_id] at this
+    have h𝒟 : 𝒟.Hom X.2 Y.2 ◁ 𝒟.id Y.2 ≫ 𝒟.comp X.2 Y.2 Y.2 = (ρ_ _).hom := by
+      have := 𝒟.comp_id X.2 Y.2
+      rwa [Iso.inv_comp_eq, Category.comp_id] at this
+    rw [MonoidalCategory.whiskerLeft_comp_assoc, tensorμ_natural_right_assoc,
+      tensorHom_comp_tensorHom, h𝒞, h𝒟, ← tensor_right_unitality, Iso.inv_hom_id]
+  assoc W X Y Z := by
+    have h𝒞 : 𝒞.comp W.1 X.1 Y.1 ▷ 𝒞.Hom Y.1 Z.1 ≫ 𝒞.comp W.1 Y.1 Z.1
+        = (α_ _ _ _).hom ≫ 𝒞.Hom W.1 X.1 ◁ 𝒞.comp X.1 Y.1 Z.1 ≫ 𝒞.comp W.1 X.1 Z.1 := by
+      have := 𝒞.assoc W.1 X.1 Y.1 Z.1
+      rwa [Iso.inv_comp_eq] at this
+    have h𝒟 : 𝒟.comp W.2 X.2 Y.2 ▷ 𝒟.Hom Y.2 Z.2 ≫ 𝒟.comp W.2 Y.2 Z.2
+        = (α_ _ _ _).hom ≫ 𝒟.Hom W.2 X.2 ◁ 𝒟.comp X.2 Y.2 Z.2 ≫ 𝒟.comp W.2 X.2 Z.2 := by
+      have := 𝒟.assoc W.2 X.2 Y.2 Z.2
+      rwa [Iso.inv_comp_eq] at this
+    rw [comp_whiskerRight_assoc, MonoidalCategory.whiskerLeft_comp_assoc,
+      tensorμ_natural_left_assoc, tensorμ_natural_right_assoc,
+      tensorHom_comp_tensorHom, tensorHom_comp_tensorHom, h𝒞, h𝒟,
+      ← tensorHom_comp_tensorHom, tensor_associativity_assoc, Iso.inv_hom_id_assoc]
 
 -- structure RelativeMonad (J : C ⥤ D) where
 --   /-- The monadic mapping on objects. -/

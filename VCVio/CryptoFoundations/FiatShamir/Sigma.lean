@@ -123,25 +123,16 @@ lemma runtimeWithCache_evalDist_bind_pure
 
 /-- The Fiat-Shamir runtime commutes with binding a lifted `ProbComp` prefix:
 evaluating `liftM oa >>= rest` under the runtime is the same as first sampling
-`oa` in `SPMF` and then evaluating `rest x` under the runtime. -/
+`oa` in `SPMF` and then evaluating `rest x` under the runtime.
+
+A direct corollary of the generic `SPMFSemantics.withStateOracle_evalDist_bind_liftM`. -/
 lemma runtimeWithCache_evalDist_bind_liftComp
     (cache : (M × Commit →ₒ Chal).QueryCache)
     {α β : Type} (oa : ProbComp α)
     (rest : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β) :
     (runtimeWithCache M cache).evalDist (liftM oa >>= rest) =
-      𝒟[oa] >>= fun x => (runtimeWithCache M cache).evalDist (rest x) := by
-  classical
-  let ro : QueryImpl (M × Commit →ₒ Chal)
-      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
-  let impl : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
-      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := unifFwdImpl (M × Commit →ₒ Chal) + ro
-  unfold runtimeWithCache ProbCompRuntime.evalDist SPMFSemantics.evalDist SemanticsVia.denote
-  change 𝒟[(simulateQ impl (liftM oa >>= rest)).run' cache] =
-      𝒟[oa] >>= fun x => 𝒟[(simulateQ impl (rest x)).run' cache]
-  rw [simulateQ_bind]
-  rw [roSim.run'_liftM_bind (ro := ro) (oa := oa)
-    (rest := fun x => simulateQ impl (rest x)) (s := cache)]
-  rw [evalDist_bind]
+      𝒟[oa] >>= fun x => (runtimeWithCache M cache).evalDist (rest x) :=
+  SPMFSemantics.withStateOracle_evalDist_bind_liftM _ cache oa rest
 
 /-- The Fiat-Shamir runtime commutes with `<$>`: `cache := ∅` instance of
 `runtimeWithCache_evalDist_map`. -/

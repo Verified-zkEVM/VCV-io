@@ -60,6 +60,7 @@ import VCVio.EvalDist.Bool
 import VCVio.EvalDist.Defs.AlternativeMonad
 import VCVio.EvalDist.Defs.Basic
 import VCVio.EvalDist.Defs.Instances
+import VCVio.EvalDist.Defs.LawfulSemantics
 import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Defs.Semantics
 import VCVio.EvalDist.Defs.Support

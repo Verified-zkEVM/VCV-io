@@ -7,6 +7,7 @@ import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.EvalDist.Defs.Semantics
 
 /-!
@@ -71,5 +72,32 @@ lemma withStateOracle_evalDist_bind_pure
   have heq : (mx >>= fun x => pure (f x)) = f <$> mx := by
     rw [map_eq_bind_pure_comp]; rfl
   rw [heq, withStateOracle_evalDist_map]
+
+/-- `withStateOracle` commutes with binding a lifted `ProbComp` prefix: evaluating
+`liftM oa >>= rest` under the runtime is the same as first sampling `oa` in `SPMF` and then
+evaluating `rest x` under the runtime. The lifted `ProbComp` does not touch the cache state,
+so the result distribution factors through `oa` cleanly.
+
+Restricted to `σ = hashSpec.QueryCache` because the underlying `roSim` simulation lemmas hard-code
+that state type via `unifFwdImpl`. The vast majority of `withStateOracle` instantiations in this
+repo use this state type (e.g. via `randomOracle`). -/
+lemma withStateOracle_evalDist_bind_liftM
+    {ι : Type} {hashSpec : OracleSpec ι}
+    (hashImpl : QueryImpl hashSpec (StateT hashSpec.QueryCache ProbComp))
+    (s : hashSpec.QueryCache)
+    {α β : Type} (oa : ProbComp α)
+    (rest : α → OracleComp (unifSpec + hashSpec) β) :
+    (SPMFSemantics.withStateOracle hashImpl s).evalDist (liftM oa >>= rest) =
+      𝒟[oa] >>= fun x => (SPMFSemantics.withStateOracle hashImpl s).evalDist (rest x) := by
+  classical
+  let impl : QueryImpl (unifSpec + hashSpec) (StateT hashSpec.QueryCache ProbComp) :=
+    unifFwdImpl hashSpec + hashImpl
+  unfold SPMFSemantics.evalDist SemanticsVia.denote
+  change 𝒟[(simulateQ impl (liftM oa >>= rest)).run' s] =
+      𝒟[oa] >>= fun x => 𝒟[(simulateQ impl (rest x)).run' s]
+  rw [simulateQ_bind]
+  rw [roSim.run'_liftM_bind (ro := hashImpl) (oa := oa)
+    (rest := fun x => simulateQ impl (rest x)) (s := s)]
+  rw [evalDist_bind]
 
 end SPMFSemantics

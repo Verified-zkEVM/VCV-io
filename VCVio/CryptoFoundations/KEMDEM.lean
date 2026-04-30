@@ -7,6 +7,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.OneTime
+import VCVio.EvalDist.Defs.LawfulSemantics
 
 /-!
 # KEM + DEM Composition
@@ -149,18 +150,439 @@ def composeWithDEM_toDEMReduction
 
 /-- Proof-ladders A1 reduction statement: the one-time IND-CPA advantage of textbook KEM+DEM is
 bounded by two KEM IND-CPA advantages plus one DEM IND-CPA advantage, using the canonical
-left/right and DEM reductions defined above. -/
+left/right and DEM reductions defined above.
+
+The proof goes via signed advantage and a 3-hop hybrid argument over the four "leaf" SPMFs
+indexed by (real/random KEM key) × (left/right message). Each game's `signedBoolAdv` decomposes
+as `(s_X - s_Y)/2` for two of these four leaves, and the standard real triangle inequality then
+gives the stated bound after dividing by `2`. The decomposition uses
+`SPMF.signedBoolAdv_bind_uniformBool` (in `SecExp.lean`) once per game; the runtime hypotheses
+`[Lawful]` and `[LiftCoherent]` push `runtime.evalDist` through the bind structure of each
+game body. -/
 theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
     (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
     (dem : DEMScheme (OracleComp spec) K M CDEM)
     (runtime : ProbCompRuntime (OracleComp spec))
+    [ProbCompRuntime.Lawful runtime] [ProbCompRuntime.LiftCoherent runtime]
     (adversary : AsymmEncAlg.IND_CPA_Adv (kem.composeWithDEM dem)) :
     AsymmEncAlg.IND_CPA_OneTime_biasAdvantage (kem.composeWithDEM dem) runtime adversary ≤
       kem.IND_CPA_Advantage runtime (kem.composeWithDEM_toKEMLeftReduction dem adversary) +
       kem.IND_CPA_Advantage runtime (kem.composeWithDEM_toKEMRightReduction dem adversary) +
       dem.IND_CPA_Advantage runtime
         (kem.composeWithDEM_toDEMReduction dem adversary) := by
-  sorry
+  -- The four "leaf" SPMFs, packaged as `OracleComp`s. These are the corners of the four-game
+  -- diamond: real-or-random KEM key × left-or-right adversary message.
+  let A_rL : OracleComp spec Bool := do
+    let (pk, _) ← kem.keygen
+    let (m₀, _m₁, st) ← adversary.chooseMessages pk
+    let (kc, k) ← kem.encaps pk
+    let dc ← dem.encrypt k m₀
+    adversary.distinguish st (kc, dc)
+  let A_rR : OracleComp spec Bool := do
+    let (pk, _) ← kem.keygen
+    let (_m₀, m₁, st) ← adversary.chooseMessages pk
+    let (kc, k) ← kem.encaps pk
+    let dc ← dem.encrypt k m₁
+    adversary.distinguish st (kc, dc)
+  let A_rndL : OracleComp spec Bool := do
+    let (pk, _) ← kem.keygen
+    let (m₀, _m₁, st) ← adversary.chooseMessages pk
+    let (kc, _kReal) ← kem.encaps pk
+    let kRand ← runtime.liftProbComp ($ᵗ K)
+    let dc ← dem.encrypt kRand m₀
+    adversary.distinguish st (kc, dc)
+  let A_rndR : OracleComp spec Bool := do
+    let (pk, _) ← kem.keygen
+    let (_m₀, m₁, st) ← adversary.chooseMessages pk
+    let (kc, _kReal) ← kem.encaps pk
+    let kRand ← runtime.liftProbComp ($ᵗ K)
+    let dc ← dem.encrypt kRand m₁
+    adversary.distinguish st (kc, dc)
+  -- Step 1: show the LHS one-time game's `signedBoolAdv` decomposes as
+  -- `((evalDist A_rL).signedBoolAdv - (evalDist A_rR).signedBoolAdv) / 2`.
+  have h_LHS_form :
+      AsymmEncAlg.IND_CPA_OneTime_Game (encAlg := kem.composeWithDEM dem) adversary runtime =
+      (do
+        let t ← (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)
+        let z ← if t then runtime.evalDist A_rL else runtime.evalDist A_rR
+        pure (t == z) : SPMF Bool) := by
+    unfold AsymmEncAlg.IND_CPA_OneTime_Game KEMScheme.composeWithDEM
+    simp only [ProbCompRuntime.Lawful.evalDist_bind, ProbCompRuntime.Lawful.evalDist_pure,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
+    refine bind_congr fun b => ?_
+    cases b
+    · simp [A_rR, ProbCompRuntime.Lawful.evalDist_bind, bind_pure_comp]
+    · simp [A_rL, ProbCompRuntime.Lawful.evalDist_bind, bind_pure_comp]
+  have h_uniformBool_fail :
+      Pr[⊥ | (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)] = 0 := by simp
+  have h_uniformBool_half :
+      Pr[= true | (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)] = 1 / 2 := by
+    simp [Fintype.card_bool]
+  have h_LHS_signed :
+      (AsymmEncAlg.IND_CPA_OneTime_Game (encAlg := kem.composeWithDEM dem)
+          adversary runtime).signedBoolAdv =
+      ((runtime.evalDist A_rL).signedBoolAdv - (runtime.evalDist A_rR).signedBoolAdv) / 2 := by
+    rw [h_LHS_form]
+    exact SPMF.signedBoolAdv_uniformBool_branch _ _ _ h_uniformBool_fail h_uniformBool_half
+  -- Step 2: expose `kRand`-augmented variants of `A_rL` and `A_rR` so the natural shape of the
+  -- KEM-LEFT/RIGHT game bodies (which always sample `kRand` regardless of `b`) factors cleanly
+  -- through the prefix lemma. The SPMFs of these augmented variants agree with the canonical
+  -- `A_rL`, `A_rR` because `liftProbComp ($ᵗ K)` is total (no failure mass).
+  let A_rL_KL : OracleComp spec Bool := do
+    let (pk, _) ← kem.keygen
+    let (m₀, _m₁, st) ← adversary.chooseMessages pk
+    let (kc, k) ← kem.encaps pk
+    let _kRand ← runtime.liftProbComp ($ᵗ K)
+    let dc ← dem.encrypt k m₀
+    adversary.distinguish st (kc, dc)
+  let A_rR_KR : OracleComp spec Bool := do
+    let (pk, _) ← kem.keygen
+    let (_m₀, m₁, st) ← adversary.chooseMessages pk
+    let (kc, k) ← kem.encaps pk
+    let _kRand ← runtime.liftProbComp ($ᵗ K)
+    let dc ← dem.encrypt k m₁
+    adversary.distinguish st (kc, dc)
+  have h_uniformK_fail :
+      Pr[⊥ | (𝒟[($ᵗ K : ProbComp K)] : SPMF K)] = 0 := by
+    change Pr[⊥ | ($ᵗ K : ProbComp K)] = 0
+    exact probFailure_uniformSample K
+  -- Bridge: the unused `kRand` sample doesn't shift any output probability.
+  have h_AL_pr : ∀ y : Bool,
+      Pr[= y | runtime.evalDist A_rL_KL] = Pr[= y | runtime.evalDist A_rL] := by
+    intro y
+    show Pr[= y | (runtime.evalDist A_rL_KL : SPMF Bool)] =
+      Pr[= y | (runtime.evalDist A_rL : SPMF Bool)]
+    simp only [A_rL_KL, A_rL, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
+    refine probOutput_bind_congr' _ y ?_
+    intro ⟨pk, _sk⟩
+    refine probOutput_bind_congr' _ y ?_
+    intro ⟨m₀, _m₁, st⟩
+    refine probOutput_bind_congr' _ y ?_
+    intro ⟨kc, k⟩
+    rw [probOutput_bind_const, h_uniformK_fail, tsub_zero, one_mul]
+  have h_AR_pr : ∀ y : Bool,
+      Pr[= y | runtime.evalDist A_rR_KR] = Pr[= y | runtime.evalDist A_rR] := by
+    intro y
+    show Pr[= y | (runtime.evalDist A_rR_KR : SPMF Bool)] =
+      Pr[= y | (runtime.evalDist A_rR : SPMF Bool)]
+    simp only [A_rR_KR, A_rR, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
+    refine probOutput_bind_congr' _ y ?_
+    intro ⟨pk, _sk⟩
+    refine probOutput_bind_congr' _ y ?_
+    intro ⟨_m₀, m₁, st⟩
+    refine probOutput_bind_congr' _ y ?_
+    intro ⟨kc, k⟩
+    rw [probOutput_bind_const, h_uniformK_fail, tsub_zero, one_mul]
+  have h_AL_signedBoolAdv :
+      (runtime.evalDist A_rL_KL).signedBoolAdv = (runtime.evalDist A_rL).signedBoolAdv := by
+    unfold SPMF.signedBoolAdv
+    rw [show Pr[= true | (runtime.evalDist A_rL_KL : SPMF Bool)] =
+      Pr[= true | (runtime.evalDist A_rL : SPMF Bool)] from h_AL_pr true,
+      show Pr[= false | (runtime.evalDist A_rL_KL : SPMF Bool)] =
+        Pr[= false | (runtime.evalDist A_rL : SPMF Bool)] from h_AL_pr false]
+  have h_AR_signedBoolAdv :
+      (runtime.evalDist A_rR_KR).signedBoolAdv = (runtime.evalDist A_rR).signedBoolAdv := by
+    unfold SPMF.signedBoolAdv
+    rw [show Pr[= true | (runtime.evalDist A_rR_KR : SPMF Bool)] =
+      Pr[= true | (runtime.evalDist A_rR : SPMF Bool)] from h_AR_pr true,
+      show Pr[= false | (runtime.evalDist A_rR_KR : SPMF Bool)] =
+        Pr[= false | (runtime.evalDist A_rR : SPMF Bool)] from h_AR_pr false]
+  -- Step 3: KEM-LEFT signed advantage decomposition.
+  have h_KEMLEFT_form :
+      kem.IND_CPA_Game runtime (kem.composeWithDEM_toKEMLeftReduction dem adversary) =
+      (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (m₀, _m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₀, st))
+        let t ← (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)
+        let z ← if t then runtime.evalDist (do
+            let (kc, k) ← kem.encaps a.1
+            let _kRand ← runtime.liftProbComp ($ᵗ K)
+            let dc ← dem.encrypt k a.2.1
+            adversary.distinguish a.2.2 (kc, dc))
+          else runtime.evalDist (do
+            let (kc, _kReal) ← kem.encaps a.1
+            let kRand ← runtime.liftProbComp ($ᵗ K)
+            let dc ← dem.encrypt kRand a.2.1
+            adversary.distinguish a.2.2 (kc, dc))
+        pure (t == z) : SPMF Bool) := by
+    unfold KEMScheme.IND_CPA_Game KEMScheme.composeWithDEM_toKEMLeftReduction
+    simp only [ProbCompRuntime.Lawful.evalDist_bind, ProbCompRuntime.Lawful.evalDist_pure,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, bind_assoc, pure_bind]
+    refine bind_congr fun pk_sk => ?_
+    refine bind_congr fun mst => ?_
+    refine bind_congr fun b => ?_
+    cases b
+    · simp
+    · simp
+  have h_KEMLEFT_pref_real :
+      (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (m₀, _m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₀, st))
+        runtime.evalDist (do
+          let (kc, k) ← kem.encaps a.1
+          let _kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt k a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      runtime.evalDist A_rL_KL := by
+    show (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (m₀, _m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₀, st))
+        runtime.evalDist (do
+          let (kc, k) ← kem.encaps a.1
+          let _kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt k a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      (runtime.evalDist A_rL_KL : SPMF Bool)
+    simp only [A_rL_KL, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
+      bind_assoc, pure_bind]
+  have h_KEMLEFT_pref_rand :
+      (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (m₀, _m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₀, st))
+        runtime.evalDist (do
+          let (kc, _kReal) ← kem.encaps a.1
+          let kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt kRand a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      runtime.evalDist A_rndL := by
+    show (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (m₀, _m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₀, st))
+        runtime.evalDist (do
+          let (kc, _kReal) ← kem.encaps a.1
+          let kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt kRand a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      (runtime.evalDist A_rndL : SPMF Bool)
+    simp only [A_rndL, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
+      bind_assoc, pure_bind]
+  have h_KEMLEFT_signed :
+      (kem.IND_CPA_Game runtime
+        (kem.composeWithDEM_toKEMLeftReduction dem adversary)).signedBoolAdv =
+      ((runtime.evalDist A_rL).signedBoolAdv -
+        (runtime.evalDist A_rndL).signedBoolAdv) / 2 := by
+    rw [h_KEMLEFT_form]
+    rw [SPMF.signedBoolAdv_bind_uniformBool _ _ _ _ h_uniformBool_fail h_uniformBool_half]
+    rw [h_KEMLEFT_pref_real, h_KEMLEFT_pref_rand, h_AL_signedBoolAdv]
+  -- Step 4: KEM-RIGHT signed advantage decomposition (mirror of Step 3 with `m₁`).
+  have h_KEMRIGHT_form :
+      kem.IND_CPA_Game runtime (kem.composeWithDEM_toKEMRightReduction dem adversary) =
+      (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (_m₀, m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₁, st))
+        let t ← (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)
+        let z ← if t then runtime.evalDist (do
+            let (kc, k) ← kem.encaps a.1
+            let _kRand ← runtime.liftProbComp ($ᵗ K)
+            let dc ← dem.encrypt k a.2.1
+            adversary.distinguish a.2.2 (kc, dc))
+          else runtime.evalDist (do
+            let (kc, _kReal) ← kem.encaps a.1
+            let kRand ← runtime.liftProbComp ($ᵗ K)
+            let dc ← dem.encrypt kRand a.2.1
+            adversary.distinguish a.2.2 (kc, dc))
+        pure (t == z) : SPMF Bool) := by
+    unfold KEMScheme.IND_CPA_Game KEMScheme.composeWithDEM_toKEMRightReduction
+    simp only [ProbCompRuntime.Lawful.evalDist_bind, ProbCompRuntime.Lawful.evalDist_pure,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, bind_assoc, pure_bind]
+    refine bind_congr fun pk_sk => ?_
+    refine bind_congr fun mst => ?_
+    refine bind_congr fun b => ?_
+    cases b
+    · simp
+    · simp
+  have h_KEMRIGHT_pref_real :
+      (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (_m₀, m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₁, st))
+        runtime.evalDist (do
+          let (kc, k) ← kem.encaps a.1
+          let _kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt k a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      runtime.evalDist A_rR_KR := by
+    show (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (_m₀, m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₁, st))
+        runtime.evalDist (do
+          let (kc, k) ← kem.encaps a.1
+          let _kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt k a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      (runtime.evalDist A_rR_KR : SPMF Bool)
+    simp only [A_rR_KR, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
+      bind_assoc, pure_bind]
+  have h_KEMRIGHT_pref_rand :
+      (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (_m₀, m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₁, st))
+        runtime.evalDist (do
+          let (kc, _kReal) ← kem.encaps a.1
+          let kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt kRand a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      runtime.evalDist A_rndR := by
+    show (do
+        let a ← runtime.evalDist (do
+          let (pk, _sk) ← kem.keygen
+          let (_m₀, m₁, st) ← adversary.chooseMessages pk
+          pure (pk, m₁, st))
+        runtime.evalDist (do
+          let (kc, _kReal) ← kem.encaps a.1
+          let kRand ← runtime.liftProbComp ($ᵗ K)
+          let dc ← dem.encrypt kRand a.2.1
+          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
+      (runtime.evalDist A_rndR : SPMF Bool)
+    simp only [A_rndR, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
+      bind_assoc, pure_bind]
+  have h_KEMRIGHT_signed :
+      (kem.IND_CPA_Game runtime
+        (kem.composeWithDEM_toKEMRightReduction dem adversary)).signedBoolAdv =
+      ((runtime.evalDist A_rR).signedBoolAdv -
+        (runtime.evalDist A_rndR).signedBoolAdv) / 2 := by
+    rw [h_KEMRIGHT_form]
+    rw [SPMF.signedBoolAdv_bind_uniformBool _ _ _ _ h_uniformBool_fail h_uniformBool_half]
+    rw [h_KEMRIGHT_pref_real, h_KEMRIGHT_pref_rand, h_AR_signedBoolAdv]
+  -- Step 5: DEM signed advantage decomposition. Here `b` is at the top of the game body, so the
+  -- no-prefix variant of the lemma applies. The two leaves both sample `kRand`; they differ only
+  -- in whether the encrypted message is the second (`m₁`, b=true) or first (`m₀`, b=false).
+  -- Define helper leaves matching the DEM body shape (kRand sampled before keygen).
+  let A_DEMb_real : OracleComp spec Bool := do
+    let kRand ← runtime.liftProbComp ($ᵗ K)
+    let (pk, _sk) ← kem.keygen
+    let (_m₀, m₁, st) ← adversary.chooseMessages pk
+    let (kc, _) ← kem.encaps pk
+    let dc ← dem.encrypt kRand m₁
+    adversary.distinguish st (kc, dc)
+  let A_DEMb_rand : OracleComp spec Bool := do
+    let kRand ← runtime.liftProbComp ($ᵗ K)
+    let (pk, _sk) ← kem.keygen
+    let (m₀, _m₁, st) ← adversary.chooseMessages pk
+    let (kc, _) ← kem.encaps pk
+    let dc ← dem.encrypt kRand m₀
+    adversary.distinguish st (kc, dc)
+  have h_DEM_form :
+      dem.IND_CPA_Game runtime (kem.composeWithDEM_toDEMReduction dem adversary) =
+      (do
+        let t ← (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)
+        let z ← if t then runtime.evalDist A_DEMb_real else runtime.evalDist A_DEMb_rand
+        pure (t == z) : SPMF Bool) := by
+    unfold DEMScheme.IND_CPA_Game KEMScheme.composeWithDEM_toDEMReduction
+    simp only [ProbCompRuntime.Lawful.evalDist_bind, ProbCompRuntime.Lawful.evalDist_pure,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, bind_assoc, pure_bind]
+    refine bind_congr fun b => ?_
+    cases b
+    · simp [A_DEMb_rand]
+    · simp [A_DEMb_real]
+  -- Bridges from DEM-shape leaves to canonical A_rndL/A_rndR via three bind-swaps moving the
+  -- `kRand` sample past `keygen`, `chooseMessages`, and `encaps` (all independent of `kRand`).
+  have h_DEMb_real_pr : ∀ y : Bool,
+      Pr[= y | runtime.evalDist A_DEMb_real] = Pr[= y | runtime.evalDist A_rndR] := by
+    intro y
+    show Pr[= y | (runtime.evalDist A_DEMb_real : SPMF Bool)] =
+      Pr[= y | (runtime.evalDist A_rndR : SPMF Bool)]
+    simp only [A_DEMb_real, A_rndR, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
+    rw [probOutput_bind_bind_swap]
+    refine probOutput_bind_congr' _ y ?_
+    intro pk_sk
+    rw [probOutput_bind_bind_swap]
+    refine probOutput_bind_congr' _ y ?_
+    intro mst
+    rw [probOutput_bind_bind_swap]
+  have h_DEMb_rand_pr : ∀ y : Bool,
+      Pr[= y | runtime.evalDist A_DEMb_rand] = Pr[= y | runtime.evalDist A_rndL] := by
+    intro y
+    show Pr[= y | (runtime.evalDist A_DEMb_rand : SPMF Bool)] =
+      Pr[= y | (runtime.evalDist A_rndL : SPMF Bool)]
+    simp only [A_DEMb_rand, A_rndL, ProbCompRuntime.Lawful.evalDist_bind,
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
+    rw [probOutput_bind_bind_swap]
+    refine probOutput_bind_congr' _ y ?_
+    intro pk_sk
+    rw [probOutput_bind_bind_swap]
+    refine probOutput_bind_congr' _ y ?_
+    intro mst
+    rw [probOutput_bind_bind_swap]
+  have h_DEMb_real_signedBoolAdv :
+      (runtime.evalDist A_DEMb_real).signedBoolAdv =
+      (runtime.evalDist A_rndR).signedBoolAdv := by
+    unfold SPMF.signedBoolAdv
+    rw [show Pr[= true | (runtime.evalDist A_DEMb_real : SPMF Bool)] =
+      Pr[= true | (runtime.evalDist A_rndR : SPMF Bool)] from h_DEMb_real_pr true,
+      show Pr[= false | (runtime.evalDist A_DEMb_real : SPMF Bool)] =
+        Pr[= false | (runtime.evalDist A_rndR : SPMF Bool)] from h_DEMb_real_pr false]
+  have h_DEMb_rand_signedBoolAdv :
+      (runtime.evalDist A_DEMb_rand).signedBoolAdv =
+      (runtime.evalDist A_rndL).signedBoolAdv := by
+    unfold SPMF.signedBoolAdv
+    rw [show Pr[= true | (runtime.evalDist A_DEMb_rand : SPMF Bool)] =
+      Pr[= true | (runtime.evalDist A_rndL : SPMF Bool)] from h_DEMb_rand_pr true,
+      show Pr[= false | (runtime.evalDist A_DEMb_rand : SPMF Bool)] =
+        Pr[= false | (runtime.evalDist A_rndL : SPMF Bool)] from h_DEMb_rand_pr false]
+  have h_DEM_signed :
+      (dem.IND_CPA_Game runtime
+        (kem.composeWithDEM_toDEMReduction dem adversary)).signedBoolAdv =
+      ((runtime.evalDist A_rndR).signedBoolAdv -
+        (runtime.evalDist A_rndL).signedBoolAdv) / 2 := by
+    rw [h_DEM_form]
+    rw [SPMF.signedBoolAdv_uniformBool_branch _ _ _ h_uniformBool_fail h_uniformBool_half]
+    rw [h_DEMb_real_signedBoolAdv, h_DEMb_rand_signedBoolAdv]
+  -- Step 6: triangle inequality on signed advantages, then convert back to bias advantages.
+  -- The four signedBoolAdv's at the diamond corners satisfy the linear identity
+  --   2 * signedBoolAdv(LHS) = (sAL - sAR)
+  --                          = (sAL - sAndL) - (sAR - sAndR) - (sAndR - sAndL)
+  --                          = 2 * signedBoolAdv(KEMLEFT) - 2 * signedBoolAdv(KEMRIGHT)
+  --                            - 2 * signedBoolAdv(DEM).
+  -- Taking absolute values and using the standard triangle inequality on real numbers gives the
+  -- claimed bound on the bias advantages (since boolBiasAdvantage = |signedBoolAdv|).
+  unfold AsymmEncAlg.IND_CPA_OneTime_biasAdvantage KEMScheme.IND_CPA_Advantage
+    DEMScheme.IND_CPA_Advantage
+  rw [SPMF.boolBiasAdvantage_eq_abs_signedBoolAdv,
+      SPMF.boolBiasAdvantage_eq_abs_signedBoolAdv,
+      SPMF.boolBiasAdvantage_eq_abs_signedBoolAdv,
+      SPMF.boolBiasAdvantage_eq_abs_signedBoolAdv]
+  rw [h_LHS_signed, h_KEMLEFT_signed, h_KEMRIGHT_signed, h_DEM_signed]
+  -- Goal: |(sAL - sAR) / 2| ≤
+  --       |(sAL - sAndL) / 2| + |(sAR - sAndR) / 2| + |(sAndR - sAndL) / 2|.
+  set sAL := (runtime.evalDist A_rL).signedBoolAdv
+  set sAR := (runtime.evalDist A_rR).signedBoolAdv
+  set sAndL := (runtime.evalDist A_rndL).signedBoolAdv
+  set sAndR := (runtime.evalDist A_rndR).signedBoolAdv
+  have h_decomp : (sAL - sAR) / 2 =
+      (sAL - sAndL) / 2 + (-((sAR - sAndR) / 2)) + (-((sAndR - sAndL) / 2)) := by ring
+  rw [h_decomp]
+  calc |(sAL - sAndL) / 2 + (-((sAR - sAndR) / 2)) + (-((sAndR - sAndL) / 2))|
+      _ ≤ |(sAL - sAndL) / 2 + (-((sAR - sAndR) / 2))| + |(-((sAndR - sAndL) / 2))| :=
+          abs_add_le _ _
+      _ ≤ (|(sAL - sAndL) / 2| + |(-((sAR - sAndR) / 2))|) + |(-((sAndR - sAndL) / 2))| := by
+          gcongr; exact abs_add_le _ _
+      _ = |(sAL - sAndL) / 2| + |(sAR - sAndR) / 2| + |(sAndR - sAndL) / 2| := by
+          rw [abs_neg, abs_neg]
 
 end IND_CPA
 
