@@ -96,9 +96,18 @@ def vectorNegacyclicRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :
   backend := vectorBackend Coeff n
   kernel := vectorKernel Coeff n
   zero := (0 : Poly Coeff n)
-  add := fun f g => Vector.ofFn fun i => f.get i + g.get i
-  sub := fun f g => Vector.ofFn fun i => f.get i - g.get i
-  neg := fun f => Vector.ofFn fun i => -f.get i
+  -- Use `Vector.zipWith` (matching `Vector.instAdd` / `Vector.instSub` /
+  -- `Vector.instNeg`) so that the kernel-provided `Add`/`Sub`/`Neg` instances
+  -- on `ring.Poly` agree *definitionally* with the Mathlib/core `Vector`
+  -- instances. Equality with the `Vector.ofFn`-form is a one-line `Vector.ext`,
+  -- but using the same shape avoids a 256-element `whnf` loop when downstream
+  -- files install local `Vector.instSub` shorthands and then ask the
+  -- elaborator to unify field types in `Power2RoundOps.Laws` /
+  -- `RoundingOps.Laws` against the bodies of the corresponding `_field`
+  -- proofs.
+  add := fun f g => f.zipWith (· + ·) g
+  sub := fun f g => f.zipWith (· - ·) g
+  neg := fun f => f.map Neg.neg
   mul := negacyclicMulPure (vectorKernel Coeff n)
 
 section VectorRingSimp

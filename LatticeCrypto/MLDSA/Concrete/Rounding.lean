@@ -1993,16 +1993,17 @@ theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
 
 theorem concretePower2RoundLaws :
     LatticeCrypto.Power2RoundOps.Laws (ring := coeffRing)
-      concretePower2RoundOps LatticeCrypto.cInfNorm := by
-  sorry
+      concretePower2RoundOps LatticeCrypto.cInfNorm where
+  power2Round_bound := concretePower2Round_bound_field
 
 theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     LatticeCrypto.RoundingOps.Laws (ring := coeffRing)
-      (concreteRoundingOps p) LatticeCrypto.cInfNorm := by
-  sorry
-
-/-
-The concrete `Power2Round` and approved-parameter `RoundingOps` wrappers now compile.
--/
+      (concreteRoundingOps p) LatticeCrypto.cInfNorm where
+  high_low_decomp := concreteRounding_high_low_decomp_field_of_isApproved p hp
+  lowBits_bound := concreteRounding_lowBits_bound_field_of_isApproved p hp
+  hide_low := concreteRounding_hide_low_field_of_isApproved p hp
+  shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
+  useHint_correct := concreteRounding_useHint_correct_field_of_isApproved p hp
+  useHint_bound := concreteRounding_useHint_bound_field_of_isApproved p hp
 
 end MLDSA.Concrete
