@@ -90,6 +90,37 @@ theorem applyMatrix_id (f : backend.Poly) :
   simp_rw [h]
   exact backend.build_coeff f
 
+/-- Pointwise distributivity of `applyMatrix` over a binary backend operation
+`op` whose coefficient image distributes over multiplication and finite sums.
+Specializes to `applyMatrix_add` and `applyMatrix_sub`. -/
+theorem applyMatrix_pointwise
+    (M : Fin backend.degree → Fin backend.degree → Coeff)
+    (op : backend.Poly → backend.Poly → backend.Poly)
+    (cop : Coeff → Coeff → Coeff)
+    (hop : ∀ f g : backend.Poly, ∀ i,
+      backend.coeff (op f g) i = cop (backend.coeff f i) (backend.coeff g i))
+    (hmul : ∀ x a b : Coeff, x * cop a b = cop (x * a) (x * b))
+    (hsum : ∀ (φ ψ : Fin backend.degree → Coeff),
+        ∑ c, cop (φ c) (ψ c) = cop (∑ c, φ c) (∑ c, ψ c))
+    (f g : backend.Poly) :
+    applyMatrix backend M (op f g) =
+      op (backend.build (fun row =>
+            ∑ col : Fin backend.degree, M row col * backend.coeff f col))
+         (backend.build (fun row =>
+            ∑ col : Fin backend.degree, M row col * backend.coeff g col)) := by
+  simp only [applyMatrix]
+  have key : ∀ row : Fin backend.degree,
+      (∑ col, M row col * backend.coeff (op f g) col) =
+      cop (∑ col, M row col * backend.coeff f col)
+          (∑ col, M row col * backend.coeff g col) := by
+    intro row
+    simp_rw [hop f g, hmul]
+    exact hsum _ _
+  simp_rw [key]
+  rw [← backend.build_coeff (op _ _)]
+  congr 1; funext row
+  rw [hop _ _ row, backend.coeff_build, backend.coeff_build]
+
 theorem applyMatrix_add
     (M : Fin backend.degree → Fin backend.degree → Coeff)
     [Add backend.Poly] (hadd : ∀ f g : backend.Poly,
@@ -100,13 +131,10 @@ theorem applyMatrix_add
         ∑ col : Fin backend.degree, M row col * backend.coeff f col) +
       backend.build (fun row =>
         ∑ col : Fin backend.degree, M row col * backend.coeff g col) := by
-  simp only [applyMatrix]
-  have hfg : ∀ col, backend.coeff (f + g) col = backend.coeff f col + backend.coeff g col :=
-    fun col => congr_fun (hadd f g) col
-  simp_rw [hfg, mul_add, Finset.sum_add_distrib]
-  rw [← backend.build_coeff (_ + _)]
-  congr 1; funext row
-  rw [congr_fun (hadd _ _) row, backend.coeff_build, backend.coeff_build]
+  refine applyMatrix_pointwise M (· + ·) (· + ·) ?_ ?_ ?_ f g
+  · intro f' g' i; exact congr_fun (hadd f' g') i
+  · intros; exact mul_add _ _ _
+  · intros; exact Finset.sum_add_distrib
 
 theorem applyMatrix_zero
     (M : Fin backend.degree → Fin backend.degree → Coeff)
@@ -126,12 +154,9 @@ theorem applyMatrix_sub
         ∑ col : Fin backend.degree, M row col * backend.coeff f col) -
       backend.build (fun row =>
         ∑ col : Fin backend.degree, M row col * backend.coeff g col) := by
-  simp only [applyMatrix]
-  have hfg : ∀ col, backend.coeff (f - g) col = backend.coeff f col - backend.coeff g col :=
-    fun col => congr_fun (hsub f g) col
-  simp_rw [hfg, mul_sub, Finset.sum_sub_distrib]
-  rw [← backend.build_coeff (_ - _)]
-  congr 1; funext row
-  rw [congr_fun (hsub _ _) row, backend.coeff_build, backend.coeff_build]
+  refine applyMatrix_pointwise M (· - ·) (· - ·) ?_ ?_ ?_ f g
+  · intro f' g' i; exact congr_fun (hsub f' g') i
+  · intros; exact mul_sub _ _ _
+  · intro φ ψ; exact Finset.sum_sub_distrib (f := φ) (g := ψ)
 
 end LatticeCrypto.NTTCert
