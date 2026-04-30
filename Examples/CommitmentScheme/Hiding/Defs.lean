@@ -5,37 +5,71 @@ Authors: James Waters
 -/
 import Examples.CommitmentScheme.Common
 
+/-!
+# Hiding for the random-oracle commitment scheme — definitions
+
+Two-phase hiding adversaries, the four oracle implementations used in the
+identical-until-bad chain, and the supporting bookkeeping for the hiding
+proof in `Examples/CommitmentScheme/Hiding/Main.lean`.
+
+## Textbook statement (Lemma cm-hiding)
+
+There exists a simulator `S` such that for every `t`-query adversary `A`,
+the following two distributions are `t / |S|`-close:
+
+```
+Real:  A^H(state, H(m, s))  where (m, state) ← A^H, s ← $ᵗ S,
+Sim:   A^H(state, S^H)      where (m, state) ← A^H, S^H outputs uniform C.
+```
+
+The simulator just outputs a fresh uniform element of `C`.
+
+## The four oracle implementations
+
+State of every implementation: `QueryCache (CMOracle M S C) × ℕ` — the
+random-oracle cache plus a counter of how many queries with salt `s` have
+been processed (including the mandatory challenge query `(m, s)`).
+
+Bad event: `saltCount ≥ 2`. Since the challenge query always increments
+`saltCount` by `1`, bad means at least one *adversary* query also had salt
+`s`. Three regimes:
+
+* `saltCount = 0`: before the challenge; no salt-`s` queries yet.
+* `saltCount = 1`: only the challenge query has hit salt `s`.
+* `saltCount ≥ 2`: at least one adversary query also hit salt `s` (BAD).
+
+* `hidingImpl₁ s` (real game): standard caching, increment salt counter.
+* `hidingImpl₂ s` (identical-until-bad bridge): like `hidingImpl₁`, but
+  redirect cache-miss salt-`s` queries to `(default, default)` only when
+  `saltCount ≥ 2`.
+* `hidingImplSim s` (simulator game): like `hidingImpl₁`, but redirect
+  *all* cache-miss salt-`s` queries to `(default, default)`.
+* `hidingImplCountAll` (averaged-bound bookkeeping): standard caching with
+  a per-salt counter `S → ℕ` instead of the single counter at `s`.
+
+The pair `(hidingImpl₁ s, hidingImpl₂ s)` is identical until `saltCount ≥ 2`
+(the redirect condition). The pair `(hidingImpl₂ s, hidingImplSim s)` is
+distributionally equal because the underlying random oracle is memoryless,
+so redirecting cache misses does not change marginal output distributions.
+Composing the two gives the per-salt TVD bound `Pr[saltCount ≥ 2]`.
+
+## `Pr[bad]` bound
+
+`Pr[bad] = Pr[saltCount ≥ 2 at end] = Pr[∃ adversary query with salt = s]`,
+and averaged over `s ← $ᵗ S` this is `≤ t / |S|`. The averaging step is
+unavoidable: a trivial adversary always querying salt `s` makes
+`Pr[bad] = 1`. See `hiding_bound_avg` in
+`Examples/CommitmentScheme/Hiding/Main.lean`.
+-/
+
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
   [Fintype M] [Fintype S] [Fintype C]
   [Inhabited M] [Inhabited S] [Inhabited C]
-/-! ## 3. Hiding
 
-**Textbook (Lemma cm-hiding)**: There exists a simulator S such that for every
-`t`-query adversary A, the following two distributions are `t / |S|`-close:
-  Real: A^H(state, H(m, s))  where (m, state) ← A^H, s ← S
-  Sim:  A^H(state, S^H)      where (m, state) ← A^H, S^H outputs uniform C
-
-The simulator simply outputs a random element of C.
-
-The proof uses identical-until-bad with a counter-based bad predicate.
-The state tracks `(cache, saltCount)` where `saltCount` counts how many
-queries with salt `s` have been processed (including the challenge query).
-Bad is defined as `saltCount ≥ 2`, meaning at least one ADVERSARY query
-had salt `s` in addition to the challenge commitment query.
-
-Since the challenge query always increments `saltCount` by 1, we have:
-- `saltCount = 0`: no salt-s queries yet (before challenge, no adversary salt-s)
-- `saltCount = 1`: only the challenge query had salt s (no adversary salt-s)
-- `saltCount ≥ 2`: at least one adversary query had salt s
-
-When `¬bad` (`saltCount < 2`), both implementations agree on every query,
-because the redirect condition in impl₂ requires `saltCount ≥ 2`.
-
-**Note on the `Pr[bad]` bound**: `Pr[bad]` = `Pr[saltCount ≥ 2 at end]`
-= `Pr[∃ adversary query with salt = s]` ≤ `t / |S|`. -/
+/-! ## Hiding adversary and real game -/
 
 /-- A hiding adversary with two phases and total adversary query budget `t`.
 
@@ -68,21 +102,10 @@ def hidingReal {AUX : Type} {t : ℕ} (A : HidingAdversary M S C AUX t) (s : S) 
     let cm ← (CMOracle M S C).query (m, s)
     A.distinguish aux cm)).run' ∅
 
-/-! ### Identical-until-bad infrastructure for hiding
+/-! ## Identical-until-bad oracle implementations
 
-State: `QueryCache (CMOracle M S C) × ℕ` — cache plus a counter of how many
-queries with salt `s` have been processed.
-
-Bad: `saltCount ≥ 2` — at least two salt-`s` queries have occurred. Since the
-challenge query `(m, s)` always contributes one, bad means at least one
-ADVERSARY query also had salt `s`.
-
-**`hidingImpl₁`** (real): standard caching + increments counter on salt `s`.
-**`hidingImpl₂`** (intermediate): same as `hidingImpl₁` EXCEPT when
-`saltCount ≥ 2` and cache miss with salt `s`, queries at `(default, default)`.
-
-When `¬bad` (`saltCount < 2`): both implementations are literally identical
-(the redirect condition `saltCount ≥ 2 && salt = s` is `false`).
+The four query implementations described in the module docstring, plus the
+shared adversary computation `hidingOa` and total-query-bound bookkeeping.
 -/
 
 /-- The "bad" predicate: at least 2 salt-`s` queries have occurred (the challenge

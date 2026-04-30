@@ -489,6 +489,18 @@ lemma one_eq_probOutput_iff' [HasEvalSPMF m] [HasEvalFinset m] [DecidableEq α] 
   rw [eq_comm, probOutput_eq_one_iff']
 alias ⟨_, one_eq_probOutput'⟩ := one_eq_probOutput_iff'
 
+/-- If a non-failing computation can only return `x`, then it returns `x` with probability one. -/
+lemma probOutput_eq_one_of_support_subset_singleton [HasEvalSPMF m]
+    (hnf : Pr[⊥ | mx] = 0) (huniq : ∀ y ∈ support mx, y = x) :
+    Pr[= x | mx] = 1 := by
+  have hnot : ∀ y ≠ x, Pr[= y | mx] = 0 :=
+    fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
+  have hsum : ∑' y, Pr[= y | mx] = Pr[= x | mx] :=
+    tsum_eq_single x hnot
+  have htot := probFailure_add_tsum_probOutput mx
+  rw [hnf, hsum, zero_add] at htot
+  exact htot
+
 end bounds
 
 section mono_le

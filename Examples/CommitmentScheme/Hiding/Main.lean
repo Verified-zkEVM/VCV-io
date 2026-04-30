@@ -5,6 +5,28 @@ Authors: James Waters
 -/
 import Examples.CommitmentScheme.Hiding.LoggingBounds
 
+/-!
+# Hiding for the random-oracle commitment scheme — main theorems
+
+The two packaged hiding bounds, both stating that real and simulated
+hiding games are `t / |S|`-close in TV distance after the salt is averaged
+over `s ← $ᵗ S`.
+
+* `hiding_bound_avg` — per-salt sum, divided by `|S|`. Distance bound:
+  `t / |S|`.
+* `hiding_bound_finite` — salt sampled inside the experiment via
+  `HidingAvgSpec`. Distance bound: `t / |S|`.
+
+`hiding_bound_finite` is the textbook-facing form: sample the salt inside
+the experiment, then compare. `hiding_bound_avg` is the underlying
+technical form, summing the per-salt TVD bounds and dividing by `|S|`. The
+packaging step uses `tvDist_bind_left_le` to push the salt sampling
+through the TV distance.
+
+The per-salt bound `tvDist(real(s), sim(s)) ≤ t / |S|` is FALSE: a trivial
+adversary always querying salt `s` makes `Pr[bad(s)] = 1`. The averaging
+over the uniform salt is essential. -/
+
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
@@ -21,17 +43,28 @@ private lemma tvDist_liftComp_hidingAvgSpec {α : Type}
   rw [tvDist, tvDist, evalDist_liftComp, evalDist_liftComp]
 
 omit [Fintype M] [DecidableEq C] in
-/-- **Hiding theorem (averaged technical form)**:
-The average statistical distance between real and simulated hiding games,
-taken over uniformly random salt `s`, is at most `t / |S|`.
+/-- **Hiding bound (averaged technical form, Lemma cm-hiding).**
 
-For every individual `s`, we have `tvDist(real(s), sim(s)) ≤ Pr[bad(s)]`
-(identical-until-bad).  Summing over `s` and dividing by `|S|` gives:
-  `𝔼_s[tvDist(real(s), sim(s))] ≤ 𝔼_s[Pr[bad(s)]] ≤ t / |S|`.
+For every `t`-query two-phase hiding adversary `A`, the average statistical
+distance between real and simulated hiding games, taken over uniformly
+random salt `s ← $ᵗ S`, is at most `t / |S|`:
 
-The per-salt bound `tvDist ≤ t/|S|` for fixed `s` is FALSE: a trivial adversary
-always querying salt `s` makes `Pr[bad] = 1`.  The textbook (Lemma cm-hiding)
-implicitly averages over the uniform salt. -/
+```
+(∑ s, tvDist(hidingReal A s, hidingSim A s)) / |S|  ≤  t / |S|.
+```
+
+Proof: per-salt identical-until-bad
+(`tvDist_hidingReal_hidingSim_le_probBad`) gives
+`tvDist(real(s), sim(s)) ≤ Pr[bad(s)]` for every fixed `s`. Summing over
+`s` and applying `sum_probEvent_hidingBad_le` (which exchanges the per-salt
+bad sum for the adversary's total query bound) yields
+`𝔼_s[tvDist(real(s), sim(s))] ≤ 𝔼_s[Pr[bad(s)]] ≤ t / |S|`.
+
+The averaging is essential. The per-salt bound `tvDist ≤ t / |S|` is FALSE
+in general: a trivial adversary always querying salt `s` makes
+`Pr[bad(s)] = 1`. The textbook lemma silently averages over the uniform
+salt, which `hiding_bound_finite` makes explicit by sampling the salt
+inside a packaged `HidingAvgSpec` experiment. -/
 theorem hiding_bound_avg [Finite M] {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S, tvDist (hidingReal A s) (hidingSim A s)) / (Fintype.card S : ℝ) ≤
@@ -56,9 +89,21 @@ theorem hiding_bound_avg [Finite M] {AUX : Type} {t : ℕ}
           ENNReal.coe_ne_top).mpr hsum
 
 omit [Fintype M] [DecidableEq C] in
-/-- **Hiding theorem (Lemma cm-hiding, bounded packaged form)**:
-sample the salt uniformly inside the experiment, then compare the resulting real and simulated
-hiding games. This is the bounded-query textbook-facing wrapper around `hiding_bound_avg`. -/
+/-- **Hiding bound (Lemma cm-hiding, packaged textbook form).**
+
+For every `t`-query two-phase hiding adversary `A`,
+
+```
+tvDist(hidingMixedReal A, hidingMixedSim A)  ≤  t / |S|,
+```
+
+where `hidingMixedReal` and `hidingMixedSim` sample the salt
+`s ← $ᵗ S` *inside* the experiment (via the `HidingAvgSpec` random-salt
+oracle) and then run the corresponding per-salt game.
+
+This is the textbook-facing wrapper around `hiding_bound_avg`: it pushes
+the salt sampling through `tvDist_bind_left_le`, leaving the per-salt sum
+that `hiding_bound_avg` already controls. -/
 theorem hiding_bound_finite [Finite M] {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     tvDist (hidingMixedReal (M := M) (S := S) (C := C) A)

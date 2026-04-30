@@ -137,10 +137,10 @@ structure RelativeMonad where
 
 namespace RelativeMonad
 
-@[simps]
-def inducedFunctor (M : RelativeMonad C D J) : EnrichedFunctor (Bundled c) C D where
-  obj A := M.T A
-  map f := sorry
+-- @[simps]
+-- def inducedFunctor (M : RelativeMonad C D J) : EnrichedFunctor (Bundled c) C D where
+--   obj A := M.T A
+--   map f := sorry
 
 -- def prod
 

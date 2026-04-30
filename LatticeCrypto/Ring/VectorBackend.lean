@@ -49,11 +49,16 @@ def ofPi (f : Fin n → Coeff) : Poly Coeff n :=
   funext i
   simp [toPi, ofPi, Vector.get]
 
+/-- Pointwise extensionality for `Poly`: two vector-backed polynomials with
+equal `Fin`-indexed entries are equal. Bridges core `Vector.ext` (stated in
+terms of `[i]`) into the `.get` style used throughout the lattice layer. -/
+theorem ext_get_eq {p q : Poly Coeff n}
+    (h : ∀ i : Fin n, p.get i = q.get i) : p = q :=
+  Vector.ext fun i hi => h ⟨i, hi⟩
+
 @[simp] theorem ofPi_toPi (p : Poly Coeff n) :
-    ofPi (toPi p) = p := by
-  apply Vector.ext
-  intro i hi
-  simp [toPi, ofPi, Vector.get]
+    ofPi (toPi p) = p :=
+  ext_get_eq fun i => by simp [toPi, ofPi, Vector.get]
 
 end Poly
 
@@ -68,9 +73,7 @@ def vectorBackend (Coeff : Type u) (n : Nat) : PolyBackend Coeff where
     simp [Vector.get]
   build_coeff := by
     intro p
-    apply Vector.ext
-    intro i hi
-    simp [Vector.get]
+    exact Poly.ext_get_eq fun _ => by simp [Vector.get]
 
 /-- The canonical vector/array executable kernel. -/
 def vectorKernel (Coeff : Type u) [Zero Coeff] (n : Nat) :
@@ -86,9 +89,7 @@ def vectorKernel (Coeff : Type u) [Zero Coeff] (n : Nat) :
     simp [vectorBackend, hi, Vector.get]
   ofArray_toArray := by
     intro p
-    apply Vector.ext
-    intro i hi
-    simp
+    exact Poly.ext_get_eq fun _ => by simp
 
 /-- The canonical bundled negacyclic ring over the vector backend. -/
 def vectorNegacyclicRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :

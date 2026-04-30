@@ -1459,6 +1459,17 @@ def tryProbEqPlans (plans : List (List ProbEqAction)) : TacticM Bool := do
   | none => return false
   | some (plan, _) => tryProbEqActions plan
 
+/-- Explicit probability-equality normalization.
+
+This runs the deeper planner-backed bind-rewrite/congruence search used by `vcstep?`, but only
+when the user asks for it. Plain `vcstep` keeps the smaller default plan set. -/
+def runProbEqNormalize : TacticM Bool := do
+  for plan in ← probEqPlannerActionPlansForGoal do
+    let preview ← previewActionWithGoals (tryProbEqActions plan)
+    if preview.ok && preview.goalCount = 0 then
+      return (← tryProbEqActions plan)
+  return false
+
 /-- Try to handle a `Pr[ ...] = Pr[ ...]` equality goal by swap, congr, or swap+congr.
 Also tries a fallback bridge from exact `probOutput` equalities into relational VCGen. -/
 def runProbOutputEqRelBridge : TacticM Bool := do
@@ -1511,6 +1522,13 @@ def throwVCGenStepRwCongrError (supportSensitive : Bool) : TacticM Unit := withM
       "vcstep rw congr': expected a `Pr[ ...] = Pr[ ...]` goal with a shared outer\n\
       bind, leaving only the bound variable.\n\
       Goal:{indentExpr target}"
+
+def throwVCGenStepRwNormalizeError : TacticM Unit := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  throwError
+    "vcstep rw normalize: expected a `Pr[ ...] = Pr[ ...]` goal where the bounded\n\
+    probability-equality planner can close the goal by bind-swap and congruence steps.\n\
+    Goal:{indentExpr target}"
 
 /-- Try to lower a probability goal into a `Triple`, `wp`, or probability-equality goal. -/
 def tryLowerProbGoal : TacticM Bool := do

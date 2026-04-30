@@ -25,9 +25,13 @@ They share the exact same code path: `evalDist` is `simulateQ` with `m = PMF` an
 
 The README and large amounts of commented-out code use `++ₒ` for combining oracle specs. The current API uses standard `+` (`HAdd`).
 
-### 5. Commented-out code uses OLD API patterns
+### 5. Delete obsolete commented-out code
 
-Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain large commented-out blocks that use obsolete patterns (`[= x | ...]`, `++ₒ`, `simulate'`, `getM`, `guard` via `Alternative`). **Only follow patterns in uncommented code.** Use `Examples/OneTimePad/Basic.lean` as the canonical reference.
+Do not keep large commented-out Lean blocks around as reference material,
+especially if they use obsolete patterns (`[= x | ...]`, `++ₒ`, `simulate'`,
+`getM`, `guard` via `Alternative`). Delete them instead. This is distinct from
+unfinished live proof attempts, which should be preserved with `stop`.
+Use `Examples/OneTimePad/Basic.lean` as the canonical reference for current style.
 
 ## Type System
 
@@ -87,7 +91,7 @@ Check the module layering DAG before adding imports:
 ```
 ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
   → {SimSemantics, QueryTracking, Constructions, Coercions, ProbComp}
-  → {ProgramLogic, CryptoFoundations} → Examples
+  → {ProgramLogic, CryptoFoundations, CryptoFoundations/Asymptotics} → Examples
 ```
 
 ### 14. Preserve partial proof attempts with `stop`
@@ -96,7 +100,10 @@ When a proof attempt is not finished or is currently broken, insert a local `sto
 
 ### 15. `OracleComp.inductionOn` is the canonical eliminator
 
-Pattern: `| pure x => ... | query_bind t oa ih => ...`. Use `simulateQ_bind`, `simulateQ_query`, `simulateQ_pure` simp lemmas in the `query_bind` case. See `simulateQ_id'` in `SimSemantics/SimulateQ.lean` for a clean example.
+Pattern: `| pure x => ... | query_bind t oa ih => ...`. Use `simulateQ_bind`,
+`simulateQ_query`, `simulateQ_pure` simp lemmas in the `query_bind` case.
+See `simulateQ_id'` in `VCVio/OracleComp/SimSemantics/SimulateQ.lean` for a
+clean example.
 
 ### 16. Full cutover, no backward-compatibility shims
 
@@ -109,9 +116,10 @@ When splitting a file into a folder of submodules, do **not** add a sibling `X.l
 whose only content is a chain of `import X.A; import X.B`. Each caller imports the
 specific submodule it actually uses.
 
-**Allowed umbrellas** (strictly top-level roots only): the auto-generated root imports
-maintained by `./scripts/update-lib.sh` and used by CI, currently `VCVio.lean`,
-`ToMathlib.lean`, `Examples.lean`, `LatticeCrypto.lean`, `LatticeCryptoTest.lean`.
+**Allowed umbrellas** (strictly top-level roots only): root imports such as
+`VCVio.lean`, `ToMathlib.lean`, `FFI.lean`, `Examples.lean`, `LatticeCrypto.lean`,
+`Interop.lean`, `VCVioWidgets.lean`, `VCVioTest.lean`, and
+`LatticeCryptoTest.lean`.
 When a new top-level root is added, extend this list alongside it.
 
 **Not allowed**: umbrellas inside a subdirectory (e.g. a top-level
@@ -133,11 +141,14 @@ problems and fix the underlying declaration, proof, naming, or formatting issue 
 
 ### 20. After adding new `.lean` files, run `./scripts/update-lib.sh`
 
-This regenerates root import files (`VCVio.lean`, `Examples.lean`, `ToMathlib.lean`). CI checks they're up to date.
+This regenerates the root import files covered by the build import check:
+`ToMathlib.lean`, `VCVio.lean`, `FFI.lean`, `LatticeCrypto.lean`,
+`Examples.lean`, and `Interop.lean`. CI checks those are up to date.
 
 ### 21. Lean toolchain and Mathlib version must stay in sync
 
-Both currently `v4.28.0`. When upgrading, update both `lean-toolchain` and `lakefile.lean`'s `require mathlib` line simultaneously.
+Both currently `v4.29.0`. When upgrading, update both `lean-toolchain` and
+`lakefile.lean`'s `require mathlib` line simultaneously.
 
 ### 22. Use public references in shared docs
 

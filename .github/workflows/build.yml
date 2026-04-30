@@ -42,6 +42,9 @@ jobs:
       - name: Check for all imports in Examples
         run: lake exe mk_all --lib Examples --check
 
+      - name: Check for all imports in VCVioWidgets
+        run: lake exe mk_all --lib VCVioWidgets --check
+
       - name: Check for all imports in Interop
         run: lake exe mk_all --lib Interop --check
 
@@ -70,9 +73,8 @@ jobs:
           echo "BUILD_TIMING_SOURCE_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_SOURCE_BRANCH=${{ github.head_ref || github.ref_name }}" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_BASE_REF=" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_MERGE_BASE_SHA=" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio FFI LatticeCrypto Examples Interop" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio FFI LatticeCrypto Examples Interop" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio FFI LatticeCrypto Examples VCVioWidgets Interop" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio FFI LatticeCrypto Examples VCVioWidgets Interop" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_NAME=Smoke test" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_COMMAND=lake env lean VCVioTest/Smoke.lean" >> "$GITHUB_ENV"
           {
@@ -80,14 +82,10 @@ jobs:
             git log -1 --format=%s
             echo "EOF"
           } >> "$GITHUB_ENV"
-      - name: Determine PR timing merge base
+      - name: Determine PR timing base ref
         if: github.event_name == 'pull_request'
         run: |
           echo "BUILD_TIMING_BASE_REF=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_ENV"
-          merge_base_sha="$(git merge-base "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" || true)"
-          if [ -n "$merge_base_sha" ]; then
-            echo "BUILD_TIMING_MERGE_BASE_SHA=$merge_base_sha" >> "$GITHUB_ENV"
-          fi
       - name: Restore Lake cache
         id: lake-cache
         uses: actions/cache/restore@v4
@@ -117,8 +115,16 @@ jobs:
             --path-prefix ToMathlib/ \
             --path-prefix VCVio/ \
             --path-prefix FFI/ \
+            --path-prefix LatticeCrypto/ \
             --path-prefix Examples/ \
+            --path-prefix VCVioWidgets/ \
             --path-prefix Interop/ \
+            --path-prefix ToMathlib.lean \
+            --path-prefix VCVio.lean \
+            --path-prefix FFI.lean \
+            --path-prefix LatticeCrypto.lean \
+            --path-prefix Examples.lean \
+            --path-prefix VCVioWidgets.lean \
             --path-prefix Interop.lean \
             --exclude-substring 'declaration uses `sorry`' \
             --label 'repository non-sorry warnings'
@@ -172,7 +178,6 @@ jobs:
             const pullRequest = context.payload.pull_request;
             const headRef = pullRequest.head.ref;
             const baseRef = process.env.BUILD_TIMING_BASE_REF;
-            const mergeBaseSha = process.env.BUILD_TIMING_MERGE_BASE_SHA;
 
             async function firstRunWithArtifact(runs) {
               for (const run of runs) {
@@ -198,6 +203,28 @@ jobs:
               return null;
             }
 
+            const baseRunsResponse = await github.rest.actions.listWorkflowRunsForRepo({
+              owner,
+              repo,
+              event: 'push',
+              branch: baseRef,
+              status: 'completed',
+              per_page: 100,
+            });
+            const baseCandidates = baseRunsResponse.data.workflow_runs.filter(run =>
+              run.name === workflowName && run.conclusion === 'success'
+            );
+            const baseRun = await firstRunWithArtifact(baseCandidates);
+            if (baseRun) {
+              core.setOutput('run-id', String(baseRun.id));
+              core.setOutput('sha', baseRun.head_sha);
+              core.setOutput(
+                'label',
+                `the latest successful \`${baseRef}\` run`
+              );
+              return;
+            }
+
             const prRunsResponse = await github.rest.actions.listWorkflowRunsForRepo({
               owner,
               repo,
@@ -218,42 +245,6 @@ jobs:
               core.setOutput('run-id', String(previousPrRun.id));
               core.setOutput('sha', previousPrRun.head_sha);
               core.setOutput('label', 'the previous successful PR update');
-              return;
-            }
-
-            const baseRunsResponse = await github.rest.actions.listWorkflowRunsForRepo({
-              owner,
-              repo,
-              event: 'push',
-              branch: baseRef,
-              status: 'completed',
-              per_page: 100,
-            });
-            const baseCandidates = baseRunsResponse.data.workflow_runs.filter(run =>
-              run.name === workflowName && run.conclusion === 'success'
-            );
-            const exactMergeBaseCandidates = mergeBaseSha
-              ? baseCandidates.filter(run => run.head_sha === mergeBaseSha)
-              : [];
-            const exactMergeBaseRun =
-              exactMergeBaseCandidates.length > 0
-                ? await firstRunWithArtifact(exactMergeBaseCandidates)
-                : null;
-            const fallbackBaseCandidates = mergeBaseSha
-              ? baseCandidates.filter(run => run.head_sha !== mergeBaseSha)
-              : baseCandidates;
-            const baseRun =
-              exactMergeBaseRun ?? await firstRunWithArtifact(fallbackBaseCandidates);
-            if (baseRun) {
-              const isMergeBase = Boolean(mergeBaseSha) && baseRun.head_sha === mergeBaseSha;
-              core.setOutput('run-id', String(baseRun.id));
-              core.setOutput('sha', baseRun.head_sha);
-              core.setOutput(
-                'label',
-                isMergeBase
-                  ? `merge-base on \`${baseRef}\``
-                  : `the latest successful \`${baseRef}\` run`
-              );
               return;
             }
 

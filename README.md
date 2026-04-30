@@ -19,6 +19,12 @@ Assuming Lean 4 and lake are already installed, the project can be built by just
 lake exe cache get && lake build
 ```
 
+CI's timed build covers the non-test Lean libraries `ToMathlib`, `VCVio`, `FFI`,
+`LatticeCrypto`, `Examples`, `VCVioWidgets`, and `Interop`.
+The build timing report parses per-file timings for that same set.
+Test libraries and test executables are intentionally outside the timed build; CI
+only times the smoke module separately with `lake env lean VCVioTest/Smoke.lean`.
+
 Mathematical foundations such as probability theory, computational complexity, and algebraic structures are based on or written to the Mathlib project (see [MATHLIB4](REFERENCES.md#mathlib4)), making all of that library usable in constructions and proofs.
 
 Generally the project aims to enable proof complexity comparable to that found in Mathlib.
@@ -43,6 +49,13 @@ for lattice-specific entry points and workflows.
 
 External papers and project references cited in this repo are centralized in
 [`REFERENCES.md`](REFERENCES.md).
+
+## End-to-end examples
+
+For compact examples showing how the framework layers compose on concrete
+schemes, see [`docs/agents/end-to-end-examples.md`](docs/agents/end-to-end-examples.md).
+It covers the Schnorr signature EUF-CMA reduction and the ROM commitment scheme
+proofs of binding, extractability, and hiding.
 
 ## Acknowledgments
 

@@ -173,6 +173,7 @@ Variants:
 - `vcstep inv I` to apply a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal.
 - `vcstep rw` to perform one explicit top-level probability-equality rewrite step.
 - `vcstep rw under n` to rewrite one bind-swap under `n` shared bind prefixes.
+- `vcstep rw normalize` to run the bounded probability-equality planner explicitly.
 - `vcstep rw congr` to expose one shared bind plus its support hypothesis.
 - `vcstep rw congr'` to expose one shared bind without a support hypothesis.
 
@@ -217,6 +218,7 @@ elab_rules : tactic
 
 syntax "vcstep" &"rw" : tactic
 syntax "vcstep" &"rw" " under " num : tactic
+syntax "vcstep" &"rw" &"normalize" : tactic
 syntax "vcstep" &"rw" &"congr" : tactic
 syntax "vcstep" &"rw" &"congr'" : tactic
 syntax "vcstep" &"rw" "as" "⟨" binderIdent,* "⟩" : tactic
@@ -255,6 +257,9 @@ elab_rules : tactic
       let depth := n.getNat
       if ← TacticInternals.Unary.runProbEqAction (.rewriteUnder depth) then return
       TacticInternals.Unary.throwVCGenStepRwError depth
+  | `(tactic| vcstep rw normalize) => do
+      if ← TacticInternals.Unary.runProbEqNormalize then return
+      TacticInternals.Unary.throwVCGenStepRwNormalizeError
   | `(tactic| vcstep rw congr) => do
       if ← TacticInternals.Unary.runProbEqAction .congr then return
       TacticInternals.Unary.throwVCGenStepRwCongrError true

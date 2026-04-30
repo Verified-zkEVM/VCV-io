@@ -32,9 +32,13 @@ The repo also includes a first-class lattice cryptography library under `Lattice
 ## Repo Map
 
 - `VCVio/`: generic oracle-computation framework, program logic, crypto abstractions, and generic reductions.
+- `ToMathlib/`: local Mathlib-facing utilities and lemmas intended to remain below the framework layer.
+- `FFI/`: shared Lean FFI bindings used by concrete implementations.
 - `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
 - `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
-- `Examples/`: compact framework examples such as OneTimePad, ElGamal, and Schnorr.
+- `VCVioTest/`: framework smoke tests and test support modules.
+- `VCVioWidgets/`: optional widget experiments and visualizations.
+- `Examples/`: compact framework examples such as OneTimePad, ElGamal, Schnorr, and program-logic tactic walkthroughs.
 - `Interop/`: experimental bridges to Rust verification frontends (hax, aeneas). **Strict TCB isolation**: nothing in core VCVio depends on it. See `docs/agents/interop.md`.
 - `csrc/`: C FFI shims used for differential testing against native ML-DSA, ML-KEM, and Falcon code.
 - `third_party/`: vendored native backends used by the FFI and test harnesses.
@@ -97,8 +101,8 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 ## Canonical Examples
 
 - Compact modern crypto proof: `Examples/OneTimePad/Basic.lean`
-- ElGamal IND-CPA via DDH (hybrid argument): `Examples/ElGamal/Basic.lean`
-- Schnorr sigma protocol (completeness, soundness, HVZK): `Examples/Schnorr.lean`
+- ElGamal IND-CPA via the generic one-time DDH lift: `Examples/ElGamal/Basic.lean`
+- Schnorr sigma protocol (completeness, soundness, HVZK): `Examples/Schnorr/SigmaProtocol.lean`
 - Oracle computation core: `VCVio/OracleComp/OracleComp.lean`
 - Probability lemmas: `VCVio/EvalDist/Monad/Basic.lean`
 - SubSpec / coercions: `VCVio/OracleComp/Coercions/SubSpec.lean`
@@ -128,6 +132,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - End-to-end UC `CompEmulates 0` at a three-port boundary: `Examples/OneTimePad/UC.lean`
 - Interaction examples: `VCVio/Interaction/TwoParty/Examples.lean`, `VCVio/Interaction/Multiparty/Examples.lean`, `VCVio/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
+- Program logic tactic walkthroughs: `Examples/ProgramLogic/`
 - Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
 - ML-DSA proof-level IDS: `LatticeCrypto/MLDSA/Scheme.lean`
 - ML-DSA FIPS signing layer: `LatticeCrypto/MLDSA/Signature.lean`
@@ -160,6 +165,13 @@ bundle on demand).
 lake exe cache get && lake build
 ```
 
+CI runs the timed build on the non-test Lean libraries:
+`ToMathlib`, `VCVio`, `FFI`, `LatticeCrypto`, `Examples`,
+`VCVioWidgets`, and `Interop`.
+The timing report parses per-file build times only for that same set.
+Test libraries and test executables are not part of the timed build; CI only
+times the smoke module separately with `lake env lean VCVioTest/Smoke.lean`.
+
 After adding new `.lean` files: `./scripts/update-lib.sh`
 
 Lean toolchain and Mathlib must stay in sync (both currently `v4.29.0`). Files should stay under 1500 lines.
@@ -175,6 +187,7 @@ Before working in a specific area, read the relevant guide in `docs/agents/`:
 - **Query tracking / weighted cost / expected runtime**: [`docs/agents/query-tracking.md`](docs/agents/query-tracking.md)
 - **Probability reasoning (EvalDist, ProbComp)**: [`docs/agents/probability.md`](docs/agents/probability.md)
 - **Crypto primitives and reductions**: [`docs/agents/crypto.md`](docs/agents/crypto.md)
+- **End-to-end crypto examples**: [`docs/agents/end-to-end-examples.md`](docs/agents/end-to-end-examples.md)
 - **Program logic tactics**: [`docs/agents/program-logic.md`](docs/agents/program-logic.md)
 - **All notation**: [`docs/agents/notation.md`](docs/agents/notation.md)
 - **Proof workflows (game-hopping, reductions)**: [`docs/agents/proof-workflows.md`](docs/agents/proof-workflows.md)

@@ -208,35 +208,6 @@ def simChalUniformGivenCommit [Fintype Chal]
 
 end hvzk
 
-section randomChallengeVerification
-
-variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
-
-open scoped ENNReal in
-/-- `verifyChallengePredictability δ` means that for any fixed statement, commitment, and
-response, a uniformly random challenge is accepted by the verifier with probability at most `δ`.
-
-This isolates the "cache-miss verify" term in the Fiat-Shamir security reduction: when the
-forgery's hash point was never queried, final verification samples a fresh challenge from the
-random oracle, and the reduction needs an external bound on that acceptance probability.
-Unlike `simCommitPredictability`, this is a property of the verifier relation itself rather than
-of the simulator transcript. -/
-def verifyChallengePredictability
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-    (δ : ℝ≥0∞) : Prop :=
-  ∀ x pc p, Pr[fun ω : Chal => σ.verify x pc ω p = true | ($ᵗ Chal : ProbComp Chal)] ≤ δ
-
-/-- Trivial upper bound for `verifyChallengePredictability`. Useful when a sharper
-scheme-specific estimate is unavailable. -/
-lemma verifyChallengePredictability_one
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) :
-    σ.verifyChallengePredictability 1 := by
-  dsimp [verifyChallengePredictability]
-  intro x pc p
-  exact probEvent_le_one
-
-end randomChallengeVerification
-
 section uniqueResponses
 
 /-- A Σ-protocol has unique responses if for any statement, commitment, and challenge,

@@ -450,6 +450,13 @@ import VCVio.Interaction.Multiparty.Broadcast  -- or Directed / Profile
 -- Concurrent
 import VCVio.Interaction.Concurrent.Spec
 import VCVio.Interaction.Concurrent.Process
+
+-- UC / open systems
+import VCVio.Interaction.UC.OpenTheory
+import VCVio.Interaction.UC.OpenProcess
+import VCVio.Interaction.UC.OpenProcessModel
+import VCVio.Interaction.UC.Runtime
+import VCVio.Interaction.UC.Computational
 ```
 
 ## File index
@@ -491,7 +498,7 @@ import VCVio.Interaction.Concurrent.Process
 
 | File | Purpose |
 |------|---------|
-| `Core.lean` | `ViewMode`, `ObsType`, `Action`, `toObservation`/`fromObservation` (kernel bridges), `Multiparty.Strategy` |
+| `Core.lean` | `ViewMode`, `ObsType`, `Action`, `ViewMode.toObservation` / `Observation.toViewMode` (kernel bridges), `Multiparty.Strategy` |
 | `Observation.lean` | `Multiparty.Observation` (= `PFunctor.Idx (Observation.basePFunctor X)`), `top`/`bot`/`Refines`/`combine`/`postcomp`/`Action`, Mathlib order typeclasses (`Top`/`Bot`/`LE`/`Preorder`/`OrderTop`/`OrderBot`/`Max`) |
 | `ObservationProfile.lean` | `Multiparty.ObservationProfile Party X := Party → Observation X` (with pointwise `Pi` order instances), `toViewProfile` |
 | `Broadcast.lean` | `PartyDecoration`, `Broadcast.Strategy` |
@@ -539,6 +546,14 @@ import VCVio.Interaction.Concurrent.Process
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
 | `Computational.lean` | `Semantics`, `CompEmulates`, `AsympCompEmulates` (computational observation layer) |
 | `Runtime.lean` | `Spec.Sampler m`, `sampleTranscript`, `ProcessOver.runSteps`, `processSemantics` (no external `sampler` arg; pulled from `process.stepSampler`), `processSemanticsProbComp`, `processSemanticsOracle` (oracle-aware runtime) |
+| `AsyncRuntime.lean` | asynchronous runtime variants for open processes |
+| `AsyncSecurity.lean` | asynchronous security surfaces |
+| `Notation.lean` | UC notation helpers |
+| `StdDoBridge.lean` | bridge lemmas for `Std.Do`-style process code |
+| `EnvAction.lean` / `EnvOpenProcess.lean` | environment actions and open-process wrappers |
+| `CorruptionModel.lean` / `MomentaryCorruption.lean` | corruption modeling surfaces |
+| `Leakage.lean` | leakage-oriented UC observation helpers |
+| `MachineId.lean` / `Standard.lean` | machine identifiers and standard packaged interfaces |
 
 ## In-tree examples
 
