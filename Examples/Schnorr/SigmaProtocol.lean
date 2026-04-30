@@ -8,10 +8,13 @@ import VCVio.ProgramLogic.Tactics.Unary
 import VCVio.ProgramLogic.Tactics.Relational
 
 /-!
-# Schnorr Sigma Protocol
+# Schnorr Σ-protocol
 
 Standard Schnorr Σ-protocol for proof of knowledge of discrete logarithm
-over a cyclic group, formalized using `Module F G`.
+over a cyclic group, formalized using `Module F G`. This file is the
+σ-protocol layer of the end-to-end EUF-CMA proof for the Schnorr signature
+in `Examples/Schnorr/Signature.lean`; everything proven here is fed verbatim into
+`FiatShamir.euf_cma_bound`.
 
 ## Mathematical setup
 
@@ -23,21 +26,45 @@ over a cyclic group, formalized using `Module F G`.
 
 Given public key `pk : G` with witness `sk : F` satisfying `sk • g = pk`:
 
-1. **Commit**: sample `r ← F`, output `(r • g, r)` as `(R, r)`
+1. **Commit**: sample `r ← F`, output `(R, r) := (r • g, r)`
 2. **Challenge**: receive `c ← F` (full-field challenge)
-3. **Respond**: `z = r + c * sk`
+3. **Respond**: `z = r + c · sk`
 4. **Verify**: check `z • g = R + c • pk`
 
 This matches the textbook Schnorr protocol. In multiplicative notation,
 verification is `g^z = R · pk^c`.
 
-## Security properties
+## What's in this file
 
-- **Completeness**: trivial from `Module` axioms (`add_smul`, `mul_smul`)
-- **Special soundness**: from two accepting transcripts with distinct challenges,
-  extract `sk = (z₁ - z₂) * (c₁ - c₂)⁻¹` using field division
-- **HVZK**: simulator picks `c, z ← F`, computes `R = z • g - c • pk`;
-  distribution matches via change of variables
+| Theorem                              | Plays the role of …
+| ------------------------------------ | --------------------------------------
+| `sigma_complete`                     | perfect completeness of the σ-protocol
+| `sigma_speciallySound`               | the special-soundness extractor
+|                                      |     `(z₁ - z₂) · (c₁ - c₂)⁻¹`
+| `sigma_hvzk`                         | perfect HVZK (`ζ_zk = 0`)
+| `sigma_simCommitPredictability`      | simulator commit-predictability
+|                                      |     `β = 1/|F|` (needs the bijection
+|                                      |     `· • g : F → G`)
+| `sigma_simChalUniformGivenCommit`    | simulator's challenge is conditionally
+|                                      |     uniform given the commit
+
+The first three are the textbook Σ-protocol security properties. The last
+two are the additional facts the Fiat-Shamir CMA-to-NMA reduction needs to
+control the signing-simulator's collisions with the random oracle.
+
+## Sketches
+
+* **Completeness**: trivial from `Module` axioms (`add_smul`, `mul_smul`).
+* **Special soundness**: from two accepting transcripts with distinct
+  challenges, extract `sk = (z₁ - z₂) · (c₁ - c₂)⁻¹` using field division.
+* **HVZK**: simulator picks `c, z ← F`, computes `R = z • g - c • pk`;
+  distribution matches via the bijection `r ↦ r + c · sk`.
+* **Commit-predictability**: when `· • g : F → G` is a bijection, both
+  `r • g` (real) and `z • g - c • pk` (simulator) are uniform on `G`,
+  giving probability `1/|G| = 1/|F|` for any specific commit.
+* **Conditional challenge uniformity**: in the closed form
+  `(r • g, c, r + c · sk)` with `r, c ← $ᵗ F` independent, the joint
+  marginal on `(commit, chal)` factors as `Pr[commit] · 1/|F|`.
 -/
 
 open OracleSpec OracleComp SigmaProtocol
@@ -60,11 +87,14 @@ def sigma (g : G) : SigmaProtocol G F G F F F
   sim _pk := $ᵗ G
   extract c₁ z₁ c₂ z₂ := pure ((z₁ - z₂) * (c₁ - c₂)⁻¹)
 
-/-! ## Security properties -/
+/-! ## Textbook Σ-protocol security properties
+
+The three classical Σ-protocol properties: completeness, special soundness,
+and (perfect) honest-verifier zero-knowledge. -/
 
 omit [Fintype F] [DecidableEq F] in
-/-- Completeness: an honest prover with valid witness always produces an accepting transcript.
-Follows from `add_smul` and `mul_smul`. -/
+/-- Perfect completeness: an honest prover with a valid witness always produces
+an accepting transcript. Follows from `add_smul` and `mul_smul`. -/
 theorem sigma_complete (g : G) :
     PerfectlyComplete (sigma F G g) := by
   intro pk sk h
@@ -127,6 +157,13 @@ theorem sigma_hvzk (g : G) [Finite F] :
     rvcstep using (· + c * sk)
     exact ⟨fun _ _ h => add_right_cancel h, fun z => ⟨z - c * sk, sub_add_cancel z _⟩⟩
 
+/-! ## Companion facts for the Fiat-Shamir reduction
+
+Two additional properties that the FS CMA-to-NMA reduction needs (on top of
+HVZK) to bound the probability that the signing-simulator collides with the
+random oracle when programming a hash entry. They concern the shape of the
+*simulator transcript distribution*, not the σ-protocol itself. -/
+
 omit [Fintype F] [DecidableEq F] in
 /-- Closed-form for the Schnorr `realTranscript`: the real transcript is the joint
 distribution of `(r • g, c, r + c * sk)` where `r, c ← $ᵗ F` are sampled *independently*.
@@ -141,15 +178,20 @@ private lemma realTranscript_eq_indep (g : G) (pk : G) (sk : F) :
   simp only [SigmaProtocol.realTranscript, sigma, bind_assoc, pure_bind]
 
 omit [DecidableEq F] in
-/-- **`simCommitPredictability` for Schnorr.** With the standard bijection hypothesis
-`hg : Function.Bijective (· • g : F → G)` (`F` acts simply transitively on `G`, so `g`
-generates the group), the simulator's commit marginal is uniform over `G`, giving
-predictability `β = 1/|F|` (equivalently `1/|G|`).
+/-- **Simulator commit-predictability for Schnorr.** With the standard bijection
+hypothesis `hg : Function.Bijective (· • g : F → G)` (`F` acts simply transitively on
+`G`, so `g` generates the group), the simulator's commit marginal is uniform over `G`,
+giving predictability bound `β = 1/|F|` (equivalently `1/|G|`).
 
-Proof: for any fixed challenge `c`, the response map `z ↦ z • g - c • pk : F → G` is a
-bijection (composition of `· • g` with translation), so `(z • g - c • pk)` is uniform on
-`G` when `z ← $ᵗ F`. Averaging over `c ← $ᵗ F` preserves uniformity, and uniformity on
-`G` gives probability `1/|G| = 1/|F|` for any specific output. -/
+This is the `β` parameter consumed by `FiatShamir.euf_cma_bound`: it controls the
+`qS · (qS + qH) · β` collision term in the CMA-to-NMA reduction, where each
+simulator-programmed hash entry collides with the adversary's view with probability
+at most `β`.
+
+Proof: for any fixed challenge `c`, the response map `z ↦ z • g - c • pk : F → G` is
+a bijection (composition of `· • g` with translation), so `(z • g - c • pk)` is uniform
+on `G` when `z ← $ᵗ F`. Averaging over `c ← $ᵗ F` preserves uniformity, and uniformity
+on `G` gives probability `1/|G| = 1/|F|` for any specific output. -/
 theorem sigma_simCommitPredictability (g : G)
     (hg : Function.Bijective (· • g : F → G)) :
     SigmaProtocol.simCommitPredictability (sigma F G g) (simTranscript F G g)
@@ -189,10 +231,16 @@ theorem sigma_simCommitPredictability (g : G)
   exact h_eq.le
 
 omit [DecidableEq F] in
-/-- **`simChalUniformGivenCommit` for Schnorr.** The proof reduces to the joint distribution
-of independently-sampled `r, c ← $ᵗ F` via perfect HVZK and the closed form
-`realTranscript_eq_indep`. The commitment `r • g` and challenge `c` are then literally
-independent (by sampling order), so the joint factors as `Pr[commit = c₀] * (1/|F|)`. -/
+/-- **Simulator-challenge uniformity given commit, for Schnorr.** For any commit value
+`c₀ : G` and challenge value `ch₀ : F`, the simulator's joint marginal on
+`(commit, chal)` factors as `Pr[commit = c₀] · (1/|F|)`.
+
+This is the strengthening of commit-predictability that the FS reduction's joint
+coupling needs: it asserts that conditional on any commit value, the simulator's
+challenge is uniform on `F`. The proof reduces to the explicit independent product
+`(do r ← $ᵗ F; c ← $ᵗ F; pure (r • g, c, r + c · sk))` via perfect HVZK and the
+closed form `realTranscript_eq_indep`; in that form the commit `r • g` and challenge
+`c` are literally independent (by sampling order), so the factoring is immediate. -/
 theorem sigma_simChalUniformGivenCommit (g : G) :
     simChalUniformGivenCommit (sigma F G g) (simTranscript F G g) := by
   classical

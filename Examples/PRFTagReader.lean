@@ -654,7 +654,12 @@ theorem unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound
             PRFScheme.prfAdvantage prfs.multiplePRFScheme multiAdv +
             PRFScheme.prfAdvantage prfs.singlePRFScheme singleAdv +
             ((sessionsPerTag ^ 2 * Fintype.card TagId : ℕ) : ℝ) * maxNonceProb := by
-  sorry
+  obtain ⟨multiAdv, singleAdv, hSum⟩ :=
+    unlinkabilityAdvantage_le_two_prf_plus_collision prfs adversary
+  refine ⟨multiAdv, singleAdv, hSum.trans ?_⟩
+  have hBad := unlinkBadExp_le_sessionCollisionBound (sessionsPerTag := sessionsPerTag)
+    adversary maxNonceProb hmax
+  linarith
 
 end Theorems
 

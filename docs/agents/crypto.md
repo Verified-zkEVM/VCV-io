@@ -32,6 +32,37 @@ structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type) where
   verify (pk : PK) (msg : M) (σ : S) : m Bool
 ```
 
+For an end-to-end EUF-CMA reduction worked through the framework (Σ-protocol →
+Fiat-Shamir transform → managed-RO NMA → replay forking → DLog), see
+[`Examples/Schnorr/Signature.lean`](../../Examples/Schnorr/Signature.lean) and the
+[Schnorr signature walkthrough](end-to-end-examples.md#schnorr-signature-euf-cma).
+The Schnorr-specific σ-protocol facts that feed in live in
+[`Examples/Schnorr/SigmaProtocol.lean`](../../Examples/Schnorr/SigmaProtocol.lean).
+
+### Commitment schemes (`CommitmentScheme`)
+
+```lean
+structure CommitmentScheme (PP M C D : Type) where
+  setup : ProbComp PP
+  commit (pp : PP) (m : M) : ProbComp (C × D)
+  verify (pp : PP) (m : M) (c : C) (d : D) : Bool
+```
+
+Defined in
+[`VCVio/CryptoFoundations/CommitmentScheme.lean`](../../VCVio/CryptoFoundations/CommitmentScheme.lean)
+together with `PerfectlyCorrect`, `PerfectlyHiding`, `hidingExp`,
+`bindingExp`, and `extractExp`. The standard-model `binding ≤ keyed-CR ≤
+birthday` bridge from a `KeyedHashFamily` lives in
+[`VCVio/CryptoFoundations/HashCommitment.lean`](../../VCVio/CryptoFoundations/HashCommitment.lean)
+as `bindingAdvantage_toCommitment_le_keyedCRAdvantage`.
+
+For an end-to-end ROM proof of binding, extractability, and hiding for the
+textbook `Commit(m) = (H(m, s), s)` scheme — exercising `cachingOracle`,
+`loggingOracle`, the birthday bound, and identical-until-bad — see
+[`Examples/CommitmentScheme.lean`](../../Examples/CommitmentScheme.lean)
+and the
+[ROM commitment scheme walkthrough](end-to-end-examples.md#rom-commitment-scheme).
+
 ### Sigma protocols (`SigmaProtocol`)
 
 ```lean

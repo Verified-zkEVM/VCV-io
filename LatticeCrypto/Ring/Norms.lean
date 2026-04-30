@@ -159,6 +159,12 @@ theorem neg_le_and_le_of_natAbs_le {z : ℤ} {b : ℕ}
     (hbound : z.natAbs ≤ b) : -(b : ℤ) ≤ z ∧ z ≤ b := by
   constructor <;> omega
 
+/-- Lower and upper integer bounds yield a `natAbs` bound. Inverse of
+`neg_le_and_le_of_natAbs_le`. -/
+theorem natAbs_le_of_neg_le_and_le {z : ℤ} {b : ℕ}
+    (hl : -(b : ℤ) ≤ z) (hu : z ≤ b) : z.natAbs ≤ b := by
+  omega
+
 /-- The canonical centered coefficient view for `ZMod q`. -/
 def zmodCenteredCoeffView (q : ℕ) [NeZero q] : CenteredCoeffView (ZMod q) where
   repr := centeredRepr
