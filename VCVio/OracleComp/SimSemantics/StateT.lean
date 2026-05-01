@@ -93,7 +93,7 @@ def flattenStateT {ι : Type _} {spec : OracleSpec ι}
     ((impl.liftTarget (StateT σ (StateT τ m))).flattenStateT t).run (s, q) =
       (fun y : spec.Range t × τ => (y.1, (s, y.2))) <$> (impl t).run q := by
   simp [flattenStateT, QueryImpl.liftTarget_apply, StateT.run_bind,
-    StateT.run_monadLift, map_eq_bind_pure_comp]
+    StateT.run_monadLift, monad_norm]
 
 /-- Indexed version of `QueryImpl.parallelStateT`. Note that `m` cannot vary with `t`.
 dtumad: The `Function.update` thing is nice but forces `DecidableEq`. -/

@@ -353,7 +353,7 @@ private def cmaRealSourceFullSum_postKeygenOrnament
       rcases cp with ⟨c, prv⟩
       cases hcache : cache (m, c) with
       | some ch =>
-          simp [fs_simp, map_eq_bind_pure_comp]
+          simp [fs_simp, monad_norm]
       | none =>
           simp [fs_simp, uniformSampleImpl, StateT.run_modifyGet, monad_norm]
 
@@ -377,7 +377,7 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
           (StateT (List M) (StateT (RoCache M Commit Chal) ProbComp))).flattenStateT
         (.inl n)).run (signed, cache)
     rw [QueryImpl.flattenStateT_liftTarget_apply_run]
-    simp [fsBaseImpl, unifFwdImpl, map_eq_bind_pure_comp]
+    simp [fsBaseImpl, unifFwdImpl, monad_norm]
   · ext st
     rcases st with ⟨signed, cache⟩
     conv_lhs =>
@@ -389,7 +389,7 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
           (StateT (List M) (StateT (RoCache M Commit Chal) ProbComp))).flattenStateT
         (.inr mc)).run (signed, cache)
     rw [QueryImpl.flattenStateT_liftTarget_apply_run]
-    simp [fsBaseImpl, unifFwdImpl, randomOracle, map_eq_bind_pure_comp]
+    simp [fsBaseImpl, unifFwdImpl, randomOracle, monad_norm]
   · ext st
     rcases st with ⟨signed, cache⟩
     simp [postKeygenAppendProdImpl, postKeygenAppendImpl, monad_norm,
@@ -621,12 +621,12 @@ private def cmaRealAppendOrnament :
   project_step := fun t st _ => by
     rcases st with ⟨⟨signed, cache, keypair⟩, bad⟩
     rcases t with (n | mc) | m
-    · simp [fs_simp, QueryImpl.extendStateLeft, map_eq_bind_pure_comp]
+    · simp [fs_simp, QueryImpl.extendStateLeft, monad_norm]
     · cases hcache : cache mc with
       | some ch =>
-          simp [fs_simp, QueryImpl.extendStateLeft, hcache, map_eq_bind_pure_comp]
+          simp [fs_simp, QueryImpl.extendStateLeft, hcache, monad_norm]
       | none =>
-          simp [fs_simp, QueryImpl.extendStateLeft, hcache, map_eq_bind_pure_comp]
+          simp [fs_simp, QueryImpl.extendStateLeft, hcache, monad_norm]
     · cases hkp : keypair with
       | none =>
           simp only [add_apply_inr, fs_simp, monad_norm, QueryImpl.extendStateLeft,
@@ -636,7 +636,7 @@ private def cmaRealAppendOrnament :
           rcases cp with ⟨c, prv⟩
           cases hcache : cache (m, c) with
           | some ch =>
-              simp [fs_simp, map_eq_bind_pure_comp]
+              simp [fs_simp, monad_norm]
           | none =>
               simp [fs_simp, monad_norm]
       | some ps =>
