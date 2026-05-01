@@ -207,8 +207,8 @@ theorem map_run_withLogging_inputs_eq_run_appendInputLog
       | inr t' =>
           simp only [OracleSpec.add_apply_inr, simulateQ_bind, simulateQ_query,
             OracleQuery.input_query, OracleQuery.cont_query, add_apply_inr, withLogging_apply,
-            bind_pure_comp, map_bind, Functor.map_map, id_eq, bind_assoc, bind_map_left,
-            WriterT.run_bind', WriterT.run_liftM, List.empty_eq, WriterT.run_tell, pure_bind,
+            bind_pure_comp, map_bind, Functor.map_map, id_eq, monad_norm, bind_map_left,
+            WriterT.run_bind', WriterT.run_liftM, List.empty_eq, WriterT.run_tell,
             List.cons_append, List.nil_append, Prod.map_fst, Prod.map_snd, List.map_cons,
             appendInputLog_apply, StateT.run_bind, StateT.run_get, StateT.run_monadLift,
             monadLift_self, StateT.run_set]

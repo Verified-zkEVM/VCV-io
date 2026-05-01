@@ -250,8 +250,8 @@ lemma verify_eq_true_of_cached
       fun c => pure (ids.verify pk w c z)).run cache) = _
   rw [StateT.run_bind]
   simp only [randomOracle, QueryImpl.withCaching_apply,
-    StateT.run_bind, StateT.run_get, pure_bind, hcached,
-    StateT.run_pure, map_pure, hverify]
+    StateT.run_bind, StateT.run_get, monad_norm, hcached,
+    StateT.run_pure, hverify, Function.comp_apply]
 
 /-- Correctness of the Fiat-Shamir with aborts signature scheme: the canonical
 keygen-sign-verify execution succeeds with probability at least `1 - δ`, where `δ` bounds
