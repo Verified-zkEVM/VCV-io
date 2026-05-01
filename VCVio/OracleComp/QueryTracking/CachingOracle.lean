@@ -219,8 +219,7 @@ lemma withCaching_cache_le [LawfulMonad m] [HasEvalSet m]
     simp only [ht, StateT.run_bind] at hz
     have hlift : (liftM (so t) : StateT spec.QueryCache m (spec.Range t)).run cache₀ =
         so t >>= fun v => pure (v, cache₀) := rfl
-    rw [hlift, bind_assoc] at hz
-    simp only [monad_norm] at hz
+    simp only [hlift, monad_norm] at hz
     rcases (mem_support_bind_iff _ _ _).1 hz with ⟨v, _, hmod⟩
     have : (modifyGet fun c => (v, QueryCache.cacheQuery c t v) :
         StateT spec.QueryCache m (spec.Range t)).run cache₀ =
@@ -570,7 +569,7 @@ theorem cachingOracle_query_caches (t : spec.Domain)
         StateT (QueryCache spec) (OracleComp spec) _).run cache₀ =
         ((liftM (query t) : OracleComp _ _) >>= fun u =>
           pure (u, cache₀)) from rfl] at hmem
-    rw [bind_assoc] at hmem; simp only [pure_bind] at hmem
+    simp only [monad_norm] at hmem
     rw [support_bind] at hmem; simp only [Set.mem_iUnion] at hmem
     obtain ⟨u, _, hmem⟩ := hmem
     simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,

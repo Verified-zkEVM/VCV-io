@@ -458,7 +458,7 @@ private theorem preservesInv_layered
           (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run s₀) >>= fun us =>
             (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (oa us.1)).run us.2 := by
         simp [simulateQ_bind, simulateQ_query, StateT.run_bind,
-          map_eq_bind_pure_comp, OracleQuery.cont_query, OracleQuery.input_query]
+          monad_norm, OracleQuery.cont_query, OracleQuery.input_query]
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at hz
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at hz
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
@@ -569,7 +569,7 @@ private theorem queryLog_cache_outer_lockstep
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀)) >>= fun us =>
               (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (oa us.1)).run us.2 := by
         simp [simulateQ_bind, simulateQ_query, StateT.run_bind,
-          map_eq_bind_pure_comp, OracleQuery.cont_query, OracleQuery.input_query]
+          monad_norm, OracleQuery.cont_query, OracleQuery.input_query]
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at hz
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at hz
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
@@ -743,7 +743,7 @@ private theorem queryLog_extends_l₀
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀)) >>= fun us =>
               (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (oa us.1)).run us.2 := by
         simp [simulateQ_bind, simulateQ_query, StateT.run_bind,
-          map_eq_bind_pure_comp, OracleQuery.cont_query, OracleQuery.input_query]
+          monad_norm, OracleQuery.cont_query, OracleQuery.input_query]
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at h
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at h
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := h
@@ -876,7 +876,7 @@ private theorem inner_prefix_det
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀)) >>= fun us =>
               (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (oa us.1)).run us.2 := by
         simp [simulateQ_bind, simulateQ_query, StateT.run_bind,
-          map_eq_bind_pure_comp, OracleQuery.cont_query, OracleQuery.input_query]
+          monad_norm, OracleQuery.cont_query, OracleQuery.input_query]
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at h₁ h₂
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at h₁ h₂
       obtain ⟨us_w₁, hus_w₁, pw₁, hpw₁, hz_eq₁⟩ := h₁
@@ -1109,7 +1109,7 @@ private theorem inner_prefix_det_one_more_inr
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀)) >>= fun us =>
               (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (oa us.1)).run us.2 := by
         simp [simulateQ_bind, simulateQ_query, StateT.run_bind,
-          map_eq_bind_pure_comp, OracleQuery.cont_query, OracleQuery.input_query]
+          monad_norm, OracleQuery.cont_query, OracleQuery.input_query]
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at h₁ h₂
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at h₁ h₂
       obtain ⟨us_w₁, hus_w₁, pw₁, hpw₁, hz_eq₁⟩ := h₁

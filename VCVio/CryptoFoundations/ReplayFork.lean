@@ -2331,7 +2331,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
               rw [replayOracle_run_nextEntry_none t t
                 ({stR with replacement := u} : ReplayForkState spec t)
                 h_Rcon h_Rmis hR_next]
-              simp only [bind_assoc, pure_bind, map_bind]
+              simp only [monad_norm]
               refine bind_congr fun u' => ?_
               exact fst_map_simulateQ_replayOracle_of_live t (oa u')
                 ((({stR with replacement := u}).markMismatch).noteObserved t u')
@@ -2359,7 +2359,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
               rw [replayOracle_run_mismatch_ne t₀ t t₀ u'₀
                 ({stL with replacement := u} : ReplayForkState spec t₀)
                 h_Lcon h_Lmis hL_next h_tt₀]
-              simp only [bind_assoc, pure_bind, map_bind]
+              simp only [monad_norm]
               refine bind_congr fun u' => ?_
               exact fst_map_simulateQ_replayOracle_of_live t₀ (oa u')
                 ((({stL with replacement := u}).markMismatch).noteObserved t u')
@@ -2374,7 +2374,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
               rw [replayOracle_run_nextEntry_none t₀ t
                 ({stR with replacement := u} : ReplayForkState spec t₀)
                 h_Rcon h_Rmis hR_next]
-              simp only [bind_assoc, pure_bind, map_bind]
+              simp only [monad_norm]
               refine bind_congr fun u' => ?_
               exact fst_map_simulateQ_replayOracle_of_live t₀ (oa u')
                 ((({stR with replacement := u}).markMismatch).noteObserved t u')
@@ -2487,7 +2487,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
               rw [replayOracle_run_mismatch_ne t₀ t t₀ u'₀
                 ({stL with replacement := u} : ReplayForkState spec t₀)
                 h_Lcon h_Lmis hL_next h_tt₀]
-              simp only [bind_assoc, pure_bind, map_bind]
+              simp only [monad_norm]
               refine bind_congr fun u' => ?_
               exact fst_map_simulateQ_replayOracle_of_live t₀ (oa u')
                 ((({stL with replacement := u}).markMismatch).noteObserved t u')
@@ -2502,7 +2502,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
               rw [replayOracle_run_mismatch_ne t₀ t t₀ u'₀
                 ({stR with replacement := u} : ReplayForkState spec t₀)
                 h_Rcon h_Rmis hR_next h_tt₀]
-              simp only [bind_assoc, pure_bind, map_bind]
+              simp only [monad_norm]
               refine bind_congr fun u' => ?_
               exact fst_map_simulateQ_replayOracle_of_live t₀ (oa u')
                 ((({stR with replacement := u}).markMismatch).noteObserved t u')
@@ -3434,7 +3434,7 @@ private lemma sq_probOutput_main_le_noGuardReplayComp
         some <$> ((cf p.1, ·) <$> (cf <$> Prod.fst <$> (do
           let u ← liftComp ($ᵗ spec.Range i) spec
           replayRunWithTraceValue main i p.2 ↑s u))) := by
-      simp [map_eq_bind_pure_comp, Function.comp]
+        simp [monad_norm]
     rw [hinner, probOutput_some_map_some, probOutput_prod_mk_snd_map]
     change (if (some s, some s).1 = cf p.1 then
         Pr[= (some s, some s).2 | (cf <$> Prod.fst <$> (do

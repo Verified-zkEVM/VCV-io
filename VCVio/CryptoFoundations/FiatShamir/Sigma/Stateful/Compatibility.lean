@@ -170,7 +170,7 @@ theorem statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage
     statefulPostKeygenFreshAdvantage
   rw [cmaRealRun_eq_keygen_bind (σ := σ) (hr := hr) (M := M)
     (Commit := Commit) (Chal := Chal) (Resp := Resp) adv]
-  simp only [bind_assoc]
+  simp only [monad_norm]
   apply congrArg (fun p => Pr[= true | p])
   apply bind_congr
   intro ps
@@ -179,7 +179,6 @@ theorem statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     adv ps.1 ((([] : List M), (∅ : RoCache M Commit Chal),
       (some (ps.1, ps.2) : Option (Stmt × Wit))), false)]
-  simp
 
 /-! ## Public WriterT compatibility -/
 
@@ -346,18 +345,17 @@ private def cmaRealSourceFullSum_postKeygenOrnament
       | none =>
           simp [fs_simp, hcache, uniformSampleImpl]
     · simp only [add_apply_inr, fs_simp, bind_pure_comp,
-        map_eq_bind_pure_comp, Prod.mk.eta, StateT.run_mk, bind_assoc,
+        map_eq_bind_pure_comp, Prod.mk.eta, StateT.run_mk, monad_norm,
         FiatShamir, QueryImpl.toHasQuery_query,
         randomOracle, QueryImpl.withCaching_apply, StateT.run_bind, StateT.run_monadLift,
-        monadLift_self, StateT.run_get, Function.comp_apply, StateT.run_pure, pure_bind]
+        monadLift_self, StateT.run_get, Function.comp_apply]
       refine bind_congr (m := ProbComp) fun cp => ?_
       rcases cp with ⟨c, prv⟩
       cases hcache : cache (m, c) with
       | some ch =>
           simp [fs_simp, map_eq_bind_pure_comp]
       | none =>
-          simp [fs_simp, uniformSampleImpl, StateT.run_modifyGet,
-            map_eq_bind_pure_comp, bind_assoc]
+          simp [fs_simp, uniformSampleImpl, StateT.run_modifyGet, monad_norm]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma postKeygenAppendProdImpl_eq_flattenStateT
@@ -394,10 +392,9 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
     simp [fsBaseImpl, unifFwdImpl, randomOracle, map_eq_bind_pure_comp]
   · ext st
     rcases st with ⟨signed, cache⟩
-    simp [postKeygenAppendProdImpl, postKeygenAppendImpl,
+    simp [postKeygenAppendProdImpl, postKeygenAppendImpl, monad_norm,
       QueryImpl.flattenStateT, QueryImpl.add_apply_inr, QueryImpl.appendInputLog_apply,
-      StateT.run_bind, StateT.run_get, StateT.run_set, StateT.run_monadLift,
-      map_eq_bind_pure_comp, bind_assoc]
+      StateT.run_bind, StateT.run_get, StateT.run_set, StateT.run_monadLift]
 
 /-- Fixed-key public post-keygen experiment after WriterT logging has been
 converted to an input log. This is split at the candidate/log boundary. -/
@@ -582,8 +579,7 @@ private lemma cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
     ext st
     rcases st with ⟨signed, st⟩
     simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase,
-      QueryImpl.flattenStateT, StateT.run_bind, map_eq_bind_pure_comp,
-      bind_assoc]
+      QueryImpl.flattenStateT, StateT.run_bind, monad_norm]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
@@ -633,9 +629,8 @@ private def cmaRealAppendOrnament :
           simp [fs_simp, QueryImpl.extendStateLeft, hcache, map_eq_bind_pure_comp]
     · cases hkp : keypair with
       | none =>
-          simp only [add_apply_inr, fs_simp,
-            QueryImpl.extendStateLeft, bind_pure_comp, map_eq_bind_pure_comp,
-            Prod.mk.eta, StateT.run_mk, bind_assoc]
+          simp only [add_apply_inr, fs_simp, monad_norm, QueryImpl.extendStateLeft,
+            Prod.mk.eta, StateT.run_mk]
           refine bind_congr (m := ProbComp) fun ps => ?_
           refine bind_congr (m := ProbComp) fun cp => ?_
           rcases cp with ⟨c, prv⟩
@@ -646,9 +641,8 @@ private def cmaRealAppendOrnament :
               simp [fs_simp, monad_norm]
       | some ps =>
           rcases ps with ⟨pk, sk⟩
-          simp only [add_apply_inr, fs_simp,
-            QueryImpl.extendStateLeft, bind_pure_comp, map_eq_bind_pure_comp,
-            Prod.mk.eta, StateT.run_mk, bind_assoc]
+          simp only [add_apply_inr, fs_simp, monad_norm, QueryImpl.extendStateLeft,
+            Prod.mk.eta, StateT.run_mk]
           refine bind_congr (m := ProbComp) fun cp => ?_
           rcases cp with ⟨c, prv⟩
           cases hcache : cache (m, c) with
@@ -743,8 +737,7 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
   simp only [StateT.run'_eq, simulateQ_bind, simulateQ_query,
     OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind,
     bind_assoc]
-  simp only [postKeygenAppendImpl, StateT.run_pure,
-    bind_pure_comp, map_eq_bind_pure_comp, bind_assoc, Function.comp_apply, pure_bind,
+  simp only [postKeygenAppendImpl, StateT.run_pure, monad_norm,
     cmaSignLogImpl, bind_pure, CompTriple.comp_eq, StateT.run_monadLift, monadLift_self,
     simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
     cmaReal, Prod.mk.eta, simulateQ_pure, cmaInit, StateT.run_bind, StateT.run_mk]

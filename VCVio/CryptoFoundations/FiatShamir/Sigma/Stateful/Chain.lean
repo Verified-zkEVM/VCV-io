@@ -1135,7 +1135,7 @@ private lemma forkVerifyFreshComp_prob_true_le_finalQueryTrace
                           (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
                   simp only [forkFinalQueryTrace, Fork.roImpl, StateT.run_bind,
                     StateT.run_get, hlive, StateT.run_monadLift, StateT.run_set,
-                    StateT.run_pure, monadLift_self, bind_assoc, pure_bind]
+                    StateT.run_pure, monadLift_self, monad_norm]
                   change
                     Pr[fun ch : Chal => σ.verify pk c ch resp = true |
                       (((Fork.wrappedSpec Chal).query (Sum.inr ())) :
@@ -1709,8 +1709,7 @@ private lemma forkLogged_verify_prob_true_le_forkPoint_run
               pure ((Fork.forkPoint (M := M) (Commit := Commit)
                 (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
           simp [finalRun, loggedRun, forkLoggedImpl, forkInitialState,
-            forkInitialBaseState, map_eq_bind_pure_comp, bind_assoc,
-            forkFinalQueryTrace]
+            forkInitialBaseState, monad_norm, forkFinalQueryTrace]
       _ =
         Pr[= true |
           (simulateQ (forkBaseImpl (M := M) (Commit := Commit)

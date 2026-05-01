@@ -395,7 +395,7 @@ lemma probOutput_generateSeed_bind_map_simulateQ
       f <$> Prod.fst <$> (simulateQ seededOracle oa).run seed : OracleComp spec₀ β)] =
       Pr[= y | f <$> oa] := by
   -- Reduce `map` to `bind` + `pure`, then apply the `bind` lemma.
-  simpa [map_eq_bind_pure_comp, Function.comp] using
+  simpa [monad_norm, Function.comp] using
     (probOutput_generateSeed_bind_simulateQ_bind (qc := qc) (js := js)
       (oa := oa) (ob := fun x => pure (f x)) (y := y))
 
@@ -531,8 +531,7 @@ lemma evalDist_liftComp_replicate_uniformSample_bind_simulateQ_run'_addValues
   | zero => intro σ; simp [replicate_zero, QuerySeed.addValues_nil]
   | succ n ih =>
     intro σ
-    simp only [replicate_succ, seq_eq_bind_map, map_eq_bind_pure_comp,
-      liftComp_bind, liftComp_pure, bind_assoc, Function.comp, pure_bind]
+    simp only [replicate_succ, monad_norm, liftComp_bind, liftComp_pure, Function.comp]
     have hrew : (do
         let u ← liftComp ($ᵗ spec₀.Range i) spec₀
         let us ← liftComp (replicate n ($ᵗ spec₀.Range i)) spec₀

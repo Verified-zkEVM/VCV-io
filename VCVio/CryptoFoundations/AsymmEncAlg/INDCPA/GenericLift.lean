@@ -565,10 +565,10 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
                else encAlg'.IND_CPA_LR_hybridGame adversary k
       pure (bit == z)]
   cases bit <;> dsimp <;>
-    simp only [IND_CPA_LR_hybridGame, bind_assoc] <;>
+    simp only [IND_CPA_LR_hybridGame, monad_norm] <;>
     (refine probOutput_bind_congr' encAlg'.keygen x ?_) <;>
     intro pk_sk <;>
-    simp only [IND_CPA_stepAdversary, bind_assoc] <;>
+    simp only [IND_CPA_stepAdversary, monad_norm] <;>
     (change (𝒟[_]) x = (𝒟[_]) x) <;>
     congr 1
   · rename_i pk_sk

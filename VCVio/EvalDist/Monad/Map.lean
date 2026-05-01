@@ -77,7 +77,7 @@ lemma probOutput_map_eq_tsum_subtype (y : β) :
 
 lemma probOutput_map_eq_tsum (y : β) :
     Pr[= y | f <$> mx] = ∑' x, Pr[= x | mx] * Pr[= y | (pure (f x) : m β)] := by
-  simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum, Function.comp_apply]
+  simp [monad_norm, probOutput_bind_eq_tsum]
 
 lemma probOutput_map_eq_tsum_subtype_ite [DecidableEq β] (y : β) :
     Pr[= y | f <$> mx] = ∑' x : support mx, if y = f x then Pr[= x | mx] else 0 := by
@@ -154,13 +154,13 @@ lemma finSupport_map_const [DecidableEq α] [DecidableEq β] [HasEvalFinset m]
 lemma probOutput_map_const (y' : β) :
     Pr[= y' | (fun _ => y) <$> mx] =
       (1 - Pr[⊥ | mx]) * Pr[= y' | (pure y : m β)] := by
-  rw [map_eq_bind_pure_comp, Function.comp_def, probOutput_bind_const]
+  simp only [monad_norm, Function.comp_def, probOutput_bind_const]
 
 @[simp, aesop safe norm, grind =_]
 lemma probEvent_map_const (p : β → Prop) :
     Pr[ p | (fun _ => y) <$> mx] =
       (1 - Pr[⊥ | mx]) * Pr[ p | (pure y : m β)] := by
-  rw [map_eq_bind_pure_comp, Function.comp_def, probEvent_bind_const]
+  simp only [monad_norm, Function.comp_def, probEvent_bind_const]
 
 @[simp, aesop safe norm]
 lemma probEvent_map_const' (p : β → Prop) [DecidablePred p] :
