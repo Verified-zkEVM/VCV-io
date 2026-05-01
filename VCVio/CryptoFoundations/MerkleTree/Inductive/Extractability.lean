@@ -111,18 +111,20 @@ def extractability_game
     (committingAdv : OracleComp (spec α)
         (α × AuxState))
     (openingAdv : AuxState →
-        OracleComp (spec α) (SkeletonLeafIndex s × α × List α)) :
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
     OracleComp (spec α)
-      (α × AuxState × SkeletonLeafIndex s × α × List α ×
-       FullData (Option α) s × List (Option α) × Bool) :=
+      (α × AuxState ×
+        ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
+         FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) :=
   do
     let ((root, aux), queryLog) ← committingAdv.withQueryLog
     let extractedTree := extractor s queryLog root
-    let (idx, leaf, proof) ← openingAdv aux
+    let ⟨idx, leaf, proof⟩ ← openingAdv aux
     let extractedProof := generateProof extractedTree idx
     let verifiedOpt ← (verifyProof idx leaf root proof).run
     let verified := verifiedOpt.isSome
-    return (root, aux, idx, leaf, proof, extractedTree, extractedProof, verified)
+    return (root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, verified⟩)
 
 
 
@@ -131,12 +133,13 @@ The event that the adversary wins the extractability game:
 verification passes but the extracted leaf or proof does not match.
 -/
 def adversary_wins_extractability_game_event {α : Type} [BEq α] {s : Skeleton} {AuxState : Type} :
-    α × AuxState × SkeletonLeafIndex s × α × List α ×
-    FullData (Option α) s × List (Option α) × Bool → Prop
-  | (_, _, idx, leaf, proof, extractedTree, extractedProof, verified) =>
+    α × AuxState ×
+      ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
+       FullData (Option α) s × List.Vector (Option α) idx.depth × Bool) → Prop
+  | (_, _, ⟨idx, leaf, proof, extractedTree, extractedProof, verified⟩) =>
     verified ∧
     (not (leaf == extractedTree.get idx.toNodeIndex)
-    ∨ not (proof.map (Option.some) == extractedProof))
+    ∨ not (proof.toList.map Option.some == extractedProof.toList))
 
 /--
 The event that the adversary wins the extractability game with logging:
@@ -145,8 +148,10 @@ The query log is ignored for the win condition.
 -/
 def adversary_wins_extractability_game_with_logging_event
     {α : Type} [BEq α] {s : Skeleton} {AuxState : Type} :
-    (α × AuxState × SkeletonLeafIndex s × α × List α ×
-     FullData (Option α) s × List (Option α) × Bool) × (spec α).QueryLog → Prop :=
+    (α × AuxState ×
+       ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
+        FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) ×
+    (spec α).QueryLog → Prop :=
   adversary_wins_extractability_game_event ∘ Prod.fst
 
 /--
@@ -169,10 +174,13 @@ theorem extractability_game_IsTotalQueryBound
     [DecidableEq α] [SampleableType α] [Fintype α] [OracleSpec.Fintype (spec α)]
     {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState → OracleComp (spec α) (SkeletonLeafIndex s × α × List α))
+    (openingAdv : AuxState →
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
     (qb : ℕ)
     (h : IsTotalQueryBound
-        (do let (root, aux) ← committingAdv; let (idx, leaf, proof) ← openingAdv aux; pure ())
+        (do let (root, aux) ← committingAdv;
+            let ⟨idx, leaf, proof⟩ ← openingAdv aux; pure ())
         qb) :
     IsTotalQueryBound
         ((extractability_game committingAdv openingAdv))
@@ -184,7 +192,9 @@ theorem evalDist_extractability_game_eq
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited] {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState → OracleComp (spec α) (SkeletonLeafIndex s × α × List α)) :
+    (openingAdv : AuxState →
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
   evalDist (extractability_game committingAdv openingAdv) =
     evalDist (Prod.fst <$> (extractability_game committingAdv openingAdv).withQueryLog) := by
   congr 1
@@ -222,23 +232,20 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     (committingAdv : OracleComp (spec α)
         (α × AuxState))
     (openingAdv : AuxState →
-        OracleComp (spec α) (SkeletonLeafIndex s × α × List α))
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
     (qb : ℕ)
     (h_IsQueryBound_qb :
       IsTotalQueryBound
         (do
           let (root, aux) ← committingAdv
-          let (idx, leaf, proof) ← openingAdv aux
+          let ⟨idx, leaf, proof⟩ ← openingAdv aux
           pure ())
         qb)
     (h_le_qb : 4 * s.leafCount + 1 ≤ qb)
           :
     Pr[adversary_wins_extractability_game_event |
-      do
-        let (root, aux, idx, leaf, proof, extractedTree, extractedProof, verified) ←
-          extractability_game committingAdv openingAdv
-        return (root, aux, idx, leaf, proof, extractedTree, extractedProof, verified)
-      ] ≤
+        extractability_game committingAdv openingAdv] ≤
         ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α)
         + 2 * (s.depth + 1) * s.leafCount / (Fintype.card α)
     := by
@@ -248,8 +255,6 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
           (extractability_game committingAdv openingAdv).withQueryLog] := by
       simp only [adversary_wins_extractability_game_with_logging_event]
       rw [← probEvent_withQueryLog]
-      congr 1
-      simp [bind_pure]
 
     -- The bad event happens only when there is a collision event
     -- or the bad event happens with no collision
@@ -289,7 +294,8 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
           (extractability_game committingAdv openingAdv).withQueryLog] ≤
             2 * (s.depth + 1) * s.leafCount / (Fintype.card α : ENNReal) := by
         sorry
-      gcongr <;> first | exact hno_coll | norm_cast
+      gcongr
+      norm_cast
 
   /-
   Now we can break down the bad event into smaller events
