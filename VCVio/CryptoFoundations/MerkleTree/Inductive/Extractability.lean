@@ -201,6 +201,73 @@ theorem evalDist_extractability_game_eq
   exact (loggingOracle.fst_map_run_simulateQ _).symm
 
 /--
+**No-collision lucky-guess bound.** Conditional on the combined query log of
+`extractability_game` containing no collision, the adversary still wins only by a
+"lucky guess": the committer publishes a `root` it never computed via the random
+oracle, and the verifier's hash chain coincidentally produces that `root` at the top.
+The total probability of this joint event is bounded by
+`2 * (s.depth + 1) * s.leafCount / |α|`.
+-/
+theorem extractability_game_noCollision_wins_le
+    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
+    [(spec α).Fintype] [(spec α).Inhabited]
+    {s : Skeleton} {AuxState : Type}
+    (committingAdv : OracleComp (spec α) (α × AuxState))
+    (openingAdv : AuxState →
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
+    Pr[fun (vals, log) =>
+        ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
+      (extractability_game committingAdv openingAdv).withQueryLog] ≤
+        2 * (s.depth + 1) * s.leafCount / (Fintype.card α : ENNReal) := by
+  /-
+  Proof outline.
+
+  Decompose the joint event by whether the committed `root` appears as the
+  output of any hash query in committingAdv's log:
+
+  Case A — `root ∈ committingLog.outputs`.
+    Under no-collision, committingAdv's query producing `root` is the *unique*
+    combined-log query producing it, so any chain reaching `root` must use that
+    exact input pair. Inducting down the tree from `root`, the verifier's level-`k`
+    query input must agree with committingAdv's level-`k` query (for k = s.depth,
+    …, 1): if it did not, the verifier's level-`k` output would either equal the
+    extracted node value at that position (forcing input agreement by no-collision)
+    or differ (breaking the chain to `root`). By induction the verifier's chain
+    traces exactly the path `extractor` builds, so opened (leaf, proof) equals
+    extracted (leaf, proof) and the win condition fails. Hence
+    `Pr[case A ∧ no-collision ∧ win] = 0`.
+
+  Case B — `root ∉ committingLog.outputs`.
+    Then `extractor s queryLog root` returns the all-`none` extension below the
+    root, so the leaf-mismatch disjunct of `adversary_wins_extractability_game_event`
+    is automatic whenever `idx.depth > 0`, reducing the win event to
+    `verified = true`. Verification succeeding requires the random oracle to produce
+    `root` at the verifier's terminal hash query. Since by case hypothesis no prior
+    committingAdv query produced `root`, that terminal output is uniform on `α`
+    (conditional on its input pair being fresh, which no-collision guarantees up to
+    duplicate-query reuse), so it equals `root` with probability `1/|α|` per chain.
+
+  Step 4 (union bound).
+    Sum `1/|α|` over `idx : SkeletonLeafIndex s` (≤ `s.leafCount` choices) and the
+    ≤ `s.depth + 1` levels at which the verifier's chain may "rejoin" committingAdv's
+    tree from below; the factor of `2` absorbs the left/right child direction at
+    each rejoin.
+
+  Formalization sketch.
+    1. Express the event as a finite disjunction over `(idx, k)` with
+       `k : Fin (s.depth + 1)` indexing the deepest level at which the verifier's
+       chain leaves committingAdv's tree.
+    2. For each `(idx, k)`, bound the per-event probability by `1 / |α|` using the
+       random oracle's fresh-output uniform bound (`probOutput_query` /
+       `evalDist_query`).
+    3. Sum via `probEvent_finset_sum_le` and a `Fintype.card`-style cardinality
+       bound on `SkeletonLeafIndex s` (≤ `s.leafCount`) to assemble the stated
+       `2 * (s.depth + 1) * s.leafCount / |α|` bound.
+  -/
+  sorry
+
+/--
 The extractability theorem for Merkle trees.
 
 Adapting from the SNARGs book Lemma 18.5.1:
@@ -289,11 +356,13 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     -- We bound the no-collision bad event probability
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         2 * (s.depth + 1) * s.leafCount / (Fintype.card α) := by
-      have hno_coll : Pr[fun (vals, log) =>
+      have h := extractability_game_noCollision_wins_le committingAdv openingAdv
+        (s := s) (AuxState := AuxState)
+      have h' : Pr[fun (vals, log) =>
             ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
           (extractability_game committingAdv openingAdv).withQueryLog] ≤
             2 * (s.depth + 1) * s.leafCount / (Fintype.card α : ENNReal) := by
-        sorry
+        exact_mod_cast h
       gcongr
       norm_cast
 
