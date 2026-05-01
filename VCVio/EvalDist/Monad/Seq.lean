@@ -36,7 +36,7 @@ lemma mem_support_seq_iff [HasEvalSet m] [LawfulMonad m] (mf : m (α → β)) (m
   simp [seq_eq_bind_map]
 
 @[simp] lemma evalDist_seq [HasEvalSPMF m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
-    𝒟[mf <*> mx] = 𝒟[mf] <*> 𝒟[mx] := by simp [seq_eq_bind_map]
+    𝒟[mf <*> mx] = 𝒟[mf] <*> 𝒟[mx] := by simp [monad_norm]
 
 lemma probOutput_seq_eq_tsum [HasEvalSPMF m] [LawfulMonad m]
     (mf : m (α → β)) (mx : m α) (y : β) :
@@ -164,7 +164,7 @@ lemma evalDist_seq_map [HasEvalSPMF m] :
 lemma probOutput_seq_map_eq_tsum [HasEvalSPMF m]
     (z : γ) : Pr[= z | f <$> mx <*> my] = ∑' (x : α) (y : β),
       Pr[= x | mx] * Pr[= y | my] * Pr[= z | (pure (f x y) : m γ)] := by
-  simp only [map_eq_bind_pure_comp, Function.comp, seq_eq_bind_map, bind_assoc, pure_bind,
+  simp only [monad_norm, Function.comp,
     probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left, mul_assoc]
 
 lemma probOutput_seq_map_eq_tsum_ite [HasEvalSPMF m] [DecidableEq γ]

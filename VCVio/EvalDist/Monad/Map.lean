@@ -27,7 +27,7 @@ open ENNReal
 @[simp, grind =]
 lemma support_map [HasEvalSet m] [LawfulMonad m] (f : α → β) (mx : m α) :
     support (f <$> mx) = f '' support mx := by
-  simp [map_eq_bind_pure_comp]
+  simp [monad_norm]
   aesop
 
 @[simp, grind =]
@@ -38,7 +38,7 @@ lemma finSupport_map [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
 
 @[simp, grind =]
 lemma evalDist_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (f : α → β) :
-    𝒟[f <$> mx] = f <$> (𝒟[mx]) := by simp [map_eq_bind_pure_comp]
+    𝒟[f <$> mx] = f <$> (𝒟[mx]) := by simp [monad_norm]
 
 lemma evalDist_map_eq_of_evalDist_eq [HasEvalSPMF m] [LawfulMonad m]
     {mx my : m α} (h : 𝒟[mx] = 𝒟[my]) (f : α → β) :
@@ -111,7 +111,7 @@ lemma probOutput_map_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α]
 
 @[simp, grind =]
 lemma probFailure_map : Pr[⊥ | f <$> mx] = Pr[⊥ | mx] := by
-  simp [map_eq_bind_pure_comp, probFailure_bind_eq_add_tsum]
+  simp [monad_norm, probFailure_bind_eq_add_tsum]
 
 @[simp, grind =]
 lemma probEvent_map (q : β → Prop) : Pr[ q | f <$> mx] = Pr[ q ∘ f | mx] := by

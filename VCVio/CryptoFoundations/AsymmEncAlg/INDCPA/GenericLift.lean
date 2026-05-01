@@ -577,32 +577,32 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
     dsimp at hresume
     apply evalDist_ext; intro y
     refine Eq.trans ?_ (probOutput_map_eq_of_evalDist_eq hresume (false == ·) y)
-    simp only [map_eq_bind_pure_comp, bind_assoc]
+    simp only [monad_norm]
     refine probOutput_bind_congr'
       ((IND_CPA_stepPrefix (encAlg' := encAlg') pk_sk.1 k (adversary pk_sk.1)).run (∅, 0)) y
       fun ⟨res, _st⟩ => ?_
     cases res with
     | done guess =>
-        dsimp; simp only [pure_bind]
+        dsimp; simp only [monad_norm]
         simp
     | paused _ _ =>
-        dsimp; simp only [map_eq_bind_pure_comp, Function.comp, pure_bind, bind_assoc]
+        dsimp; simp only [monad_norm, Function.comp]
   · rename_i pk_sk
     have hresume := IND_CPA_stepPrefix_resume_eq_hybridLR (encAlg' := encAlg')
       pk_sk.1 k true (adversary pk_sk.1) (∅, 0) (Nat.zero_le k)
     dsimp at hresume
     apply evalDist_ext; intro y
     refine Eq.trans ?_ (probOutput_map_eq_of_evalDist_eq hresume (true == ·) y)
-    simp only [map_eq_bind_pure_comp, bind_assoc]
+    simp only [monad_norm]
     refine probOutput_bind_congr'
       ((IND_CPA_stepPrefix (encAlg' := encAlg') pk_sk.1 k (adversary pk_sk.1)).run (∅, 0)) y
       fun ⟨res, _st⟩ => ?_
     cases res with
     | done guess =>
-        dsimp; simp only [pure_bind]
+        dsimp; simp only [monad_norm]
         simp
     | paused _ _ =>
-        dsimp; simp only [map_eq_bind_pure_comp, Function.comp, pure_bind, bind_assoc]
+        dsimp; simp only [monad_norm, Function.comp]
 
 end MultiQueryToOneTime
 

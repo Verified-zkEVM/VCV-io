@@ -376,7 +376,7 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
     let x ← Prod.fst <$> (simulateQ seededOracle oa).run seed
     ob x) = ((do
     let seed ← liftComp (generateSeed spec₀ qc js) spec₀
-    (simulateQ seededOracle oa).run' seed) >>= ob) from by simp [bind_assoc]]
+    (simulateQ seededOracle oa).run' seed) >>= ob) from by simp [monad_norm]]
   rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   congr 1; ext x
   congr 1

@@ -390,7 +390,7 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     -- unfolds to a concrete ProbComp. Case-split on `s` and apply the uniform-masking lemma.
     cases s with
     | none =>
-        simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
+        simp only [dhTripleRand, StateT.run, monad_norm]
         change 𝒟[do
               let a ← ($ᵗ F)
               let b ← ($ᵗ F)
@@ -411,7 +411,7 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
           (α := F) (β := G) (fun x : F => x • gen) hg m₀ m₁
           (fun y => pure ((b • gen, y), some a))
     | some a =>
-        simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
+        simp only [dhTripleRand, StateT.run, monad_norm]
         change 𝒟[do
               let b ← ($ᵗ F)
               let c ← ($ᵗ F)

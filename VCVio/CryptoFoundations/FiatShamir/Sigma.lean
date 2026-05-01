@@ -507,7 +507,7 @@ theorem perfectlyCorrect [SampleableType Chal]
         StateT.run_get, pure_bind, uniformSampleImpl, bind_assoc, map_bind,
         liftM, MonadLiftT.monadLift,
         MonadLift.monadLift, StateT.run_lift, hmod]
-    simp only [bind_assoc, pure_bind]
+    simp only [monad_norm]
     simp_rw [hpeel, hro_miss, hpeel]
     have hro_hit : ∀ {β : Type} (q : M × Commit) (r : Chal)
         (rest : Chal → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β),

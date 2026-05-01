@@ -75,7 +75,7 @@ private lemma isRollBound_map_aux (oa : FreeM P α) (f : α → β)
   | pure x => intro b; exact ⟨fun _ => trivial, fun _ => trivial⟩
   | roll a r ih =>
     intro b
-    simp only [map_eq_bind_pure_comp, Function.comp_def, monad_bind_def, bind_roll]
+    simp only [monad_norm, Function.comp_def, monad_bind_def, bind_roll]
     rw [isRollBound_roll_iff, isRollBound_roll_iff]
     exact and_congr_right fun _ => forall_congr' fun y => ih y
 

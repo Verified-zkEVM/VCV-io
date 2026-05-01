@@ -142,7 +142,7 @@ lemma allPathsSatisfy_bind_iff
   | pure x =>
       simp
   | query_bind q oa ih =>
-      simp only [bind_assoc, OracleComp.allPathsSatisfy_query_bind, ih]
+      simp only [monad_norm, OracleComp.allPathsSatisfy_query_bind, ih]
 
 /-- A bind satisfies an existential path property exactly when either the first computation
 already satisfies it on some path, or one reachable continuation does. -/
@@ -159,7 +159,7 @@ lemma somePathSatisfies_bind_iff
   | pure x =>
       simp
   | query_bind q oa ih =>
-      simp only [bind_assoc, OracleComp.somePathSatisfies_query_bind, ih]
+      simp only [monad_norm, OracleComp.somePathSatisfies_query_bind, ih]
 
 /-- Output-only specialization of [`OracleComp.allPathsSatisfy_bind_iff`]. -/
 @[simp]

@@ -271,9 +271,9 @@ private lemma cmaRealSourceFullSum_sign_run_some
   rcases cp with ⟨c, prv⟩
   cases hcache : cache (m, c) with
   | some ch =>
-      simp [map_eq_bind_pure_comp]
+      simp [monad_norm]
   | none =>
-      simp [map_eq_bind_pure_comp]
+      simp [monad_norm]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private def cmaRealSourceFullSum_postKeygenOrnament
@@ -460,7 +460,7 @@ private lemma postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run
         (fun z : α × (List M × RoCache M Commit Chal) => ((z.1, z.2.1), z.2.2)) <$>
           (simulateQ impl.flattenStateT oa).run (signed, cache) := by
         rw [hflat]
-        simp [map_eq_bind_pure_comp, bind_assoc]
+        simp [monad_norm]
     _ =
         (fun z : α × CmaState M Commit Chal Stmt Wit =>
           ((z.1, z.2.1.1), z.2.1.2.1)) <$>
@@ -643,7 +643,7 @@ private def cmaRealAppendOrnament :
           | some ch =>
               simp [fs_simp, map_eq_bind_pure_comp]
           | none =>
-              simp [fs_simp, map_eq_bind_pure_comp, bind_assoc]
+              simp [fs_simp, monad_norm]
       | some ps =>
           rcases ps with ⟨pk, sk⟩
           simp only [add_apply_inr, fs_simp,
@@ -653,9 +653,9 @@ private def cmaRealAppendOrnament :
           rcases cp with ⟨c, prv⟩
           cases hcache : cache (m, c) with
           | some ch =>
-              simp [fs_simp, map_eq_bind_pure_comp, bind_assoc]
+              simp [fs_simp, monad_norm]
           | none =>
-              simp [fs_simp, map_eq_bind_pure_comp, bind_assoc]
+              simp [fs_simp, monad_norm]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run
@@ -757,7 +757,7 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
     (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
     (Resp := Resp) (oa := adv.main ps.1) ps.1 ps.2
     ([] : List M) (∅ : RoCache M Commit Chal)]
-  simp only [Prod.mk.eta, map_eq_bind_pure_comp, bind_assoc, Function.comp_apply, pure_bind]
+  simp only [Prod.mk.eta, monad_norm, Function.comp_apply]
   refine bind_congr (m := ProbComp) fun z => ?_
   rcases z with ⟨out, st⟩
   rcases out with ⟨msg, sig⟩
@@ -805,7 +805,7 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
           simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache]
         rw [hrun]
         simp
-      simpa [map_eq_bind_pure_comp] using hleft.trans hright.symm
+      simpa [monad_norm] using hleft.trans hright.symm
   | none =>
       have hleft :
           (((_root_.FiatShamir
@@ -814,8 +814,7 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
             fun a => pure (!decide (msg ∈ signed) && a.1)) =
             (($ᵗ Chal) >>= fun ch =>
               pure (!decide (msg ∈ signed) && σ.verify ps.1 c ch resp)) := by
-        simp [FiatShamir, hcache, uniformSampleImpl, map_eq_bind_pure_comp,
-          bind_assoc]
+        simp [FiatShamir, hcache, uniformSampleImpl, monad_norm]
       have hright :
           ((simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
               ((SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify
@@ -826,15 +825,13 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
             (($ᵗ Chal) >>= fun ch =>
               pure (!decide (msg ∈ signed) && σ.verify ps.1 c ch resp)) := by
         simp only [SourceSigAlg, FiatShamir, HasQuery.instOfMonadLift_query,
-          bind_pure_comp, map_eq_bind_pure_comp, liftM_bind, Function.comp_apply, liftM_pure,
-          simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure, bind_assoc,
-          pure_bind]
+          monad_norm, liftM_bind, liftM_pure,
+          simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure]
         rw [cmaRealSourceFullSum_lift_ro_query_run (σ := σ) (hr := hr)
           (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
           (Stmt := Stmt) (Wit := Wit) (mc := (msg, c))]
-        simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache,
-          map_eq_bind_pure_comp, bind_assoc]
-      simpa [map_eq_bind_pure_comp] using hleft.trans hright.symm
+        simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache, monad_norm]
+      simpa [monad_norm] using hleft.trans hright.symm
 
 /-- Fixed-key public post-keygen experiment in the WriterT signing-log form. -/
 @[reducible] private noncomputable def postKeygenFreshWriterComp

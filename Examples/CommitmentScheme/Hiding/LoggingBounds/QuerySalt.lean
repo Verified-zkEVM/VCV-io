@@ -398,7 +398,7 @@ theorem run_cached_logging_proj_eq_cachingOracle
       rw [simulateQ_query_bind, StateT.run_bind, simulateQ_query_bind, StateT.run_bind]
       cases ht : cache₀ t with
       | some u =>
-          simp [ht, StateT.run_bind, StateT.run_get, pure_bind]
+          simp [ht, StateT.run_bind, StateT.run_get, monad_norm]
           simpa [simulateQ_map, StateT.map, StateT.run, Function.comp_def] using ih u cache₀
       | none =>
           simp only [OracleQuery.input_query, QueryImpl.withCaching_apply,

@@ -81,7 +81,7 @@ lemma PerfectSecrecyCipherExp_eq_bind [LawfulMonad m] (encAlg : SymmEncAlg m M K
     encAlg.PerfectSecrecyCipherExp mgen =
       mgen >>= fun msg =>
         encAlg.PerfectSecrecyCipherGivenMsgExp msg := by
-  simp [PerfectSecrecyCipherExp, PerfectSecrecyExp_eq_bind, map_eq_bind_pure_comp, bind_assoc]
+  simp [PerfectSecrecyCipherExp, PerfectSecrecyExp_eq_bind, monad_norm]
 
 variable [HasEvalPMF m]
 

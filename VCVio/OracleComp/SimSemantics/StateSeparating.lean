@@ -160,7 +160,7 @@ lemma runState_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I))
           (fun p => (simulateQ (ofStateless h) (k p.1)).run p.2) =
         (fun x => (x, PUnit.unit)) <$> (h t >>= fun u => simulateQ h (k u))
     rw [StateT.run_monadLift]
-    simp only [bind_assoc, pure_bind, map_bind]
+    simp only [monad_norm]
     refine bind_congr fun u => ?_
     exact ih u
 

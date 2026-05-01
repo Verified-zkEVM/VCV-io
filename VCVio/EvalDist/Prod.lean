@@ -111,14 +111,14 @@ lemma probOutput_seq_map_prod_mk_map_eq_mul' (z : γ × δ) :
 @[simp]
 lemma probOutput_bind_map_prod_mk_eq_mul (z : γ × δ) :
     Pr[= z | do let x ← mx; (f x, g ·) <$> my] = Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
-  simpa [seq_eq_bind_map, map_eq_bind_pure_comp] using
+  simpa [monad_norm] using
     probOutput_seq_map_prod_mk_map_eq_mul mx my f g z
 
 @[simp]
 lemma probOutput_bind_map_prod_mk_eq_mul'
     (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (z : γ × δ) :
     Pr[= z | do let y ← my; (f ·, g y) <$> mx] = Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
-  simpa [seq_eq_bind_map, map_eq_bind_pure_comp] using
+  simpa [monad_norm] using
     probOutput_seq_map_prod_mk_map_eq_mul' mx my f g z
 
 @[simp high]

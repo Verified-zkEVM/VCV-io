@@ -279,7 +279,7 @@ theorem Strategy.compWithRolesFlat_splitPrefixWithRoles
             go (rest x) (rRest x)
               (s₂ := fun p => s₂ ⟨x, p⟩)
               (r₂ := fun p => r₂ ⟨x, p⟩) next
-        simpa [map_eq_bind_pure_comp, bind_assoc] using hcont
+        simpa [monad_norm] using hcont
   exact go s₁ r₁ strat
 
 /-- Compose counterparts along `Spec.append` with a two-argument output family
@@ -353,7 +353,7 @@ theorem Counterpart.append_eq_appendFlat_mapOutput
       funext x
       refine congrArg (fun k => c₁ x >>= k) ?_
       funext cRest
-      simpa [bind_assoc] using
+      simpa [monad_norm] using
         congrArg pure
           (append_eq_appendFlat_mapOutput cRest (fun p o => c₂ ⟨x, p⟩ o))
   | .node _ rest, _, ⟨.receiver, rRest⟩, _, _, _, c₁, c₂ => by

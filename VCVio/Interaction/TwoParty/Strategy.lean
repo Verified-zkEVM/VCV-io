@@ -635,7 +635,7 @@ theorem Strategy.runWithRoles_mapOutputWithRoles_mapOutput
               (fun tr => OutputC' ⟨xc.1, tr⟩) tr) →
             ((tr : Transcript (Spec.node _ rest)) × OutputP' tr × OutputC' tr) :=
           fun a => ⟨⟨xc.1, a.1⟩, a.2.1, a.2.2⟩
-        simpa [bind_assoc, addPrefix] using
+        simpa [monad_norm, addPrefix] using
           congrArg (fun z => addPrefix <$> z)
             (go (rest xc.1) (rRest xc.1) (fun tr => fP ⟨xc.1, tr⟩) (fun tr => fC ⟨xc.1, tr⟩)
               xc.2 cNext)
@@ -653,7 +653,7 @@ theorem Strategy.runWithRoles_mapOutputWithRoles_mapOutput
               (fun tr => OutputC' ⟨xc.1, tr⟩) tr) →
             ((tr : Transcript (Spec.node _ rest)) × OutputP' tr × OutputC' tr) :=
           fun a => ⟨⟨xc.1, a.1⟩, a.2.1, a.2.2⟩
-        simpa [bind_assoc, addPrefix] using
+        simpa [monad_norm, addPrefix] using
           congrArg (fun z => addPrefix <$> z)
             (go (rest xc.1) (rRest xc.1) (fun tr => fP ⟨xc.1, tr⟩) (fun tr => fC ⟨xc.1, tr⟩)
               next xc.2)
