@@ -9,6 +9,7 @@ import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.EvalDist.Defs.Semantics
+import VCVio.EvalDist.Defs.LawfulSemantics
 
 /-!
 # Bundled Subprobability Semantics for Oracle Simulations
@@ -100,4 +101,139 @@ lemma withStateOracle_evalDist_bind_liftM
     (rest := fun x => simulateQ impl (rest x)) (s := s)]
   rw [evalDist_bind]
 
+/-- `withStateOracle` allows commuting a `liftM oa` sample past an arbitrary preceding
+ambient computation `mx`. Because `liftM oa` does not interact with the cache state,
+sampling it before or after `mx` yields the same observed `SPMF`.
+
+This is the foundation for the `BindLiftSwap` instance on `withStateOracle`-built runtimes:
+the buried hidden bit / extra public-randomness sample of a KEM/DEM-style game body factors
+out of the bundled observation regardless of where it appears in the do-block. -/
+lemma withStateOracle_evalDist_bind_liftM_swap
+    {ι : Type} {hashSpec : OracleSpec ι}
+    (hashImpl : QueryImpl hashSpec (StateT hashSpec.QueryCache ProbComp))
+    (s : hashSpec.QueryCache)
+    {α β γ : Type} (mx : OracleComp (unifSpec + hashSpec) α) (oa : ProbComp β)
+    (f : α → β → OracleComp (unifSpec + hashSpec) γ) :
+    (SPMFSemantics.withStateOracle hashImpl s).evalDist
+        (mx >>= fun a => liftM oa >>= fun b => f a b) =
+    (SPMFSemantics.withStateOracle hashImpl s).evalDist
+        (liftM oa >>= fun b => mx >>= fun a => f a b) := by
+  classical
+  -- The RHS factors via `withStateOracle_evalDist_bind_liftM` since `liftM oa` is at the top.
+  rw [withStateOracle_evalDist_bind_liftM hashImpl s oa
+        (fun b => mx >>= fun a => f a b)]
+  -- For the LHS, expand via `simulateQ_bind` and `roSim.run'_liftM_bind`, reducing to a
+  -- `ProbComp`-level `bind_bind_swap` on `oa` and `(simulateQ impl mx).run s`.
+  let impl : QueryImpl (unifSpec + hashSpec) (StateT hashSpec.QueryCache ProbComp) :=
+    unifFwdImpl hashSpec + hashImpl
+  -- LHS: rewrite the buried liftM via simulateQ_bind + roSim.run'_liftM_bind.
+  have hLHS :
+      (SPMFSemantics.withStateOracle hashImpl s).evalDist
+          (mx >>= fun a => liftM oa >>= fun b => f a b) =
+        𝒟[(simulateQ impl mx).run s >>= fun pair =>
+          oa >>= fun b => (simulateQ impl (f pair.1 b)).run' pair.2] := by
+    unfold SPMFSemantics.evalDist SemanticsVia.denote
+    change 𝒟[(simulateQ impl (mx >>= fun a => liftM oa >>= fun b => f a b)).run' s] = _
+    congr 1
+    change Prod.fst <$>
+        (simulateQ impl (mx >>= fun a => liftM oa >>= fun b => f a b)).run s = _
+    rw [show simulateQ impl (mx >>= fun a => liftM oa >>= fun b => f a b)
+          = simulateQ impl mx >>= fun a =>
+              simulateQ impl (liftM oa) >>= fun b => simulateQ impl (f a b) by
+        simp [simulateQ_bind]]
+    rw [StateT.run_bind]
+    simp only [map_bind]
+    refine bind_congr fun pair => ?_
+    change (simulateQ impl (liftM oa) >>= fun b => simulateQ impl (f pair.1 b)).run' pair.2 = _
+    exact roSim.run'_liftM_bind (ro := hashImpl) (oa := oa)
+      (rest := fun b => simulateQ impl (f pair.1 b)) (s := pair.2)
+  -- RHS inner: rewrite via simulateQ_bind.
+  have hRHS_inner : ∀ b : β,
+      (SPMFSemantics.withStateOracle hashImpl s).evalDist (mx >>= fun a => f a b) =
+        𝒟[(simulateQ impl mx).run s >>= fun pair =>
+          (simulateQ impl (f pair.1 b)).run' pair.2] := by
+    intro b
+    unfold SPMFSemantics.evalDist SemanticsVia.denote
+    change 𝒟[(simulateQ impl (mx >>= fun a => f a b)).run' s] = _
+    congr 1
+    change Prod.fst <$> (simulateQ impl (mx >>= fun a => f a b)).run s = _
+    rw [show simulateQ impl (mx >>= fun a => f a b) =
+          simulateQ impl mx >>= fun a => simulateQ impl (f a b) by
+        rw [simulateQ_bind]]
+    rw [StateT.run_bind]
+    simp only [map_bind]
+    rfl
+  rw [hLHS]
+  -- Rewrite the RHS inner `withStateOracle.evalDist (mx >>= fun a => f a b)` to `𝒟[...]`
+  -- form via `hRHS_inner`, then collapse the outer `𝒟[oa] >>= fun b => 𝒟[…]` to a single
+  -- `𝒟[oa >>= …]` via `evalDist_bind` so both sides are `𝒟[ProbComp]`.
+  rw [show (𝒟[oa] >>= fun b =>
+        (SPMFSemantics.withStateOracle hashImpl s).evalDist (mx >>= fun a => f a b)) =
+      𝒟[oa >>= fun b =>
+        (simulateQ impl mx).run s >>= fun pair =>
+          (simulateQ impl (f pair.1 b)).run' pair.2] from by
+    rw [evalDist_bind]
+    exact bind_congr fun b => hRHS_inner b]
+  -- Both sides are `𝒟[ProbComp]`; the underlying ProbComps differ only in bind order.
+  apply evalDist_ext
+  intro x
+  exact probOutput_bind_bind_swap (mx := (simulateQ impl mx).run s) (my := oa)
+    (f := fun pair b => (simulateQ impl (f pair.1 b)).run' pair.2) (z := x)
+
 end SPMFSemantics
+
+/-! ## ROM-friendly `ProbCompRuntime` and its coherence instances
+
+A canonical `ProbCompRuntime` constructor `ProbCompRuntime.withStateOracle` packages
+`SPMFSemantics.withStateOracle hashImpl s` with the `MonadLiftT ProbComp _`-derived
+`ProbCompLift`. Both `ProbCompRuntime.LiftBindCoherent` and `ProbCompRuntime.BindLiftSwap`
+are inhabited for this constructor, so any concrete ROM-style runtime built on
+`withStateOracle hashImpl s` (e.g. the Fiat-Shamir `runtimeWithCache`) can re-export the
+instances by pointing at this canonical form.
+
+Lawfulness is **not** provided here — `withStateOracle` is not a monad morphism in general
+(its bundled `observe` discards final state). The shape-restricted classes above are exactly
+what hybrid arguments need without ever requiring full lawfulness. -/
+
+namespace ProbCompRuntime
+
+/-- Canonical `ProbCompRuntime` for the `withStateOracle` semantics: bundles the stateful
+oracle observation with the standard `MonadLiftT ProbComp _` lift. -/
+noncomputable def withStateOracle
+    {ι : Type} {hashSpec : OracleSpec ι}
+    (hashImpl : QueryImpl hashSpec (StateT hashSpec.QueryCache ProbComp))
+    (s : hashSpec.QueryCache) :
+    ProbCompRuntime (OracleComp (unifSpec + hashSpec)) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle hashImpl s
+  toProbCompLift := ProbCompLift.ofMonadLift _
+
+/-- The canonical ROM-style runtime is **lift-bind-coherent**: a `liftProbComp`-prefixed bind
+factors as the underlying ProbComp distribution bound into the post-prefix evalDist. The three
+class fields all follow from existing `withStateOracle_evalDist_*` lemmas (the `_pure` field
+goes through `withStateOracle_evalDist_bind_liftM` after rewriting the empty bind). -/
+noncomputable instance instLiftBindCoherent_withStateOracle
+    {ι : Type} {hashSpec : OracleSpec ι}
+    (hashImpl : QueryImpl hashSpec (StateT hashSpec.QueryCache ProbComp))
+    (s : hashSpec.QueryCache) :
+    (withStateOracle hashImpl s).LiftBindCoherent where
+  evalDist_pure a := by
+    -- Reduce evalDist (pure a) via direct unfolding through simulateQ_pure + StateT.run'_pure.
+    change (SPMFSemantics.withStateOracle hashImpl s).evalDist (pure a) = pure a
+    unfold SPMFSemantics.evalDist SemanticsVia.denote
+    simp [SPMFSemantics.withStateOracle, simulateQ', StateT.run'_eq]
+  evalDist_map f mx := SPMFSemantics.withStateOracle_evalDist_map _ _ _ _
+  evalDist_liftProbComp_bind oa rest :=
+    SPMFSemantics.withStateOracle_evalDist_bind_liftM hashImpl s oa rest
+
+/-- The canonical ROM-style runtime admits **bind-lift swap**: a `liftProbComp` sample
+buried after a prefix can be commuted to the front. Direct corollary of
+`SPMFSemantics.withStateOracle_evalDist_bind_liftM_swap`. -/
+noncomputable instance instBindLiftSwap_withStateOracle
+    {ι : Type} {hashSpec : OracleSpec ι}
+    (hashImpl : QueryImpl hashSpec (StateT hashSpec.QueryCache ProbComp))
+    (s : hashSpec.QueryCache) :
+    (withStateOracle hashImpl s).BindLiftSwap where
+  evalDist_bind_liftProbComp_swap mx oa f :=
+    SPMFSemantics.withStateOracle_evalDist_bind_liftM_swap hashImpl s mx oa f
+
+end ProbCompRuntime

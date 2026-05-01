@@ -74,7 +74,7 @@ theorem perfectlyCorrect_composeWithDEM
   simp only [AsymmEncAlg.CorrectExp, composeWithDEM]
   rw [← hkem]
   unfold KEMScheme.CorrectExp
-  simp only [bind_assoc, pure_bind]
+  simp only [monad_norm]
   apply probOutput_bind_congr
   intro ⟨pk, sk⟩ hks
   apply probOutput_bind_congr
@@ -158,7 +158,17 @@ as `(s_X - s_Y)/2` for two of these four leaves, and the standard real triangle 
 gives the stated bound after dividing by `2`. The decomposition uses
 `SPMF.signedBoolAdv_bind_uniformBool` (in `SecExp.lean`) once per game; the runtime hypotheses
 `[Lawful]` and `[LiftCoherent]` push `runtime.evalDist` through the bind structure of each
-game body. -/
+game body.
+
+**Runtime scope.** The `[ProbCompRuntime.Lawful runtime]` hypothesis restricts this theorem
+to runtimes whose `evalDist` is a monad morphism. This holds for the canonical
+`ProbCompRuntime.probComp` runtime but **not** for `withStateOracle`-style runtimes such as
+`FiatShamir.runtime` (any ROM-based instantiation). Generalizing the bound to ROM-based
+KEM-DEM constructions (e.g. ML-KEM, where the underlying KEM/DEM use a hash modeled as a
+random oracle) would require replacing `[Lawful]` with shape-specific bind lemmas; the
+building block is `withStateOracle_evalDist_bind_liftM` in
+`OracleComp.SimSemantics.BundledSemantics`. TODO: factor an ROM-friendly variant once a
+concrete consumer needs it. -/
 theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
     (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
     (dem : DEMScheme (OracleComp spec) K M CDEM)
@@ -250,45 +260,27 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
   have h_AL_pr : ∀ y : Bool,
       Pr[= y | runtime.evalDist A_rL_KL] = Pr[= y | runtime.evalDist A_rL] := by
     intro y
-    show Pr[= y | (runtime.evalDist A_rL_KL : SPMF Bool)] =
-      Pr[= y | (runtime.evalDist A_rL : SPMF Bool)]
     simp only [A_rL_KL, A_rL, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
-    refine probOutput_bind_congr' _ y ?_
-    intro ⟨pk, _sk⟩
-    refine probOutput_bind_congr' _ y ?_
-    intro ⟨m₀, _m₁, st⟩
-    refine probOutput_bind_congr' _ y ?_
-    intro ⟨kc, k⟩
+    refine probOutput_bind_congr' _ y ?_; intro ⟨pk, _sk⟩
+    refine probOutput_bind_congr' _ y ?_; intro ⟨m₀, _m₁, st⟩
+    refine probOutput_bind_congr' _ y ?_; intro ⟨kc, k⟩
     rw [probOutput_bind_const, h_uniformK_fail, tsub_zero, one_mul]
   have h_AR_pr : ∀ y : Bool,
       Pr[= y | runtime.evalDist A_rR_KR] = Pr[= y | runtime.evalDist A_rR] := by
     intro y
-    show Pr[= y | (runtime.evalDist A_rR_KR : SPMF Bool)] =
-      Pr[= y | (runtime.evalDist A_rR : SPMF Bool)]
     simp only [A_rR_KR, A_rR, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
-    refine probOutput_bind_congr' _ y ?_
-    intro ⟨pk, _sk⟩
-    refine probOutput_bind_congr' _ y ?_
-    intro ⟨_m₀, m₁, st⟩
-    refine probOutput_bind_congr' _ y ?_
-    intro ⟨kc, k⟩
+    refine probOutput_bind_congr' _ y ?_; intro ⟨pk, _sk⟩
+    refine probOutput_bind_congr' _ y ?_; intro ⟨_m₀, m₁, st⟩
+    refine probOutput_bind_congr' _ y ?_; intro ⟨kc, k⟩
     rw [probOutput_bind_const, h_uniformK_fail, tsub_zero, one_mul]
   have h_AL_signedBoolAdv :
-      (runtime.evalDist A_rL_KL).signedBoolAdv = (runtime.evalDist A_rL).signedBoolAdv := by
-    unfold SPMF.signedBoolAdv
-    rw [show Pr[= true | (runtime.evalDist A_rL_KL : SPMF Bool)] =
-      Pr[= true | (runtime.evalDist A_rL : SPMF Bool)] from h_AL_pr true,
-      show Pr[= false | (runtime.evalDist A_rL_KL : SPMF Bool)] =
-        Pr[= false | (runtime.evalDist A_rL : SPMF Bool)] from h_AL_pr false]
+      (runtime.evalDist A_rL_KL).signedBoolAdv = (runtime.evalDist A_rL).signedBoolAdv :=
+    SPMF.signedBoolAdv_congr h_AL_pr
   have h_AR_signedBoolAdv :
-      (runtime.evalDist A_rR_KR).signedBoolAdv = (runtime.evalDist A_rR).signedBoolAdv := by
-    unfold SPMF.signedBoolAdv
-    rw [show Pr[= true | (runtime.evalDist A_rR_KR : SPMF Bool)] =
-      Pr[= true | (runtime.evalDist A_rR : SPMF Bool)] from h_AR_pr true,
-      show Pr[= false | (runtime.evalDist A_rR_KR : SPMF Bool)] =
-        Pr[= false | (runtime.evalDist A_rR : SPMF Bool)] from h_AR_pr false]
+      (runtime.evalDist A_rR_KR).signedBoolAdv = (runtime.evalDist A_rR).signedBoolAdv :=
+    SPMF.signedBoolAdv_congr h_AR_pr
   -- Step 3: KEM-LEFT signed advantage decomposition.
   have h_KEMLEFT_form :
       kem.IND_CPA_Game runtime (kem.composeWithDEM_toKEMLeftReduction dem adversary) =
@@ -311,7 +303,7 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
         pure (t == z) : SPMF Bool) := by
     unfold KEMScheme.IND_CPA_Game KEMScheme.composeWithDEM_toKEMLeftReduction
     simp only [ProbCompRuntime.Lawful.evalDist_bind, ProbCompRuntime.Lawful.evalDist_pure,
-      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, bind_assoc, pure_bind]
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, monad_norm]
     refine bind_congr fun pk_sk => ?_
     refine bind_congr fun mst => ?_
     refine bind_congr fun b => ?_
@@ -330,20 +322,9 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
           let dc ← dem.encrypt k a.2.1
           adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
       runtime.evalDist A_rL_KL := by
-    show (do
-        let a ← runtime.evalDist (do
-          let (pk, _sk) ← kem.keygen
-          let (m₀, _m₁, st) ← adversary.chooseMessages pk
-          pure (pk, m₀, st))
-        runtime.evalDist (do
-          let (kc, k) ← kem.encaps a.1
-          let _kRand ← runtime.liftProbComp ($ᵗ K)
-          let dc ← dem.encrypt k a.2.1
-          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
-      (runtime.evalDist A_rL_KL : SPMF Bool)
     simp only [A_rL_KL, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
-      bind_assoc, pure_bind]
+      monad_norm]
   have h_KEMLEFT_pref_rand :
       (do
         let a ← runtime.evalDist (do
@@ -356,20 +337,9 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
           let dc ← dem.encrypt kRand a.2.1
           adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
       runtime.evalDist A_rndL := by
-    show (do
-        let a ← runtime.evalDist (do
-          let (pk, _sk) ← kem.keygen
-          let (m₀, _m₁, st) ← adversary.chooseMessages pk
-          pure (pk, m₀, st))
-        runtime.evalDist (do
-          let (kc, _kReal) ← kem.encaps a.1
-          let kRand ← runtime.liftProbComp ($ᵗ K)
-          let dc ← dem.encrypt kRand a.2.1
-          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
-      (runtime.evalDist A_rndL : SPMF Bool)
     simp only [A_rndL, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
-      bind_assoc, pure_bind]
+      monad_norm]
   have h_KEMLEFT_signed :
       (kem.IND_CPA_Game runtime
         (kem.composeWithDEM_toKEMLeftReduction dem adversary)).signedBoolAdv =
@@ -400,7 +370,7 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
         pure (t == z) : SPMF Bool) := by
     unfold KEMScheme.IND_CPA_Game KEMScheme.composeWithDEM_toKEMRightReduction
     simp only [ProbCompRuntime.Lawful.evalDist_bind, ProbCompRuntime.Lawful.evalDist_pure,
-      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, bind_assoc, pure_bind]
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, monad_norm]
     refine bind_congr fun pk_sk => ?_
     refine bind_congr fun mst => ?_
     refine bind_congr fun b => ?_
@@ -419,20 +389,9 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
           let dc ← dem.encrypt k a.2.1
           adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
       runtime.evalDist A_rR_KR := by
-    show (do
-        let a ← runtime.evalDist (do
-          let (pk, _sk) ← kem.keygen
-          let (_m₀, m₁, st) ← adversary.chooseMessages pk
-          pure (pk, m₁, st))
-        runtime.evalDist (do
-          let (kc, k) ← kem.encaps a.1
-          let _kRand ← runtime.liftProbComp ($ᵗ K)
-          let dc ← dem.encrypt k a.2.1
-          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
-      (runtime.evalDist A_rR_KR : SPMF Bool)
     simp only [A_rR_KR, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
-      bind_assoc, pure_bind]
+      monad_norm]
   have h_KEMRIGHT_pref_rand :
       (do
         let a ← runtime.evalDist (do
@@ -445,20 +404,9 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
           let dc ← dem.encrypt kRand a.2.1
           adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
       runtime.evalDist A_rndR := by
-    show (do
-        let a ← runtime.evalDist (do
-          let (pk, _sk) ← kem.keygen
-          let (_m₀, m₁, st) ← adversary.chooseMessages pk
-          pure (pk, m₁, st))
-        runtime.evalDist (do
-          let (kc, _kReal) ← kem.encaps a.1
-          let kRand ← runtime.liftProbComp ($ᵗ K)
-          let dc ← dem.encrypt kRand a.2.1
-          adversary.distinguish a.2.2 (kc, dc)) : SPMF Bool) =
-      (runtime.evalDist A_rndR : SPMF Bool)
     simp only [A_rndR, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.Lawful.evalDist_pure, ProbCompRuntime.LiftCoherent.evalDist_liftProbComp,
-      bind_assoc, pure_bind]
+      monad_norm]
   have h_KEMRIGHT_signed :
       (kem.IND_CPA_Game runtime
         (kem.composeWithDEM_toKEMRightReduction dem adversary)).signedBoolAdv =
@@ -493,7 +441,7 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
         pure (t == z) : SPMF Bool) := by
     unfold DEMScheme.IND_CPA_Game KEMScheme.composeWithDEM_toDEMReduction
     simp only [ProbCompRuntime.Lawful.evalDist_bind, ProbCompRuntime.Lawful.evalDist_pure,
-      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, bind_assoc, pure_bind]
+      ProbCompRuntime.LiftCoherent.evalDist_liftProbComp, monad_norm]
     refine bind_congr fun b => ?_
     cases b
     · simp [A_DEMb_rand]
@@ -503,47 +451,31 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
   have h_DEMb_real_pr : ∀ y : Bool,
       Pr[= y | runtime.evalDist A_DEMb_real] = Pr[= y | runtime.evalDist A_rndR] := by
     intro y
-    show Pr[= y | (runtime.evalDist A_DEMb_real : SPMF Bool)] =
-      Pr[= y | (runtime.evalDist A_rndR : SPMF Bool)]
     simp only [A_DEMb_real, A_rndR, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
     rw [probOutput_bind_bind_swap]
-    refine probOutput_bind_congr' _ y ?_
-    intro pk_sk
+    refine probOutput_bind_congr' _ y ?_; intro pk_sk
     rw [probOutput_bind_bind_swap]
-    refine probOutput_bind_congr' _ y ?_
-    intro mst
+    refine probOutput_bind_congr' _ y ?_; intro mst
     rw [probOutput_bind_bind_swap]
   have h_DEMb_rand_pr : ∀ y : Bool,
       Pr[= y | runtime.evalDist A_DEMb_rand] = Pr[= y | runtime.evalDist A_rndL] := by
     intro y
-    show Pr[= y | (runtime.evalDist A_DEMb_rand : SPMF Bool)] =
-      Pr[= y | (runtime.evalDist A_rndL : SPMF Bool)]
     simp only [A_DEMb_rand, A_rndL, ProbCompRuntime.Lawful.evalDist_bind,
       ProbCompRuntime.LiftCoherent.evalDist_liftProbComp]
     rw [probOutput_bind_bind_swap]
-    refine probOutput_bind_congr' _ y ?_
-    intro pk_sk
+    refine probOutput_bind_congr' _ y ?_; intro pk_sk
     rw [probOutput_bind_bind_swap]
-    refine probOutput_bind_congr' _ y ?_
-    intro mst
+    refine probOutput_bind_congr' _ y ?_; intro mst
     rw [probOutput_bind_bind_swap]
   have h_DEMb_real_signedBoolAdv :
       (runtime.evalDist A_DEMb_real).signedBoolAdv =
-      (runtime.evalDist A_rndR).signedBoolAdv := by
-    unfold SPMF.signedBoolAdv
-    rw [show Pr[= true | (runtime.evalDist A_DEMb_real : SPMF Bool)] =
-      Pr[= true | (runtime.evalDist A_rndR : SPMF Bool)] from h_DEMb_real_pr true,
-      show Pr[= false | (runtime.evalDist A_DEMb_real : SPMF Bool)] =
-        Pr[= false | (runtime.evalDist A_rndR : SPMF Bool)] from h_DEMb_real_pr false]
+        (runtime.evalDist A_rndR).signedBoolAdv :=
+    SPMF.signedBoolAdv_congr h_DEMb_real_pr
   have h_DEMb_rand_signedBoolAdv :
       (runtime.evalDist A_DEMb_rand).signedBoolAdv =
-      (runtime.evalDist A_rndL).signedBoolAdv := by
-    unfold SPMF.signedBoolAdv
-    rw [show Pr[= true | (runtime.evalDist A_DEMb_rand : SPMF Bool)] =
-      Pr[= true | (runtime.evalDist A_rndL : SPMF Bool)] from h_DEMb_rand_pr true,
-      show Pr[= false | (runtime.evalDist A_DEMb_rand : SPMF Bool)] =
-        Pr[= false | (runtime.evalDist A_rndL : SPMF Bool)] from h_DEMb_rand_pr false]
+        (runtime.evalDist A_rndL).signedBoolAdv :=
+    SPMF.signedBoolAdv_congr h_DEMb_rand_pr
   have h_DEM_signed :
       (dem.IND_CPA_Game runtime
         (kem.composeWithDEM_toDEMReduction dem adversary)).signedBoolAdv =
@@ -583,6 +515,140 @@ theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
           gcongr; exact abs_add_le _ _
       _ = |(sAL - sAndL) / 2| + |(sAR - sAndR) / 2| + |(sAndR - sAndL) / 2| := by
           rw [abs_neg, abs_neg]
+
+/-! ## Generalized form: LHS rewrite under `LiftBindCoherent`
+
+The **LHS** of the KEMDEM bound — the one-time IND-CPA game's `signedBoolAdv` — admits a
+branch-game decomposition using only the weaker `[LiftBindCoherent runtime]` hypothesis. This is
+the easy half of the bound: the hidden bit `b ← liftProbComp ($ᵗ Bool)` is at the top of the
+OneTime game body, so a single `evalDist_liftProbComp_bind` extracts it without needing to push
+`evalDist` past any non-lift binds. The two per-branch obligations are then closed by
+`monad_norm`-driven OracleComp bind normalization plus `evalDist_bind_pure_comp` to fold the
+trailing `pure (b == b')`.
+
+The KEM and DEM sides of the full bound additionally need `BindLiftSwap` (to commute the buried
+hidden bit and the unused `kRand` sample past `keygen`/`preChallenge`/`encaps`); a full
+`_general` proof is sketched in the comment block below but not yet wired up. `BindLiftSwap`
+for `withStateOracle` runtimes — needed for ROM applicability — requires a swap lemma derivable
+from `roSim.run'_liftM_bind` plus `ProbComp` bind-commutativity, but isn't in the repo as of
+writing. -/
+omit [SampleableType K] in
+theorem ind_cpa_one_time_signed_eq_branch_le
+    (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
+    (dem : DEMScheme (OracleComp spec) K M CDEM)
+    (runtime : ProbCompRuntime (OracleComp spec))
+    [ProbCompRuntime.LiftBindCoherent runtime]
+    (adversary : AsymmEncAlg.IND_CPA_Adv (kem.composeWithDEM dem)) :
+    let A_rL : OracleComp spec Bool := do
+      let (pk, _) ← kem.keygen
+      let (m₀, _m₁, st) ← adversary.chooseMessages pk
+      let (kc, k) ← kem.encaps pk
+      let dc ← dem.encrypt k m₀
+      adversary.distinguish st (kc, dc)
+    let A_rR : OracleComp spec Bool := do
+      let (pk, _) ← kem.keygen
+      let (_m₀, m₁, st) ← adversary.chooseMessages pk
+      let (kc, k) ← kem.encaps pk
+      let dc ← dem.encrypt k m₁
+      adversary.distinguish st (kc, dc)
+    (AsymmEncAlg.IND_CPA_OneTime_Game (encAlg := kem.composeWithDEM dem)
+        adversary runtime).signedBoolAdv =
+      ((runtime.evalDist A_rL).signedBoolAdv -
+        (runtime.evalDist A_rR).signedBoolAdv) / 2 := by
+  intro A_rL A_rR
+  have h_form :
+      AsymmEncAlg.IND_CPA_OneTime_Game (encAlg := kem.composeWithDEM dem) adversary runtime =
+      (do
+        let t ← (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)
+        let z ← if t then runtime.evalDist A_rL else runtime.evalDist A_rR
+        pure (t == z) : SPMF Bool) := by
+    unfold AsymmEncAlg.IND_CPA_OneTime_Game KEMScheme.composeWithDEM
+    rw [ProbCompRuntime.LiftBindCoherent.evalDist_liftProbComp_bind]
+    refine bind_congr fun b => ?_
+    cases b <;>
+      simp [A_rL, A_rR, monad_norm, ← ProbCompRuntime.LiftBindCoherent.evalDist_bind_pure_comp]
+  -- Apply branch-game signed-advantage decomposition.
+  have h_uniformBool_fail :
+      Pr[⊥ | (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)] = 0 := by simp
+  have h_uniformBool_half :
+      Pr[= true | (𝒟[($ᵗ Bool : ProbComp Bool)] : SPMF Bool)] = 1 / 2 := by
+    simp [Fintype.card_bool]
+  rw [h_form]
+  exact SPMF.signedBoolAdv_uniformBool_branch _ _ _ h_uniformBool_fail h_uniformBool_half
+
+/-! ## Generalized KEMDEM bound: foundations under `LiftBindCoherent + BindLiftSwap`
+
+The original `ind_cpa_one_time_bias_advantage_compose_with_dem_le` requires
+`[Lawful runtime] [LiftCoherent runtime]`, which excludes ROM-style runtimes built on
+`SPMFSemantics.withStateOracle` (e.g. `FiatShamir.runtimeWithCache`). The strictly weaker
+typeclasses `[LiftBindCoherent runtime] [BindLiftSwap runtime]` (in
+`VCVio.EvalDist.Defs.LawfulSemantics`) are satisfied by ROM-style runtimes via
+`SPMFSemantics.withStateOracle_evalDist_bind_liftM_swap` and the canonical
+`ProbCompRuntime.withStateOracle` instances. They are also satisfied by every
+`Lawful + LiftCoherent` runtime via a generic derivation, so any future `_general` theorem
+under these classes will subsume the original.
+
+The two helpers below — generic enough to be reused across any KEM/DEM-shaped game — package
+the central manoeuvre needed: dropping an unused `liftProbComp ($ᵗ K)` sample. Combined with
+`SPMF.signedBoolAdv_uniformBool_branch` (in `SecExp.lean`) and
+`ind_cpa_one_time_signed_eq_branch_le` (above), they reduce a full `_general` proof to
+mechanical KEM-LEFT / KEM-RIGHT / DEM `BindLiftSwap` chains plus the triangle inequality.
+
+A sketch of the full proof (with each `simp only [Lawful.evalDist_bind, ...]` step replaced by
+the corresponding `BindLiftSwap` + `LiftBindCoherent` rewrite chain) is folded into the docs
+agents `proof-workflows.md`. Closing it is the natural follow-up to wiring the typeclasses. -/
+
+/-- Helper: a `liftProbComp ($ᵗ K)` sample buried after a one-binder prefix collapses out of
+`runtime.evalDist` because the sample's value is unused. Combines `BindLiftSwap` (to surface)
+plus `LiftBindCoherent` (to factor) plus totality of `$ᵗ K` (no failure). -/
+lemma evalDist_drop_kRand_after_one
+    (runtime : ProbCompRuntime (OracleComp spec))
+    [ProbCompRuntime.LiftBindCoherent runtime] [ProbCompRuntime.BindLiftSwap runtime]
+    {α β : Type} (pref : OracleComp spec α) (rest : α → OracleComp spec β) :
+    runtime.evalDist (pref >>= fun a =>
+        runtime.liftProbComp ($ᵗ K) >>= fun _ => rest a) =
+      runtime.evalDist (pref >>= rest) := by
+  rw [ProbCompRuntime.BindLiftSwap.evalDist_bind_liftProbComp_swap pref ($ᵗ K)
+    (fun a _ => rest a)]
+  rw [ProbCompRuntime.LiftBindCoherent.evalDist_liftProbComp_bind ($ᵗ K)
+    (fun _ => pref >>= rest)]
+  -- Goal: SPMF identity `𝒟[$ᵗ K] >>= fun _ => evalDist (pref >>= rest) = evalDist (pref >>= rest)`.
+  -- Pointwise via `evalDist_ext` + `probOutput_bind_const` + `probFailure_uniformSample = 0`.
+  have h := evalDist_ext (m := SPMF) (n := SPMF)
+    (mx := (𝒟[($ᵗ K : ProbComp K)] : SPMF K) >>= fun _ =>
+      runtime.evalDist (pref >>= rest))
+    (mx' := runtime.evalDist (pref >>= rest))
+    (fun y => by
+      rw [probOutput_bind_const]
+      rw [show Pr[⊥ | (𝒟[($ᵗ K : ProbComp K)] : SPMF K)] = 0 by
+        change Pr[⊥ | ($ᵗ K : ProbComp K)] = 0
+        exact probFailure_uniformSample K]
+      rw [tsub_zero, one_mul])
+  simpa using h
+
+/-- Helper: a `liftProbComp ($ᵗ K)` sample buried after a three-binder prefix collapses out.
+Reduces to `evalDist_drop_kRand_after_one` after pairing the three prefix outputs into a tuple
+so the sample sits behind a single composite binder. -/
+lemma evalDist_drop_kRand_after_three
+    (runtime : ProbCompRuntime (OracleComp spec))
+    [ProbCompRuntime.LiftBindCoherent runtime] [ProbCompRuntime.BindLiftSwap runtime]
+    {α₁ α₂ α₃ β : Type} (p₁ : OracleComp spec α₁) (p₂ : α₁ → OracleComp spec α₂)
+    (p₃ : α₁ → α₂ → OracleComp spec α₃)
+    (rest : α₁ → α₂ → α₃ → OracleComp spec β) :
+    runtime.evalDist (p₁ >>= fun x₁ => p₂ x₁ >>= fun x₂ => p₃ x₁ x₂ >>= fun x₃ =>
+        runtime.liftProbComp ($ᵗ K) >>= fun _ => rest x₁ x₂ x₃) =
+      runtime.evalDist (p₁ >>= fun x₁ => p₂ x₁ >>= fun x₂ => p₃ x₁ x₂ >>= fun x₃ =>
+        rest x₁ x₂ x₃) := by
+  rw [show (p₁ >>= fun x₁ => p₂ x₁ >>= fun x₂ => p₃ x₁ x₂ >>= fun x₃ =>
+        runtime.liftProbComp ($ᵗ K) >>= fun _ => rest x₁ x₂ x₃) =
+      ((p₁ >>= fun x₁ => p₂ x₁ >>= fun x₂ => p₃ x₁ x₂ >>= fun x₃ => pure (x₁, x₂, x₃)) >>=
+        fun t => runtime.liftProbComp ($ᵗ K) >>= fun _ => rest t.1 t.2.1 t.2.2) by
+    simp [bind_assoc]]
+  rw [evalDist_drop_kRand_after_one runtime
+    (p₁ >>= fun x₁ => p₂ x₁ >>= fun x₂ => p₃ x₁ x₂ >>= fun x₃ => pure (x₁, x₂, x₃))
+    (fun t => rest t.1 t.2.1 t.2.2)]
+  congr 1
+  simp [bind_assoc]
 
 end IND_CPA
 

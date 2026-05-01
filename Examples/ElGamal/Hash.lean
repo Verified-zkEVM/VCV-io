@@ -160,11 +160,11 @@ theorem cpaGame_eq_ddhReal
         (encAlg := hashedElGamal F g hash) adv] =
       Pr[= true | cpaCanonical] := by
     simp [AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp, hashedElGamal, cpaCanonical,
-      map_eq_bind_pure_comp, smul_smul, mul_comm]
+      monad_norm, smul_smul, mul_comm]
   have hswap :
       Pr[= true | cpaCanonical] =
       Pr[= true | ddhCanonical] := by
-    simpa [cpaCanonical, ddhCanonical, bind_assoc, map_eq_bind_pure_comp] using
+    simpa [cpaCanonical, ddhCanonical, monad_norm] using
       (probOutput_bind_bind_swap
         ($ᵗ Bool)
         (do
@@ -190,10 +190,10 @@ theorem cpaGame_eq_ddhReal
       let b' ← adv.distinguish x.2.2
         (y • g, hash hk (y • (a • g)) + if b then x.1 else x.2.1)
       pure (b == b')]
-    · simpa [ddhExpReal, ddhReduction, bind_assoc, map_eq_bind_pure_comp,
+    · simpa [ddhExpReal, ddhReduction, monad_norm,
         smul_smul, mul_comm] using
         (probOutput_bind_congr' ($ᵗ F) true (fun a => by
-          simpa [bind_assoc, map_eq_bind_pure_comp, smul_smul, mul_comm] using
+          simpa [monad_norm, smul_smul, mul_comm] using
             (probOutput_bind_bind_swap
               ($ᵗ F)
               (do
@@ -206,7 +206,7 @@ theorem cpaGame_eq_ddhReal
                   (y • g, hash hk (y • (a • g)) + if b then x.1 else x.2.1)
                 pure (b == b'))
               true)))
-    · simpa [ddhCanonical, bind_assoc, map_eq_bind_pure_comp] using
+    · simpa [ddhCanonical, monad_norm] using
         (probOutput_bind_bind_swap
           ($ᵗ F)
           ($ᵗ HK)
@@ -249,9 +249,9 @@ theorem ddhRand_eq_esReal
       let b' ← adv.distinguish x.2.2
         (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
       pure (b == b')]
-    · simpa [ddhExpRand, ddhReduction, bind_assoc, map_eq_bind_pure_comp] using
+    · simpa [ddhExpRand, ddhReduction, monad_norm] using
         (probOutput_bind_congr' ($ᵗ F) true (fun a => by
-          simpa [bind_assoc, map_eq_bind_pure_comp] using
+          simpa [monad_norm] using
             (probOutput_bind_bind_swap
               ($ᵗ F)
               (do
@@ -275,9 +275,9 @@ theorem ddhRand_eq_esReal
           let b' ← adv.distinguish x.2.2
             (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
           pure (b == b')]
-      · simpa [bind_assoc, map_eq_bind_pure_comp] using
+      · simpa [monad_norm] using
           (probOutput_bind_congr' ($ᵗ F) true (fun a => by
-            simpa [bind_assoc, map_eq_bind_pure_comp] using
+            simpa [monad_norm] using
               (probOutput_bind_bind_swap
                 ($ᵗ F)
                 (do
@@ -291,7 +291,7 @@ theorem ddhRand_eq_esReal
                     (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
                   pure (b == b'))
                 true)))
-      · simpa [canonical, bind_assoc, map_eq_bind_pure_comp] using
+      · simpa [canonical, monad_norm] using
           (probOutput_bind_bind_swap
             ($ᵗ F)
             ($ᵗ HK)
@@ -309,8 +309,7 @@ theorem ddhRand_eq_esReal
       Pr[= true | canonical] := by
     refine probOutput_bind_congr' ($ᵗ HK) true ?_
     intro hk
-    simpa [EntropySmoothing.realExp, esReduction, canonical, bind_assoc,
-      map_eq_bind_pure_comp] using
+    simpa [EntropySmoothing.realExp, esReduction, canonical, monad_norm] using
       (probOutput_bind_bind_swap
         ($ᵗ F)
         (do
@@ -377,7 +376,7 @@ theorem esIdeal_eq_half
       let h ← ($ᵗ M)
       let b' ← adv.distinguish x.2.2 (y • g, h + if b then x.1 else x.2.1)
       pure (decide (b = b'))]
-    · simpa [inner, bind_assoc, map_eq_bind_pure_comp] using
+    · simpa [inner, monad_norm] using
         (probOutput_bind_bind_swap
           ($ᵗ M)
           (do
@@ -394,7 +393,7 @@ theorem esIdeal_eq_half
           let b ← ($ᵗ Bool)
           let b' ← f hk b
           pure (decide (b = b'))]
-      · simpa [f, bind_assoc, map_eq_bind_pure_comp] using
+      · simpa [f, monad_norm] using
           (probOutput_bind_bind_swap
             (do
               let sk ← ($ᵗ F)

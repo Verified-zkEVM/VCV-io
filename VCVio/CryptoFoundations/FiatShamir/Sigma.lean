@@ -13,6 +13,7 @@ import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
+import VCVio.EvalDist.Defs.LawfulSemantics
 import VCVio.ProgramLogic.NotationCore
 import VCVio.ProgramLogic.Tactics.Unary
 
@@ -76,15 +77,16 @@ get cached for later. Specializing `cache := ∅` recovers the standard fresh-RO
 
 The `cache` parameter is the universal hook for **programming** the random oracle: any caller
 that wants to inject pre-decided answers at chosen points runs its experiment under
-`runtimeWithCache cache` instead of `runtime`. -/
+`runtimeWithCache cache` instead of `runtime`. Definitionally
+`ProbCompRuntime.withStateOracle randomOracle cache`, so it inherits the
+`LiftBindCoherent` and `BindLiftSwap` instances of the canonical ROM-style runtime. -/
 noncomputable def runtimeWithCache
     (cache : (M × Commit →ₒ Chal).QueryCache) :
-    ProbCompRuntime (OracleComp (unifSpec + (M × Commit →ₒ Chal))) where
-  toSPMFSemantics := SPMFSemantics.withStateOracle
-    (hashImpl := (randomOracle :
-      QueryImpl (M × Commit →ₒ Chal) (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+    ProbCompRuntime (OracleComp (unifSpec + (M × Commit →ₒ Chal))) :=
+  ProbCompRuntime.withStateOracle
+    (randomOracle :
+      QueryImpl (M × Commit →ₒ Chal) (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp))
     cache
-  toProbCompLift := ProbCompLift.ofMonadLift _
 
 open scoped Classical in
 /-- Runtime bundle for the Fiat-Shamir random-oracle world.
@@ -157,6 +159,22 @@ lemma runtime_evalDist_bind_liftComp
     (runtime M).evalDist (liftM oa >>= rest) =
       𝒟[oa] >>= fun x => (runtime M).evalDist (rest x) :=
   runtimeWithCache_evalDist_bind_liftComp M ∅ oa rest
+
+/-- The cache-parametric Fiat-Shamir runtime is **lift-bind-coherent**: a `liftProbComp` sample
+factors out of `evalDist` whether or not it appears at the top of a do-block. Inherited from the
+canonical `ProbCompRuntime.withStateOracle` instance. -/
+noncomputable instance instLiftBindCoherent_runtimeWithCache
+    (cache : (M × Commit →ₒ Chal).QueryCache) :
+    (runtimeWithCache M cache).LiftBindCoherent :=
+  ProbCompRuntime.instLiftBindCoherent_withStateOracle _ _
+
+/-- The cache-parametric Fiat-Shamir runtime admits **bind-lift swap**: a `liftProbComp` sample
+buried after a prefix of effectful operations can be commuted to the front. Inherited from the
+canonical `ProbCompRuntime.withStateOracle` instance. -/
+noncomputable instance instBindLiftSwap_runtimeWithCache
+    (cache : (M × Commit →ₒ Chal).QueryCache) :
+    (runtimeWithCache M cache).BindLiftSwap :=
+  ProbCompRuntime.instBindLiftSwap_withStateOracle _ _
 
 end semantics
 

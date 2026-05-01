@@ -151,6 +151,93 @@ lemma SPMF.probOutput_bind_uniformBool_of_half {α : Type}
   rw [probOutput_bind_eq_tsum, tsum_fintype (L := .unconditional _), Fintype.sum_bool,
     huniform, hfalse, one_div, ← mul_add, mul_comm, ← div_eq_mul_inv]
 
+/-! ### Branch-game congruence and closed forms
+
+Helpers shared by the four hidden-bit branch-game lemmas below: a pointwise
+`Pr[= x | ·]` congruence for `signedBoolAdv` / `boolBiasAdvantage`, the closed
+form for `Pr[= x | branchGame]` averaging the two branches, and an `evalDist`
+swap lemma that pulls a prefix sample past the hidden bit. -/
+
+/-- Two SPMFs with equal pointwise `Pr[= x | ·]` outputs have equal signed advantage. -/
+lemma SPMF.signedBoolAdv_congr {p q : SPMF Bool}
+    (h : ∀ x : Bool, Pr[= x | p] = Pr[= x | q]) :
+    p.signedBoolAdv = q.signedBoolAdv := by
+  unfold SPMF.signedBoolAdv; rw [h true, h false]
+
+/-- Two SPMFs with equal pointwise `Pr[= x | ·]` outputs have equal bias advantage. -/
+lemma SPMF.boolBiasAdvantage_congr {p q : SPMF Bool}
+    (h : ∀ x : Bool, Pr[= x | p] = Pr[= x | q]) :
+    p.boolBiasAdvantage = q.boolBiasAdvantage := by
+  unfold SPMF.boolBiasAdvantage; rw [h true, h false]
+
+/-- Closed form for the output probabilities of a hidden-bit branch game over two SPMF branches:
+`Pr[= x | branchGame] = (Pr[= x | real] + Pr[= !x | rand]) / 2`. -/
+private lemma SPMF.probOutput_branchGame_uniformBool
+    (real rand : SPMF Bool) (b : SPMF Bool)
+    (hfail_b : Pr[⊥ | b] = 0) (huniform_b : Pr[= true | b] = 1 / 2) (x : Bool) :
+    Pr[= x | (do
+      let t ← b
+      let z ← if t then real else rand
+      pure (t == z) : SPMF Bool)] =
+        (Pr[= x | real] + Pr[= !x | rand]) / 2 := by
+  have h_id : (BEq.beq true : Bool → Bool) = id := by funext z; cases z <;> rfl
+  have h_not : (BEq.beq false : Bool → Bool) = (! ·) := by funext z; cases z <;> rfl
+  have hgame_eq :
+      (do
+        let t ← b
+        let z ← if t then real else rand
+        pure (t == z) : SPMF Bool) =
+        (b >>= fun t => if t then ((true == ·) <$> real) else ((false == ·) <$> rand)) := by
+    apply bind_congr; intro t
+    cases t <;> simp [bind_pure_comp]
+  rw [hgame_eq, SPMF.probOutput_bind_uniformBool_of_half b hfail_b huniform_b _ x,
+    h_id, h_not, id_map]
+  cases x
+  · simp [probOutput_not_map']
+  · simp [probOutput_not_map]
+
+/-- Pulling a prefix sample past the hidden bit preserves the `evalDist` of a branch game:
+`𝒟[bind pref ; branch] = 𝒟[branch with prefixes bound inside]`. -/
+private lemma SPMF.evalDist_branchGame_bind_swap {α : Type}
+    (pref : SPMF α) (real rand : α → SPMF Bool) (b : SPMF Bool) :
+    𝒟[(do
+        let a ← pref
+        let t ← b
+        let z ← if t then real a else rand a
+        pure (t == z) : SPMF Bool)] =
+    𝒟[(do
+        let t ← b
+        let z ← if t then (pref >>= real) else (pref >>= rand)
+        pure (t == z) : SPMF Bool)] := by
+  apply evalDist_ext
+  intro x
+  calc
+    Pr[= x | (do
+        let a ← pref
+        let t ← b
+        let z ← if t then real a else rand a
+        pure (t == z) : SPMF Bool)] =
+        Pr[= x | (do
+          let t ← b
+          let a ← pref
+          let z ← if t then real a else rand a
+          pure (t == z) : SPMF Bool)] := by
+      simpa [bind_assoc] using
+        (probOutput_bind_bind_swap pref b
+          (fun a t => do
+            let z ← if t then real a else rand a
+            pure (t == z))
+          x)
+    _ = Pr[= x | (do
+        let t ← b
+        let z ← if t then (pref >>= real) else (pref >>= rand)
+        pure (t == z) : SPMF Bool)] := by
+      refine probOutput_bind_congr' b x ?_
+      intro t
+      cases t <;> simp
+
+/-! ### Branch-game advantage equalities -/
+
 /-- A hidden-bit guessing game over two SPMF branches has Boolean bias equal to the distinguishing
 advantage between those branches, provided the two branches share the same failure mass.
 
@@ -167,41 +254,9 @@ lemma SPMF.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch_of_failure_
       let z ← if t then real else rand
       pure (t == z)).boolBiasAdvantage =
     real.boolDistAdvantage rand := by
-  have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by funext z; cases z <;> rfl
-  have hbeqFalse : (BEq.beq false : Bool → Bool) = (! ·) := by funext z; cases z <;> rfl
-  -- Step A: closed form for `Pr[= x | game]` via the helper.
-  have hbranch : ∀ x : Bool,
-      Pr[= x | (do
-        let t ← b
-        let z ← if t then real else rand
-        pure (t == z) : SPMF Bool)] =
-      (Pr[= x | (true == ·) <$> real] + Pr[= x | (false == ·) <$> rand]) / 2 := fun x => by
-    have hgame_eq :
-        (do
-          let t ← b
-          let z ← if t then real else rand
-          pure (t == z) : SPMF Bool) =
-          (b >>= fun t => if t then ((true == ·) <$> real) else ((false == ·) <$> rand)) := by
-      apply bind_congr; intro t
-      cases t <;> simp [bind_pure_comp]
-    rw [hgame_eq]
-    exact SPMF.probOutput_bind_uniformBool_of_half b hfail_b huniform_b
-      (fun t => if t then ((true == ·) <$> real) else ((false == ·) <$> rand)) x
-  have hT :
-      Pr[= true | (do
-        let t ← b
-        let z ← if t then real else rand
-        pure (t == z) : SPMF Bool)] =
-        (Pr[= true | real] + Pr[= false | rand]) / 2 := by
-    rw [hbranch true, hbeqTrue, hbeqFalse, id_map, probOutput_not_map]
-  have hF :
-      Pr[= false | (do
-        let t ← b
-        let z ← if t then real else rand
-        pure (t == z) : SPMF Bool)] =
-        (Pr[= false | real] + Pr[= true | rand]) / 2 := by
-    rw [hbranch false, hbeqTrue, hbeqFalse, id_map, probOutput_not_map']
-  -- Step B: convert to ℝ arithmetic and finish.
+  have hT := SPMF.probOutput_branchGame_uniformBool real rand b hfail_b huniform_b true
+  have hF := SPMF.probOutput_branchGame_uniformBool real rand b hfail_b huniform_b false
+  simp only [Bool.not_true, Bool.not_false] at hT hF
   unfold SPMF.boolBiasAdvantage SPMF.boolDistAdvantage
   rw [hT, hF]
   set pT_r : ℝ := (Pr[= true | real]).toReal
@@ -245,39 +300,9 @@ lemma SPMF.signedBoolAdv_uniformBool_branch
       let z ← if t then real else rand
       pure (t == z)).signedBoolAdv =
     (real.signedBoolAdv - rand.signedBoolAdv) / 2 := by
-  have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by funext z; cases z <;> rfl
-  have hbeqFalse : (BEq.beq false : Bool → Bool) = (! ·) := by funext z; cases z <;> rfl
-  have hbranch : ∀ x : Bool,
-      Pr[= x | (do
-        let t ← b
-        let z ← if t then real else rand
-        pure (t == z) : SPMF Bool)] =
-      (Pr[= x | (true == ·) <$> real] + Pr[= x | (false == ·) <$> rand]) / 2 := fun x => by
-    have hgame_eq :
-        (do
-          let t ← b
-          let z ← if t then real else rand
-          pure (t == z) : SPMF Bool) =
-          (b >>= fun t => if t then ((true == ·) <$> real) else ((false == ·) <$> rand)) := by
-      apply bind_congr; intro t
-      cases t <;> simp [bind_pure_comp]
-    rw [hgame_eq]
-    exact SPMF.probOutput_bind_uniformBool_of_half b hfail_b huniform_b
-      (fun t => if t then ((true == ·) <$> real) else ((false == ·) <$> rand)) x
-  have hT :
-      Pr[= true | (do
-        let t ← b
-        let z ← if t then real else rand
-        pure (t == z) : SPMF Bool)] =
-        (Pr[= true | real] + Pr[= false | rand]) / 2 := by
-    rw [hbranch true, hbeqTrue, hbeqFalse, id_map, probOutput_not_map]
-  have hF :
-      Pr[= false | (do
-        let t ← b
-        let z ← if t then real else rand
-        pure (t == z) : SPMF Bool)] =
-        (Pr[= false | real] + Pr[= true | rand]) / 2 := by
-    rw [hbranch false, hbeqTrue, hbeqFalse, id_map, probOutput_not_map']
+  have hT := SPMF.probOutput_branchGame_uniformBool real rand b hfail_b huniform_b true
+  have hF := SPMF.probOutput_branchGame_uniformBool real rand b hfail_b huniform_b false
+  simp only [Bool.not_true, Bool.not_false] at hT hF
   unfold SPMF.signedBoolAdv
   rw [hT, hF, ENNReal.toReal_div, ENNReal.toReal_div,
     ENNReal.toReal_add probOutput_ne_top probOutput_ne_top,
@@ -298,47 +323,9 @@ lemma SPMF.signedBoolAdv_bind_uniformBool
       pure (t == z)).signedBoolAdv =
     ((do let a ← pref; real a).signedBoolAdv -
       (do let a ← pref; rand a).signedBoolAdv) / 2 := by
-  let game : SPMF Bool := do
-    let a ← pref
-    let t ← b
-    let z ← if t then real a else rand a
-    pure (t == z)
-  let left : SPMF Bool := do
-    let a ← pref
-    real a
-  let right : SPMF Bool := do
-    let a ← pref
-    rand a
-  let branchGame : SPMF Bool := do
-    let t ← b
-    let z ← if t then left else right
-    pure (t == z)
-  have hbranch : 𝒟[game] = 𝒟[branchGame] := by
-    apply evalDist_ext
-    intro x
-    calc
-      Pr[= x | game] =
-          Pr[= x | (do
-            let t ← b
-            let a ← pref
-            let z ← if t then real a else rand a
-            pure (t == z) : SPMF Bool)] := by
-        simpa [game, bind_assoc] using
-          (probOutput_bind_bind_swap pref b
-            (fun a t => do
-              let z ← if t then real a else rand a
-              pure (t == z))
-            x)
-      _ = Pr[= x | branchGame] := by
-        refine probOutput_bind_congr' b x ?_
-        intro t
-        cases t <;> simp [left, right]
-  have hprob := evalDist_ext_iff.mp hbranch
-  rw [show game.signedBoolAdv = branchGame.signedBoolAdv by
-    unfold SPMF.signedBoolAdv
-    rw [hprob true, hprob false]]
-  simpa [branchGame, left, right] using
-    SPMF.signedBoolAdv_uniformBool_branch left right b hfail_b huniform_b
+  rw [SPMF.signedBoolAdv_congr (evalDist_ext_iff.mp
+    (SPMF.evalDist_branchGame_bind_swap pref real rand b))]
+  exact SPMF.signedBoolAdv_uniformBool_branch _ _ b hfail_b huniform_b
 
 /-- Shared-prefix variant of
 `boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch_of_failure_eq`: the prefix `pref` is
@@ -359,54 +346,18 @@ lemma SPMF.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage_of_failure_eq
       (do
         let a ← pref
         rand a) := by
-  let game : SPMF Bool := do
-    let a ← pref
-    let t ← b
-    let z ← if t then real a else rand a
-    pure (t == z)
-  let left : SPMF Bool := do
-    let a ← pref
-    real a
-  let right : SPMF Bool := do
-    let a ← pref
-    rand a
-  let branchGame : SPMF Bool := do
-    let t ← b
-    let z ← if t then left else right
-    pure (t == z)
-  have hbranch : 𝒟[game] = 𝒟[branchGame] := by
-    apply evalDist_ext
-    intro x
-    calc
-      Pr[= x | game] =
-          Pr[= x | (do
-            let t ← b
-            let a ← pref
-            let z ← if t then real a else rand a
-            pure (t == z) : SPMF Bool)] := by
-        simpa [game, bind_assoc] using
-          (probOutput_bind_bind_swap pref b
-            (fun a t => do
-              let z ← if t then real a else rand a
-              pure (t == z))
-            x)
-      _ = Pr[= x | branchGame] := by
-        refine probOutput_bind_congr' b x ?_
-        intro t
-        cases t <;> simp [left, right]
-  have hprob := evalDist_ext_iff.mp hbranch
-  have hfail_left_right : Pr[⊥ | left] = Pr[⊥ | right] := by
+  have hfail_left_right :
+      Pr[⊥ | (do let a ← pref; real a : SPMF Bool)] =
+        Pr[⊥ | (do let a ← pref; rand a : SPMF Bool)] := by
     change Pr[⊥ | pref >>= real] = Pr[⊥ | pref >>= rand]
     rw [probFailure_bind_eq_add_tsum_support, probFailure_bind_eq_add_tsum_support]
     congr 1
     refine tsum_congr fun a => ?_
     rw [hfail_eq a a.2]
-  rw [show game.boolBiasAdvantage = branchGame.boolBiasAdvantage by
-    unfold SPMF.boolBiasAdvantage
-    rw [hprob true, hprob false]]
-  simpa [branchGame, left, right] using
-    SPMF.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch_of_failure_eq
-      left right b hfail_b huniform_b hfail_left_right
+  rw [SPMF.boolBiasAdvantage_congr (evalDist_ext_iff.mp
+    (SPMF.evalDist_branchGame_bind_swap pref real rand b))]
+  exact SPMF.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch_of_failure_eq
+    _ _ b hfail_b huniform_b hfail_left_right
 
 /-- Triangle inequality for Boolean distinguishing advantage. -/
 lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :

@@ -190,8 +190,8 @@ lemma runtimeWithCache_evalDist_eq_fsBaseImpl
       𝒟[(simulateQ
         (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)) oa).run'
         cache] := by
-  unfold _root_.FiatShamir.runtimeWithCache ProbCompRuntime.evalDist
-    SPMFSemantics.evalDist SemanticsVia.denote fsBaseImpl
+  unfold _root_.FiatShamir.runtimeWithCache ProbCompRuntime.withStateOracle
+    ProbCompRuntime.evalDist SPMFSemantics.evalDist SemanticsVia.denote fsBaseImpl
   unfold SPMFSemantics.withStateOracle unifFwdImpl simulateQ' evalDist
   have hbase :
       (QueryImpl.ofLift unifSpec ProbComp).liftTarget
