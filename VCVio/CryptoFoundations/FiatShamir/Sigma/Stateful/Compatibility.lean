@@ -490,7 +490,7 @@ private theorem postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     (oa := adv.main pk)
     pk sk ([] : List M) (∅ : RoCache M Commit Chal)]
-  simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp_apply, pure_bind]
+  simp only [monad_norm]
   refine bind_congr (m := ProbComp) fun z => ?_
   rcases z with ⟨out, st⟩
   rcases out with ⟨msg, sig⟩

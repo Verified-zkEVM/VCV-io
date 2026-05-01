@@ -75,7 +75,7 @@ Use `return (b == b')` or `return decide (r x w)` instead. `guard` requires `Opt
 
 Lean 4.29 changed `do`-block elaboration so the desugared bind may use a `Bind` instance
 that differs syntactically from `Monad.toBind`. This means `pure_bind`, `bind_assoc`, and
-`bind_pure` won't fire via `simp` or `rw` on goals produced by `do` notation.
+`bind_pure` won't fire via `simp` or `rw` on goals produced by `do` notation in special cases of using more non-standard instances.
 
 **Symptom**: `simp [pure_bind]` or `rw [bind_assoc]` does nothing on a `do`-block goal.
 

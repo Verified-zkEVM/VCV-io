@@ -50,10 +50,10 @@ instance {m} [Monad m] [Commutative m] {α β} (ma : m α) (mb : m β) :
   -- Use associativity to factor out the pair construction
   have h1 : (ma >>= fun a => mb >>= fun b => f (a, b)) =
            ((ma >>= fun a => mb >>= fun b => pure (a, b)) >>= fun ⟨a, b⟩ => f (a, b)) := by
-    simp only [bind_assoc, pure_bind]
+    simp only [monad_norm]
   have h2 : (mb >>= fun b => ma >>= fun a => f (a, b)) =
            ((mb >>= fun b => ma >>= fun a => pure (b, a)) >>= fun ⟨b, a⟩ => f (a, b)) := by
-    simp only [bind_assoc, pure_bind]
+    simp only [monad_norm]
   rw [h1, h2]
   -- Apply commutativity
   rw [bind_comm]
@@ -74,10 +74,10 @@ alias bind_swap := bind_comm_comp
   -- Use associativity to factor out the pair construction
   have h1 : (ma >>= fun a => mb >>= fun b => f (a, b)) =
            ((ma >>= fun a => mb >>= fun b => pure (a, b)) >>= fun ⟨a, b⟩ => f (a, b)) := by
-    simp only [bind_assoc, pure_bind]
+    simp only [monad_norm]
   have h2 : (mb >>= fun b => ma >>= fun a => f (a, b)) =
            ((mb >>= fun b => ma >>= fun a => pure (b, a)) >>= fun ⟨b, a⟩ => f (a, b)) := by
-    simp only [bind_assoc, pure_bind]
+    simp only [monad_norm]
   rw [h1, h2]
   -- Apply commutativity
   rw [h]

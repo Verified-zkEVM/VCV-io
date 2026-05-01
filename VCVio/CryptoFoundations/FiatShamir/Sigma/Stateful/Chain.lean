@@ -113,7 +113,7 @@ theorem cmaToNma_shiftLeft_signedFreshAdv_eq_bind
               (Commit := Commit) (Chal := Chal) (Resp := Resp) p)).run log' := by
   unfold QueryImpl.Stateful.shiftLeft QueryImpl.Stateful.run signedFreshAdv
   rw [StateT.run'_eq, simulateQ_bind, StateT.run_bind]
-  simp [map_eq_bind_pure_comp, bind_assoc]
+  simp [monad_norm]
 
 /-! ## H5 fork-side infrastructure -/
 
@@ -338,8 +338,7 @@ private lemma nma_lift_unif_run
     | query_bind n k ih =>
         simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
           OracleQuery.cont_query, id_map, StateT.run_bind]
-        simp only [map_eq_bind_pure_comp, StateT.run_mk, bind_assoc,
-          Function.comp_apply, pure_bind, impl₁]
+        simp only [monad_norm, StateT.run_mk, impl₁]
         refine bind_congr (m := ProbComp) fun u => ?_
         exact ih u s
   have hsim := QueryImpl.simulateQ_liftM_eq_of_query
@@ -523,14 +522,14 @@ private def cmaSimLoggedLeftOrnament
         exact simulatedNmaUnifSim_fsUniform_run_for_cma (M := M)
           (Commit := Commit) (Chal := Chal) (oa := simT pk) (cache := advCache)
       rw [hleft]
-      simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp_apply, pure_bind]
+      simp only [monad_norm]
       conv_rhs =>
         lhs
         change simulateQ (fsUniformImpl (M := M) (Commit := Commit) (Chal := Chal))
           ((simulateQ (simulatedNmaUnifSim (M := M) (Commit := Commit)
             (Chal := Chal)) (simT pk)).run advCache)
         rw [hright]
-      simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp_apply, pure_bind]
+      simp only [monad_norm]
       refine bind_congr (m := ProbComp) fun x => ?_
       cases htarget : cache (m, x.1) with
       | some old =>
@@ -569,10 +568,8 @@ private lemma cmaToNma_lift_ro_query_run
       (fun ch => (ch, log)) <$>
         (((nmaSpec M Commit Chal Stmt).query (.ro mc)) :
           OracleComp (nmaSpec M Commit Chal Stmt) Chal)
-  simp only [simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query, cmaToNma,
-    StateT.run_mk, StateT.run_bind, map_eq_bind_pure_comp,
-    Function.comp_apply]
-  simp [map_eq_bind_pure_comp]
+  simp [simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query, cmaToNma,
+    StateT.run_mk, map_eq_bind_pure_comp]
 
 omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] [Inhabited Chal] in
 private lemma cmaSim_lift_ro_query_run
@@ -608,13 +605,13 @@ private lemma cmaSim_lift_ro_query_run
     (Chal := Chal) (Resp := Resp) (Stmt := Stmt) simT mc log]
   cases hcache : cache mc with
   | none =>
-      simp [simulateQ_map, StateT.run_map, nma, nmaPublic, cmaFrame,
+      simp [nma, nmaPublic, cmaFrame,
         cmaOuterLens, cmaNmaLens, QueryImpl.Stateful.Frame.linkReshape,
-        hcache, QueryCache.cacheQuery, Functor.map_map]
+        hcache, QueryCache.cacheQuery, monad_norm]
   | some ch =>
-      simp [simulateQ_map, StateT.run_map, nma, nmaPublic, cmaFrame,
+      simp [nma, nmaPublic, cmaFrame,
         cmaOuterLens, cmaNmaLens, QueryImpl.Stateful.Frame.linkReshape,
-        hcache]
+        hcache, monad_norm]
 
 omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] [Inhabited Chal] in
 private lemma cmaSimVerifyFreshComp_project
@@ -1222,7 +1219,7 @@ private lemma forkBase_finalQuery_runTrace_eq
     (oa := adv.main pk)
     (s := (∅ : (fsRoSpec M Commit Chal).QueryCache))
     (q := ((∅ : (M × Commit →ₒ Chal).QueryCache), ([] : List (M × Commit))))]
-  simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp_apply, pure_bind]
+  simp only [monad_norm]
   apply bind_congr
   intro z
   rcases z with ⟨⟨msg, c, resp⟩, advCache, liveCache, queryLog⟩
@@ -2000,7 +1997,7 @@ private lemma nma_runProb_shiftLeft_signedFreshAdv_eq_forkH5Body
             hr simT) (adv.main ps.1)).run st0) >>= common := by
         simp only [bind_map_left]
         refine bind_congr fun x => ?_
-        simpa [cmaSim, _root_.FiatShamir, map_eq_bind_pure_comp] using
+        simpa [cmaSim, _root_.FiatShamir, monad_norm] using
           cmaSimVerifyFreshComp_project (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp)
           (Stmt := Stmt) (Wit := Wit) simT ps.1 x.1 x.2
