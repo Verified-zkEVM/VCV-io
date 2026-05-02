@@ -325,7 +325,7 @@ lemma isQueryBoundP_bind {oa : OracleComp spec α} {ob : α → OracleComp spec 
     IsQueryBoundP (oa >>= ob) p (n + m) := by
   induction oa using OracleComp.inductionOn generalizing n with
   | pure x =>
-      simp only [pure_bind]
+      simp only [monad_norm]
       exact (h' x (by simp)).mono (Nat.le_add_left _ _)
   | query_bind t mx ih =>
       rw [isQueryBoundP_query_bind_iff] at h
@@ -516,7 +516,7 @@ private lemma isPerIndexQueryBound_bind_aux (oa : OracleComp spec α)
   induction oa using OracleComp.inductionOn with
   | pure x =>
     intro qb₁ _
-    simp only [pure_bind]
+    simp only [monad_norm]
     exact (h2 x).mono le_add_self
   | query_bind t mx ih =>
     intro qb₁ h1
@@ -908,7 +908,7 @@ theorem IsTotalQueryBound.residual_of_mem_support_counting
   | pure x =>
       rw [countingOracle.mem_support_simulate_pure_iff] at hz
       subst z
-      simpa [pure_bind] using h
+      simpa [monad_norm] using h
   | query_bind t mx ih =>
       rw [bind_assoc, isTotalQueryBound_query_bind_iff] at h
       rw [countingOracle.mem_support_simulate_queryBind_iff] at hz
@@ -1165,7 +1165,7 @@ theorem IsQueryBoundP.residual_of_mem_support_counting [DecidableEq ι] [Fintype
   | pure x =>
       rw [countingOracle.mem_support_simulate_pure_iff] at hz
       subst z
-      simpa [pure_bind] using h
+      simpa [monad_norm] using h
   | query_bind t mx ih =>
       rw [bind_assoc, isQueryBoundP_query_bind_iff] at h
       rw [countingOracle.mem_support_simulate_queryBind_iff] at hz

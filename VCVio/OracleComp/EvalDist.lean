@@ -103,7 +103,7 @@ theorem bind_congr_of_forall_mem_support (mx : OracleComp spec α) {f g : α →
     (h : ∀ x ∈ support mx, f x = g x) : mx >>= f = mx >>= g := by
   induction mx using OracleComp.inductionOn with
   | pure a =>
-    simp only [pure_bind]
+    simp only [monad_norm]
     exact h a (by simp [support_pure])
   | query_bind q k ih =>
     change liftM (query q) >>= (fun u => k u >>= f) =

@@ -76,9 +76,9 @@ to convert the `for`/`let mut` desugaring (which uses `forIn` + `MProd` state +
 `ForInStep.yield`) into the direct `foldlM` formulation. The only proof obligation
 is showing that each branch of the loop body wraps its result in `ForInStep.yield`. -/
 theorem pirQuery'_eq_pirQuery (i₀ : Fin N) : pirQuery' i₀ = pirQuery i₀ := by
-  simp only [pirQuery', pirQuery, pure_bind]
+  simp only [pirQuery', pirQuery, monad_norm]
   exact List.forIn_mprod_yield_eq_foldlM _ _ _ _ _ (fun j b c => by
-    simp only [bind_assoc]
+    simp only [monad_norm]
     congr 1; ext b₁
     split <;> split <;> simp)
 

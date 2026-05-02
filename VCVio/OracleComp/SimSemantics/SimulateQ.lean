@@ -74,12 +74,12 @@ lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
 @[simp, grind =]
 lemma simulateQ_map [LawfulMonad r] (mx : OracleComp spec α) (f : α → β) :
     simulateQ impl (f <$> mx) = f <$> simulateQ impl mx := by
-  simp [map_eq_bind_pure_comp]
+  simp [monad_norm]
 
 @[simp]
 lemma simulateQ_seq [LawfulMonad r] (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
     simulateQ impl (og <*> mx) = simulateQ impl og <*> simulateQ impl mx := by
-  simp [seq_eq_bind_map]
+  simp [monad_norm]
 
 @[simp]
 lemma simulateQ_seqLeft [LawfulMonad r] (mx : OracleComp spec α) (my : OracleComp spec β) :

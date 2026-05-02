@@ -1198,7 +1198,7 @@ def runProbEqSwap : TacticM Bool := do
       | (rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
          refine tsum_congr fun _ => ?_
          congr 1
-         try simp only [bind_assoc]
+         try simp only [monad_norm]
          first
            | exact probEvent_bind_bind_swap _ _ _ _
            | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
@@ -1209,7 +1209,7 @@ def runProbEqSwap : TacticM Bool := do
          rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
          refine tsum_congr fun _ => ?_
          congr 1
-         try simp only [bind_assoc]
+         try simp only [monad_norm]
          first
            | exact probEvent_bind_bind_swap _ _ _ _
            | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]

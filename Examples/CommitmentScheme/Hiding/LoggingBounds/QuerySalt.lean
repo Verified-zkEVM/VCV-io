@@ -398,7 +398,7 @@ theorem run_cached_logging_proj_eq_cachingOracle
       rw [simulateQ_query_bind, StateT.run_bind, simulateQ_query_bind, StateT.run_bind]
       cases ht : cache₀ t with
       | some u =>
-          simp [ht, StateT.run_bind, StateT.run_get, pure_bind]
+          simp [ht, StateT.run_bind, StateT.run_get, monad_norm]
           simpa [simulateQ_map, StateT.map, StateT.run, Function.comp_def] using ih u cache₀
       | none =>
           simp only [OracleQuery.input_query, QueryImpl.withCaching_apply,
@@ -789,9 +789,8 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
               change (StateT.lift
                   (PFunctor.FreeM.lift ((CMOracle M S C).query t))
                   (cache₀.cacheQuery (m, s) cm) >>= _) = _
-              simp only [StateT.lift, bind_assoc, pure_bind,
-                modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
-                StateT.modifyGet, StateT.run]
+              simp only [StateT.lift, modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
+                StateT.modifyGet, StateT.run, monad_norm]
               rfl
             have hmiss_common :
                 (liftM ((CMOracle M S C).cachingOracle t) :
@@ -805,7 +804,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
               change (StateT.lift
                 (PFunctor.FreeM.lift ((CMOracle M S C).query t))
                 cache₀ >>= _) = _
-              simp only [StateT.lift, bind_assoc, pure_bind,
+              simp only [StateT.lift, monad_norm,
                 modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
                 StateT.modifyGet, StateT.run]
               rfl

@@ -73,7 +73,7 @@ theorem perfectlyCorrect_composeWithDEM
   simp only [AsymmEncAlg.CorrectExp, composeWithDEM]
   rw [← hkem]
   unfold KEMScheme.CorrectExp
-  simp only [bind_assoc, pure_bind]
+  simp only [monad_norm]
   apply probOutput_bind_congr
   intro ⟨pk, sk⟩ hks
   apply probOutput_bind_congr
@@ -93,7 +93,7 @@ theorem perfectlyCorrect_composeWithDEM
   have hkEq := kem_decaps_mem_support hkem hks hck hkOpt
   subst hkEq
   simp only [probOutput_pure]
-  simpa [DEMScheme.CorrectExp, bind_assoc]
+  simpa [DEMScheme.CorrectExp, monad_norm]
     using (hdem k msg)
 
 end Correct
