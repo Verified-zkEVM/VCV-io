@@ -1179,12 +1179,12 @@ inductive ProbEqAction where
 
 private def normalizeProbEqGoal : TacticM Unit := do
   discard <| tryEvalTacticSyntax (← `(tactic|
-    simp only [monad_norm]))
+    simp only [map_eq_bind_pure_comp, bind_assoc]))
 
 def runProbEqSwap : TacticM Bool := do
   normalizeProbEqGoal
   tryEvalTacticSyntax (← `(tactic| (
-    try simp only [monad_norm]
+    try simp only [bind_assoc]
     first
       | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
          exact probEvent_bind_bind_swap _ _ _ _)
