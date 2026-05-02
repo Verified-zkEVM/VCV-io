@@ -194,7 +194,7 @@ import VCVio.OracleComp.QueryTracking.WriterCost
 import VCVio.OracleComp.RunIO
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.BundledSemantics
-import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.SimSemantics.QueryImpl.Constructions
 import VCVio.OracleComp.SimSemantics.PreservesInv
 import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.SimSemantics.ReaderT

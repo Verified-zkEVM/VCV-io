@@ -1514,11 +1514,7 @@ private theorem replayRun_mem_support_replayFirstRun_append [spec.DecidableEq]
       rcases ih (u := us.1) (st₀ := us.2) (z := z) hzcont with ⟨log, hlog, hobs⟩
       refine ⟨⟨t, us.1⟩ :: log, ?_, ?_⟩
       · rw [replayFirstRun, OracleComp.run_simulateQ_loggingOracle_query_bind]
-        rw [support_bind]
-        simp only [Set.mem_iUnion]
-        refine ⟨us.1, mem_support_query t us.1, ?_⟩
-        rw [support_map]
-        exact ⟨(z.1, log), hlog, by simp⟩
+        simpa [replayFirstRun] using hlog
       · calc
           z.2.observed = us.2.observed ++ log := hobs
           _ = st₀.observed.logQuery t us.1 ++ log := by

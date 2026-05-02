@@ -228,7 +228,6 @@ def OracleSpec.loggingOracle {spec : OracleSpec ι} :
 
 namespace loggingOracle
 
-
 /-- Specialization of `QueryImpl.probFailure_run_simulateQ_withLogging` to `loggingOracle`. -/
 @[simp]
 lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
@@ -289,11 +288,7 @@ lemma run_simulateQ_loggingOracle_query_bind
   simp [loggingOracle, QueryImpl.withLogging_apply, OracleQuery.cont_query,
     Function.id_def]
 
-/-! ### Bidirectional query-bound transfer for `loggingOracle` / `withLogging`
-
-The writer log overlay leaves the underlying query structure untouched, so all three
-query-bound flavors transfer biconditionally via `fst_map_run_simulateQ` /
-`QueryImpl.fst_map_run_withLogging` and `isXQueryBound_iff_of_map_eq`. -/
+section isQueryBound
 
 theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
     {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
@@ -399,6 +394,8 @@ theorem log_length_le_of_mem_support_run_simulateQ
         ih qu.1 (m - 1) (hrest qu.1) z' hz'
       have hm : 1 + (m - 1) = m := by omega
       simpa [List.length_append, hqu_log, hm] using Nat.add_le_add_left hz'_len 1
+
+end isQueryBound
 
 end OracleComp
 

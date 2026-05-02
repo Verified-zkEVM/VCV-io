@@ -16,12 +16,11 @@ open OracleSpec OracleComp Prod Sum
 
 universe u v w
 
-variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
-
 namespace QueryImpl
 
 section compose
 
+variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
 variable {ι' : Type} {spec' : OracleSpec ι'} {m : Type u → Type v} [Monad m] [LawfulMonad m]
 
 /-- Given an implementation of `spec` in terms of a new set of oracles `spec'`,
@@ -47,11 +46,44 @@ lemma simulateQ_compose (so' : QueryImpl spec' m)
 
 end compose
 
+section insertPre
+
+variable {m : Type u → Type v} [Monad m]
+    {n : Type u → Type w} [Monad n] [MonadLiftT m n]
+    {ι : Type*} {spec : OracleSpec ι}
+
+/-- Given monads `m` and `n` with `MonadLiftT m n`, an implementation of `spec` in `m`,
+and a computation `nx` in `n` for each query input, construct a new implementation
+`QueryImpl.preInsert so nx` that calls `nx` on every query before the actual substitution `so`.
+Note that `nx` is expected to have some side-effects, it's actual result is discarded. -/
+def preInsert (so : QueryImpl spec m) {α} (nx : spec.Domain → n α) :
+    QueryImpl spec n :=
+  fun t => do let _ ← nx t; liftM (so t)
+
+end insertPre
+
+section insertPost
+
+variable {m : Type u → Type v} [Monad m]
+    {n : Type u → Type w} [Monad n] [MonadLiftT m n]
+    {ι : Type*} {spec : OracleSpec ι}
+
+/-- Given monads `m` and `n` with `MonadLiftT m n`, an implementation of `spec` in `m`,
+and a computation `nx` in `n` for each query output, construct a new implementation
+`QueryImpl.postInsert so nx` that calls `nx` on on the result of each substitution.
+Note that `nx` is expected to have some side-effects, it's actual result is discarded. -/
+def postInsert (so : QueryImpl spec m) {α} (nx : (t : spec.Domain) → spec.Range t → n α) :
+    QueryImpl spec n :=
+  fun t => do let u ← liftM (so t); let _ ← nx t u; return u
+
+end insertPost
+
 end QueryImpl
 
-/-- Simulation oracle for replacing queries with uniform random selection, using `unifSpec`.
-The resulting computation is still identical under `evalDist`.
-The relevant `OracleSpec` can usually be inferred automatically, so we leave it implicit. -/
+variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
+
+/-- Given that the output type of all oracles has a `SampleableType` instance, replace all queries
+with uniformly random responses by calling the corresponding `uniformSample` at each query. -/
 def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
     QueryImpl spec ProbComp := fun t => $ᵗ spec.Range t
 

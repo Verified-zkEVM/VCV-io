@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.Structures
+import VCVio.OracleComp.SimSemantics.QueryImpl.Constructions
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.SimSemantics.WriterT
 import ToMathlib.Control.Trace
@@ -77,7 +78,7 @@ the writer `ω` *before* running the handler. The trace value depends only on
 the query, so a failure inside the handler still leaves the trace recorded. -/
 def withTraceBefore (so : QueryImpl spec m) (traceFn : spec.Domain → ω) :
     QueryImpl spec (WriterT ω m) :=
-  fun t => do tell (traceFn t); so t
+  so.preInsert fun t => tell (traceFn t)
 
 @[simp, grind =]
 lemma withTraceBefore_apply (so : QueryImpl spec m) (traceFn : spec.Domain → ω)
@@ -151,7 +152,7 @@ A handler failure skips the trace (the response never materialised). -/
 def withTrace (so : QueryImpl spec m)
     (traceFn : (t : spec.Domain) → spec.Range t → ω) :
     QueryImpl spec (WriterT ω m) :=
-  fun t => do let u ← so t; tell (traceFn t u); return u
+  so.postInsert fun t u => tell (traceFn t u)
 
 @[simp, grind =]
 lemma withTrace_apply (so : QueryImpl spec m)
@@ -235,7 +236,7 @@ push, `bind` concatenates with `++`). The trace value depends only on the
 query, so a failure inside the handler still leaves the trace recorded. -/
 def withTraceAppendBefore (so : QueryImpl spec m) (traceFn : spec.Domain → ω) :
     QueryImpl spec (WriterT ω m) :=
-  fun t => do tell (traceFn t); so t
+  so.preInsert fun t => tell (traceFn t)
 
 @[simp, grind =]
 lemma withTraceAppendBefore_apply (so : QueryImpl spec m) (traceFn : spec.Domain → ω)
@@ -301,7 +302,7 @@ A handler failure skips the trace (the response never materialised). -/
 def withTraceAppend (so : QueryImpl spec m)
     (traceFn : (t : spec.Domain) → spec.Range t → ω) :
     QueryImpl spec (WriterT ω m) :=
-  fun t => do let u ← so t; tell (traceFn t u); return u
+  so.postInsert fun t u => tell (traceFn t u)
 
 @[simp, grind =]
 lemma withTraceAppend_apply (so : QueryImpl spec m)
