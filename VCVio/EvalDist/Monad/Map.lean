@@ -27,7 +27,7 @@ open ENNReal
 @[simp, grind =]
 lemma support_map [HasEvalSet m] [LawfulMonad m] (f : α → β) (mx : m α) :
     support (f <$> mx) = f '' support mx := by
-  simp [map_eq_bind_pure_comp]
+  simp [monad_norm]
   aesop
 
 @[simp, grind =]
@@ -38,7 +38,7 @@ lemma finSupport_map [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
 
 @[simp, grind =]
 lemma evalDist_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (f : α → β) :
-    𝒟[f <$> mx] = f <$> (𝒟[mx]) := by simp [map_eq_bind_pure_comp]
+    𝒟[f <$> mx] = f <$> (𝒟[mx]) := by simp [monad_norm]
 
 lemma evalDist_map_eq_of_evalDist_eq [HasEvalSPMF m] [LawfulMonad m]
     {mx my : m α} (h : 𝒟[mx] = 𝒟[my]) (f : α → β) :
@@ -77,7 +77,7 @@ lemma probOutput_map_eq_tsum_subtype (y : β) :
 
 lemma probOutput_map_eq_tsum (y : β) :
     Pr[= y | f <$> mx] = ∑' x, Pr[= x | mx] * Pr[= y | (pure (f x) : m β)] := by
-  simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum, Function.comp_apply]
+  simp [monad_norm, probOutput_bind_eq_tsum]
 
 lemma probOutput_map_eq_tsum_subtype_ite [DecidableEq β] (y : β) :
     Pr[= y | f <$> mx] = ∑' x : support mx, if y = f x then Pr[= x | mx] else 0 := by
@@ -111,7 +111,7 @@ lemma probOutput_map_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α]
 
 @[simp, grind =]
 lemma probFailure_map : Pr[⊥ | f <$> mx] = Pr[⊥ | mx] := by
-  simp [map_eq_bind_pure_comp, probFailure_bind_eq_add_tsum]
+  simp [monad_norm, probFailure_bind_eq_add_tsum]
 
 @[simp, grind =]
 lemma probEvent_map (q : β → Prop) : Pr[ q | f <$> mx] = Pr[ q ∘ f | mx] := by
@@ -154,13 +154,13 @@ lemma finSupport_map_const [DecidableEq α] [DecidableEq β] [HasEvalFinset m]
 lemma probOutput_map_const (y' : β) :
     Pr[= y' | (fun _ => y) <$> mx] =
       (1 - Pr[⊥ | mx]) * Pr[= y' | (pure y : m β)] := by
-  rw [map_eq_bind_pure_comp, Function.comp_def, probOutput_bind_const]
+  simp only [monad_norm, Function.comp_def, probOutput_bind_const]
 
 @[simp, aesop safe norm, grind =_]
 lemma probEvent_map_const (p : β → Prop) :
     Pr[ p | (fun _ => y) <$> mx] =
       (1 - Pr[⊥ | mx]) * Pr[ p | (pure y : m β)] := by
-  rw [map_eq_bind_pure_comp, Function.comp_def, probEvent_bind_const]
+  simp only [monad_norm, Function.comp_def, probEvent_bind_const]
 
 @[simp, aesop safe norm]
 lemma probEvent_map_const' (p : β → Prop) [DecidablePred p] :

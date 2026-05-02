@@ -526,8 +526,7 @@ theorem countingOracle_triple (t : spec.Domain) (qc₀ : QueryCount ι) :
         (fun x => (x, QueryCount.single t * (1 : QueryCount ι))) <$>
           (HasQuery.query t : OracleComp spec _) := by
     change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query,
-      bind_assoc, map_eq_bind_pure_comp]
+    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query, monad_norm]
   rw [hrun] at hmem
   simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
@@ -595,8 +594,7 @@ theorem costOracle_triple (costFn : spec.Domain → ω)
       (fun x => (x, costFn t * (1 : ω))) <$>
         (HasQuery.query t : OracleComp spec _) := by
     change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query,
-      bind_assoc, map_eq_bind_pure_comp]
+    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query, monad_norm]
   rw [hrun] at hmem
   simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem

@@ -35,7 +35,7 @@ lemma uniformMaskedCipher_bind_dist_indep {β : Type}
       evalDist_map_eq_of_evalDist_eq
         (h := evalDist_add_left_uniform_eq (α := M) m₁ m₂)
         (f := fun z : M => (head, z))
-  simpa [map_eq_bind_pure_comp, Function.comp, evalDist_bind, bind_assoc] using
+  simpa [monad_norm, Function.comp, evalDist_bind] using
     congrArg (fun p => p >>= fun c => 𝒟[cont c]) hmask
 
 end ElGamalExamples

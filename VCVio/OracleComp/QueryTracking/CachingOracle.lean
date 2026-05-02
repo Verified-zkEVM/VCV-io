@@ -219,8 +219,7 @@ lemma withCaching_cache_le [LawfulMonad m] [HasEvalSet m]
     simp only [ht, StateT.run_bind] at hz
     have hlift : (liftM (so t) : StateT spec.QueryCache m (spec.Range t)).run cache₀ =
         so t >>= fun v => pure (v, cache₀) := rfl
-    rw [hlift, bind_assoc] at hz
-    simp only [pure_bind] at hz
+    simp only [hlift, monad_norm] at hz
     rcases (mem_support_bind_iff _ _ _).1 hz with ⟨v, _, hmod⟩
     have : (modifyGet fun c => (v, QueryCache.cacheQuery c t v) :
         StateT spec.QueryCache m (spec.Range t)).run cache₀ =
@@ -486,9 +485,9 @@ private lemma fst_map_cachingOracle_run_some (cache : spec.QueryCache) (t : spec
   unfold cachingOracle QueryImpl.withCaching QueryImpl.ofLift
   simp only [StateT.run_bind,
     show (get : StateT spec.QueryCache (OracleComp spec) _).run cache =
-      (pure (cache, cache) : OracleComp spec _) from rfl, pure_bind, hv,
+      (pure (cache, cache) : OracleComp spec _) from rfl, monad_norm, hv,
     show (pure v : StateT spec.QueryCache (OracleComp spec) _).run cache =
-      (pure (v, cache) : OracleComp spec _) from rfl, map_pure]
+      (pure (v, cache) : OracleComp spec _) from rfl, Function.comp_apply]
 
 private lemma fst_map_cachingOracle_run_none (cache : spec.QueryCache) (t : spec.Domain)
     (hv : cache t = none) :
@@ -497,15 +496,14 @@ private lemma fst_map_cachingOracle_run_none (cache : spec.QueryCache) (t : spec
   unfold cachingOracle QueryImpl.withCaching QueryImpl.ofLift
   simp only [StateT.run_bind,
     show (get : StateT spec.QueryCache (OracleComp spec) _).run cache =
-      (pure (cache, cache) : OracleComp spec _) from rfl, pure_bind, hv,
+      (pure (cache, cache) : OracleComp spec _) from rfl, monad_norm, hv,
     show (liftM (query t : OracleComp spec _) :
         StateT _ (OracleComp spec) _).run cache =
       ((query t : OracleComp spec _) >>= fun u => pure (u, cache)) from rfl,
-    bind_assoc, pure_bind,
     show ∀ u, (modifyGet (fun c : QueryCache spec => (u, c.cacheQuery t u)) :
         StateT _ (OracleComp spec) _).run cache =
       (pure (u, cache.cacheQuery t u) : OracleComp spec _) from fun _ => rfl,
-    map_bind, map_pure, bind_pure]
+    map_bind, Function.comp_apply]
 
 lemma withCacheOverlay_query_hit (cache : spec.QueryCache) (t : spec.Domain)
     (v : spec.Range t) (hv : cache t = some v) :
@@ -570,7 +568,7 @@ theorem cachingOracle_query_caches (t : spec.Domain)
         StateT (QueryCache spec) (OracleComp spec) _).run cache₀ =
         ((liftM (query t) : OracleComp _ _) >>= fun u =>
           pure (u, cache₀)) from rfl] at hmem
-    rw [bind_assoc] at hmem; simp only [pure_bind] at hmem
+    simp only [monad_norm] at hmem
     rw [support_bind] at hmem; simp only [Set.mem_iUnion] at hmem
     obtain ⟨u, _, hmem⟩ := hmem
     simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,

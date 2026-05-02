@@ -190,7 +190,7 @@ lemma mapM_map {α β} (x : FreeM P α) (f : α → β) :
 lemma mapM_seq {α β}
     (s : (a : P.A) → m (P.B a)) (x : FreeM P (α → β)) (y : FreeM P α) :
     FreeM.mapM s (x <*> y) = (FreeM.mapM s x) <*> (FreeM.mapM s y) := by
-  simp [seq_eq_bind_map]
+  simp [monad_norm]
 
 @[simp]
 lemma mapM_lift (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :

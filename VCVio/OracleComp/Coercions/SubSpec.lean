@@ -257,7 +257,7 @@ lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
 @[simp]
 lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
     liftComp (og <*> mx) superSpec = liftComp og superSpec <*> liftComp mx superSpec := by
-  simp [liftComp, seq_eq_bind_map]
+  simp [liftComp, monad_norm]
 
 -- NOTE: `liftComp_failure` cannot be stated for `OracleComp spec` because `failure` only exists
 -- in `OptionT (OracleComp spec)`, not in `OracleComp spec` itself. `OracleComp` is

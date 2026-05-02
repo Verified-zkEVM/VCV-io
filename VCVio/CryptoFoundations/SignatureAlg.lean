@@ -252,7 +252,7 @@ lemma unforgeableAdv.advantage_le_unforgeableExpNoFresh
         runtime.evalDist joint := by
     rw [← h_pull]
     congr 1
-    simp only [hjoint_def, bind_assoc, pure_bind]
+    simp only [hjoint_def, monad_norm]
   have hNoFresh : (runtime.evalDist do
         let (pk, sk) ← sigAlg.keygen
         let impl : QueryImpl (spec + (M →ₒ S))
@@ -267,7 +267,7 @@ lemma unforgeableAdv.advantage_le_unforgeableExpNoFresh
       (fun t : M × QueryLog (M →ₒ S) × Bool => t.2.2) <$> runtime.evalDist joint := by
     rw [← h_pull]
     congr 1
-    simp only [hjoint_def, bind_assoc, pure_bind, bind_pure]
+    simp only [hjoint_def, monad_norm]
   rw [hExp, hNoFresh, ← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
     probEvent_map, probEvent_map]
   refine probEvent_mono fun _ _ hv => ?_

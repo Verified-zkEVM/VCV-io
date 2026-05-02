@@ -108,9 +108,9 @@ lemma probEvent_from_fresh_query_le_inv
           let u ← (CMOracle M S C).query t
           pure (u, cache₀.cacheQuery t u)) := by
       simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
-        StateT.run_bind, StateT.run_get, pure_bind, hfresh]
+        StateT.run_bind, StateT.run_get, monad_norm, hfresh]
       change (StateT.lift (PFunctor.FreeM.lift ((CMOracle M S C).query t)) cache₀ >>= _) = _
-      simp only [StateT.lift, bind_assoc, pure_bind,
+      simp only [StateT.lift, monad_norm,
         modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
         StateT.modifyGet, StateT.run]
       rfl

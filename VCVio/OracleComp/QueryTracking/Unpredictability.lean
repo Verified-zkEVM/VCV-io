@@ -54,8 +54,7 @@ theorem probOutput_fresh_cachingOracle_query
     Pr[= (u, cache₀.cacheQuery t u) | (cachingOracle t).run cache₀] =
       (Fintype.card (spec'.Range t) : ℝ≥0∞)⁻¹ := by
   simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind, hfresh]
-  simp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift, StateT.run_lift, bind_assoc,
-    pure_bind]
+  simp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift, StateT.run_lift, monad_norm]
   simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
     StateT.modifyGet, StateT.run]
   erw [probOutput_map_injective _ (fun a b hab => by exact Prod.ext_iff.mp hab |>.1)]
@@ -157,11 +156,11 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
           simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
             StateT.run_bind, StateT.run_get, pure_bind, ht_none]
           change (StateT.lift (PFunctor.FreeM.lift (query t)) cache₀ >>= _) = _
-          simp only [StateT.lift, bind_assoc, pure_bind,
+          simp only [StateT.lift, monad_norm,
             modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
             StateT.modifyGet, StateT.run]
           rfl
-        rw [hstep, bind_assoc]; simp [pure_bind]
+        rw [hstep]; simp [monad_norm]
       rw [hrun]
       -- Decompose: ∑ u, Pr[=u|query t] * Pr[event | cont(u)]
       rw [probEvent_bind_eq_tsum]
