@@ -65,7 +65,7 @@ protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
   toFun_pure' x := by
     simp
   toFun_bind' x y := by
-    simp only [run_bind, Option.elimM, MonadHom.toFun_bind', bind_assoc]
+    simp only [run_bind, Option.elimM, MonadHom.toFun_bind', monad_norm]
     congr 1
     ext x; cases x; all_goals simp
 

@@ -150,7 +150,7 @@ lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type} {σ₁ σ₂ : Type}
   | query_bind t k ih =>
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
       id_map, StateT.run_bind, map_bind, evalDist_bind, evalDist_map, hh t s]
-    simp only [map_eq_bind_pure_comp, bind_assoc]
+    simp only [monad_norm]
     refine bind_congr fun p => ?_
     rcases p with ⟨x, s'⟩
     have hih := ih x (φ.symm s')

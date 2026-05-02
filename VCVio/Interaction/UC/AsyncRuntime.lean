@@ -272,8 +272,7 @@ theorem runStepsAsync_empty_trivial_eq
       simp [runStepsAsync, ProcessOver.runSteps]
   | succ n ih =>
       rw [runStepsAsync, ProcessOver.runSteps]
-      simp only [Interaction.UC.trivialEnvScheduler_apply, pure_bind,
-        bind_assoc, ih]
+      simp only [Interaction.UC.trivialEnvScheduler_apply, monad_norm, ih]
       rfl
 
 end Concurrent
@@ -398,7 +397,7 @@ theorem processSemantics_eq_processSemanticsAsync_trivial
         fuel ⟨init process, ()⟩
       observe process final.proc)
   rw [Concurrent.runStepsAsync_empty_trivial_eq]
-  simp only [bind_assoc, pure_bind]
+  simp only [monad_norm]
 
 /--
 The `ProbComp` specialization of `processSemantics_eq_processSemanticsAsync_trivial`:

@@ -158,8 +158,7 @@ omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited 
 private lemma extractabilityInner_eq_fst_tagged {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     extractabilityInner A = Prod.fst <$> extractabilityInner_tagged A := by
-  simp only [extractabilityInner, extractabilityInner_tagged, map_eq_bind_pure_comp,
-    bind_assoc, Function.comp, pure_bind]
+  simp only [extractabilityInner, extractabilityInner_tagged, monad_norm, Function.comp]
   congr 1; ext ⟨⟨cm, aux⟩, tr⟩
   congr 1; ext ⟨m, s⟩
   congr 1; ext c

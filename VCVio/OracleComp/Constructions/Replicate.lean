@@ -68,7 +68,7 @@ lemma replicateTR_eq_replicate : replicateTR n oa = replicate n oa := by
   | succ n ih => simp [List.replicate, List.mapM_cons, ih]
 
 lemma replicate_succ : replicate (n + 1) oa = List.cons <$> oa <*> replicate n oa := by
-  simp [replicate_succ_bind, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, Function.comp]
+  simp [replicate_succ_bind, monad_norm, Function.comp]
 
 @[simp]
 lemma replicate_pure (x : α) :

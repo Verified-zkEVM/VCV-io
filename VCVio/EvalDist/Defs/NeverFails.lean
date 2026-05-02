@@ -158,7 +158,7 @@ Mapping a value through a total function preserves `NeverFail`.
 @[simp, grind .]
 instance instMap [LawfulMonad m] {mx : m α} [h : NeverFail mx] (f : α → β) :
     NeverFail (f <$> mx) := by
-  simp only [map_eq_bind_pure_comp, bind_of_forall, Function.comp_def]
+  simp only [monad_norm, bind_of_forall, Function.comp_def]
 
 
 

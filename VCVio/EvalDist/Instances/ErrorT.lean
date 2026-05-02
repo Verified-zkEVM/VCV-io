@@ -147,7 +147,7 @@ noncomputable def toSPMF' [HasEvalPMF m] : ExceptT ε m →ᵐ SPMF where
   toFun_pure' x := by simp
   toFun_bind' mx f := by
     change HasEvalSPMF.toSPMF (mx.run >>= ExceptT.bindCont f) >>= _ = _
-    simp only [MonadHom.toFun_bind', bind_assoc]
+    simp only [MonadHom.toFun_bind', monad_norm]
     congr 1; funext r
     cases r with
     | ok a =>

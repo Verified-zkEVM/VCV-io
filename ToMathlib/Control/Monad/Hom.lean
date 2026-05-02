@@ -142,12 +142,10 @@ variable {m : Type u → Type v} [Monad m]
     F (mx >>= my) = F mx >>= fun x => F (my x) := by grind
 
 @[simp, grind =] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
-    (x : m α) (g : α → β) : F (g <$> x) = g <$> F x := by
-  simp [map_eq_bind_pure_comp]
+    (x : m α) (g : α → β) : F (g <$> x) = g <$> F x := by simp [monad_norm]
 
 @[simp] lemma mmap_seq [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
-    (x : m (α → β)) (y : m α) : F (x <*> y) = F x <*> F y := by
-  simp [seq_eq_bind_map]
+    (x : m (α → β)) (y : m α) : F (x <*> y) = F x <*> F y := by simp [monad_norm]
 
 @[simp] lemma mmap_seqLeft [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
     (x : m α) (y : m β) : F (x <* y) = F x <* F y := by

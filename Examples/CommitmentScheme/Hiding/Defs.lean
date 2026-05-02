@@ -155,13 +155,13 @@ lemma hidingImpl₁_step_totalBound (s : S) (ms : M × S)
   obtain ⟨cache, cnt⟩ := st
   cases hcache : cache ms with
   | some u =>
-      simpa [hidingImpl₁, hcache, StateT.run_bind, StateT.run_get, pure_bind] using
+      simpa [hidingImpl₁, hcache, StateT.run_bind, StateT.run_get, monad_norm] using
         (show IsTotalQueryBound
             (pure (u, (cache, cnt)) :
               OracleComp (CMOracle M S C) (C × (QueryCache (CMOracle M S C) × ℕ))) 1 from
           trivial)
   | none =>
-      simpa [hidingImpl₁, hcache, StateT.run_bind, StateT.run_get, pure_bind,
+      simpa [hidingImpl₁, hcache, StateT.run_bind, StateT.run_get, monad_norm,
         StateT.run_set, StateT.run_pure, OracleComp.liftM_run_StateT, MonadLift.monadLift]
         using
           (show IsTotalQueryBound
@@ -181,14 +181,14 @@ lemma hidingImplCountAll_step_totalBound (ms : M × S)
   obtain ⟨cache, counts⟩ := st
   cases hcache : cache ms with
   | some u =>
-      simpa [hidingImplCountAll, hcache, StateT.run_bind, StateT.run_get, pure_bind] using
+      simpa [hidingImplCountAll, hcache, StateT.run_bind, StateT.run_get, monad_norm] using
         (show IsTotalQueryBound
             (pure (u, (cache, counts)) :
               OracleComp (CMOracle M S C)
                 (C × (QueryCache (CMOracle M S C) × (S → ℕ)))) 1 from
           trivial)
   | none =>
-      simpa [hidingImplCountAll, hcache, StateT.run_bind, StateT.run_get, pure_bind,
+      simpa [hidingImplCountAll, hcache, StateT.run_bind, StateT.run_get, monad_norm,
         StateT.run_set, StateT.run_pure, OracleComp.liftM_run_StateT, MonadLift.monadLift]
         using
           (show IsTotalQueryBound

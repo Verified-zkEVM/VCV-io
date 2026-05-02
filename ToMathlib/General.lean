@@ -661,7 +661,7 @@ theorem List.forIn_mprod_yield_eq_foldlM
   | nil => simp [List.forIn_nil, List.foldlM_nil]
   | cons x xs ih =>
     rw [List.forIn_cons, List.foldlM_cons, hfg]
-    simp only [bind_assoc, pure_bind]
+    simp only [monad_norm]
     congr 1; funext ⟨b', c'⟩
     exact ih b' c'
 
@@ -676,8 +676,6 @@ theorem bind_eq_of_map_eq {m : Type → Type*} [Monad m] [LawfulMonad m]
     (h_first : proj <$> m₁ = m₂)
     (h_cont : ∀ a₁, f₁ a₁ = f₂ (proj a₁)) :
     m₁ >>= f₁ = m₂ >>= f₂ := by
-  rw [← h_first, map_eq_bind_pure_comp, bind_assoc]
-  simp only [Function.comp, pure_bind]
-  exact bind_congr fun a₁ => h_cont a₁
+  simp only [← h_first, monad_norm, funext h_cont, Function.comp_apply]
 
 end CrossTypeBind

@@ -358,11 +358,11 @@ the bind rule entirely when both sides reduce to a leaf). -/
 
 example {a : α} {f : α → OracleComp spec β} :
     ⟪(do let x ← pure a; f x) ~ f a | EqRel β⟫ := by
-  simpa only [pure_bind] using (relTriple_refl (oa := f a))
+  simpa only [monad_norm] using (relTriple_refl (oa := f a))
 
 example {oa : OracleComp spec α} {f : α → OracleComp spec β} {g : β → OracleComp spec γ} :
     ⟪((oa >>= f) >>= g) ~ (do let x ← oa; let y ← f x; g y) | EqRel γ⟫ := by
-  simpa only [bind_assoc] using
+  simpa only [monad_norm] using
     (relTriple_refl (oa := oa >>= fun x => f x >>= g))
 
 /-! ## Regression: multi-goal isolation

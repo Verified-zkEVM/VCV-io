@@ -43,7 +43,7 @@ lemma complete (sp : ℕ) : (oneTimePad sp).Complete := by
   have hsimp : (oneTimePad sp).CompleteExp msg =
       (fun _ : BitVec sp => (some msg : Option (BitVec sp))) <$>
         ($ᵗ BitVec sp : ProbComp (BitVec sp)) := by
-    simp [SymmEncAlg.CompleteExp, oneTimePad, map_eq_bind_pure_comp, pure_bind, Function.comp]
+    simp [SymmEncAlg.CompleteExp, oneTimePad, monad_norm]
   rw [hsimp, probOutput_eq_one_iff]
   exact ⟨HasEvalPMF.probFailure_eq_zero _,
     support_map_const (mx := ($ᵗ BitVec sp : ProbComp (BitVec sp))) (y := some msg)
@@ -54,7 +54,7 @@ lemma probOutput_cipher_uniform (sp : ℕ)
     Pr[= σ | (oneTimePad sp).PerfectSecrecyCipherExp mgen] =
       (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
   simpa [SymmEncAlg.PerfectSecrecyCipherExp, SymmEncAlg.PerfectSecrecyExp, oneTimePad,
-    map_eq_bind_pure_comp, bind_assoc, pure_bind] using
+    monad_norm] using
     probOutput_cipher_from_pair_uniform sp (mx := mgen) σ
 
 /-- The one-time pad is perfectly secret in the canonical independence form. -/
@@ -65,7 +65,7 @@ lemma perfectSecrecyAt (sp : ℕ) : (oneTimePad sp).perfectSecrecyAt := by
         Pr[= msg | mgen] *
           (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
     simpa [SymmEncAlg.PerfectSecrecyExp, oneTimePad,
-      bind_assoc, pure_bind] using
+      monad_norm] using
       probOutput_pair_xor_uniform sp (mx := mgen) msg σ
   rw [hpair, ← probOutput_cipher_uniform]
 

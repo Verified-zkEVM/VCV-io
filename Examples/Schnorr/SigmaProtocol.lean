@@ -99,7 +99,7 @@ theorem sigma_complete (g : G) :
     PerfectlyComplete (sigma F G g) := by
   intro pk sk h
   have h_eq : sk • g = pk := of_decide_eq_true h
-  simp only [sigma, pure_bind]
+  simp only [sigma, monad_norm]
   have hverify : ∀ (r c : F), (r + c * sk) • g = r • g + c • pk := by
     intro r c; rw [add_smul, mul_smul, h_eq]
   simp [hverify]
@@ -175,7 +175,7 @@ private lemma realTranscript_eq_indep (g : G) (pk : G) (sk : F) :
         let r ← $ᵗ F
         let c ← $ᵗ F
         pure ((r • g, c, r + c * sk) : G × F × F)) := by
-  simp only [SigmaProtocol.realTranscript, sigma, bind_assoc, pure_bind]
+  simp only [SigmaProtocol.realTranscript, sigma, monad_norm]
 
 omit [DecidableEq F] in
 /-- **Simulator commit-predictability for Schnorr.** With the standard bijection
@@ -217,7 +217,7 @@ theorem sigma_simCommitPredictability (g : G)
       intro c
       have h_map : (do let z ← ($ᵗ F); pure (z • g - c • pk) : ProbComp G) =
           (fun z : F => z • g - c • pk) <$> ($ᵗ F) := by
-        simp [map_eq_bind_pure_comp]
+        simp [monad_norm]
       rw [h_map,
         probOutput_map_bijective_uniform_cross F (f := fun z : F => z • g - c • pk) (hbij_c c),
         probOutput_uniformSample (α := G)]
