@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.SimSemantics.SimulateQ
+import VCVio.OracleComp.EvalDist
 import VCVio.EvalDist.Bool
 import VCVio.EvalDist.Prod
 import Init.Data.UInt.Lemmas
@@ -496,3 +498,56 @@ lemma probOutput_decide_eq_uniformBool_half
     rwa [Fintype.sum_bool] at this
   rw [htrue, hfalse, h true, ← mul_add, hsum, mul_one]
   simp [one_div]
+
+section UniformSampleImpl
+
+open OracleSpec OracleComp
+
+variable {ι : Type*} {spec : OracleSpec ι}
+
+/-- Given that the output type of all oracles has a `SampleableType` instance, replace all queries
+with uniformly random responses by calling the corresponding `uniformSample` at each query. -/
+def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
+    QueryImpl spec ProbComp := fun t => $ᵗ spec.Range t
+
+namespace uniformSampleImpl
+
+variable {ι₀ : Type} {spec₀ : OracleSpec ι₀} [∀ i, SampleableType (spec₀.Range i)]
+
+@[simp]
+lemma evalDist_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) :
+    𝒟[simulateQ uniformSampleImpl oa] = 𝒟[oa] := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t mx h => simp [h, uniformSampleImpl]
+
+@[simp]
+lemma probOutput_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) (x : α) :
+    Pr[= x | simulateQ uniformSampleImpl oa] = Pr[= x | oa] :=
+  congrFun (congrArg DFunLike.coe (evalDist_simulateQ oa)) x
+
+@[simp]
+lemma probEvent_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) (p : α → Prop) :
+    Pr[ p | simulateQ uniformSampleImpl oa] = Pr[ p | oa] := by
+  simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
+
+@[simp]
+lemma support_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) :
+    support (simulateQ uniformSampleImpl oa) = support oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t mx h => simp [h, uniformSampleImpl]
+
+@[simp]
+lemma finSupport_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    [DecidableEq α] (oa : OracleComp spec₀ α) :
+    finSupport (simulateQ uniformSampleImpl oa) = finSupport oa := by
+  simp [finSupport_eq_iff_support_eq_coe]
+
+end uniformSampleImpl
+
+end UniformSampleImpl
