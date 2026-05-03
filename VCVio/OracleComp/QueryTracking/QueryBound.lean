@@ -9,7 +9,7 @@ import ToMathlib.PFunctor.Bound
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.SimSemantics.Append
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
 # Bounding Queries Made by a Computation

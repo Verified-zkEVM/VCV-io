@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Instances.OptionT
 import VCVio.OracleComp.SimSemantics.SimulateQ
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
 # Output Distribution of Computations

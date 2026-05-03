@@ -7,7 +7,7 @@ import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.SimSemantics.QueryImpl.Constructions
 import VCVio.OracleComp.SimSemantics.PreservesInv
-import VCVio.OracleComp.SimSemantics.StateProjection
+import VCVio.OracleComp.SimSemantics.StateT.StateProjection
 
 /-!
 # Caching Queries Made by a Computation

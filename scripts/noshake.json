@@ -10,7 +10,9 @@
   "VCVio.EvalDist.Defs.Support":
    ["VCVio.Prelude", "ToMathlib.ProbabilityTheory.SPMF"],
   "VCVio.OracleComp.SimSemantics.SimulateQ":
-   ["VCVio.Prelude", "ToMathlib.Control.OptionT"],
+   ["VCVio.Prelude"],
+  "VCVio.OracleComp.SimSemantics.OptionT.Basic":
+   ["ToMathlib.Control.OptionT"],
   "VCVio.OracleComp.Coercions.Add":
    ["VCVio.OracleComp.ProbComp"],
   "VCVio.OracleComp.QueryTracking.Structures":

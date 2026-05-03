@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.SeededFork
-import VCVio.OracleComp.SimSemantics.StateProjection
+import VCVio.OracleComp.SimSemantics.StateT.StateProjection
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 
 /-!
