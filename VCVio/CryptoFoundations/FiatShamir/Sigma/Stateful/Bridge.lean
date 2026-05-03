@@ -262,7 +262,7 @@ lemma cmaRealRun_eq_keygen_bind
             ((([] : List M), (∅ : RoCache M Commit Chal),
               (some (ps.1, ps.2) : Option (Stmt × Wit))), false))) by
     simp [cmaReal, cmaInit, StateT.run, StateT.mk]]
-  simp only [bind_assoc, pure_bind]
+  simp only [monad_norm]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-! ## Joint signing/hash query bounds -/

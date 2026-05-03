@@ -90,7 +90,7 @@ lemma probOutput_bind_bijective_uniform_cross
   haveI := Fintype.ofBijective f hf
   have h : (($ᵗ α) >>= fun x => g (f x)) =
       ((f <$> ($ᵗ α)) >>= g) := by
-    simp [map_eq_bind_pure_comp, bind_assoc, pure_bind]
+    simp [monad_norm]
   rw [h, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   congr 1
   funext y
@@ -125,7 +125,7 @@ lemma probOutput_bind_add_left_uniform [AddGroup α] {β : Type}
   have hleft :
       (do let y ← $ᵗ α; f (m + y)) =
         (((fun y : α => m + y) <$> ($ᵗ α)) >>= fun y => f y) := by
-    simp [map_eq_bind_pure_comp, bind_assoc]
+    simp [monad_norm]
   rw [hleft, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   refine tsum_congr fun y => ?_
   rw [probOutput_add_left_uniform (α := α) m y]
@@ -144,7 +144,7 @@ lemma probOutput_bind_add_right_uniform [AddGroup α] {β : Type}
   have hright :
       (do let y ← $ᵗ α; f (y + m)) =
         (((fun y : α => y + m) <$> ($ᵗ α)) >>= fun y => f y) := by
-    simp [map_eq_bind_pure_comp, bind_assoc]
+    simp [monad_norm]
   rw [hright, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   refine tsum_congr fun y => ?_
   rw [probOutput_add_right_uniform (α := α) m y]
@@ -208,13 +208,13 @@ lemma evalDist_bind_bijective_add_right_uniform {β γ : Type}
   have hbind :
       (do let x ← ($ᵗ α); cont (f x + m)) =
         (f <$> ($ᵗ α)) >>= fun y => cont (y + m) := by
-    simp [map_eq_bind_pure_comp, bind_assoc]
+    simp [monad_norm]
   rw [hbind, evalDist_bind,
       evalDist_map_bijective_uniform_cross (α := α) (β := β) f hf, ← evalDist_bind]
   have hshift :
       (do let y ← ($ᵗ β); cont (y + m)) =
         (((· + m) : β → β) <$> ($ᵗ β)) >>= cont := by
-    simp [map_eq_bind_pure_comp, bind_assoc]
+    simp [monad_norm]
   rw [hshift, evalDist_bind, evalDist_add_right_uniform (α := β) m, ← evalDist_bind]
 
 /-- Constant-irrelevance form of `evalDist_bind_bijective_add_right_uniform`: sampling through a

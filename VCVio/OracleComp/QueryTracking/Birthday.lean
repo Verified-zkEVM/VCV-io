@@ -660,10 +660,10 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
             StateT.run_bind, StateT.run_get, pure_bind, ht_none]
           -- Goal involves StateT.lift ... cache₀
           change (StateT.lift (PFunctor.FreeM.lift (query t)) cache₀ >>= _) = _
-          simp only [StateT.lift, bind_assoc, pure_bind,
+          simp only [StateT.lift, monad_norm,
             modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
             StateT.modifyGet, StateT.run]; rfl
-        rw [hstep, bind_assoc]; simp [pure_bind]
+        rw [hstep]; simp [monad_norm]
       rw [hrun]
       -- Apply probEvent_bind_le_add to decompose:
       -- ε₁ = Pr[CacheHasCollision (cache₀.cacheQuery t u) | u ← query t] ≤ k * C⁻¹

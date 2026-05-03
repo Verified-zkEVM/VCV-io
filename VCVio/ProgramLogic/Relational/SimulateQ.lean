@@ -1508,7 +1508,7 @@ lemma expectedQuerySlack_bind_eq_of_right_zero
   | pure x =>
       simp [hzero x qS p]
   | query_bind t cont ih =>
-      simp only [bind_assoc]
+      simp only [monad_norm]
       rw [expectedQuerySlack_query_bind, expectedQuerySlack_query_bind]
       congr
       funext u qS' p'

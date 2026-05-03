@@ -186,7 +186,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
       pure (decide (bit = bit'))]
     · refine probOutput_bind_congr' ($ᵗ G) true ?_
       intro head
-      simpa [inner, bind_assoc, map_eq_bind_pure_comp] using
+      simpa [inner, monad_norm] using
         (probOutput_bind_bind_swap
           ($ᵗ G)
           (do
@@ -197,7 +197,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
             let bit' ← adv.distinguish x.2.2 (head, mask + if bit then x.1 else x.2.1)
             pure (decide (bit = bit')))
           true)
-    · simpa [f, bind_assoc, map_eq_bind_pure_comp] using
+    · simpa [f, monad_norm] using
         (probOutput_bind_bind_swap
           (do
             let head ← ($ᵗ G)
@@ -227,8 +227,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
         let bit ← ($ᵗ Bool)
         let bit' ← adv.distinguish st (b • gen, c • gen + if bit then m₁ else m₂)
         pure (decide (bit = bit'))]
-      · simpa [DiffieHellman.ddhExpRand, IND_CPA_OneTime_DDHReduction, bind_assoc,
-          map_eq_bind_pure_comp,
+      · simpa [DiffieHellman.ddhExpRand, IND_CPA_OneTime_DDHReduction, monad_norm,
           show ∀ a b : Bool, (a == b) = decide (a = b) from by decide] using
           (probOutput_bind_bijective_uniform_cross
             (α := F) (β := G) (f := (· • gen)) hg
@@ -249,7 +248,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
           let bit ← ($ᵗ Bool)
           let bit' ← adv.distinguish st (head, c • gen + if bit then m₁ else m₂)
           pure (decide (bit = bit'))]
-        · simpa [bind_assoc, map_eq_bind_pure_comp] using
+        · simpa [monad_norm] using
             (probOutput_bind_bijective_uniform_cross
               (α := F) (β := G) (f := (· • gen)) hg
               (g := fun head => do
@@ -261,7 +260,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
               true)
         · refine probOutput_bind_congr' ($ᵗ G) true ?_
           intro head
-          simpa [inner, bind_assoc, map_eq_bind_pure_comp] using
+          simpa [inner, monad_norm] using
             (probOutput_bind_bijective_uniform_cross
               (α := F) (β := G) (f := (· • gen)) hg
               (g := fun mask => do

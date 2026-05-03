@@ -93,7 +93,11 @@ ASCII banners are visually loud, do not appear in the generated documentation, a
 ## Style Notes
 
 - Keep imports at the top of the file.
-- Follow Mathlib naming conventions where possible.
+- Follow Mathlib naming conventions where possible. See the [Mathlib naming guide](https://leanprover-community.github.io/contribute/naming.html) for the full set of rules. The capitalization rules in particular:
+  - Terms of `Prop`s (e.g. proofs, theorem names) use `snake_case`.
+  - `Prop`s and `Type`s (or `Sort`) (inductive types, structures, classes) are in `UpperCamelCase`.
+  - Functions are named the same way as their return values (e.g. a function of type `A → B → C` is named as though it is a term of type `C`).
+  - All other terms of `Type`s (basically anything else) are in `lowerCamelCase`.
 - Respect the module layering documented in [`AGENTS.md`](AGENTS.md).
 - Use `/-! ## Title -/` doc-headers, not ASCII banners, for inline section breaks (see *Documentation Expectations* above).
 

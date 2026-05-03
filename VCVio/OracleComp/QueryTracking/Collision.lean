@@ -160,7 +160,7 @@ theorem log_entry_in_cache_and_mono {α : Type}
       (fun zz : (α × QueryLog spec) × QueryCache spec =>
         ((zz.1.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: zz.1.2), zz.2)) <$>
       ((simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run)).run cache_mid)
-      from by simp only [StateT.map, StateT.run, map_eq_bind_pure_comp,
+      from by simp only [StateT.map, StateT.run, monad_norm,
         Function.comp_def]] at hmem
     rw [support_map] at hmem
     obtain ⟨⟨⟨x', log'⟩, cache_final⟩, hmem_cont, heq⟩ := hmem

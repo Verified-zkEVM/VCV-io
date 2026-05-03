@@ -28,6 +28,43 @@
    → Use `vcstep` if the swap should close the goal
    → Use `vcstep rw` (or `vcstep rw under n`) if you need to continue after rewriting
 
+## Monadic Normalization with `monad_norm`
+
+The canonical way to normalize monadic expressions in this codebase is Mathlib's
+`monad_norm` simp set (declared in `Mathlib.Tactic.Attr.Register`). It bundles
+`pure_bind`, `bind_assoc`, `bind_pure`, `map_pure`, `pure_seq`, `seq_assoc`,
+`seq_eq_bind_map`, and `map_eq_bind_pure_comp`, which between them push goals
+toward an associated bind-canonical form.
+
+Prefer `simp [monad_norm]` (or `simp […, monad_norm]`) over hand-rolled lemma
+lists like `simp [bind_assoc, pure_bind, …]`. It documents intent, keeps proofs
+robust if Mathlib adds further rules, and reads more clearly. In `simp only`
+calls it is fine too — `simp only [monad_norm]` is just the closed set.
+
+When it isn't feasible:
+
+- **Direction-flipping conflicts.** `monad_norm` rewrites `f <$> x` toward
+  `x >>= pure ∘ f`. Proofs that deliberately use `bind_pure_comp` /
+  `map_pure` to keep the goal in `<$>` form (common in StateT-heavy proofs in
+  `Examples/CommitmentScheme/Hiding/*` and large stretches of
+  `VCVio/CryptoFoundations/ReplayFork.lean`) will break, because a downstream
+  `rw [some_lemma_about_<$>]` no longer matches. Keep the explicit lemma list
+  at those sites.
+- **Tightly tuned `simp only` chains.** When a proof relies on a *specific*
+  partial-rewrite state between two `simp only` calls (e.g. peeling structure
+  before a `simp_rw [hpeel, …]`), folding `monad_norm` into the earlier call
+  can over-rewrite. Leave the two-pass structure alone.
+- **`rw` and `simp_rw` lemma lists.** These take individual lemmas, not simp
+  sets — `monad_norm` doesn't apply.
+- **Files that don't import `Mathlib.Tactic.Attr.Register`.** A few low-level
+  files in `ToMathlib/Control/Monad/` (e.g. `Indexed.lean`, `Graded.lean`)
+  import only `Mathlib.Algebra.…` and don't see `monad_norm`. Don't widen
+  imports just to use it; spelling out `bind_assoc` is fine there.
+
+Treat `monad_norm` as the default and the manual lemma list as the exception.
+When you do choose the manual list, the choice is usually load-bearing — leave
+a one-line comment explaining what shape downstream needs.
+
 ## Game-Hopping Recipe
 
 ### Step 1: State the security theorem

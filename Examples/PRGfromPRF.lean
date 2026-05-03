@@ -184,7 +184,7 @@ theorem prgRealExp_eq_prfRealExp
   simp_rw [simulateQ_prfReal_reduction]
   change 𝒟[(·, ·) <$> ($ᵗ K) <*> ($ᵗ S) >>=
     fun ks => adv (streamOutputs (prf.eval ks.1) n ks.2)] = _
-  simp only [seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def]
+  simp only [monad_norm, Function.comp_def]
   rw [evalDist_bind, evalDist_bind, hkey]
 
 omit [DecidableEq O] in

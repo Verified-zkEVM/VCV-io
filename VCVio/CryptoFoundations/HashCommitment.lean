@@ -76,7 +76,7 @@ theorem bindingAdvantage_toCommitment_le_keyedCRAdvantage
       keyedCRAdvantage H (bindingAdv_toCRAdv A) := by
   unfold bindingAdvantage CommitmentScheme.bindingExp
     keyedCRAdvantage keyedCRExp bindingAdv_toCRAdv KeyedHashFamily.toCommitment
-  simp only [bind_assoc, pure_bind]
+  simp only [monad_norm]
   refine probOutput_bind_mono fun k _ => ?_
   refine probOutput_bind_mono fun ⟨c, m₁, s₁, m₂, s₂⟩ _ => ?_
   grind

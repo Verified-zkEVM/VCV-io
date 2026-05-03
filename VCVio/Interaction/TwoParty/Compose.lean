@@ -279,7 +279,7 @@ theorem Strategy.compWithRolesFlat_splitPrefixWithRoles
             go (rest x) (rRest x)
               (s₂ := fun p => s₂ ⟨x, p⟩)
               (r₂ := fun p => r₂ ⟨x, p⟩) next
-        simpa [map_eq_bind_pure_comp, bind_assoc] using hcont
+        simpa [monad_norm] using hcont
   exact go s₁ r₁ strat
 
 /-- Compose counterparts along `Spec.append` with a two-argument output family
@@ -353,7 +353,7 @@ theorem Counterpart.append_eq_appendFlat_mapOutput
       funext x
       refine congrArg (fun k => c₁ x >>= k) ?_
       funext cRest
-      simpa [bind_assoc] using
+      simpa [monad_norm] using
         congrArg pure
           (append_eq_appendFlat_mapOutput cRest (fun p o => c₂ ⟨x, p⟩ o))
   | .node _ rest, _, ⟨.receiver, rRest⟩, _, _, _, c₁, c₂ => by
@@ -447,9 +447,7 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
           Strategy.runWithRoles_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [do_pure_bind]
-        simp only [Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
-        simp only [do_pure_bind, bind_assoc]
+        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
         refine congrArg (fun k => strat₁ >>= k) ?_
         funext xc
         have hpure := @Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure m _ _
@@ -461,7 +459,7 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
               (fun tr₂ => OutputP ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩)
             from f ⟨xc.fst, tr₁⟩ mid)
-        erw [hpure, do_pure_bind]
+        erw [hpure, pure_bind]
         refine congrArg (fun k => cpt₁ xc.1 >>= k) ?_
         funext cRest
         have ih := @go (rest xc.fst) (rRest xc.fst)
@@ -481,13 +479,11 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
                 Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-        simp only [Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure, do_pure_bind] at ih
+        simp only [Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure, pure_bind] at ih
         exact ih
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [do_pure_bind]
-        simp only [Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
-        simp only [do_pure_bind, bind_assoc]
+        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
         refine congrArg (fun k => cpt₁ >>= k) ?_
         funext xc
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
@@ -509,9 +505,7 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
                 Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-  have h := go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
-  simp only [do_bind_pure, Prod.eta] at h
-  exact h
+  simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Executing a flat composed strategy/counterpart factors into first executing
 the prefix interaction and then executing the suffix continuation. -/
@@ -575,9 +569,7 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
           Strategy.runWithRoles_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [do_pure_bind]
-        simp only [Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
-        simp only [do_pure_bind, bind_assoc]
+        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
         refine congrArg (fun k => strat₁ >>= k) ?_
         funext xc
         rw [LawfulCommMonad.bind_comm]
@@ -602,9 +594,7 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [do_pure_bind]
-        simp only [Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
-        simp only [do_pure_bind, bind_assoc]
+        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
         refine congrArg (fun k => cpt₁ >>= k) ?_
         funext xc
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
@@ -626,9 +616,7 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
                 Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-  have h := go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
-  simp only [do_bind_pure, Prod.eta] at h
-  exact h
+  simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Executing a factored composed strategy/counterpart (using `compWithRoles` and
 `Counterpart.append`) factors into first executing the prefix interaction and then
@@ -696,9 +684,7 @@ theorem Strategy.runWithRoles_compWithRoles_append
           Spec.Transcript.append, Spec.Transcript.liftAppend, Spec.Transcript.packAppend]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Strategy.compWithRoles, Counterpart.append]
-        simp only [do_pure_bind]
-        simp only [Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
-        simp only [do_pure_bind, bind_assoc]
+        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
         refine congrArg (fun k => strat₁ >>= k) ?_
         funext xc
         rw [LawfulCommMonad.bind_comm]
@@ -721,9 +707,7 @@ theorem Strategy.runWithRoles_compWithRoles_append
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Strategy.compWithRoles, Counterpart.append]
-        simp only [do_pure_bind]
-        simp only [Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
-        simp only [do_pure_bind, bind_assoc]
+        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
         refine congrArg (fun k => cpt₁ >>= k) ?_
         funext xc
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
@@ -743,9 +727,7 @@ theorem Strategy.runWithRoles_compWithRoles_append
               (FC ⟨xc.fst, p⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-  have h := go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
-  simp only [do_bind_pure] at h
-  exact h
+  simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Role swapping commutes with replication. -/
 theorem RoleDecoration.swap_replicate {spec : Spec}
