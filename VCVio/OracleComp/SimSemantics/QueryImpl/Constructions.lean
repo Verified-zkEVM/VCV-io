@@ -79,9 +79,40 @@ lemma simulateQ_preInsert_query [LawfulMonad n]
     simulateQ (so.preInsert nx) (query t) = (do let _ ← nx t; liftM (so t)) := by
   simp
 
+/-- Induction principle for `proj (simulateQ (so.preInsert nx) oa)` parametric in a
+motive `OracleComp spec β → m β → Prop`. The recursion structure of
+`proj_simulateQ_preInsert` is exposed as two cases mirroring `OracleComp.inductionOn`:
+in `pure x` the projected term reduces to `pure x`, and in `query t >>= k` it reduces
+to `so t >>= k'` for some continuation `k' u = proj (simulateQ (so.preInsert nx) (k u))`.
+Tagged `@[elab_as_elim]` so it is usable as `induction oa using simulateQ_preInsert.induct`. -/
+@[elab_as_elim]
+lemma simulateQ_preInsert.induct [Monad m] [LawfulMonad m] [LawfulMonad n]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    {motive : OracleComp spec β → m β → Prop}
+    (h_pure : ∀ (x : β), motive (pure x : OracleComp spec β) (pure x))
+    (h_query_bind : ∀ (t : spec.Domain) (k : spec.Range t → OracleComp spec β)
+        (k' : spec.Range t → m β),
+        (∀ u, motive (k u) (k' u)) → motive (query t >>= k) (so t >>= k'))
+    (oa : OracleComp spec β) :
+    motive oa (proj (simulateQ (so.preInsert nx) oa)) := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      rw [simulateQ_pure, hproj_pure]
+      exact h_pure x
+  | query_bind t k ih =>
+      rw [simulateQ_bind, simulateQ_spec_query, hproj_bind, hproj_apply]
+      exact h_query_bind t k _ ih
+
 /-- Generic strip lemma: given a monad-morphism-style projection `proj : ∀ {γ}, n γ → m γ`
 that preserves `pure` and `bind` and discards the inserted side effect on each query,
-simulating with `preInsert so nx` and projecting back recovers `simulateQ so`. -/
+simulating with `preInsert so nx` and projecting back recovers `simulateQ so`. The proof
+is the canonical use of `simulateQ_preInsert.induct`: the parametric motive is instantiated
+to the equality with `simulateQ so oa`, leaving trivial cases. -/
 lemma proj_simulateQ_preInsert [Monad m] [LawfulMonad m] [LawfulMonad n]
     (so : QueryImpl spec m) (nx : spec.Domain → n α)
     (proj : ∀ {γ : Type u}, n γ → m γ)
@@ -91,12 +122,11 @@ lemma proj_simulateQ_preInsert [Monad m] [LawfulMonad m] [LawfulMonad n]
     (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
     (oa : OracleComp spec β) :
     proj (simulateQ (so.preInsert nx) oa) = simulateQ so oa := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => rw [simulateQ_pure, simulateQ_pure, hproj_pure]
-  | query_bind t k ih =>
-      simp only [simulateQ_bind, simulateQ_spec_query]
-      rw [hproj_bind, hproj_apply]
-      exact bind_congr fun u => ih u
+  induction oa using simulateQ_preInsert.induct so nx proj hproj_pure hproj_bind hproj_apply with
+  | h_pure x => rfl
+  | h_query_bind t k k' ih =>
+      simp only [simulateQ_bind, HasQuery.instOfMonadLift_query, simulateQ_spec_query]
+      exact bind_congr ih
 
 /-- A `preInsert` instrumentation preserves failure probability for any base monad with
 `HasEvalSPMF`, given the projection bundle and its compatibility with failure probabilities. -/
@@ -219,9 +249,40 @@ lemma simulateQ_postInsert_query [LawfulMonad n]
       (do let u ← liftM (so t); let _ ← nx t u; return u) := by
   simp
 
+/-- Induction principle for `proj (simulateQ (so.postInsert nx) oa)` parametric in a
+motive `OracleComp spec β → m β → Prop`. The recursion structure of
+`proj_simulateQ_postInsert` is exposed as two cases mirroring `OracleComp.inductionOn`:
+in `pure x` the projected term reduces to `pure x`, and in `query t >>= k` it reduces
+to `so t >>= k'` for some continuation `k' u = proj (simulateQ (so.postInsert nx) (k u))`.
+Tagged `@[elab_as_elim]` so it is usable as `induction oa using simulateQ_postInsert.induct`. -/
+@[elab_as_elim]
+lemma simulateQ_postInsert.induct [LawfulMonad m] [LawfulMonad n]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    {motive : OracleComp spec β → m β → Prop}
+    (h_pure : ∀ (x : β), motive (pure x : OracleComp spec β) (pure x))
+    (h_query_bind : ∀ (t : spec.Domain) (k : spec.Range t → OracleComp spec β)
+        (k' : spec.Range t → m β),
+        (∀ u, motive (k u) (k' u)) → motive (query t >>= k) (so t >>= k'))
+    (oa : OracleComp spec β) :
+    motive oa (proj (simulateQ (so.postInsert nx) oa)) := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      rw [simulateQ_pure, hproj_pure]
+      exact h_pure x
+  | query_bind t k ih =>
+      rw [simulateQ_bind, simulateQ_spec_query, hproj_bind, hproj_apply]
+      exact h_query_bind t k _ ih
+
 /-- Generic strip lemma: given a monad-morphism-style projection `proj : ∀ {γ}, n γ → m γ`
 that preserves `pure` and `bind` and discards the inserted side effect on each query,
-simulating with `postInsert so nx` and projecting back recovers `simulateQ so`. -/
+simulating with `postInsert so nx` and projecting back recovers `simulateQ so`. The proof
+is the canonical use of `simulateQ_postInsert.induct`: the parametric motive is instantiated
+to the equality with `simulateQ so oa`, leaving trivial cases. -/
 lemma proj_simulateQ_postInsert [LawfulMonad m] [LawfulMonad n]
     (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
     (proj : ∀ {γ : Type u}, n γ → m γ)
@@ -231,12 +292,11 @@ lemma proj_simulateQ_postInsert [LawfulMonad m] [LawfulMonad n]
     (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
     (oa : OracleComp spec β) :
     proj (simulateQ (so.postInsert nx) oa) = simulateQ so oa := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => rw [simulateQ_pure, simulateQ_pure, hproj_pure]
-  | query_bind t k ih =>
-      simp only [simulateQ_bind, simulateQ_spec_query]
-      rw [hproj_bind, hproj_apply]
-      exact bind_congr fun u => ih u
+  induction oa using simulateQ_postInsert.induct so nx proj hproj_pure hproj_bind hproj_apply with
+  | h_pure x => rfl
+  | h_query_bind t k k' ih =>
+      simp only [simulateQ_bind, HasQuery.instOfMonadLift_query, simulateQ_spec_query]
+      exact bind_congr ih
 
 /-- A `postInsert` instrumentation preserves failure probability for any base monad with
 `HasEvalSPMF`, given the projection bundle and its compatibility with failure probabilities. -/
