@@ -87,10 +87,11 @@ lemma withTraceBefore_apply (so : QueryImpl spec m) (traceFn : spec.Domain → �
 
 lemma fst_map_run_withTraceBefore [LawfulMonad m]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run = simulateQ so mx := by
-  exact simulateQ_writerT_fst_map_run_eq_of_query (so.withTraceBefore traceFn) so (by
-    intro t
-    simp [withTraceBefore_apply, WriterT.run_tell]) mx
+    Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run = simulateQ so mx :=
+  proj_simulateQ_preInsert so (fun t => tell (traceFn t))
+    (proj := fun {γ} (x : WriterT ω m γ) => Prod.fst <$> x.run)
+    WriterT.fst_map_run_pure WriterT.fst_map_run_bind
+    (fun t => by simp [WriterT.run_tell]) mx
 
 /-- A "before"-style trace preserves failure probability for any base monad with
 `HasEvalSPMF`: instrumenting with `withTraceBefore` does not change the
@@ -162,10 +163,11 @@ lemma withTrace_apply (so : QueryImpl spec m)
 lemma fst_map_run_withTrace [LawfulMonad m]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
-    Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run = simulateQ so mx := by
-  exact simulateQ_writerT_fst_map_run_eq_of_query (so.withTrace traceFn) so (by
-    intro t
-    simp [withTrace_apply, WriterT.run_tell]) mx
+    Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run = simulateQ so mx :=
+  proj_simulateQ_postInsert so (fun t u => tell (traceFn t u))
+    (proj := fun {γ} (x : WriterT ω m γ) => Prod.fst <$> x.run)
+    WriterT.fst_map_run_pure WriterT.fst_map_run_bind
+    (fun t => by simp [WriterT.run_tell]) mx
 
 /-- An "after"-style trace preserves failure probability for any base monad with
 `HasEvalSPMF`: instrumenting with `withTrace` does not change the probability
@@ -245,10 +247,11 @@ lemma withTraceAppendBefore_apply (so : QueryImpl spec m) (traceFn : spec.Domain
 
 lemma fst_map_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    Prod.fst <$> (simulateQ (so.withTraceAppendBefore traceFn) mx).run = simulateQ so mx := by
-  exact simulateQ_writerT_append_fst_map_run_eq_of_query (so.withTraceAppendBefore traceFn) so (by
-    intro t
-    simp [withTraceAppendBefore_apply, WriterT.run_tell]) mx
+    Prod.fst <$> (simulateQ (so.withTraceAppendBefore traceFn) mx).run = simulateQ so mx :=
+  proj_simulateQ_preInsert so (fun t => tell (traceFn t))
+    (proj := fun {γ} (x : WriterT ω m γ) => Prod.fst <$> x.run)
+    WriterT.fst_map_run_pure' WriterT.fst_map_run_bind'
+    (fun t => by simp [WriterT.run_tell]) mx
 
 lemma probFailure_run_simulateQ_withTraceAppendBefore [LawfulMonad m]
     [LawfulAppend ω] [HasEvalSPMF m]
@@ -312,10 +315,11 @@ lemma withTraceAppend_apply (so : QueryImpl spec m)
 lemma fst_map_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
-    Prod.fst <$> (simulateQ (so.withTraceAppend traceFn) mx).run = simulateQ so mx := by
-  exact simulateQ_writerT_append_fst_map_run_eq_of_query (so.withTraceAppend traceFn) so (by
-    intro t
-    simp [withTraceAppend_apply, WriterT.run_tell]) mx
+    Prod.fst <$> (simulateQ (so.withTraceAppend traceFn) mx).run = simulateQ so mx :=
+  proj_simulateQ_postInsert so (fun t u => tell (traceFn t u))
+    (proj := fun {γ} (x : WriterT ω m γ) => Prod.fst <$> x.run)
+    WriterT.fst_map_run_pure' WriterT.fst_map_run_bind'
+    (fun t => by simp [WriterT.run_tell]) mx
 
 lemma probFailure_run_simulateQ_withTraceAppend [LawfulMonad m]
     [LawfulAppend ω] [HasEvalSPMF m]

@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.Constructions.SampleableType
+import VCVio.OracleComp.EvalDist
 
 /-!
 # Basic Constructions of Simulation Oracles
@@ -60,6 +61,119 @@ def preInsert (so : QueryImpl spec m) {α} (nx : spec.Domain → n α) :
     QueryImpl spec n :=
   fun t => do let _ ← nx t; liftM (so t)
 
+variable {α β : Type u}
+
+omit [Monad m] in
+@[simp, grind =]
+lemma preInsert_apply (so : QueryImpl spec m) (nx : spec.Domain → n α) (t : spec.Domain) :
+    so.preInsert nx t = (do let _ ← nx t; liftM (so t)) := rfl
+
+/-- One-step characterisation of `simulateQ (preInsert so nx)` on a single query. -/
+lemma simulateQ_preInsert_query (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (t : spec.Domain) :
+    simulateQ (so.preInsert nx) (query t) = (do let _ ← nx t; liftM (so t)) := by
+  sorry
+
+/-- Generic strip lemma: given a monad-morphism-style projection `proj : ∀ {γ}, n γ → m γ`
+that preserves `pure` and `bind` and discards the inserted side effect on each query,
+simulating with `preInsert so nx` and projecting back recovers `simulateQ so`. -/
+lemma proj_simulateQ_preInsert [LawfulMonad m] [LawfulMonad n]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    proj (simulateQ (so.preInsert nx) oa) = simulateQ so oa := by
+  sorry
+
+/-- A `preInsert` instrumentation preserves failure probability for any base monad with
+`HasEvalSPMF`, given the projection bundle and its compatibility with failure probabilities. -/
+lemma probFailure_proj_simulateQ_preInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    Pr[⊥ | proj (simulateQ (so.preInsert nx) oa)] = Pr[⊥ | simulateQ so oa] := by
+  sorry
+
+/-- `NeverFail` biconditional companion of `probFailure_proj_simulateQ_preInsert`. -/
+lemma neverFail_proj_simulateQ_preInsert_iff
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    NeverFail (proj (simulateQ (so.preInsert nx) oa)) ↔ NeverFail (simulateQ so oa) := by
+  sorry
+
+/-- When `nx` is constantly `pure x`, `preInsert so nx` is the lift of `so` and the
+resulting simulation equals the lifted underlying simulation. Generic analogue of the
+`run_simulateQ_withTraceBefore_const_one` no-op identity. -/
+lemma simulateQ_preInsert_const_pure
+    [LawfulMonad m] [LawfulMonad n] [LawfulMonadLiftT m n]
+    (so : QueryImpl spec m) (x : α) (oa : OracleComp spec β) :
+    simulateQ (so.preInsert (fun _ => (pure x : n α))) oa = liftM (simulateQ so oa) := by
+  sorry
+
+/-! #### `evalDist` / `probOutput` / `support` bridges for `preInsert` -/
+
+lemma evalDist_proj_simulateQ_preInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    𝒟[proj (simulateQ (so.preInsert nx) oa)] = 𝒟[simulateQ so oa] := by
+  sorry
+
+lemma probOutput_proj_simulateQ_preInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    (oa : OracleComp spec β) (x : β) :
+    Pr[= x | proj (simulateQ (so.preInsert nx) oa)] = Pr[= x | simulateQ so oa] := by
+  sorry
+
+lemma support_proj_simulateQ_preInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    support (proj (simulateQ (so.preInsert nx) oa)) = support (simulateQ so oa) := by
+  sorry
+
+lemma finSupport_proj_simulateQ_preInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m] [HasEvalFinset m] [DecidableEq β]
+    (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.preInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    finSupport (proj (simulateQ (so.preInsert nx) oa)) = finSupport (simulateQ so oa) := by
+  sorry
+
 end insertPre
 
 section insertPost
@@ -75,6 +189,121 @@ Note that `nx` is expected to have some side-effects, it's actual result is disc
 def postInsert (so : QueryImpl spec m) {α} (nx : (t : spec.Domain) → spec.Range t → n α) :
     QueryImpl spec n :=
   fun t => do let u ← liftM (so t); let _ ← nx t u; return u
+
+variable {α β : Type u}
+
+omit [Monad m] in
+@[simp, grind =]
+lemma postInsert_apply (so : QueryImpl spec m)
+    (nx : (t : spec.Domain) → spec.Range t → n α) (t : spec.Domain) :
+    so.postInsert nx t = (do let u ← liftM (so t); let _ ← nx t u; return u) := rfl
+
+/-- One-step characterisation of `simulateQ (postInsert so nx)` on a single query. -/
+lemma simulateQ_postInsert_query (so : QueryImpl spec m)
+    (nx : (t : spec.Domain) → spec.Range t → n α) (t : spec.Domain) :
+    simulateQ (so.postInsert nx) (query t) =
+      (do let u ← liftM (so t); let _ ← nx t u; return u) := by
+  sorry
+
+/-- Generic strip lemma: given a monad-morphism-style projection `proj : ∀ {γ}, n γ → m γ`
+that preserves `pure` and `bind` and discards the inserted side effect on each query,
+simulating with `postInsert so nx` and projecting back recovers `simulateQ so`. -/
+lemma proj_simulateQ_postInsert [LawfulMonad m] [LawfulMonad n]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    proj (simulateQ (so.postInsert nx) oa) = simulateQ so oa := by
+  sorry
+
+/-- A `postInsert` instrumentation preserves failure probability for any base monad with
+`HasEvalSPMF`, given the projection bundle and its compatibility with failure probabilities. -/
+lemma probFailure_proj_simulateQ_postInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    Pr[⊥ | proj (simulateQ (so.postInsert nx) oa)] = Pr[⊥ | simulateQ so oa] := by
+  sorry
+
+/-- `NeverFail` biconditional companion of `probFailure_proj_simulateQ_postInsert`. -/
+lemma neverFail_proj_simulateQ_postInsert_iff
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    NeverFail (proj (simulateQ (so.postInsert nx) oa)) ↔ NeverFail (simulateQ so oa) := by
+  sorry
+
+/-- When `nx` is constantly `pure x`, `postInsert so nx` is the lift of `so` and the
+resulting simulation equals the lifted underlying simulation. Generic analogue of the
+`run_simulateQ_withTrace_const_one` no-op identity. -/
+lemma simulateQ_postInsert_const_pure
+    [LawfulMonad m] [LawfulMonad n] [LawfulMonadLiftT m n]
+    (so : QueryImpl spec m) (x : α) (oa : OracleComp spec β) :
+    simulateQ (so.postInsert (fun _ _ => (pure x : n α))) oa = liftM (simulateQ so oa) := by
+  sorry
+
+/-! #### `evalDist` / `probOutput` / `support` bridges for `postInsert` -/
+
+lemma evalDist_proj_simulateQ_postInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    𝒟[proj (simulateQ (so.postInsert nx) oa)] = 𝒟[simulateQ so oa] := by
+  sorry
+
+lemma probOutput_proj_simulateQ_postInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    (oa : OracleComp spec β) (x : β) :
+    Pr[= x | proj (simulateQ (so.postInsert nx) oa)] = Pr[= x | simulateQ so oa] := by
+  sorry
+
+lemma support_proj_simulateQ_postInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    support (proj (simulateQ (so.postInsert nx) oa)) = support (simulateQ so oa) := by
+  sorry
+
+lemma finSupport_proj_simulateQ_postInsert
+    [LawfulMonad m] [LawfulMonad n] [HasEvalSPMF m] [HasEvalFinset m] [DecidableEq β]
+    (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)
+    (proj : ∀ {γ : Type u}, n γ → m γ)
+    (hproj_pure : ∀ {γ : Type u} (x : γ), proj (pure x : n γ) = pure x)
+    (hproj_bind : ∀ {γ δ : Type u} (b : n γ) (f : γ → n δ),
+        proj (b >>= f) = proj b >>= fun x => proj (f x))
+    (hproj_apply : ∀ t, proj ((so.postInsert nx) t) = so t)
+    (oa : OracleComp spec β) :
+    finSupport (proj (simulateQ (so.postInsert nx) oa)) = finSupport (simulateQ so oa) := by
+  sorry
 
 end insertPost
 

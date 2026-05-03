@@ -85,6 +85,19 @@ lemma run_seqLeft {m : Type u → Type v} [Monad m] {ω : Type u} [Monoid ω] {�
     (x : WriterT ω m α) (y : WriterT ω m β) :
     (x *> y).run = x.run >>= fun z => Prod.map id (z.2 * ·) <$> y.run := rfl
 
+/-- `Prod.fst <$> WriterT.run` preserves `pure` (Monoid flavour). -/
+lemma fst_map_run_pure [LawfulMonad m] (x : α) :
+    Prod.fst <$> ((pure x : WriterT ω m α).run) = pure x := by
+  simp [WriterT.run_pure]
+
+/-- `Prod.fst <$> WriterT.run` preserves `bind` (Monoid flavour) — i.e. it is a
+monad morphism `WriterT ω m → m`. -/
+lemma fst_map_run_bind [LawfulMonad m] (b : WriterT ω m α) (f : α → WriterT ω m β) :
+    Prod.fst <$> (b >>= f).run =
+      (Prod.fst <$> b.run) >>= fun x => Prod.fst <$> (f x).run := by
+  simp only [WriterT.run_bind, map_bind, Functor.map_map]
+  exact (bind_map_left (m := m) Prod.fst b.run (fun x => Prod.fst <$> (f x).run)).symm
+
 end monoid
 
 section append
@@ -121,6 +134,19 @@ lemma run_seqLeft' {m : Type u → Type v} [Monad m] {ω : Type u} [Monoid ω] {
 
 @[simp]
 lemma run_map' (x : WriterT ω m α) (f : α → β) : (f <$> x).run = Prod.map f id <$> x.run := rfl
+
+/-- `Prod.fst <$> WriterT.run` preserves `pure` (Append flavour). -/
+lemma fst_map_run_pure' [LawfulMonad m] (x : α) :
+    Prod.fst <$> ((pure x : WriterT ω m α).run) = pure x := by
+  simp
+
+/-- `Prod.fst <$> WriterT.run` preserves `bind` (Append flavour) — i.e. it is a
+monad morphism `WriterT ω m → m`. -/
+lemma fst_map_run_bind' [LawfulMonad m] (b : WriterT ω m α) (f : α → WriterT ω m β) :
+    Prod.fst <$> (b >>= f).run =
+      (Prod.fst <$> b.run) >>= fun x => Prod.fst <$> (f x).run := by
+  simp only [WriterT.run_bind', map_bind, Functor.map_map]
+  exact (bind_map_left (m := m) Prod.fst b.run (fun x => Prod.fst <$> (f x).run)).symm
 
 end append
 
