@@ -12,7 +12,8 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
-import VCVio.OracleComp.SimSemantics.PreservesInv
+import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
+import VCVio.OracleComp.SimSemantics.WriterT.PreservesInv
 
 /-!
 # `Std.Do` handler specifications for `OracleComp` simulators

@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.SimSemantics.QueryImpl.Constructions
-import VCVio.OracleComp.SimSemantics.PreservesInv
+import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 import VCVio.OracleComp.SimSemantics.StateT.StateProjection
 
 /-!

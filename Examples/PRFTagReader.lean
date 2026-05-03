@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.PRF
-import VCVio.OracleComp.SimSemantics.PreservesInv
+import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 
 /-!
 # PRF Tag/Reader Protocol
