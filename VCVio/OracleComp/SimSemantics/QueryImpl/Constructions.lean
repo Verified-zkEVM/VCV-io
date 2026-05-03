@@ -45,6 +45,10 @@ lemma simulateQ_compose [LawfulMonad m] (so' : QueryImpl spec' m)
   | pure x => simp
   | query_bind t mx h => simp [h]
 
+@[simp]
+lemma compose_id' [LawfulMonad m] (so : QueryImpl spec m) :
+    so ∘ₛ QueryImpl.id' spec = so := by ext x; simp
+
 end compose
 
 section insertPre
@@ -57,16 +61,17 @@ variable {m : Type u → Type v}
 and a computation `nx` in `n` for each query input, construct a new implementation
 `QueryImpl.preInsert so nx` that calls `nx` on every query before the actual substitution `so`.
 Note that `nx` is expected to have some side-effects, it's actual result is discarded. -/
-def preInsert (so : QueryImpl spec m) {α} (nx : spec.Domain → n α) :
+def preInsert (so : QueryImpl spec m) (nx : spec.Domain → n α) :
     QueryImpl spec n :=
-  fun t => do let _ ← nx t; liftM (so t)
+  fun t => nx t *> liftM (so t)
 
--- omit [Monad m] in
+variable (so : QueryImpl spec m) (nx : spec.Domain → n α)
+
 @[simp, grind =]
-lemma preInsert_apply (so : QueryImpl spec m) (nx : spec.Domain → n α) (t : spec.Domain) :
-    so.preInsert nx t = (do let _ ← nx t; liftM (so t)) := rfl
+lemma preInsert_apply [LawfulMonad n] (so : QueryImpl spec m) (nx : spec.Domain → n α) (t : spec.Domain) :
+    so.preInsert nx t = (do let _ ← nx t; liftM (so t)) := by
+  simp [preInsert, seqRight_eq, monad_norm]
 
--- omit [Monad m] in
 /-- One-step characterisation of `simulateQ (preInsert so nx)` on a single query. -/
 lemma simulateQ_preInsert_query [LawfulMonad n]
     (so : QueryImpl spec m) (nx : spec.Domain → n α)
@@ -128,9 +133,7 @@ lemma simulateQ_preInsert_const_pure [Monad m]
     (so : QueryImpl spec m) (x : α) (oa : OracleComp spec β) :
     simulateQ (so.preInsert (fun _ => (pure x : n α))) oa = liftM (simulateQ so oa) := by
   have h : so.preInsert (fun _ => (pure x : n α)) = so.liftTarget n := by
-    funext t
-    change (do let _ ← (pure x : n α); liftM (so t)) = liftM (so t)
-    exact pure_bind x (fun _ => liftM (so t))
+    funext t; simp
   rw [h, simulateQ_liftTarget]
 
 /-! #### `evalDist` / `probOutput` / `support` bridges for `preInsert` -/
