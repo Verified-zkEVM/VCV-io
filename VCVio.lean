@@ -201,6 +201,7 @@ import VCVio.OracleComp.SimSemantics.ReaderT.Basic
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.SimSemantics.StateT.Basic
 import VCVio.OracleComp.SimSemantics.StateT.BundledSemantics
+import VCVio.OracleComp.SimSemantics.StateT.EvalDist
 import VCVio.OracleComp.SimSemantics.StateT.StateProjection
 import VCVio.OracleComp.SimSemantics.StateT.StateSeparating
 import VCVio.OracleComp.SimSemantics.WriterT.Basic
