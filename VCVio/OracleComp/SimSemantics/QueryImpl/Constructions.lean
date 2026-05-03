@@ -95,7 +95,8 @@ def preInsert (so : QueryImpl spec m) (nx : spec.Domain → n α) :
 variable (so : QueryImpl spec m) (nx : spec.Domain → n α)
 
 @[simp, grind =]
-lemma preInsert_apply [LawfulMonad n] (so : QueryImpl spec m) (nx : spec.Domain → n α) (t : spec.Domain) :
+lemma preInsert_apply [LawfulMonad n] (so : QueryImpl spec m) (nx : spec.Domain → n α)
+    (t : spec.Domain) :
     so.preInsert nx t = (do let _ ← nx t; liftM (so t)) := by
   simp [preInsert, seqRight_eq, monad_norm]
 

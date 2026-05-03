@@ -839,7 +839,7 @@ theorem IsTotalQueryBound.simulateQ_of_step_le {ι' : Type u} {spec' : OracleSpe
         have hpos : 0 < n := h.1
         rcases n with _ | k
         · omega
-        · simp [Nat.succ_sub_one, Nat.succ_mul]; ring
+        · simp [Nat.succ_mul]; ring
       simpa [hn] using isTotalQueryBound_bind (hstep t) hrest
 
 /-! ### Forward query-bound transfer for `preInsert` / `postInsert`
@@ -910,7 +910,7 @@ theorem IsQueryBoundP.simulateQ_of_step_le_total
       refine hbind.mono ?_
       rcases n with _ | k
       · exact absurd h.1 (lt_irrefl 0)
-      · simp [Nat.succ_sub_one, Nat.succ_mul]; ring_nf; rfl
+      · simp [Nat.succ_mul]; ring_nf; rfl
 
 theorem isQueryBoundP_simulateQ_preInsert
     {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
