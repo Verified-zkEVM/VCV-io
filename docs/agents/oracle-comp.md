@@ -191,6 +191,50 @@ infixl : 65 " ∘ₛ " => QueryImpl.compose
 
 Key lemma: `simulateQ (so' ∘ₛ so) oa = simulateQ so' (simulateQ so oa)`
 
+### Wrapping a QueryImpl with a per-query side effect (`preInsert` / `postInsert`)
+
+**Prefer these combinators (or their downstream wrappers) over hand-rolling a new `QueryImpl`** whenever the wrapper has the shape "for each query, run a side effect and then delegate to a base implementation". They are defined in `VCVio/OracleComp/SimSemantics/QueryImpl/Constructions.lean`:
+
+```lean
+def preInsert  (so : QueryImpl spec m) (nx : spec.Domain → n α) :
+    QueryImpl spec n
+def postInsert (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α) :
+    QueryImpl spec n
+```
+
+| | `preInsert` | `postInsert` |
+|---|---|---|
+| Side effect runs | **before** the handler | **after** the handler |
+| Sees the response? | No | Yes (the response is passed to `nx`) |
+| If the handler fails | Side effect still happens | Side effect skipped |
+
+Both come with a complete generic theory: induction principles (`simulateQ_preInsert.induct` / `simulateQ_postInsert.induct`), projection / strip lemmas (`proj_simulateQ_preInsert`, `proj_simulateQ_postInsert`), and bridge lemmas for `probFailure`, `NeverFail`, `evalDist`, `probOutput`, `support`, `finSupport`, plus `IsTotalQueryBound` / `IsQueryBoundP` transfer in `QueryBound.lean`. Defining a wrapper via `preInsert` / `postInsert` makes all of this theory available immediately and avoids re-proving instance-specific lemmas.
+
+#### Already in the repo (use these directly when applicable)
+
+| Wrapper | File | Built on |
+|---|---|---|
+| `withTraceBefore` (response-independent monoid trace) | `QueryTracking/Tracing.lean` | `preInsert` |
+| `withTrace` (response-dependent monoid trace) | `QueryTracking/Tracing.lean` | `postInsert` |
+| `withTraceAppendBefore` / `withTraceAppend` (`Append`-flavoured) | `QueryTracking/Tracing.lean` | `preInsert` / `postInsert` |
+| `withCost`, `withCounting` | `QueryTracking/CountingOracle.lean` | `withTraceBefore` |
+| `withAddCost`, `withUnitCost` | `QueryTracking/WriterCost.lean` | `withCost` |
+| `withLogging` | `QueryTracking/LoggingOracle.lean` | `withTraceAppend` |
+| `appendInputLog` (StateT input log) | `QueryTracking/LoggingOracle.lean` | `preInsert` |
+
+If a new wrapper looks like one of these, add it as a small specialization rather than starting from `fun t => ...` from scratch.
+
+#### When `preInsert` / `postInsert` is *not* the right shape
+
+The combinators assume the underlying handler **always runs**. They are not the right tool when the wrapper's control flow is conditional on external state or on the would-be response — for instance:
+
+- **Cache-on-hit logic** (`withCaching` in `CachingOracle.lean`): a cache hit replaces the query body entirely.
+- **Fallback-style seeding** (`withPregen` in `SeededOracle.lean`): consumes a pre-generated value when available, otherwise queries.
+- **Budget gating** (`enforceOracle` in `Enforcement.lean`): if the budget is exhausted, returns `default` and skips the handler.
+- **Game-state handlers** that branch on session state, gating flags, or bad-event flags.
+
+These are genuinely custom and stay as hand-written `QueryImpl` definitions. If you find yourself reaching for `preInsert` / `postInsert` and discovering that you need to inspect external state to decide *whether* to query, you are in this category — write the impl directly.
+
 ### evalDist IS simulateQ
 
 `evalDist : OracleComp spec α → PMF α` is *definitionally* (`rfl`) `simulateQ` into `PMF`, with each query interpreted as the uniform distribution over its response type. The `HasEvalPMF` instance at `VCVio/OracleComp/EvalDist.lean:154-156` reads:

@@ -108,12 +108,6 @@ private def roQueryImpl :
     (StateT ((Rand →ₒ M).QueryCache) ProbComp)
   idImpl + ro
 
-/-- Logging version of the random-oracle implementation, used by the inversion reduction. -/
-private def loggingROQueryImpl :
-    QueryImpl (RO_Spec Rand M)
-      (WriterT (QueryLog (RO_Spec Rand M)) (StateT ((Rand →ₒ M).QueryCache) ProbComp)) :=
-  roQueryImpl.withLogging
-
 /-- Lift a `ProbComp` computation into the BR93 random-oracle world. -/
 private def liftProbComp {α : Type} (px : ProbComp α) : OracleComp (RO_Spec Rand M) α :=
   px
@@ -168,7 +162,7 @@ def badEventExp (tdp : TrapdoorPermutation PK SK Rand)
   let loggedRun :
       StateT ((Rand →ₒ M).QueryCache) ProbComp
         (Rand × QueryLog (RO_Spec Rand M)) :=
-    (simulateQ loggingROQueryImpl <| (show OracleComp (RO_Spec Rand M) Rand from do
+    (simulateQ roQueryImpl.withLogging <| (show OracleComp (RO_Spec Rand M) Rand from do
       let (pk, _sk) ← liftProbComp tdp.keygen
       let (m₁, m₂, st) ← adv.choose pk
       let b ← liftProbComp ($ᵗ Bool)
@@ -196,7 +190,7 @@ def inverter (tdp : TrapdoorPermutation PK SK Rand)
     let loggedRun :
         StateT ((Rand →ₒ M).QueryCache) ProbComp
           (Unit × QueryLog (RO_Spec Rand M)) :=
-      (simulateQ loggingROQueryImpl <| (show OracleComp (RO_Spec Rand M) Unit from do
+      (simulateQ roQueryImpl.withLogging <| (show OracleComp (RO_Spec Rand M) Unit from do
         let (m₁, m₂, st) ← adv.choose pk
         let b ← liftProbComp ($ᵗ Bool)
         let h ← liftProbComp ($ᵗ M)

@@ -11,6 +11,33 @@ import VCVio.OracleComp.EvalDist
 # Basic Constructions of Simulation Oracles
 
 This file defines a number of basic simulation oracles, as well as operations to combine them.
+
+## `preInsert` and `postInsert`
+
+The two main building blocks for instrumented `QueryImpl` values are `preInsert` and
+`postInsert`. Both take a base `QueryImpl spec m` and a per-query side effect, and produce
+a new `QueryImpl spec n` that wraps the base with that side effect:
+
+* `preInsert  so nx` runs `nx t` *before* the handler `so t`. The side effect happens
+  unconditionally, including when the handler later fails.
+* `postInsert so nx` runs `nx t u` *after* the handler returns response `u`, so the side
+  effect can depend on the response and is skipped when the handler fails.
+
+Both come with a complete generic theory, parametric in a projection
+`proj : ∀ {γ}, n γ → m γ` that strips the instrumentation: `proj_simulateQ_preInsert`,
+`probFailure_proj_simulateQ_preInsert`, `NeverFail_proj_simulateQ_preInsert_iff`,
+`evalDist_proj_simulateQ_preInsert`, `probOutput_proj_simulateQ_preInsert`,
+`support_proj_simulateQ_preInsert`, `finSupport_proj_simulateQ_preInsert`, and the
+induction principle `simulateQ_preInsert.induct` (with `postInsert` analogues). Query-bound
+transfer through these wrappers lives in `QueryTracking/QueryBound.lean`.
+
+Most of the wrappers in `QueryTracking/` (`withTraceBefore`, `withTrace`,
+`withTraceAppendBefore`, `withTraceAppend`, `withCost`, `withCounting`, `withAddCost`,
+`withUnitCost`, `withLogging`, `appendInputLog`) bottom out at these combinators. New
+instrumentation should follow the same pattern when its shape is "for each query, run a
+side effect and delegate" — wrappers whose control flow is conditional on external state
+or the would-be response (cache-on-hit, seed fallback, budget gating) genuinely need a
+custom `QueryImpl` and stay outside this hierarchy.
 -/
 
 open OracleSpec OracleComp Prod Sum
