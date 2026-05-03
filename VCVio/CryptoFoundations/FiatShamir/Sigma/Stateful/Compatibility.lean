@@ -394,7 +394,7 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
     rcases st with ⟨signed, cache⟩
     simp [postKeygenAppendProdImpl, postKeygenAppendImpl, monad_norm,
       QueryImpl.flattenStateT, QueryImpl.add_apply_inr, QueryImpl.appendInputLog_apply,
-      StateT.run_bind, StateT.run_get, StateT.run_set, StateT.run_monadLift]
+      StateT.run_bind, StateT.run_monadLift]
 
 /-- Fixed-key public post-keygen experiment after WriterT logging has been
 converted to an input log. This is split at the candidate/log boundary. -/
