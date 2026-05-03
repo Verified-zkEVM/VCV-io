@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic

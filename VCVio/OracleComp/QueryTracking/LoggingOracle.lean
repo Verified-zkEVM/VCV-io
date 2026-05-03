@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.QueryTracking.Tracing
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.SimSemantics.Append
 import ToMathlib.Control.WriterT
 
