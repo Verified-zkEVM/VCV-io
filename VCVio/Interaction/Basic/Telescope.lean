@@ -50,25 +50,31 @@ by running the round `round s : Spec` and recursing into
 `Telescope round step (step s tr)` for every transcript `tr`. As an inductive
 type, every inhabitant is finite, so the existence of a `Telescope` term is a
 proof that the underlying state machine terminates. -/
-inductive Telescope {St : Type v}
+abbrev Telescope {St : Type v}
     (round : St → Spec.{u})
-    (step : (s : St) → Transcript (round s) → St) : St → Type (max u v)
-  | done (s : St) : Telescope round step s
-  | extend (s : St)
-      (cont : (tr : Transcript (round s)) → Telescope round step (step s tr)) :
-      Telescope round step s
+    (step : (s : St) → Transcript (round s) → St) : St → Type (max u v) :=
+  PFunctor.FreeM.Telescope round step
 
 namespace Telescope
 
 variable {St : Type v} {round : St → Spec.{u}}
     {step : (s : St) → Transcript (round s) → St}
 
+/-- Constructor wrapper for terminating a `Spec.Telescope`. -/
+abbrev done (s : St) : Telescope round step s :=
+  PFunctor.FreeM.Telescope.done s
+
+/-- Constructor wrapper for extending a `Spec.Telescope` by one round. -/
+abbrev extend (s : St)
+    (cont : (tr : Transcript (round s)) → Telescope round step (step s tr)) :
+    Telescope round step s :=
+  PFunctor.FreeM.Telescope.extend s cont
+
 /-- Flatten a `Telescope` into a concrete `Spec` by iterated `Spec.append`.
 Each `extend` step contributes its round spec to the head, with the tail
 expanding through the recursive continuation. -/
-def toSpec : {s : St} → Telescope round step s → Spec
-  | _, .done _ => .done
-  | _, .extend s cont => (round s).append fun tr => (cont tr).toSpec
+def toSpec : {s : St} → Telescope round step s → Spec :=
+  PFunctor.FreeM.Telescope.toFreeM (fun _ => Spec.done)
 
 @[simp, grind =]
 theorem toSpec_done (s : St) :

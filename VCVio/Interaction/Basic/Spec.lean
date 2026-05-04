@@ -191,9 +191,8 @@ def recOn {motive : Spec → Sort*}
 recorded, producing a root-to-leaf path through the interaction tree.
 For `.done`, the transcript is trivial (`PUnit`); for `.node X rest`,
 it is a chosen move `x : X` paired with a transcript for `rest x`. -/
-def Transcript : Spec → Type u
-  | .done => PUnit
-  | .node X rest => (x : X) × Transcript (rest x)
+abbrev Transcript (s : Spec.{u}) : Type u :=
+  PFunctor.FreeM.Transcript s
 
 /-- A straight-line `Spec` with no branching: each move type in the list
 becomes one round, and later rounds do not depend on earlier moves. -/
