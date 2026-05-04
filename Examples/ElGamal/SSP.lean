@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.StateSeparating.Hybrid
-import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.SimSemantics.QueryImpl.Constructions
 
 /-!
 # State-Separating Proofs: ElGamal IND-CPA via DDH

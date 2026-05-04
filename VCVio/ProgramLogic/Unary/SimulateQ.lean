@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.OracleComp.SimSemantics.SimulateQ
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 import VCVio.OracleComp.Coercions.SubSpec
 
 /-!

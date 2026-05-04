@@ -5,7 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.CryptoFoundations.SecExp
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.Add

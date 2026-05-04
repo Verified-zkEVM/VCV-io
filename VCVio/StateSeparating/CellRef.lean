@@ -6,7 +6,7 @@ Authors: Quang Dao
 import ToMathlib.Data.Heap
 import VCVio.EvalDist.Defs.Instances
 import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.SimSemantics.QueryImpl.Constructions
 
 /-!
 # State-separating cell references

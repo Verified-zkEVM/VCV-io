@@ -12,7 +12,8 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
-import VCVio.OracleComp.SimSemantics.PreservesInv
+import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
+import VCVio.OracleComp.SimSemantics.WriterT.PreservesInv
 
 /-!
 # `Std.Do` handler specifications for `OracleComp` simulators
@@ -457,7 +458,8 @@ theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
         WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ v log' => ⌜log' = log₀ ++ [⟨t, v⟩]⌝) := by
-  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.ofLift
+  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.postInsert
+    QueryImpl.ofLift
   mvcgen
   rename_i s _ heq
   subst heq
@@ -473,7 +475,8 @@ theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
         WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ _ log' => ⌜log₀ <+: log'⌝) := by
-  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.ofLift
+  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.postInsert
+    QueryImpl.ofLift
   mvcgen
   rename_i s _ heq
   subst heq

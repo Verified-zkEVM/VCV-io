@@ -24,6 +24,33 @@ The stack is also intentionally split into:
 | `ToMathlib/Control/WriterT.lean` | Pathwise and output-indexed cost predicates for `AddWriterT` |
 | `ToMathlib/Probability/ProbabilityMassFunction/TailSums.lean` | Generic PMF tail-sum identities used for expected runtime |
 
+## Instrumentation Pattern: `preInsert` / `postInsert`
+
+Almost every `QueryImpl` wrapper in this directory ultimately bottoms out at the
+`preInsert` / `postInsert` combinators in
+`VCVio/OracleComp/SimSemantics/QueryImpl/Constructions.lean`:
+
+```
+preInsert / postInsert  (generic combinators + bridge theory)
+  withTraceBefore / withTrace                         (Tracing.lean)
+    withCost                                          (CountingOracle.lean)
+      withCounting                                    (CountingOracle.lean)
+      withAddCost / withUnitCost                      (WriterCost.lean)
+    withTraceAppendBefore / withTraceAppend           (Tracing.lean)
+      withLogging                                     (LoggingOracle.lean)
+      appendInputLog                                  (LoggingOracle.lean)
+```
+
+Read this top-down before adding a new instrumentation wrapper. The rule of thumb:
+
+- **If the wrapper's shape is "for each query, accumulate a value, then delegate"**, define it as a one-liner over `withTraceBefore` / `withCost` (i.e. through `preInsert`).
+- **If it's "delegate, then record query+response"**, route it through `withTrace` / `withTraceAppend` / `withLogging` (i.e. through `postInsert`).
+- **If the wrapper genuinely needs to inspect external state to decide whether or not to query** (cache-on-hit, seed fallback, budget gate, bad-event gating), write a custom `QueryImpl` — `preInsert` / `postInsert` cannot express this. Existing examples: `withCaching` (`CachingOracle.lean`), `withPregen` (`SeededOracle.lean`), `enforceOracle` (`Enforcement.lean`).
+
+Defining the wrapper through this chain gets you the full generic theory for free: `proj_simulateQ_*`, `probFailure_proj_simulateQ_*`, `NeverFail_proj_simulateQ_*_iff`, `evalDist_proj_simulateQ_*`, `probOutput_proj_simulateQ_*`, `support_proj_simulateQ_*`, plus `IsTotalQueryBound` / `IsQueryBoundP` transfer in `QueryBound.lean`. Hand-rolled wrappers have to re-prove all of these one by one.
+
+See `docs/agents/oracle-comp.md` for the full table of combinators and the underlying theory.
+
 ## Layering
 
 ### 1. `AddWriterT`: raw cost semantics

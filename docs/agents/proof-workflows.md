@@ -311,6 +311,36 @@ by_dist                     -- enters TV distance mode
 by_dist ε₂
 ```
 
+## Reusing `preInsert` / `postInsert` Theory
+
+When a goal mentions `simulateQ` of a `QueryImpl` wrapper from `QueryTracking/`
+(`countingOracle`, `loggingOracle`, `withCost`, `withLogging`, `withTraceBefore`, etc.) or
+any custom wrapper built on `preInsert` / `postInsert`, **prefer the generic bridge lemmas
+from `VCVio/OracleComp/SimSemantics/QueryImpl/Constructions.lean` over re-proving the
+specific instance.** The bridges are parameterised over a projection
+`proj : ∀ {γ}, n γ → m γ` (typically `Prod.fst <$> WriterT.run ·` for a writer-style
+wrapper, or `(·.run s) >>= ...` for a state-style wrapper), and they exist for every
+distribution-side observable:
+
+| Lemma family | What it gives you |
+|---|---|
+| `proj_simulateQ_preInsert` / `proj_simulateQ_postInsert` | Strip the instrumentation: `proj (simulateQ (so.preInsert nx) oa) = simulateQ so oa`. |
+| `probFailure_proj_simulateQ_*` | Failure probability is preserved by the wrapper. |
+| `NeverFail_proj_simulateQ_*_iff` | `NeverFail` lifts through the wrapper iff it holds on the base. |
+| `evalDist_proj_simulateQ_*` / `probOutput_proj_simulateQ_*` | Output-marginal distribution / probability is unchanged. |
+| `support_proj_simulateQ_*` / `finSupport_proj_simulateQ_*` | Output-marginal support / `Finset` support is unchanged. |
+| `simulateQ_preInsert.induct` / `simulateQ_postInsert.induct` (`@[elab_as_elim]`) | Induction principle parametric in the projection — useful when the bridges above are too rigid. |
+
+For query-bound transfer through a wrapper, see
+`isTotalQueryBound_simulateQ_preInsert` / `…_postInsert` (and the predicated
+`IsQueryBoundP` versions) in `QueryTracking/QueryBound.lean`.
+
+If you find yourself writing an inductive proof that "running my wrapper preserves
+`probOutput`" and the wrapper is built on `preInsert` / `postInsert`, the proof is almost
+certainly already a one-line specialisation of `probOutput_proj_simulateQ_preInsert` (or
+its `postInsert` sibling) with the right projection. Reach for the bridge before reaching
+for `OracleComp.inductionOn`.
+
 ## Asymptotic Security Reductions
 
 For proofs involving asymptotic security (negligible advantage), use the lemmas in

@@ -6,7 +6,7 @@ Authors: Quang Dao
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.Append
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 import VCVio.EvalDist.Defs.Semantics
 
 /-!

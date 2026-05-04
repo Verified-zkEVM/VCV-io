@@ -5,11 +5,11 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.Append
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
 # Fujisaki-Okamoto Shared Definitions
