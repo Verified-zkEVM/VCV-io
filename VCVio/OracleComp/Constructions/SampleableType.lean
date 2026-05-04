@@ -512,39 +512,39 @@ def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
 
 namespace uniformSampleImpl
 
-variable {ι₀ : Type} {spec₀ : OracleSpec ι₀} [∀ i, SampleableType (spec₀.Range i)]
+variable [∀ i, SampleableType (spec.Range i)]
 
 @[simp]
-lemma evalDist_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
-    (oa : OracleComp spec₀ α) :
+lemma evalDist_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) :
     𝒟[simulateQ uniformSampleImpl oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma probOutput_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
-    (oa : OracleComp spec₀ α) (x : α) :
+lemma probOutput_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (x : α) :
     Pr[= x | simulateQ uniformSampleImpl oa] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ oa)) x
 
 @[simp]
-lemma probEvent_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
-    (oa : OracleComp spec₀ α) (p : α → Prop) :
+lemma probEvent_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (p : α → Prop) :
     Pr[ p | simulateQ uniformSampleImpl oa] = Pr[ p | oa] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
 
 @[simp]
-lemma support_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
-    (oa : OracleComp spec₀ α) :
+lemma support_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) :
     support (simulateQ uniformSampleImpl oa) = support oa := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma finSupport_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
-    [DecidableEq α] (oa : OracleComp spec₀ α) :
+lemma finSupport_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+    [DecidableEq α] (oa : OracleComp spec α) :
     finSupport (simulateQ uniformSampleImpl oa) = finSupport oa := by
   simp [finSupport_eq_iff_support_eq_coe]
 
