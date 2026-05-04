@@ -103,7 +103,7 @@ theorem bind_congr_of_forall_mem_support (mx : OracleComp spec α) {f g : α →
     (h : ∀ x ∈ support mx, f x = g x) : mx >>= f = mx >>= g := by
   induction mx using OracleComp.inductionOn with
   | pure a =>
-    simp only [pure_bind]
+    simp only [monad_norm]
     exact h a (by simp [support_pure])
   | query_bind q k ih =>
     change liftM (query q) >>= (fun u => k u >>= f) =
@@ -450,5 +450,39 @@ lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
     · funext ⟨u, s'⟩; exact ih u s'
 
 end simulateQ_evalDist
+
+section support_simulateQ_StateT
+
+/-- Simulating an `OracleComp` through a stateful implementation in monad `m` can only shrink the
+support: any output reachable after simulation was already reachable in the original computation
+(where oracle queries may return any value). This is the support-level analogue of
+`evalDist_simulateQ_run'_eq_evalDist`. -/
+theorem support_simulateQ_run'_subset
+    {m : Type w → Type _} [Monad m] [LawfulMonad m] [HasEvalSet m] {σ : Type w}
+    (impl : QueryImpl spec (StateT σ m))
+    (oa : OracleComp spec α) (s : σ) :
+    support ((simulateQ impl oa).run' s) ⊆ support oa := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x =>
+    simp only [simulateQ_pure, StateT.run'_eq, StateT.run_pure, map_pure, support_pure]
+    exact Set.Subset.rfl
+  | query_bind t k ih =>
+    intro x hx
+    rw [simulateQ_bind, simulateQ_spec_query, StateT.run'_eq] at hx
+    rw [support_map] at hx
+    obtain ⟨⟨a, s'⟩, hmem, ha⟩ := hx
+    rw [StateT.run_bind] at hmem
+    rw [support_bind] at hmem
+    simp only [Set.mem_iUnion, exists_prop] at hmem
+    obtain ⟨⟨u, s''⟩, _, hmem'⟩ := hmem
+    have hrun' : a ∈ support ((simulateQ impl (k u)).run' s'') := by
+      rw [StateT.run'_eq, support_map]
+      exact ⟨(a, s'), hmem', rfl⟩
+    have hih := ih u s'' hrun'
+    rw [support_bind]
+    simp only [Set.mem_iUnion, exists_prop]
+    exact ⟨u, mem_support_query t u, ha ▸ hih⟩
+
+end support_simulateQ_StateT
 
 end OracleComp

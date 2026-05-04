@@ -71,7 +71,7 @@ lemma sum_counts_step_le_succ_hidingImplCountAll (ms : M × S)
     (hx : x ∈ support ((hidingImplCountAll (M := M) (S := S) (C := C) ms).run st)) :
     (∑ s' : S, x.2.2 s') ≤ (∑ s' : S, st.2 s') + 1 := by
   obtain ⟨cache, counts⟩ := st
-  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, pure_bind] at hx
+  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, monad_norm] at hx
   cases hcache : cache ms with
   | some u =>
       simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
@@ -81,7 +81,7 @@ lemma sum_counts_step_le_succ_hidingImplCountAll (ms : M × S)
       simp only [hcache, StateT.run_bind] at hx
       rw [mem_support_bind_iff] at hx
       obtain ⟨u, _, hx⟩ := hx
-      simp only [StateT.run_set, StateT.run_pure, pure_bind, support_pure,
+      simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,
         Set.mem_singleton_iff] at hx
       rw [hx]
       simp [sum_update_succ_count]
@@ -134,7 +134,7 @@ lemma count_mono_step_hidingImplCountAll (s : S) (ms : M × S)
     (hx : x ∈ support ((hidingImplCountAll (M := M) (S := S) (C := C) ms).run st)) :
     st.2 s ≤ x.2.2 s := by
   obtain ⟨cache, counts⟩ := st
-  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, pure_bind] at hx
+  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, monad_norm] at hx
   cases hcache : cache ms with
   | some u =>
       simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
@@ -143,7 +143,7 @@ lemma count_mono_step_hidingImplCountAll (s : S) (ms : M × S)
       simp only [hcache, StateT.run_bind] at hx
       rw [mem_support_bind_iff] at hx
       obtain ⟨u, _, hx⟩ := hx
-      simp only [StateT.run_set, StateT.run_pure, pure_bind, support_pure,
+      simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,
         Set.mem_singleton_iff] at hx
       rw [hx]
       by_cases hs : ms.2 = s
@@ -167,7 +167,7 @@ lemma count_coord_le_succ_of_mem_support_step_hidingImplCountAll
   have hmono :
       counts s ≤ x.2.2 s :=
     count_mono_step_hidingImplCountAll (M := M) (S := S) (C := C) s ms (cache, counts) x hx
-  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, pure_bind] at hx
+  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, monad_norm] at hx
   cases hcache : cache ms with
   | some u =>
       simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
@@ -177,7 +177,7 @@ lemma count_coord_le_succ_of_mem_support_step_hidingImplCountAll
       simp only [hcache, StateT.run_bind] at hx
       rw [mem_support_bind_iff] at hx
       obtain ⟨u, _, hx⟩ := hx
-      simp only [StateT.run_set, StateT.run_pure, pure_bind, support_pure,
+      simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,
         Set.mem_singleton_iff] at hx
       subst hx
       constructor
@@ -200,7 +200,7 @@ lemma count_coord_le_add_hit_of_mem_support_step_hidingImplCountAll
     (hx : x ∈ support ((hidingImplCountAll (M := M) (S := S) (C := C) ms).run st)) :
     x.2.2 s ≤ st.2 s + if ms.2 = s then 1 else 0 := by
   obtain ⟨cache, counts⟩ := st
-  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, pure_bind] at hx
+  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, monad_norm] at hx
   cases hcache : cache ms with
   | some u =>
       simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
@@ -216,7 +216,7 @@ lemma count_coord_le_add_hit_of_mem_support_step_hidingImplCountAll
       simp only [hcache, StateT.run_bind] at hx
       rw [mem_support_bind_iff] at hx
       obtain ⟨u, _, hx⟩ := hx
-      simp only [StateT.run_set, StateT.run_pure, pure_bind, support_pure,
+      simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,
         Set.mem_singleton_iff] at hx
       subst hx
       by_cases hs : ms.2 = s
@@ -255,7 +255,7 @@ lemma self_mem_cache_of_mem_support_step_hidingImplCountAll (ms : M × S)
     (hx : x ∈ support ((hidingImplCountAll (M := M) (S := S) (C := C) ms).run st)) :
     x.2.1 ms = some x.1 := by
   obtain ⟨cache, counts⟩ := st
-  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, pure_bind] at hx
+  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, monad_norm] at hx
   cases hcache : cache ms with
   | some u =>
       simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
@@ -265,7 +265,7 @@ lemma self_mem_cache_of_mem_support_step_hidingImplCountAll (ms : M × S)
       simp only [hcache, StateT.run_bind] at hx
       rw [mem_support_bind_iff] at hx
       obtain ⟨u, _, hx⟩ := hx
-      simp only [StateT.run_set, StateT.run_pure, pure_bind, support_pure,
+      simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,
         Set.mem_singleton_iff] at hx
       subst hx
       simp
@@ -283,7 +283,7 @@ lemma hidingCountInv_step_hidingImplCountAll (ms₀ : M × S)
     (hx : x ∈ support ((hidingImplCountAll (M := M) (S := S) (C := C) ms₀).run st)) :
     HidingCountInv x.2 := by
   obtain ⟨cache, counts⟩ := st
-  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, pure_bind] at hx
+  simp only [hidingImplCountAll, StateT.run_bind, StateT.run_get, monad_norm] at hx
   cases hcache : cache ms₀ with
   | some u₀ =>
       simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
@@ -293,7 +293,7 @@ lemma hidingCountInv_step_hidingImplCountAll (ms₀ : M × S)
       simp only [hcache, StateT.run_bind] at hx
       rw [mem_support_bind_iff] at hx
       obtain ⟨u₀, _, hx⟩ := hx
-      simp only [StateT.run_set, StateT.run_pure, pure_bind, support_pure,
+      simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,
         Set.mem_singleton_iff] at hx
       subst hx
       intro ms u hms

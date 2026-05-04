@@ -52,6 +52,22 @@ inductive Skeleton where
   | leaf : Skeleton
   | internal : Skeleton → Skeleton → Skeleton
 
+/--
+Depth of a `Skeleton`, measured as the maximum number of edges from the root to a leaf.
+A standalone leaf has depth `0`, and an internal node has depth one more than the deeper child.
+-/
+def Skeleton.depth : Skeleton → Nat
+  | Skeleton.leaf => 0
+  | Skeleton.internal left right => max left.depth right.depth + 1
+
+/--
+Number of leaves of a `Skeleton`.
+A leaf contributes one, and an internal node sums the leaf counts of its children.
+-/
+def Skeleton.leafCount : Skeleton → Nat
+  | Skeleton.leaf => 1
+  | Skeleton.internal left right => left.leafCount + right.leafCount
+
 /-- Type of indices of leaves of a skeleton -/
 inductive SkeletonLeafIndex : Skeleton → Type
   | ofLeaf : SkeletonLeafIndex Skeleton.leaf

@@ -26,37 +26,36 @@ namespace LatticeCrypto
 
 variable {R : Type*} [CommRing R] {n : Nat}
 
+/-- Private alias for the canonical quotient map onto `R[X] / (X^n + 1)`. Reducible
+so that proofs treat `mkQ R n p` and `Ideal.Quotient.mk (Ideal.span …) p` as the same
+expression, while keeping local theorem statements compact. -/
+private noncomputable abbrev mkQ (R : Type*) [CommRing R] (n : Nat) :
+    Polynomial R →+* NegacyclicQuotient R n :=
+  Ideal.Quotient.mk _
+
 /-! ## Section 1: Negacyclic Quotient Algebra -/
 
 /-- The negacyclic modulus `X^n + 1` maps to zero in the quotient. -/
 theorem mk_negacyclicModulus_eq_zero :
-    (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-      (negacyclicModulus R n) = 0 :=
+    mkQ R n (negacyclicModulus R n) = 0 :=
   Ideal.Quotient.eq_zero_iff_mem.mpr (Ideal.subset_span rfl)
 
 /-- In `R[X]/(X^n + 1)`, `X^n = -1`. -/
-theorem mk_X_pow_n :
-    (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-      ((X : Polynomial R) ^ n) = -1 := by
+theorem mk_X_pow_n : mkQ R n ((X : Polynomial R) ^ n) = -1 := by
   have h := mk_negacyclicModulus_eq_zero (R := R) (n := n)
-  have h' :
-      (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-        ((X : Polynomial R) ^ n) + 1 = 0 := by
+  have h' : mkQ R n ((X : Polynomial R) ^ n) + 1 = 0 := by
     simpa [negacyclicModulus, map_add, map_one] using h
   exact (add_eq_zero_iff_eq_neg.mp h')
 
 /-- In `R[X]/(X^n + 1)`, `X^(k + n) = -X^k`. -/
 theorem mk_X_pow_add_n (k : Nat) :
-    (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-      ((X : Polynomial R) ^ (k + n)) =
-    -(Ideal.Quotient.mk _ (X ^ k)) := by
+    mkQ R n ((X : Polynomial R) ^ (k + n)) = -(mkQ R n (X ^ k)) := by
   rw [pow_add, map_mul, mk_X_pow_n]; ring
 
 /-- In `R[X]/(X^n + 1)`, `monomial (k + n) c = -monomial k c`. -/
 theorem mk_monomial_add_n (k : Nat) (c : R) :
-    (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-      (Polynomial.monomial (k + n) c) =
-    -(Ideal.Quotient.mk _ (Polynomial.monomial k c)) := by
+    mkQ R n (Polynomial.monomial (k + n) c) =
+      -(mkQ R n (Polynomial.monomial k c)) := by
   rw [← C_mul_X_pow_eq_monomial, ← C_mul_X_pow_eq_monomial, map_mul, map_mul,
     mk_X_pow_add_n]
   ring
@@ -75,24 +74,18 @@ theorem toPolynomial_mul_eq_double_sum (backend : PolyBackend R) (f g : backend.
 /-- The key algebraic step: the double sum of monomial products maps to the
 same quotient element as the negacyclic convolution polynomial. -/
 theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
-    (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-      (∑ i : Fin n, ∑ j : Fin n,
+    mkQ R n (∑ i : Fin n, ∑ j : Fin n,
         Polynomial.monomial (i.val + j.val) (f i * g j)) =
-    (Ideal.Quotient.mk _)
-      (∑ k : Fin n, Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
+    mkQ R n (∑ k : Fin n, Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
   have h_reduction : ∀ i j : Fin n,
-      (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-        (Polynomial.monomial (i.val + j.val) (f i * g j)) =
-      (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-        (Polynomial.monomial ((i.val + j.val) % n)
+      mkQ R n (Polynomial.monomial (i.val + j.val) (f i * g j)) =
+      mkQ R n (Polynomial.monomial ((i.val + j.val) % n)
           (if i.val + j.val < n then f i * g j else -(f i * g j))) := by
     intro i j
     split_ifs with h
     · rw [Nat.mod_eq_of_lt h]
-    · have h_neg : (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-          (Polynomial.monomial (n + (i.val + j.val - n)) (f i * g j)) =
-        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-          (-Polynomial.monomial ((i.val + j.val - n)) (f i * g j)) := by
+    · have h_neg : mkQ R n (Polynomial.monomial (n + (i.val + j.val - n)) (f i * g j)) =
+          mkQ R n (-Polynomial.monomial ((i.val + j.val - n)) (f i * g j)) := by
         simpa [Nat.add_comm] using
           mk_monomial_add_n (i.val + j.val - n) (f i * g j)
       have hle : n ≤ i.val + j.val := le_of_not_gt h
@@ -103,34 +96,29 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
         rw [Nat.mod_eq_sub_mod hle, Nat.mod_eq_of_lt hlt]
       simpa [Nat.add_sub_of_le hle, h, hmod] using h_neg
   calc
-    (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-        (∑ i : Fin n, ∑ j : Fin n,
+    mkQ R n (∑ i : Fin n, ∑ j : Fin n,
           Polynomial.monomial (i.val + j.val) (f i * g j)) =
       ∑ i : Fin n, ∑ j : Fin n,
-        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-          (Polynomial.monomial (i.val + j.val) (f i * g j)) := by
+        mkQ R n (Polynomial.monomial (i.val + j.val) (f i * g j)) := by
           rw [map_sum]
           refine Finset.sum_congr rfl fun i _ => ?_
           rw [map_sum]
     _ =
       ∑ i : Fin n, ∑ j : Fin n,
-        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-          (Polynomial.monomial ((i.val + j.val) % n)
+        mkQ R n (Polynomial.monomial ((i.val + j.val) % n)
             (if i.val + j.val < n then f i * g j else -(f i * g j))) := by
           refine Finset.sum_congr rfl fun i _ => ?_
           refine Finset.sum_congr rfl fun j _ => ?_
           exact h_reduction i j
     _ =
       ∑ x ∈ Finset.univ ×ˢ Finset.univ,
-        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-          (Polynomial.monomial ((x.1.val + x.2.val) % n)
+        mkQ R n (Polynomial.monomial ((x.1.val + x.2.val) % n)
             (if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2))) := by
           rw [← Finset.sum_product']
     _ =
       ∑ x ∈ Finset.univ ×ˢ Finset.univ,
         ∑ k : Fin n,
-          (Ideal.Quotient.mk _)
-            (Polynomial.monomial k.val
+          mkQ R n (Polynomial.monomial k.val
               (if (x.1.val + x.2.val) % n = k.val then
                 if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
               else 0)) := by
@@ -148,16 +136,14 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
     _ =
       ∑ k : Fin n,
         ∑ x ∈ Finset.univ ×ˢ Finset.univ,
-          (Ideal.Quotient.mk _)
-            (Polynomial.monomial k.val
+          mkQ R n (Polynomial.monomial k.val
               (if (x.1.val + x.2.val) % n = k.val then
                 if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
               else 0)) := by
           rw [Finset.sum_comm]
     _ =
       ∑ k : Fin n,
-        (Ideal.Quotient.mk _)
-          (∑ x ∈ Finset.univ ×ˢ Finset.univ,
+        mkQ R n (∑ x ∈ Finset.univ ×ˢ Finset.univ,
             Polynomial.monomial k.val
               (if (x.1.val + x.2.val) % n = k.val then
                 if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
@@ -166,8 +152,7 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
           rw [map_sum]
     _ =
       ∑ k : Fin n,
-        (Ideal.Quotient.mk _)
-          (Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
+        mkQ R n (Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
           refine Finset.sum_congr rfl fun k _ => ?_
           let coeffTerm : Fin n × Fin n → R := fun x =>
             if (x.1.val + x.2.val) % n = k.val then
@@ -177,16 +162,8 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
               Polynomial.monomial k.val (∑ x : Fin n × Fin n, coeffTerm x) =
                 ∑ x : Fin n × Fin n, Polynomial.monomial k.val (coeffTerm x) := by
             rw [← map_sum]
-          change
-            (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-              (∑ x : Fin n × Fin n, Polynomial.monomial k.val (coeffTerm x)) =
-            (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-              (Polynomial.monomial k.val (∑ x : Fin n × Fin n, coeffTerm x))
-          exact congrArg
-            (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
-            h_monomial_sum.symm
-    _ = (Ideal.Quotient.mk _)
-        (∑ k : Fin n, Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
+          exact congrArg (mkQ R n) h_monomial_sum.symm
+    _ = mkQ R n (∑ k : Fin n, Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
           rw [← map_sum]
 
 /-! ## Section 4: Assembly -/

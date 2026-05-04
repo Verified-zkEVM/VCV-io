@@ -148,7 +148,7 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
             let a ← pref
             let z ← if b then real a else rand a
             pure (b == z)] := by
-              simpa [game, bind_assoc] using
+              simpa [game, monad_norm] using
                 (probOutput_bind_bind_swap pref ($ᵗ Bool)
                   (fun a b => do
                     let z ← if b then real a else rand a

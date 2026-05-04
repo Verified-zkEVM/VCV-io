@@ -321,7 +321,7 @@ theorem dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction
         (Pr[= b' | adversary g (b • g)] *
           (if (a' * b') • g = (a * b) • g then 1 else 0)))) := by
     unfold cdhExp dlogToCDHReduction
-    simp only [bind_assoc, pure_bind, probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left]
+    simp only [monad_norm, probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left]
     refine tsum_congr fun a => ?_
     refine tsum_congr fun b => ?_
     refine tsum_congr fun a' => ?_

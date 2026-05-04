@@ -324,7 +324,7 @@ theorem hidingReal_eq_impl₁ {AUX : Type} {t : ℕ}
         simp [StateT.run_pure, Prod.map]
       | none =>
         simp only [StateT.run_bind, OracleComp.liftM_run_StateT]
-        simp only [bind_assoc, pure_bind]
+        simp only [monad_norm]
         simp [StateT.run_set, StateT.run_pure, Prod.map, StateT.run_modifyGet]
     ) (hidingOa A s) (∅, 0)).symm
 

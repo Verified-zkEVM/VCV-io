@@ -619,7 +619,7 @@ private lemma sq_probOutput_main_le_noGuardComp (s : Fin (qb i + 1)) :
                        (simulateQ seededOracle main).run'
                          ((σ.takeAtIndex i ↑s).addValue i u))
                      pure (cf x₁, cf x₂)) := by
-      simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp, pure_bind]
+      simp only [monad_norm, Function.comp]
     rw [hcomp, probOutput_some_map_some, probOutput_bind_bind_prod_mk_eq_mul']
     congr 1
     have h := seededOracle.evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
@@ -925,7 +925,7 @@ theorem le_probOutput_seededFork (s : Fin (qb i + 1)) :
                        else
                          pure none)] := by
               rw [hif]
-              simpa [map_eq_bind_pure_comp] using hmono
+              simpa [monad_norm] using hmono
             have hadd :
                 Pr[= z |
                   (fun r ↦ Option.map (Prod.map cf cf) r) <$>

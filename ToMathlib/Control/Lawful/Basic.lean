@@ -27,33 +27,27 @@ variable {m : Type u → Type v} [Monad m] [LawfulMonad m]
 
 @[simp]
 theorem do_pure_bind {α β : Type u} (a : α) (f : α → m β) :
-    (do let x ← (pure a : m α); f x) = f a :=
-  pure_bind a f
+    (do let x ← (pure a : m α); f x) = f a := by simp
 
 @[simp]
 theorem do_bind_pure {α : Type u} (x : m α) :
-    (do let a ← x; pure a) = x :=
-  bind_pure x
+    (do let a ← x; pure a) = x := by simp
 
 @[simp]
 theorem do_bind_assoc {α β γ : Type u} (x : m α) (f : α → m β) (g : β → m γ) :
-    (do let b ← (do let a ← x; f a); g b) = (do let a ← x; let b ← f a; g b) :=
-  bind_assoc x f g
+    (do let b ← (do let a ← x; f a); g b) = (do let a ← x; let b ← f a; g b) := by simp
 
 @[simp]
 theorem do_bind_pure_comp {α β : Type u} (f : α → β) (x : m α) :
-    (do let a ← x; pure (f a)) = f <$> x :=
-  bind_pure_comp f x
+    (do let a ← x; pure (f a)) = f <$> x := by simp
 
 @[simp]
 theorem do_map_bind {α β γ : Type u} (f : β → γ) (x : m α) (g : α → m β) :
-    f <$> (do let a ← x; g a) = (do let a ← x; f <$> g a) :=
-  map_bind f x g
+    f <$> (do let a ← x; g a) = (do let a ← x; f <$> g a) := by simp
 
 @[simp]
 theorem do_bind_map_left {α β γ : Type u} (f : α → β) (x : m α) (g : β → m γ) :
-    (do let b ← f <$> x; g b) = (do let a ← x; g (f a)) :=
-  bind_map_left f x g
+    (do let b ← f <$> x; g b) = (do let a ← x; g (f a)) := by simp
 
 end LawfulMonad
 

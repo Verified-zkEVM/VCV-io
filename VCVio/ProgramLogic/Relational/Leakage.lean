@@ -233,7 +233,7 @@ private lemma snd_map_bind_snd {m : Type → Type _} [Monad m] [LawfulMonad m]
     {α' ω₁ γ' ω₂ : Type} (mx : m (α' × ω₁)) (f : ω₁ → m (γ' × ω₂)) :
     Prod.snd <$> (mx >>= fun z => f z.2) =
     (Prod.snd <$> mx) >>= fun w => Prod.snd <$> f w := by
-  simp only [← bind_pure_comp, bind_assoc, pure_bind]
+  simp only [monad_norm, Function.comp_apply]
 
 /-- Trace noninterference is preserved by sequential composition (bind).
 The continuations may depend on both the result and the trace, but whenever the
