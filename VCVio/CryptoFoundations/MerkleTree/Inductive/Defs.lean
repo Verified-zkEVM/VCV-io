@@ -93,18 +93,13 @@ def buildMerkleTree {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (
 
 /--
 A functional form of merkle tree construction, that doesn't depend on the monad.
-This receives an explicit hash function
+This receives an explicit hash function. Implemented as the bottom-up
+`populate_up` from `ToMathlib.Data.IndexedBinaryTree.Basic`.
 -/
 @[simp, grind]
 def buildMerkleTreeWithHash {s} (leaf_tree : LeafData α s) (hashFn : α → α → α) :
     (FullData α s) :=
-  match leaf_tree with
-  | LeafData.leaf a => FullData.leaf a
-  | LeafData.internal left right =>
-    let leftTree := buildMerkleTreeWithHash left hashFn
-    let rightTree := buildMerkleTreeWithHash right hashFn
-    let rootHash := hashFn (leftTree.getRootValue) (rightTree.getRootValue)
-    FullData.internal rootHash leftTree rightTree
+  populate_up leaf_tree hashFn
 
 /--
 Running the monadic version of `buildMerkleTree` with an oracle function `f`

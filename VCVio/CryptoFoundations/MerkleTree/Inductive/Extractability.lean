@@ -51,22 +51,6 @@ open List OracleSpec OracleComp BinaryTree
 variable {α : Type}
 
 /--
-Given a tree skeleton, a root value, and a function `f` that maps node values to a pair of values for the left and right children, `populate_down_tree` constructs a `FullData` tree of the given skeleton by recursively applying `f` to populate the children of each node, starting from the root.
--/
-def populate_down_tree {α : Type} (s : Skeleton)
-    (f : α → (α × α))
-    (root : α) :
-    FullData α s :=
-  match s with
-  | .leaf => FullData.leaf root
-  | .internal s_left s_right =>
-    let ⟨left_root, right_root⟩ := f root
-    FullData.internal
-      root
-      (populate_down_tree s_left f left_root)
-      (populate_down_tree s_right f right_root)
-
-/--
 The extraction algorithm for Merkle trees.
 
 This algorithm takes a merkle tree cache, a root, and a skeleton, and
@@ -104,30 +88,7 @@ def extractor {α : Type} [DecidableEq α] [SampleableType α]
       | some q =>
         let child_hashes := q.1;
         (some child_hashes.1, some child_hashes.2)
-  populate_down_tree s children (some root)
-
-/-! ### Structural lemmas for `populate_down_tree` and `extractor` -/
-
-/-- For an internal skeleton, `populate_down_tree` unfolds to a `FullData.internal`
-whose subtrees are recursively populated from the projections of `children root`.
-
-This holds by `rfl` thanks to Prod-eta: the `let ⟨l, r⟩ := children root` in the
-definition is `Prod.casesOn (children root) _`, and Prod-eta makes
-`Prod.casesOn p f = f p.1 p.2` definitional. -/
-@[simp] lemma populate_down_tree_internal_def {β : Type} {sl sr : Skeleton}
-    (children : β → β × β) (root : β) :
-    populate_down_tree (.internal sl sr) children root =
-      FullData.internal root
-        (populate_down_tree sl children (children root).1)
-        (populate_down_tree sr children (children root).2) := rfl
-
-/-- The root value of `populate_down_tree` is the input `root`. -/
-@[simp] lemma populate_down_tree_getRootValue {β : Type} {s : Skeleton}
-    (children : β → β × β) (root : β) :
-    (populate_down_tree s children root).getRootValue = root := by
-  cases s with
-  | leaf => rfl
-  | internal sl sr => rfl
+  populate_down s children (some root)
 
 /-! ### Chain predicate and consistency lemma
 
@@ -210,7 +171,7 @@ the extractor (to descend) and the one used by the verifier's chain (to ascend),
 so their input pairs agree. Specifically, for `idx = .ofLeft idxLeft` we use:
 
 * `chainInLog` produces an entry `⟨(ancestor, proof.head), root⟩ ∈ log`.
-* `_h_ne_none` plus `extractor`'s `populate_down_tree` definition forces
+* `_h_ne_none` plus `extractor`'s `populate_down` definition forces
   `log.find? (·.2 == root)` to be `some _`.
 * No-collision then identifies that `find?` result with the chain entry above,
   giving `extracted leftRoot = some ancestor` and `extracted rightRoot = some proof.head`.
@@ -261,13 +222,13 @@ theorem extractor_chain_match
           (q := (⟨(ancestor, proof.head), root⟩ : (_i : (α × α)) × α))
           h_no_coll h_log_mem
       simpa using this
-    -- Step 3. The extractor decomposes via `populate_down_tree_internal_def`.
+    -- Step 3. The extractor decomposes via `populate_down_internal_def`.
     have h_extractor_decomp :
         extractor (Skeleton.internal sl sr) log root =
           FullData.internal (some root)
             (extractor sl log ancestor) (extractor sr log proof.head) := by
-      change populate_down_tree (Skeleton.internal sl sr) _ (some root) = _
-      rw [populate_down_tree_internal_def]
+      change populate_down (Skeleton.internal sl sr) _ (some root) = _
+      rw [populate_down_internal_def]
       simp only [h_find, FullData.internal.injEq, true_and]
       exact ⟨rfl, rfl⟩
     rw [h_extractor_decomp]
@@ -302,8 +263,8 @@ theorem extractor_chain_match
         FullData.leftSubtree_internal]
       -- `(extractor sr log proof.head).getRootValue = some proof.head`.
       have h_root_value : (extractor sr log proof.head).getRootValue = some proof.head := by
-        change (populate_down_tree sr _ (some proof.head)).getRootValue = some proof.head
-        rw [populate_down_tree_getRootValue]
+        change (populate_down sr _ (some proof.head)).getRootValue = some proof.head
+        rw [populate_down_getRootValue]
       -- `(a ::ᵥ v).toList = a :: v.toList` definitionally.
       change (extractor sr log proof.head).getRootValue ::
             (generateProof (extractor sl log ancestor) idxLeft).toList =
@@ -331,8 +292,8 @@ theorem extractor_chain_match
         extractor (Skeleton.internal sl sr) log root =
           FullData.internal (some root)
             (extractor sl log proof.head) (extractor sr log ancestor) := by
-      change populate_down_tree (Skeleton.internal sl sr) _ (some root) = _
-      rw [populate_down_tree_internal_def]
+      change populate_down (Skeleton.internal sl sr) _ (some root) = _
+      rw [populate_down_internal_def]
       simp only [h_find, FullData.internal.injEq, true_and]
       exact ⟨rfl, rfl⟩
     rw [h_extractor_decomp]
@@ -362,8 +323,8 @@ theorem extractor_chain_match
       simp only [generateProof, FullData.leftSubtree_internal,
         FullData.rightSubtree_internal]
       have h_root_value : (extractor sl log proof.head).getRootValue = some proof.head := by
-        change (populate_down_tree sl _ (some proof.head)).getRootValue = some proof.head
-        rw [populate_down_tree_getRootValue]
+        change (populate_down sl _ (some proof.head)).getRootValue = some proof.head
+        rw [populate_down_getRootValue]
       change (extractor sl log proof.head).getRootValue ::
             (generateProof (extractor sr log ancestor) idxRight).toList =
           proof.toList.map some

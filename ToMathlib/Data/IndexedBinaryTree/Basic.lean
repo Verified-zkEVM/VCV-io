@@ -716,54 +716,98 @@ theorem FullData.map_getRootValue {α β : Type _} {s : Skeleton}
 
 end map
 
-section ComposeBuild
+section Populate
 
 /-!
-## Build
+## Building full trees
 
-This section contains theorems about building full trees from leaf trees.
+Two dual constructions of `FullData` trees:
+
+* `LeafData.populate_up` — bottom-up. Given a leaf-valued tree and a binary
+  composition function, fill internal nodes by recursively composing the
+  child subtrees' root values. (This is the standard Merkle-tree build.)
+* `populate_down` — top-down. Given a skeleton, a child-decomposition function
+  `α → α × α`, and a root value, recursively expand each node by applying the
+  function to obtain its two children.
 -/
 
-/-- Build a `FullData` tree by hashing together the roots of child subtrees. -/
-def LeafData.composeBuild {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
+/-- Bottom-up tree population: fill internal nodes by composing child subtrees'
+root values via `compose`. -/
+def populate_up {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
     (compose : α → α → α) :
     FullData α s :=
   match leaf_data_tree with
   | .leaf value =>
     .leaf value
   | .internal left right =>
-    let leftTree := left.composeBuild compose
-    let rightTree := right.composeBuild compose
+    let leftTree := populate_up left compose
+    let rightTree := populate_up right compose
     .internal
       (compose leftTree.getRootValue rightTree.getRootValue)
       leftTree
       rightTree
 
 @[simp]
-theorem LeafData.composeBuild_leaf {α} (a : α)
+theorem populate_up_leaf {α} (a : α)
     (compose : α → α → α) :
-    (LeafData.leaf a).composeBuild compose = FullData.leaf a := by
+    populate_up (LeafData.leaf a) compose = FullData.leaf a := by
   rfl
 
 @[simp]
-theorem LeafData.composeBuild_internal {α} {s_left s_right : Skeleton}
+theorem populate_up_internal {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :
-    (LeafData.internal left right).composeBuild compose =
+    populate_up (LeafData.internal left right) compose =
       FullData.internal
-        (compose (left.composeBuild compose).getRootValue (right.composeBuild compose).getRootValue)
-        (left.composeBuild compose)
-        (right.composeBuild compose) := by
+        (compose (populate_up left compose).getRootValue (populate_up right compose).getRootValue)
+        (populate_up left compose)
+        (populate_up right compose) := by
   rfl
 
 @[simp]
-theorem LeafData.composeBuild_getRootValue {α} {s_left s_right : Skeleton}
+theorem populate_up_getRootValue {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :
-    ((LeafData.internal left right).composeBuild compose).getRootValue =
-      compose (left.composeBuild compose).getRootValue
-        (right.composeBuild compose).getRootValue := by
+    (populate_up (LeafData.internal left right) compose).getRootValue =
+      compose (populate_up left compose).getRootValue
+        (populate_up right compose).getRootValue := by
   rfl
+
+/-- Top-down tree population: fill nodes by recursively expanding the input root
+into a pair of child values via `children`. -/
+def populate_down {α : Type _} (s : Skeleton)
+    (children : α → α × α)
+    (root : α) :
+    FullData α s :=
+  match s with
+  | .leaf => FullData.leaf root
+  | .internal s_left s_right =>
+    let ⟨left_root, right_root⟩ := children root
+    FullData.internal
+      root
+      (populate_down s_left children left_root)
+      (populate_down s_right children right_root)
+
+/-- For an internal skeleton, `populate_down` unfolds to a `FullData.internal`
+whose subtrees are recursively populated from the projections of `children root`.
+
+This holds by `rfl` thanks to Prod-eta: the `let ⟨l, r⟩ := children root` in the
+definition is `Prod.casesOn (children root) _`, and Prod-eta makes
+`Prod.casesOn p f = f p.1 p.2` definitional. -/
+@[simp] lemma populate_down_internal_def {β : Type _} {sl sr : Skeleton}
+    (children : β → β × β) (root : β) :
+    populate_down (.internal sl sr) children root =
+      FullData.internal root
+        (populate_down sl children (children root).1)
+        (populate_down sr children (children root).2) := rfl
+
+/-- The root value of `populate_down` is the input `root`. -/
+@[simp] lemma populate_down_getRootValue {β : Type _} {s : Skeleton}
+    (children : β → β × β) (root : β) :
+    (populate_down s children root).getRootValue = root := by
+  cases s with
+  | leaf => rfl
+  | internal sl sr => rfl
 
 /-- Lift a binary function through two `Option` arguments. -/
 def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
@@ -771,30 +815,30 @@ def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
   f (← x) (← y)
 
 /-- Build a tree while allowing failures in the composition function. -/
-def LeafData.optionComposeBuild {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
+def optionPopulateUp {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
     (compose : α → α → Option α) :
     FullData (Option α) s :=
-  (leaf_data_tree.map (.some)).composeBuild (Option.doubleBind compose)
+  populate_up (leaf_data_tree.map (.some)) (Option.doubleBind compose)
 
 @[simp]
-theorem LeafData.optionComposeBuild_leaf {α} (a : α)
+theorem optionPopulateUp_leaf {α} (a : α)
     (compose : α → α → Option α) :
-    (LeafData.leaf a).optionComposeBuild compose = FullData.leaf (.some a) := by
+    optionPopulateUp (LeafData.leaf a) compose = FullData.leaf (.some a) := by
   rfl
 
 @[simp]
-theorem LeafData.optionComposeBuild_internal {α} {s_left s_right : Skeleton}
+theorem optionPopulateUp_internal {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → Option α) :
-    (LeafData.internal left right).optionComposeBuild compose =
+    optionPopulateUp (LeafData.internal left right) compose =
       FullData.internal
         (Option.doubleBind compose
-          (left.optionComposeBuild compose).getRootValue
-          (right.optionComposeBuild compose).getRootValue)
-        (left.optionComposeBuild compose)
-        (right.optionComposeBuild compose) := by
+          (optionPopulateUp left compose).getRootValue
+          (optionPopulateUp right compose).getRootValue)
+        (optionPopulateUp left compose)
+        (optionPopulateUp right compose) := by
   rfl
 
-end ComposeBuild
+end Populate
 
 end BinaryTree
