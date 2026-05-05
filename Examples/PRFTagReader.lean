@@ -1088,6 +1088,28 @@ theorem unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound
     adversary maxNonceProb hmax
   linarith
 
+/-- Tightest unlinkability bound: when nonces are sampled uniformly (as enforced by
+`SampleableType`), the session-collision term is exactly `sessionsPerTag² · |TagId| / |Nonce|`. -/
+theorem unlinkabilityAdvantage_le_two_prf_plus_uniform_sessionCollisionBound
+    [Fintype Nonce]
+    (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag)
+    (adversary : UnlinkAdversary TagId Nonce Digest) :
+    ∃ multiAdv : PRFScheme.PRFAdversary (TagId × Nonce) Digest,
+      ∃ singleAdv : PRFScheme.PRFAdversary ((TagId × Fin sessionsPerTag) × Nonce) Digest,
+        unlinkabilityAdvantage (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+          (sessionsPerTag := sessionsPerTag) prfs adversary ≤
+            PRFScheme.prfAdvantage prfs.multiplePRFScheme multiAdv +
+            PRFScheme.prfAdvantage prfs.singlePRFScheme singleAdv +
+            (sessionsPerTag ^ 2 * Fintype.card TagId : ℕ) /
+              (Fintype.card Nonce : ℝ) := by
+  have hmax : ∀ nonce : Nonce,
+      (Pr[= nonce | ($ᵗ Nonce)]).toReal ≤ (Fintype.card Nonce : ℝ)⁻¹ := fun nonce => by
+    simp [probOutput_uniformSample, ENNReal.toReal_inv, ENNReal.toReal_natCast]
+  obtain ⟨multiAdv, singleAdv, h⟩ :=
+    unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound prfs adversary
+      ((Fintype.card Nonce : ℝ)⁻¹) hmax
+  exact ⟨multiAdv, singleAdv, by rwa [div_eq_mul_inv]⟩
+
 end Theorems
 
 end PRFTagReader
