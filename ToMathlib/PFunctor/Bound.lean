@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 module
 
-public import ToMathlib.PFunctor.Free
+public import ToMathlib.PFunctor.Free.Basic
 
 /-!
 # Roll Bounds for the Free Monad of a Polynomial Functor

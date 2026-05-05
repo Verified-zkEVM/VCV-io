@@ -55,4 +55,33 @@ lemma run_failure' [Monad m] [Alternative m] :
 lemma mk_pure_eq_pure [Monad m] (x : α) :
   StateT.mk (fun s ↦ pure (x, s)) = (pure x : StateT σ m α) := rfl
 
+/-! ## `StateT.run'` lemmas -/
+
+section run'
+
+variable [Monad m] [LawfulMonad m]
+
+@[simp]
+lemma run'_pure' (x : α) (s : σ) :
+    (pure x : StateT σ m α).run' s = pure x := by
+  simp [StateT.run'_eq]
+
+@[simp]
+lemma run'_bind' (x : StateT σ m α) (f : α → StateT σ m β) (s : σ) :
+    (x >>= f).run' s = x.run s >>= fun ⟨a, s'⟩ => (f a).run' s' := by
+  simp only [StateT.run'_eq, StateT.run, monad_bind_def, StateT.bind,
+    map_eq_bind_pure_comp, bind_assoc]
+
+@[simp]
+lemma run'_map' (x : StateT σ m α) (f : α → β) (s : σ) :
+    (f <$> x).run' s = f <$> x.run' s := by
+  simp [StateT.run'_eq, Functor.map_map]
+
+@[simp]
+lemma run'_lift' (x : m α) (s : σ) :
+    (StateT.lift x : StateT σ m α).run' s = x := by
+  simp [StateT.run'_eq, map_eq_bind_pure_comp, bind_assoc]
+
+end run'
+
 end StateT

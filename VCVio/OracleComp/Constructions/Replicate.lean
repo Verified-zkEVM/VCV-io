@@ -152,4 +152,27 @@ lemma probOutput_replicate_uniformSample {α : Type} [Fintype α] [SampleableTyp
   simpa [Nat.cast_pow] using
     (ENNReal.inv_pow (a := (Fintype.card α : ENNReal)) (n := n)).symm
 
+/-! ## SimulateQ distributivity -/
+
+section SimulateQ
+
+variable {ι'} {spec' : OracleSpec ι'} {r : Type v → Type*}
+  [Monad r] [LawfulMonad r] (impl : QueryImpl spec r)
+
+omit [spec.Fintype] [spec.Inhabited] in
+/-- `simulateQ` distributes over `replicate`: simulating a replicated computation
+equals running the simulated body `n` times via monadic recursion. -/
+lemma simulateQ_replicate :
+    simulateQ impl (replicate n oa) =
+      (List.replicate n ()).mapM (fun _ => simulateQ impl oa) := by
+  induction n with
+  | zero => simp [replicate_zero, List.replicate, List.mapM_nil]
+  | succ n ih =>
+    simp only [replicate_succ_bind, simulateQ_bind, simulateQ_pure,
+      List.replicate, List.mapM_cons]
+    congr 1; funext x
+    simp only [ih]
+
+end SimulateQ
+
 end OracleComp

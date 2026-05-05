@@ -109,8 +109,6 @@ lemma pure_inj (x y : α) : FreeM.pure (P := P) x = FreeM.pure y ↔ x = y := by
     simp
   · simp [hx]
 
--- @[simp] lemma bind
-
 /-- Proving a predicate `C` of `FreeM P α` requires two cases:
 * `pure x` for some `x : α`
 * `roll x r h` for some `x : P.A`, `r : P.B x → FreeM P α`, and `h : ∀ y, C (r y)`

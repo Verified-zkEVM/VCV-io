@@ -93,6 +93,7 @@ import VCVio.Interaction.Basic.SpecFintype
 import VCVio.Interaction.Basic.StateChain
 import VCVio.Interaction.Basic.Strategy
 import VCVio.Interaction.Basic.Syntax
+import VCVio.Interaction.Basic.Telescope
 import VCVio.Interaction.Concurrent.Bisimulation
 import VCVio.Interaction.Concurrent.Control
 import VCVio.Interaction.Concurrent.Current
