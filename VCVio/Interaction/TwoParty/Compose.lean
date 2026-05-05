@@ -55,6 +55,15 @@ class LawfulCommMonad (m : Type u → Type u) [Monad m] extends LawfulMonad m wh
       let a ← ma
       k a b)
 
+private theorem bind_pure_sigma_mk {m : Type u → Type u} [Monad m] [LawfulMonad m]
+    {α : Type u} {β : α → Type u} (x : α) {tail : β x} {action : m (β x)}
+    (h : action = pure tail) :
+    (do
+      let rest ← action
+      pure (Sigma.mk x rest)) = pure (Sigma.mk x tail) := by
+  rw [h]
+  simp [monad_norm]
+
 /-- Compose role-aware strategies along `Spec.append` with a two-argument output family
 lifted through `Transcript.liftAppend`. The continuation receives the first phase's
 output and produces a second-phase strategy. -/
@@ -158,7 +167,7 @@ private theorem Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure
     | .done, r₁ =>
         cases r₁
         rfl
-    | .node _ rest, ⟨.sender, rRest⟩ =>
+    | .node X rest, ⟨.sender, rRest⟩ =>
         rw [Strategy.compWithRolesFlat.eq_2]
         refine congrArg pure ?_
         refine congrArg (fun k => strat₁ >>= k) ?_
@@ -236,7 +245,7 @@ theorem Strategy.compWithRolesFlat_splitPrefixWithRoles
     | .done, r₁ =>
         cases r₁
         rfl
-    | .node _ rest, ⟨.sender, rRest⟩ =>
+    | .node X rest, ⟨.sender, rRest⟩ =>
         rw [Strategy.compWithRolesFlat.eq_2, Strategy.splitPrefixWithRoles.eq_2]
         refine congrArg pure ?_
         simp only [bind_map_left]
@@ -254,10 +263,22 @@ theorem Strategy.compWithRolesFlat_splitPrefixWithRoles
               strat >>= fun a => pure ⟨a.1, a.2⟩ := by
                 refine congrArg (fun k => strat >>= k) ?_
                 funext xc
-                rw [go (rest xc.1) (rRest xc.1)
-                  (s₂ := fun p => s₂ ⟨xc.1, p⟩)
-                  (r₂ := fun p => r₂ ⟨xc.1, p⟩) xc.2]
-                simp
+                rcases xc with ⟨x, tail⟩
+                let Suffix : X → Type u := fun y =>
+                  (pairedSyntax m).Family Participant.focal
+                    ((fun b => PFunctor.FreeM.append (rest b) (fun path => s₂ ⟨b, path⟩)) y)
+                    ((fun y => (rRest y).append fun p => r₂ ⟨y, p⟩) y)
+                    (fun tr => Output ⟨y, tr⟩)
+                have hgo :
+                    (Strategy.compWithRolesFlat (Strategy.splitPrefixWithRoles tail)
+                      (fun _ strat₂ => pure strat₂)) = pure tail :=
+                  go (rest x) (rRest x)
+                    (s₂ := fun p => s₂ ⟨x, p⟩)
+                    (r₂ := fun p => r₂ ⟨x, p⟩) tail
+                exact bind_pure_sigma_mk (m := m) (α := X) (β := Suffix)
+                  (x := x) (tail := tail)
+                  (action := Strategy.compWithRolesFlat (Strategy.splitPrefixWithRoles tail)
+                    (fun _ strat₂ => pure strat₂)) hgo
           _ = strat := by
                 simp
     | .node _ rest, ⟨.receiver, rRest⟩ =>

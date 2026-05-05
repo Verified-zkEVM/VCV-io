@@ -194,33 +194,6 @@ it is a chosen move `x : X` paired with a transcript for `rest x`. -/
 abbrev Transcript (s : Spec.{u}) : Type u :=
   PFunctor.FreeM.Path s
 
-/--
-View a plain transcript as a runtime path along the identity lens on
-`Spec.basePFunctor`.
--/
-def Transcript.toPathAlongId (s : Spec.{u}) :
-    Transcript s → PFunctor.FreeM.PathAlong (PFunctor.Lens.id Spec.basePFunctor) s :=
-  PFunctor.FreeM.pathToPathAlongId s
-
-/--
-View a runtime path along the identity lens on `Spec.basePFunctor` as a plain
-transcript.
--/
-def Transcript.ofPathAlongId (s : Spec.{u}) :
-    PFunctor.FreeM.PathAlong (PFunctor.Lens.id Spec.basePFunctor) s → Transcript s :=
-  PFunctor.FreeM.projectPathAlong (PFunctor.Lens.id Spec.basePFunctor) s
-
-@[simp]
-theorem Transcript.ofPathAlongId_toPathAlongId (s : Spec.{u}) (tr : Transcript s) :
-    Transcript.ofPathAlongId s (Transcript.toPathAlongId s tr) = tr :=
-  PFunctor.FreeM.projectPathAlong_id_pathToPathAlongId s tr
-
-@[simp]
-theorem Transcript.toPathAlongId_ofPathAlongId (s : Spec.{u})
-    (path : PFunctor.FreeM.PathAlong (PFunctor.Lens.id Spec.basePFunctor) s) :
-    Transcript.toPathAlongId s (Transcript.ofPathAlongId s path) = path :=
-  PFunctor.FreeM.pathToPathAlongId_projectPathAlong_id s path
-
 /-- A straight-line `Spec` with no branching: each move type in the list
 becomes one round, and later rounds do not depend on earlier moves. -/
 def ofList : List (Type u) → Spec
