@@ -6,7 +6,7 @@ Authors: Quang Dao
 module
 
 public import ToMathlib.Control.Monad.Free
-public import ToMathlib.PFunctor.Free
+public import ToMathlib.PFunctor.Free.Basic
 public import Mathlib.Control.Monad.Cont
 public import Mathlib
 

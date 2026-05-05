@@ -57,7 +57,8 @@ import ToMathlib.PFunctor.Category
 import ToMathlib.PFunctor.Chart.Basic
 import ToMathlib.PFunctor.Cofree
 import ToMathlib.PFunctor.Equiv.Basic
-import ToMathlib.PFunctor.Free
+import ToMathlib.PFunctor.Free.Basic
+import ToMathlib.PFunctor.Free.Path
 import ToMathlib.PFunctor.Lens.Basic
 import ToMathlib.PFunctor.Lens.Cartesian
 import ToMathlib.PFunctor.Lens.State
