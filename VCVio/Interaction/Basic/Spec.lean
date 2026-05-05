@@ -192,7 +192,7 @@ recorded, producing a root-to-leaf path through the interaction tree.
 For `.done`, the transcript is trivial (`PUnit`); for `.node X rest`,
 it is a chosen move `x : X` paired with a transcript for `rest x`. -/
 abbrev Transcript (s : Spec.{u}) : Type u :=
-  PFunctor.FreeM.Transcript s
+  PFunctor.FreeM.Path s
 
 /-- A straight-line `Spec` with no branching: each move type in the list
 becomes one round, and later rounds do not depend on earlier moves. -/

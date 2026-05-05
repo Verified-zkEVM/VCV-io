@@ -15,22 +15,30 @@ basic free monad on a polynomial functor.
 
 For a polynomial/container `P`, `PFunctor.FreeM P α` is the inductive type of
 well-founded `P`-branching trees with leaves labelled by `α`. The definitions
-below isolate the canonical branch object of such a tree:
+below isolate the branch-object pattern of such a tree:
 
-* `FreeM.Transcript s` records a complete root-to-leaf branch through `s`.
-* `FreeM.output s tr` recovers the leaf payload selected by that branch.
-* `FreeM.append s k` grafts a suffix tree selected by the branch path of `s`.
-* `FreeM.Telescope` is the state-indexed initial algebra obtained by iterating
-  such rounds, where the next state is selected by a branch path.
+* `FreeM.PathView` describes how to present one observed node step.
+* `FreeM.PathWith view s` records a complete root-to-leaf branch through `s`
+  using that presentation.
+* `FreeM.Path s` is the canonical path view, recording an explicit polynomial
+  direction at every node.
+* `FreeM.output s path` recovers the leaf payload selected by that path.
+* `FreeM.append s k` grafts a suffix tree selected by the canonical path of `s`.
+* `FreeM.TelescopeWith` is the state-indexed initial algebra obtained by
+  iterating such rounds, where the next state is selected by an abstract
+  observation of the round.
+* `FreeM.Telescope` is the specialization where observations are canonical
+  branch paths.
 
 ## Terminology and references
 
 The same object appears under several names in the literature. In polynomial
 functor language, the free monad on a polynomial is a type of terminating
 decision trees. In container and W-type language, these are well-founded trees
-and `Transcript` is the type of paths through such a tree. In dependent-type
-presentations of games, these are dependent type trees and paths. In programming
-language semantics, the coinductive analogue is an interaction tree.
+and `Path` is the type of paths through such a tree. In dependent-type
+presentations of games, these are dependent type trees and paths. In
+programming language semantics, the coinductive analogue is an interaction
+tree.
 
 Relevant references include:
 
@@ -55,83 +63,177 @@ namespace FreeM
 
 variable {P : PFunctor.{uA, uB}} {α : Type v}
 
-/-- A complete branch through a `FreeM` tree. For a terminal `pure` leaf the
-branch is trivial; for a `roll a rest` node it consists of a child choice
-`b : P.B a` and a branch through the selected subtree `rest b`.
+/-- Presentation of one observed path step at a `FreeM` node.
 
-For ordinary interaction specs this is the usual transcript. More generally,
-the observed branch data is determined entirely by the polynomial fiber `P.B`;
-positions with singleton fibers contribute no nontrivial branch choice. -/
-def Transcript {α : Type v} : FreeM P α → Type uB
+For a node `roll a rest`, a recursive path algebra first supplies a family
+`K : P.B a → Type w` of path tails for each child. A `PathView` chooses a
+presentation of the one-step path data over that family. The `pack` and
+`unpack` maps connect that presentation to the canonical sigma view. -/
+structure PathView (P : PFunctor.{uA, uB}) where
+  Step : (a : P.A) → (P.B a → Type w) → Type w
+  pack : {a : P.A} → {K : P.B a → Type w} → ((b : P.B a) × K b) → Step a K
+  unpack : {a : P.A} → {K : P.B a → Type w} → Step a K → (b : P.B a) × K b
+
+namespace PathView
+
+/-- The canonical path view records the chosen polynomial direction together
+with the recursive path tail. -/
+def canonical (P : PFunctor.{uA, uB}) : PathView.{uB} P where
+  Step _ K := (b : _) × K b
+  pack x := x
+  unpack x := x
+
+end PathView
+
+/-- A complete branch through a `FreeM` tree, presented through a chosen
+`PathView`. For a terminal `pure` leaf the path is trivial; for a `roll` node,
+the path is one observed step whose tails are recursive paths through the
+children. -/
+def PathWith (view : PathView.{w} P) {α : Type v} : FreeM P α → Type w
   | .pure _ => PUnit
-  | .roll a rest => (b : P.B a) × Transcript (rest b)
+  | .roll a rest => view.Step a (fun b => PathWith view (rest b))
 
-/-- The leaf payload selected by a branch transcript. Although the transcript
-itself records only branch choices, the tree and transcript together determine
-the terminal `pure` payload. -/
-def output : (s : FreeM P α) → Transcript s → α
+/-- The canonical root-to-leaf path through a `FreeM` tree. This records an
+explicit polynomial direction at every `roll` node. -/
+abbrev Path {α : Type v} (s : FreeM P α) : Type uB :=
+  PathWith (PathView.canonical P) s
+
+/-- The leaf payload selected by a path. Although the path itself records only
+branch choices, the tree and path together determine the terminal `pure`
+payload. -/
+def outputWith (view : PathView.{w} P) : (s : FreeM P α) → PathWith view s → α
   | .pure x, _ => x
-  | .roll _ rest, ⟨b, tr⟩ => output (rest b) tr
+  | .roll _ rest, path =>
+      let ⟨b, tail⟩ := view.unpack path
+      outputWith view (rest b) tail
+
+/-- The leaf payload selected by a canonical path. -/
+def output : (s : FreeM P α) → Path s → α :=
+  outputWith (PathView.canonical P)
 
 @[simp]
-theorem output_pure (x : α) (tr : Transcript (FreeM.pure (P := P) x)) :
-    output (FreeM.pure x) tr = x := rfl
+theorem output_pure (x : α) (path : Path (FreeM.pure (P := P) x)) :
+    output (FreeM.pure x) path = x := rfl
 
 @[simp]
 theorem output_roll (a : P.A) (rest : P.B a → FreeM P α)
-    (b : P.B a) (tr : Transcript (rest b)) :
-    output (FreeM.roll a rest) ⟨b, tr⟩ = output (rest b) tr := rfl
+    (b : P.B a) (path : Path (rest b)) :
+    output (FreeM.roll a rest) ⟨b, path⟩ = output (rest b) path := rfl
 
-/-- Dependent sequential composition for `FreeM` trees. Run `s₁`, then
-continue with a suffix selected by the branch transcript of `s₁`; the suffix
-may change the leaf payload from `α` to `β`.
+/-- Dependent sequential composition for `FreeM` trees using an arbitrary path
+view. Run `s₁`, then continue with a suffix selected by the observed path of
+`s₁`; the suffix may change the leaf payload from `α` to `β`.
 
 The payload produced by `s₁` is still available to the suffix as
-`FreeM.output s₁ tr`, since it is determined by the tree and branch transcript. -/
-def append {β : Type w} :
+`FreeM.outputWith view s₁ path`, since it is determined by the tree and path. -/
+def appendWith (view : PathView.{w} P) {β : Type t} :
     (s₁ : FreeM P α) →
-    (Transcript s₁ → FreeM P β) →
+    (PathWith view s₁ → FreeM P β) →
     FreeM P β
   | .pure _, s₂ => s₂ ⟨⟩
   | .roll a rest, s₂ =>
-      .roll a fun b => append (rest b) (fun p => s₂ ⟨b, p⟩)
+      .roll a fun b => appendWith view (rest b) (fun path => s₂ (view.pack ⟨b, path⟩))
+
+/-- Dependent sequential composition for `FreeM` trees using canonical paths. -/
+def append {β : Type t} :
+    (s₁ : FreeM P α) →
+    (Path s₁ → FreeM P β) →
+    FreeM P β
+  | .pure _, s₂ => s₂ ⟨⟩
+  | .roll a rest, s₂ =>
+      .roll a fun b => append (rest b) (fun path => s₂ ⟨b, path⟩)
 
 @[simp]
-theorem append_pure {β : Type w} (x : α)
-    (s₂ : Transcript (FreeM.pure (P := P) x) → FreeM P β) :
+theorem append_pure {β : Type t} (x : α)
+    (s₂ : Path (FreeM.pure (P := P) x) → FreeM P β) :
     append (FreeM.pure x) s₂ = s₂ ⟨⟩ := rfl
 
 @[simp]
-theorem append_roll {β : Type w} (a : P.A) (rest : P.B a → FreeM P α)
-    (s₂ : Transcript (FreeM.roll a rest) → FreeM P β) :
+theorem append_roll {β : Type t} (a : P.A) (rest : P.B a → FreeM P α)
+    (s₂ : Path (FreeM.roll a rest) → FreeM P β) :
     append (FreeM.roll a rest) s₂ =
-      FreeM.roll a (fun b => append (rest b) (fun p => s₂ ⟨b, p⟩)) := rfl
+      FreeM.roll a (fun b => append (rest b) (fun path => s₂ ⟨b, path⟩)) := rfl
 
 /-! ## Telescopes -/
 
 /-- Initial-algebra presentation of a state-machine telescope of `FreeM`
-rounds. At each state `s`, an inhabitant either terminates or extends by
-running `round s` and recursing into the next state selected by the branch
-transcript of that round. -/
-inductive Telescope {St : Type z} {Out : St → Type v}
+rounds observed through an arbitrary observation family `Obs`.
+
+At each state `s`, an inhabitant either terminates or extends by running
+`round s` and recursing into the next state selected by an observation
+`obs : Obs s`. The observation family is intentionally abstract: canonical
+`FreeM` branch paths use `Obs s = Path (round s)`, while quotiented or compact
+views can erase uninformative singleton choices. -/
+inductive TelescopeWith {St : Type z} {Out : St → Type v}
     (round : (s : St) → FreeM P (Out s))
-    (step : (s : St) → Transcript (round s) → St) : St → Type (max uB z)
-  | done (s : St) : Telescope round step s
+    (Obs : St → Type w)
+    (step : (s : St) → Obs s → St) : St → Type (max w z)
+  | done (s : St) : TelescopeWith round Obs step s
   | extend (s : St)
-      (cont : (tr : Transcript (round s)) → Telescope round step (step s tr)) :
-      Telescope round step s
+      (cont : (obs : Obs s) → TelescopeWith round Obs step (step s obs)) :
+      TelescopeWith round Obs step s
+
+namespace TelescopeWith
+
+variable {St : Type z} {Out : St → Type v} {round : (s : St) → FreeM P (Out s)}
+    {Obs : St → Type w} {step : (s : St) → Obs s → St}
+
+/-- Flatten a telescope into a single `FreeM` tree by iterated dependent
+append, using `appendRound` to graft each observed round and `finish` at
+terminal states. -/
+def toFreeM {β : Type t}
+    (appendRound : (s : St) → (Obs s → FreeM P β) → FreeM P β)
+    (finish : St → FreeM P β) :
+    {s : St} → TelescopeWith round Obs step s → FreeM P β
+  | _, .done s => finish s
+  | _, .extend s cont => appendRound s fun obs => (cont obs).toFreeM appendRound finish
+
+@[simp]
+theorem toFreeM_done {β : Type t}
+    (appendRound : (s : St) → (Obs s → FreeM P β) → FreeM P β)
+    (finish : St → FreeM P β) (s : St) :
+    (TelescopeWith.done (round := round) (Obs := Obs) (step := step) s).toFreeM
+      appendRound finish =
+      finish s := rfl
+
+@[simp]
+theorem toFreeM_extend {β : Type t}
+    (appendRound : (s : St) → (Obs s → FreeM P β) → FreeM P β)
+    (finish : St → FreeM P β) (s : St)
+    (cont : (obs : Obs s) → TelescopeWith round Obs step (step s obs)) :
+    (TelescopeWith.extend s cont).toFreeM appendRound finish =
+      appendRound s (fun obs => (cont obs).toFreeM appendRound finish) := rfl
+
+end TelescopeWith
+
+/-- State-machine telescopes whose observations are canonical `FreeM` branch
+paths. This is the default specialization of `TelescopeWith`; users with a
+more compact observation type should use `TelescopeWith` directly. -/
+abbrev Telescope {St : Type z} {Out : St → Type v}
+    (round : (s : St) → FreeM P (Out s))
+    (step : (s : St) → Path (round s) → St) : St → Type (max uB z) :=
+  TelescopeWith round (fun s => Path (round s)) step
 
 namespace Telescope
 
 variable {St : Type z} {Out : St → Type v} {round : (s : St) → FreeM P (Out s)}
-    {step : (s : St) → Transcript (round s) → St}
+    {step : (s : St) → Path (round s) → St}
 
-/-- Flatten a telescope into a single `FreeM` tree by iterated dependent
-append, using `finish` at terminal states. -/
+/-- Constructor wrapper for terminating a canonical-path telescope. -/
+abbrev done (s : St) : Telescope round step s :=
+  TelescopeWith.done s
+
+/-- Constructor wrapper for extending a canonical-path telescope. -/
+abbrev extend (s : St)
+    (cont : (path : Path (round s)) → Telescope round step (step s path)) :
+    Telescope round step s :=
+  TelescopeWith.extend s cont
+
+/-- Flatten a canonical-path telescope into a single `FreeM` tree by iterated
+dependent append, using `finish` at terminal states. -/
 def toFreeM {β : Type t} (finish : St → FreeM P β) :
-    {s : St} → Telescope round step s → FreeM P β
-  | _, .done s => finish s
-  | _, .extend s cont => append (round s) fun tr => (cont tr).toFreeM finish
+    {s : St} → Telescope round step s → FreeM P β :=
+  TelescopeWith.toFreeM (fun s => append (round s)) finish
 
 @[simp]
 theorem toFreeM_done {β : Type t} (finish : St → FreeM P β) (s : St) :
@@ -140,9 +242,9 @@ theorem toFreeM_done {β : Type t} (finish : St → FreeM P β) (s : St) :
 
 @[simp]
 theorem toFreeM_extend {β : Type t} (finish : St → FreeM P β) (s : St)
-    (cont : (tr : Transcript (round s)) → Telescope round step (step s tr)) :
+    (cont : (path : Path (round s)) → Telescope round step (step s path)) :
     (Telescope.extend s cont).toFreeM finish =
-      append (round s) (fun tr => (cont tr).toFreeM finish) := rfl
+      append (round s) (fun path => (cont path).toFreeM finish) := rfl
 
 end Telescope
 
