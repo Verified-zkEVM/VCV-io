@@ -447,7 +447,8 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
           Strategy.runWithRoles_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
+          Strategy.runWithRoles_sender]
         refine congrArg (fun k => strat₁ >>= k) ?_
         funext xc
         have hpure := @Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure m _ _
@@ -483,7 +484,8 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
         exact ih
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
+          Strategy.runWithRoles_receiver]
         refine congrArg (fun k => cpt₁ >>= k) ?_
         funext xc
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
@@ -569,7 +571,8 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
           Strategy.runWithRoles_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
+          Strategy.runWithRoles_sender]
         refine congrArg (fun k => strat₁ >>= k) ?_
         funext xc
         rw [LawfulCommMonad.bind_comm]
@@ -594,7 +597,8 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Strategy.compWithRolesFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
+          Strategy.runWithRoles_receiver]
         refine congrArg (fun k => cpt₁ >>= k) ?_
         funext xc
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
@@ -684,7 +688,8 @@ theorem Strategy.runWithRoles_compWithRoles_append
           Spec.Transcript.append, Spec.Transcript.liftAppend, Spec.Transcript.packAppend]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Strategy.compWithRoles, Counterpart.append]
-        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_sender]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
+          Strategy.runWithRoles_sender]
         refine congrArg (fun k => strat₁ >>= k) ?_
         funext xc
         rw [LawfulCommMonad.bind_comm]
@@ -707,7 +712,8 @@ theorem Strategy.runWithRoles_compWithRoles_append
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Strategy.compWithRoles, Counterpart.append]
-        simp only [monad_norm, Spec.append, Spec.Decoration.append, Strategy.runWithRoles_receiver]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
+          Strategy.runWithRoles_receiver]
         refine congrArg (fun k => cpt₁ >>= k) ?_
         funext xc
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
