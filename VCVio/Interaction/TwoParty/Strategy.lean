@@ -476,7 +476,11 @@ theorem Counterpart.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunc
             id := by
         funext c'
         exact @Counterpart.mapOutput_id m _ _ (rest x) (rRest x) (fun p => A ⟨x, p⟩) c'
-      simp [Counterpart.mapOutput, Counterpart.mapSender, hid]
+      change
+        (Counterpart.mapOutput
+          (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y)) <$> c x = c x
+      rw [hid]
+      exact LawfulFunctor.id_map (c x)
   | .node X rest, ⟨.receiver, rRest⟩ =>
       let F : ((x : X) × Counterpart m (rest x) (rRest x) (fun p => A ⟨x, p⟩)) →
           ((x : X) × Counterpart m (rest x) (rRest x) (fun p => A ⟨x, p⟩)) :=

@@ -73,8 +73,9 @@ abbrev extend (s : St)
 /-- Flatten a `Telescope` into a concrete `Spec` by iterated `Spec.append`.
 Each `extend` step contributes its round spec to the head, with the tail
 expanding through the recursive continuation. -/
-def toSpec : {s : St} → Telescope round step s → Spec :=
-  PFunctor.FreeM.Telescope.toFreeM (fun _ => Spec.done)
+def toSpec : {s : St} → Telescope round step s → Spec
+  | _, .done _ => .done
+  | _, .extend s cont => (round s).append fun tr => (cont tr).toSpec
 
 @[simp, grind =]
 theorem toSpec_done (s : St) :

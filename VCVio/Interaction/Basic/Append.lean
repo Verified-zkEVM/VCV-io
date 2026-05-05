@@ -30,9 +30,9 @@ namespace Spec
 
 /-- Sequential composition of interactions: run `s₁` first, then continue with
 `s₂ tr₁` where `tr₁` records what happened in `s₁`. -/
-@[reducible]
-def append : (s₁ : Spec) → (Transcript s₁ → Spec) → Spec :=
-  PFunctor.FreeM.append
+def append : (s₁ : Spec) → (Transcript s₁ → Spec) → Spec
+  | .done, s₂ => s₂ ⟨⟩
+  | .node X rest, s₂ => .node X (fun x => (rest x).append (fun p => s₂ ⟨x, p⟩))
 
 /-- Lift a two-argument type family `F tr₁ tr₂` (indexed by per-phase transcripts)
 to a single-argument family on the combined transcript of `s₁.append s₂`.
@@ -535,8 +535,7 @@ theorem Decoration.Over.map_append {L : Type u → Type v} {F G : ∀ X, L X →
         (fun tr₁ => Over.map η (s₂ tr₁) (d₂ tr₁) (r₂ tr₁))
   | .done, _, _, _, r₁, r₂ => rfl
   | .node X rest, s₂, ⟨l, dRest⟩, d₂, ⟨fData, rRest⟩, r₂ => by
-      simp only [Spec.append, PFunctor.FreeM.append, Decoration.append, Decoration.Over.append,
-        Decoration.Over.map]
+      simp only [Spec.append, Decoration.append, Decoration.Over.append, Decoration.Over.map]
       congr 1; funext x
       exact map_append η (rest x) (fun p => s₂ ⟨x, p⟩) (dRest x) (fun p => d₂ ⟨x, p⟩)
         (rRest x) (fun p => r₂ ⟨x, p⟩)
@@ -551,7 +550,7 @@ theorem Decoration.map_append {S : Type u → Type v} {T : Type u → Type w}
       (Decoration.map f s₁ d₁).append (fun tr₁ => Decoration.map f (s₂ tr₁) (d₂ tr₁))
   | .done, _, _, _ => rfl
   | .node X rest, s₂, ⟨s, dRest⟩, d₂ => by
-      simp only [Spec.append, PFunctor.FreeM.append, Decoration.append, Decoration.map]
+      simp only [Spec.append, Decoration.append, Decoration.map]
       congr 1; funext x
       exact map_append f (rest x) (fun p => s₂ ⟨x, p⟩) (dRest x) (fun p => d₂ ⟨x, p⟩)
 
