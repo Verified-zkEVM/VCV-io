@@ -202,3 +202,28 @@ lemma simulateQ_optionT_bind
   simp only [OptionT.lift, OptionT.mk, simulateQ_bind, simulateQ_pure]
 
 end OptionT
+
+/-! ## List / ForM distributivity -/
+
+section List
+
+/-- `simulateQ` distributes over `List.mapM`: simulating a mapped list is the same as
+mapping the simulated function over the list. -/
+@[simp]
+lemma simulateQ_list_mapM (f : α → OracleComp spec β) (xs : List α) :
+    simulateQ impl (xs.mapM f) = xs.mapM (fun a => simulateQ impl (f a)) := by
+  induction xs with
+  | nil => simp
+  | cons x xs ih => simp [List.mapM_cons, simulateQ_bind, ih]
+
+/-- `simulateQ` distributes over `List.forM`. -/
+@[simp]
+lemma simulateQ_list_forM (f : α → OracleComp spec PUnit) (xs : List α) :
+    simulateQ impl (xs.forM f) = xs.forM (fun a => simulateQ impl (f a)) := by
+  induction xs with
+  | nil => rfl
+  | cons x xs ih =>
+    have h : (x :: xs).forM f = f x >>= fun _ => xs.forM f := rfl
+    rw [h, simulateQ_bind]; congr 1; funext; exact ih
+
+end List
