@@ -46,9 +46,61 @@ Naming note:
 form as the functorial refinement of that syntax, rather than replacing it.
 -/
 
-universe u a vΓ w
+universe u a vΓ w uA uB uA₂ uB₂ t
 
 namespace Interaction
+
+open PFunctor
+
+variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
+variable {α : Type t}
+
+/--
+`SyntaxOver l Agent Γ` is local syntax over an arbitrary control polynomial
+executed through a runtime lens `l`.
+
+At control position `pos : P.A`, node metadata has type `Γ pos`, while the
+local continuation family is indexed by runtime directions
+`Q.B (l.toFunA pos)`. The lens maps each runtime direction back to the
+abstract control branch used for recursion.
+-/
+structure SyntaxOver
+    (l : PFunctor.Lens P Q)
+    (Agent : Type a)
+    (Γ : P.A → Type vΓ) where
+  Node :
+    (agent : Agent) →
+    (pos : P.A) →
+    (γ : Γ pos) →
+    (Q.B (l.toFunA pos) → Type w) →
+    Type w
+
+namespace SyntaxOver
+
+variable {Agent : Type a} {Γ : P.A → Type vΓ}
+
+/--
+Whole-tree participant family induced by lens-indexed local syntax.
+
+At leaves it returns the output family. At control nodes it presents the local
+node with runtime continuations, then recurses through the abstract branch
+selected by the lens.
+-/
+def Family {l : PFunctor.Lens P Q}
+    (syn : SyntaxOver l Agent Γ) :
+    (agent : Agent) →
+    (spec : PFunctor.FreeM P α) →
+    Decoration Γ spec →
+    (PFunctor.FreeM.PathAlong l spec → Type w) →
+    Type w
+  | _, .pure _, _, Out => Out ⟨⟩
+  | agent, .roll pos rest, ⟨γ, ctxs⟩, Out =>
+      syn.Node agent pos γ (fun d =>
+        Family syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
+          (fun path => Out ⟨d, path⟩))
+
+end SyntaxOver
+
 namespace Spec
 
 variable {Agent : Type a}

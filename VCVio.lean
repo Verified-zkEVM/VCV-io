@@ -127,6 +127,7 @@ import VCVio.Interaction.TwoParty.Decoration
 import VCVio.Interaction.TwoParty.Examples
 import VCVio.Interaction.TwoParty.Refine
 import VCVio.Interaction.TwoParty.Role
+import VCVio.Interaction.TwoParty.Syntax
 import VCVio.Interaction.TwoParty.Strategy
 import VCVio.Interaction.TwoParty.Swap
 import VCVio.Interaction.UC.AsyncRuntime
