@@ -267,13 +267,31 @@ lemma withQueryLog_self_log_eq
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq, List.append_nil] at h_eq_b
       obtain ⟨⟨h_eq_b1a, h_eq_b1b⟩, h_eq_b2⟩ := h_eq_b
       subst h_eq_b1a; subst h_eq_b1b; subst h_eq_b2
-      -- Now `hmem` is in support of `Prod.map id (log_q2 ++ ·) <$> (mx u).withQueryLog.withQueryLog`.
+      -- Now `hmem` is in support of `Prod.map id (log_q2 ++ ·) <$> (Prod.map id (l ++ ·) <$> (mx u).withQueryLog).withQueryLog`.
       rw [support_map, Set.mem_image] at hmem
-      obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_eq⟩ := hmem
+      obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner_outer, h_eq⟩ := hmem
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq
       obtain ⟨⟨h_eq_v', h_eq_l₁'⟩, h_eq_l₂⟩ := h_eq
       subst h_eq_v'; subst h_eq_l₁'; subst h_eq_l₂
-      simp only at h_inner
+      simp only at h_inner_outer
+      -- `h_inner_outer` is now in support of `(Prod.map id ([⟨t,u⟩] ++ ·) <$> (mx u).withQueryLog).withQueryLog`.
+      -- Rewrite the inner `<$>` as a bind to expose the inner `.withQueryLog.withQueryLog` for IH.
+      rw [show (Prod.map id (fun x => ([⟨t, u⟩] ++ x : (spec).QueryLog)) <$>
+              (mx u).withQueryLog) =
+            ((mx u).withQueryLog >>=
+              fun p => pure (Prod.map id (fun x => [⟨t, u⟩] ++ x) p))
+          from by simp [Functor.map_eq_bind_pure_comp, Function.comp_def]] at h_inner_outer
+      rw [OracleComp.withQueryLog_bind] at h_inner_outer
+      rw [mem_support_bind_iff] at h_inner_outer
+      obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_rest⟩ := h_inner_outer
+      rw [support_map, Set.mem_image] at h_rest
+      obtain ⟨⟨pX, lX⟩, h_pX, h_eq_X⟩ := h_rest
+      rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_pX
+      obtain ⟨h_pX1, h_pX2⟩ := h_pX
+      subst h_pX1; subst h_pX2
+      simp only [Prod.map_apply, id_eq, List.append_nil, Prod.mk.injEq] at h_eq_X
+      obtain ⟨⟨h_eq_X1a, h_eq_X1b⟩, h_eq_X2⟩ := h_eq_X
+      subst h_eq_X1a; subst h_eq_X1b; subst h_eq_X2
       have h_ih := ih u' h_inner
       rw [h_ih]
 
