@@ -265,17 +265,16 @@ lemma withQueryLog_self_log_eq
       obtain ⟨h_pure1a, h_pure1b⟩ := Prod.mk.inj h_pure1
       subst h_pure1a; subst h_pure1b; subst h_pure2
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq, List.append_nil] at h_eq_b
-      obtain ⟨h_eq_b1, h_eq_b2⟩ := h_eq_b
-      obtain ⟨h_eq_b1a, h_eq_b1b⟩ := Prod.mk.inj h_eq_b1
+      obtain ⟨⟨h_eq_b1a, h_eq_b1b⟩, h_eq_b2⟩ := h_eq_b
       subst h_eq_b1a; subst h_eq_b1b; subst h_eq_b2
       -- Now `hmem` is in support of `Prod.map id (log_q2 ++ ·) <$> (mx u).withQueryLog.withQueryLog`.
       rw [support_map, Set.mem_image] at hmem
       obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_eq⟩ := hmem
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq
-      obtain ⟨h_eq_v, h_eq_l₂⟩ := h_eq
-      obtain ⟨h_eq_v', h_eq_l₁'⟩ := Prod.mk.inj h_eq_v
+      obtain ⟨⟨h_eq_v', h_eq_l₁'⟩, h_eq_l₂⟩ := h_eq
       subst h_eq_v'; subst h_eq_l₁'; subst h_eq_l₂
-      have h_ih := ih u h_inner
+      simp only at h_inner
+      have h_ih := ih u' h_inner
       rw [h_ih]
 
 /-- Test version of `extractability_game_no_coll_match` (replaces the two
