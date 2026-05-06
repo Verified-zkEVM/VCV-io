@@ -1,0 +1,1 @@
+- [2026-05-06] Started: prove support_implies_chainInLog in MerkleTree/Inductive/Extractability.lean
