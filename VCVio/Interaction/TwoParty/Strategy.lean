@@ -708,14 +708,6 @@ theorem Strategy.runWithRoles_mapOutputWithRoles_mapOutput
               next xc.2)
   exact go spec roles fP fC strat cpt
 
-/-- `withRoles` using the monad attached at each node (from `MonadDecoration`).
-See `Counterpart.withMonads` for the dual. -/
-abbrev Strategy.withRolesAndMonads
-    (spec : Spec.{u}) (roles : RoleDecoration spec) (md : MonadDecoration spec)
-    (Output : Transcript spec → Type u) :=
-  StrategyOver focalMonadicSyntax PUnit.unit spec
-    (RoleDecoration.withMonads roles md) Output
-
 /--
 View a strategy over a constant monad decoration as an ordinary single-monad
 role strategy.
@@ -723,8 +715,9 @@ role strategy.
 def Strategy.constantMonadsToWithRoles {m : Type u → Type u} [Monad m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output : Spec.Transcript spec → Type u} :
-    Strategy.withRolesAndMonads spec roles
-      (MonadDecoration.constant ⟨m, inferInstance⟩ spec) Output →
+    StrategyOver focalMonadicSyntax PUnit.unit spec
+      (RoleDecoration.withMonads roles (MonadDecoration.constant ⟨m, inferInstance⟩ spec))
+      Output →
     Strategy.withRoles m spec roles Output :=
   match spec, roles with
   | .done, _ => fun strat => strat
@@ -748,8 +741,9 @@ def Strategy.withRolesToConstantMonads {m : Type u → Type u} [Monad m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output : Spec.Transcript spec → Type u} :
     Strategy.withRoles m spec roles Output →
-    Strategy.withRolesAndMonads spec roles
-      (MonadDecoration.constant ⟨m, inferInstance⟩ spec) Output :=
+    StrategyOver focalMonadicSyntax PUnit.unit spec
+      (RoleDecoration.withMonads roles (MonadDecoration.constant ⟨m, inferInstance⟩ spec))
+      Output :=
   match spec, roles with
   | .done, _ => fun strat => strat
   | .node _ rest, ⟨.sender, rRest⟩ =>
@@ -822,8 +816,10 @@ def Strategy.mapMonadDecoration
     {md₁ md₂ : MonadDecoration spec}
     (hom : MonadDecoration.Hom spec md₁ md₂)
     {Output : Spec.Transcript spec → Type u} :
-    Strategy.withRolesAndMonads spec roles md₁ Output →
-    Strategy.withRolesAndMonads spec roles md₂ Output :=
+    StrategyOver focalMonadicSyntax PUnit.unit spec
+      (RoleDecoration.withMonads roles md₁) Output →
+    StrategyOver focalMonadicSyntax PUnit.unit spec
+      (RoleDecoration.withMonads roles md₂) Output :=
   match spec, roles, md₁, md₂, hom with
   | .done, _, _, _, _ => fun strat => strat
   | .node _ rest, ⟨.sender, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
