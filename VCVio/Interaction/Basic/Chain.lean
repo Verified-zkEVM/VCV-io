@@ -211,13 +211,13 @@ private def branchingRound : Spec :=
 
 /-- The second round depends on the full first-round transcript. -/
 private def secondRound : Transcript branchingRound → Spec
-  | ⟨true, ⟨n, ⟨⟩⟩⟩ => .node (Fin (n + 1)) fun _ => .done
+  | ⟨true, ⟨(n : Nat), ⟨⟩⟩⟩ => .node (Fin (n + 1)) fun _ => .done
   | ⟨false, ⟨i, ⟨⟩⟩⟩ => .node (Fin (i.val + 2)) fun _ => .done
 
 /-- The third round depends on the full two-round transcript prefix. -/
 private def thirdRound :
     (tr₁ : Transcript branchingRound) → Transcript (secondRound tr₁) → Spec
-  | ⟨true, ⟨n, ⟨⟩⟩⟩, ⟨k, ⟨⟩⟩ => .node (Fin (n + k.val + 1)) fun _ => .done
+  | ⟨true, ⟨(n : Nat), ⟨⟩⟩⟩, ⟨k, ⟨⟩⟩ => .node (Fin (n + k.val + 1)) fun _ => .done
   | ⟨false, ⟨i, ⟨⟩⟩⟩, ⟨k, ⟨⟩⟩ => .node (Fin (i.val + k.val + 2)) fun _ => .done
 
 /-- A three-round chain whose final move type genuinely depends on the prefix transcript. -/

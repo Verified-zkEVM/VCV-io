@@ -55,9 +55,11 @@ def Participant.focal : Participant := ⟨.focal, ⟨PUnit.unit⟩⟩
 
 def Participant.counterpart : Participant := ⟨.counterpart, ⟨PUnit.unit⟩⟩
 
-private def roleOwner : Role → Participant
-  | .sender => Participant.focal
-  | .receiver => Participant.counterpart
+private def rolePerspective : Role → Participant → Ownership.Perspective
+  | .sender, ⟨.focal, _⟩ => .owner
+  | .sender, ⟨.counterpart, _⟩ => .observer
+  | .receiver, ⟨.focal, _⟩ => .observer
+  | .receiver, ⟨.counterpart, _⟩ => .owner
 
 private def focalView (m : Type u → Type u) (X : Type u) :
     Ownership.LocalView X where
@@ -139,7 +141,7 @@ def pairedSyntax (m : Type u → Type u) :
 
 private theorem pairedSyntax_eq_ownerBased (m : Type u → Type u) :
     pairedSyntax m =
-      Ownership.syntaxOver roleOwner (fun {X} _role agent =>
+      Ownership.syntaxOver (fun role agent => rolePerspective role agent) (fun {X} _role agent =>
         match agent.tag with
         | .focal => focalView m X
         | .counterpart => counterpartView m X) := by
@@ -147,7 +149,8 @@ private theorem pairedSyntax_eq_ownerBased (m : Type u → Type u) :
   funext agent X role Cont
   cases agent with
   | mk tag lift =>
-      cases tag <;> cases role <;> rfl
+      cases tag <;> cases role <;>
+        simp [Ownership.LocalView.node, rolePerspective, focalView, counterpartView]
 
 private def pairedInteraction (m : Type u → Type u) [Monad m] :
     InteractionOver Participant (fun _ => Role) (pairedSyntax m) m where
@@ -155,10 +158,10 @@ private def pairedInteraction (m : Type u → Type u) [Monad m] :
     match γ with
     | .sender => do
         let pNode : m ((x : X) × Cont Participant.focal x) := by
-          simpa [pairedSyntax, Ownership.syntaxOver, roleOwner, Participant.focal,
+          simpa [pairedSyntax, Ownership.syntaxOver, rolePerspective, Participant.focal,
             focalView] using profile Participant.focal
         let cNode : (x : X) → m (Cont Participant.counterpart x) := by
-          simpa [pairedSyntax, Ownership.syntaxOver, roleOwner, Participant.focal,
+          simpa [pairedSyntax, Ownership.syntaxOver, rolePerspective, Participant.focal,
             Participant.counterpart, counterpartView] using profile Participant.counterpart
         let ⟨x, pCont⟩ ← (focalRunner m X).runOwn pNode
         let cCont ← (counterpartRunner m X).runOther cNode x
@@ -167,10 +170,10 @@ private def pairedInteraction (m : Type u → Type u) [Monad m] :
           | ⟨.counterpart, _⟩ => cCont)
     | .receiver => do
         let pNode : (x : X) → m (Cont Participant.focal x) := by
-          simpa [pairedSyntax, Ownership.syntaxOver, roleOwner, Participant.focal,
+          simpa [pairedSyntax, Ownership.syntaxOver, rolePerspective, Participant.focal,
             Participant.counterpart, focalView] using profile Participant.focal
         let cNode : m ((x : X) × Cont Participant.counterpart x) := by
-          simpa [pairedSyntax, Ownership.syntaxOver, roleOwner, Participant.counterpart,
+          simpa [pairedSyntax, Ownership.syntaxOver, rolePerspective, Participant.counterpart,
             counterpartView] using profile Participant.counterpart
         let ⟨x, cCont⟩ ← (counterpartRunner m X).runOwn cNode
         let pCont ← (focalRunner m X).runOther pNode x
@@ -218,7 +221,7 @@ def pairedMonadicSyntax :
 
 private theorem pairedMonadicSyntax_eq_ownerBased :
     pairedMonadicSyntax =
-      Ownership.syntaxOver (fun {_} γ => roleOwner γ.1) (fun {X} γ agent =>
+      Ownership.syntaxOver (fun γ agent => rolePerspective γ.1 agent) (fun {X} γ agent =>
         match agent.tag, γ with
         | .focal, ⟨_, ⟨bmP, _⟩⟩ => focalMonadicView bmP X
         | .counterpart, ⟨_, ⟨_, bmC⟩⟩ => counterpartMonadicView bmC X) := by
@@ -228,7 +231,9 @@ private theorem pairedMonadicSyntax_eq_ownerBased :
   | mk tag lift =>
       cases tag <;> cases γ with
       | mk role bms =>
-          cases role <;> rfl
+          cases role <;>
+            simp [Ownership.LocalView.node, rolePerspective, focalMonadicView,
+              counterpartMonadicView]
 
 
 /-- Focal strategy: `Role.Action` at each decorated node (choose vs. respond). -/
@@ -476,7 +481,11 @@ theorem Counterpart.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunc
             id := by
         funext c'
         exact @Counterpart.mapOutput_id m _ _ (rest x) (rRest x) (fun p => A ⟨x, p⟩) c'
-      simp [Counterpart.mapOutput, Counterpart.mapSender, hid]
+      change
+        (Counterpart.mapOutput
+          (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y)) <$> c x = c x
+      rw [hid]
+      exact LawfulFunctor.id_map (c x)
   | .node X rest, ⟨.receiver, rRest⟩ =>
       let F : ((x : X) × Counterpart m (rest x) (rRest x) (fun p => A ⟨x, p⟩)) →
           ((x : X) × Counterpart m (rest x) (rRest x) (fun p => A ⟨x, p⟩)) :=
@@ -824,10 +833,10 @@ private def pairedMonadicInteraction {m : Type u → Type u} [Monad m]
     match γ with
     | ⟨.sender, ⟨bmP, bmC⟩⟩ => do
         let pNode : bmP.M ((x : X) × Cont Participant.focal x) := by
-          simpa [pairedMonadicSyntax, Ownership.syntaxOver, roleOwner, Participant.focal,
+          simpa [pairedMonadicSyntax, Ownership.syntaxOver, rolePerspective, Participant.focal,
             focalMonadicView] using profile Participant.focal
         let cNode : (x : X) → bmC.M (Cont Participant.counterpart x) := by
-          simpa [pairedMonadicSyntax, Ownership.syntaxOver, roleOwner, Participant.focal,
+          simpa [pairedMonadicSyntax, Ownership.syntaxOver, rolePerspective, Participant.focal,
             Participant.counterpart, counterpartMonadicView] using profile Participant.counterpart
         let ⟨x, pCont⟩ ← liftStrat bmP pNode
         let cCont ← liftCpt bmC (cNode x)

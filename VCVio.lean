@@ -96,6 +96,7 @@ import VCVio.Interaction.Basic.SpecFintype
 import VCVio.Interaction.Basic.StateChain
 import VCVio.Interaction.Basic.Strategy
 import VCVio.Interaction.Basic.Syntax
+import VCVio.Interaction.Basic.Telescope
 import VCVio.Interaction.Concurrent.Bisimulation
 import VCVio.Interaction.Concurrent.Control
 import VCVio.Interaction.Concurrent.Current
@@ -131,6 +132,7 @@ import VCVio.Interaction.TwoParty.Refine
 import VCVio.Interaction.TwoParty.Role
 import VCVio.Interaction.TwoParty.Strategy
 import VCVio.Interaction.TwoParty.Swap
+import VCVio.Interaction.TwoParty.Syntax
 import VCVio.Interaction.UC.AsyncRuntime
 import VCVio.Interaction.UC.AsyncSecurity
 import VCVio.Interaction.UC.Computational

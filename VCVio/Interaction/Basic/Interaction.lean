@@ -17,9 +17,8 @@ combined at a single protocol node in order to choose the next move and
 continue the interaction. The node-local information seen by those objects is
 packaged as a realized `Spec.Node.Context`.
 
-The role-based prover/verifier runners used elsewhere in the library are
-specializations of this more general notion, obtained by choosing suitable
-node contexts and syntax objects.
+Role-based prover/verifier runners are specializations of this notion, obtained
+by choosing suitable node contexts and syntax objects.
 
 Just as `SyntaxOver` reindexes contravariantly along node-context morphisms,
 `InteractionOver.comap` transports a local execution law along the same kind
@@ -27,14 +26,79 @@ of context change.
 
 Naming note:
 `InteractionOver` keeps the suffix form for the same reason as `ShapeOver`:
-it is the primary generalized execution notion, while `Interaction` is its
-trivial-data specialization rather than a base value that `InteractionOver`
-depends on.
+it is the generalized execution notion over node-local data, while
+`Interaction` names the plain specialization with trivial node data.
 -/
 
-universe u a vΓ w
+universe u a vΓ w uA uB uA₂ uB₂ t
 
 namespace Interaction
+
+open PFunctor
+
+variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
+variable {α : Type t}
+variable {Agent : Type a}
+variable {Γ : P.A → Type vΓ}
+
+/--
+`InteractionOver l Agent Γ syn m` is a one-step operational law for a
+lens-executed polynomial interaction.
+
+At each control node, every agent supplies a local syntax object. The
+interaction law chooses one runtime direction and passes each agent's matching
+continuation to the recursive runner.
+-/
+structure InteractionOver
+    (l : PFunctor.Lens P Q)
+    (Agent : Type a)
+    (Γ : P.A → Type vΓ)
+    (syn : SyntaxOver l Agent Γ)
+    (m : Type (max uB₂ a w) → Type (max uB₂ a w)) where
+  interact :
+    {pos : P.A} →
+    {γ : Γ pos} →
+    {Cont : Agent → Q.B (l.toFunA pos) → Type w} →
+    {Result : Type (max uB₂ a w)} →
+    ((agent : Agent) → syn.Node agent pos γ (Cont agent)) →
+    ((d : Q.B (l.toFunA pos)) → ((agent : Agent) → Cont agent d) → m Result) →
+    m Result
+
+namespace InteractionOver
+
+variable {l : PFunctor.Lens P Q} {syn : SyntaxOver l Agent Γ}
+
+/--
+Run a whole lens-executed protocol from a profile of local participant
+objects, producing the runtime path and each agent's output at that same path.
+-/
+def run
+    {m : Type (max uB₂ a w) → Type (max uB₂ a w)}
+    (I : InteractionOver l Agent Γ syn m) [Monad m]
+    {spec : PFunctor.FreeM P α}
+    (ctxs : Decoration Γ spec)
+    {Out : Agent → PFunctor.FreeM.PathAlong l spec → Type w}
+    (profile :
+      (agent : Agent) → SyntaxOver.Family syn agent spec ctxs (Out agent)) :
+    m ((path : PFunctor.FreeM.PathAlong l spec) × ((agent : Agent) → Out agent path)) :=
+  match spec, ctxs with
+  | .pure _, _ => pure ⟨⟨⟩, profile⟩
+  | .roll pos rest, ⟨γ, ctxs⟩ =>
+      I.interact
+        (γ := γ)
+        (Cont := fun agent d =>
+          SyntaxOver.Family syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
+            (fun path => Out agent ⟨d, path⟩))
+        (fun agent => profile agent)
+        (fun d conts => do
+          let ⟨path, out⟩ ← run I
+            (ctxs := ctxs (l.toFunB pos d))
+            (Out := fun agent path => Out agent ⟨d, path⟩)
+            conts
+          pure ⟨⟨d, path⟩, out⟩)
+
+end InteractionOver
+
 namespace Spec
 
 variable {Agent : Type a}
