@@ -696,14 +696,58 @@ theorem support_implies_chainInLog
                   log) ∈
       support (extractability_game committingAdv openingAdv).withQueryLog) :
     chainInLog log root idx leaf proof := by
-  -- Outline: unfold the game into `prefix >>= (verifyProof.run >>= pure-step)`,
-  -- decompose support via `OracleComp.withQueryLog_bind` and `support_map`, extract
-  -- the structural equalities pinning `pq.1.1.1 = root`, `pq.2.1 = idx`, etc., and
-  -- apply `verifyProof_run_support_chain` (which discharges the verifier branch via
-  -- `getPutativeRoot_support_chain`). The remaining gap is the dependent-Sigma
-  -- destructuring after the pure step, which requires careful handling of `Sigma.mk.inj`
-  -- and `subst` interactions with the `idx`-dependent type of `proof`.
-  sorry
+  have hsupport := _hsupport
+  unfold extractability_game at hsupport
+  rw [OracleComp.withQueryLog_bind] at hsupport
+  rw [mem_support_bind_iff] at hsupport
+  obtain ⟨⟨⟨root_c, aux_c⟩, log_c⟩, h_c, hsupport⟩ := hsupport
+  rw [support_map, Set.mem_image] at hsupport
+  obtain ⟨⟨resCO, log_co⟩, h_co, h_eq_co⟩ := hsupport
+  rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_co
+  obtain ⟨⟨⟨idx_o, leaf_o, proof_o⟩, log_o⟩, h_o, h_co⟩ := h_co
+  rw [support_map, Set.mem_image] at h_co
+  obtain ⟨⟨resV, log_v_inner⟩, h_v, h_eq_v⟩ := h_co
+  rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_v
+  obtain ⟨⟨verifiedOpt, log_v⟩, h_vp, h_v⟩ := h_v
+  rw [support_map, Set.mem_image] at h_v
+  obtain ⟨⟨_unit, log_p⟩, h_p, h_eq_p⟩ := h_v
+  rw [OracleComp.withQueryLog_pure, mem_support_pure_iff] at h_p
+  obtain ⟨h_p1, h_p2⟩ := Prod.mk.inj h_p
+  subst h_p2
+  obtain ⟨h_eq_p1, h_eq_p2⟩ := Prod.mk.inj h_eq_p
+  obtain ⟨h_eq_v1, h_eq_v2⟩ := Prod.mk.inj h_eq_v
+  obtain ⟨h_eq_co1, h_eq_co2⟩ := Prod.mk.inj h_eq_co
+  rw [h_p1] at h_eq_p1
+  rw [h_eq_p1] at h_eq_v1
+  rw [h_eq_v1] at h_eq_co1
+  simp only [Prod.mk.injEq] at h_eq_co1
+  obtain ⟨h_root_eq, h_aux_eq, h_sigma_eq⟩ := h_eq_co1
+  subst h_root_eq
+  subst h_aux_eq
+  obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
+  subst h_idx_eq
+  simp only [heq_eq_eq] at h_rest_eq
+  simp only [Prod.mk.injEq] at h_rest_eq
+  obtain ⟨h_leaf_eq, h_proof_eq, _h_tree_eq, _h_proof_ext_eq, h_isSome_eq⟩ := h_rest_eq
+  subst h_leaf_eq
+  subst h_proof_eq
+  have h_verifiedOpt : verifiedOpt = some () := by
+    cases verifiedOpt with
+    | none => simp at h_isSome_eq
+    | some u =>
+      cases u
+      rfl
+  subst h_verifiedOpt
+  have h_chain_v := verifyProof_run_support_chain idx leaf root proof log_v h_vp
+  apply chainInLog_mono idx _ h_chain_v
+  intro q hq
+  rw [← h_eq_co2]
+  simp only [Prod.map_fst, id_eq, Prod.map_snd]
+  rw [← h_eq_v2]
+  simp only [Prod.map_snd]
+  rw [← h_eq_p2]
+  simp only [List.append_nil]
+  exact List.mem_append_right _ (List.mem_append_right _ hq)
 
 /--
 **Extractor matches in support.** Bundled helper combining
