@@ -720,7 +720,7 @@ abbrev Strategy.withRolesAndMonads
 View a strategy over a constant monad decoration as an ordinary single-monad
 role strategy.
 -/
-def Strategy.withRolesAndMonads.toWithRolesConstant {m : Type u → Type u} [Monad m]
+def Strategy.constantMonadsToWithRoles {m : Type u → Type u} [Monad m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output : Spec.Transcript spec → Type u} :
     Strategy.withRolesAndMonads spec roles
@@ -733,17 +733,18 @@ def Strategy.withRolesAndMonads.toWithRolesConstant {m : Type u → Type u} [Mon
         Functor.map
           (fun msgAndRest =>
             ⟨msgAndRest.1,
-              toWithRolesConstant (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
+              constantMonadsToWithRoles
+                (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
           strat
   | .node _ rest, ⟨.receiver, rRest⟩ =>
       fun strat x =>
-        Functor.map (toWithRolesConstant (rest x) (rRest x)) (strat x)
+        Functor.map (constantMonadsToWithRoles (rest x) (rRest x)) (strat x)
 
 /--
 View an ordinary single-monad role strategy as a strategy over a constant monad
 decoration.
 -/
-def Strategy.withRolesAndMonads.ofWithRolesConstant {m : Type u → Type u} [Monad m]
+def Strategy.withRolesToConstantMonads {m : Type u → Type u} [Monad m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output : Spec.Transcript spec → Type u} :
     Strategy.withRoles m spec roles Output →
@@ -756,11 +757,12 @@ def Strategy.withRolesAndMonads.ofWithRolesConstant {m : Type u → Type u} [Mon
         Functor.map
           (fun msgAndRest =>
             ⟨msgAndRest.1,
-              ofWithRolesConstant (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
+              withRolesToConstantMonads
+                (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
           strat
   | .node _ rest, ⟨.receiver, rRest⟩ =>
       fun strat x =>
-        Functor.map (ofWithRolesConstant (rest x) (rRest x)) (strat x)
+        Functor.map (withRolesToConstantMonads (rest x) (rRest x)) (strat x)
 
 /--
 Lifting an ordinary role strategy into a constant monad decoration commutes
@@ -770,13 +772,13 @@ This is the naturality property used at boundaries that still accept ordinary
 single-monad strategies while internal execution is phrased over nodewise
 monad decorations.
 -/
-theorem Strategy.withRolesAndMonads.ofWithRolesConstant_mapOutputWithRoles
+theorem Strategy.withRolesToConstantMonads_mapOutputWithRoles
     {m : Type u → Type u} [Monad m] [LawfulFunctor m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output Output' : Spec.Transcript spec → Type u}
     (f : ∀ tr, Output tr → Output' tr)
     (strat : Strategy.withRoles m spec roles Output) :
-    Strategy.withRolesAndMonads.ofWithRolesConstant spec roles
+    Strategy.withRolesToConstantMonads spec roles
         (Strategy.mapOutputWithRoles f strat) =
       ShapeOver.mapOutput focalMonadicShape
         (agent := PUnit.unit)
@@ -784,28 +786,29 @@ theorem Strategy.withRolesAndMonads.ofWithRolesConstant_mapOutputWithRoles
         (ctxs := RoleDecoration.withMonads roles
           (MonadDecoration.constant ⟨m, inferInstance⟩ spec))
         f
-        (Strategy.withRolesAndMonads.ofWithRolesConstant spec roles strat) := by
+        (Strategy.withRolesToConstantMonads spec roles strat) := by
   match spec, roles with
   | .done, _ =>
       rfl
   | .node _ rest, ⟨.sender, rRest⟩ =>
       simp only [Strategy.mapOutputWithRoles, Counterpart.mapReceiver,
-        ofWithRolesConstant, ShapeOver.mapOutput, focalMonadicShape,
+        withRolesToConstantMonads, ShapeOver.mapOutput, focalMonadicShape,
         focalMonadicSyntax, RoleDecoration.withMonads, RoleDecoration.monadsOver,
         Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat)
       funext msgAndRest
-      rw [ofWithRolesConstant_mapOutputWithRoles (rest msgAndRest.1) (rRest msgAndRest.1)]
+      rw [withRolesToConstantMonads_mapOutputWithRoles
+        (rest msgAndRest.1) (rRest msgAndRest.1)]
       rfl
   | .node _ rest, ⟨.receiver, rRest⟩ =>
       funext x
-      simp only [Strategy.mapOutputWithRoles, ofWithRolesConstant,
+      simp only [Strategy.mapOutputWithRoles, withRolesToConstantMonads,
         ShapeOver.mapOutput, focalMonadicShape, focalMonadicSyntax,
         RoleDecoration.withMonads, RoleDecoration.monadsOver,
         Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat x)
       funext next
-      rw [ofWithRolesConstant_mapOutputWithRoles (rest x) (rRest x)]
+      rw [withRolesToConstantMonads_mapOutputWithRoles (rest x) (rRest x)]
       rfl
 
 /--
@@ -814,7 +817,7 @@ Retarget a monadic focal strategy along a nodewise monad homomorphism.
 This traverses the strategy tree structurally, applying the supplied lift at
 each node and recursing through the selected continuation.
 -/
-def Strategy.withRolesAndMonads.mapDecoration
+def Strategy.mapMonadDecoration
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {md₁ md₂ : MonadDecoration spec}
     (hom : MonadDecoration.Hom spec md₁ md₂)
@@ -828,13 +831,13 @@ def Strategy.withRolesAndMonads.mapDecoration
         lift <| Functor.map
           (fun msgAndRest =>
             ⟨msgAndRest.1,
-              mapDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
+              mapMonadDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
                 (homRest msgAndRest.1) msgAndRest.2⟩)
           strat
   | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
       fun strat x =>
         lift <| Functor.map
-          (mapDecoration (rest x) (rRest x) (homRest x)) (strat x)
+          (mapMonadDecoration (rest x) (rRest x) (homRest x)) (strat x)
 
 /--
 Counterpart strategy whose node effects are supplied by a `MonadDecoration`.
@@ -855,7 +858,7 @@ Retarget a monadic counterpart along a nodewise monad homomorphism.
 This traverses the counterpart tree structurally, applying the supplied lift at
 each node and recursing through the selected continuation.
 -/
-def Counterpart.withMonads.mapDecoration
+def Counterpart.mapMonadDecoration
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {md₁ md₂ : MonadDecoration spec}
     (hom : MonadDecoration.Hom spec md₁ md₂)
@@ -867,13 +870,13 @@ def Counterpart.withMonads.mapDecoration
   | .node _ rest, ⟨.sender, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
       fun cpt x =>
         lift <| Functor.map
-          (mapDecoration (rest x) (rRest x) (homRest x)) (cpt x)
+          (mapMonadDecoration (rest x) (rRest x) (homRest x)) (cpt x)
   | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
       fun cpt =>
         lift <| Functor.map
           (fun msgAndRest =>
             ⟨msgAndRest.1,
-              mapDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
+              mapMonadDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
                 (homRest msgAndRest.1) msgAndRest.2⟩)
           cpt
 
