@@ -235,40 +235,46 @@ lemma withQueryLog_self_log_eq
       rfl
   | query_bind t mx ih =>
       intros v l₁ l₂ hmem
-      -- `(query t >>= mx).withQueryLog = liftM (query t) >>= fun u =>
-      --     ((mx u).withQueryLog).bind (fun p => pure (p.1, ⟨t, u⟩ :: p.2))`.
-      -- Then withQueryLog again duplicates the log.
+      -- The outer `withQueryLog` decomposes `(do let p ← (liftM q).withQueryLog; ...)
+      -- .withQueryLog` via `withQueryLog_bind`.
       change ((v, l₁), l₂) ∈ support
-        (((liftM (OracleSpec.query t) >>= mx) :
-          OracleComp spec α).withQueryLog.withQueryLog) at hmem
+        (((liftM (OracleSpec.query t) : OracleComp spec _) >>=
+          fun u => mx u).withQueryLog.withQueryLog) at hmem
+      rw [OracleComp.withQueryLog_bind] at hmem
       rw [OracleComp.withQueryLog_bind] at hmem
       rw [mem_support_bind_iff] at hmem
-      obtain ⟨⟨u₁, log₁⟩, h₁, hmem⟩ := hmem
-      -- `h₁ : (u₁, log₁) ∈ support (liftM (query t)).withQueryLog`.
-      rw [OracleComp.withQueryLog_query, mem_support_bind_iff] at h₁
-      obtain ⟨u, hu, h₁⟩ := h₁
-      rw [mem_support_pure_iff, Prod.mk.injEq] at h₁
-      obtain ⟨h_u_eq, h_log_eq⟩ := h₁
-      subst h_u_eq
-      subst h_log_eq
-      -- Now `hmem : ((v, l₁), l₂) ∈ support
-      --   (Prod.map id ([⟨t, u⟩] ++ ·) <$> (mx u).withQueryLog.withQueryLog)`.
+      obtain ⟨⟨⟨u₁, log_q1⟩, log_q2⟩, h₁, hmem⟩ := hmem
+      -- `h₁` is in support of `(liftM q).withQueryLog.withQueryLog`.
+      -- Apply withQueryLog_query to peel off the inner.
+      rw [OracleComp.withQueryLog_query] at h₁
+      -- Now `(liftM q >>= fun u => pure (u, [⟨q, u⟩])).withQueryLog`. Use bind.
+      rw [OracleComp.withQueryLog_bind] at h₁
+      rw [mem_support_bind_iff] at h₁
+      obtain ⟨⟨u₂, log_qa⟩, h₁a, h₁b⟩ := h₁
+      -- h₁a in (liftM q).withQueryLog. Use withQueryLog_query.
+      rw [OracleComp.withQueryLog_query, mem_support_bind_iff] at h₁a
+      obtain ⟨u, hu_q, h_pa⟩ := h₁a
+      rw [mem_support_pure_iff, Prod.mk.injEq] at h_pa
+      obtain ⟨h_u2_eq, h_qa_eq⟩ := h_pa
+      subst h_u2_eq; subst h_qa_eq
+      -- h₁b: `((u₁, log_q1), log_q2) ∈ support (Prod.map id ([⟨t,u⟩] ++ ·) <$> (pure (u, [⟨t, u⟩])).withQueryLog)`.
+      rw [support_map, Set.mem_image] at h₁b
+      obtain ⟨⟨⟨u', l_inner⟩, l_outer⟩, h_pure, h_eq_b⟩ := h₁b
+      rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_pure
+      obtain ⟨h_pure1, h_pure2⟩ := h_pure
+      obtain ⟨h_pure1a, h_pure1b⟩ := Prod.mk.inj h_pure1
+      subst h_pure1a; subst h_pure1b; subst h_pure2
+      simp only [Prod.map_apply, id_eq, Prod.mk.injEq, List.append_nil] at h_eq_b
+      obtain ⟨h_eq_b1, h_eq_b2⟩ := h_eq_b
+      obtain ⟨h_eq_b1a, h_eq_b1b⟩ := Prod.mk.inj h_eq_b1
+      subst h_eq_b1a; subst h_eq_b1b; subst h_eq_b2
+      -- Now `hmem` is in support of `Prod.map id (log_q2 ++ ·) <$> (mx u).withQueryLog.withQueryLog`.
       rw [support_map, Set.mem_image] at hmem
       obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_eq⟩ := hmem
-      -- Outer `withQueryLog`: now apply IH to `(mx u).withQueryLog.withQueryLog`.
-      -- But h_inner is in `support (mx u).withQueryLog.withQueryLog`? Let me check.
-      -- The outer `withQueryLog` of `(mx u).withQueryLog` produces a doubly-logged
-      -- result with the same structure.
-      -- After bind decomposition:
-      --   ((v, l₁), l₂) ∈ Prod.map id (log₁ ++ ·) <$> (mx u).withQueryLog.withQueryLog
-      -- where log₁ = [⟨t, u⟩] is the outer log of the prefix `liftM (query t)`.
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq
       obtain ⟨h_eq_v, h_eq_l₂⟩ := h_eq
       obtain ⟨h_eq_v', h_eq_l₁'⟩ := Prod.mk.inj h_eq_v
-      subst h_eq_v'
-      subst h_eq_l₁'
-      subst h_eq_l₂
-      -- Apply IH to inner support membership.
+      subst h_eq_v'; subst h_eq_l₁'; subst h_eq_l₂
       have h_ih := ih u h_inner
       rw [h_ih]
 
