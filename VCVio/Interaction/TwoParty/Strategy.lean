@@ -809,6 +809,34 @@ theorem Strategy.withRolesAndMonads.ofWithRolesConstant_mapOutputWithRoles
       rfl
 
 /--
+Retarget a monadic focal strategy along a nodewise monad homomorphism.
+
+This traverses the strategy tree structurally, applying the supplied lift at
+each node and recursing through the selected continuation.
+-/
+def Strategy.withRolesAndMonads.mapDecoration
+    (spec : Spec.{u}) (roles : RoleDecoration spec)
+    {md₁ md₂ : MonadDecoration spec}
+    (hom : MonadDecoration.Hom spec md₁ md₂)
+    {Output : Spec.Transcript spec → Type u} :
+    Strategy.withRolesAndMonads spec roles md₁ Output →
+    Strategy.withRolesAndMonads spec roles md₂ Output :=
+  match spec, roles, md₁, md₂, hom with
+  | .done, _, _, _, _ => fun strat => strat
+  | .node _ rest, ⟨.sender, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
+      fun strat =>
+        lift <| Functor.map
+          (fun msgAndRest =>
+            ⟨msgAndRest.1,
+              mapDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
+                (homRest msgAndRest.1) msgAndRest.2⟩)
+          strat
+  | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
+      fun strat x =>
+        lift <| Functor.map
+          (mapDecoration (rest x) (rRest x) (homRest x)) (strat x)
+
+/--
 Counterpart strategy whose node effects are supplied by a `MonadDecoration`.
 
 At sender-owned nodes the counterpart observes the focal move and continues in
