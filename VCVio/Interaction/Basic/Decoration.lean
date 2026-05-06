@@ -129,6 +129,11 @@ def Decoration (Γ : Node.Context.{u, v}) : Spec → Type (max u v)
   | .done => PUnit
   | .node X rest => Γ X × (∀ x, Decoration Γ (rest x))
 
+/-- The unique decoration by the empty node context. -/
+def Decoration.empty : (spec : Spec) → Decoration Node.Context.empty spec
+  | .done => PUnit.unit
+  | .node _ rest => ⟨PUnit.unit, fun x => Decoration.empty (rest x)⟩
+
 /-- Natural transformation between per-node decorations, applied recursively. -/
 def Decoration.map {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}}
     (f : Interaction.Spec.Node.ContextHom Γ Δ) :

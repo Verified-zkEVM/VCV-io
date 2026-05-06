@@ -3,17 +3,22 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.Basic.Spec
+import VCVio.Interaction.Basic.Interaction
 
 /-!
-# Strategies (`Spec.Strategy`)
+# One-player strategies
 
-A `Strategy m spec Output` plays through `spec`, choosing moves and interleaving effects in `m`,
-producing a transcript-dependent result `Output tr`. Definitions are by structural recursion on
-the spec (Hancock–Setzer), avoiding positivity issues for generic `m`.
+`Strategy m spec Output` is the one-participant strategy induced by
+`Strategy.syntax`. At every node it chooses the next move and stores the
+continuation in the ambient monad `m`; at a leaf it produces the
+transcript-dependent output.
 
-`run` executes a strategy; `mapOutput` is functorial in the output family. Dependent sequential
-composition `Strategy.comp` requires `Spec.append` from `VCVio.Interaction.Basic.Append`.
+This is the singleton-agent specialization of `StrategyOver` over the empty
+node context. `Strategy.run` is the corresponding specialization of the
+generic `StrategyOver.run` runner.
+
+Dependent sequential composition `Strategy.comp` requires `Spec.append` from
+`VCVio.Interaction.Basic.Append`.
 -/
 
 universe u
@@ -23,27 +28,50 @@ namespace Spec
 
 variable {m : Type u → Type u}
 
-/-- One-player strategy with monadic effects: at each node, choose a move `x` and continue in
-`m`. -/
-def Strategy (m : Type u → Type u) :
-    (spec : Spec) → (Transcript spec → Type u) → Type u
-  | .done, Output => Output ⟨⟩
-  | .node X rest, Output =>
-      (x : X) × m (Strategy m (rest x) (fun p => Output ⟨x, p⟩))
+/-- One-participant syntax for ordinary monadic strategies.
+
+At each node the strategy chooses a move `x` and provides the continuation in
+the ambient monad `m`. -/
+def Strategy.syntax (m : Type u → Type u) :
+    SyntaxOver.{u, u, u, u} PUnit Node.Context.empty where
+  Node _ X _ Cont := (x : X) × m (Cont x)
+
+/-- One-player strategy with monadic effects. -/
+abbrev Strategy (m : Type u → Type u)
+    (spec : Spec) (Output : Transcript spec → Type u) :=
+  StrategyOver (Strategy.syntax m) PUnit.unit spec (Decoration.empty spec) Output
 
 /-- Non-dependent output type `α` at every transcript. -/
 abbrev Strategy' (m : Type u → Type u) (spec : Spec) (α : Type u) :=
   Strategy m spec (fun _ => α)
 
+/-- One-step execution law for ordinary one-player strategies. -/
+def Strategy.interaction (m : Type u → Type u) [Monad m] :
+    Interaction PUnit (Strategy.syntax m) m where
+  interact := fun {_X} {_γ} {_Cont} {_Result} profile k => do
+    let node := profile PUnit.unit
+    let next ← node.2
+    k node.1 (fun _ => next)
+
 /-- Run the strategy, returning the full transcript and the dependent output. -/
 def Strategy.run {m : Type u → Type u} [Monad m] :
     (spec : Spec) → {Output : Transcript spec → Type u} →
     Strategy m spec Output → m ((tr : Transcript spec) × Output tr)
-  | .done, _, output => pure ⟨⟨⟩, output⟩
-  | .node _ rest, _, ⟨move, cont⟩ => do
-      let next ← cont
-      let ⟨tail, out⟩ ← run (rest move) next
-      return ⟨⟨move, tail⟩, out⟩
+  | spec, Output, strat =>
+      StrategyOver.run
+        (Agent := PUnit)
+        (Γ := Node.Context.empty)
+        (syn := Strategy.syntax m)
+        (m := m)
+        (Strategy.interaction m)
+        (spec := spec)
+        (Out := fun _ => Output)
+        (Result := Output)
+        (Decoration.empty spec)
+        (fun agent => by
+          cases agent
+          exact strat)
+        (fun _ out => out PUnit.unit)
 
 /-- Map the dependent output family along a natural transformation over transcripts. -/
 def Strategy.mapOutput {m : Type u → Type u} [Functor m] :
