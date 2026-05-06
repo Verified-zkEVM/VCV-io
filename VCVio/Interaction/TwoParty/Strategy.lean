@@ -179,6 +179,30 @@ def focalMonadicSyntax :
     | ⟨role, bm⟩ => role.Action bm.M X Cont
 
 /--
+Functorial shape for the focal side of a role-decorated tree with per-node
+monads.
+
+The local node syntax is `focalMonadicSyntax`; the map operation transports
+only recursive continuations, leaving the role, node monad, and selected move
+unchanged.
+-/
+def focalMonadicShape :
+    ShapeOver.{u, 0, u, u + 1} PUnit RoleMonadContext where
+  toSyntaxOver := focalMonadicSyntax
+  map := fun {agent} {X} {γ} {A} {B} f node =>
+    match γ with
+    | ⟨.sender, bm⟩ =>
+        let send : bm.M ((x : X) × A x) := by
+          simpa [focalMonadicSyntax] using node
+        show focalMonadicSyntax.Node agent X ⟨.sender, bm⟩ B from
+          ((fun xa => ⟨xa.1, f xa.1 xa.2⟩) <$> send : bm.M ((x : X) × B x))
+    | ⟨.receiver, bm⟩ =>
+        let observe : (x : X) → bm.M (A x) := by
+          simpa [focalMonadicSyntax] using node
+        show focalMonadicSyntax.Node agent X ⟨.receiver, bm⟩ B from
+          (fun x => f x <$> observe x : (x : X) → bm.M (B x))
+
+/--
 One-participant syntax for the counterpart side of a role-decorated tree with
 per-node monads.
 
@@ -193,7 +217,15 @@ def counterpartMonadicSyntax :
     | ⟨.sender, bm⟩ => (x : X) → bm.M (Cont x)
     | ⟨.receiver, bm⟩ => bm.M ((x : X) × Cont x)
 
-private def counterpartMonadicShape :
+/--
+Functorial shape for the counterpart side of a role-decorated tree with
+per-node monads.
+
+The local node syntax is `counterpartMonadicSyntax`; the map operation
+transports only recursive continuations, preserving the role, node monad, and
+message/challenge choice.
+-/
+def counterpartMonadicShape :
     ShapeOver.{u, 0, u, u + 1} PUnit RoleMonadContext where
   toSyntaxOver := counterpartMonadicSyntax
   map := fun {agent} {X} {γ} {A} {B} f node =>
@@ -691,21 +723,9 @@ def Strategy.withRolesAndMonads.mapOutput
     (f : ∀ tr, Output₁ tr → Output₂ tr) :
     Strategy.withRolesAndMonads spec roles md Output₁ →
     Strategy.withRolesAndMonads spec roles md Output₂ :=
-  match spec, roles, md with
-  | .done, _, _ => fun strat => f ⟨⟩ strat
-  | .node _ rest, ⟨.sender, rRest⟩, ⟨_, mdRest⟩ =>
-      fun strat =>
-        Functor.map
-          (fun msgAndRest =>
-            ⟨msgAndRest.1,
-              mapOutput (rest msgAndRest.1) (rRest msgAndRest.1) (mdRest msgAndRest.1)
-                (fun tr => f ⟨msgAndRest.1, tr⟩) msgAndRest.2⟩)
-          strat
-  | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, mdRest⟩ =>
-      fun strat x =>
-        Functor.map
-          (mapOutput (rest x) (rRest x) (mdRest x) (fun tr => f ⟨x, tr⟩))
-          (strat x)
+  ShapeOver.mapOutput focalMonadicShape
+    (agent := PUnit.unit) (spec := spec) (ctxs := RoleDecoration.withMonads roles md)
+    (A := Output₁) (B := Output₂) f
 
 /--
 Retarget a monadic role strategy along a nodewise monad homomorphism.
