@@ -14,9 +14,9 @@ import VCVio.Interaction.Basic.Interaction
 
 The corresponding one-participant syntax, `Strategy.monadicSyntax`, chooses a
 move at a node and places the continuation in the monad recorded by that node.
-Thus `Strategy.withMonads` is a direct `StrategyOver` specialization, and
-`Strategy.runWithMonads` executes it by lifting each node monad into one ambient
-execution monad.
+Use it directly with `StrategyOver` for whole-tree strategies and with
+`StrategyOver.run` through `Strategy.monadicInteraction` for execution in an
+ambient monad.
 -/
 
 universe u
@@ -89,13 +89,6 @@ def Strategy.monadicSyntax :
   Node _ (X : Type u) bm (Cont : X → Type u) :=
     (x : X) × bm.M (Cont x)
 
-/-- Strategy type where each node's continuation uses the monad from its
-`MonadDecoration`. -/
-abbrev Strategy.withMonads
-    (spec : Spec.{u}) (deco : MonadDecoration.{u, u, u} spec)
-    (Output : Transcript spec → Type u) :=
-  StrategyOver Strategy.monadicSyntax PUnit.unit spec deco Output
-
 /-- One-step execution law for `Strategy.monadicSyntax`.
 
 The node selects the next move directly. Its continuation is lifted from the
@@ -108,26 +101,6 @@ def Strategy.monadicInteraction {m : Type u → Type u} [Monad m]
     let node := profile PUnit.unit
     let next ← liftM γ node.2
     k node.1 (fun _ => next)
-
-/-- Execute a `withMonads` strategy, lifting each node's bundled monad into `m`. -/
-def Strategy.runWithMonads {m : Type u → Type u} [Monad m]
-    (liftM : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
-    (spec : Spec) → (deco : MonadDecoration.{u, u, u} spec) →
-    {Output : Transcript spec → Type u} →
-    Strategy.withMonads spec deco Output → m ((tr : Transcript spec) × Output tr)
-  | spec, deco, Output, strat =>
-      StrategyOver.run
-        (Agent := PUnit)
-        (Γ := fun (_ : Type u) => BundledMonad.{u, u})
-        (syn := Strategy.monadicSyntax)
-        (m := m)
-        (Strategy.monadicInteraction liftM)
-        (spec := spec)
-        (Out := fun _ => Output)
-        (Result := Output)
-        deco
-        (fun _ => strat)
-        (fun _ out => out PUnit.unit)
 
 end Spec
 end Interaction
