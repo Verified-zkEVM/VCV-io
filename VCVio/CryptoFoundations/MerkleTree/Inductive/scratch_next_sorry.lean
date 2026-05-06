@@ -362,7 +362,7 @@ theorem extractability_game_no_coll_match'
   -- `withQueryLog`. This is `withQueryLog_self_log_eq` applied to `committingAdv`.
   have h_aux_eq_log_c : aux_c = log_c :=
     withQueryLog_self_log_eq committingAdv h_c
-  subst h_aux_eq_log_c
+  rw [h_aux_eq_log_c] at h_tree_eq h_proof_ext_eq h_eq_v1 h_p1 h_sigma_eq h_c
   -- Now: `extractedTree = extractor s log_c root_c.1` and
   -- `extractedProof = generateProof (extractor s log_c root_c.1) idx_o`.
   -- Also `log = log_c ++ log_o ++ log_v ++ []` (modulo the trivial empty `log_p`).
@@ -381,7 +381,7 @@ theorem extractability_game_no_coll_match'
   -- Use this to transfer `h_ne_none` to `log_c`.
   have h_ne_none_lc :
       (extractor s log_c root_c.1).get idx_o.toNodeIndex ≠ none := by
-    rw [← h_tree_eq]; exact h_ne_none
+    rw [h_tree_eq]; exact h_ne_none
   -- Restrict the chain to `log_c`.
   have h_chain_lc : chainInLog log_c root_c.1 idx_o leaf_o proof_o :=
     chainInLog_restrict idx_o log log_c root_c.1 leaf_o proof_o
