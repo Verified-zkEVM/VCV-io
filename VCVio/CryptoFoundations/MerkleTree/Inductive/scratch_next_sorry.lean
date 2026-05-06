@@ -395,8 +395,8 @@ theorem extractability_game_no_coll_match'
     extractor_chain_match idx_o log_c root_c.1 leaf_o proof_o
       h_no_coll_lc h_ne_none_lc h_chain_lc
   refine ⟨?_, ?_⟩
-  · rw [h_tree_eq]; exact h_get
-  · rw [h_proof_ext_eq, h_tree_eq]
+  · rw [← h_tree_eq]; exact h_get
+  · rw [← h_proof_ext_eq]
     exact h_proof_eq.symm
 
 end InductiveMerkleTree
