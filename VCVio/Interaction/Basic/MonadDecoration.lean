@@ -5,13 +5,18 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.BundledMonad
 import VCVio.Interaction.Basic.Decoration
+import VCVio.Interaction.Basic.Interaction
 
 /-!
 # Per-node monad decorations
 
-`MonadDecoration spec` assigns a `BundledMonad` to each internal node. `Strategy.withMonads`
-generalizes `Strategy` so continuations live in the monad recorded at each node; `runWithMonads`
-lifts everything into a single ambient monad.
+`MonadDecoration spec` assigns a `BundledMonad` to each internal node.
+
+The corresponding one-participant syntax, `Strategy.monadicSyntax`, chooses a
+move at a node and places the continuation in the monad recorded by that node.
+Thus `Strategy.withMonads` is a direct `StrategyOver` specialization, and
+`Strategy.runWithMonads` executes it by lifting each node monad into one ambient
+execution monad.
 -/
 
 universe u
@@ -75,24 +80,54 @@ end Hom
 
 end MonadDecoration
 
-/-- Strategy type where each node's continuation uses the monad from `MonadDecoration`. -/
-def Strategy.withMonads :
-    (spec : Spec.{u}) → MonadDecoration spec → (Transcript spec → Type u) → Type u
-  | .done, _, Output => Output ⟨⟩
-  | .node X rest, ⟨bm, dRest⟩, Output =>
-      (x : X) × bm.M (withMonads (rest x) (dRest x) (fun p => Output ⟨x, p⟩))
+/-- One-participant local syntax whose continuation lives in the node monad.
+
+At each node the strategy chooses a move `x` immediately, then supplies the
+continuation in the `BundledMonad` stored by the node decoration. -/
+def Strategy.monadicSyntax :
+    SyntaxOver.{u, u, u, u + 1} PUnit (fun (_ : Type u) => BundledMonad.{u, u}) where
+  Node _ (X : Type u) bm (Cont : X → Type u) :=
+    (x : X) × bm.M (Cont x)
+
+/-- Strategy type where each node's continuation uses the monad from its
+`MonadDecoration`. -/
+abbrev Strategy.withMonads
+    (spec : Spec.{u}) (deco : MonadDecoration.{u, u, u} spec)
+    (Output : Transcript spec → Type u) :=
+  StrategyOver Strategy.monadicSyntax PUnit.unit spec deco Output
+
+/-- One-step execution law for `Strategy.monadicSyntax`.
+
+The node selects the next move directly. Its continuation is lifted from the
+decorated node monad into the ambient execution monad before the generic runner
+continues with the selected subtree. -/
+def Strategy.monadicInteraction {m : Type u → Type u} [Monad m]
+    (liftM : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
+    InteractionOver PUnit (fun (_ : Type u) => BundledMonad.{u, u}) Strategy.monadicSyntax m where
+  interact := fun {_X} {γ} {_Cont} {_Result} profile k => do
+    let node := profile PUnit.unit
+    let next ← liftM γ node.2
+    k node.1 (fun _ => next)
 
 /-- Execute a `withMonads` strategy, lifting each node's bundled monad into `m`. -/
 def Strategy.runWithMonads {m : Type u → Type u} [Monad m]
-    (liftM : ∀ (bm : BundledMonad) {α : Type u}, bm.M α → m α) :
-    (spec : Spec) → (deco : MonadDecoration spec) →
+    (liftM : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
+    (spec : Spec) → (deco : MonadDecoration.{u, u, u} spec) →
     {Output : Transcript spec → Type u} →
     Strategy.withMonads spec deco Output → m ((tr : Transcript spec) × Output tr)
-  | .done, _, _, output => pure ⟨⟨⟩, output⟩
-  | .node _ rest, ⟨bm, dRest⟩, _, ⟨x, cont⟩ => do
-      let next ← liftM bm cont
-      let ⟨tail, out⟩ ← runWithMonads liftM (rest x) (dRest x) next
-      return ⟨⟨x, tail⟩, out⟩
+  | spec, deco, Output, strat =>
+      StrategyOver.run
+        (Agent := PUnit)
+        (Γ := fun (_ : Type u) => BundledMonad.{u, u})
+        (syn := Strategy.monadicSyntax)
+        (m := m)
+        (Strategy.monadicInteraction liftM)
+        (spec := spec)
+        (Out := fun _ => Output)
+        (Result := Output)
+        deco
+        (fun _ => strat)
+        (fun _ out => out PUnit.unit)
 
 end Spec
 end Interaction
