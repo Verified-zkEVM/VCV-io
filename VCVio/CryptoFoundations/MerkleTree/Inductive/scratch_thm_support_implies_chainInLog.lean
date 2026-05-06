@@ -703,31 +703,40 @@ theorem support_implies_chainInLog
   obtain ⟨⟨⟨root_c, aux_c⟩, log_c⟩, h_c, hsupport⟩ := hsupport
   rw [support_map, Set.mem_image] at hsupport
   obtain ⟨⟨resCO, log_co⟩, h_co, h_eq_co⟩ := hsupport
+  -- root_c : α × AuxState, aux_c : QueryLog (inner committingAdv log), log_c : QueryLog (outer)
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_co
+  obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
+  -- Now h_co's continuation depends on root_c.1, root_c.2.
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_co
   obtain ⟨⟨⟨idx_o, leaf_o, proof_o⟩, log_o⟩, h_o, h_co⟩ := h_co
   rw [support_map, Set.mem_image] at h_co
   obtain ⟨⟨resV, log_v_inner⟩, h_v, h_eq_v⟩ := h_co
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_v
+  obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_v
   obtain ⟨⟨verifiedOpt, log_v⟩, h_vp, h_v⟩ := h_v
   rw [support_map, Set.mem_image] at h_v
   obtain ⟨⟨_unit, log_p⟩, h_p, h_eq_p⟩ := h_v
-  rw [OracleComp.withQueryLog_pure, mem_support_pure_iff] at h_p
-  obtain ⟨h_p1, h_p2⟩ := Prod.mk.inj h_p
+  rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_p
+  obtain ⟨h_p1, h_p2⟩ := h_p
   subst h_p2
-  obtain ⟨h_eq_p1, h_eq_p2⟩ := Prod.mk.inj h_eq_p
-  obtain ⟨h_eq_v1, h_eq_v2⟩ := Prod.mk.inj h_eq_v
-  obtain ⟨h_eq_co1, h_eq_co2⟩ := Prod.mk.inj h_eq_co
-  rw [h_p1] at h_eq_p1
-  rw [h_eq_p1] at h_eq_v1
-  rw [h_eq_v1] at h_eq_co1
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_p
+  obtain ⟨h_eq_p1, h_eq_p2⟩ := h_eq_p
+  -- Chain the equalities.
+  -- h_p1 : _unit = (root_c.1, root_c.2, ⟨idx_o, leaf_o, proof_o, ext, gen, verifiedOpt.isSome⟩)
+  -- h_eq_p1 : _unit = resV
+  -- h_eq_v1 : resV = resCO
+  -- h_eq_co1 : resCO = (root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩)
+  rw [← h_eq_p1, h_p1] at h_eq_v1
+  rw [← h_eq_v1] at h_eq_co1
+  -- h_eq_co1 : (root_c.1, root_c.2, ⟨idx_o, leaf_o, proof_o, ext, gen, verifiedOpt.isSome⟩) = (root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩)
   simp only [Prod.mk.injEq] at h_eq_co1
   obtain ⟨h_root_eq, h_aux_eq, h_sigma_eq⟩ := h_eq_co1
   subst h_root_eq
   subst h_aux_eq
   obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
   subst h_idx_eq
-  simp only [heq_eq_eq] at h_rest_eq
-  simp only [Prod.mk.injEq] at h_rest_eq
+  simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
   obtain ⟨h_leaf_eq, h_proof_eq, _h_tree_eq, _h_proof_ext_eq, h_isSome_eq⟩ := h_rest_eq
   subst h_leaf_eq
   subst h_proof_eq
@@ -741,12 +750,12 @@ theorem support_implies_chainInLog
   have h_chain_v := verifyProof_run_support_chain idx leaf root proof log_v h_vp
   apply chainInLog_mono idx _ h_chain_v
   intro q hq
+  -- log = log_c ++ log_co, log_co = log_o ++ log_v_inner, log_v_inner = log_v ++ [] = log_v.
   rw [← h_eq_co2]
-  simp only [Prod.map_fst, id_eq, Prod.map_snd]
   rw [← h_eq_v2]
-  simp only [Prod.map_snd]
   rw [← h_eq_p2]
   simp only [List.append_nil]
+  -- Goal: q ∈ log_c ++ (log_o ++ log_v)
   exact List.mem_append_right _ (List.mem_append_right _ hq)
 
 /--
