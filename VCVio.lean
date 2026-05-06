@@ -43,8 +43,11 @@ import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.KEMDEM
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.MacAlg
+import VCVio.CryptoFoundations.MerkleTree.Inductive.Collision
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Completeness
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
+import VCVio.CryptoFoundations.MerkleTree.Inductive.Extractability
+import VCVio.CryptoFoundations.MerkleTree.Inductive.Lemmas
 import VCVio.CryptoFoundations.MerkleTree.Vector.Basic
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG

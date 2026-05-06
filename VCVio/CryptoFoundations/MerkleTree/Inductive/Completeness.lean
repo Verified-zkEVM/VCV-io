@@ -47,13 +47,14 @@ theorem functional_completeness {s : Skeleton}
   | ofLeaf =>
       cases leaf_data_tree with
       | leaf a =>
-          simp only [buildMerkleTreeWithHash, getPutativeRootWithHash, LeafData.get_leaf,
-            FullData.getRootValue_leaf]
+          simp only [buildMerkleTreeWithHash, populate_up_leaf, getPutativeRootWithHash,
+            LeafData.get_leaf, FullData.getRootValue_leaf]
   | ofLeft idxLeft ih =>
       cases leaf_data_tree with
       | internal left right =>
           simp only [getPutativeRootWithHash, LeafData.get_ofLeft, LeafData.leftSubtree_internal,
-            generateProof, buildMerkleTreeWithHash, FullData.rightSubtree_internal,
+            generateProof, buildMerkleTreeWithHash, populate_up_internal,
+            FullData.rightSubtree_internal,
             FullData.leftSubtree_internal, List.Vector.head_cons, FullData.internal_getRootValue]
           have hproof :=
             congrArg (fun p => getPutativeRootWithHash idxLeft (left.get idxLeft) p hash)
@@ -65,6 +66,7 @@ theorem functional_completeness {s : Skeleton}
       cases leaf_data_tree with
       | internal left right =>
           simp only [getPutativeRootWithHash, generateProof, buildMerkleTreeWithHash,
+            populate_up_internal,
             FullData.leftSubtree_internal, FullData.rightSubtree_internal, List.Vector.head_cons,
             LeafData.get_ofRight, LeafData.rightSubtree_internal, FullData.internal_getRootValue]
           have hproof :=
