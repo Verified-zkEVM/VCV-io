@@ -677,6 +677,103 @@ abbrev Strategy.withRolesAndMonads
   StrategyOver strategyMonadicSyntax PUnit.unit spec
     (RoleDecoration.withMonads roles md) Output
 
+/-- Map the transcript-indexed output of a monadic role strategy. -/
+def Strategy.withRolesAndMonads.mapOutput
+    (spec : Spec.{u}) (roles : RoleDecoration spec) (md : MonadDecoration spec)
+    {Output₁ Output₂ : Spec.Transcript spec → Type u}
+    (f : ∀ tr, Output₁ tr → Output₂ tr) :
+    Strategy.withRolesAndMonads spec roles md Output₁ →
+    Strategy.withRolesAndMonads spec roles md Output₂ :=
+  match spec, roles, md with
+  | .done, _, _ => fun strat => f ⟨⟩ strat
+  | .node _ rest, ⟨.sender, rRest⟩, ⟨_, mdRest⟩ =>
+      fun strat =>
+        Functor.map
+          (fun msgAndRest =>
+            ⟨msgAndRest.1,
+              mapOutput (rest msgAndRest.1) (rRest msgAndRest.1) (mdRest msgAndRest.1)
+                (fun tr => f ⟨msgAndRest.1, tr⟩) msgAndRest.2⟩)
+          strat
+  | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, mdRest⟩ =>
+      fun strat x =>
+        Functor.map
+          (mapOutput (rest x) (rRest x) (mdRest x) (fun tr => f ⟨x, tr⟩))
+          (strat x)
+
+/--
+Retarget a monadic role strategy along a nodewise monad homomorphism.
+
+The protocol tree and output family stay fixed; only the node effects are
+lifted from the source monad decoration to the target decoration.
+-/
+def Strategy.withRolesAndMonads.mapDecoration
+    (spec : Spec.{u}) (roles : RoleDecoration spec)
+    {md₁ md₂ : MonadDecoration spec}
+    (hom : MonadDecoration.Hom spec md₁ md₂)
+    {Output : Spec.Transcript spec → Type u} :
+    Strategy.withRolesAndMonads spec roles md₁ Output →
+    Strategy.withRolesAndMonads spec roles md₂ Output :=
+  match spec, roles, md₁, md₂, hom with
+  | .done, _, _, _, _ => fun strat => strat
+  | .node _ rest, ⟨.sender, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
+      fun strat =>
+        lift <| Functor.map
+          (fun msgAndRest =>
+            ⟨msgAndRest.1,
+              mapDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
+                (homRest msgAndRest.1) msgAndRest.2⟩)
+          strat
+  | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
+      fun strat x =>
+        lift <| Functor.map
+          (mapDecoration (rest x) (rRest x) (homRest x)) (strat x)
+
+/--
+View a strategy over a constant monad decoration as an ordinary single-monad
+role strategy.
+-/
+def Strategy.withRolesAndMonads.toWithRolesConstant {m : Type u → Type u} [Monad m]
+    (spec : Spec.{u}) (roles : RoleDecoration spec)
+    {Output : Spec.Transcript spec → Type u} :
+    Strategy.withRolesAndMonads spec roles
+      (MonadDecoration.constant ⟨m, inferInstance⟩ spec) Output →
+    Strategy.withRoles m spec roles Output :=
+  match spec, roles with
+  | .done, _ => fun strat => strat
+  | .node _ rest, ⟨.sender, rRest⟩ =>
+      fun strat =>
+        Functor.map
+          (fun msgAndRest =>
+            ⟨msgAndRest.1,
+              toWithRolesConstant (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
+          strat
+  | .node _ rest, ⟨.receiver, rRest⟩ =>
+      fun strat x =>
+        Functor.map (toWithRolesConstant (rest x) (rRest x)) (strat x)
+
+/--
+View an ordinary single-monad role strategy as a strategy over a constant monad
+decoration.
+-/
+def Strategy.withRolesAndMonads.ofWithRolesConstant {m : Type u → Type u} [Monad m]
+    (spec : Spec.{u}) (roles : RoleDecoration spec)
+    {Output : Spec.Transcript spec → Type u} :
+    Strategy.withRoles m spec roles Output →
+    Strategy.withRolesAndMonads spec roles
+      (MonadDecoration.constant ⟨m, inferInstance⟩ spec) Output :=
+  match spec, roles with
+  | .done, _ => fun strat => strat
+  | .node _ rest, ⟨.sender, rRest⟩ =>
+      fun strat =>
+        Functor.map
+          (fun msgAndRest =>
+            ⟨msgAndRest.1,
+              ofWithRolesConstant (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
+          strat
+  | .node _ rest, ⟨.receiver, rRest⟩ =>
+      fun strat x =>
+        Functor.map (ofWithRolesConstant (rest x) (rRest x)) (strat x)
+
 /-- Counterpart with per-node monads and transcript-dependent output.
 
 This is the primary type for oracle verifiers: `OracleCounterpart` (in
@@ -736,6 +833,34 @@ theorem Counterpart.withMonads.mapOutput_receiver_eq
         ⟨xc.1,
           Counterpart.withMonads.mapOutput
             (rest xc.1) (rRest xc.1) (mdRest xc.1) (fun tr => f ⟨xc.1, tr⟩) xc.2⟩) <$> cpt := rfl
+
+/--
+Retarget a monadic counterpart along a nodewise monad homomorphism.
+
+This traverses the counterpart tree structurally, applying the supplied lift at
+each node and recursing through the selected continuation.
+-/
+def Counterpart.withMonads.mapDecoration
+    (spec : Spec.{u}) (roles : RoleDecoration spec)
+    {md₁ md₂ : MonadDecoration spec}
+    (hom : MonadDecoration.Hom spec md₁ md₂)
+    {Output : Spec.Transcript spec → Type u} :
+    Counterpart.withMonads spec roles md₁ Output →
+    Counterpart.withMonads spec roles md₂ Output :=
+  match spec, roles, md₁, md₂, hom with
+  | .done, _, _, _, _ => fun cpt => cpt
+  | .node _ rest, ⟨.sender, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
+      fun cpt x =>
+        lift <| Functor.map
+          (mapDecoration (rest x) (rRest x) (homRest x)) (cpt x)
+  | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
+      fun cpt =>
+        lift <| Functor.map
+          (fun msgAndRest =>
+            ⟨msgAndRest.1,
+              mapDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
+                (homRest msgAndRest.1) msgAndRest.2⟩)
+          cpt
 
 private theorem pairedMonadicSyntax_forAgent_focal :
     pairedMonadicSyntax.forAgent Participant.focal =

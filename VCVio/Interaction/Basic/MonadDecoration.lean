@@ -23,6 +23,58 @@ namespace Spec
 abbrev MonadDecoration :=
   Decoration (fun (_ : Type u) => BundledMonad)
 
+namespace MonadDecoration
+
+/--
+Constant monad decoration: every node in the interaction tree uses the same
+bundled monad.
+
+This is the bridge between ordinary single-monad strategies and strategies
+whose node effects are described by a `MonadDecoration`.
+-/
+def constant (bm : BundledMonad.{u, u}) :
+    (spec : Spec.{u}) → MonadDecoration.{u, u, u} spec
+  | .done => PUnit.unit
+  | .node _ rest => ⟨bm, fun x => constant bm (rest x)⟩
+
+/--
+Nodewise monad homomorphism between two monad decorations on the same
+interaction tree.
+
+At each internal node it gives a lift from the source bundled monad to the
+target bundled monad, together with recursive lifts for every continuation
+subtree.
+-/
+def Hom :
+    (spec : Spec.{u}) → MonadDecoration.{u, u, u} spec →
+      MonadDecoration.{u, u, u} spec → Type (u + 1)
+  | .done, _, _ => PUnit
+  | .node X rest, ⟨m₁, md₁⟩, ⟨m₂, md₂⟩ =>
+      (∀ {α : Type u}, m₁.M α → m₂.M α) ×
+        ((x : X) → Hom (rest x) (md₁ x) (md₂ x))
+
+namespace Hom
+
+/-- Identity homomorphism on a monad decoration. -/
+def id :
+    (spec : Spec.{u}) → (md : MonadDecoration.{u, u, u} spec) →
+      Hom spec md md
+  | .done, _ => PUnit.unit
+  | .node _ rest, ⟨_, mdRest⟩ =>
+      ⟨fun x => x, fun x => id (rest x) (mdRest x)⟩
+
+/-- Constant homomorphism induced by a single monad lift. -/
+def constant {bm₁ bm₂ : BundledMonad.{u, u}}
+    (lift : ∀ {α : Type u}, bm₁.M α → bm₂.M α) :
+    (spec : Spec.{u}) →
+      Hom spec (MonadDecoration.constant bm₁ spec) (MonadDecoration.constant bm₂ spec)
+  | .done => PUnit.unit
+  | .node _ rest => ⟨lift, fun x => constant lift (rest x)⟩
+
+end Hom
+
+end MonadDecoration
+
 /-- Strategy type where each node's continuation uses the monad from `MonadDecoration`. -/
 def Strategy.withMonads :
     (spec : Spec.{u}) → MonadDecoration spec → (Transcript spec → Type u) → Type u
