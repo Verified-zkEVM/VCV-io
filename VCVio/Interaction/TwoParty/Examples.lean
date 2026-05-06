@@ -9,7 +9,7 @@ import VCVio.Interaction.TwoParty.Decoration
 import VCVio.Interaction.TwoParty.Strategy
 
 /-!
-# Examples: computing `withRoles` / `Counterpart` types
+# Examples: computing paired two-party strategy types
 
 Small hand-crafted specs show how role-dependent strategy types unfold.
 -/
@@ -27,10 +27,12 @@ private def exSpec := Spec.node T fun _ => .node U fun _ => .done
 private def exRoles : RoleDecoration (exSpec T U) :=
   ⟨.sender, fun _ => ⟨.receiver, fun _ => ⟨⟩⟩⟩
 
-example : Spec.Strategy.withRoles m (exSpec T U) (exRoles T U) (fun _ => α)
+example : Spec.StrategyOver (Spec.pairedSyntax m) TwoParty.Participant.focal
+    (exSpec T U) (exRoles T U) (fun _ => α)
     = m ((_ : T) × ((_ : U) → m α)) := rfl
 
-example : Spec.Counterpart m (exSpec T U) (exRoles T U) (fun _ => α)
+example : Spec.StrategyOver (Spec.pairedSyntax m) TwoParty.Participant.counterpart
+    (exSpec T U) (exRoles T U) (fun _ => α)
     = ((_ : T) → m (m ((_ : U) × α))) := rfl
 
 end Examples

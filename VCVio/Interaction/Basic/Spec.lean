@@ -65,7 +65,7 @@ representation.
   refinement, bisimulation, packaged equivalence notions, fairness, liveness,
   per-party observation profiles,
   scheduler/control ownership, and current local frontier views
-- `TwoParty/` — sender/receiver roles, `withRoles`, `Counterpart`
+- `TwoParty/` — sender/receiver roles and paired focal/counterpart strategies
 - `Reduction.lean` — prover, verifier, reduction
 - `Oracle/` — oracle decoration, path-dependent oracle access
 - `Security.lean` / `OracleSecurity.lean` — security definitions

@@ -32,6 +32,7 @@ namespace Interaction
 namespace Spec
 
 variable {m : Type u → Type u}
+open TwoParty
 
 /-- A lawful monad whose independent effects may be swapped.
 
@@ -73,10 +74,10 @@ def Strategy.compWithRoles {m : Type u → Type u} [Monad m]
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {Mid : Spec.Transcript s₁ → Type u}
     {F : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u}
-    (strat₁ : Strategy.withRoles m s₁ r₁ Mid)
+    (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ Mid)
     (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
-      m (Strategy.withRoles m (s₂ tr₁) (r₂ tr₁) (F tr₁))) :
-    m (Strategy.withRoles m (s₁.append s₂) (r₁.append r₂)
+      m (StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁) (F tr₁))) :
+    m (StrategyOver (pairedSyntax m) Participant.focal (s₁.append s₂) (r₁.append r₂)
       (Spec.Transcript.liftAppend s₁ s₂ F)) :=
   match s₁, r₁ with
   | .done, _ => f ⟨⟩ strat₁
@@ -98,11 +99,11 @@ def Strategy.compWithRolesFlat {m : Type u → Type u} [Monad m]
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {Mid : Spec.Transcript s₁ → Type u}
     {Output : Spec.Transcript (s₁.append s₂) → Type u}
-    (strat₁ : Strategy.withRoles m s₁ r₁ Mid)
+    (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ Mid)
     (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
-      m (Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+      m (StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))) :
-    m (Strategy.withRoles m (s₁.append s₂) (r₁.append r₂) Output) :=
+    m (StrategyOver (pairedSyntax m) Participant.focal (s₁.append s₂) (r₁.append r₂) Output) :=
   match s₁, r₁ with
   | .done, _ => f ⟨⟩ strat₁
   | .node _ _, ⟨.sender, _⟩ =>
@@ -123,11 +124,11 @@ private def Strategy.compWithRolesFlatPure {m : Type u → Type u} [Monad m]
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {Mid : Spec.Transcript s₁ → Type u}
     {Output : Spec.Transcript (s₁.append s₂) → Type u}
-    (strat₁ : Strategy.withRoles m s₁ r₁ Mid)
+    (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ Mid)
     (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
-      Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+      StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
-    Strategy.withRoles m (s₁.append s₂) (r₁.append r₂) Output :=
+    StrategyOver (pairedSyntax m) Participant.focal (s₁.append s₂) (r₁.append r₂) Output :=
   match s₁, r₁ with
   | .done, _ => f ⟨⟩ strat₁
   | .node _ _, ⟨.sender, _⟩ => do
@@ -145,9 +146,9 @@ private theorem Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {Mid : Spec.Transcript s₁ → Type u}
     {Output : Spec.Transcript (s₁.append s₂) → Type u}
-    (strat₁ : Strategy.withRoles m s₁ r₁ Mid)
+    (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ Mid)
     (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
-      Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+      StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
     Strategy.compWithRolesFlat strat₁ (fun tr₁ mid => pure (f tr₁ mid)) =
       pure (Strategy.compWithRolesFlatPure strat₁ f) := by
@@ -157,9 +158,9 @@ private theorem Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure
       {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
       {Mid : Spec.Transcript s₁ → Type u}
       {Output : Spec.Transcript (s₁.append s₂) → Type u}
-      (strat₁ : Strategy.withRoles m s₁ r₁ Mid)
+      (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ Mid)
       (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
-        Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+        StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
           (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
       Strategy.compWithRolesFlat strat₁ (fun tr₁ mid => pure (f tr₁ mid)) =
         pure (Strategy.compWithRolesFlatPure strat₁ f) := by
@@ -204,9 +205,9 @@ def Strategy.splitPrefixWithRoles {m : Type u → Type u} [Functor m] :
     {r₁ : RoleDecoration s₁} →
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)} →
     {Output : Spec.Transcript (s₁.append s₂) → Type u} →
-    Strategy.withRoles m (s₁.append s₂) (r₁.append r₂) Output →
-    Strategy.withRoles m s₁ r₁ (fun tr₁ =>
-      Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+    StrategyOver (pairedSyntax m) Participant.focal (s₁.append s₂) (r₁.append r₂) Output →
+    StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ (fun tr₁ =>
+      StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
   | .done, _, _, _, _, strat => strat
   | .node _ _, s₂, ⟨.sender, rRest⟩, r₂, _, strat =>
@@ -228,7 +229,7 @@ theorem Strategy.compWithRolesFlat_splitPrefixWithRoles
     {r₁ : RoleDecoration s₁}
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {Output : Spec.Transcript (s₁.append s₂) → Type u}
-    (strat : Strategy.withRoles m (s₁.append s₂) (r₁.append r₂) Output) :
+    (strat : StrategyOver (pairedSyntax m) Participant.focal (s₁.append s₂) (r₁.append r₂) Output) :
     Strategy.compWithRolesFlat
       (Strategy.splitPrefixWithRoles (s₂ := s₂) (r₁ := r₁) (r₂ := r₂) strat)
       (fun _ strat₂ => pure strat₂) = pure strat := by
@@ -237,7 +238,8 @@ theorem Strategy.compWithRolesFlat_splitPrefixWithRoles
       {s₂ : Spec.Transcript s₁ → Spec}
       {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
       {Output : Spec.Transcript (s₁.append s₂) → Type u}
-      (strat : Strategy.withRoles m (s₁.append s₂) (r₁.append r₂) Output) :
+      (strat : StrategyOver (pairedSyntax m) Participant.focal
+        (s₁.append s₂) (r₁.append r₂) Output) :
       Strategy.compWithRolesFlat
         (Strategy.splitPrefixWithRoles (s₂ := s₂) (r₁ := r₁) (r₂ := r₂) strat)
         (fun _ strat₂ => pure strat₂) = pure strat := by
@@ -312,10 +314,10 @@ def Counterpart.append {m : Type u → Type u} [Monad m]
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {Output₁ : Spec.Transcript s₁ → Type u}
     {F : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u} :
-    Counterpart m s₁ r₁ Output₁ →
+    StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ Output₁ →
     ((tr₁ : Spec.Transcript s₁) → Output₁ tr₁ →
-      Counterpart m (s₂ tr₁) (r₂ tr₁) (F tr₁)) →
-    Counterpart m (s₁.append s₂) (r₁.append r₂)
+      StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (F tr₁)) →
+    StrategyOver (pairedSyntax m) Participant.counterpart (s₁.append s₂) (r₁.append r₂)
       (Spec.Transcript.liftAppend s₁ s₂ F) :=
   match s₁, r₁ with
   | .done, _ => fun out₁ c₂ => c₂ ⟨⟩ out₁
@@ -335,11 +337,11 @@ def Counterpart.appendFlat {m : Type u → Type u} [Monad m]
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {Output₁ : Spec.Transcript s₁ → Type u}
     {Output₂ : Spec.Transcript (s₁.append s₂) → Type u} :
-    Counterpart m s₁ r₁ Output₁ →
+    StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ Output₁ →
     ((tr₁ : Spec.Transcript s₁) → Output₁ tr₁ →
-      Counterpart m (s₂ tr₁) (r₂ tr₁)
+      StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => Output₂ (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) →
-    Counterpart m (s₁.append s₂) (r₁.append r₂) Output₂ :=
+    StrategyOver (pairedSyntax m) Participant.counterpart (s₁.append s₂) (r₁.append r₂) Output₂ :=
   match s₁, r₁ with
   | .done, _ => fun out₁ c₂ => c₂ ⟨⟩ out₁
   | .node _ _, ⟨.sender, _⟩ => fun c₁ c₂ =>
@@ -360,9 +362,9 @@ theorem Counterpart.append_eq_appendFlat_mapOutput
     {r₂ : (tr₁ : Transcript s₁) → RoleDecoration (s₂ tr₁)} →
     {Output₁ : Transcript s₁ → Type u} →
     {F : (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Type u} →
-    (c₁ : Counterpart m s₁ r₁ Output₁) →
+    (c₁ : StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ Output₁) →
     (c₂ : (tr₁ : Transcript s₁) → Output₁ tr₁ →
-      Counterpart m (s₂ tr₁) (r₂ tr₁) (F tr₁)) →
+      StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (F tr₁)) →
     Counterpart.append c₁ c₂ =
       Counterpart.appendFlat c₁ (fun tr₁ o =>
         Counterpart.mapOutput
@@ -392,13 +394,13 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {MidP MidC : Spec.Transcript s₁ → Type u}
     {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
-    (strat₁ : Strategy.withRoles m s₁ r₁ MidP)
+    (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ MidP)
     (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
-      Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+      StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
-    (cpt₁ : Counterpart m s₁ r₁ MidC)
+    (cpt₁ : StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ MidC)
     (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
-      Counterpart m (s₂ tr₁) (r₂ tr₁)
+      StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
     (do
       let strat ← Strategy.compWithRolesFlat strat₁ (fun tr₁ mid => pure (f tr₁ mid))
@@ -416,13 +418,13 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
       {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
       {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
       {β : Type u}
-      (strat₁ : Strategy.withRoles m s₁ r₁ MidP)
+      (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ MidP)
       (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
-        Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+        StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
           (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
-      (cpt₁ : Counterpart m s₁ r₁ MidC)
+      (cpt₁ : StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ MidC)
       (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
-        Counterpart m (s₂ tr₁) (r₂ tr₁)
+        StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
           (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
       (g : ((tr : Spec.Transcript (s₁.append s₂)) × OutputP tr × OutputC tr) → m β) :
       (do
@@ -452,7 +454,8 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
           (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => OutputP ⟨xc.fst, tr⟩)
           xc.snd
           (fun tr₁ mid =>
-            show Strategy.withRoles m (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
+            show StrategyOver (pairedSyntax m) Participant.focal
+                (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
               (fun tr₂ => OutputP ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩)
             from f ⟨xc.fst, tr₁⟩ mid)
@@ -465,13 +468,15 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
           (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
           β xc.snd
           (fun tr₁ mid =>
-            show Strategy.withRoles m (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
+            show StrategyOver (pairedSyntax m) Participant.focal
+                (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
               (fun tr₂ => OutputP ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩)
             from f ⟨xc.fst, tr₁⟩ mid)
           cRest
           (fun p o =>
-            show Counterpart m (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
+            show StrategyOver (pairedSyntax m) Participant.counterpart
+                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
               (fun tr₂ => OutputC ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
@@ -492,13 +497,15 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat_pure
           (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
           β next
           (fun tr₁ mid =>
-            show Strategy.withRoles m (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
+            show StrategyOver (pairedSyntax m) Participant.focal
+                (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
               (fun tr₂ => OutputP ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩)
             from f ⟨xc.fst, tr₁⟩ mid)
           xc.snd
           (fun p o =>
-            show Counterpart m (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
+            show StrategyOver (pairedSyntax m) Participant.counterpart
+                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
               (fun tr₂ => OutputC ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
@@ -514,13 +521,13 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {MidP MidC : Spec.Transcript s₁ → Type u}
     {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
-    (strat₁ : Strategy.withRoles m s₁ r₁ MidP)
+    (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ MidP)
     (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
-      m (Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+      m (StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂))))
-    (cpt₁ : Counterpart m s₁ r₁ MidC)
+    (cpt₁ : StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ MidC)
     (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
-      Counterpart m (s₂ tr₁) (r₂ tr₁)
+      StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
         (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
     (do
       let strat ← Strategy.compWithRolesFlat strat₁ f
@@ -539,13 +546,13 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
       {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
       {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
       {β : Type u}
-      (strat₁ : Strategy.withRoles m s₁ r₁ MidP)
+      (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ MidP)
       (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
-        m (Strategy.withRoles m (s₂ tr₁) (r₂ tr₁)
+        m (StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁)
           (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂))))
-      (cpt₁ : Counterpart m s₁ r₁ MidC)
+      (cpt₁ : StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ MidC)
       (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
-        Counterpart m (s₂ tr₁) (r₂ tr₁)
+        StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
           (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
       (g : ((tr : Spec.Transcript (s₁.append s₂)) × OutputP tr × OutputC tr) → m β) :
       (do
@@ -580,13 +587,15 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
           (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
           β xc.snd
           (fun tr₁ mid =>
-            show m (Strategy.withRoles m (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
+            show m (StrategyOver (pairedSyntax m) Participant.focal
+              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
               (fun tr₂ => OutputP ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩))
             from f ⟨xc.fst, tr₁⟩ mid)
           cRest
           (fun p o =>
-            show Counterpart m (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
+            show StrategyOver (pairedSyntax m) Participant.counterpart
+                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
               (fun tr₂ => OutputC ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
@@ -605,13 +614,15 @@ theorem Strategy.runWithRoles_compWithRolesFlat_appendFlat
           (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
           β next
           (fun tr₁ mid =>
-            show m (Strategy.withRoles m (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
+            show m (StrategyOver (pairedSyntax m) Participant.focal
+              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
               (fun tr₂ => OutputP ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩))
             from f ⟨xc.fst, tr₁⟩ mid)
           xc.snd
           (fun p o =>
-            show Counterpart m (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
+            show StrategyOver (pairedSyntax m) Participant.counterpart
+                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
               (fun tr₂ => OutputC ⟨xc.fst,
                 Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
@@ -628,12 +639,12 @@ theorem Strategy.runWithRoles_compWithRoles_append
     {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
     {MidP MidC : Spec.Transcript s₁ → Type u}
     {FP FC : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u}
-    (strat₁ : Strategy.withRoles m s₁ r₁ MidP)
+    (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ MidP)
     (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
-      m (Strategy.withRoles m (s₂ tr₁) (r₂ tr₁) (FP tr₁)))
-    (cpt₁ : Counterpart m s₁ r₁ MidC)
+      m (StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁) (FP tr₁)))
+    (cpt₁ : StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ MidC)
     (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
-      Counterpart m (s₂ tr₁) (r₂ tr₁) (FC tr₁)) :
+      StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (FC tr₁)) :
     (do
       let strat ← Strategy.compWithRoles strat₁ f
       Strategy.runWithRoles (s₁.append s₂) (r₁.append r₂) strat
@@ -653,12 +664,12 @@ theorem Strategy.runWithRoles_compWithRoles_append
       {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
       {FP FC : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u}
       {β : Type u}
-      (strat₁ : Strategy.withRoles m s₁ r₁ MidP)
+      (strat₁ : StrategyOver (pairedSyntax m) Participant.focal s₁ r₁ MidP)
       (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
-        m (Strategy.withRoles m (s₂ tr₁) (r₂ tr₁) (FP tr₁)))
-      (cpt₁ : Counterpart m s₁ r₁ MidC)
+        m (StrategyOver (pairedSyntax m) Participant.focal (s₂ tr₁) (r₂ tr₁) (FP tr₁)))
+      (cpt₁ : StrategyOver (pairedSyntax m) Participant.counterpart s₁ r₁ MidC)
       (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
-        Counterpart m (s₂ tr₁) (r₂ tr₁) (FC tr₁))
+        StrategyOver (pairedSyntax m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (FC tr₁))
       (g : ((tr : Spec.Transcript (s₁.append s₂)) ×
         Spec.Transcript.liftAppend s₁ s₂ FP tr ×
         Spec.Transcript.liftAppend s₁ s₂ FC tr) → m β) :
@@ -694,15 +705,18 @@ theorem Strategy.runWithRoles_compWithRoles_append
         exact @go (rest xc.fst) (rRest xc.fst)
           (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
           (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr₁ tr₂ => FP ⟨xc.fst, tr₁⟩ tr₂) (fun tr₁ tr₂ => FC ⟨xc.fst, tr₁⟩ tr₂)
+          (fun tr₁ tr₂ => FP ⟨xc.fst, tr₁⟩ tr₂)
+          (fun tr₁ tr₂ => FC ⟨xc.fst, tr₁⟩ tr₂)
           β xc.snd
           (fun tr₁ mid =>
-            show m (Strategy.withRoles m (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
+            show m (StrategyOver (pairedSyntax m) Participant.focal
+              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
               (FP ⟨xc.fst, tr₁⟩))
             from f ⟨xc.fst, tr₁⟩ mid)
           cRest
           (fun p o =>
-            show Counterpart m (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
+            show StrategyOver (pairedSyntax m) Participant.counterpart
+                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
               (FC ⟨xc.fst, p⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
@@ -717,15 +731,18 @@ theorem Strategy.runWithRoles_compWithRoles_append
         exact @go (rest xc.fst) (rRest xc.fst)
           (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
           (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr₁ tr₂ => FP ⟨xc.fst, tr₁⟩ tr₂) (fun tr₁ tr₂ => FC ⟨xc.fst, tr₁⟩ tr₂)
+          (fun tr₁ tr₂ => FP ⟨xc.fst, tr₁⟩ tr₂)
+          (fun tr₁ tr₂ => FC ⟨xc.fst, tr₁⟩ tr₂)
           β next
           (fun tr₁ mid =>
-            show m (Strategy.withRoles m (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
+            show m (StrategyOver (pairedSyntax m) Participant.focal
+              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
               (FP ⟨xc.fst, tr₁⟩))
             from f ⟨xc.fst, tr₁⟩ mid)
           xc.snd
           (fun p o =>
-            show Counterpart m (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
+            show StrategyOver (pairedSyntax m) Participant.counterpart
+                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
               (FC ⟨xc.fst, p⟩)
             from cpt₂ ⟨xc.fst, p⟩ o)
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
@@ -742,9 +759,11 @@ through each round. -/
 def Counterpart.iterate {m : Type u → Type u} [Monad m]
     {spec : Spec} {roles : RoleDecoration spec} {β : Type u} :
     (n : Nat) →
-    (Fin n → β → Counterpart m spec roles (fun _ => β)) →
+    (Fin n → β →
+      StrategyOver (pairedSyntax m) Participant.counterpart spec roles (fun _ => β)) →
     β →
-    Counterpart m (spec.replicate n) (roles.replicate n) (fun _ => β)
+    StrategyOver (pairedSyntax m) Participant.counterpart
+      (spec.replicate n) (roles.replicate n) (fun _ => β)
   | 0, _, b => b
   | n + 1, step, b =>
       Counterpart.appendFlat (step 0 b) (fun _ b' => iterate n (fun i => step i.succ) b')
@@ -755,9 +774,10 @@ def Strategy.iterateWithRoles {m : Type u → Type u} [Monad m]
     {spec : Spec} {roles : RoleDecoration spec} {α : Type u} :
     (n : Nat) →
     (step : Fin n → α →
-      m (Strategy.withRoles m spec roles (fun _ => α))) →
+      m (StrategyOver (pairedSyntax m) Participant.focal spec roles (fun _ => α))) →
     α →
-    m (Strategy.withRoles m (spec.replicate n) (roles.replicate n) (fun _ => α))
+    m (StrategyOver (pairedSyntax m) Participant.focal
+      (spec.replicate n) (roles.replicate n) (fun _ => α))
   | 0, _, a => pure a
   | n + 1, step, a => do
     let strat ← step 0 a
@@ -766,6 +786,8 @@ def Strategy.iterateWithRoles {m : Type u → Type u} [Monad m]
 end Spec
 
 namespace Spec
+
+open TwoParty
 
 /-- Compose counterparts along a state chain with stage-dependent output. At each stage,
 the step transforms `Family i s` into a counterpart whose output is
@@ -777,9 +799,11 @@ def Counterpart.stateChainComp {m : Type u → Type u} [Monad m]
     {roles : (i : Nat) → (s : Stage i) → RoleDecoration (spec i s)}
     {Family : (i : Nat) → Stage i → Type u}
     (step : (i : Nat) → (s : Stage i) → Family i s →
-      Counterpart m (spec i s) (roles i s) (fun tr => Family (i + 1) (advance i s tr))) :
+      StrategyOver (pairedSyntax m) Participant.counterpart
+        (spec i s) (roles i s) (fun tr => Family (i + 1) (advance i s tr))) :
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
-    Counterpart m (Spec.stateChain Stage spec advance n i s)
+    StrategyOver (pairedSyntax m) Participant.counterpart
+      (Spec.stateChain Stage spec advance n i s)
       (Spec.Decoration.stateChain roles n i s) (Spec.Transcript.stateChainFamily Family n i s)
   | 0, _, _, b => b
   | n + 1, i, s, b =>
@@ -796,10 +820,10 @@ def Strategy.stateChainCompWithRoles {m : Type u → Type u} [Monad m]
     {roles : (i : Nat) → (s : Stage i) → RoleDecoration (spec i s)}
     {Family : (i : Nat) → Stage i → Type u}
     (step : (i : Nat) → (s : Stage i) → Family i s →
-      m (Strategy.withRoles m (spec i s) (roles i s)
+      m (StrategyOver (pairedSyntax m) Participant.focal (spec i s) (roles i s)
         (fun tr => Family (i + 1) (advance i s tr)))) :
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
-    m (Strategy.withRoles m (Spec.stateChain Stage spec advance n i s)
+    m (StrategyOver (pairedSyntax m) Participant.focal (Spec.stateChain Stage spec advance n i s)
       (Spec.Decoration.stateChain roles n i s) (Spec.Transcript.stateChainFamily Family n i s))
   | 0, _, _, a => pure a
   | n + 1, i, s, a => do
