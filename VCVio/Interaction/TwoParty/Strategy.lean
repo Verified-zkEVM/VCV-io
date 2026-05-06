@@ -717,34 +717,6 @@ abbrev Strategy.withRolesAndMonads
     (RoleDecoration.withMonads roles md) Output
 
 /--
-Retarget a monadic role strategy along a nodewise monad homomorphism.
-
-The protocol tree and output family stay fixed; only the node effects are
-lifted from the source monad decoration to the target decoration.
--/
-def Strategy.withRolesAndMonads.mapDecoration
-    (spec : Spec.{u}) (roles : RoleDecoration spec)
-    {md₁ md₂ : MonadDecoration spec}
-    (hom : MonadDecoration.Hom spec md₁ md₂)
-    {Output : Spec.Transcript spec → Type u} :
-    Strategy.withRolesAndMonads spec roles md₁ Output →
-    Strategy.withRolesAndMonads spec roles md₂ Output :=
-  match spec, roles, md₁, md₂, hom with
-  | .done, _, _, _, _ => fun strat => strat
-  | .node _ rest, ⟨.sender, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
-      fun strat =>
-        lift <| Functor.map
-          (fun msgAndRest =>
-            ⟨msgAndRest.1,
-              mapDecoration (rest msgAndRest.1) (rRest msgAndRest.1)
-                (homRest msgAndRest.1) msgAndRest.2⟩)
-          strat
-  | .node _ rest, ⟨.receiver, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
-      fun strat x =>
-        lift <| Functor.map
-          (mapDecoration (rest x) (rRest x) (homRest x)) (strat x)
-
-/--
 View a strategy over a constant monad decoration as an ordinary single-monad
 role strategy.
 -/
