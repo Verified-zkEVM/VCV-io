@@ -3,5 +3,8 @@
   "branch": "numina/merkle-tree-soundness-chaininlog",
   "source_type": "latex",
   "notes": "",
-  "entries": []
+  "entries": [],
+  "settings": {
+    "pr_mode": "ready"
+  }
 }
