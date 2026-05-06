@@ -274,13 +274,13 @@ lemma withQueryLog_self_log_eq
       obtain ⟨⟨h_eq_v', h_eq_l₁'⟩, h_eq_l₂⟩ := h_eq
       subst h_eq_v'; subst h_eq_l₁'; subst h_eq_l₂
       simp only at h_inner_outer
-      -- `h_inner_outer` is now in support of `(Prod.map id ([⟨t,u⟩] ++ ·) <$> (mx u).withQueryLog).withQueryLog`.
+      -- `h_inner_outer` is now in support of `(Prod.map id ([⟨t,u'⟩] ++ ·) <$> (mx u').withQueryLog).withQueryLog`.
       -- Rewrite the inner `<$>` as a bind to expose the inner `.withQueryLog.withQueryLog` for IH.
-      rw [show (Prod.map id (fun x => ([⟨t, u⟩] ++ x : (spec).QueryLog)) <$>
-              (mx u).withQueryLog) =
-            ((mx u).withQueryLog >>=
-              fun p => pure (Prod.map id (fun x => [⟨t, u⟩] ++ x) p))
-          from by simp [Functor.map_eq_bind_pure_comp, Function.comp_def]] at h_inner_outer
+      rw [show (Prod.map id (fun x => ([⟨t, u'⟩] ++ x : (spec).QueryLog)) <$>
+              (mx u').withQueryLog) =
+            ((mx u').withQueryLog >>=
+              fun p => pure (Prod.map id (fun x => [⟨t, u'⟩] ++ x) p))
+          from by rw [map_eq_pure_bind]] at h_inner_outer
       rw [OracleComp.withQueryLog_bind] at h_inner_outer
       rw [mem_support_bind_iff] at h_inner_outer
       obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_rest⟩ := h_inner_outer
@@ -357,6 +357,12 @@ theorem extractability_game_no_coll_match'
   obtain ⟨h_leaf_eq, h_proof_eq, h_tree_eq, h_proof_ext_eq, h_isSome_eq⟩ := h_rest_eq
   subst h_leaf_eq
   subst h_proof_eq
+  -- Bridge `aux_c = log_c`: the inner queryLog (paired with the result of
+  -- `committingAdv.withQueryLog`) equals the outer queryLog from the second
+  -- `withQueryLog`. This is `withQueryLog_self_log_eq` applied to `committingAdv`.
+  have h_aux_eq_log_c : aux_c = log_c :=
+    withQueryLog_self_log_eq committingAdv h_c
+  subst h_aux_eq_log_c
   -- Now: `extractedTree = extractor s log_c root_c.1` and
   -- `extractedProof = generateProof (extractor s log_c root_c.1) idx_o`.
   -- Also `log = log_c ++ log_o ++ log_v ++ []` (modulo the trivial empty `log_p`).
