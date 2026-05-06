@@ -1,0 +1,1 @@
+- [2026-05-06] Started: prove next sorry in Extractability.lean (h_extracted_tree_eq inside extractability_game_no_coll_match)
