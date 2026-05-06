@@ -763,6 +763,52 @@ def Strategy.withRolesAndMonads.ofWithRolesConstant {m : Type u → Type u} [Mon
         Functor.map (ofWithRolesConstant (rest x) (rRest x)) (strat x)
 
 /--
+Lifting an ordinary role strategy into a constant monad decoration commutes
+with output maps.
+
+This is the naturality property used at boundaries that still accept ordinary
+single-monad strategies while internal execution is phrased over nodewise
+monad decorations.
+-/
+theorem Strategy.withRolesAndMonads.ofWithRolesConstant_mapOutputWithRoles
+    {m : Type u → Type u} [Monad m] [LawfulFunctor m]
+    (spec : Spec.{u}) (roles : RoleDecoration spec)
+    {Output Output' : Spec.Transcript spec → Type u}
+    (f : ∀ tr, Output tr → Output' tr)
+    (strat : Strategy.withRoles m spec roles Output) :
+    Strategy.withRolesAndMonads.ofWithRolesConstant spec roles
+        (Strategy.mapOutputWithRoles f strat) =
+      ShapeOver.mapOutput focalMonadicShape
+        (agent := PUnit.unit)
+        (spec := spec)
+        (ctxs := RoleDecoration.withMonads roles
+          (MonadDecoration.constant ⟨m, inferInstance⟩ spec))
+        f
+        (Strategy.withRolesAndMonads.ofWithRolesConstant spec roles strat) := by
+  match spec, roles with
+  | .done, _ =>
+      rfl
+  | .node _ rest, ⟨.sender, rRest⟩ =>
+      simp only [Strategy.mapOutputWithRoles, Counterpart.mapReceiver,
+        ofWithRolesConstant, ShapeOver.mapOutput, focalMonadicShape,
+        focalMonadicSyntax, RoleDecoration.withMonads, RoleDecoration.monadsOver,
+        Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
+      apply congrArg (fun g => g <$> strat)
+      funext msgAndRest
+      rw [ofWithRolesConstant_mapOutputWithRoles (rest msgAndRest.1) (rRest msgAndRest.1)]
+      rfl
+  | .node _ rest, ⟨.receiver, rRest⟩ =>
+      funext x
+      simp only [Strategy.mapOutputWithRoles, ofWithRolesConstant,
+        ShapeOver.mapOutput, focalMonadicShape, focalMonadicSyntax,
+        RoleDecoration.withMonads, RoleDecoration.monadsOver,
+        Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
+      apply congrArg (fun g => g <$> strat x)
+      funext next
+      rw [ofWithRolesConstant_mapOutputWithRoles (rest x) (rRest x)]
+      rfl
+
+/--
 Counterpart strategy whose node effects are supplied by a `MonadDecoration`.
 
 At sender-owned nodes the counterpart observes the focal move and continues in
