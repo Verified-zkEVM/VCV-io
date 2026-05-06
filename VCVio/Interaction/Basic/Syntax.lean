@@ -37,8 +37,7 @@ Role-based APIs are specializations of this pattern:
 * `Spec.Node.ContextHom` and `SyntaxOver.comap` express contravariant
   reindexing of local syntax along context morphisms;
 * `fun _ => Role` is one example of a simple node context;
-* `withRoles`, `Counterpart`, and `Counterpart.withMonads` are specific
-  syntax objects built on top of this core.
+* `StrategyOver` is the whole-tree local strategy induced by one-node syntax.
 
 Naming note:
 `SyntaxOver` is the base local-syntax notion. `ShapeOver` uses the same suffix
@@ -79,14 +78,18 @@ namespace SyntaxOver
 
 variable {Agent : Type a} {Γ : P.A → Type vΓ}
 
-/--
-Whole-tree participant family induced by lens-indexed local syntax.
+end SyntaxOver
 
-At leaves it returns the output family. At control nodes it presents the local
-node with runtime continuations, then recurses through the abstract branch
-selected by the lens.
+variable {Agent : Type a} {Γ : P.A → Type vΓ}
+
+/--
+Whole-tree local strategy induced by lens-indexed local syntax.
+
+At leaves it returns the output family. At a control node it presents the local
+node object supplied by `syn`, whose continuation family is recursively the
+strategy for the abstract branch selected by the lens.
 -/
-def Family {l : PFunctor.Lens P Q}
+def StrategyOver {l : PFunctor.Lens P Q}
     (syn : SyntaxOver l Agent Γ) :
     (agent : Agent) →
     (spec : PFunctor.FreeM P α) →
@@ -96,10 +99,8 @@ def Family {l : PFunctor.Lens P Q}
   | _, .pure _, _, Out => Out ⟨⟩
   | agent, .roll pos rest, ⟨γ, ctxs⟩, Out =>
       syn.Node agent pos γ (fun d =>
-        Family syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
+        StrategyOver syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
           (fun path => Out ⟨d, path⟩))
-
-end SyntaxOver
 
 namespace Spec
 
@@ -125,7 +126,7 @@ It describes the type of one local node object, uniformly for every possible:
 * continuation family.
 
 The whole-tree notion is obtained later by structural recursion on `Spec` via
-`SyntaxOver.Family`.
+`StrategyOver`.
 
 This is the most general local syntax layer because:
 * binary and multiparty interaction are both recovered by the choice of
@@ -209,8 +210,8 @@ theorem SyntaxOver.comap_comp
   rfl
 
 /--
-`SyntaxOver.Family syn a spec ctxs Out` is the whole-tree participant
-type for agent `a` induced by the local syntax `syn`.
+`StrategyOver syn a spec ctxs Out` is the whole-tree local strategy
+for agent `a` induced by the one-node syntax `syn`.
 
 Inputs:
 * `spec` is the underlying protocol tree;
@@ -222,10 +223,10 @@ The result is obtained by structural recursion on `spec`:
 * at an internal node, the family is `syn.Node ...` applied to the
   recursively defined continuation family for each child subtree.
 
-So `SyntaxOver` is the **local syntax specification**, while `Family` is the
-induced **whole-tree syntax** for one agent.
+So `SyntaxOver` is local and one-step, while `StrategyOver` is the induced
+whole-tree object for one agent.
 -/
-def SyntaxOver.Family
+def StrategyOver
     (syn : SyntaxOver Agent Γ) :
     (agent : Agent) →
     (spec : Spec) →
@@ -235,34 +236,46 @@ def SyntaxOver.Family
   | _, .done, _, Out => Out ⟨⟩
   | agent, .node X next, ⟨γ, ctxs⟩, Out =>
       syn.Node agent X γ (fun x =>
-        Family syn agent (next x) (ctxs x) (fun tr =>
+        StrategyOver syn agent (next x) (ctxs x) (fun tr =>
           Out ⟨x, tr⟩))
+
+/-- At an internal node, `StrategyOver` unfolds to the local node object
+whose continuations are the recursively induced strategies for each child. -/
+theorem StrategyOver.node
+    (syn : SyntaxOver Agent Γ)
+    {agent : Agent} {X : Type u} {next : X → Spec}
+    {γ : Γ X} {ctxs : (x : X) → Decoration Γ (next x)}
+    {Out : Transcript (Spec.node X next) → Type w} :
+    StrategyOver syn agent (Spec.node X next) ⟨γ, ctxs⟩ Out =
+      syn.Node agent X γ (fun x =>
+        StrategyOver syn agent (next x) (ctxs x) (fun tr => Out ⟨x, tr⟩)) :=
+  rfl
 
 /--
 Whole-tree families for `syn.comap f` are exactly families for `syn`
 evaluated on the mapped decoration `Decoration.map f ctxs`.
 -/
-theorem SyntaxOver.family_comap {Δ : Node.Context}
+theorem StrategyOver.comap {Δ : Node.Context}
     (syn : SyntaxOver Agent Δ) (f : Node.ContextHom Γ Δ) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    SyntaxOver.Family (syn.comap f) agent spec ctxs Out =
-      SyntaxOver.Family syn agent spec (Decoration.map f spec ctxs) Out
+    StrategyOver (syn.comap f) agent spec ctxs Out =
+      StrategyOver syn agent spec (Decoration.map f spec ctxs) Out
   | _, .done, _, _ => rfl
   | agent, .node _ next, ⟨γ, ctxs⟩, Out => by
-      simp only [SyntaxOver.Family, SyntaxOver.comap, Decoration.map]
+      simp only [StrategyOver, SyntaxOver.comap, Decoration.map]
       congr 1
       funext x
-      exact family_comap syn f (agent := agent) (ctxs := ctxs x)
+      exact StrategyOver.comap syn f (agent := agent) (ctxs := ctxs x)
 
-theorem SyntaxOver.family_comapSchema
+theorem StrategyOver.comapSchema
     {Δ : Node.Context} {S : Node.Schema Γ} {T : Node.Schema Δ}
     (syn : SyntaxOver Agent Δ) (f : Node.Schema.SchemaMap S T) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    SyntaxOver.Family (syn.comapSchema f) agent spec ctxs Out =
-      SyntaxOver.Family syn agent spec (Decoration.Schema.map f spec ctxs) Out :=
-  SyntaxOver.family_comap syn f.toContextHom
+    StrategyOver (syn.comapSchema f) agent spec ctxs Out =
+      StrategyOver syn agent spec (Decoration.Schema.map f spec ctxs) Out :=
+  StrategyOver.comap syn f.toContextHom
 
 end Spec
 end Interaction

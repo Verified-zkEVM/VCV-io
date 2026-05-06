@@ -140,19 +140,6 @@ theorem ShapeOver.comap_comp
   rfl
 
 /--
-Whole-tree families for a shape are inherited from the underlying
-`SyntaxOver`.
--/
-abbrev ShapeOver.Family
-    (shape : ShapeOver Agent Γ) :
-    (agent : Agent) →
-    (spec : Spec) →
-    Decoration Γ spec →
-    (Transcript spec → Type w) →
-    Type w :=
-  SyntaxOver.Family shape.toSyntaxOver
-
-/--
 `ShapeOver.mapOutput` lifts a pointwise transformation of leaf outputs to a
 transformation of whole-tree participant objects.
 
@@ -168,8 +155,8 @@ def ShapeOver.mapOutput
     :
     {A B : Transcript spec → Type w} →
     (∀ tr, A tr → B tr) →
-    ShapeOver.Family shape agent spec ctxs A →
-    ShapeOver.Family shape agent spec ctxs B
+    StrategyOver shape.toSyntaxOver agent spec ctxs A →
+    StrategyOver shape.toSyntaxOver agent spec ctxs B
   :=
     match spec, ctxs with
     | .done, _ => fun f out => f ⟨⟩ out
@@ -189,12 +176,12 @@ theorem ShapeOver.family_comap {Δ : Node.Context}
     (shape : ShapeOver Agent Δ) (f : Node.ContextHom Γ Δ) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    ShapeOver.Family (shape.comap f) agent spec ctxs Out =
-      ShapeOver.Family shape agent spec (Decoration.map f spec ctxs) Out
+    StrategyOver (shape.comap f).toSyntaxOver agent spec ctxs Out =
+      StrategyOver shape.toSyntaxOver agent spec (Decoration.map f spec ctxs) Out
   := by
     intro agent spec ctxs Out
-    simpa [ShapeOver.Family] using
-      (SyntaxOver.family_comap shape.toSyntaxOver f
+    simpa using
+      (StrategyOver.comap shape.toSyntaxOver f
         (agent := agent) (spec := spec) (ctxs := ctxs) (Out := Out))
 
 theorem ShapeOver.family_comapSchema
@@ -202,12 +189,12 @@ theorem ShapeOver.family_comapSchema
     (shape : ShapeOver Agent Δ) (f : Node.Schema.SchemaMap S T) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    ShapeOver.Family (shape.comapSchema f) agent spec ctxs Out =
-      ShapeOver.Family shape agent spec (Decoration.Schema.map f spec ctxs) Out :=
+    StrategyOver (shape.comapSchema f).toSyntaxOver agent spec ctxs Out =
+      StrategyOver shape.toSyntaxOver agent spec (Decoration.Schema.map f spec ctxs) Out :=
   by
     intro agent spec ctxs Out
-    simpa [ShapeOver.Family] using
-      (SyntaxOver.family_comapSchema shape.toSyntaxOver f
+    simpa using
+      (StrategyOver.comapSchema shape.toSyntaxOver f
         (agent := agent) (spec := spec) (ctxs := ctxs) (Out := Out))
 
 end Spec

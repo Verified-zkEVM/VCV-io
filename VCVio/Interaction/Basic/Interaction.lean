@@ -64,13 +64,14 @@ structure InteractionOver
     ((d : Q.B (l.toFunA pos)) → ((agent : Agent) → Cont agent d) → m Result) →
     m Result
 
-namespace InteractionOver
+namespace StrategyOver
 
 variable {l : PFunctor.Lens P Q} {syn : SyntaxOver l Agent Γ}
 
 /--
 Run a whole lens-executed protocol from a profile of local participant
-objects, producing the runtime path and each agent's output at that same path.
+objects, producing the runtime path and an output collected from all agents at
+that same path.
 -/
 def run
     {m : Type (max uB₂ a w) → Type (max uB₂ a w)}
@@ -78,26 +79,32 @@ def run
     {spec : PFunctor.FreeM P α}
     (ctxs : Decoration Γ spec)
     {Out : Agent → PFunctor.FreeM.PathAlong l spec → Type w}
+    {Result : PFunctor.FreeM.PathAlong l spec → Type (max a w)}
     (profile :
-      (agent : Agent) → SyntaxOver.Family syn agent spec ctxs (Out agent)) :
-    m ((path : PFunctor.FreeM.PathAlong l spec) × ((agent : Agent) → Out agent path)) :=
+      (agent : Agent) → StrategyOver syn agent spec ctxs (Out agent))
+    (collect :
+      (path : PFunctor.FreeM.PathAlong l spec) →
+        ((agent : Agent) → Out agent path) → Result path) :
+    m ((path : PFunctor.FreeM.PathAlong l spec) × Result path) :=
   match spec, ctxs with
-  | .pure _, _ => pure ⟨⟨⟩, profile⟩
+  | .pure _, _ => pure ⟨⟨⟩, collect ⟨⟩ profile⟩
   | .roll pos rest, ⟨γ, ctxs⟩ =>
       I.interact
         (γ := γ)
         (Cont := fun agent d =>
-          SyntaxOver.Family syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
+          StrategyOver syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
             (fun path => Out agent ⟨d, path⟩))
         (fun agent => profile agent)
         (fun d conts => do
           let ⟨path, out⟩ ← run I
             (ctxs := ctxs (l.toFunB pos d))
             (Out := fun agent path => Out agent ⟨d, path⟩)
+            (Result := fun path => Result ⟨d, path⟩)
             conts
+            (fun path out => collect ⟨d, path⟩ out)
           pure ⟨⟨d, path⟩, out⟩)
 
-end InteractionOver
+end StrategyOver
 
 namespace Spec
 
@@ -232,43 +239,48 @@ Inputs:
   agent;
 * `profile` supplies, for every agent, that agent's whole-tree participant
   object induced by `syn`.
+* `collect` assembles the agent outputs at the realized transcript into the
+  result returned by the runner.
 
 Output:
 * a monadic computation producing
   * a concrete transcript `tr`, and
-  * for each agent `a`, the final output `Out a tr` obtained by following that
-    transcript.
+  * the collected output at that transcript.
 
 So `run` is the whole-tree execution induced by the local execution law
 `InteractionOver.interact`. It is the generic profile-level analogue of the
 specialized two-party runners elsewhere in the library.
 
-This first executable version is intentionally specialized to the common
-single-universe setting used throughout the current interaction layer. The
-underlying `SyntaxOver` and `InteractionOver` abstractions remain more general.
+This executable facade uses the single-universe setting used by the `Spec`
+interaction layer. The underlying `SyntaxOver` and `InteractionOver`
+abstractions remain universe-polymorphic.
 -/
-def InteractionOver.run
+def StrategyOver.run
     (I : InteractionOver Agent Γ syn m) [Monad m]
     {spec : Spec}
     (ctxs : Decoration Γ spec)
     {Out : Agent → Transcript spec → Type u}
+    {Result : Transcript spec → Type u}
     (profile :
-      (agent : Agent) → SyntaxOver.Family syn agent spec ctxs (Out agent)) :
-    m ((tr : Transcript spec) × ((agent : Agent) → Out agent tr)) :=
+      (agent : Agent) → StrategyOver syn agent spec ctxs (Out agent))
+    (collect : (tr : Transcript spec) → ((agent : Agent) → Out agent tr) → Result tr) :
+    m ((tr : Transcript spec) × Result tr) :=
   match spec, ctxs with
-  | .done, _ => pure ⟨PUnit.unit, profile⟩
+  | .done, _ => pure ⟨PUnit.unit, collect PUnit.unit profile⟩
   | .node _ next, ⟨γ, ctxs⟩ =>
       I.interact
         (γ := γ)
         (Cont := fun agent x =>
-          SyntaxOver.Family syn agent (next x) (ctxs x)
+          StrategyOver syn agent (next x) (ctxs x)
             (fun tr => Out agent ⟨x, tr⟩))
         (fun agent => profile agent)
         (fun x conts => do
           let ⟨tr, out⟩ ← run I
             (ctxs := ctxs x)
             (Out := fun agent tr => Out agent ⟨x, tr⟩)
+            (Result := fun tr => Result ⟨x, tr⟩)
             conts
+            (fun tr out => collect ⟨x, tr⟩ out)
           pure ⟨⟨x, tr⟩, out⟩)
 
 end Run

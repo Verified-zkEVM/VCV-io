@@ -13,7 +13,7 @@ This module provides the two-party ownership profile and common local syntax
 specializations over the generic `Interaction.SyntaxOver` core.
 
 It intentionally does not define another recursive strategy hierarchy:
-whole-tree participant types are always obtained from `SyntaxOver.Family`.
+whole-tree participant types are always obtained from `StrategyOver`.
 -/
 
 @[expose] public section

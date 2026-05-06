@@ -265,7 +265,7 @@ theorem Strategy.compWithRolesFlat_splitPrefixWithRoles
                 funext xc
                 rcases xc with ⟨x, tail⟩
                 let Suffix : X → Type u := fun y =>
-                  (pairedSyntax m).Family Participant.focal
+                  StrategyOver (pairedSyntax m) Participant.focal
                     ((fun b => PFunctor.FreeM.append (rest b) (fun path => s₂ ⟨b, path⟩)) y)
                     ((fun y => (rRest y).append fun p => r₂ ⟨y, p⟩) y)
                     (fun tr => Output ⟨y, tr⟩)
