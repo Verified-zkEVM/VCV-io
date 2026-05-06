@@ -17,9 +17,8 @@ combined at a single protocol node in order to choose the next move and
 continue the interaction. The node-local information seen by those objects is
 packaged as a realized `Spec.Node.Context`.
 
-The role-based prover/verifier runners used elsewhere in the library are
-specializations of this more general notion, obtained by choosing suitable
-node contexts and syntax objects.
+Role-based prover/verifier runners are specializations of this notion, obtained
+by choosing suitable node contexts and syntax objects.
 
 Just as `SyntaxOver` reindexes contravariantly along node-context morphisms,
 `InteractionOver.comap` transports a local execution law along the same kind
@@ -27,9 +26,8 @@ of context change.
 
 Naming note:
 `InteractionOver` keeps the suffix form for the same reason as `ShapeOver`:
-it is the primary generalized execution notion, while `Interaction` is its
-trivial-data specialization rather than a base value that `InteractionOver`
-depends on.
+it is the generalized execution notion over node-local data, while
+`Interaction` names the plain specialization with trivial node data.
 -/
 
 universe u a vΓ w uA uB uA₂ uB₂ t

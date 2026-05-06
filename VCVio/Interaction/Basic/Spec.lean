@@ -25,10 +25,10 @@ moves are computed. Those concerns are separated into companion modules:
 * `Strategy` — one-player strategies with monadic effects
 * `Append`, `Replicate`, `Chain` — sequential composition and iteration
 
-This is the foundation of the entire `Interaction` layer, which replaces
-the old flat `ProtocolSpec n` model with a dependent-type-native design.
-The key advantage is that later rounds can depend on earlier moves, which
-is mathematically forced in protocols like sumcheck and FRI.
+This is the foundation of the `Interaction` layer: a dependent tree of moves
+whose later rounds may depend on earlier choices. That dependence is part of
+the protocol shape itself, matching examples such as sumcheck and FRI where
+later messages and checks are indexed by the preceding transcript.
 
 ## Polynomial substrate
 
@@ -47,10 +47,9 @@ shapes are obtained by replacing `PFunctor.FreeM` with the corresponding
 `PFunctor.FreeM ... α` for nontrivial `α` (see `Strategy` / `StepOver`).
 
 The `Spec` notation, `Spec.done`, and `Spec.node` are tagged with
-`@[match_pattern]` so that downstream definitions and proofs continue to
-pattern-match exactly as before, with no rewrite required at call sites.
-The substrate is the truth; the names are an ergonomic re-skin in the
-spirit of `OracleSpec`/`OracleComp`.
+`@[match_pattern]`, so downstream definitions can pattern-match on the
+interaction constructors while the polynomial substrate remains the canonical
+representation.
 
 ## Module map
 
@@ -132,8 +131,8 @@ Those additional layers are supplied separately by:
 `Spec` is **definitionally** the free monad on `Spec.basePFunctor` at the
 unit payload, exposing the polynomial substrate that the rest of the
 `Interaction` library builds on. The `Spec.done` / `Spec.node` aliases
-are tagged with `@[match_pattern]`, so existing pattern-matching code
-continues to work unchanged. -/
+are tagged with `@[match_pattern]`, so definitions can use constructor-style
+patterns without exposing the underlying `FreeM` representation. -/
 def Spec : Type (u+1) :=
   PFunctor.FreeM Spec.basePFunctor.{u} PUnit.{u+1}
 

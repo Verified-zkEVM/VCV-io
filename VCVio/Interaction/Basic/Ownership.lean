@@ -16,9 +16,8 @@ objects from two ingredients:
 * a participant-local `LocalView` describing what that agent stores when it
   owns the node versus when it merely observes someone else's move.
 
-This does **not** replace `SyntaxOver` or `InteractionOver`.
-It is only a structured way to construct common owner-driven interaction
-patterns on top of the generic core.
+This is a structured builder on top of `SyntaxOver` and `InteractionOver` for
+common owner-driven interaction patterns.
 
 In particular, this layer is useful for two-party and multiparty interaction
 models where every node has one acting party and the other parties follow the

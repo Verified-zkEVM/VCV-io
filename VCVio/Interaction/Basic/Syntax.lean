@@ -30,8 +30,7 @@ local syntax, but they need not support a generic continuation map.
 notion: it adds continuation reindexing when the local syntax really does
 support it.
 
-The existing role-based notions are specializations of this more general
-pattern:
+Role-based APIs are specializations of this pattern:
 * `Spec.Node.Context` is the semantic family of node-local data;
 * `Spec.Node.Schema` is the telescope-style front-end for building such
   contexts;
@@ -42,8 +41,9 @@ pattern:
   syntax objects built on top of this core.
 
 Naming note:
-`SyntaxOver` is the true base local-syntax notion. `ShapeOver` keeps the suffix
-form as the functorial refinement of that syntax, rather than replacing it.
+`SyntaxOver` is the base local-syntax notion. `ShapeOver` uses the same suffix
+to signal that it is the functorial refinement of syntax, with continuation
+reindexing available as part of the interface.
 -/
 
 universe u a vΓ w uA uB uA₂ uB₂ t
