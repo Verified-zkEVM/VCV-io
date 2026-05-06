@@ -836,19 +836,6 @@ def Strategy.mapMonadDecoration
           (mapMonadDecoration (rest x) (rRest x) (homRest x)) (strat x)
 
 /--
-Counterpart strategy whose node effects are supplied by a `MonadDecoration`.
-
-At sender-owned nodes the counterpart observes the focal move and continues in
-the decorated node monad. At receiver-owned nodes it samples its own move and
-continuation in the decorated node monad.
--/
-abbrev Counterpart.withMonads
-    (spec : Spec.{u}) (roles : RoleDecoration spec) (md : MonadDecoration spec)
-    (Output : Transcript spec → Type u) :=
-  StrategyOver counterpartMonadicSyntax PUnit.unit spec
-    (RoleDecoration.withMonads roles md) Output
-
-/--
 Retarget a monadic counterpart along a nodewise monad homomorphism.
 
 This traverses the counterpart tree structurally, applying the supplied lift at
@@ -859,8 +846,10 @@ def Counterpart.mapMonadDecoration
     {md₁ md₂ : MonadDecoration spec}
     (hom : MonadDecoration.Hom spec md₁ md₂)
     {Output : Spec.Transcript spec → Type u} :
-    Counterpart.withMonads spec roles md₁ Output →
-    Counterpart.withMonads spec roles md₂ Output :=
+    StrategyOver counterpartMonadicSyntax PUnit.unit spec
+      (RoleDecoration.withMonads roles md₁) Output →
+    StrategyOver counterpartMonadicSyntax PUnit.unit spec
+      (RoleDecoration.withMonads roles md₂) Output :=
   match spec, roles, md₁, md₂, hom with
   | .done, _, _, _, _ => fun cpt => cpt
   | .node _ rest, ⟨.sender, rRest⟩, ⟨_, _⟩, ⟨_, _⟩, ⟨lift, homRest⟩ =>
