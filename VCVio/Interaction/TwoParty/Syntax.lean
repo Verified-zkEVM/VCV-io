@@ -13,12 +13,12 @@ This module provides the two-party ownership profile and common local syntax
 specializations over the generic `Interaction.SyntaxOver` core.
 
 It intentionally does not define another recursive strategy hierarchy:
-whole-tree participant types are always obtained from `SyntaxOver.Family`.
+whole-tree participant types are always obtained from `StrategyOver`.
 -/
 
 @[expose] public section
 
-universe uA uB uA₂ uB₂ w
+universe u uA uB uA₂ uB₂ w
 
 namespace Interaction
 namespace TwoParty
@@ -29,7 +29,7 @@ variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
 variable (l : PFunctor.Lens P Q)
 
 /-- The two agents in a focused two-party interaction. -/
-inductive Participant where
+inductive Participant : Type u where
   | focal
   | counterpart
   deriving DecidableEq
@@ -58,7 +58,7 @@ instead of an opaque `m ((d : Move) × Cont d)`, it stores
 `m Move × ((d : Move) → Cont d)`. This exposes the continuation family needed
 for replaying prescribed public challenges.
 -/
-def publicCoinCounterpartSyntax
+def PublicCoinCounterpart.syntax
     (monad :
       (pos : P.A) → Role → Participant →
         BundledMonad.{uB₂, uB₂}) :
@@ -121,49 +121,49 @@ theorem monadicSyntax_counterpart_receiver
   rfl
 
 @[simp]
-theorem publicCoinCounterpartSyntax_focal_sender
+theorem PublicCoinCounterpart.syntax_focal_sender
     (monad :
       (pos : P.A) → Role → Participant →
         BundledMonad.{uB₂, uB₂})
     (pos : P.A)
     (Cont : Q.B (l.toFunA pos) → Type uB₂) :
-    (publicCoinCounterpartSyntax l monad).Node Participant.focal pos Role.sender Cont =
+    (PublicCoinCounterpart.syntax l monad).Node Participant.focal pos Role.sender Cont =
       (monad pos Role.sender Participant.focal).M
         ((d : Q.B (l.toFunA pos)) × Cont d) :=
   rfl
 
 @[simp]
-theorem publicCoinCounterpartSyntax_counterpart_sender
+theorem PublicCoinCounterpart.syntax_counterpart_sender
     (monad :
       (pos : P.A) → Role → Participant →
         BundledMonad.{uB₂, uB₂})
     (pos : P.A)
     (Cont : Q.B (l.toFunA pos) → Type uB₂) :
-    (publicCoinCounterpartSyntax l monad).Node Participant.counterpart pos Role.sender Cont =
+    (PublicCoinCounterpart.syntax l monad).Node Participant.counterpart pos Role.sender Cont =
       ((d : Q.B (l.toFunA pos)) →
         (monad pos Role.sender Participant.counterpart).M (Cont d)) :=
   rfl
 
 @[simp]
-theorem publicCoinCounterpartSyntax_focal_receiver
+theorem PublicCoinCounterpart.syntax_focal_receiver
     (monad :
       (pos : P.A) → Role → Participant →
         BundledMonad.{uB₂, uB₂})
     (pos : P.A)
     (Cont : Q.B (l.toFunA pos) → Type uB₂) :
-    (publicCoinCounterpartSyntax l monad).Node Participant.focal pos Role.receiver Cont =
+    (PublicCoinCounterpart.syntax l monad).Node Participant.focal pos Role.receiver Cont =
       ((d : Q.B (l.toFunA pos)) →
         (monad pos Role.receiver Participant.focal).M (Cont d)) :=
   rfl
 
 @[simp]
-theorem publicCoinCounterpartSyntax_counterpart_receiver
+theorem PublicCoinCounterpart.syntax_counterpart_receiver
     (monad :
       (pos : P.A) → Role → Participant →
         BundledMonad.{uB₂, uB₂})
     (pos : P.A)
     (Cont : Q.B (l.toFunA pos) → Type uB₂) :
-    (publicCoinCounterpartSyntax l monad).Node Participant.counterpart pos Role.receiver Cont =
+    (PublicCoinCounterpart.syntax l monad).Node Participant.counterpart pos Role.receiver Cont =
       ((monad pos Role.receiver Participant.counterpart).M (Q.B (l.toFunA pos)) ×
         ((d : Q.B (l.toFunA pos)) → Cont d)) :=
   rfl

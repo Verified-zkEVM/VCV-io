@@ -149,9 +149,9 @@ family member indexed by the transcript of that round. -/
 def strategyComp {m : Type u → Type u} [Monad m]
     {Family : {n : Nat} → Chain n → Type u}
     (step : {n : Nat} → (c : Chain (n + 1)) → Family c →
-      m (Strategy m c.1 (fun tr => Family (c.2 tr)))) :
+      m (Strategy.Plain m c.1 (fun tr => Family (c.2 tr)))) :
     (n : Nat) → (c : Chain n) → Family c →
-    m (Strategy m (toSpec n c) (outputFamily Family n c))
+    m (Strategy.Plain m (toSpec n c) (outputFamily Family n c))
   | 0, _, a => pure a
   | n + 1, ⟨spec, cont⟩, a => do
       let strat ← step ⟨spec, cont⟩ a
@@ -259,7 +259,7 @@ example (i : Fin 2) :
 /-- Pure strategy that follows a prescribed transcript and returns a chosen leaf output. -/
 private def scriptStrategy :
     (spec : Spec) → (tr : Transcript spec) → {Output : Transcript spec → Type u} →
-    Output tr → Strategy Id spec Output
+    Output tr → Strategy.Plain Id spec Output
   | .done, _, _, out => out
   | .node _ rest, ⟨x, trRest⟩, _, out => ⟨x, scriptStrategy (rest x) trRest out⟩
 
@@ -271,13 +271,13 @@ private abbrev ReplayState {n : Nat} (c : Chain.{0} n) : Type :=
 play the current round verbatim, and return the tail transcript. -/
 private def replayStep {n : Nat} (c : Chain.{0} (n + 1))
     (tr : ReplayState c) :
-    Id (Strategy Id c.1 (fun tr₁ => ReplayState (c.2 tr₁))) :=
+    Id (Strategy.Plain Id c.1 (fun tr₁ => ReplayState (c.2 tr₁))) :=
   let ⟨tr₁, trRest⟩ := Chain.splitTranscript n c tr
   scriptStrategy c.1 tr₁ trRest
 
 /-- Replay a full flattened transcript using the intrinsic dependent strategy combinator. -/
 private def replayStrategy (n : Nat) (c : Chain.{0} n) (tr : ReplayState c) :
-    Strategy Id (Chain.toSpec n c)
+    Strategy.Plain Id (Chain.toSpec n c)
       (Chain.outputFamily (Family := fun {_} c => ReplayState c) n c) :=
   Chain.strategyComp (Family := fun {_} c => ReplayState c) replayStep n c tr
 

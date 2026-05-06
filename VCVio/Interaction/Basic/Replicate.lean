@@ -164,9 +164,9 @@ variable {m : Type u → Type u}
 def Strategy.iterate {m : Type u → Type u} [Monad m]
     {spec : Spec} {α : Type u} :
     (n : Nat) →
-    (step : Fin n → α → m (Strategy m spec (fun _ => α))) →
+    (step : Fin n → α → m (Strategy.Plain m spec (fun _ => α))) →
     α →
-    m (Strategy m (spec.replicate n) (fun _ => α))
+    m (Strategy.Plain m (spec.replicate n) (fun _ => α))
   | 0, _, a => pure a
   | n + 1, step, a => do
     let strat ← step 0 a

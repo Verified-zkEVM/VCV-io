@@ -407,7 +407,7 @@ abbrev Strategy
     (resolve : Spec.Node.ContextHom Γ (fun X : Type u => ViewMode X))
     (spec : Spec) (ctxs : Spec.Decoration Γ spec)
     (Output : Spec.Transcript spec → Type u) :=
-  Spec.SyntaxOver.Family ((localSyntax m).comap resolve) PUnit.unit spec ctxs Output
+  Spec.StrategyOver ((localSyntax m).comap resolve) PUnit.unit spec ctxs Output
 
 end Multiparty
 end Interaction
