@@ -878,100 +878,13 @@ def Counterpart.withMonads.mapDecoration
                 (homRest msgAndRest.1) msgAndRest.2⟩)
           cpt
 
-private theorem pairedMonadicSyntax_forAgent_focal :
-    pairedMonadicSyntax.forAgent Participant.focal =
-      focalMonadicSyntax.comap RolePairedMonadContext.fst := by
-  apply congrArg SyntaxOver.mk
-  funext _ X γ Cont
-  cases γ with
-  | mk role bms =>
-      cases role <;> cases bms <;>
-        simp [pairedMonadicSyntax, focalMonadicSyntax,
-          RolePairedMonadContext.fst, Spec.Node.Context.extendMap,
-          Spec.Node.ContextHom.id, Role.Action]
-
-private theorem pairedMonadicSyntax_forAgent_counterpart :
-    pairedMonadicSyntax.forAgent Participant.counterpart =
-      counterpartMonadicSyntax.comap RolePairedMonadContext.snd := by
-  apply congrArg SyntaxOver.mk
-  funext _ X γ Cont
-  cases γ with
-  | mk role bms =>
-      cases role <;> cases bms <;>
-        simp [pairedMonadicSyntax, counterpartMonadicSyntax,
-          RolePairedMonadContext.snd, Spec.Node.Context.extendMap, Spec.Node.ContextHom.id]
-
-private theorem pairedMonadicStrategy_focal :
-    {spec : Spec} → {roles : RoleDecoration spec} →
-    {stratDeco cptDeco : MonadDecoration spec} →
-    {Output : Transcript spec → Type u} →
-    StrategyOver pairedMonadicSyntax Participant.focal spec
-      (RoleDecoration.withPairedMonads roles stratDeco cptDeco) Output =
-      Strategy.withRolesAndMonads spec roles stratDeco Output
-  | spec, roles, stratDeco, cptDeco, Output => by
-      rw [← StrategyOver.forAgent pairedMonadicSyntax Participant.focal
-        (spec := spec)
-        (ctxs := RoleDecoration.withPairedMonads roles stratDeco cptDeco)
-        (Out := Output)]
-      rw [pairedMonadicSyntax_forAgent_focal]
-      rw [StrategyOver.comap focalMonadicSyntax RolePairedMonadContext.fst
-        (agent := PUnit.unit)
-        (ctxs := RoleDecoration.withPairedMonads roles stratDeco cptDeco)
-        (Out := Output)]
-      rw [RoleDecoration.withPairedMonads_map_fst
-        (spec := spec) (roles := roles)
-        (stratDeco := stratDeco) (cptDeco := cptDeco)]
-
-private theorem pairedMonadicStrategy_counterpart :
-    {spec : Spec} → {roles : RoleDecoration spec} →
-    {stratDeco cptDeco : MonadDecoration spec} →
-    {Output : Transcript spec → Type u} →
-    StrategyOver pairedMonadicSyntax Participant.counterpart spec
-      (RoleDecoration.withPairedMonads roles stratDeco cptDeco) Output =
-      Counterpart.withMonads spec roles cptDeco Output
-  | spec, roles, stratDeco, cptDeco, Output => by
-      rw [← StrategyOver.forAgent pairedMonadicSyntax Participant.counterpart
-        (spec := spec)
-        (ctxs := RoleDecoration.withPairedMonads roles stratDeco cptDeco)
-        (Out := Output)]
-      rw [pairedMonadicSyntax_forAgent_counterpart]
-      rw [StrategyOver.comap counterpartMonadicSyntax RolePairedMonadContext.snd
-        (agent := PUnit.unit)
-        (ctxs := RoleDecoration.withPairedMonads roles stratDeco cptDeco)
-        (Out := Output)]
-      rw [RoleDecoration.withPairedMonads_map_snd
-        (spec := spec) (roles := roles)
-        (stratDeco := stratDeco) (cptDeco := cptDeco)]
-
-/-- Assemble a focal monadic strategy and counterpart monadic strategy into a
-participant-indexed profile for the paired monadic runner. -/
-def monadicParticipantProfile {spec : Spec} {roles : RoleDecoration spec}
-    {stratDeco cptDeco : MonadDecoration spec}
-    {OutputP OutputC : Transcript spec → Type u}
-    (strat : Strategy.withRolesAndMonads spec roles stratDeco OutputP)
-    (cpt : Counterpart.withMonads spec roles cptDeco OutputC) :
-    (agent : Participant) →
-      StrategyOver pairedMonadicSyntax agent spec
-        (RoleDecoration.withPairedMonads roles stratDeco cptDeco)
-        (participantOutputFamily OutputP OutputC agent)
-  | .focal => by
-      exact cast
-        (pairedMonadicStrategy_focal (spec := spec) (roles := roles)
-          (stratDeco := stratDeco) (cptDeco := cptDeco) (Output := OutputP)).symm
-        strat
-  | .counterpart => by
-      exact cast
-        (pairedMonadicStrategy_counterpart (spec := spec) (roles := roles)
-          (stratDeco := stratDeco) (cptDeco := cptDeco) (Output := OutputC)).symm
-        cpt
-
 /-- One-step execution law for paired monadic two-party profiles.
 
 At each node, the participant that owns the move runs in its decorated monad.
 The supplied lifts embed the focal and counterpart node monads into the common
 execution monad `m`; the resulting continuations are then passed to the generic
 tree runner. -/
-private def pairedMonadicInteraction {m : Type u → Type u} [Monad m]
+def pairedMonadicInteraction {m : Type u → Type u} [Monad m]
     (liftStrat : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α)
     (liftCpt : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
     InteractionOver Participant RolePairedMonadContext pairedMonadicSyntax m where
@@ -995,27 +908,6 @@ private def pairedMonadicInteraction {m : Type u → Type u} [Monad m]
         k x (fun
           | .focal => pCont
           | .counterpart => cCont)
-
-/-- Execute a focal monadic strategy against a monadic counterpart.
-
-This is the generic `StrategyOver.run` specialized to `pairedMonadicSyntax`.
-`liftStrat` and `liftCpt` embed the per-node monads for the focal strategy and
-the counterpart into the common execution monad `m`; the result contains the
-realized transcript and both participant outputs at that transcript. -/
-def Strategy.runWithRolesAndMonads {m : Type u → Type u} [Monad m]
-    (liftStrat : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α)
-    (liftCpt : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α)
-    (spec : Spec.{u}) (roles : RoleDecoration spec)
-    (stratDeco : MonadDecoration spec) (cptDeco : MonadDecoration spec)
-    {OutputP : Transcript spec → Type u}
-    {OutputC : Transcript spec → Type u}
-    (strat : Strategy.withRolesAndMonads spec roles stratDeco OutputP)
-    (cpt : Counterpart.withMonads spec roles cptDeco OutputC) :
-    m ((tr : Transcript spec) × OutputP tr × OutputC tr) :=
-  StrategyOver.run (pairedMonadicInteraction liftStrat liftCpt)
-    (RoleDecoration.withPairedMonads roles stratDeco cptDeco)
-    (monadicParticipantProfile strat cpt)
-    collectParticipantOutputs
 
 end Spec
 end Interaction
