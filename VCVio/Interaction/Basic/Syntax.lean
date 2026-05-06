@@ -102,6 +102,56 @@ def StrategyOver {l : PFunctor.Lens P Q}
         StrategyOver syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
           (fun path => Out ⟨d, path⟩))
 
+namespace StrategyOver
+
+variable {Agent₁ : Type a} {Agent₂ : Type u}
+variable {l : PFunctor.Lens P Q}
+
+/--
+A local homomorphism between two lens-executed `StrategyOver` fibers.
+
+The source and target may use different local syntax objects and different
+agents, while sharing the same control lens and node-context decoration.
+At each node, `mapNode` translates the source node object into the target node
+object after recursive continuations have already been translated.
+-/
+structure Hom
+    (syn₁ : SyntaxOver l Agent₁ Γ) (agent₁ : Agent₁)
+    (syn₂ : SyntaxOver l Agent₂ Γ) (agent₂ : Agent₂) where
+  mapNode :
+    {pos : P.A} →
+    {γ : Γ pos} →
+    {A B : Q.B (l.toFunA pos) → Type w} →
+    (∀ d, A d → B d) →
+    syn₁.Node agent₁ pos γ A →
+    syn₂.Node agent₂ pos γ B
+
+/--
+Map a lens-executed whole-tree strategy along a local homomorphism, while also
+mapping its leaf output family.
+
+The recursion follows runtime directions through `PathAlong l spec`; the lens
+maps each runtime direction back to the corresponding control branch.
+-/
+def map
+    {syn₁ : SyntaxOver l Agent₁ Γ} {agent₁ : Agent₁}
+    {syn₂ : SyntaxOver l Agent₂ Γ} {agent₂ : Agent₂}
+    (η : Hom syn₁ agent₁ syn₂ agent₂) :
+    {spec : PFunctor.FreeM P α} → {ctxs : Decoration Γ spec} →
+    {A B : PFunctor.FreeM.PathAlong l spec → Type w} →
+    (∀ path, A path → B path) →
+    StrategyOver syn₁ agent₁ spec ctxs A →
+    StrategyOver syn₂ agent₂ spec ctxs B
+  | PFunctor.FreeM.pure _, _, _, _, f, out => f ⟨⟩ out
+  | PFunctor.FreeM.roll pos _, ⟨_, ctxs⟩, _, _, f, stratNode =>
+      η.mapNode
+        (fun d =>
+          map η (ctxs := ctxs (l.toFunB pos d))
+            (fun path => f ⟨d, path⟩))
+        stratNode
+
+end StrategyOver
+
 namespace Spec
 
 variable {Agent : Type a}
@@ -239,6 +289,57 @@ def StrategyOver
       syn.Node agent X γ (fun x =>
         StrategyOver syn agent (next x) (ctxs x) (fun tr =>
           Out ⟨x, tr⟩))
+
+namespace StrategyOver
+
+variable {Agent₁ : Type a} {Agent₂ : Type uA}
+
+/--
+A local homomorphism between two `StrategyOver` fibers.
+
+The source and target may use different local syntax objects and different
+agents, but they must live over the same node-context decoration. At each node,
+`mapNode` explains how to translate the source node object into the target
+node object once recursive continuations have already been translated.
+
+This is the generic recursion principle behind output maps and syntax-forgetting
+maps for whole-tree strategies.
+-/
+structure Hom
+    (syn₁ : SyntaxOver Agent₁ Γ) (agent₁ : Agent₁)
+    (syn₂ : SyntaxOver Agent₂ Γ) (agent₂ : Agent₂) where
+  mapNode :
+    {X : Type u} →
+    {γ : Γ X} →
+    {A B : X → Type w} →
+    (∀ x, A x → B x) →
+    syn₁.Node agent₁ X γ A →
+    syn₂.Node agent₂ X γ B
+
+/--
+Map a whole-tree strategy along a local homomorphism, while also mapping its
+leaf output family.
+
+At leaves this is the supplied output map. At internal nodes the local
+homomorphism maps the node object after recursively mapping each child
+continuation.
+-/
+def map
+    {syn₁ : SyntaxOver Agent₁ Γ} {agent₁ : Agent₁}
+    {syn₂ : SyntaxOver Agent₂ Γ} {agent₂ : Agent₂}
+    (η : Hom syn₁ agent₁ syn₂ agent₂) :
+    {spec : Spec} → {ctxs : Decoration Γ spec} →
+    {A B : Transcript spec → Type w} →
+    (∀ tr, A tr → B tr) →
+    StrategyOver syn₁ agent₁ spec ctxs A →
+    StrategyOver syn₂ agent₂ spec ctxs B
+  | PFunctor.FreeM.pure _, _, _, _, f, out => f ⟨⟩ out
+  | PFunctor.FreeM.roll _ _, ⟨_, ctxs⟩, _, _, f, stratNode =>
+      η.mapNode
+        (fun x => map η (ctxs := ctxs x) (fun tr => f ⟨x, tr⟩))
+        stratNode
+
+end StrategyOver
 
 /-- At an internal node, `StrategyOver` unfolds to the local node object
 whose continuations are the recursively induced strategies for each child. -/

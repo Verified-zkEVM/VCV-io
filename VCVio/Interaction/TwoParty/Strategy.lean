@@ -410,6 +410,30 @@ private def publicCoinCounterpartShape (m : Type u → Type u) [Functor m] :
     (fun X Cont => m X × ((x : X) → Cont x))
     Counterpart.mapSender mapReceiver
 
+/--
+Local syntax-forgetting map from replayable public-coin counterparts to
+ordinary executable counterparts.
+
+At sender nodes the observer continuation is unchanged except for the recursive
+translation. At receiver nodes the explicit sampler/continuation pair is
+packed into the ordinary monadic action that samples a challenge and returns
+the translated continuation for that challenge.
+-/
+def toCounterpartHom {m : Type u → Type u} [Monad m] :
+    StrategyOver.Hom (PublicCoinCounterpart.syntax m) PUnit.unit
+      (pairedSyntax m) Participant.counterpart where
+  mapNode := fun {X} {γ} {A} {B} f node =>
+    match γ with
+    | .sender =>
+        Counterpart.mapSender f node
+    | .receiver =>
+        let receiver : m X × ((x : X) → A x) := by
+          simpa [PublicCoinCounterpart.syntax, counterpartFamilySyntax] using node
+        show (pairedSyntax m).Node Participant.counterpart X .receiver B from
+          do
+            let x ← receiver.1
+            pure ⟨x, f x (receiver.2 x)⟩
+
 /-- Functorial output map for public-coin counterparts. The challenge samplers
 are unchanged; only the terminal output carried by continuations is mapped. -/
 def mapOutput {m : Type u → Type u} [Functor m] :
@@ -430,14 +454,11 @@ def toCounterpart {m : Type u → Type u} [Monad m] :
     {Output : Transcript spec → Type u} →
     StrategyOver (PublicCoinCounterpart.syntax m) PUnit.unit spec roles Output →
     StrategyOver (pairedSyntax m) Participant.counterpart spec roles Output
-  | .done, _, _, c => c
-  | .node _ _, ⟨.sender, _⟩, _, observe =>
-      fun x => do
-        let next ← observe x
-        pure <| toCounterpart next
-  | .node _ _, ⟨.receiver, _⟩, _, ⟨sample, next⟩ => do
-      let x ← sample
-      pure ⟨x, toCounterpart (next x)⟩
+  :=
+    fun {spec} {roles} {Output} =>
+      StrategyOver.map toCounterpartHom
+        (spec := spec) (ctxs := roles)
+        (A := Output) (B := Output) (fun _ out => out)
 
 /-- Replay a prescribed transcript through a public-coin counterpart. Sender
 messages are read from the transcript; receiver samplers are ignored and the

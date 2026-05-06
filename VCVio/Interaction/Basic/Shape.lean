@@ -103,6 +103,17 @@ instance : Coe (ShapeOver Agent Γ) (SyntaxOver Agent Γ) where
   coe := ShapeOver.toSyntaxOver
 
 /--
+View a functorial shape as a local strategy homomorphism on one agent fiber.
+
+The homomorphism keeps the syntax and agent fixed; it only applies the shape's
+node-level continuation map.
+-/
+def ShapeOver.toStrategyHom
+    (shape : ShapeOver Agent Γ) (agent : Agent) :
+    StrategyOver.Hom shape.toSyntaxOver agent shape.toSyntaxOver agent where
+  mapNode f node := shape.map f node
+
+/--
 Reindex a local syntax object contravariantly along a node-context morphism.
 
 If `f : Γ → Δ`, then any shape over `Δ` can be viewed as a shape over `Γ` by
