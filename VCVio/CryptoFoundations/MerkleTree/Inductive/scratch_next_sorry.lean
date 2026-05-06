@@ -271,11 +271,6 @@ lemma withQueryLog_self_log_eq
       -- Apply IH to inner support membership.
       have h_ih := ih u h_inner
       rw [h_ih]
-  | failure =>
-      intros v l₁ l₂ hmem
-      change ((v, l₁), l₂) ∈ support
-        ((failure : OracleComp spec α).withQueryLog.withQueryLog) at hmem
-      simp [OracleComp.withQueryLog] at hmem
 
 /-- Test version of `extractability_game_no_coll_match` (replaces the two
 sorries in the main file). -/
