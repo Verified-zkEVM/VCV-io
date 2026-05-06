@@ -212,6 +212,71 @@ theorem chainInLog_restrict
       ih log log_c ancestor leaf proof.tail h_sub h_no_coll h_ne_none_inner h_chain_rec
     refine ⟨ancestor, h_chain_entry_in_lc, h_chain_inner⟩
 
+/-- The two log layers produced by `oa.withQueryLog.withQueryLog` agree on every
+support point: simulating `loggingOracle` over `oa.withQueryLog` records the
+same queries the inner `withQueryLog` already recorded. -/
+lemma withQueryLog_self_log_eq
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
+    [spec.Fintype] [spec.Inhabited]
+    (oa : OracleComp spec α) :
+    ∀ {v : α} {l₁ l₂ : spec.QueryLog},
+      ((v, l₁), l₂) ∈ support oa.withQueryLog.withQueryLog →
+      l₁ = l₂ := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intros v l₁ l₂ hmem
+      change ((v, l₁), l₂) ∈ support
+        ((pure x : OracleComp spec α).withQueryLog.withQueryLog) at hmem
+      rw [OracleComp.withQueryLog_pure, OracleComp.withQueryLog_pure,
+        mem_support_pure_iff] at hmem
+      obtain ⟨hv1, hl2⟩ := Prod.mk.inj hmem
+      obtain ⟨_, hl1⟩ := Prod.mk.inj hv1
+      subst hl1; subst hl2
+      rfl
+  | query_bind t mx ih =>
+      intros v l₁ l₂ hmem
+      -- `(query t >>= mx).withQueryLog = liftM (query t) >>= fun u =>
+      --     ((mx u).withQueryLog).bind (fun p => pure (p.1, ⟨t, u⟩ :: p.2))`.
+      -- Then withQueryLog again duplicates the log.
+      change ((v, l₁), l₂) ∈ support
+        (((liftM (OracleSpec.query t) >>= mx) :
+          OracleComp spec α).withQueryLog.withQueryLog) at hmem
+      rw [OracleComp.withQueryLog_bind] at hmem
+      rw [mem_support_bind_iff] at hmem
+      obtain ⟨⟨u₁, log₁⟩, h₁, hmem⟩ := hmem
+      -- `h₁ : (u₁, log₁) ∈ support (liftM (query t)).withQueryLog`.
+      rw [OracleComp.withQueryLog_query, mem_support_bind_iff] at h₁
+      obtain ⟨u, hu, h₁⟩ := h₁
+      rw [mem_support_pure_iff, Prod.mk.injEq] at h₁
+      obtain ⟨h_u_eq, h_log_eq⟩ := h₁
+      subst h_u_eq
+      subst h_log_eq
+      -- Now `hmem : ((v, l₁), l₂) ∈ support
+      --   (Prod.map id ([⟨t, u⟩] ++ ·) <$> (mx u).withQueryLog.withQueryLog)`.
+      rw [support_map, Set.mem_image] at hmem
+      obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_eq⟩ := hmem
+      -- Outer `withQueryLog`: now apply IH to `(mx u).withQueryLog.withQueryLog`.
+      -- But h_inner is in `support (mx u).withQueryLog.withQueryLog`? Let me check.
+      -- The outer `withQueryLog` of `(mx u).withQueryLog` produces a doubly-logged
+      -- result with the same structure.
+      -- After bind decomposition:
+      --   ((v, l₁), l₂) ∈ Prod.map id (log₁ ++ ·) <$> (mx u).withQueryLog.withQueryLog
+      -- where log₁ = [⟨t, u⟩] is the outer log of the prefix `liftM (query t)`.
+      simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq
+      obtain ⟨h_eq_v, h_eq_l₂⟩ := h_eq
+      obtain ⟨h_eq_v', h_eq_l₁'⟩ := Prod.mk.inj h_eq_v
+      subst h_eq_v'
+      subst h_eq_l₁'
+      subst h_eq_l₂
+      -- Apply IH to inner support membership.
+      have h_ih := ih u h_inner
+      rw [h_ih]
+  | failure =>
+      intros v l₁ l₂ hmem
+      change ((v, l₁), l₂) ∈ support
+        ((failure : OracleComp spec α).withQueryLog.withQueryLog) at hmem
+      simp [OracleComp.withQueryLog] at hmem
+
 /-- Test version of `extractability_game_no_coll_match` (replaces the two
 sorries in the main file). -/
 theorem extractability_game_no_coll_match'
