@@ -26,7 +26,7 @@ decoration still determines which participant owns each move.
 
 This module also contains a public-coin counterpart syntax. An executable
 counterpart samples a receiver move together with its continuation as one
-opaque action; `Spec.PublicCoinCounterpart` exposes the sampler and
+opaque action; `Spec.publicCoinCounterpartSyntax` exposes the sampler and
 challenge-indexed continuation separately:
 
 - `sample : m X` — how the next public challenge is chosen
@@ -406,7 +406,7 @@ right shape for execution, but it is too weak for verifier-side Fiat-Shamir:
 given a prescribed challenge `x`, there is no way to recover the continuation
 for `x` unless that continuation is exposed separately.
 
-`PublicCoinCounterpart` factors each receiver node into:
+`publicCoinCounterpartSyntax` factors each receiver node into:
 - `sample : m X` — how the verifier samples the next public challenge
 - `next : (x : X) → ...` — how the rest of the verifier depends on that challenge
 
@@ -416,11 +416,6 @@ def publicCoinCounterpartSyntax (m : Type u → Type u) :
     SyntaxOver.{u, 0, u, 0} PUnit (fun _ => Role) :=
   counterpartFamilySyntax (fun X Cont => (x : X) → m (Cont x))
     (fun X Cont => m X × ((x : X) → Cont x))
-
-/-- Whole-tree public-coin counterpart induced by `publicCoinCounterpartSyntax`. -/
-abbrev PublicCoinCounterpart (m : Type u → Type u)
-    (spec : Spec) (roles : RoleDecoration spec) (Output : Transcript spec → Type u) :=
-  StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles Output
 
 namespace PublicCoinCounterpart
 
@@ -441,8 +436,8 @@ def mapOutput {m : Type u → Type u} [Functor m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {A B : Transcript spec → Type u} →
     (∀ tr, A tr → B tr) →
-    PublicCoinCounterpart m spec roles A →
-    PublicCoinCounterpart m spec roles B :=
+    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles A →
+    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles B :=
   fun {spec} {roles} {A} {B} f =>
     ShapeOver.mapOutput (publicCoinCounterpartShape m)
       (agent := PUnit.unit) (spec := spec) roles
@@ -453,7 +448,8 @@ counterpart. -/
 def toCounterpart {m : Type u → Type u} [Monad m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {Output : Transcript spec → Type u} →
-    PublicCoinCounterpart m spec roles Output → Counterpart m spec roles Output
+    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles Output →
+    Counterpart m spec roles Output
   | .done, _, _, c => c
   | .node _ _, ⟨.sender, _⟩, _, observe =>
       fun x => do
@@ -469,7 +465,7 @@ stored continuation family is followed at the recorded challenge. -/
 def replay {m : Type u → Type u} [Monad m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {Output : Transcript spec → Type u} →
-    PublicCoinCounterpart m spec roles Output →
+    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles Output →
     (tr : Transcript spec) → m (Output tr)
   | .done, _, _, c, _ => pure c
   | .node _ _, ⟨.sender, _⟩, _, observe, ⟨x, tr⟩ =>
