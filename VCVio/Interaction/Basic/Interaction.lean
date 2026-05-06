@@ -64,7 +64,7 @@ structure InteractionOver
     ((d : Q.B (l.toFunA pos)) → ((agent : Agent) → Cont agent d) → m Result) →
     m Result
 
-namespace StrategyOver
+namespace InteractionOver
 
 variable {l : PFunctor.Lens P Q} {syn : SyntaxOver l Agent Γ}
 
@@ -75,7 +75,7 @@ that same path.
 -/
 def run
     {m : Type (max uB₂ a w) → Type (max uB₂ a w)}
-    (I : InteractionOver l Agent Γ syn m) [Monad m]
+    [Monad m]
     {spec : PFunctor.FreeM P α}
     (ctxs : Decoration Γ spec)
     {Out : Agent → PFunctor.FreeM.PathAlong l spec → Type w}
@@ -84,7 +84,8 @@ def run
       (agent : Agent) → StrategyOver syn agent spec ctxs (Out agent))
     (collect :
       (path : PFunctor.FreeM.PathAlong l spec) →
-        ((agent : Agent) → Out agent path) → Result path) :
+        ((agent : Agent) → Out agent path) → Result path)
+    (I : InteractionOver l Agent Γ syn m) :
     m ((path : PFunctor.FreeM.PathAlong l spec) × Result path) :=
   match spec, ctxs with
   | .pure _, _ => pure ⟨⟨⟩, collect ⟨⟩ profile⟩
@@ -96,15 +97,16 @@ def run
             (fun path => Out agent ⟨d, path⟩))
         (fun agent => profile agent)
         (fun d conts => do
-          let ⟨path, out⟩ ← run I
+          let ⟨path, out⟩ ← run
             (ctxs := ctxs (l.toFunB pos d))
             (Out := fun agent path => Out agent ⟨d, path⟩)
             (Result := fun path => Result ⟨d, path⟩)
             conts
             (fun path out => collect ⟨d, path⟩ out)
+            I
           pure ⟨⟨d, path⟩, out⟩)
 
-end StrategyOver
+end InteractionOver
 
 namespace Spec
 
@@ -187,8 +189,8 @@ execution law sees.
 -/
 def InteractionOver.comap {Δ : Node.Context} {syn : SyntaxOver Agent Δ}
     {m : Type w → Type w}
-    (I : InteractionOver Agent Δ syn m) (f : Node.ContextHom Γ Δ) :
-    InteractionOver Agent Γ (syn.comap f) m where
+    (f : Node.ContextHom Γ Δ) (I : InteractionOver Agent Δ syn m) :
+    InteractionOver Agent Γ (SyntaxOver.comap f syn) m where
   interact profile k := I.interact profile k
 
 /--
@@ -199,16 +201,16 @@ abbrev InteractionOver.comapSchema
     {Δ : Node.Context} {S : Node.Schema Γ} {T : Node.Schema Δ}
     {syn : SyntaxOver Agent Δ}
     {m : Type w → Type w}
-    (I : InteractionOver Agent Δ syn m) (f : Node.Schema.SchemaMap S T) :
-    InteractionOver Agent Γ (SyntaxOver.comapSchema syn f) m :=
-  I.comap f.toContextHom
+    (f : Node.Schema.SchemaMap S T) (I : InteractionOver Agent Δ syn m) :
+    InteractionOver Agent Γ (SyntaxOver.comapSchema f syn) m :=
+  InteractionOver.comap f.toContextHom I
 
 @[simp]
 theorem InteractionOver.comap_id
     {syn : SyntaxOver Agent Γ}
     {m : Type w → Type w}
     (I : InteractionOver Agent Γ syn m) :
-    I.comap (Node.ContextHom.id Γ) = I := by
+    InteractionOver.comap (Node.ContextHom.id Γ) I = I := by
   cases I
   rfl
 
@@ -218,7 +220,8 @@ theorem InteractionOver.comap_comp
     {m : Type w → Type w}
     (I : InteractionOver Agent Λ syn m)
     (g : Node.ContextHom Δ Λ) (f : Node.ContextHom Γ Δ) :
-    (I.comap g).comap f = I.comap (Node.ContextHom.comp g f) := by
+    InteractionOver.comap f (InteractionOver.comap g I) =
+      InteractionOver.comap (Node.ContextHom.comp g f) I := by
   cases I
   rfl
 
@@ -255,15 +258,16 @@ This executable facade uses the single-universe setting used by the `Spec`
 interaction layer. The underlying `SyntaxOver` and `InteractionOver`
 abstractions remain universe-polymorphic.
 -/
-def StrategyOver.run
-    (I : InteractionOver Agent Γ syn m) [Monad m]
+def InteractionOver.run
+    [Monad m]
     {spec : Spec}
     (ctxs : Decoration Γ spec)
     {Out : Agent → Transcript spec → Type u}
     {Result : Transcript spec → Type u}
     (profile :
       (agent : Agent) → StrategyOver syn agent spec ctxs (Out agent))
-    (collect : (tr : Transcript spec) → ((agent : Agent) → Out agent tr) → Result tr) :
+    (collect : (tr : Transcript spec) → ((agent : Agent) → Out agent tr) → Result tr)
+    (I : InteractionOver Agent Γ syn m) :
     m ((tr : Transcript spec) × Result tr) :=
   match spec, ctxs with
   | .done, _ => pure ⟨PUnit.unit, collect PUnit.unit profile⟩
@@ -275,12 +279,13 @@ def StrategyOver.run
             (fun tr => Out agent ⟨x, tr⟩))
         (fun agent => profile agent)
         (fun x conts => do
-          let ⟨tr, out⟩ ← run I
+          let ⟨tr, out⟩ ← run
             (ctxs := ctxs x)
             (Out := fun agent tr => Out agent ⟨x, tr⟩)
             (Result := fun tr => Result ⟨x, tr⟩)
             conts
             (fun tr out => collect ⟨x, tr⟩ out)
+            I
           pure ⟨⟨x, tr⟩, out⟩)
 
 end Run

@@ -21,6 +21,10 @@ to `Spec.Decoration.Over` with fiber `Role.SenderData` is an equivalence; `map` 
 universe u v w w₂
 
 namespace Interaction
+namespace Spec
+namespace TwoParty
+
+open _root_.Interaction.TwoParty
 
 /-- Role-aware displayed data: `S X` at sender nodes; `∀` recursion at receiver nodes. -/
 @[reducible] def Role.Refine (S : Type u → Type v) :
@@ -283,4 +287,6 @@ theorem ofDecorationOver_map {S T : Type u → Type v} (f : ∀ X, S X → T X) 
       exact ofDecorationOver_map f (rest x) (rRest x) (rr x)
 
 end Role.Refine
+end TwoParty
+end Spec
 end Interaction

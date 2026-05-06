@@ -15,6 +15,7 @@ and its environment; `interact` runs one round.
 universe u
 
 namespace Interaction
+namespace TwoParty
 
 /-- Which side speaks at a protocol node: sender (proposes a move) or receiver (observes). -/
 inductive Role where
@@ -57,4 +58,5 @@ def interact {m : Type u → Type u} [Monad m] {X : Type u}
       k x cont dualCont
 
 end Role
+end TwoParty
 end Interaction

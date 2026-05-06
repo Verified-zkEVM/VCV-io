@@ -180,7 +180,7 @@ then using the original `Δ`-syntax there.
 So `SyntaxOver` is contravariant in its context parameter.
 -/
 def SyntaxOver.comap {Δ : Node.Context}
-    (syn : SyntaxOver Agent Δ) (f : Node.ContextHom Γ Δ) :
+    (f : Node.ContextHom Γ Δ) (syn : SyntaxOver Agent Δ) :
     SyntaxOver Agent Γ where
   Node agent X γ Cont := syn.Node agent X (f X γ) Cont
 
@@ -190,14 +190,14 @@ the underlying realized context morphism.
 -/
 abbrev SyntaxOver.comapSchema
     {Δ : Node.Context} {S : Node.Schema Γ} {T : Node.Schema Δ}
-    (syn : SyntaxOver Agent Δ) (f : Node.Schema.SchemaMap S T) :
+    (f : Node.Schema.SchemaMap S T) (syn : SyntaxOver Agent Δ) :
     SyntaxOver Agent Γ :=
-  syn.comap f.toContextHom
+  SyntaxOver.comap f.toContextHom syn
 
 @[simp]
 theorem SyntaxOver.comap_id
     (syn : SyntaxOver Agent Γ) :
-    syn.comap (Node.ContextHom.id Γ) = syn := by
+    SyntaxOver.comap (Node.ContextHom.id Γ) syn = syn := by
   cases syn
   rfl
 
@@ -205,7 +205,8 @@ theorem SyntaxOver.comap_comp
     {Δ : Node.Context} {Λ : Node.Context}
     (syn : SyntaxOver Agent Λ)
     (g : Node.ContextHom Δ Λ) (f : Node.ContextHom Γ Δ) :
-    (syn.comap g).comap f = syn.comap (Node.ContextHom.comp g f) := by
+    SyntaxOver.comap f (SyntaxOver.comap g syn) =
+      SyntaxOver.comap (Node.ContextHom.comp g f) syn := by
   cases syn
   rfl
 
@@ -252,14 +253,14 @@ theorem StrategyOver.node
   rfl
 
 /--
-Whole-tree families for `syn.comap f` are exactly families for `syn`
+Whole-tree families for `SyntaxOver.comap f syn` are exactly families for `syn`
 evaluated on the mapped decoration `Decoration.map f ctxs`.
 -/
 theorem StrategyOver.comap {Δ : Node.Context}
     (syn : SyntaxOver Agent Δ) (f : Node.ContextHom Γ Δ) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    StrategyOver (syn.comap f) agent spec ctxs Out =
+    StrategyOver (SyntaxOver.comap f syn) agent spec ctxs Out =
       StrategyOver syn agent spec (Decoration.map f spec ctxs) Out
   | _, .done, _, _ => rfl
   | agent, .node _ next, ⟨γ, ctxs⟩, Out => by
@@ -273,7 +274,7 @@ theorem StrategyOver.comapSchema
     (syn : SyntaxOver Agent Δ) (f : Node.Schema.SchemaMap S T) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    StrategyOver (syn.comapSchema f) agent spec ctxs Out =
+    StrategyOver (SyntaxOver.comapSchema f syn) agent spec ctxs Out =
       StrategyOver syn agent spec (Decoration.Schema.map f spec ctxs) Out :=
   StrategyOver.comap syn f.toContextHom
 

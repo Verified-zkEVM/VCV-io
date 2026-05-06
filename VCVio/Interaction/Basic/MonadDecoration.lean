@@ -15,7 +15,7 @@ import VCVio.Interaction.Basic.Interaction
 The corresponding one-participant syntax, `Strategy.monadicSyntax`, chooses a
 move at a node and places the continuation in the monad recorded by that node.
 Use it directly with `StrategyOver` for whole-tree strategies and with
-`StrategyOver.run` through `Strategy.monadicInteraction` for execution in an
+`InteractionOver.run` through `Strategy.monadicInteraction` for execution in an
 ambient monad.
 -/
 

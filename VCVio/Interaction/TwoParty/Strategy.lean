@@ -28,7 +28,7 @@ decoration still determines which participant owns each move.
 
 This module also contains a public-coin counterpart syntax. An executable
 counterpart samples a receiver move together with its continuation as one
-opaque action; `Spec.publicCoinCounterpartSyntax` exposes the sampler and
+opaque action; `Spec.TwoParty.PublicCoinCounterpart.syntax` exposes the sampler and
 challenge-indexed continuation separately:
 
 - `sample : m X` — how the next public challenge is chosen
@@ -42,9 +42,10 @@ universe u
 
 namespace Interaction
 namespace Spec
+namespace TwoParty
 
 variable {m : Type u → Type u}
-open TwoParty
+open _root_.Interaction.TwoParty
 
 private def rolePerspective : Role → Participant.{u} → Ownership.Perspective
   | .sender, .focal => .owner
@@ -94,7 +95,7 @@ private def SyntaxOver.forAgent {Agent : Type u} {Γ : Node.Context}
 private theorem StrategyOver.forAgent {Agent : Type u} {Γ : Node.Context}
     (syn : SyntaxOver Agent Γ) (agent : Agent) :
     {spec : Spec} → {ctxs : Decoration Γ spec} → {Out : Transcript spec → Type u} →
-    StrategyOver (syn.forAgent agent) PUnit.unit spec ctxs Out =
+    StrategyOver (SyntaxOver.forAgent syn agent) PUnit.unit spec ctxs Out =
       StrategyOver syn agent spec ctxs Out
   | .done, _, _ => rfl
   | .node _ next, ⟨γ, ctxs⟩, Out => by
@@ -137,7 +138,7 @@ private theorem pairedSyntax_eq_ownerBased (m : Type u → Type u) :
 At a sender node, the focal participant supplies the move and continuation,
 while the counterpart observes that move. At a receiver node, the counterpart
 supplies the move and continuation, while the focal participant observes it.
-Together with `StrategyOver.run`, this is the canonical whole-protocol runner
+Together with `InteractionOver.run`, this is the canonical whole-protocol runner
 for two-party role-decorated strategies.
 -/
 def pairedInteraction (m : Type u → Type u) [Monad m] :
@@ -307,7 +308,7 @@ def Counterpart.mapSender {m : Type u → Type u} [Functor m] :
   | _, _, _, f, observe => fun x => f x <$> observe x
 
 /-- Functorial output map for role-dependent strategies. -/
-def Strategy.mapOutputWithRoles {m : Type u → Type u} [Functor m] :
+def Focal.mapOutput {m : Type u → Type u} [Functor m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {A B : Transcript spec → Type u} →
     (∀ tr, A tr → B tr) →
@@ -315,16 +316,16 @@ def Strategy.mapOutputWithRoles {m : Type u → Type u} [Functor m] :
       StrategyOver (pairedSyntax m) Participant.focal spec roles B
   | .done, _, _, _, f, a => f ⟨⟩ a
   | .node _ _, ⟨.sender, _⟩, _, _, f, send =>
-      Counterpart.mapReceiver (fun x => mapOutputWithRoles (fun p => f ⟨x, p⟩)) send
+      Counterpart.mapReceiver (fun x => mapOutput (fun p => f ⟨x, p⟩)) send
   | .node _ _, ⟨.receiver, _⟩, _, _, f, respond =>
-      fun x => (mapOutputWithRoles (fun p => f ⟨x, p⟩) ·) <$> respond x
+      fun x => (mapOutput (fun p => f ⟨x, p⟩) ·) <$> respond x
 
 /-- Pointwise identity on outputs is the identity on role-dependent strategies. -/
 @[simp]
-theorem Strategy.mapOutputWithRoles_id {m : Type u → Type u} [Functor m] [LawfulFunctor m]
+theorem Focal.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunctor m]
     {spec : Spec} {roles : RoleDecoration spec} {A : Transcript spec → Type u}
     (σ : StrategyOver (pairedSyntax m) Participant.focal spec roles A) :
-    Strategy.mapOutputWithRoles (fun _ x => x) σ = σ := by
+    Focal.mapOutput (fun _ x => x) σ = σ := by
   match spec, roles with
   | .done, roles =>
       cases roles
@@ -336,31 +337,31 @@ theorem Strategy.mapOutputWithRoles_id {m : Type u → Type u} [Functor m] [Lawf
           ((x : X) × StrategyOver (pairedSyntax m) Participant.focal
             (rest x) (rRest x) (fun p => A ⟨x, p⟩)) :=
         fun xc => ⟨xc.1,
-          Strategy.mapOutputWithRoles
+          Focal.mapOutput
             (fun (p : Transcript (rest xc.1)) (y : A ⟨xc.1, p⟩) => y) xc.2⟩
       have hpair : F = id := by
         funext xc
         cases xc with
         | mk x σ' =>
             simp only [F]
-            rw [Strategy.mapOutputWithRoles_id]
+            rw [Focal.mapOutput_id]
             rfl
-      rw [Strategy.mapOutputWithRoles, Counterpart.mapReceiver]
+      rw [Focal.mapOutput, Counterpart.mapReceiver]
       change F <$> σ = σ
       rw [hpair]
       exact LawfulFunctor.id_map σ
   | .node _ rest, ⟨.receiver, rRest⟩ =>
       funext x
       have hid :
-          (mapOutputWithRoles (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) :
+          (mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) :
               StrategyOver (pairedSyntax m) Participant.focal
                 (rest x) (rRest x) (fun p => A ⟨x, p⟩) →
                 StrategyOver (pairedSyntax m) Participant.focal
                   (rest x) (rRest x) (fun p => A ⟨x, p⟩)) =
             id := by
         funext s
-        exact @mapOutputWithRoles_id m _ _ (rest x) (rRest x) (fun p => A ⟨x, p⟩) s
-      simp only [Strategy.mapOutputWithRoles, hid]
+        exact @mapOutput_id m _ _ (rest x) (rRest x) (fun p => A ⟨x, p⟩) s
+      simp only [Focal.mapOutput, hid]
       exact LawfulFunctor.id_map (σ x)
 
 /-- Functorial output map for counterparts. -/
@@ -385,13 +386,13 @@ for verifier-side Fiat-Shamir: given a prescribed challenge `x`, there is no
 way to recover the continuation for `x` unless that continuation is exposed
 separately.
 
-`publicCoinCounterpartSyntax` factors each receiver node into:
+`PublicCoinCounterpart.syntax` factors each receiver node into:
 - `sample : m X` — how the verifier samples the next public challenge
 - `next : (x : X) → ...` — how the rest of the verifier depends on that challenge
 
 This is exactly the extra structure needed to replay a prescribed transcript
 through the verifier. -/
-def publicCoinCounterpartSyntax (m : Type u → Type u) :
+def PublicCoinCounterpart.syntax (m : Type u → Type u) :
     SyntaxOver.{u, 0, u, 0} PUnit (fun _ => Role) :=
   counterpartFamilySyntax (fun X Cont => (x : X) → m (Cont x))
     (fun X Cont => m X × ((x : X) → Cont x))
@@ -415,8 +416,8 @@ def mapOutput {m : Type u → Type u} [Functor m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {A B : Transcript spec → Type u} →
     (∀ tr, A tr → B tr) →
-    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles A →
-    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles B :=
+    StrategyOver (PublicCoinCounterpart.syntax m) PUnit.unit spec roles A →
+    StrategyOver (PublicCoinCounterpart.syntax m) PUnit.unit spec roles B :=
   fun {spec} {roles} {A} {B} f =>
     ShapeOver.mapOutput (publicCoinCounterpartShape m)
       (agent := PUnit.unit) (spec := spec) roles
@@ -427,7 +428,7 @@ counterpart. -/
 def toCounterpart {m : Type u → Type u} [Monad m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {Output : Transcript spec → Type u} →
-    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles Output →
+    StrategyOver (PublicCoinCounterpart.syntax m) PUnit.unit spec roles Output →
     StrategyOver (pairedSyntax m) Participant.counterpart spec roles Output
   | .done, _, _, c => c
   | .node _ _, ⟨.sender, _⟩, _, observe =>
@@ -444,7 +445,7 @@ stored continuation family is followed at the recorded challenge. -/
 def replay {m : Type u → Type u} [Monad m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {Output : Transcript spec → Type u} →
-    StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles Output →
+    StrategyOver (PublicCoinCounterpart.syntax m) PUnit.unit spec roles Output →
     (tr : Transcript spec) → m (Output tr)
   | .done, _, _, c, _ => pure c
   | .node _ _, ⟨.sender, _⟩, _, observe, ⟨x, tr⟩ =>
@@ -510,7 +511,7 @@ theorem Counterpart.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunc
 At sender nodes the observational branch structure is unchanged. At receiver
 nodes the chosen move and continuation are simply wrapped in `pure`. This is a
 generic utility for reusing deterministic environments inside monadic execution
-machinery built from `StrategyOver.run`. -/
+machinery built from `InteractionOver.run`. -/
 def Counterpart.liftId {m : Type u → Type u} [Monad m] :
     {spec : Spec} → {roles : RoleDecoration spec} →
     {Output : Transcript spec → Type u} →
@@ -558,32 +559,32 @@ def participantProfile
 
 /-- Execute a focal/counterpart pair over a role-decorated interaction tree.
 
-This is the generic `StrategyOver.run` specialized to `pairedSyntax`, with the
+This is the generic `InteractionOver.run` specialized to `pairedSyntax`, with the
 two participant fibers assembled by `participantProfile` and collected by
 `collectParticipantOutputs`.
 -/
-def Strategy.runWithRoles {m : Type u → Type u} [Monad m]
+def run {m : Type u → Type u} [Monad m]
     (spec : Spec) (roles : RoleDecoration spec)
     {OutputP : Transcript spec → Type u}
     {OutputC : Transcript spec → Type u}
     (strat : StrategyOver (pairedSyntax m) Participant.focal spec roles OutputP)
     (cpt : StrategyOver (pairedSyntax m) Participant.counterpart spec roles OutputC) :
     m ((tr : Transcript spec) × OutputP tr × OutputC tr) :=
-  StrategyOver.run (pairedInteraction m) roles (participantProfile strat cpt)
+  InteractionOver.run (I := pairedInteraction m) roles (participantProfile strat cpt)
     collectParticipantOutputs
 
 @[simp]
-theorem StrategyOver.run_paired_done {m : Type u → Type u} [Monad m]
+theorem InteractionOver.run_paired_done {m : Type u → Type u} [Monad m]
     {OutputP OutputC : Transcript Spec.done → Type u}
     (outP : OutputP ⟨⟩) (outC : OutputC ⟨⟩) :
-    StrategyOver.run (pairedInteraction m) (spec := Spec.done) (ctxs := PUnit.unit)
+    InteractionOver.run (I := pairedInteraction m) (spec := Spec.done) (ctxs := PUnit.unit)
       (participantProfile outP outC) collectParticipantOutputs =
       (pure ⟨⟨⟩, outP, outC⟩ :
         m ((tr : Transcript Spec.done) × OutputP tr × OutputC tr)) := by
   rfl
 
 @[simp]
-theorem StrategyOver.run_paired_sender {m : Type u → Type u} [Monad m]
+theorem InteractionOver.run_paired_sender {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
     {OutputP OutputC : Transcript (Spec.node X rest) → Type u}
     (send :
@@ -591,16 +592,21 @@ theorem StrategyOver.run_paired_sender {m : Type u → Type u} [Monad m]
         (rest x) (rRest x) (fun tr => OutputP ⟨x, tr⟩)))
     (dualFn : (x : X) → m (StrategyOver (pairedSyntax m) Participant.counterpart
       (rest x) (rRest x) (fun tr => OutputC ⟨x, tr⟩))) :
-    StrategyOver.run (pairedInteraction m) (spec := Spec.node X rest)
+    InteractionOver.run (I := pairedInteraction m) (spec := Spec.node X rest)
       (ctxs := ⟨.sender, rRest⟩)
-      (participantProfile send dualFn) collectParticipantOutputs = (do
+      (participantProfile
+        (show StrategyOver (pairedSyntax m) Participant.focal
+          (Spec.node X rest) ⟨.sender, rRest⟩ OutputP from send)
+        (show StrategyOver (pairedSyntax m) Participant.counterpart
+          (Spec.node X rest) ⟨.sender, rRest⟩ OutputC from dualFn))
+      collectParticipantOutputs = (do
       let xc ← send
       let dualNext ← dualFn xc.1
-      let tailOut ← StrategyOver.run (pairedInteraction m) (spec := rest xc.1)
+      let tailOut ← InteractionOver.run (I := pairedInteraction m) (spec := rest xc.1)
         (ctxs := rRest xc.1)
         (participantProfile xc.2 dualNext) collectParticipantOutputs
       pure ⟨⟨xc.1, tailOut.1⟩, tailOut.2⟩) := by
-  simp only [StrategyOver.run, pairedInteraction, pairedSyntax,
+  simp only [InteractionOver.run, pairedInteraction, pairedSyntax,
     participantOutputFamily, participantProfile, collectParticipantOutputs,
     focalRunner, counterpartRunner]
   apply congrArg (fun k => send >>= k)
@@ -610,7 +616,7 @@ theorem StrategyOver.run_paired_sender {m : Type u → Type u} [Monad m]
   rfl
 
 @[simp]
-theorem StrategyOver.run_paired_receiver {m : Type u → Type u} [Monad m]
+theorem InteractionOver.run_paired_receiver {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
     {OutputP OutputC : Transcript (Spec.node X rest) → Type u}
     (respond : (x : X) → m (StrategyOver (pairedSyntax m) Participant.focal
@@ -618,16 +624,21 @@ theorem StrategyOver.run_paired_receiver {m : Type u → Type u} [Monad m]
     (dualSample :
       m ((x : X) × StrategyOver (pairedSyntax m) Participant.counterpart
         (rest x) (rRest x) (fun tr => OutputC ⟨x, tr⟩))) :
-    StrategyOver.run (pairedInteraction m) (spec := Spec.node X rest)
+    InteractionOver.run (I := pairedInteraction m) (spec := Spec.node X rest)
       (ctxs := ⟨.receiver, rRest⟩)
-      (participantProfile respond dualSample) collectParticipantOutputs = (do
+      (participantProfile
+        (show StrategyOver (pairedSyntax m) Participant.focal
+          (Spec.node X rest) ⟨.receiver, rRest⟩ OutputP from respond)
+        (show StrategyOver (pairedSyntax m) Participant.counterpart
+          (Spec.node X rest) ⟨.receiver, rRest⟩ OutputC from dualSample))
+      collectParticipantOutputs = (do
       let xc ← dualSample
       let next ← respond xc.1
-      let tailOut ← StrategyOver.run (pairedInteraction m) (spec := rest xc.1)
+      let tailOut ← InteractionOver.run (I := pairedInteraction m) (spec := rest xc.1)
         (ctxs := rRest xc.1)
         (participantProfile next xc.2) collectParticipantOutputs
       pure ⟨⟨xc.1, tailOut.1⟩, tailOut.2⟩) := by
-  simp only [StrategyOver.run, pairedInteraction, pairedSyntax,
+  simp only [InteractionOver.run, pairedInteraction, pairedSyntax,
     participantOutputFamily, participantProfile, collectParticipantOutputs,
     focalRunner, counterpartRunner]
   apply congrArg (fun k => dualSample >>= k)
@@ -638,7 +649,7 @@ theorem StrategyOver.run_paired_receiver {m : Type u → Type u} [Monad m]
 
 /-- Running a paired profile after mapping both participant outputs is the same
 as running first and mapping the final triple. -/
-theorem StrategyOver.run_paired_mapOutputWithRoles_mapOutput
+theorem InteractionOver.run_paired_mapOutput_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
     {spec : Spec} {roles : RoleDecoration spec}
     {OutputP OutputP' OutputC OutputC' : Transcript spec → Type u}
@@ -646,11 +657,11 @@ theorem StrategyOver.run_paired_mapOutputWithRoles_mapOutput
     (fC : ∀ tr, OutputC tr → OutputC' tr)
     (strat : StrategyOver (pairedSyntax m) Participant.focal spec roles OutputP)
     (cpt : StrategyOver (pairedSyntax m) Participant.counterpart spec roles OutputC) :
-    StrategyOver.run (pairedInteraction m) (spec := spec) (ctxs := roles)
-      (participantProfile (Strategy.mapOutputWithRoles fP strat) (Counterpart.mapOutput fC cpt))
+    InteractionOver.run (I := pairedInteraction m) (spec := spec) (ctxs := roles)
+      (participantProfile (Focal.mapOutput fP strat) (Counterpart.mapOutput fC cpt))
       collectParticipantOutputs =
       (fun z => ⟨z.1, fP z.1 z.2.1, fC z.1 z.2.2⟩) <$>
-        StrategyOver.run (pairedInteraction m) (spec := spec) (ctxs := roles)
+        InteractionOver.run (I := pairedInteraction m) (spec := spec) (ctxs := roles)
           (participantProfile strat cpt) collectParticipantOutputs := by
   let rec go
       (spec : Spec) (roles : RoleDecoration spec)
@@ -659,20 +670,20 @@ theorem StrategyOver.run_paired_mapOutputWithRoles_mapOutput
       (fC : ∀ tr, OutputC tr → OutputC' tr)
       (strat : StrategyOver (pairedSyntax m) Participant.focal spec roles OutputP)
       (cpt : StrategyOver (pairedSyntax m) Participant.counterpart spec roles OutputC) :
-      StrategyOver.run (pairedInteraction m) (spec := spec) (ctxs := roles)
-        (participantProfile (Strategy.mapOutputWithRoles fP strat) (Counterpart.mapOutput fC cpt))
+      InteractionOver.run (I := pairedInteraction m) (spec := spec) (ctxs := roles)
+        (participantProfile (Focal.mapOutput fP strat) (Counterpart.mapOutput fC cpt))
         collectParticipantOutputs =
         (fun z => ⟨z.1, fP z.1 z.2.1, fC z.1 z.2.2⟩) <$>
-          StrategyOver.run (pairedInteraction m) (spec := spec) (ctxs := roles)
+          InteractionOver.run (I := pairedInteraction m) (spec := spec) (ctxs := roles)
             (participantProfile strat cpt) collectParticipantOutputs := by
     match spec, roles with
     | .done, roles =>
         cases roles
-        simp [Strategy.mapOutputWithRoles, Counterpart.mapOutput, StrategyOver.run_paired_done]
+        simp [Focal.mapOutput, Counterpart.mapOutput, InteractionOver.run_paired_done]
     | .node _ rest, ⟨.sender, rRest⟩ =>
-        simp only [Strategy.mapOutputWithRoles, Counterpart.mapOutput, Counterpart.mapReceiver,
+        simp only [Focal.mapOutput, Counterpart.mapOutput, Counterpart.mapReceiver,
           Counterpart.mapSender]
-        simp only [StrategyOver.run_paired_sender, bind_pure_comp, bind_map_left, map_bind,
+        simp only [InteractionOver.run_paired_sender, bind_pure_comp, bind_map_left, map_bind,
           Functor.map_map]
         refine congrArg (fun k => strat >>= k) ?_
         funext xc
@@ -688,10 +699,10 @@ theorem StrategyOver.run_paired_mapOutputWithRoles_mapOutput
             (go (rest xc.1) (rRest xc.1) (fun tr => fP ⟨xc.1, tr⟩) (fun tr => fC ⟨xc.1, tr⟩)
               xc.2 cNext)
     | .node _ rest, ⟨.receiver, rRest⟩ =>
-        simp only [Strategy.mapOutputWithRoles, Counterpart.mapOutput,
+        simp only [Focal.mapOutput, Counterpart.mapOutput,
           Counterpart.mapReceiver]
         simp only
-          [StrategyOver.run_paired_receiver, bind_pure_comp, bind_map_left, map_bind,
+          [InteractionOver.run_paired_receiver, bind_pure_comp, bind_map_left, map_bind,
             Functor.map_map]
         refine congrArg (fun k => cpt >>= k) ?_
         funext xc
@@ -709,16 +720,16 @@ theorem StrategyOver.run_paired_mapOutputWithRoles_mapOutput
   exact go spec roles fP fC strat cpt
 
 @[simp]
-theorem Strategy.runWithRoles_done {m : Type u → Type u} [Monad m]
+theorem run_done {m : Type u → Type u} [Monad m]
     {OutputP OutputC : Transcript Spec.done → Type u}
     (outP : OutputP ⟨⟩) (outC : OutputC ⟨⟩) :
-    Strategy.runWithRoles .done PUnit.unit outP outC =
+    run .done PUnit.unit outP outC =
       (pure ⟨⟨⟩, outP, outC⟩ :
         m ((tr : Transcript Spec.done) × OutputP tr × OutputC tr)) := by
-  simp [Strategy.runWithRoles]
+  simp [run]
 
 @[simp]
-theorem Strategy.runWithRoles_sender {m : Type u → Type u} [Monad m]
+theorem run_sender {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
     {OutputP OutputC : Transcript (Spec.node X rest) → Type u}
     (send :
@@ -726,15 +737,15 @@ theorem Strategy.runWithRoles_sender {m : Type u → Type u} [Monad m]
         (fun tr => OutputP ⟨x, tr⟩)))
     (dualFn : (x : X) → m (StrategyOver (pairedSyntax m) Participant.counterpart
       (rest x) (rRest x) (fun tr => OutputC ⟨x, tr⟩))) :
-    Strategy.runWithRoles (Spec.node X rest) ⟨.sender, rRest⟩ send dualFn = (do
+    run (Spec.node X rest) ⟨.sender, rRest⟩ send dualFn = (do
       let xc ← send
       let dualNext ← dualFn xc.1
-      let tailOut ← Strategy.runWithRoles (rest xc.1) (rRest xc.1) xc.2 dualNext
+      let tailOut ← run (rest xc.1) (rRest xc.1) xc.2 dualNext
       pure ⟨⟨xc.1, tailOut.1⟩, tailOut.2⟩) := by
-  simp [Strategy.runWithRoles, StrategyOver.run_paired_sender]
+  simp [run, InteractionOver.run_paired_sender]
 
 @[simp]
-theorem Strategy.runWithRoles_receiver {m : Type u → Type u} [Monad m]
+theorem run_receiver {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
     {OutputP OutputC : Transcript (Spec.node X rest) → Type u}
     (respond : (x : X) → m (StrategyOver (pairedSyntax m) Participant.focal
@@ -742,14 +753,14 @@ theorem Strategy.runWithRoles_receiver {m : Type u → Type u} [Monad m]
     (dualSample :
       m ((x : X) × StrategyOver (pairedSyntax m) Participant.counterpart
         (rest x) (rRest x) (fun tr => OutputC ⟨x, tr⟩))) :
-    Strategy.runWithRoles (Spec.node X rest) ⟨.receiver, rRest⟩ respond dualSample = (do
+    run (Spec.node X rest) ⟨.receiver, rRest⟩ respond dualSample = (do
       let xc ← dualSample
       let next ← respond xc.1
-      let tailOut ← Strategy.runWithRoles (rest xc.1) (rRest xc.1) next xc.2
+      let tailOut ← run (rest xc.1) (rRest xc.1) next xc.2
       pure ⟨⟨xc.1, tailOut.1⟩, tailOut.2⟩) := by
-  simp [Strategy.runWithRoles, StrategyOver.run_paired_receiver]
+  simp [run, InteractionOver.run_paired_receiver]
 
-theorem Strategy.runWithRoles_mapOutputWithRoles_mapOutput
+theorem run_mapOutput_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
     {spec : Spec} {roles : RoleDecoration spec}
     {OutputP OutputP' OutputC OutputC' : Transcript spec → Type u}
@@ -757,19 +768,19 @@ theorem Strategy.runWithRoles_mapOutputWithRoles_mapOutput
     (fC : ∀ tr, OutputC tr → OutputC' tr)
     (strat : StrategyOver (pairedSyntax m) Participant.focal spec roles OutputP)
     (cpt : StrategyOver (pairedSyntax m) Participant.counterpart spec roles OutputC) :
-    Strategy.runWithRoles spec roles (Strategy.mapOutputWithRoles fP strat)
+    run spec roles (Focal.mapOutput fP strat)
       (Counterpart.mapOutput fC cpt) =
       (fun z => ⟨z.1, fP z.1 z.2.1, fC z.1 z.2.2⟩) <$>
-        Strategy.runWithRoles spec roles strat cpt := by
-  simpa [Strategy.runWithRoles] using
-    (StrategyOver.run_paired_mapOutputWithRoles_mapOutput (m := m)
+        run spec roles strat cpt := by
+  simpa [run] using
+    (InteractionOver.run_paired_mapOutput_mapOutput (m := m)
       fP fC strat cpt)
 
 /--
 View a strategy over a constant monad decoration as an ordinary single-monad
 role strategy.
 -/
-def Strategy.constantMonadsToWithRoles {m : Type u → Type u} [Monad m]
+def Focal.ofConstantMonads {m : Type u → Type u} [Monad m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output : Spec.Transcript spec → Type u} :
     StrategyOver focalMonadicSyntax PUnit.unit spec
@@ -783,18 +794,18 @@ def Strategy.constantMonadsToWithRoles {m : Type u → Type u} [Monad m]
         Functor.map
           (fun msgAndRest =>
             ⟨msgAndRest.1,
-              constantMonadsToWithRoles
+              ofConstantMonads
                 (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
           strat
   | .node _ rest, ⟨.receiver, rRest⟩ =>
       fun strat x =>
-        Functor.map (constantMonadsToWithRoles (rest x) (rRest x)) (strat x)
+        Functor.map (ofConstantMonads (rest x) (rRest x)) (strat x)
 
 /--
 View an ordinary single-monad role strategy as a strategy over a constant monad
 decoration.
 -/
-def Strategy.withRolesToConstantMonads {m : Type u → Type u} [Monad m]
+def Focal.toConstantMonads {m : Type u → Type u} [Monad m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output : Spec.Transcript spec → Type u} :
     StrategyOver (pairedSyntax m) Participant.focal spec roles Output →
@@ -808,12 +819,12 @@ def Strategy.withRolesToConstantMonads {m : Type u → Type u} [Monad m]
         Functor.map
           (fun msgAndRest =>
             ⟨msgAndRest.1,
-              withRolesToConstantMonads
+              toConstantMonads
                 (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
           strat
   | .node _ rest, ⟨.receiver, rRest⟩ =>
       fun strat x =>
-        Functor.map (withRolesToConstantMonads (rest x) (rRest x)) (strat x)
+        Functor.map (toConstantMonads (rest x) (rRest x)) (strat x)
 
 /--
 Lifting an ordinary role strategy into a constant monad decoration commutes
@@ -823,43 +834,43 @@ This is the naturality property used at boundaries that still accept ordinary
 single-monad strategies while internal execution is phrased over nodewise
 monad decorations.
 -/
-theorem Strategy.withRolesToConstantMonads_mapOutputWithRoles
+theorem Focal.toConstantMonads_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulFunctor m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output Output' : Spec.Transcript spec → Type u}
     (f : ∀ tr, Output tr → Output' tr)
     (strat : StrategyOver (pairedSyntax m) Participant.focal spec roles Output) :
-    Strategy.withRolesToConstantMonads spec roles
-        (Strategy.mapOutputWithRoles f strat) =
+    Focal.toConstantMonads spec roles
+        (Focal.mapOutput f strat) =
       ShapeOver.mapOutput focalMonadicShape
         (agent := PUnit.unit)
         (spec := spec)
         (ctxs := RoleDecoration.withMonads roles
           (MonadDecoration.constant ⟨m, inferInstance⟩ spec))
         f
-        (Strategy.withRolesToConstantMonads spec roles strat) := by
+        (Focal.toConstantMonads spec roles strat) := by
   match spec, roles with
   | .done, _ =>
       rfl
   | .node _ rest, ⟨.sender, rRest⟩ =>
-      simp only [Strategy.mapOutputWithRoles, Counterpart.mapReceiver,
-        withRolesToConstantMonads, ShapeOver.mapOutput, focalMonadicShape,
+      simp only [Focal.mapOutput, Counterpart.mapReceiver,
+        toConstantMonads, ShapeOver.mapOutput, focalMonadicShape,
         focalMonadicSyntax, RoleDecoration.withMonads, RoleDecoration.monadsOver,
         Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat)
       funext msgAndRest
-      rw [withRolesToConstantMonads_mapOutputWithRoles
+      rw [toConstantMonads_mapOutput
         (rest msgAndRest.1) (rRest msgAndRest.1)]
       rfl
   | .node _ rest, ⟨.receiver, rRest⟩ =>
       funext x
-      simp only [Strategy.mapOutputWithRoles, withRolesToConstantMonads,
+      simp only [Focal.mapOutput, toConstantMonads,
         ShapeOver.mapOutput, focalMonadicShape, focalMonadicSyntax,
         RoleDecoration.withMonads, RoleDecoration.monadsOver,
         Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat x)
       funext next
-      rw [withRolesToConstantMonads_mapOutputWithRoles (rest x) (rRest x)]
+      rw [toConstantMonads_mapOutput (rest x) (rRest x)]
       rfl
 
 /--
@@ -868,7 +879,7 @@ Retarget a monadic focal strategy along a nodewise monad homomorphism.
 This traverses the strategy tree structurally, applying the supplied lift at
 each node and recursing through the selected continuation.
 -/
-def Strategy.mapMonadDecoration
+def Focal.mapMonadDecoration
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {md₁ md₂ : MonadDecoration spec}
     (hom : MonadDecoration.Hom spec md₁ md₂)
@@ -953,5 +964,6 @@ def pairedMonadicInteraction {m : Type u → Type u} [Monad m]
           | .focal => pCont
           | .counterpart => cCont)
 
+end TwoParty
 end Spec
 end Interaction
