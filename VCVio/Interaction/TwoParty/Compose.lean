@@ -196,46 +196,6 @@ private theorem Strategy.compWithRolesFlat_eq_pure_compWithRolesFlatPure
           (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
   exact go s₁ r₁ strat₁ f
 
-/--
-Compose monad-decorated role strategies along `Spec.append`.
-
-The continuation that builds the suffix strategy runs in a construction monad
-`m`. To splice that construction into the first-phase strategy tree, callers
-provide a nodewise homomorphism from the constant `m` decoration into the
-first phase's strategy decoration.
--/
-def Strategy.withRolesAndMonads.compFlat {m : Type u → Type u} [Monad m]
-    {s₁ : Spec.{u}} {s₂ : Spec.Transcript s₁ → Spec.{u}}
-    {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {md₁ : MonadDecoration s₁}
-    {md₂ : (tr₁ : Spec.Transcript s₁) → MonadDecoration (s₂ tr₁)}
-    (setupLift :
-      MonadDecoration.Hom s₁ (MonadDecoration.constant ⟨m, inferInstance⟩ s₁) md₁)
-    {Mid : Spec.Transcript s₁ → Type u}
-    {Output : Spec.Transcript (s₁.append s₂) → Type u}
-    (strat₁ : Strategy.withRolesAndMonads s₁ r₁ md₁ Mid)
-    (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
-      m (Strategy.withRolesAndMonads (s₂ tr₁) (r₂ tr₁) (md₂ tr₁)
-        (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))) :
-    m (Strategy.withRolesAndMonads (s₁.append s₂) (r₁.append r₂)
-      (Decoration.append md₁ md₂) Output) :=
-  match s₁, r₁, md₁, setupLift with
-  | .done, _, _, _ => f ⟨⟩ strat₁
-  | .node _ _, ⟨.sender, _⟩, ⟨_, _⟩, ⟨liftSetup, liftRest⟩ =>
-      pure <| do
-        let ⟨x, next⟩ ← strat₁
-        let restStrat ← liftSetup <|
-          compFlat (setupLift := liftRest x) next
-            (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
-        pure ⟨x, restStrat⟩
-  | .node _ _, ⟨.receiver, _⟩, ⟨_, _⟩, ⟨liftSetup, liftRest⟩ =>
-      pure fun x => do
-        let next ← strat₁ x
-        liftSetup <|
-          compFlat (setupLift := liftRest x) next
-            (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
-
 /-- Extract the first-phase role-aware strategy from a strategy on a composed
 interaction. At each first-phase transcript `tr₁`, the remainder is the
 second-phase strategy with output indexed by `Transcript.append`. -/
