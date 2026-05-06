@@ -210,13 +210,13 @@ lemma simulateQ_getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s)
 Verify a Merkle proof `proof` that a given `leaf` at index `i` is in the Merkle tree with given
 `root`.
 Works by computing the putative root based on the branch, and comparing that to the actual root.
-Outputs `failure` if the proof is invalid.
+Returns `true` if the proof is valid, and `false` otherwise.
 -/
 @[simp, grind]
 def verifyProof {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
     [DecidableEq α] {s} (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α) (rootValue : α)
-    (proof : List.Vector α idx.depth) : OptionT m Unit := do
+    (proof : List.Vector α idx.depth) : m Bool := do
   let putative_root ← (getPutativeRoot idx leafValue proof : m α)
-  guard (putative_root = rootValue)
+  return (putative_root == rootValue)
 
 end InductiveMerkleTree
