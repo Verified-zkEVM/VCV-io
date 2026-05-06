@@ -18,7 +18,7 @@ whole-tree participant types are always obtained from `StrategyOver`.
 
 @[expose] public section
 
-universe uA uB uA₂ uB₂ w
+universe u uA uB uA₂ uB₂ w
 
 namespace Interaction
 namespace TwoParty
@@ -29,7 +29,7 @@ variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
 variable (l : PFunctor.Lens P Q)
 
 /-- The two agents in a focused two-party interaction. -/
-inductive Participant where
+inductive Participant : Type u where
   | focal
   | counterpart
   deriving DecidableEq

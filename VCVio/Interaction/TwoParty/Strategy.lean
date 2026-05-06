@@ -10,6 +10,7 @@ import VCVio.Interaction.Basic.Ownership
 import VCVio.Interaction.Basic.Interaction
 import VCVio.Interaction.Basic.MonadDecoration
 import VCVio.Interaction.TwoParty.Decoration
+import VCVio.Interaction.TwoParty.Syntax
 import VCVio.Interaction.Basic.Shape
 
 /-!
@@ -42,14 +43,9 @@ namespace Interaction
 namespace Spec
 
 variable {m : Type u → Type u}
+open TwoParty
 
-/-- The two agents in a focused two-party interaction. -/
-inductive Participant : Type u where
-  | focal
-  | counterpart
-  deriving DecidableEq
-
-private def rolePerspective : Role → Participant → Ownership.Perspective
+private def rolePerspective : Role → Participant.{u} → Ownership.Perspective
   | .sender, .focal => .owner
   | .sender, .counterpart => .observer
   | .receiver, .focal => .observer
@@ -116,7 +112,7 @@ private def counterpartFamilySyntax
     | .receiver => Receiver X Cont
 
 def pairedSyntax (m : Type u → Type u) :
-    SyntaxOver.{u, u, u, 0} Participant (fun _ => Role) where
+    SyntaxOver.{u, u, u, 0} Participant.{u} (fun _ => Role) where
   Node agent X role Cont :=
     match agent, role with
     | .focal, .sender => m ((x : X) × Cont x)
@@ -136,7 +132,7 @@ private theorem pairedSyntax_eq_ownerBased (m : Type u → Type u) :
         simp [Ownership.LocalView.node, rolePerspective, focalView, counterpartView]
 
 private def pairedInteraction (m : Type u → Type u) [Monad m] :
-    InteractionOver Participant (fun _ => Role) (pairedSyntax m) m where
+    InteractionOver Participant.{u} (fun _ => Role) (pairedSyntax m) m where
   interact := fun {X} {γ : Role} {Cont} {Result} profile k =>
     match γ with
     | .sender => do
@@ -242,7 +238,7 @@ def counterpartMonadicShape :
           ((fun xc => ⟨xc.1, f xc.1 xc.2⟩) <$> receive : bm.M ((x : X) × B x))
 
 def pairedMonadicSyntax :
-    SyntaxOver.{u, u, u, u + 1} Participant RolePairedMonadContext where
+    SyntaxOver.{u, u, u, u + 1} Participant.{u} RolePairedMonadContext where
   Node agent X γ Cont :=
     match agent, γ with
     | .focal, ⟨.sender, ⟨bmP, _⟩⟩ => bmP.M ((x : X) × Cont x)
@@ -545,7 +541,7 @@ rules a single canonical shape for participant outputs, which keeps dependent
 function arguments definitionally aligned. -/
 def participantOutputFamily
     {spec : Spec} (OutputP OutputC : Transcript spec → Type u)
-    (agent : Participant) (tr : Transcript spec) : Type u :=
+    (agent : Participant.{u}) (tr : Transcript spec) : Type u :=
   match agent with
   | .focal => OutputP tr
   | .counterpart => OutputC tr
@@ -555,7 +551,7 @@ two-party run. -/
 def collectParticipantOutputs
     {spec : Spec} {OutputP OutputC : Transcript spec → Type u} :
     (tr : Transcript spec) →
-      ((agent : Participant) → participantOutputFamily OutputP OutputC agent tr) →
+      ((agent : Participant.{u}) → participantOutputFamily OutputP OutputC agent tr) →
       OutputP tr × OutputC tr :=
   fun _ out => (out Participant.focal, out Participant.counterpart)
 
@@ -566,7 +562,7 @@ def participantProfile
     {OutputP OutputC : Transcript spec → Type u}
     (strat : Strategy.withRoles m spec roles OutputP)
     (cpt : Counterpart m spec roles OutputC) :
-    (agent : Participant) →
+    (agent : Participant.{u}) →
       StrategyOver (pairedSyntax m) agent spec roles (participantOutputFamily OutputP OutputC agent)
   | .focal => strat
   | .counterpart => cpt
@@ -870,7 +866,7 @@ tree runner. -/
 def pairedMonadicInteraction {m : Type u → Type u} [Monad m]
     (liftStrat : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α)
     (liftCpt : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
-    InteractionOver Participant RolePairedMonadContext pairedMonadicSyntax m where
+    InteractionOver Participant.{u} RolePairedMonadContext pairedMonadicSyntax m where
   interact := fun {X} {γ : RolePairedMonadContext X} {Cont} {Result} profile k =>
     match γ with
     | ⟨.sender, ⟨bmP, bmC⟩⟩ => do
