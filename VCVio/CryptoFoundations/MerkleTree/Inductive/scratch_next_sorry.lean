@@ -748,6 +748,86 @@ theorem support_implies_chainInLog
   simp only [List.append_nil]
   exact List.mem_append_right _ (List.mem_append_right _ hq)
 
+/-- Restriction lemma. Suppose `log_c ⊆ log`, `log` is collision-free, and the
+extractor built from `log_c` has an intact path to `idx` (the value at
+`idx.toNodeIndex` is `≠ none`). Then any chain in the larger `log` from `root`
+down to `leaf` along `idx` already lives entirely in the smaller `log_c`. -/
+theorem chainInLog_restrict
+    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
+    {s : Skeleton} (idx : SkeletonLeafIndex s) :
+    ∀ (log log_c : (spec α).QueryLog) (root : α) (leaf : α)
+      (proof : List.Vector α idx.depth),
+    (∀ q, q ∈ log_c → q ∈ log) →
+    ¬ collisionIn log →
+    (extractor s log_c root).get idx.toNodeIndex ≠ none →
+    chainInLog log root idx leaf proof →
+    chainInLog log_c root idx leaf proof := by
+  induction idx with
+  | ofLeaf =>
+    -- `chainInLog _ root .ofLeaf leaf _` is just `leaf = root`, which is
+    -- independent of the log.
+    intros _ _ _ _ _ _ _ _ h_chain
+    exact h_chain
+  | @ofLeft sl sr idxLeft ih =>
+    intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
+    -- Destructure the chain in `log` to obtain the chain entry.
+    obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
+    -- The path-intactness in `log_c` forces `log_c.find? (·.2 == root)` to
+    -- return `some _`. We extract this entry `q_c` and identify it with the
+    -- chain entry via no-collision in `log`.
+    set children : Option α → Option α × Option α := fun node =>
+      match node with
+      | none => (none, none)
+      | some a =>
+        match log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) with
+        | none => (none, none)
+        | some q => (some q.1.1, some q.1.2)
+    have h_extr_eq :
+        extractor (Skeleton.internal sl sr) log_c root =
+          FullData.internal (some root)
+            (populate_down sl children (children (some root)).1)
+            (populate_down sr children (children (some root)).2) := by
+      change populate_down (Skeleton.internal sl sr) children (some root) = _
+      rw [populate_down_internal_def]
+    -- Path-intactness on the `.ofLeft` index pushes into the left subtree.
+    have h_left_ne_none :
+        (populate_down sl children (children (some root)).1).get
+            idxLeft.toNodeIndex ≠ none := by
+      intro hne
+      apply h_ne_none
+      change (extractor (Skeleton.internal sl sr) log_c root).get
+        (SkeletonNodeIndex.ofLeft idxLeft.toNodeIndex) = none
+      rw [h_extr_eq, FullData.get_internal_ofLeft]
+      exact hne
+    -- If `children (some root) = (none, none)`, then `populate_down sl children none`
+    -- has all-`none` gets, contradicting `h_left_ne_none`.
+    have h_find_some :
+        ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
+      rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
+      · exfalso
+        apply h_left_ne_none
+        have hch : children (some root) = (none, none) := by
+          show (match log_c.find? (fun q' => q'.2 == root) with
+            | none => (none, none)
+            | some q => (some q.1.1, some q.1.2)) = (none, none)
+          rw [hf]
+        rw [hch]
+        -- `populate_down sl children none` produces a tree of all `none`s.
+        clear h_left_ne_none h_chain_rec h_extr_eq h_log_mem h_chain h_ne_none
+        induction sl with
+        | leaf => rfl
+        | internal sll slr ihL ihR =>
+          rcases idxLeft with _ | idxLL | idxLR
+          · -- `.ofLeaf` not applicable to internal; impossible
+            ·  -- Actually this is `.ofInternal`? skipped: handle below.
+              skip
+          all_goals sorry
+      · exact ⟨q, rfl⟩
+    sorry
+  | @ofRight sl sr idxRight ih =>
+    intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
+    sorry
+
 /--
 **Extractor matches in support.** Bundled helper combining
 `support_implies_chainInLog` with `extractor_chain_match`. From the game's
@@ -758,13 +838,6 @@ leaf and proof.
 This is the form directly consumable by `extractability_game_noColl_caseA_eq_zero`:
 the extracted-tree and extracted-proof equalities suffice to falsify
 `adversary_wins_extractability_game_event`.
-
-Implementation outline. Inside the support, `extractedTree` is concretely
-`extractor s committingLog root` for the committing prefix `committingLog ⊆ log`.
-Under `¬ collisionIn log`, `extractor` produces the same tree whether built from
-`committingLog` or from `log` (any new entries in `log` with response equal to
-an existing one would be a collision). So we apply `extractor_chain_match` with
-the full log.
 -/
 theorem extractability_game_no_coll_match
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -786,31 +859,7 @@ theorem extractability_game_no_coll_match
       support (extractability_game committingAdv openingAdv).withQueryLog) :
     extractedTree.get idx.toNodeIndex = some leaf ∧
       proof.toList.map some = extractedProof.toList := by
-  -- Bridge the committingLog used by `extractedTree`/`extractedProof` and the full
-  -- `log` used by `chainInLog`. Under no-collision in the full log, the extractor's
-  -- choice of children at any value `a` is determined by the unique log entry
-  -- with response `a`, which agrees whether we look in the committing prefix or in
-  -- the full log. So `extractedTree = extractor s log root` and
-  -- `extractedProof = generateProof extractedTree idx`.
-  have h_extracted_tree_eq : extractedTree = extractor s log root := by
-    -- Follows from `hsupport` (extractedTree comes from `extractor s committingLog root`)
-    -- combined with the no-collision-equivalence above.
-    sorry
-  have h_extracted_proof_eq : extractedProof = generateProof extractedTree idx := by
-    -- Follows directly from `hsupport`'s structure.
-    sorry
-  -- Get the chain from the support.
-  have h_chain : chainInLog log root idx leaf proof :=
-    support_implies_chainInLog committingAdv openingAdv hsupport
-  -- Apply the pure consistency lemma.
-  have h_ne_none_log : (extractor s log root).get idx.toNodeIndex ≠ none := by
-    rw [← h_extracted_tree_eq]; exact h_ne_none
-  obtain ⟨h_get, h_proof_eq⟩ :=
-    extractor_chain_match idx log root leaf proof h_no_coll h_ne_none_log h_chain
-  refine ⟨?_, ?_⟩
-  · rw [h_extracted_tree_eq]; exact h_get
-  · rw [h_extracted_proof_eq, h_extracted_tree_eq]
-    exact h_proof_eq.symm
+  sorry
 
 /-! ### No-collision lucky-guess bound -/
 
