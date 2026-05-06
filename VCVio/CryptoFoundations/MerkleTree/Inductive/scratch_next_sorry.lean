@@ -31,6 +31,33 @@ lemma populate_down_none_get_eq_none {s : Skeleton}
       rw [this]
       exact ihR idxR
 
+/-- A localized abbreviation for the `extractor`'s children function over a log. -/
+private def extractorChildren [DecidableEq α]
+    (log_c : (spec α).QueryLog) :
+    Option α → Option α × Option α := fun node =>
+  match node with
+  | none => (none, none)
+  | some a =>
+    match log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) with
+    | none => (none, none)
+    | some q => (some q.1.1, some q.1.2)
+
+@[simp] private lemma extractorChildren_none [DecidableEq α]
+    (log_c : (spec α).QueryLog) :
+    extractorChildren log_c none = (none, none) := rfl
+
+private lemma extractor_eq_populate [DecidableEq α] [SampleableType α]
+    [(spec α).Fintype]
+    (s : Skeleton) (log_c : (spec α).QueryLog) (root : α) :
+    extractor s log_c root = populate_down s (extractorChildren log_c) (some root) := rfl
+
+private lemma extractorChildren_some [DecidableEq α]
+    (log_c : (spec α).QueryLog) (a : α) :
+    extractorChildren log_c (some a) =
+      match log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) with
+      | none => (none, none)
+      | some q => (some q.1.1, some q.1.2) := rfl
+
 /-- If the extractor's path to `idx` is intact in `log_c`, then any chain in
 the larger collision-free `log` from `root` along `idx` also lives in `log_c`. -/
 theorem chainInLog_restrict
@@ -50,32 +77,25 @@ theorem chainInLog_restrict
   | @ofLeft sl sr idxLeft ih =>
     intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
     obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    -- The `children` function used by the extractor over `log_c`.
-    set children : Option α → Option α × Option α := fun node =>
-      match node with
-      | none => (none, none)
-      | some a =>
-        match log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) with
-        | none => (none, none)
-        | some q => (some q.1.1, some q.1.2)
-    have h_children_none : children none = (none, none) := rfl
-    have h_extr_eq :
-        extractor (Skeleton.internal sl sr) log_c root =
-          populate_down (Skeleton.internal sl sr) children (some root) := rfl
     -- Step 1: derive `log_c.find? (·.2 == root) = some _` from path-intactness.
     have h_find_some :
         ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
       rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
       · exfalso
         apply h_ne_none
-        rw [h_extr_eq, populate_down_internal_def, FullData.get_internal_ofLeft]
-        have hch : children (some root) = (none, none) := by
-          show (match log_c.find? (fun q' => q'.2 == root) with
-            | none => (none, none)
-            | some q => (some q.1.1, some q.1.2)) = (none, none)
-          rw [hf]
-        rw [show (children (some root)).1 = none from by rw [hch]]
-        exact populate_down_none_get_eq_none children h_children_none idxLeft.toNodeIndex
+        rw [extractor_eq_populate, populate_down_internal_def]
+        change (FullData.internal (some root)
+            (populate_down sl (extractorChildren log_c)
+              (extractorChildren log_c (some root)).1)
+            (populate_down sr (extractorChildren log_c)
+              (extractorChildren log_c (some root)).2)).get
+            (SkeletonNodeIndex.ofLeft idxLeft.toNodeIndex) = none
+        rw [FullData.get_internal_ofLeft]
+        have hch : extractorChildren log_c (some root) = (none, none) := by
+          rw [extractorChildren_some, hf]
+        rw [show (extractorChildren log_c (some root)).1 = none from by rw [hch]]
+        exact populate_down_none_get_eq_none (extractorChildren log_c)
+          (extractorChildren_none log_c) idxLeft.toNodeIndex
       · exact ⟨q, rfl⟩
     obtain ⟨q_c, h_find_c⟩ := h_find_some
     -- Step 2: q_c ∈ log_c (hence ∈ log), and q_c.2 = root.
@@ -104,25 +124,23 @@ theorem chainInLog_restrict
         extractor (Skeleton.internal sl sr) log_c root =
           FullData.internal (some root)
             (extractor sl log_c ancestor) (extractor sr log_c proof.head) := by
-      rw [h_extr_eq, populate_down_internal_def]
-      have hch1 : (children (some root)).1 = some ancestor := by
-        show (match log_c.find? (fun q' => q'.2 == root) with
-          | none => (none, none)
-          | some q => (some q.1.1, some q.1.2)).1 = some ancestor
-        rw [h_find_c']
-      have hch2 : (children (some root)).2 = some proof.head := by
-        show (match log_c.find? (fun q' => q'.2 == root) with
-          | none => (none, none)
-          | some q => (some q.1.1, some q.1.2)).2 = some proof.head
-        rw [h_find_c']
-      rw [hch1, hch2]
+      rw [extractor_eq_populate, populate_down_internal_def]
+      have hch : extractorChildren log_c (some root) =
+          (some ancestor, some proof.head) := by
+        rw [extractorChildren_some, h_find_c']
+      rw [show (extractorChildren log_c (some root)).1 = some ancestor from by rw [hch],
+          show (extractorChildren log_c (some root)).2 = some proof.head from by rw [hch]]
       rfl
     -- Step 6: path-intactness pushes into the left subtree.
     have h_ne_none_inner :
         (extractor sl log_c ancestor).get idxLeft.toNodeIndex ≠ none := by
       intro hne
       apply h_ne_none
-      rw [h_extr_decomp, FullData.get_internal_ofLeft]
+      rw [h_extr_decomp]
+      change (FullData.internal (some root)
+          (extractor sl log_c ancestor) (extractor sr log_c proof.head)).get
+        (SkeletonNodeIndex.ofLeft idxLeft.toNodeIndex) = none
+      rw [FullData.get_internal_ofLeft]
       exact hne
     -- Step 7: recurse.
     have h_chain_inner :=
@@ -131,30 +149,24 @@ theorem chainInLog_restrict
   | @ofRight sl sr idxRight ih =>
     intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
     obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    set children : Option α → Option α × Option α := fun node =>
-      match node with
-      | none => (none, none)
-      | some a =>
-        match log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) with
-        | none => (none, none)
-        | some q => (some q.1.1, some q.1.2)
-    have h_children_none : children none = (none, none) := rfl
-    have h_extr_eq :
-        extractor (Skeleton.internal sl sr) log_c root =
-          populate_down (Skeleton.internal sl sr) children (some root) := rfl
     have h_find_some :
         ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
       rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
       · exfalso
         apply h_ne_none
-        rw [h_extr_eq, populate_down_internal_def, FullData.get_internal_ofRight]
-        have hch : children (some root) = (none, none) := by
-          show (match log_c.find? (fun q' => q'.2 == root) with
-            | none => (none, none)
-            | some q => (some q.1.1, some q.1.2)) = (none, none)
-          rw [hf]
-        rw [show (children (some root)).2 = none from by rw [hch]]
-        exact populate_down_none_get_eq_none children h_children_none idxRight.toNodeIndex
+        rw [extractor_eq_populate, populate_down_internal_def]
+        change (FullData.internal (some root)
+            (populate_down sl (extractorChildren log_c)
+              (extractorChildren log_c (some root)).1)
+            (populate_down sr (extractorChildren log_c)
+              (extractorChildren log_c (some root)).2)).get
+            (SkeletonNodeIndex.ofRight idxRight.toNodeIndex) = none
+        rw [FullData.get_internal_ofRight]
+        have hch : extractorChildren log_c (some root) = (none, none) := by
+          rw [extractorChildren_some, hf]
+        rw [show (extractorChildren log_c (some root)).2 = none from by rw [hch]]
+        exact populate_down_none_get_eq_none (extractorChildren log_c)
+          (extractorChildren_none log_c) idxRight.toNodeIndex
       · exact ⟨q, rfl⟩
     obtain ⟨q_c, h_find_c⟩ := h_find_some
     have h_qc_mem_lc : q_c ∈ log_c := List.mem_of_find?_eq_some h_find_c
@@ -179,24 +191,22 @@ theorem chainInLog_restrict
         extractor (Skeleton.internal sl sr) log_c root =
           FullData.internal (some root)
             (extractor sl log_c proof.head) (extractor sr log_c ancestor) := by
-      rw [h_extr_eq, populate_down_internal_def]
-      have hch1 : (children (some root)).1 = some proof.head := by
-        show (match log_c.find? (fun q' => q'.2 == root) with
-          | none => (none, none)
-          | some q => (some q.1.1, some q.1.2)).1 = some proof.head
-        rw [h_find_c']
-      have hch2 : (children (some root)).2 = some ancestor := by
-        show (match log_c.find? (fun q' => q'.2 == root) with
-          | none => (none, none)
-          | some q => (some q.1.1, some q.1.2)).2 = some ancestor
-        rw [h_find_c']
-      rw [hch1, hch2]
+      rw [extractor_eq_populate, populate_down_internal_def]
+      have hch : extractorChildren log_c (some root) =
+          (some proof.head, some ancestor) := by
+        rw [extractorChildren_some, h_find_c']
+      rw [show (extractorChildren log_c (some root)).1 = some proof.head from by rw [hch],
+          show (extractorChildren log_c (some root)).2 = some ancestor from by rw [hch]]
       rfl
     have h_ne_none_inner :
         (extractor sr log_c ancestor).get idxRight.toNodeIndex ≠ none := by
       intro hne
       apply h_ne_none
-      rw [h_extr_decomp, FullData.get_internal_ofRight]
+      rw [h_extr_decomp]
+      change (FullData.internal (some root)
+          (extractor sl log_c proof.head) (extractor sr log_c ancestor)).get
+        (SkeletonNodeIndex.ofRight idxRight.toNodeIndex) = none
+      rw [FullData.get_internal_ofRight]
       exact hne
     have h_chain_inner :=
       ih log log_c ancestor leaf proof.tail h_sub h_no_coll h_ne_none_inner h_chain_rec
