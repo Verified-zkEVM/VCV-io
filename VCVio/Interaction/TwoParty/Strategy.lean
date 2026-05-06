@@ -164,13 +164,29 @@ private def pairedInteraction (m : Type u → Type u) [Monad m] :
           | .focal => pCont
           | .counterpart => cCont)
 
-private def strategyMonadicSyntax :
+/--
+One-participant syntax for the focal side of a role-decorated tree with
+per-node monads.
+
+At sender nodes the focal participant owns the move and returns a message
+together with the continuation in the node monad. At receiver nodes it observes
+the counterpart's message and returns the continuation in the node monad.
+-/
+def focalMonadicSyntax :
     SyntaxOver.{u, 0, u, u + 1} PUnit RoleMonadContext where
   Node _ (X : Type u) γ (Cont : X → Type u) :=
     match γ with
     | ⟨role, bm⟩ => role.Action bm.M X Cont
 
-private def counterpartMonadicSyntax :
+/--
+One-participant syntax for the counterpart side of a role-decorated tree with
+per-node monads.
+
+At sender nodes the counterpart observes the focal participant's move. At
+receiver nodes it owns the move and returns a message together with the
+continuation in the node monad.
+-/
+def counterpartMonadicSyntax :
     SyntaxOver.{u, 0, u, u + 1} PUnit RoleMonadContext where
   Node _ (X : Type u) γ (Cont : X → Type u) :=
     match γ with
@@ -676,7 +692,7 @@ See `Counterpart.withMonads` for the dual. -/
 abbrev Strategy.withRolesAndMonads
     (spec : Spec.{u}) (roles : RoleDecoration spec) (md : MonadDecoration spec)
     (Output : Transcript spec → Type u) :=
-  StrategyOver strategyMonadicSyntax PUnit.unit spec
+  StrategyOver focalMonadicSyntax PUnit.unit spec
     (RoleDecoration.withMonads roles md) Output
 
 /-- Map the transcript-indexed output of a monadic role strategy. -/
@@ -864,13 +880,13 @@ def Counterpart.withMonads.mapDecoration
 
 private theorem pairedMonadicSyntax_forAgent_focal :
     pairedMonadicSyntax.forAgent Participant.focal =
-      strategyMonadicSyntax.comap RolePairedMonadContext.fst := by
+      focalMonadicSyntax.comap RolePairedMonadContext.fst := by
   apply congrArg SyntaxOver.mk
   funext _ X γ Cont
   cases γ with
   | mk role bms =>
       cases role <;> cases bms <;>
-        simp [pairedMonadicSyntax, strategyMonadicSyntax,
+        simp [pairedMonadicSyntax, focalMonadicSyntax,
           RolePairedMonadContext.fst, Spec.Node.Context.extendMap,
           Spec.Node.ContextHom.id, Role.Action]
 
@@ -898,7 +914,7 @@ private theorem pairedMonadicStrategy_focal :
         (ctxs := RoleDecoration.withPairedMonads roles stratDeco cptDeco)
         (Out := Output)]
       rw [pairedMonadicSyntax_forAgent_focal]
-      rw [StrategyOver.comap strategyMonadicSyntax RolePairedMonadContext.fst
+      rw [StrategyOver.comap focalMonadicSyntax RolePairedMonadContext.fst
         (agent := PUnit.unit)
         (ctxs := RoleDecoration.withPairedMonads roles stratDeco cptDeco)
         (Out := Output)]
