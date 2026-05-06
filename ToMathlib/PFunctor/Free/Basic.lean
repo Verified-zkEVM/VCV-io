@@ -7,6 +7,7 @@ module
 
 public import ToMathlib.Control.Monad.Hom
 public import ToMathlib.PFunctor.Basic
+public import ToMathlib.PFunctor.Lens.Basic
 
 /-!
 # Free Monad of a Polynomial Functor
@@ -17,7 +18,7 @@ We define the free monad on a **polynomial functor** (`PFunctor`), and prove som
 
 @[expose] public section
 
-universe u v uA uB
+universe u v uA uB uA₂ uB₂ uA₃ uB₃
 
 namespace PFunctor
 
@@ -108,6 +109,66 @@ lemma pure_inj (x y : α) : FreeM.pure (P := P) x = FreeM.pure y ↔ x = y := by
   · cases hx
     simp
   · simp [hx]
+
+section mapLens
+
+variable {Q : PFunctor.{uA₂, uB₂}} {R : PFunctor.{uA₃, uB₃}}
+
+/-- Transport a free polynomial tree along a polynomial lens.
+
+The source polynomial `P` is the abstract/control interface. The target
+polynomial `Q` is the concrete/runtime interface. At each `P`-node, the lens
+chooses a `Q`-position by `toFunA`; when runtime supplies a `Q`-direction,
+`toFunB` maps it back to the corresponding `P`-direction selecting the
+control continuation. -/
+protected def mapLens (l : Lens P Q) : FreeM P α → FreeM Q α
+  | .pure x => .pure x
+  | .roll a rest => .roll (l.toFunA a) fun d =>
+      (rest (l.toFunB a d)).mapLens l
+
+@[simp]
+theorem mapLens_pure (l : Lens P Q) (x : α) :
+    (FreeM.pure x : FreeM P α).mapLens l = FreeM.pure x :=
+  rfl
+
+@[simp]
+theorem mapLens_roll (l : Lens P Q) (a : P.A) (rest : P.B a → FreeM P α) :
+    (FreeM.roll a rest).mapLens l =
+      FreeM.roll (l.toFunA a) (fun d => (rest (l.toFunB a d)).mapLens l) :=
+  rfl
+
+@[simp]
+theorem mapLens_id (x : FreeM P α) :
+    x.mapLens (Lens.id P) = x := by
+  induction x with
+  | pure _ => rfl
+  | roll a rest ih =>
+      exact congrArg (FreeM.roll a) (funext ih)
+
+@[simp]
+theorem mapLens_comp (l₂ : Lens Q R) (l₁ : Lens P Q) (x : FreeM P α) :
+    (x.mapLens l₁).mapLens l₂ = x.mapLens (l₂ ∘ₗ l₁) := by
+  induction x with
+  | pure _ => rfl
+  | roll a rest ih =>
+      exact congrArg (FreeM.roll (l₂.toFunA (l₁.toFunA a))) (funext fun d => ih _)
+
+@[simp]
+theorem mapLens_bind (l : Lens P Q) (x : FreeM P α) (f : α → FreeM P β) :
+    (FreeM.bind x f).mapLens l =
+      FreeM.bind (x.mapLens l) (fun a => (f a).mapLens l) := by
+  induction x with
+  | pure _ => rfl
+  | roll a rest ih =>
+      exact congrArg (FreeM.roll (l.toFunA a)) (funext fun d => ih _)
+
+@[simp]
+theorem mapLens_bind' (l : Lens P Q) (x : FreeM P α) (f : α → FreeM P β) :
+    (x >>= f).mapLens l =
+      x.mapLens l >>= fun a => (f a).mapLens l :=
+  mapLens_bind l x f
+
+end mapLens
 
 /-- Proving a predicate `C` of `FreeM P α` requires two cases:
 * `pure x` for some `x : α`

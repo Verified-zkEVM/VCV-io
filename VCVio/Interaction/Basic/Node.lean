@@ -43,12 +43,11 @@ The rest of the interaction core consumes realized node contexts, not schemas:
   induce canonical forgetful maps on realized contexts.
 
 Worked example:
-if we previously thought of node metadata in two stages,
-first a tag `Tag X` and then dependent data `Data X tag`,
-the corresponding schema is
+node metadata with a tag `Tag X` followed by dependent data `Data X tag`
+is represented by the schema
 `(Spec.Node.Schema.singleton Tag).extend Data`.
 Its realized context is `Spec.Node.Context.extend Tag Data`,
-so a single decoration by that context packages the old staged view into one
+so a decoration by that context provides both pieces of node-local data as one
 semantic object.
 -/
 

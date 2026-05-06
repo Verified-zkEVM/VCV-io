@@ -235,9 +235,8 @@ theorem Transcript.collapseAppend_append :
       (fun tr₁ tr₂ => F (Transcript.append s₁ s₂ tr₁ tr₂))
       (Transcript.append s₁ s₂ tr₁ tr₂)) →
     collapseAppend s₁ s₂ F (Transcript.append s₁ s₂ tr₁ tr₂) x =
-      cast (Transcript.liftAppend_append s₁ s₂
-        (fun tr₁ tr₂ => F (Transcript.append s₁ s₂ tr₁ tr₂))
-        tr₁ tr₂) x
+      Transcript.unpackAppend s₁ s₂
+        (fun tr₁ tr₂ => F (Transcript.append s₁ s₂ tr₁ tr₂)) tr₁ tr₂ x
   | .done, _, _, ⟨⟩, _, _ => rfl
   | .node _ rest, s₂, F, ⟨xm, tail₁⟩, tr₂, x => by
       simpa [Transcript.collapseAppend, Transcript.append] using
