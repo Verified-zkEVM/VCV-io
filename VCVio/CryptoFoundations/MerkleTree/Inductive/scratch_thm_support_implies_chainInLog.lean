@@ -729,7 +729,7 @@ theorem support_implies_chainInLog
   -- h_eq_co1 : resCO = (root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩)
   rw [← h_eq_p1, h_p1] at h_eq_v1
   rw [← h_eq_v1] at h_eq_co1
-  -- h_eq_co1 : (root_c.1, root_c.2, ⟨idx_o, leaf_o, proof_o, ext, gen, verifiedOpt.isSome⟩) = (root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩)
+  -- h_eq_co1 now has the inner tuple = (root, aux, ⟨idx, leaf, proof, ext, ext', true⟩).
   simp only [Prod.mk.injEq] at h_eq_co1
   obtain ⟨h_root_eq, h_aux_eq, h_sigma_eq⟩ := h_eq_co1
   subst h_root_eq
@@ -747,8 +747,8 @@ theorem support_implies_chainInLog
       cases u
       rfl
   subst h_verifiedOpt
-  have h_chain_v := verifyProof_run_support_chain idx leaf root proof log_v h_vp
-  apply chainInLog_mono idx _ h_chain_v
+  have h_chain_v := verifyProof_run_support_chain idx_o leaf_o root_c.1 proof_o log_v h_vp
+  apply chainInLog_mono idx_o _ h_chain_v
   intro q hq
   -- log = log_c ++ log_co, log_co = log_o ++ log_v_inner, log_v_inner = log_v ++ [] = log_v.
   rw [← h_eq_co2]
