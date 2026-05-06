@@ -15,23 +15,25 @@ import VCVio.Interaction.Basic.Shape
 /-!
 # Role-dependent strategies and counterparts
 
-`Spec.Strategy.withRoles` is the prover / focal party: owned nodes are
-effectful move/continuation packages, while non-owned nodes respond to the
-other party's move. `Spec.Counterpart` is the dual type. `withRolesAndMonads` and
-`runWithRolesAndMonads` extend this with per-node `BundledMonad` data from
-`MonadDecoration`.
+Two-party strategies are `StrategyOver` specializations over role-decorated
+interaction trees. `Spec.Strategy.withRoles` is the focal participant: owned
+nodes are effectful move/continuation packages, while non-owned nodes respond
+to the counterpart's move. `Spec.Counterpart` is the dual participant view.
 
-This module also contains the public-coin specialization needed for
-verifier-side Fiat-Shamir. The ordinary `Counterpart` type is the right shape
-for execution, but at receiver nodes it hides the continuation behind an
-opaque monadic sample. `Spec.PublicCoinCounterpart` refines that node shape to
-expose:
+The monadic variants add a `MonadDecoration`, so each node can use the effect
+recorded in the decoration instead of one ambient monad. The same role
+decoration still determines which participant owns each move.
+
+This module also contains a public-coin counterpart syntax. An executable
+counterpart samples a receiver move together with its continuation as one
+opaque action; `Spec.PublicCoinCounterpart` exposes the sampler and
+challenge-indexed continuation separately:
 
 - `sample : m X` — how the next public challenge is chosen
 - `next : (x : X) → ...` — how the rest of the verifier depends on that challenge
 
-This makes transcript replay definable without changing the core two-party
-interaction model.
+This is the structure needed for replay against a prescribed public transcript
+while keeping execution itself in the ordinary two-party model.
 -/
 
 universe u
@@ -774,15 +776,13 @@ def Strategy.withRolesAndMonads.ofWithRolesConstant {m : Type u → Type u} [Mon
       fun strat x =>
         Functor.map (ofWithRolesConstant (rest x) (rRest x)) (strat x)
 
-/-- Counterpart with per-node monads and transcript-dependent output.
+/--
+Counterpart strategy whose node effects are supplied by a `MonadDecoration`.
 
-This is the primary type for oracle verifiers: `OracleCounterpart` (in
-`Oracle/Core.lean`) is defined as `Counterpart.withMonads` with a
-`MonadDecoration` computed from the oracle decoration via `toMonadDecoration`.
-At sender nodes the monad is `Id` (pure observation); at receiver nodes it is
-`OracleComp` with the accumulated oracle access. All generic
-`Counterpart.withMonads` composition combinators (e.g., `withMonads.append`,
-`withMonads.stateChainComp`) therefore apply directly to oracle counterparts. -/
+At sender-owned nodes the counterpart observes the focal move and continues in
+the decorated node monad. At receiver-owned nodes it samples its own move and
+continuation in the decorated node monad.
+-/
 abbrev Counterpart.withMonads
     (spec : Spec.{u}) (roles : RoleDecoration spec) (md : MonadDecoration spec)
     (Output : Transcript spec → Type u) :=

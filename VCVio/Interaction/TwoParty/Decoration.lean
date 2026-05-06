@@ -12,8 +12,9 @@ import VCVio.Interaction.TwoParty.Role
 # Role decorations and common role-based node contexts
 
 A `RoleDecoration spec` is a `Spec.Decoration` with fiber `fun _ => Role`: each internal node is
-labeled sender or receiver. This replaces a separate two-party interaction inductive while reusing
-all `Spec` infrastructure (`Transcript`, `append`, etc.).
+labeled sender or receiver. It adds two-party control information to an ordinary
+interaction tree while reusing the surrounding `Spec` infrastructure
+(`Transcript`, `append`, etc.).
 
 This file also packages the most common role-based node contexts used by the two-party interaction
 layer:
@@ -27,8 +28,8 @@ Only the plain role layer is exposed as a schema here. The monadic extensions ar
 realized node contexts, because `BundledMonad` lives in a higher universe than `Role`, while
 `Spec.Node.Schema` currently uses one fixed universe for all staged fields.
 
-These are the outward-facing schema/context names used by `Strategy.withRolesAndMonads`,
-`Counterpart.withMonads`, and the monadic execution layer.
+These contexts are ordinary inputs to `StrategyOver`: roles say who owns the
+move, and monad decorations say which node effect is used by each participant.
 -/
 
 universe u
