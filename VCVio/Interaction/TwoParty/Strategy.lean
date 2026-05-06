@@ -716,17 +716,6 @@ abbrev Strategy.withRolesAndMonads
   StrategyOver focalMonadicSyntax PUnit.unit spec
     (RoleDecoration.withMonads roles md) Output
 
-/-- Map the transcript-indexed output of a monadic role strategy. -/
-def Strategy.withRolesAndMonads.mapOutput
-    (spec : Spec.{u}) (roles : RoleDecoration spec) (md : MonadDecoration spec)
-    {Output₁ Output₂ : Spec.Transcript spec → Type u}
-    (f : ∀ tr, Output₁ tr → Output₂ tr) :
-    Strategy.withRolesAndMonads spec roles md Output₁ →
-    Strategy.withRolesAndMonads spec roles md Output₂ :=
-  ShapeOver.mapOutput focalMonadicShape
-    (agent := PUnit.unit) (spec := spec) (ctxs := RoleDecoration.withMonads roles md)
-    (A := Output₁) (B := Output₂) f
-
 /--
 Retarget a monadic role strategy along a nodewise monad homomorphism.
 
@@ -813,51 +802,6 @@ abbrev Counterpart.withMonads
     (Output : Transcript spec → Type u) :=
   StrategyOver counterpartMonadicSyntax PUnit.unit spec
     (RoleDecoration.withMonads roles md) Output
-
-/-- Map the transcript-indexed output of a monadic counterpart. This is the
-counterpart-side analog of `Strategy.mapOutputWithRoles`, specialized to
-`Counterpart.withMonads`. -/
-def Counterpart.withMonads.mapOutput
-    (spec : Spec.{u}) (roles : RoleDecoration spec) (md : MonadDecoration spec)
-    {Output₁ Output₂ : Transcript spec → Type u}
-    (f : ∀ tr, Output₁ tr → Output₂ tr) :
-    Counterpart.withMonads spec roles md Output₁ →
-    Counterpart.withMonads spec roles md Output₂ :=
-  ShapeOver.mapOutput counterpartMonadicShape
-    (agent := PUnit.unit) (spec := spec) (ctxs := RoleDecoration.withMonads roles md)
-    (A := Output₁) (B := Output₂) f
-
-@[simp]
-theorem Counterpart.withMonads.mapOutput_done
-    {Output₁ Output₂ : PUnit → Type u}
-    (md : PUnit) (f : ∀ tr, Output₁ tr → Output₂ tr)
-    (cpt : Counterpart.withMonads .done PUnit.unit md Output₁) :
-    Counterpart.withMonads.mapOutput .done PUnit.unit md f cpt = f ⟨⟩ cpt := rfl
-
-@[simp]
-theorem Counterpart.withMonads.mapOutput_sender_eq
-    {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
-    {bm : BundledMonad} {mdRest : (x : X) → MonadDecoration (rest x)}
-    {Output₁ Output₂ : Transcript (.node X rest) → Type u}
-    (f : ∀ tr, Output₁ tr → Output₂ tr)
-    (cpt : Counterpart.withMonads (.node X rest) ⟨.sender, rRest⟩ ⟨bm, mdRest⟩ Output₁) :
-    Counterpart.withMonads.mapOutput (.node X rest) ⟨.sender, rRest⟩ ⟨bm, mdRest⟩ f cpt =
-      fun x =>
-        Counterpart.withMonads.mapOutput
-          (rest x) (rRest x) (mdRest x) (fun tr => f ⟨x, tr⟩) <$> cpt x := rfl
-
-@[simp]
-theorem Counterpart.withMonads.mapOutput_receiver_eq
-    {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
-    {bm : BundledMonad} {mdRest : (x : X) → MonadDecoration (rest x)}
-    {Output₁ Output₂ : Transcript (.node X rest) → Type u}
-    (f : ∀ tr, Output₁ tr → Output₂ tr)
-    (cpt : Counterpart.withMonads (.node X rest) ⟨.receiver, rRest⟩ ⟨bm, mdRest⟩ Output₁) :
-    Counterpart.withMonads.mapOutput (.node X rest) ⟨.receiver, rRest⟩ ⟨bm, mdRest⟩ f cpt =
-      (fun xc =>
-        ⟨xc.1,
-          Counterpart.withMonads.mapOutput
-            (rest xc.1) (rRest xc.1) (mdRest xc.1) (fun tr => f ⟨xc.1, tr⟩) xc.2⟩) <$> cpt := rfl
 
 /--
 Retarget a monadic counterpart along a nodewise monad homomorphism.
