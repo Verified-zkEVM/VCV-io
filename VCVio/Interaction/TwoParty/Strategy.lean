@@ -263,14 +263,8 @@ receiver-side node representations.
 
 Sender nodes model how the environment follows a move chosen by the focal
 party. Receiver nodes model how the environment chooses a move itself. Both
-ordinary `Counterpart` and replayable `PublicCoinCounterpart` are
-specializations of this single recursion. -/
-abbrev CounterpartFamily
-    (Sender Receiver : (X : Type u) → (X → Type u) → Type u)
-    (spec : Spec) (roles : RoleDecoration spec) (Output : Transcript spec → Type u) :=
-  StrategyOver (counterpartFamilySyntax Sender Receiver) PUnit.unit spec roles Output
-
-/-- Functorial output map for a generic counterpart family. -/
+ordinary `Counterpart` and replayable public-coin syntax are both direct
+`StrategyOver` specializations. -/
 private def counterpartFamilyShape
     (Sender : (X : Type u) → (X → Type u) → Type u)
     (Receiver : (X : Type u) → (X → Type u) → Type u)
@@ -288,26 +282,6 @@ private def counterpartFamilyShape
         mapSender f node
     | .receiver =>
         mapReceiver f node
-
-def CounterpartFamily.mapOutput
-    (Sender : (X : Type u) → (X → Type u) → Type u)
-    (Receiver : (X : Type u) → (X → Type u) → Type u)
-    (mapSender :
-      {X : Type u} → {A B : X → Type u} →
-      (∀ x, A x → B x) → Sender X A → Sender X B)
-    (mapReceiver :
-      {X : Type u} → {A B : X → Type u} →
-      (∀ x, A x → B x) → Receiver X A → Receiver X B) :
-    {spec : Spec.{u}} → {roles : RoleDecoration spec} →
-    {A B : Transcript spec → Type u} →
-    (∀ tr, A tr → B tr) →
-    CounterpartFamily Sender Receiver spec roles A →
-    CounterpartFamily Sender Receiver spec roles B :=
-  fun {spec} {roles} {A} {B} f =>
-    ShapeOver.mapOutput
-      (counterpartFamilyShape Sender Receiver mapSender mapReceiver)
-      (agent := PUnit.unit) (spec := spec) roles
-      (A := A) (B := B) f
 
 /-- Counterpart / environment type with transcript-dependent output: dual
 actions at each node, producing `Output ⟨⟩` at `.done`.
@@ -406,9 +380,15 @@ for `x` unless that continuation is exposed separately.
 
 This is exactly the extra structure needed to replay a prescribed transcript
 through the verifier. -/
-abbrev PublicCoinCounterpart (m : Type u → Type u) :=
-  CounterpartFamily (fun X Cont => (x : X) → m (Cont x))
+def publicCoinCounterpartSyntax (m : Type u → Type u) :
+    SyntaxOver.{u, 0, u, 0} PUnit (fun _ => Role) :=
+  counterpartFamilySyntax (fun X Cont => (x : X) → m (Cont x))
     (fun X Cont => m X × ((x : X) → Cont x))
+
+/-- Whole-tree public-coin counterpart induced by `publicCoinCounterpartSyntax`. -/
+abbrev PublicCoinCounterpart (m : Type u → Type u)
+    (spec : Spec) (roles : RoleDecoration spec) (Output : Transcript spec → Type u) :=
+  StrategyOver (publicCoinCounterpartSyntax m) PUnit.unit spec roles Output
 
 namespace PublicCoinCounterpart
 
@@ -416,6 +396,12 @@ private def mapReceiver {m : Type u → Type u} :
     {X : Type u} → {A B : X → Type u} →
     (∀ x, A x → B x) → (m X × ((x : X) → A x)) → (m X × ((x : X) → B x))
   | _, _, _, f, ⟨sample, next⟩ => ⟨sample, fun x => f x (next x)⟩
+
+private def publicCoinCounterpartShape (m : Type u → Type u) [Functor m] :
+    ShapeOver PUnit (fun _ => Role) :=
+  counterpartFamilyShape (fun X Cont => (x : X) → m (Cont x))
+    (fun X Cont => m X × ((x : X) → Cont x))
+    Counterpart.mapSender mapReceiver
 
 /-- Functorial output map for public-coin counterparts. The challenge samplers
 are unchanged; only the terminal output carried by continuations is mapped. -/
@@ -425,7 +411,10 @@ def mapOutput {m : Type u → Type u} [Functor m] :
     (∀ tr, A tr → B tr) →
     PublicCoinCounterpart m spec roles A →
     PublicCoinCounterpart m spec roles B :=
-  CounterpartFamily.mapOutput _ _ Counterpart.mapSender mapReceiver
+  fun {spec} {roles} {A} {B} f =>
+    ShapeOver.mapOutput (publicCoinCounterpartShape m)
+      (agent := PUnit.unit) (spec := spec) roles
+      (A := A) (B := B) f
 
 /-- Forget the public-coin factorization and recover the ordinary executable
 counterpart. -/
