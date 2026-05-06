@@ -212,4 +212,102 @@ theorem chainInLog_restrict
       ih log log_c ancestor leaf proof.tail h_sub h_no_coll h_ne_none_inner h_chain_rec
     refine ⟨ancestor, h_chain_entry_in_lc, h_chain_inner⟩
 
+/-- Test version of `extractability_game_no_coll_match` (replaces the two
+sorries in the main file). -/
+theorem extractability_game_no_coll_match'
+    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
+    [(spec α).Fintype] [(spec α).Inhabited]
+    {s : Skeleton} {AuxState : Type}
+    (committingAdv : OracleComp (spec α) (α × AuxState))
+    (openingAdv : AuxState →
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
+    {root : α} {aux : AuxState} {idx : SkeletonLeafIndex s} {leaf : α}
+    {proof : List.Vector α idx.depth}
+    {extractedTree : FullData (Option α) s}
+    {extractedProof : List.Vector (Option α) idx.depth}
+    {log : (spec α).QueryLog}
+    (h_no_coll : ¬ collisionIn log)
+    (h_ne_none : extractedTree.get idx.toNodeIndex ≠ none)
+    (hsupport : ((root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩),
+                  log) ∈
+      support (extractability_game committingAdv openingAdv).withQueryLog) :
+    extractedTree.get idx.toNodeIndex = some leaf ∧
+      proof.toList.map some = extractedProof.toList := by
+  -- Decompose `hsupport` via the same pattern as `support_implies_chainInLog` to
+  -- expose `log_c` (committingAdv's log), `log_o` (openingAdv's log), `log_v`
+  -- (verifyProof's log), and the equalities relating `extractedTree` /
+  -- `extractedProof` to the committing log.
+  have hsup := hsupport
+  unfold extractability_game at hsup
+  rw [OracleComp.withQueryLog_bind] at hsup
+  rw [mem_support_bind_iff] at hsup
+  obtain ⟨⟨⟨root_c, aux_c⟩, log_c⟩, h_c, hsup⟩ := hsup
+  rw [support_map, Set.mem_image] at hsup
+  obtain ⟨⟨resCO, log_co⟩, h_co, h_eq_co⟩ := hsup
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_co
+  obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
+  rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_co
+  obtain ⟨⟨⟨idx_o, leaf_o, proof_o⟩, log_o⟩, h_o, h_co⟩ := h_co
+  rw [support_map, Set.mem_image] at h_co
+  obtain ⟨⟨resV, log_v_inner⟩, h_v, h_eq_v⟩ := h_co
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_v
+  obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
+  rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_v
+  obtain ⟨⟨verifiedOpt, log_v⟩, h_vp, h_v⟩ := h_v
+  rw [support_map, Set.mem_image] at h_v
+  obtain ⟨⟨_unit, log_p⟩, h_p, h_eq_p⟩ := h_v
+  rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_p
+  obtain ⟨h_p1, h_p2⟩ := h_p
+  subst h_p2
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_p
+  obtain ⟨h_eq_p1, h_eq_p2⟩ := h_eq_p
+  rw [← h_eq_p1, h_p1] at h_eq_v1
+  rw [← h_eq_v1] at h_eq_co1
+  simp only [Prod.mk.injEq] at h_eq_co1
+  obtain ⟨h_root_eq, h_aux_eq, h_sigma_eq⟩ := h_eq_co1
+  subst h_root_eq
+  subst h_aux_eq
+  obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
+  subst h_idx_eq
+  simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
+  obtain ⟨h_leaf_eq, h_proof_eq, h_tree_eq, h_proof_ext_eq, h_isSome_eq⟩ := h_rest_eq
+  subst h_leaf_eq
+  subst h_proof_eq
+  -- Now: `extractedTree = extractor s log_c root_c.1` and
+  -- `extractedProof = generateProof (extractor s log_c root_c.1) idx_o`.
+  -- Also `log = log_c ++ log_o ++ log_v ++ []` (modulo the trivial empty `log_p`).
+  -- We need `log_c ⊆ log`.
+  have h_log_eq : log = log_c ++ log_o ++ log_v := by
+    rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
+    simp [List.append_nil]
+  have h_sub : ∀ q, q ∈ log_c → q ∈ log := by
+    intro q hq
+    rw [h_log_eq]
+    exact List.mem_append_left _ (List.mem_append_left _ hq)
+  -- Get the chain in `log`.
+  have h_chain : chainInLog log root_c.1 idx_o leaf_o proof_o :=
+    support_implies_chainInLog committingAdv openingAdv hsupport
+  -- The extracted tree equals `extractor s log_c root_c.1`.
+  -- Use this to transfer `h_ne_none` to `log_c`.
+  have h_ne_none_lc :
+      (extractor s log_c root_c.1).get idx_o.toNodeIndex ≠ none := by
+    rw [← h_tree_eq]; exact h_ne_none
+  -- Restrict the chain to `log_c`.
+  have h_chain_lc : chainInLog log_c root_c.1 idx_o leaf_o proof_o :=
+    chainInLog_restrict idx_o log log_c root_c.1 leaf_o proof_o
+      h_sub h_no_coll h_ne_none_lc h_chain
+  -- No-collision on `log_c` (subset of collision-free `log`).
+  have h_no_coll_lc : ¬ collisionIn log_c := by
+    intro ⟨q1, q2, hne, hm1, hm2, hresp⟩
+    exact h_no_coll ⟨q1, q2, hne, h_sub _ hm1, h_sub _ hm2, hresp⟩
+  -- Apply the pure consistency lemma.
+  obtain ⟨h_get, h_proof_eq⟩ :=
+    extractor_chain_match idx_o log_c root_c.1 leaf_o proof_o
+      h_no_coll_lc h_ne_none_lc h_chain_lc
+  refine ⟨?_, ?_⟩
+  · rw [h_tree_eq]; exact h_get
+  · rw [h_proof_ext_eq, h_tree_eq]
+    exact h_proof_eq.symm
+
 end InductiveMerkleTree
