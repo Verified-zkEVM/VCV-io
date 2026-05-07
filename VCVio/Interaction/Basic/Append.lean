@@ -82,6 +82,13 @@ def Transcript.append :
     (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Transcript (s₁.append s₂) :=
   PFunctor.FreeM.Path.append
 
+@[simp]
+theorem Transcript.append_done
+    (s₂ : Transcript Spec.done → Spec)
+    (tr₂ : Transcript (s₂ PUnit.unit)) :
+    Transcript.append Spec.done s₂ PUnit.unit tr₂ = tr₂ :=
+  rfl
+
 /-- `liftAppend` on an appended transcript reduces to the original two-argument
 family. -/
 @[simp]
@@ -155,6 +162,14 @@ def Transcript.packAppend :
     (tr₁ : Transcript s₁) → (tr₂ : Transcript (s₂ tr₁)) →
     F tr₁ tr₂ → liftAppend s₁ s₂ F (append s₁ s₂ tr₁ tr₂) :=
   PFunctor.FreeM.Path.packAppend
+
+@[simp]
+theorem Transcript.packAppend_done
+    (s₂ : Transcript Spec.done → Spec)
+    (F : (tr₁ : Transcript Spec.done) → Transcript (s₂ tr₁) → Type u)
+    (tr₂ : Transcript (s₂ PUnit.unit)) (x : F PUnit.unit tr₂) :
+    Transcript.packAppend Spec.done s₂ F PUnit.unit tr₂ x = x :=
+  rfl
 
 /-- Transport a `liftAppend` value back to the pair-indexed family.
 Inverse of `packAppend`. -/

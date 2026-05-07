@@ -113,13 +113,37 @@ private def counterpartFamilySyntax
     | .receiver => Receiver X Cont
 
 def pairedSyntax (m : Type u → Type u) :
-    Spec.SyntaxOver.{u, u, u, 0} Participant.{u} (fun _ => Role) where
-  Node agent X role Cont :=
-    match agent, role with
-    | .focal, .sender => m ((x : X) × Cont x)
-    | .focal, .receiver => (x : X) → m (Cont x)
-    | .counterpart, .sender => (x : X) → m (Cont x)
-    | .counterpart, .receiver => m ((x : X) × Cont x)
+    Spec.SyntaxOver.{u, u, u, 0} Participant.{u} (fun _ => Role) :=
+  Spec.SyntaxOver.ofGeneric
+    (pairedSyntaxOver (PFunctor.Lens.id Spec.basePFunctor) m)
+
+@[simp]
+theorem pairedSyntax_focal_sender
+    (m : Type u → Type u) (X : Type u) (Cont : X → Type u) :
+    (pairedSyntax m).Node Participant.focal X Role.sender Cont =
+      m ((x : X) × Cont x) :=
+  rfl
+
+@[simp]
+theorem pairedSyntax_focal_receiver
+    (m : Type u → Type u) (X : Type u) (Cont : X → Type u) :
+    (pairedSyntax m).Node Participant.focal X Role.receiver Cont =
+      ((x : X) → m (Cont x)) :=
+  rfl
+
+@[simp]
+theorem pairedSyntax_counterpart_sender
+    (m : Type u → Type u) (X : Type u) (Cont : X → Type u) :
+    (pairedSyntax m).Node Participant.counterpart X Role.sender Cont =
+      ((x : X) → m (Cont x)) :=
+  rfl
+
+@[simp]
+theorem pairedSyntax_counterpart_receiver
+    (m : Type u → Type u) (X : Type u) (Cont : X → Type u) :
+    (pairedSyntax m).Node Participant.counterpart X Role.receiver Cont =
+      m ((x : X) × Cont x) :=
+  rfl
 
 private theorem pairedSyntax_eq_ownerBased (m : Type u → Type u) :
     pairedSyntax m =
@@ -132,7 +156,8 @@ private theorem pairedSyntax_eq_ownerBased (m : Type u → Type u) :
   apply congrArg Spec.SyntaxOver.mk
   funext agent X role Cont
   cases agent <;> cases role <;>
-        simp [Spec.Ownership.LocalView.node, rolePerspective, focalView, counterpartView]
+        simp [pairedSyntaxOver, PFunctor.Lens.id, Spec.Ownership.LocalView.node,
+          rolePerspective, focalView, counterpartView]
 
 /-- Local execution law for the two participants of `pairedSyntax`.
 
@@ -704,15 +729,24 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
         cases roles
         simp [Focal.mapOutput, Counterpart.mapOutput, Spec.InteractionOver.run,
           participantProfile, collectParticipantOutputs]
-    | .node _ rest, ⟨.sender, rRest⟩ =>
+    | .node X rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.mapOutput, Counterpart.mapOutput, Counterpart.mapReceiver,
           Counterpart.mapSender]
         simp only [Spec.InteractionOver.run, pairedInteraction, pairedSyntax,
           participantOutputFamily, participantProfile, collectParticipantOutputs,
-          focalRunner, counterpartRunner, bind_pure_comp, bind_map_left, map_bind,
-          Functor.map_map]
+          focalRunner, counterpartRunner, bind_pure_comp]
+        refine (bind_map_left
+          (fun xc =>
+            (⟨xc.1, Focal.mapOutput (fun p => fP ⟨xc.1, p⟩) xc.2⟩ :
+              (x : X) × Spec.StrategyOver (pairedSyntax m) Participant.focal
+                (rest x) (rRest x) (fun tr => OutputP' ⟨x, tr⟩)))
+          strat _).trans ?_
+        simp only [map_bind, Functor.map_map]
         refine congrArg (fun k => strat >>= k) ?_
         funext xc
+        refine (bind_map_left
+          (fun cNext => Counterpart.mapOutput (fun p => fC ⟨xc.1, p⟩) cNext)
+          (cpt xc.1) _).trans ?_
         refine congrArg (fun k => cpt xc.1 >>= k) ?_
         funext cNext
         let addPrefix :
@@ -724,16 +758,25 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
           congrArg (fun z => addPrefix <$> z)
             (go (rest xc.1) (rRest xc.1) (fun tr => fP ⟨xc.1, tr⟩) (fun tr => fC ⟨xc.1, tr⟩)
               xc.2 cNext)
-    | .node _ rest, ⟨.receiver, rRest⟩ =>
+    | .node X rest, ⟨.receiver, rRest⟩ =>
         simp only [Focal.mapOutput, Counterpart.mapOutput,
           Counterpart.mapReceiver]
         simp only
           [Spec.InteractionOver.run, pairedInteraction, pairedSyntax,
             participantOutputFamily, participantProfile, collectParticipantOutputs,
-            focalRunner, counterpartRunner, bind_pure_comp, bind_map_left, map_bind,
-            Functor.map_map]
+            focalRunner, counterpartRunner, bind_pure_comp]
+        refine (bind_map_left
+          (fun xc =>
+            (⟨xc.1, Counterpart.mapOutput (fun p => fC ⟨xc.1, p⟩) xc.2⟩ :
+              (x : X) × Spec.StrategyOver (pairedSyntax m) Participant.counterpart
+                (rest x) (rRest x) (fun tr => OutputC' ⟨x, tr⟩)))
+          cpt _).trans ?_
+        simp only [map_bind, Functor.map_map]
         refine congrArg (fun k => cpt >>= k) ?_
         funext xc
+        refine (bind_map_left
+          (fun next => Focal.mapOutput (fun p => fP ⟨xc.1, p⟩) next)
+          (strat xc.1) _).trans ?_
         refine congrArg (fun k => strat xc.1 >>= k) ?_
         funext next
         let addPrefix :
