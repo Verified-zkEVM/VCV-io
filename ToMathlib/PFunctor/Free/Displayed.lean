@@ -84,6 +84,55 @@ theorem roll_eq (D : Shape P α) (a : P.A) (rest : P.B a → FreeM P α) :
 
 variable {D : Shape.{uA, uB, v, w} P α}
 
+/--
+A displayed family over an existing displayed family.
+
+If `D` assigns a fiber to each `FreeM` tree, then an `OverShape D` assigns a
+second-layer fiber over each inhabitant of `Displayed D s`. This is the
+generic form of a dependent decoration over a base decoration.
+-/
+structure OverShape (D : Shape.{uA, uB, v, w} P α) where
+  leaf : (x : α) → D.leaf x → Sort w₂
+  node :
+    (a : P.A) →
+    (child : (b : P.B a) → Sort w) →
+    ((b : P.B a) → child b → Sort w₂) →
+    D.node a child → Sort w₂
+
+/--
+Evaluate a displayed-over shape over concrete displayed data.
+
+This is the dependent analogue of `Displayed`: the base displayed data chooses
+which second-layer fiber is available at every node.
+-/
+def Over (E : OverShape D) :
+    (s : FreeM P α) → Displayed D s → Sort w₂
+  | .pure x, d => E.leaf x d
+  | .roll a rest, d =>
+      E.node a (fun b => Displayed D (rest b))
+        (fun b d => Over E (rest b) d) d
+
+namespace Over
+
+@[simp]
+theorem pure_eq (E : OverShape D) (x : α) (d : D.leaf x) :
+    Over E (FreeM.pure (P := P) x) d = E.leaf x d :=
+  rfl
+
+@[simp]
+theorem roll_eq (E : OverShape D) (a : P.A) (rest : P.B a → FreeM P α)
+    (d : D.node a (fun b => Displayed D (rest b))) :
+    Over E (FreeM.roll a rest) d =
+      E.node a (fun b => Displayed D (rest b))
+        (fun b d => Over E (rest b) d) d :=
+  rfl
+
+end Over
+
+/-- The total space of a displayed family together with one displayed-over layer. -/
+abbrev Total (E : OverShape D) (s : FreeM P α) :=
+  PSigma fun d : Displayed D s => Over E s d
+
 /-- A section chooses displayed data over every `FreeM` tree. -/
 abbrev Section (D : Shape P α) :=
   (s : FreeM P α) → Displayed D s

@@ -96,6 +96,12 @@ open PFunctor
 
 variable {P : PFunctor.{u, v}} {α : Type w}
 
+/-- Displayed-family shape for node-local metadata over a polynomial tree. -/
+def Decoration.shape (Γ : P.A → Type w₂) :
+    PFunctor.FreeM.Displayed.Shape P α where
+  leaf := fun _ => PUnit.{max v w₂ + 1}
+  node := fun a child => Γ a × ((b : P.B a) → child b)
+
 /--
 Node-local metadata over an arbitrary polynomial free tree.
 
@@ -105,10 +111,23 @@ The plain `Spec.Decoration` below is the specialization to
 `Spec.basePFunctor` and terminal payload `PUnit`.
 -/
 abbrev Decoration (Γ : P.A → Type w₂) : PFunctor.FreeM P α → Type (max v w₂) :=
-  PFunctor.FreeM.Displayed {
-    leaf := fun _ => PUnit.{max v w₂ + 1}
-    node := fun a child => Γ a × ((b : P.B a) → child b)
-  }
+  PFunctor.FreeM.Displayed (Decoration.shape Γ)
+
+/--
+Displayed-family shape for a dependent layer over a polynomial decoration.
+
+At a node with base metadata `γ : Γ a`, the over-layer stores data in
+`F a γ` and recursively stores over-data over each decorated child.
+-/
+def Decoration.overShape (Γ : P.A → Type w₂) (F : (a : P.A) → Γ a → Type w₂) :
+    PFunctor.FreeM.Displayed.OverShape (Decoration.shape (P := P) (α := α) Γ) where
+  leaf := fun _ _ => PUnit.{max v w₂ + 1}
+  node := fun a _ over d => F a d.1 × ((b : P.B a) → over b (d.2 b))
+
+/-- Dependent node-local metadata over an existing polynomial decoration. -/
+abbrev Decoration.Over (Γ : P.A → Type w₂) (F : (a : P.A) → Γ a → Type w₂)
+    (s : PFunctor.FreeM P α) (d : Decoration Γ s) : Type (max v w₂) :=
+  PFunctor.FreeM.Displayed.Over (Decoration.overShape Γ F) s d
 
 namespace Spec
 
