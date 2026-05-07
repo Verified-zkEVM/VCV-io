@@ -34,9 +34,87 @@ specialization. This differs from `Decoration.Over`, which is literally
 dependent data over a fixed base decoration value.
 -/
 
-universe u a vΓ w
+universe u a vΓ w uA uB uA₂ uB₂ t
 
 namespace Interaction
+
+open PFunctor
+
+variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
+variable {α : Type t}
+
+/--
+`ShapeOver l Agent Γ` is functorial local syntax over an arbitrary control
+polynomial executed through a runtime lens `l`.
+
+It refines `SyntaxOver l Agent Γ` with a node-level continuation map. At a
+control position `pos : P.A`, recursive continuations are indexed by runtime
+directions `Q.B (l.toFunA pos)`, and the lens determines which control child
+each runtime direction selects.
+-/
+structure ShapeOver
+    (l : PFunctor.Lens P Q)
+    (Agent : Type a)
+    (Γ : P.A → Type vΓ) extends SyntaxOver l Agent Γ where
+  /--
+  Transform the recursive continuation payload of one local node object.
+  The agent, control position, node-local context, and runtime move shape are
+  unchanged.
+  -/
+  map :
+    {agent : Agent} →
+    {pos : P.A} →
+    {γ : Γ pos} →
+    {A B : Q.B (l.toFunA pos) → Type w} →
+    (∀ d, A d → B d) →
+    Node agent pos γ A →
+    Node agent pos γ B
+
+namespace ShapeOver
+
+variable {l : PFunctor.Lens P Q}
+variable {Agent : Type a} {Γ : P.A → Type vΓ}
+
+instance : Coe (ShapeOver l Agent Γ) (SyntaxOver l Agent Γ) where
+  coe := ShapeOver.toSyntaxOver
+
+/--
+View a functorial shape as a local strategy homomorphism on one agent fiber.
+-/
+def toStrategyHom
+    (shape : ShapeOver l Agent Γ) (agent : Agent) :
+    StrategyOver.Hom shape.toSyntaxOver agent shape.toSyntaxOver agent where
+  mapNode f node := shape.map f node
+
+/--
+Map leaf outputs through a whole lens-executed strategy.
+
+This is the recursive global form of the local `ShapeOver.map` field. The
+runtime path index is `PathAlong l spec`, so it applies equally to plain specs
+and to control specs such as `Oracle.Spec` executed through a lens.
+-/
+def mapOutput
+    (shape : ShapeOver l Agent Γ)
+    {agent : Agent}
+    {spec : PFunctor.FreeM P α}
+    (ctxs : Decoration Γ spec) :
+    {A B : PFunctor.FreeM.PathAlong l spec → Type w} →
+    (∀ path, A path → B path) →
+    StrategyOver shape.toSyntaxOver agent spec ctxs A →
+    StrategyOver shape.toSyntaxOver agent spec ctxs B :=
+  match spec, ctxs with
+  | .pure _, _ => fun f out => f ⟨⟩ out
+  | .roll pos _, ⟨γ, ctxsRest⟩ => fun f node =>
+      shape.map
+        (agent := agent)
+        (γ := γ)
+        (fun d =>
+          mapOutput shape (ctxs := ctxsRest (l.toFunB pos d))
+            (fun path => f ⟨d, path⟩))
+        node
+
+end ShapeOver
+
 namespace Spec
 
 variable {Agent : Type a}
@@ -88,6 +166,21 @@ continuation value `B x`, then we can transform a local node object with
     (∀ x, A x → B x) →
     Node agent X γ A →
     Node agent X γ B
+
+/-- View generic identity-lens shapes as shapes over plain `Spec` trees. -/
+def ShapeOver.ofGeneric
+    (shape : _root_.Interaction.ShapeOver
+      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ) :
+    ShapeOver Agent Γ where
+  toSyntaxOver := SyntaxOver.ofGeneric shape.toSyntaxOver
+  map f node := shape.map f node
+
+/-- View plain `Spec` shapes as generic shapes over the identity lens. -/
+def ShapeOver.toGeneric
+    (shape : ShapeOver Agent Γ) :
+    _root_.Interaction.ShapeOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
+  toSyntaxOver := SyntaxOver.toGeneric shape.toSyntaxOver
+  map f node := shape.map f node
 
 /--
 `Shape Agent` is the specialization of `ShapeOver` with no node-local context.

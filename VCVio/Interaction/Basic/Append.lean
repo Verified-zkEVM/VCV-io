@@ -50,11 +50,8 @@ This combinator propagates up through the entire stack:
 def Transcript.liftAppend :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
     ((tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Type u) →
-    Transcript (s₁.append s₂) → Type u
-  | .done, _, F, tr => F ⟨⟩ tr
-  | .node _ rest, s₂, F, ⟨x, tail⟩ =>
-      Transcript.liftAppend (rest x) (fun p => s₂ ⟨x, p⟩)
-        (fun tr₁ tr₂ => F ⟨x, tr₁⟩ tr₂) tail
+    Transcript (s₁.append s₂) → Type u :=
+  PFunctor.FreeM.Path.liftAppend
 
 /-- `liftAppend` respects pointwise equality of the family `F`. -/
 theorem Transcript.liftAppend_congr :
@@ -82,10 +79,8 @@ theorem Transcript.liftAppend_const (α : Type u) :
 of the composed interaction `s₁.append s₂`. -/
 def Transcript.append :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
-    (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Transcript (s₁.append s₂)
-  | .done, _, _, tr₂ => tr₂
-  | .node _ rest, s₂, ⟨x, tail₁⟩, tr₂ =>
-      ⟨x, Transcript.append (rest x) (fun p => s₂ ⟨x, p⟩) tail₁ tr₂⟩
+    (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Transcript (s₁.append s₂) :=
+  PFunctor.FreeM.Path.append
 
 /-- `liftAppend` on an appended transcript reduces to the original two-argument
 family. -/
@@ -95,21 +90,14 @@ theorem Transcript.liftAppend_append :
     (F : (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Type u) →
     (tr₁ : Transcript s₁) → (tr₂ : Transcript (s₂ tr₁)) →
     Transcript.liftAppend s₁ s₂ F (Transcript.append s₁ s₂ tr₁ tr₂) = F tr₁ tr₂
-  | .done, _, _, _, _ => rfl
-  | .node _ rest, s₂, F, ⟨x, tail₁⟩, tr₂ => by
-      simpa [Transcript.liftAppend, Transcript.append] using
-        Transcript.liftAppend_append (rest x) (fun p => s₂ ⟨x, p⟩)
-          (fun tr₁ tr₂ => F ⟨x, tr₁⟩ tr₂) tail₁ tr₂
+  := PFunctor.FreeM.Path.liftAppend_append
 
 /-- Decompose a transcript of `s₁.append s₂` into the first-phase prefix and the
 second-phase continuation. Inverse of `Transcript.append`. -/
 def Transcript.split :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
-    Transcript (s₁.append s₂) → (tr₁ : Transcript s₁) × Transcript (s₂ tr₁)
-  | .done, _, tr => ⟨⟨⟩, tr⟩
-  | .node _ rest, s₂, ⟨x, tail⟩ =>
-      let ⟨tr₁, tr₂⟩ := Transcript.split (rest x) (fun p => s₂ ⟨x, p⟩) tail
-      ⟨⟨x, tr₁⟩, tr₂⟩
+    Transcript (s₁.append s₂) → (tr₁ : Transcript s₁) × Transcript (s₂ tr₁) :=
+  PFunctor.FreeM.Path.split
 
 /-- Splitting after appending recovers the original components. -/
 @[simp, grind =]
@@ -117,9 +105,7 @@ theorem Transcript.split_append :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
     (tr₁ : Transcript s₁) → (tr₂ : Transcript (s₂ tr₁)) →
     Transcript.split s₁ s₂ (Transcript.append s₁ s₂ tr₁ tr₂) = ⟨tr₁, tr₂⟩
-  | .done, _, _, _ => rfl
-  | .node _ rest, s₂, ⟨x, tail₁⟩, tr₂ => by
-      simp only [Transcript.append, split]; rw [split_append]
+  := PFunctor.FreeM.Path.split_append
 
 /-- Appending the components produced by `split` recovers the original transcript. -/
 @[simp]
@@ -128,9 +114,7 @@ theorem Transcript.append_split :
     (tr : Transcript (s₁.append s₂)) →
     let ⟨tr₁, tr₂⟩ := Transcript.split s₁ s₂ tr
     Transcript.append s₁ s₂ tr₁ tr₂ = tr
-  | .done, _, _ => rfl
-  | .node _ rest, s₂, ⟨x, tail⟩ => by
-      simp only [split, Transcript.append]; rw [append_split]
+  := PFunctor.FreeM.Path.append_split
 
 /-- `liftAppend` can be reconstructed from the transcript pieces returned by
 `Transcript.split`. -/
@@ -169,11 +153,8 @@ def Transcript.packAppend :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
     (F : (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Type u) →
     (tr₁ : Transcript s₁) → (tr₂ : Transcript (s₂ tr₁)) →
-    F tr₁ tr₂ → liftAppend s₁ s₂ F (append s₁ s₂ tr₁ tr₂)
-  | .done, _, _, ⟨⟩, _, x => x
-  | .node _ rest, s₂, F, ⟨xm, tail₁⟩, tr₂, x =>
-      packAppend (rest xm) (fun p => s₂ ⟨xm, p⟩)
-        (fun tr₁ tr₂ => F ⟨xm, tr₁⟩ tr₂) tail₁ tr₂ x
+    F tr₁ tr₂ → liftAppend s₁ s₂ F (append s₁ s₂ tr₁ tr₂) :=
+  PFunctor.FreeM.Path.packAppend
 
 /-- Transport a `liftAppend` value back to the pair-indexed family.
 Inverse of `packAppend`. -/
@@ -181,11 +162,8 @@ def Transcript.unpackAppend :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
     (F : (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Type u) →
     (tr₁ : Transcript s₁) → (tr₂ : Transcript (s₂ tr₁)) →
-    liftAppend s₁ s₂ F (append s₁ s₂ tr₁ tr₂) → F tr₁ tr₂
-  | .done, _, _, ⟨⟩, _, x => x
-  | .node _ rest, s₂, F, ⟨xm, tail₁⟩, tr₂, x =>
-      unpackAppend (rest xm) (fun p => s₂ ⟨xm, p⟩)
-        (fun tr₁ tr₂ => F ⟨xm, tr₁⟩ tr₂) tail₁ tr₂ x
+    liftAppend s₁ s₂ F (append s₁ s₂ tr₁ tr₂) → F tr₁ tr₂ :=
+  PFunctor.FreeM.Path.unpackAppend
 
 @[simp]
 theorem Transcript.unpackAppend_packAppend :

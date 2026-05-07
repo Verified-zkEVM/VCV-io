@@ -209,6 +209,18 @@ structure SyntaxOver
     (X → Type w) →
     Type w
 
+/-- View generic identity-lens syntax as syntax over plain `Spec` trees. -/
+def SyntaxOver.ofGeneric
+    (syn : Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ) :
+    SyntaxOver Agent Γ where
+  Node agent X γ Cont := syn.Node agent X γ Cont
+
+/-- View plain `Spec` syntax as generic syntax over the identity lens. -/
+def SyntaxOver.toGeneric
+    (syn : SyntaxOver Agent Γ) :
+    Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
+  Node agent X γ Cont := syn.Node agent X γ Cont
+
 /--
 `Syntax Agent` is the specialization of `SyntaxOver` with no node-local
 context.

@@ -445,7 +445,8 @@ theorem run_compFlat_appendFlat_pure
     | .done, r₁ =>
         cases r₁
         simp [Focal.compFlat.eq_1, Counterpart.appendFlat.eq_1,
-          run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append]
+          run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append,
+          PFunctor.FreeM.Path.append]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.compFlat.eq_2, Counterpart.appendFlat.eq_2]
         simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
@@ -574,7 +575,8 @@ theorem run_compFlat_appendFlat
     | .done, r₁ =>
         cases r₁
         simp [Focal.compFlat.eq_1, Counterpart.appendFlat.eq_1,
-          run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append]
+          run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append,
+          PFunctor.FreeM.Path.append]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.compFlat.eq_2, Counterpart.appendFlat.eq_2]
         simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
@@ -693,9 +695,11 @@ theorem run_comp_append
     match s₁, r₁ with
     | .done, r₁ =>
         cases r₁
-        simp [Focal.comp, Counterpart.append,
+        simp [monad_norm, Focal.comp, Counterpart.append,
           run_done, Spec.append, Spec.Decoration.append,
-          Spec.Transcript.append, Spec.Transcript.liftAppend, Spec.Transcript.packAppend]
+          Spec.Transcript.append, Spec.Transcript.liftAppend, Spec.Transcript.packAppend,
+          PFunctor.FreeM.Path.append, PFunctor.FreeM.Path.packAppend]
+        rfl
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.comp, Counterpart.append]
         simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,

@@ -273,6 +273,229 @@ theorem append_roll {β : Type t} (a : P.A) (rest : P.B a → FreeM P α)
     append (FreeM.roll a rest) s₂ =
       FreeM.roll a (fun b => append (rest b) (fun path => s₂ ⟨b, path⟩)) := rfl
 
+namespace Path
+
+/-! ## Canonical paths through appended trees -/
+
+/-- Lift a two-argument family indexed by a canonical prefix path and canonical
+suffix path to a family on the appended tree. -/
+def liftAppend {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    ((path₁ : Path s₁) → Path (s₂ path₁) → Type w) →
+    Path (FreeM.append s₁ s₂) → Type w
+  | .pure _, _, F, path => F ⟨⟩ path
+  | .roll _ rest, s₂, F, ⟨b, path⟩ =>
+      liftAppend (rest b) (fun path₁ => s₂ ⟨b, path₁⟩)
+        (fun path₁ path₂ => F ⟨b, path₁⟩ path₂) path
+
+/-- Combine canonical prefix and suffix paths into a canonical path through the
+appended tree. -/
+def append {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (path₁ : Path s₁) → Path (s₂ path₁) → Path (FreeM.append s₁ s₂)
+  | .pure _, _, _, path₂ => path₂
+  | .roll _ rest, s₂, ⟨b, path₁⟩, path₂ =>
+      ⟨b, append (rest b) (fun path => s₂ ⟨b, path⟩) path₁ path₂⟩
+
+/-- Split a canonical path through an appended tree into prefix and suffix
+canonical paths. -/
+def split {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    Path (FreeM.append s₁ s₂) → (path₁ : Path s₁) × Path (s₂ path₁)
+  | .pure _, _, path => ⟨⟨⟩, path⟩
+  | .roll _ rest, s₂, ⟨b, path⟩ =>
+      let splitRest := split (rest b) (fun path₁ => s₂ ⟨b, path₁⟩) path
+      ⟨⟨b, splitRest.1⟩, splitRest.2⟩
+
+/-- `liftAppend` on an appended canonical path reduces to the original
+two-argument family. -/
+@[simp]
+theorem liftAppend_append {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (F : (path₁ : Path s₁) → Path (s₂ path₁) → Type w) →
+    (path₁ : Path s₁) → (path₂ : Path (s₂ path₁)) →
+    liftAppend s₁ s₂ F (append s₁ s₂ path₁ path₂) = F path₁ path₂
+  | .pure _, _, _, ⟨⟩, _ => rfl
+  | .roll _ rest, s₂, F, ⟨b, path₁⟩, path₂ => by
+      simpa [liftAppend, append] using
+        liftAppend_append (rest b) (fun path => s₂ ⟨b, path⟩)
+          (fun path₁ path₂ => F ⟨b, path₁⟩ path₂) path₁ path₂
+
+/-- Splitting after appending recovers the original canonical prefix and suffix. -/
+@[simp]
+theorem split_append {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (path₁ : Path s₁) → (path₂ : Path (s₂ path₁)) →
+    split s₁ s₂ (append s₁ s₂ path₁ path₂) = ⟨path₁, path₂⟩
+  | .pure _, _, ⟨⟩, _ => rfl
+  | .roll _ rest, s₂, ⟨b, path₁⟩, path₂ => by
+      simp only [append, split]
+      rw [split_append]
+
+/-- Appending the components produced by `split` recovers the original
+canonical path. -/
+@[simp]
+theorem append_split {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (path : Path (FreeM.append s₁ s₂)) →
+    let splitPath := split s₁ s₂ path
+    append s₁ s₂ splitPath.1 splitPath.2 = path
+  | .pure _, _, _ => rfl
+  | .roll _ rest, s₂, ⟨b, path⟩ => by
+      simp only [split, append]
+      rw [append_split]
+
+/-- Transport a value of `F path₁ path₂` to the `liftAppend` family at the
+combined canonical path. -/
+def packAppend {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (F : (path₁ : Path s₁) → Path (s₂ path₁) → Type w) →
+    (path₁ : Path s₁) → (path₂ : Path (s₂ path₁)) →
+    F path₁ path₂ → liftAppend s₁ s₂ F (append s₁ s₂ path₁ path₂)
+  | .pure _, _, _, ⟨⟩, _, x => x
+  | .roll _ rest, s₂, F, ⟨b, path₁⟩, path₂, x =>
+      packAppend (rest b) (fun path => s₂ ⟨b, path⟩)
+        (fun path₁ path₂ => F ⟨b, path₁⟩ path₂) path₁ path₂ x
+
+/-- Transport a value from the `liftAppend` family at an appended canonical path
+back to the original two-argument family. -/
+def unpackAppend {β : Type t} :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (F : (path₁ : Path s₁) → Path (s₂ path₁) → Type w) →
+    (path₁ : Path s₁) → (path₂ : Path (s₂ path₁)) →
+    liftAppend s₁ s₂ F (append s₁ s₂ path₁ path₂) → F path₁ path₂
+  | .pure _, _, _, ⟨⟩, _, x => x
+  | .roll _ rest, s₂, F, ⟨b, path₁⟩, path₂, x =>
+      unpackAppend (rest b) (fun path => s₂ ⟨b, path⟩)
+        (fun path₁ path₂ => F ⟨b, path₁⟩ path₂) path₁ path₂ x
+
+end Path
+
+namespace PathAlong
+
+/-! ## Lens-executed paths through appended trees -/
+
+/-- Lift a two-argument family indexed by a runtime prefix path and a runtime
+suffix path to a family on the appended tree.
+
+The suffix is selected by the control projection of the runtime prefix. -/
+def liftAppend {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    ((path₁ : PathAlong l s₁) →
+      PathAlong l (s₂ (projectPathAlong l s₁ path₁)) → Type w) →
+    PathAlong l (FreeM.append s₁ s₂) → Type w
+  | .pure _, _, F, path => F ⟨⟩ path
+  | .roll a rest, s₂, F, ⟨d, path⟩ =>
+      liftAppend l (rest (l.toFunB a d))
+        (fun path₁ => s₂ ⟨l.toFunB a d, path₁⟩)
+        (fun path₁ path₂ => F ⟨d, path₁⟩ path₂)
+        path
+
+/-- Combine a runtime prefix path and a runtime suffix path into a runtime path
+through the appended tree. -/
+def append {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (path₁ : PathAlong l s₁) →
+    PathAlong l (s₂ (projectPathAlong l s₁ path₁)) →
+    PathAlong l (FreeM.append s₁ s₂)
+  | .pure _, _, _, path₂ => path₂
+  | .roll a rest, s₂, ⟨d, path₁⟩, path₂ =>
+      ⟨d, append l (rest (l.toFunB a d))
+        (fun path => s₂ ⟨l.toFunB a d, path⟩)
+        path₁ path₂⟩
+
+/-- Split a runtime path through an appended tree into its prefix runtime path
+and suffix runtime path. -/
+def split {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    PathAlong l (FreeM.append s₁ s₂) →
+    (path₁ : PathAlong l s₁) ×
+      PathAlong l (s₂ (projectPathAlong l s₁ path₁))
+  | .pure _, _, path => ⟨⟨⟩, path⟩
+  | .roll a rest, s₂, ⟨d, path⟩ =>
+      let splitRest :=
+        split l (rest (l.toFunB a d))
+          (fun path₁ => s₂ ⟨l.toFunB a d, path₁⟩)
+          path
+      ⟨⟨d, splitRest.1⟩, splitRest.2⟩
+
+/-- `liftAppend` on an appended runtime path reduces to the original
+two-argument family. -/
+@[simp]
+theorem liftAppend_append {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (F : (path₁ : PathAlong l s₁) →
+      PathAlong l (s₂ (projectPathAlong l s₁ path₁)) → Type w) →
+    (path₁ : PathAlong l s₁) →
+    (path₂ : PathAlong l (s₂ (projectPathAlong l s₁ path₁))) →
+    liftAppend l s₁ s₂ F (append l s₁ s₂ path₁ path₂) = F path₁ path₂
+  | .pure _, _, _, ⟨⟩, _ => rfl
+  | .roll a rest, s₂, F, ⟨d, path₁⟩, path₂ => by
+      simpa [liftAppend, append] using
+        liftAppend_append l (rest (l.toFunB a d))
+          (fun path => s₂ ⟨l.toFunB a d, path⟩)
+          (fun path₁ path₂ => F ⟨d, path₁⟩ path₂)
+          path₁ path₂
+
+/-- Splitting after appending recovers the original runtime prefix and suffix. -/
+@[simp]
+theorem split_append {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (path₁ : PathAlong l s₁) →
+    (path₂ : PathAlong l (s₂ (projectPathAlong l s₁ path₁))) →
+    split l s₁ s₂ (append l s₁ s₂ path₁ path₂) = ⟨path₁, path₂⟩
+  | .pure _, _, ⟨⟩, _ => rfl
+  | .roll a rest, s₂, ⟨d, path₁⟩, path₂ => by
+      simp only [append, split]
+      rw [split_append]
+
+/-- Appending the components produced by `split` recovers the original runtime path. -/
+@[simp]
+theorem append_split {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (path : PathAlong l (FreeM.append s₁ s₂)) →
+    let splitPath := split l s₁ s₂ path
+    append l s₁ s₂ splitPath.1 splitPath.2 = path
+  | .pure _, _, _ => rfl
+  | .roll a rest, s₂, ⟨d, path⟩ => by
+      simp only [split, append]
+      rw [append_split]
+
+/-- Transport a value of `F path₁ path₂` to the `liftAppend` family at the
+combined runtime path. The definition follows the same recursion as
+`liftAppend`, so it avoids explicit equality transports. -/
+def packAppend {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (F : (path₁ : PathAlong l s₁) →
+      PathAlong l (s₂ (projectPathAlong l s₁ path₁)) → Type w) →
+    (path₁ : PathAlong l s₁) →
+    (path₂ : PathAlong l (s₂ (projectPathAlong l s₁ path₁))) →
+    F path₁ path₂ → liftAppend l s₁ s₂ F (append l s₁ s₂ path₁ path₂)
+  | .pure _, _, _, ⟨⟩, _, x => x
+  | .roll a rest, s₂, F, ⟨d, path₁⟩, path₂, x =>
+      packAppend l (rest (l.toFunB a d))
+        (fun path => s₂ ⟨l.toFunB a d, path⟩)
+        (fun path₁ path₂ => F ⟨d, path₁⟩ path₂)
+        path₁ path₂ x
+
+/-- Transport a value from the `liftAppend` family at an appended runtime path
+back to the original two-argument family. -/
+def unpackAppend {β : Type t} (l : Lens P Q) :
+    (s₁ : FreeM P α) → (s₂ : Path s₁ → FreeM P β) →
+    (F : (path₁ : PathAlong l s₁) →
+      PathAlong l (s₂ (projectPathAlong l s₁ path₁)) → Type w) →
+    (path₁ : PathAlong l s₁) →
+    (path₂ : PathAlong l (s₂ (projectPathAlong l s₁ path₁))) →
+    liftAppend l s₁ s₂ F (append l s₁ s₂ path₁ path₂) → F path₁ path₂
+  | .pure _, _, _, ⟨⟩, _, x => x
+  | .roll a rest, s₂, F, ⟨d, path₁⟩, path₂, x =>
+      unpackAppend l (rest (l.toFunB a d))
+        (fun path => s₂ ⟨l.toFunB a d, path⟩)
+        (fun path₁ path₂ => F ⟨d, path₁⟩ path₂)
+        path₁ path₂ x
+
+end PathAlong
+
 /-! ## Telescopes -/
 
 /-- Initial-algebra presentation of a state-machine telescope of `FreeM`
