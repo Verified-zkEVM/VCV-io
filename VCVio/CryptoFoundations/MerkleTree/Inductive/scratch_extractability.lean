@@ -1384,7 +1384,7 @@ private theorem extractability_game_noColl_caseB_le_inv_card
   · refine le_trans probEvent_le_one ?_
     rw [ENNReal.le_div_iff_mul_le (Or.inr one_ne_zero) (Or.inr ENNReal.one_ne_top)]
     simpa using h_card
-  · push_neg at h_card
+  · push Not at h_card
     exact extractability_game_noColl_caseB_le_inv_card_aux
       committingAdv openingAdv qb h_IsQueryBound_qb h_le_qb h_card
 
