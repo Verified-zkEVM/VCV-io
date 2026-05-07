@@ -232,6 +232,33 @@ variable {Γ : Node.Context}
 variable {syn : SyntaxOver Agent Γ}
 variable {m : Type u → Type u}
 
+/-- View a plain `Spec` execution law as the identity-lens generic execution law. -/
+def InteractionOver.toGeneric (I : InteractionOver Agent Γ syn m) :
+    _root_.Interaction.InteractionOver
+      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ (SyntaxOver.toGeneric syn) m where
+  interact profile k := I.interact profile k
+
+/-- View an identity-lens generic execution law as a plain `Spec` execution law. -/
+def InteractionOver.ofGeneric
+    (I : _root_.Interaction.InteractionOver
+      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ (SyntaxOver.toGeneric syn) m) :
+    InteractionOver Agent Γ syn m where
+  interact profile k := I.interact profile k
+
+@[simp]
+theorem InteractionOver.ofGeneric_toGeneric (I : InteractionOver Agent Γ syn m) :
+    InteractionOver.ofGeneric (InteractionOver.toGeneric I) = I := by
+  cases I
+  rfl
+
+@[simp]
+theorem InteractionOver.toGeneric_ofGeneric
+    (I : _root_.Interaction.InteractionOver
+      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ (SyntaxOver.toGeneric syn) m) :
+    InteractionOver.toGeneric (InteractionOver.ofGeneric I) = I := by
+  cases I
+  rfl
+
 /--
 Execute a whole protocol tree using the local one-step law `interact`.
 

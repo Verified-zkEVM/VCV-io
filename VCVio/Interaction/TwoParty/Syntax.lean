@@ -43,6 +43,12 @@ def perspective : Role → Participant → Ownership.Perspective
   | .receiver, .focal => .observer
   | .receiver, .counterpart => .owner
 
+/-- Spec-facing form of `perspective`, using the plain `Spec.Ownership` perspective type. -/
+def perspectiveSpec (role : Role) (agent : Participant) : Spec.Ownership.Perspective :=
+  match perspective role agent with
+  | .owner => .owner
+  | .observer => .observer
+
 /-- Two-party paired syntax over an arbitrary lens-executed tree, parameterized
 by an unbundled effect-like type constructor.
 
