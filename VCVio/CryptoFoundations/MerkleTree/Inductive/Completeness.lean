@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
-import VCVio.OracleComp.SimSemantics.RunWithOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 
 /-!
 # Completeness of Inductive Merkle Trees
@@ -94,20 +94,20 @@ theorem completeness [DecidableEq α] [Inhabited α] [SampleableType α] {s}
         (cache.getRootValue) proof)
       return verified)).run preexisting_cache] = 1 := by
   -- Reduce a probability-one claim about the random-oracle simulation to a value-level claim
-  -- about `runWithOracle` for every deterministic answer-function extending the cache.
+  -- about `evalWithAnswerFn` for every answer function agreeing with the cache.
   refine (probEvent_eq_one_simulateQ_randomOracle_run_iff (spec := spec α)
     (p := fun b : Bool => b = true) _ _).mpr ?_
   intro f _hf
-  -- Unfold `runWithOracle` and reduce simulation through the do-block, then collapse the
+  -- Unfold `evalWithAnswerFn` and reduce simulation through the do-block, then collapse the
   -- residual `BEq` test to a value equality and finish by `functional_completeness`.
-  change (simulateQ (QueryImpl.ofFn f) (do
+  change (simulateQ f (do
     let cache ← buildMerkleTree leaf_data_tree
     let proof := generateProof cache idx
     let verified ← (verifyProof (m := OracleComp (spec α)) idx (leaf_data_tree.get idx)
       (cache.getRootValue) proof)
     return verified) : Id Bool) = (true : Bool)
   simp only [verifyProof, simulateQ_bind, simulateQ_pure,
-    simulateQ_buildMerkleTree, simulateQ_getPutativeRoot, QueryImpl.ofFn_apply]
+    simulateQ_buildMerkleTree, simulateQ_getPutativeRoot]
   change ((_ : α) == _) = true
   rw [beq_iff_eq]
   exact functional_completeness idx leaf_data_tree fun left right => f (left, right)

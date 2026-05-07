@@ -5,7 +5,7 @@ Authors: Quang Dao, Fawad Haider
 -/
 
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
-import VCVio.OracleComp.SimSemantics.RunWithOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 
 /-!
   # Merkle Trees as a vector commitment
@@ -439,7 +439,7 @@ theorem completeness [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
   intro f _hf
   -- Reduce simulation through the do-block to a deterministic computation, then apply
   -- `functional_completeness`.
-  change (simulateQ (QueryImpl.ofFn f) (do
+  change (simulateQ f (do
     let cache ← buildMerkleTree α n leaves
     let proof := generateProof α i cache
     let verified ← (verifyProof (m := OracleComp (spec α)) α i leaves[i]
@@ -449,7 +449,7 @@ theorem completeness [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
     simulateQ_buildMerkleTree_eq, simulateQ_getPutativeRoot_eq]
   change ((_ : α) == _) = true
   rw [beq_iff_eq]
-  exact functional_completeness α leaves i (QueryImpl.ofFn f)
+  exact functional_completeness α leaves i f
 
 end
 
