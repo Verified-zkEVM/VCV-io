@@ -1267,6 +1267,52 @@ private theorem extractability_game_noColl_caseA_eq_zero
     exact Bool.noConfusion h
 
 /--
+**Case B substantive obligation, `2 ≤ |α|` branch.** Same statement as
+`extractability_game_noColl_caseB_le_inv_card`, but specialized to the
+non-trivial cardinality regime `1 < Fintype.card α`. The full case-B bound
+discharges `|α| ≤ 1` by `probEvent_le_one` and delegates to this helper for
+the substantive probabilistic argument.
+
+This helper isolates the genuinely substantive content (a `probOutput_query`
+style bound on the verifier's terminal hash query) from the trivial small-card
+boilerplate. It is left as `sorry`: the proof requires a level-by-level
+analysis of the verifier's hash chain that "leaves" committingAdv's tree —
+specifically, identifying the highest level `k` at which the chain's
+hash-input pair is fresh in the combined log (modulo no-collision /
+duplicate-query reuse, controlled by `h_le_qb : 4 * s.leafCount + 1 ≤ qb`)
+and using uniformity of the random oracle's response at that fresh input to
+bound the probability of producing any specific target value (here `root`)
+by `1/|α|`.
+-/
+private theorem extractability_game_noColl_caseB_le_inv_card_aux
+    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
+    [(spec α).Fintype] [(spec α).Inhabited]
+    {s : Skeleton} {AuxState : Type}
+    (committingAdv : OracleComp (spec α) (α × AuxState))
+    (openingAdv : AuxState →
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
+    (qb : ℕ)
+    (_h_IsQueryBound_qb :
+      IsTotalQueryBound
+        (do
+          let (_root, aux) ← committingAdv
+          let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
+          pure ())
+        qb)
+    (_h_le_qb : 4 * s.leafCount + 1 ≤ qb)
+    (_h_card : 1 < (Fintype.card α : ENNReal)) :
+    Pr[(fun x : (α × AuxState ×
+        ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
+         FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) ×
+      (spec α).QueryLog =>
+        let ⟨_, _, idx, _, _, extractedTree, _, verified⟩ := x.1
+        verified = true ∧ extractedTree.get idx.toNodeIndex = none) |
+      (extractability_game committingAdv openingAdv).withQueryLog] ≤
+        (1 : ENNReal) / (Fintype.card α : ENNReal) := by
+  sorry
+
+/--
 **Case B bound: probability `≤ 1/|α|`.** When the extractor's path from `root` to
 the opened leaf index is broken in committingAdv's log (i.e. the extracted leaf at
 `idx` is `none`), verification succeeding requires the random oracle to produce a
@@ -1274,8 +1320,9 @@ chain reaching `root` whose terminal hash query has a fresh input pair (under no
 collision). Since the random oracle's output on a fresh input is uniform on `α`,
 the probability of hitting any specific target value is `1/|α|`.
 
-The proof reduces to a `probOutput_query`-style bound on the verifier's terminal
-hash query; left as `sorry` for now.
+The trivial small-cardinality case (`|α| ≤ 1`) is handled by `probEvent_le_one`;
+the substantive `1 < |α|` branch is delegated to
+`extractability_game_noColl_caseB_le_inv_card_aux`.
 -/
 private theorem extractability_game_noColl_caseB_le_inv_card
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -1328,13 +1375,18 @@ private theorem extractability_game_noColl_caseB_le_inv_card
   random-oracle output at that level is uniform on `α`, hitting any specific
   target value with probability `1/|α|`.
 
-  Apply `probOutput_query` / `evalDist_query` on the verifier's terminal hash
-  query (when the chain "rejoins" `root`). The hypothesis `4 * s.leafCount + 1 ≤ qb`
-  bounds the size of the combined log, ruling out the pathological case where
-  many opener queries pre-set the random oracle to produce `root` on
-  inputs the verifier later queries.
+  We split by cardinality: if `Fintype.card α ≤ 1`, the bound `1/|α|` is `⊤`
+  (when `|α| = 0`) or `1` (when `|α| = 1`), so `probEvent_le_one` suffices. The
+  substantive case `2 ≤ Fintype.card α` is encapsulated as the helper
+  `extractability_game_noColl_caseB_le_inv_card_aux`.
   -/
-  sorry
+  by_cases h_card : (Fintype.card α : ENNReal) ≤ 1
+  · refine le_trans probEvent_le_one ?_
+    rw [ENNReal.le_div_iff_mul_le (Or.inr one_ne_zero) (Or.inr ENNReal.one_ne_top)]
+    simpa using h_card
+  · push_neg at h_card
+    exact extractability_game_noColl_caseB_le_inv_card_aux
+      committingAdv openingAdv qb h_IsQueryBound_qb h_le_qb h_card
 
 /--
 **Tight no-collision bound.** Conditional on the combined query log of
