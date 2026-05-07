@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Node
 import VCVio.Interaction.Basic.Spec
+import ToMathlib.PFunctor.Free.Displayed
 import Mathlib.Logic.Equiv.Defs
 
 /-!
@@ -103,9 +104,11 @@ and recursively decorates every abstract control continuation `b : P.B a`.
 The plain `Spec.Decoration` below is the specialization to
 `Spec.basePFunctor` and terminal payload `PUnit`.
 -/
-def Decoration (Γ : P.A → Type w₂) : PFunctor.FreeM P α → Type (max v w₂)
-  | .pure _ => PUnit
-  | .roll a rest => Γ a × ((b : P.B a) → Decoration Γ (rest b))
+abbrev Decoration (Γ : P.A → Type w₂) : PFunctor.FreeM P α → Type (max v w₂) :=
+  PFunctor.FreeM.Displayed {
+    leaf := fun _ => PUnit.{max v w₂ + 1}
+    node := fun a child => Γ a × ((b : P.B a) → child b)
+  }
 
 namespace Spec
 
@@ -125,9 +128,11 @@ This is different from `Spec.SyntaxOver`:
 * syntax is a **specification of local participant objects** that consumes such
   data;
 * `Spec.ShapeOver` is the functorial refinement of that syntax layer. -/
-def Decoration (Γ : Node.Context.{u, v}) : Spec → Type (max u v)
-  | .done => PUnit
-  | .node X rest => Γ X × (∀ x, Decoration Γ (rest x))
+abbrev Decoration (Γ : Node.Context.{u, v}) : Spec → Type (max u v) :=
+  Interaction.Decoration
+    (P := Spec.basePFunctor.{u})
+    (α := PUnit.{u+1})
+    Γ
 
 /-- The unique decoration by the empty node context. -/
 def Decoration.empty : (spec : Spec) → Decoration Node.Context.empty spec

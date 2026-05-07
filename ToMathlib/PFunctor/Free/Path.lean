@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 module
 
-public import ToMathlib.PFunctor.Free.Basic
+public import ToMathlib.PFunctor.Free.Displayed
 
 /-!
 # Branch paths and telescopes for `PFunctor.FreeM`
@@ -66,9 +66,11 @@ variable {P : PFunctor.{uA, uB}} {α : Type v}
 variable {Q : PFunctor.{uA₂, uB₂}}
 
 /-- The canonical root-to-leaf path through a `FreeM` tree. -/
-def Path {α : Type v} : FreeM P α → Type uB
-  | .pure _ => PUnit
-  | .roll a rest => (b : P.B a) × Path (rest b)
+abbrev Path {α : Type v} : FreeM P α → Type uB :=
+  Displayed {
+    leaf := fun _ => PUnit.{uB+1}
+    node := fun a child => (b : P.B a) × child b
+  }
 
 /-! ## Runtime paths along a lens -/
 
