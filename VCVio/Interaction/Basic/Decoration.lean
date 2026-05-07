@@ -128,11 +128,9 @@ This is different from `Spec.SyntaxOver`:
 * syntax is a **specification of local participant objects** that consumes such
   data;
 * `Spec.ShapeOver` is the functorial refinement of that syntax layer. -/
-abbrev Decoration (Γ : Node.Context.{u, v}) : Spec → Type (max u v) :=
-  Interaction.Decoration
-    (P := Spec.basePFunctor.{u})
-    (α := PUnit.{u+1})
-    Γ
+def Decoration (Γ : Node.Context.{u, v}) : Spec → Type (max u v)
+  | .done => PUnit
+  | .node X rest => Γ X × (∀ x, Decoration Γ (rest x))
 
 /-- The unique decoration by the empty node context. -/
 def Decoration.empty : (spec : Spec) → Decoration Node.Context.empty spec
