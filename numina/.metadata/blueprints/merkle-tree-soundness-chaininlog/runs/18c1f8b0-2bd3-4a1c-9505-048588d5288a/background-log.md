@@ -1,1 +1,3 @@
 - [2026-05-07] Started: filling the remaining `sorry` in `extractability_game_noColl_caseB_le_inv_card` at `VCVio/CryptoFoundations/MerkleTree/Inductive/Extractability.lean:1337`.
+- [2026-05-07] Progress: extracted the trivial small-cardinality branch, isolating the substantive `1 < |α|` content into a new helper `extractability_game_noColl_caseB_le_inv_card_aux`; module builds.
+- [2026-05-07] Review needed: the substantive `1/|α|` probability bound (now in `extractability_game_noColl_caseB_le_inv_card_aux`) is unchanged in difficulty and needs a `probOutput_query`-style argument over the verifier's terminal hash; this is a research-level formalization beyond what one autonomous prover round can discharge.
