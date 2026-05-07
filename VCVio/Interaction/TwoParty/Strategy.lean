@@ -700,11 +700,14 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
     match spec, roles with
     | .done, roles =>
         cases roles
-        simp [Focal.mapOutput, Counterpart.mapOutput, InteractionOver.run_paired_done]
+        simp [Focal.mapOutput, Counterpart.mapOutput, InteractionOver.run,
+          participantProfile, collectParticipantOutputs]
     | .node _ rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.mapOutput, Counterpart.mapOutput, Counterpart.mapReceiver,
           Counterpart.mapSender]
-        simp only [InteractionOver.run_paired_sender, bind_pure_comp, bind_map_left, map_bind,
+        simp only [InteractionOver.run, pairedInteraction, pairedSyntax,
+          participantOutputFamily, participantProfile, collectParticipantOutputs,
+          focalRunner, counterpartRunner, bind_pure_comp, bind_map_left, map_bind,
           Functor.map_map]
         refine congrArg (fun k => strat >>= k) ?_
         funext xc
@@ -723,7 +726,9 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
         simp only [Focal.mapOutput, Counterpart.mapOutput,
           Counterpart.mapReceiver]
         simp only
-          [InteractionOver.run_paired_receiver, bind_pure_comp, bind_map_left, map_bind,
+          [InteractionOver.run, pairedInteraction, pairedSyntax,
+            participantOutputFamily, participantProfile, collectParticipantOutputs,
+            focalRunner, counterpartRunner, bind_pure_comp, bind_map_left, map_bind,
             Functor.map_map]
         refine congrArg (fun k => cpt >>= k) ?_
         funext xc
@@ -747,7 +752,7 @@ theorem run_done {m : Type u → Type u} [Monad m]
     run .done PUnit.unit outP outC =
       (pure ⟨⟨⟩, outP, outC⟩ :
         m ((tr : Transcript Spec.done) × OutputP tr × OutputC tr)) := by
-  simp [run]
+  simp [run, InteractionOver.run, participantProfile, collectParticipantOutputs]
 
 @[simp]
 theorem run_sender {m : Type u → Type u} [Monad m]
@@ -763,7 +768,7 @@ theorem run_sender {m : Type u → Type u} [Monad m]
       let dualNext ← dualFn xc.1
       let tailOut ← run (rest xc.1) (rRest xc.1) xc.2 dualNext
       pure ⟨⟨xc.1, tailOut.1⟩, tailOut.2⟩) := by
-  simp [run, InteractionOver.run_paired_sender]
+  simpa [run] using InteractionOver.run_paired_sender send dualFn
 
 @[simp]
 theorem run_receiver {m : Type u → Type u} [Monad m]
@@ -779,7 +784,7 @@ theorem run_receiver {m : Type u → Type u} [Monad m]
       let next ← respond xc.1
       let tailOut ← run (rest xc.1) (rRest xc.1) next xc.2
       pure ⟨⟨xc.1, tailOut.1⟩, tailOut.2⟩) := by
-  simp [run, InteractionOver.run_paired_receiver]
+  simpa [run] using InteractionOver.run_paired_receiver respond dualSample
 
 theorem run_mapOutput_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
