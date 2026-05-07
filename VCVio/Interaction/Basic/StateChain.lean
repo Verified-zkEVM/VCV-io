@@ -302,9 +302,9 @@ def Strategy.stateChainComp {m : Type u → Type u} [Monad m]
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     {Family : (i : Nat) → Stage i → Type u}
     (step : (i : Nat) → (s : Stage i) → Family i s →
-      m (Strategy m (spec i s) (fun tr => Family (i + 1) (advance i s tr)))) :
+      m (Strategy.Plain m (spec i s) (fun tr => Family (i + 1) (advance i s tr)))) :
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
-    m (Strategy m (Spec.stateChain Stage spec advance n i s)
+    m (Strategy.Plain m (Spec.stateChain Stage spec advance n i s)
       (Transcript.stateChainFamily Family n i s))
   | 0, _, _, a => pure a
   | n + 1, i, s, a => do
