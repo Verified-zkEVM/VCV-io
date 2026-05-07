@@ -19,7 +19,6 @@ appended role decorations.
 universe u
 
 namespace Interaction
-namespace Spec
 namespace TwoParty
 
 open _root_.Interaction.TwoParty
@@ -47,5 +46,4 @@ theorem RoleDecoration.swap_append
   Spec.Decoration.map_append (fun _ => Role.swap) s₁ s₂ r₁ r₂
 
 end TwoParty
-end Spec
 end Interaction

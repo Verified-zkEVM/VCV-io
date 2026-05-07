@@ -21,7 +21,6 @@ to `Spec.Decoration.Over` with fiber `Role.SenderData` is an equivalence; `map` 
 universe u v w w₂
 
 namespace Interaction
-namespace Spec
 namespace TwoParty
 
 open _root_.Interaction.TwoParty
@@ -288,5 +287,4 @@ theorem ofDecorationOver_map {S T : Type u → Type v} (f : ∀ X, S X → T X) 
 
 end Role.Refine
 end TwoParty
-end Spec
 end Interaction
