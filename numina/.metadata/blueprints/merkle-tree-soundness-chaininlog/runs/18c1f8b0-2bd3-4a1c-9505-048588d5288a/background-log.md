@@ -1,0 +1,1 @@
+- [2026-05-07] Started: filling the remaining `sorry` in `extractability_game_noColl_caseB_le_inv_card` at `VCVio/CryptoFoundations/MerkleTree/Inductive/Extractability.lean:1337`.
