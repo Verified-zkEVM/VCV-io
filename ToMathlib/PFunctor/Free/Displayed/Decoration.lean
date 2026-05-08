@@ -101,6 +101,11 @@ def extendMap {Γ : P.A → Type w₂} {Δ : P.A → Type w₃}
 
 end Context
 
+/-- The unique decoration by the everywhere-`PUnit` node metadata family. -/
+def empty : (s : FreeM P α) → Decoration (fun _ => PUnit.{max v w₂ + 1}) s
+  | .pure _ => ⟨⟩
+  | .roll _ rest => ⟨PUnit.unit, fun b => empty (rest b)⟩
+
 /-- Constructor-local displayed morphism induced by a nodewise metadata map. -/
 def mapLocalHom {Γ : P.A → Type w₂} {Δ : P.A → Type w₃}
     (f : ∀ a, Γ a → Δ a) :
