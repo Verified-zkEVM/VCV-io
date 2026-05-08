@@ -182,7 +182,8 @@ theorem map_stateChain {S T : Type u → Type v} (f : ∀ X, S X → T X)
       stateChain (fun j t => map f (spec j t) (roles j t) (sdeco j t)) n i s
   | 0, _, _ => rfl
   | n + 1, i, s => by
-      simp only [Spec.stateChain_succ, stateChain, Spec.Decoration.stateChain]
+      simp only [Spec.stateChain_succ, stateChain,
+        PFunctor.FreeM.Displayed.Decoration.stateChain_succ]
       rw [map_append f (sdeco i s)
             (fun tr => stateChain sdeco n (i + 1) (advance i s tr))]
       refine congrArg (append (map f (spec i s) (roles i s) (sdeco i s))) ?_

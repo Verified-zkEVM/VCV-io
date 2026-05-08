@@ -62,6 +62,7 @@ import ToMathlib.PFunctor.Free.Basic
 import ToMathlib.PFunctor.Free.Displayed
 import ToMathlib.PFunctor.Free.Displayed.Append
 import ToMathlib.PFunctor.Free.Displayed.Decoration
+import ToMathlib.PFunctor.Free.Displayed.StateChain
 import ToMathlib.PFunctor.Free.Path
 import ToMathlib.PFunctor.Free.Replicate
 import ToMathlib.PFunctor.Lens.Basic
