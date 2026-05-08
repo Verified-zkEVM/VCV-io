@@ -890,7 +890,7 @@ theorem Focal.toConstantMonads_mapOutput
       simp only [Focal.mapOutput, Counterpart.mapReceiver,
         toConstantMonads, Spec.ShapeOver.mapOutput, focalMonadicShape,
         focalMonadicSyntax, RoleDecoration.withMonads, RoleDecoration.monadsOver,
-        Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
+        MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat)
       funext msgAndRest
       rw [toConstantMonads_mapOutput
@@ -901,7 +901,7 @@ theorem Focal.toConstantMonads_mapOutput
       simp only [Focal.mapOutput, toConstantMonads,
         Spec.ShapeOver.mapOutput, focalMonadicShape, focalMonadicSyntax,
         RoleDecoration.withMonads, RoleDecoration.monadsOver,
-        Spec.MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
+        MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat x)
       funext next
       rw [toConstantMonads_mapOutput (rest x) (rRest x)]

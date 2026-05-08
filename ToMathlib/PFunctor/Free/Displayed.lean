@@ -33,7 +33,7 @@ catamorphism: it chooses data in the displayed fiber over every tree.
 
 @[expose] public section
 
-universe uA uB v w w₂ w₃ w₄
+universe uA uB v w w₂ w₃ w₄ w₅ w₆
 
 namespace PFunctor
 namespace FreeM
@@ -295,6 +295,259 @@ theorem toHom_roll (η : LocalHom D E)
   rfl
 
 end LocalHom
+
+namespace Over
+
+variable
+    {R : OverShape.{uA, uB, v, w, w₅} D}
+    {S : OverShape.{uA, uB, v, w₂, w₆} E}
+    {T : OverShape.{uA, uB, v, w₃, w₄} F}
+
+/--
+A morphism between displayed-over families, lying over a morphism between their
+base displayed families.
+
+When the base morphism is `Displayed.Hom.id`, this is a fiberwise morphism over
+the same displayed data.
+-/
+structure Hom (η : Displayed.Hom D E) (R : OverShape D) (S : OverShape E) where
+  toFun :
+    (s : FreeM P α) →
+    (d : Displayed D s) →
+    Over R s d →
+    Over S s (η s d)
+
+instance {η : Displayed.Hom D E} : CoeFun (Hom η R S)
+    (fun _ =>
+      (s : FreeM P α) →
+      (d : Displayed D s) →
+      Over R s d →
+      Over S s (η s d)) where
+  coe f := f.toFun
+
+namespace Hom
+
+@[ext]
+theorem ext {η : Displayed.Hom D E} (f g : Hom η R S)
+    (h : ∀ s d r, f s d r = g s d r) : f = g := by
+  cases f
+  cases g
+  congr
+  funext s d r
+  exact h s d r
+
+/-- Identity morphism of a displayed-over family. -/
+protected def id (R : OverShape D) : Hom Displayed.Hom.id R R where
+  toFun := fun _ _ r => r
+
+/-- Composition of displayed-over morphisms over composed base morphisms. -/
+def comp {η : Displayed.Hom D E} {θ : Displayed.Hom E F}
+    (g : Hom θ S T) (f : Hom η R S) :
+    Hom (Displayed.Hom.comp θ η) R T where
+  toFun := fun s d r => g s (η s d) (f s d r)
+
+@[simp]
+theorem id_apply (s : FreeM P α) (d : Displayed D s) (r : Over R s d) :
+    Hom.id R s d r = r :=
+  rfl
+
+@[simp]
+theorem comp_apply {η : Displayed.Hom D E} {θ : Displayed.Hom E F}
+    (g : Hom θ S T) (f : Hom η R S)
+    (s : FreeM P α) (d : Displayed D s) (r : Over R s d) :
+    comp g f s d r = g s (η s d) (f s d r) :=
+  rfl
+
+@[simp]
+theorem comp_id {η : Displayed.Hom D E} (f : Hom η R S) :
+    comp (Hom.id S) f = f := by
+  ext s d r
+  rfl
+
+@[simp]
+theorem id_comp {η : Displayed.Hom D E} (f : Hom η R S) :
+    comp f (Hom.id R) = f := by
+  ext s d r
+  rfl
+
+theorem comp_assoc {η : Displayed.Hom D E} {θ : Displayed.Hom E F}
+    {ι : Displayed.Hom F G}
+    {U : OverShape.{uA, uB, v, w₄, w₅} G}
+    (h : Hom ι T U) (g : Hom θ S T) (f : Hom η R S) :
+    comp h (comp g f) = comp (comp h g) f := by
+  ext s d r
+  rfl
+
+end Hom
+
+/-- Map displayed-over data by a displayed-over morphism. -/
+def map {η : Displayed.Hom D E} (f : Hom η R S) :
+    (s : FreeM P α) →
+    (d : Displayed D s) →
+    Over R s d →
+    Over S s (η s d)
+  | s, d, r => f s d r
+
+@[simp]
+theorem map_apply {η : Displayed.Hom D E} (f : Hom η R S)
+    (s : FreeM P α) (d : Displayed D s) (r : Over R s d) :
+    map f s d r = f s d r :=
+  rfl
+
+@[simp]
+theorem map_id (s : FreeM P α) (d : Displayed D s) (r : Over R s d) :
+    map (Hom.id R) s d r = r :=
+  rfl
+
+@[simp]
+theorem map_comp {η : Displayed.Hom D E} {θ : Displayed.Hom E F}
+    (g : Hom θ S T) (f : Hom η R S)
+    (s : FreeM P α) (d : Displayed D s) (r : Over R s d) :
+    map (Hom.comp g f) s d r = map g s (η s d) (map f s d r) :=
+  rfl
+
+/--
+A constructor-local morphism between displayed-over families over the same base
+displayed family.
+
+This is the local recursion principle for maps that change only the over-layer
+data and keep the base displayed data fixed.
+-/
+structure FiberLocalHom
+    (R : OverShape.{uA, uB, v, w, w₅} D)
+    (S : OverShape.{uA, uB, v, w, w₆} D) where
+  mapLeaf : (x : α) → (d : D.leaf x) → R.leaf x d → S.leaf x d
+  mapChild :
+    (a : P.A) →
+    (child : (b : P.B a) → Sort w) →
+    (overR : (b : P.B a) → child b → Sort w₅) →
+    (overS : (b : P.B a) → child b → Sort w₆) →
+    ((b : P.B a) → (d : child b) → overR b d → overS b d) →
+    (d : D.node a child) →
+    R.node a child overR d →
+    S.node a child overS d
+
+namespace FiberLocalHom
+
+variable
+    {R' : OverShape.{uA, uB, v, w, w₅} D}
+    {S' : OverShape.{uA, uB, v, w, w₆} D}
+
+/-- The recursive function underlying `FiberLocalHom.toHom`. -/
+def toHomFun (η : FiberLocalHom R' S') :
+    (s : FreeM P α) →
+    (d : Displayed D s) →
+    Over R' s d →
+    Over S' s d
+  | .pure x, d, r => η.mapLeaf x d r
+  | .roll a rest, d, r =>
+      η.mapChild a (fun b => Displayed D (rest b))
+        (fun b d => Over R' (rest b) d)
+        (fun b d => Over S' (rest b) d)
+        (fun b d => toHomFun η (rest b) d) d r
+
+/-- Interpret a constructor-local fiber morphism as a displayed-over morphism. -/
+def toHom (η : FiberLocalHom R' S') : Hom Displayed.Hom.id R' S' where
+  toFun := toHomFun η
+
+@[simp]
+theorem toHom_pure (η : FiberLocalHom R' S') (x : α)
+    (d : D.leaf x) (r : R'.leaf x d) :
+    η.toHom (FreeM.pure (P := P) x) d r = η.mapLeaf x d r :=
+  rfl
+
+@[simp]
+theorem toHom_roll (η : FiberLocalHom R' S')
+    (a : P.A) (rest : P.B a → FreeM P α)
+    (d : D.node a (fun b => Displayed D (rest b)))
+    (r : R'.node a (fun b => Displayed D (rest b))
+      (fun b d => Over R' (rest b) d) d) :
+    η.toHom (FreeM.roll a rest) d r =
+      η.mapChild a (fun b => Displayed D (rest b))
+        (fun b d => Over R' (rest b) d)
+        (fun b d => Over S' (rest b) d)
+        (fun b d => η.toHom (rest b) d) d r :=
+  rfl
+
+end FiberLocalHom
+
+/--
+A constructor-local morphism between displayed-over families, lying over a
+constructor-local morphism between their base displayed families.
+-/
+structure LocalHom
+    {D : Shape.{uA, uB, v, w} P α}
+    {E : Shape.{uA, uB, v, w₂} P α}
+    (η : Displayed.LocalHom D E)
+    (R : OverShape.{uA, uB, v, w, w₅} D)
+    (S : OverShape.{uA, uB, v, w₂, w₆} E) where
+  mapLeaf :
+    (x : α) →
+    (d : D.leaf x) →
+    R.leaf x d →
+    S.leaf x (η.mapLeaf x d)
+  mapChild :
+    (a : P.A) →
+    (childD : (b : P.B a) → Sort w) →
+    (childE : (b : P.B a) → Sort w₂) →
+    (baseChild : (b : P.B a) → childD b → childE b) →
+    (overR : (b : P.B a) → childD b → Sort w₅) →
+    (overS : (b : P.B a) → childE b → Sort w₆) →
+    ((b : P.B a) → (d : childD b) → overR b d → overS b (baseChild b d)) →
+    (d : D.node a childD) →
+    R.node a childD overR d →
+    S.node a childE overS (η.mapChild a childD childE baseChild d)
+
+namespace LocalHom
+
+/-- The recursive function underlying `Over.LocalHom.toHom`. -/
+def toHomFun
+    {η : Displayed.LocalHom D E} (φ : LocalHom η R S) :
+    (s : FreeM P α) →
+    (d : Displayed D s) →
+    Over R s d →
+    Over S s (η.toHom s d)
+  | .pure x, d, r => φ.mapLeaf x d r
+  | .roll a rest, d, r =>
+      φ.mapChild a (fun b => Displayed D (rest b))
+        (fun b => Displayed E (rest b))
+        (fun b => η.toHom (rest b))
+        (fun b d => Over R (rest b) d)
+        (fun b d => Over S (rest b) d)
+        (fun b d => toHomFun φ (rest b) d) d r
+
+/--
+Interpret a constructor-local over morphism as a displayed-over morphism over
+the interpreted base morphism.
+-/
+def toHom {η : Displayed.LocalHom D E} (φ : LocalHom η R S) :
+    Hom η.toHom R S where
+  toFun := toHomFun φ
+
+@[simp]
+theorem toHom_pure {η : Displayed.LocalHom D E} (φ : LocalHom η R S)
+    (x : α) (d : D.leaf x) (r : R.leaf x d) :
+    φ.toHom (FreeM.pure (P := P) x) d r = φ.mapLeaf x d r :=
+  rfl
+
+@[simp]
+theorem toHom_roll {η : Displayed.LocalHom D E} (φ : LocalHom η R S)
+    (a : P.A) (rest : P.B a → FreeM P α)
+    (d : D.node a (fun b => Displayed D (rest b)))
+    (r : R.node a (fun b => Displayed D (rest b))
+      (fun b d => Over R (rest b) d) d) :
+    φ.toHom (FreeM.roll a rest) d r =
+      φ.mapChild a (fun b => Displayed D (rest b))
+        (fun b => Displayed E (rest b))
+        (fun b => η.toHom (rest b))
+        (fun b d => Over R (rest b) d)
+        (fun b d => Over S (rest b) d)
+        (fun b d => φ.toHom (rest b) d) d r :=
+  rfl
+
+end LocalHom
+
+end Over
 
 /-- Map displayed data by an interpreted morphism. -/
 def map (f : Hom D E) :

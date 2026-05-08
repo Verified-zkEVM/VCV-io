@@ -32,12 +32,131 @@ These contexts are ordinary inputs to `StrategyOver`: roles say who owns the
 move, and monad decorations say which node effect is used by each participant.
 -/
 
-universe u
+universe u uA uB t
 
 namespace Interaction
 namespace TwoParty
 
 open _root_.Interaction.TwoParty
+open PFunctor
+
+variable {P : PFunctor.{uA, uB}} {α : Type t}
+
+/-! ## Generic role contexts -/
+
+/-- The generic role-labeled node context for a polynomial control tree. -/
+abbrev RoleContextOver (P : PFunctor.{uA, uB}) : P.A → Type :=
+  fun _ => Role
+
+/-- Generic role context extended by one bundled monad field. -/
+abbrev RoleMonadContextOver (P : PFunctor.{uA, uB}) : P.A → Type (u + 1) :=
+  fun _ => Σ _ : Role, BundledMonad.{u, u}
+
+/-- Generic role context extended by a pair of bundled monads. -/
+abbrev RolePairedMonadContextOver (P : PFunctor.{uA, uB}) : P.A → Type (u + 1) :=
+  fun _ => Σ _ : Role, BundledMonad.{u, u} × BundledMonad.{u, u}
+
+namespace RolePairedMonadContextOver
+
+/-- Forget the counterpart monad from a generic paired role/monad context. -/
+abbrev fst :
+    ∀ pos, RolePairedMonadContextOver P pos → RoleMonadContextOver P pos :=
+  fun _ ⟨role, bms⟩ => ⟨role, bms.1⟩
+
+/-- Forget the focal monad from a generic paired role/monad context. -/
+abbrev snd :
+    ∀ pos, RolePairedMonadContextOver P pos → RoleMonadContextOver P pos :=
+  fun _ ⟨role, bms⟩ => ⟨role, bms.2⟩
+
+end RolePairedMonadContextOver
+
+/-- Generic per-node sender/receiver assignment on a polynomial free tree. -/
+abbrev RoleDecorationOver :=
+  Decoration (P := P) (α := α) (RoleContextOver P)
+
+/-- Swap sender and receiver at each node of a generic role decoration. -/
+def RoleDecorationOver.swap {s : PFunctor.FreeM P α} (roles : RoleDecorationOver (P := P) s) :
+    RoleDecorationOver (P := P) s :=
+  Decoration.map (P := P) (α := α) (fun _ => Role.swap) s roles
+
+namespace RoleDecorationOver
+
+/-- View a generic monad decoration as one displayed layer over a role decoration. -/
+def monadsOver :
+    (s : PFunctor.FreeM P α) → (roles : RoleDecorationOver (P := P) s) →
+    (md : MonadDecoration (P := P) (α := α) s) →
+    Decoration.Over (P := P) (α := α) (RoleContextOver P)
+      (fun _ (_ : Role) => BundledMonad.{u, u}) s roles
+  | .pure _, _, _ => ⟨⟩
+  | .roll _ rest, ⟨_, rRest⟩, ⟨bm, mRest⟩ =>
+      ⟨bm, fun b => monadsOver (rest b) (rRest b) (mRest b)⟩
+
+/-- Pack roles together with one bundled monad per node generically. -/
+def withMonads {s : PFunctor.FreeM P α}
+    (roles : RoleDecorationOver (P := P) s) (md : MonadDecoration (P := P) (α := α) s) :
+    Decoration (P := P) (α := α) (RoleMonadContextOver P) s :=
+  Decoration.ofOver (P := P) (α := α) s roles
+    (monadsOver (P := P) (α := α) s roles md)
+
+/-- View paired monad decorations as one displayed layer over a role decoration. -/
+def pairedMonadsOver :
+    (s : PFunctor.FreeM P α) → (roles : RoleDecorationOver (P := P) s) →
+    (stratDeco : MonadDecoration (P := P) (α := α) s) →
+    (cptDeco : MonadDecoration (P := P) (α := α) s) →
+    Decoration.Over (P := P) (α := α) (RoleContextOver P)
+      (fun _ (_ : Role) => BundledMonad.{u, u} × BundledMonad.{u, u}) s roles
+  | .pure _, _, _, _ => ⟨⟩
+  | .roll _ rest, ⟨_, rRest⟩, ⟨bmS, mRestS⟩, ⟨bmC, mRestC⟩ =>
+      ⟨(bmS, bmC), fun b => pairedMonadsOver (rest b) (rRest b) (mRestS b) (mRestC b)⟩
+
+/-- Pack roles together with paired focal/counterpart monads generically. -/
+def withPairedMonads {s : PFunctor.FreeM P α}
+    (roles : RoleDecorationOver (P := P) s)
+    (stratDeco : MonadDecoration (P := P) (α := α) s)
+    (cptDeco : MonadDecoration (P := P) (α := α) s) :
+    Decoration (P := P) (α := α) (RolePairedMonadContextOver P) s :=
+  Decoration.ofOver (P := P) (α := α) s roles
+    (pairedMonadsOver (P := P) (α := α) s roles stratDeco cptDeco)
+
+@[simp]
+theorem withPairedMonads_map_fst :
+    {s : PFunctor.FreeM P α} → {roles : RoleDecorationOver (P := P) s} →
+    {stratDeco cptDeco : MonadDecoration (P := P) (α := α) s} →
+    Decoration.map (P := P) (α := α) (RolePairedMonadContextOver.fst (P := P)) s
+        (withPairedMonads (P := P) (α := α) roles stratDeco cptDeco) =
+      withMonads (P := P) (α := α) roles stratDeco
+  | .pure _, _, _, _ => rfl
+  | .roll _ rest, ⟨role, rRest⟩, ⟨bmS, mRestS⟩, ⟨bmC, mRestC⟩ => by
+      simp only [withPairedMonads, withMonads, monadsOver, pairedMonadsOver,
+        RolePairedMonadContextOver.fst, Decoration.map_roll, Decoration.ofOver]
+      apply Prod.ext
+      · rfl
+      funext b
+      exact withPairedMonads_map_fst
+        (s := rest b) (roles := rRest b)
+        (stratDeco := mRestS b) (cptDeco := mRestC b)
+
+@[simp]
+theorem withPairedMonads_map_snd :
+    {s : PFunctor.FreeM P α} → {roles : RoleDecorationOver (P := P) s} →
+    {stratDeco cptDeco : MonadDecoration (P := P) (α := α) s} →
+    Decoration.map (P := P) (α := α) (RolePairedMonadContextOver.snd (P := P)) s
+        (withPairedMonads (P := P) (α := α) roles stratDeco cptDeco) =
+      withMonads (P := P) (α := α) roles cptDeco
+  | .pure _, _, _, _ => rfl
+  | .roll _ rest, ⟨role, rRest⟩, ⟨bmS, mRestS⟩, ⟨bmC, mRestC⟩ => by
+      simp only [withPairedMonads, withMonads, monadsOver, pairedMonadsOver,
+        RolePairedMonadContextOver.snd, Decoration.map_roll, Decoration.ofOver]
+      apply Prod.ext
+      · rfl
+      funext b
+      exact withPairedMonads_map_snd
+        (s := rest b) (roles := rRest b)
+        (stratDeco := mRestS b) (cptDeco := mRestC b)
+
+end RoleDecorationOver
+
+/-! ## Plain-spec role contexts -/
 
 /-- The plain role-labeled node context. -/
 abbrev RoleContext : Spec.Node.Context := fun _ => Role

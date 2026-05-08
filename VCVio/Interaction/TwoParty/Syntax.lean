@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.Interaction.Basic.Ownership
 import VCVio.Interaction.Basic.Interaction
 import VCVio.Interaction.Basic.Shape
+import VCVio.Interaction.TwoParty.Decoration
 import VCVio.Interaction.TwoParty.Role
 
 /-!
@@ -175,6 +176,81 @@ def monadicShape
           ((fun da => ⟨da.1, f da.1 da.2⟩) <$> receive :
             (monad pos Role.receiver Participant.counterpart).M
               ((d : Q.B (l.toFunA pos)) × B d))
+
+/-- Two-party syntax over a paired focal/counterpart monad context. -/
+def pairedMonadicSyntaxOver :
+    SyntaxOver l Participant
+      (RolePairedMonadContextOver.{uB₂, uA, uB} P) where
+  Node agent pos γ Cont :=
+    match agent, γ with
+    | .focal, ⟨.sender, ⟨bmP, _⟩⟩ =>
+        bmP.M ((d : Q.B (l.toFunA pos)) × Cont d)
+    | .focal, ⟨.receiver, ⟨bmP, _⟩⟩ =>
+        (d : Q.B (l.toFunA pos)) → bmP.M (Cont d)
+    | .counterpart, ⟨.sender, ⟨_, bmC⟩⟩ =>
+        (d : Q.B (l.toFunA pos)) → bmC.M (Cont d)
+    | .counterpart, ⟨.receiver, ⟨_, bmC⟩⟩ =>
+        bmC.M ((d : Q.B (l.toFunA pos)) × Cont d)
+
+/-- Functorial shape for `pairedMonadicSyntaxOver`. -/
+def pairedMonadicShapeOver :
+    Interaction.ShapeOver l Participant
+      (RolePairedMonadContextOver.{uB₂, uA, uB} P) where
+  toSyntaxOver := pairedMonadicSyntaxOver l
+  map := fun {agent} {pos} {γ} {A} {B} f node =>
+    match agent, γ with
+    | Participant.focal, ⟨Role.sender, ⟨bmP, _⟩⟩ =>
+        let send : bmP.M ((d : Q.B (l.toFunA pos)) × A d) := by
+          simpa [pairedMonadicSyntaxOver] using node
+        ((fun da => ⟨da.1, f da.1 da.2⟩) <$> send :
+          bmP.M ((d : Q.B (l.toFunA pos)) × B d))
+    | Participant.focal, ⟨Role.receiver, ⟨bmP, _⟩⟩ =>
+        let observe : (d : Q.B (l.toFunA pos)) → bmP.M (A d) := by
+          simpa [pairedMonadicSyntaxOver] using node
+        fun d => f d <$> observe d
+    | Participant.counterpart, ⟨Role.sender, ⟨_, bmC⟩⟩ =>
+        let observe : (d : Q.B (l.toFunA pos)) → bmC.M (A d) := by
+          simpa [pairedMonadicSyntaxOver] using node
+        fun d => f d <$> observe d
+    | Participant.counterpart, ⟨Role.receiver, ⟨_, bmC⟩⟩ =>
+        let receive : bmC.M ((d : Q.B (l.toFunA pos)) × A d) := by
+          simpa [pairedMonadicSyntaxOver] using node
+        ((fun da => ⟨da.1, f da.1 da.2⟩) <$> receive :
+          bmC.M ((d : Q.B (l.toFunA pos)) × B d))
+
+/-- One-step execution law for paired monadic two-party profiles over a lens. -/
+def pairedMonadicInteractionOver {m : Type uB₂ → Type uB₂} [Monad m]
+    (liftFocal : ∀ (bm : BundledMonad.{uB₂, uB₂}) {α : Type uB₂}, bm.M α → m α)
+    (liftCounterpart : ∀ (bm : BundledMonad.{uB₂, uB₂}) {α : Type uB₂}, bm.M α → m α) :
+    InteractionOver l Participant
+      (RolePairedMonadContextOver.{uB₂, uA, uB} P)
+      (pairedMonadicSyntaxOver l) m where
+  interact := fun {pos} {γ} {Cont} {_Result} profile k =>
+    match γ with
+    | ⟨.sender, ⟨bmP, bmC⟩⟩ => do
+        let pNode :
+            bmP.M ((d : Q.B (l.toFunA pos)) × Cont Participant.focal d) := by
+          simpa [pairedMonadicSyntaxOver] using profile Participant.focal
+        let cNode :
+            (d : Q.B (l.toFunA pos)) → bmC.M (Cont Participant.counterpart d) := by
+          simpa [pairedMonadicSyntaxOver] using profile Participant.counterpart
+        let ⟨d, pCont⟩ ← liftFocal bmP pNode
+        let cCont ← liftCounterpart bmC (cNode d)
+        k d (fun
+          | .focal => pCont
+          | .counterpart => cCont)
+    | ⟨.receiver, ⟨bmP, bmC⟩⟩ => do
+        let cNode :
+            bmC.M ((d : Q.B (l.toFunA pos)) × Cont Participant.counterpart d) := by
+          simpa [pairedMonadicSyntaxOver] using profile Participant.counterpart
+        let pNode :
+            (d : Q.B (l.toFunA pos)) → bmP.M (Cont Participant.focal d) := by
+          simpa [pairedMonadicSyntaxOver] using profile Participant.focal
+        let ⟨d, cCont⟩ ← liftCounterpart bmC cNode
+        let pCont ← liftFocal bmP (pNode d)
+        k d (fun
+          | .focal => pCont
+          | .counterpart => cCont)
 
 /--
 Two-party syntax where the counterpart's owned moves are public coin.

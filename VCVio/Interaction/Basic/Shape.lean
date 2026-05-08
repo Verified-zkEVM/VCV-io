@@ -34,7 +34,7 @@ specialization. This differs from `Decoration.Over`, which is literally
 dependent data over a fixed base decoration value.
 -/
 
-universe u a vΓ w uA uB uA₂ uB₂ t
+universe u a vΓ vΔ vΛ w uA uB uA₂ uB₂ t
 
 namespace Interaction
 
@@ -87,6 +87,29 @@ def toStrategyHom
   mapNode f node := shape.map f node
 
 /--
+Reindex a functorial local syntax object contravariantly along a node metadata
+map.
+-/
+def comap {Δ : P.A → Type vΔ}
+    (f : ∀ pos, Γ pos → Δ pos) (shape : ShapeOver l Agent Δ) :
+    ShapeOver l Agent Γ where
+  toSyntaxOver := SyntaxOver.comap f shape.toSyntaxOver
+  map h := shape.map h
+
+@[simp]
+theorem comap_id (shape : ShapeOver l Agent Γ) :
+    comap (fun _ γ => γ) shape = shape := by
+  cases shape
+  rfl
+
+theorem comap_comp {Δ : P.A → Type vΔ} {Λ : P.A → Type vΛ}
+    (shape : ShapeOver l Agent Λ)
+    (g : ∀ pos, Δ pos → Λ pos) (f : ∀ pos, Γ pos → Δ pos) :
+    comap f (comap g shape) = comap (fun pos => g pos ∘ f pos) shape := by
+  cases shape
+  rfl
+
+/--
 Map leaf outputs through a whole lens-executed strategy.
 
 This is the recursive global form of the local `ShapeOver.map` field. The
@@ -112,6 +135,23 @@ def mapOutput
           mapOutput shape (ctxs := ctxsRest (l.toFunB pos d))
             (fun path => f ⟨d, path⟩))
         node
+
+/--
+Whole-tree families for `ShapeOver.comap f shape` are exactly families for
+`shape` evaluated on the mapped decoration.
+-/
+theorem family_comap {Δ : P.A → Type vΔ}
+    (shape : ShapeOver l Agent Δ) (f : ∀ pos, Γ pos → Δ pos) :
+    {agent : Agent} →
+    {spec : PFunctor.FreeM P α} →
+    (ctxs : Decoration Γ spec) →
+    {Out : PFunctor.FreeM.PathAlong l spec → Type w} →
+    StrategyOver (ShapeOver.comap f shape).toSyntaxOver agent spec ctxs Out =
+      StrategyOver shape.toSyntaxOver agent spec (Decoration.map f spec ctxs) Out := by
+  intro agent spec ctxs Out
+  simpa using
+    (StrategyOver.comap shape.toSyntaxOver f
+      (agent := agent) (spec := spec) (ctxs := ctxs) (Out := Out))
 
 end ShapeOver
 

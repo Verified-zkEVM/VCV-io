@@ -50,6 +50,7 @@ import ToMathlib.ITree.Handler
 import ToMathlib.ITree.Rec
 import ToMathlib.ITree.Sim.Defs
 import ToMathlib.ITree.Sim.Facts
+import ToMathlib.Logic.HEq
 import ToMathlib.OrderEnrichedCategory
 import ToMathlib.PFunctor.Basic
 import ToMathlib.PFunctor.Bound

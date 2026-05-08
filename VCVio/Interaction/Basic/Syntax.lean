@@ -45,7 +45,7 @@ to signal that it is the functorial refinement of syntax, with continuation
 reindexing available as part of the interface.
 -/
 
-universe u a vΓ w uA uB uA₂ uB₂ t
+universe u a vΓ vΔ vΛ w uA uB uA₂ uB₂ t
 
 namespace Interaction
 
@@ -76,7 +76,33 @@ structure SyntaxOver
 
 namespace SyntaxOver
 
-variable {Agent : Type a} {Γ : P.A → Type vΓ}
+variable {l : PFunctor.Lens P Q}
+variable {Agent : Type a}
+variable {Γ : P.A → Type vΓ}
+
+/--
+Reindex a local syntax object contravariantly along a node metadata map.
+
+If `f : Γ → Δ`, then any syntax over `Δ` can be viewed as syntax over `Γ` by
+translating the local metadata value before passing it to the original syntax.
+-/
+def comap {Δ : P.A → Type vΔ}
+    (f : ∀ pos, Γ pos → Δ pos) (syn : SyntaxOver l Agent Δ) :
+    SyntaxOver l Agent Γ where
+  Node agent pos γ Cont := syn.Node agent pos (f pos γ) Cont
+
+@[simp]
+theorem comap_id (syn : SyntaxOver l Agent Γ) :
+    comap (fun _ γ => γ) syn = syn := by
+  cases syn
+  rfl
+
+theorem comap_comp {Δ : P.A → Type vΔ} {Λ : P.A → Type vΛ}
+    (syn : SyntaxOver l Agent Λ)
+    (g : ∀ pos, Δ pos → Λ pos) (f : ∀ pos, Γ pos → Δ pos) :
+    comap f (comap g syn) = comap (fun pos => g pos ∘ f pos) syn := by
+  cases syn
+  rfl
 
 end SyntaxOver
 
@@ -149,6 +175,25 @@ def map
           map η (ctxs := ctxs (l.toFunB pos d))
             (fun path => f ⟨d, path⟩))
         stratNode
+
+/--
+Whole-tree families for `SyntaxOver.comap f syn` are exactly families for `syn`
+evaluated on the mapped decoration.
+-/
+theorem comap {Δ : P.A → Type vΔ}
+    (syn : SyntaxOver l Agent Δ) (f : ∀ pos, Γ pos → Δ pos) :
+    {agent : Agent} →
+    {spec : PFunctor.FreeM P α} →
+    (ctxs : Decoration Γ spec) →
+    {Out : PFunctor.FreeM.PathAlong l spec → Type w} →
+    StrategyOver (SyntaxOver.comap f syn) agent spec ctxs Out =
+      StrategyOver syn agent spec (Decoration.map f spec ctxs) Out
+  | _, .pure _, _, _ => rfl
+  | agent, .roll pos rest, ⟨γ, ctxs⟩, Out => by
+      simp only [StrategyOver, SyntaxOver.comap, Decoration.map_roll]
+      congr 1
+      funext d
+      exact comap syn f (agent := agent) (ctxs := ctxs (l.toFunB pos d))
 
 end StrategyOver
 
