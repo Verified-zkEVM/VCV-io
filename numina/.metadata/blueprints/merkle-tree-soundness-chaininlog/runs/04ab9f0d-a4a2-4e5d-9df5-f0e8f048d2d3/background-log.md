@@ -1,0 +1,3 @@
+- [2026-05-06] Started: prove next sorry in Extractability.lean (h_extracted_tree_eq inside extractability_game_no_coll_match)
+- [2026-05-06] Proved: extractability_game_no_coll_match (both internal sorries, via refactor to use committingLog + new helpers chainInLog_restrict and withQueryLog_self_log_eq)
+- [2026-05-06] Completed: module builds; only remaining sorry is in unrelated Case B (extractability_game_noColl_caseB_le_inv_card, line 1337)
