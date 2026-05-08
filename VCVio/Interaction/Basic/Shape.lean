@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Node
-import VCVio.Interaction.Basic.Decoration
 import VCVio.Interaction.Basic.Syntax
 
 /-!
@@ -12,11 +11,11 @@ import VCVio.Interaction.Basic.Syntax
 
 This file introduces the functorial refinement of the local syntax core.
 
-`Spec.SyntaxOver` in `Basic/Syntax` is the most general local syntax object: it
+`SyntaxOver` in `Basic/Syntax` is the most general local syntax object: it
 describes which node object an agent has at one protocol node, with no
 assumption that recursive continuations can be reindexed generically.
 
-`Spec.ShapeOver` is the functorial refinement of that base notion:
+`ShapeOver` is the functorial refinement of that base notion:
 it equips a `SyntaxOver` with a continuation map. This is exactly the extra
 structure needed to define generic output transport such as
 `ShapeOver.mapOutput`.
@@ -34,180 +33,84 @@ specialization. This differs from `Decoration.Over`, which is literally
 dependent data over a fixed base decoration value.
 -/
 
-universe u a vΓ w
+universe u a vΓ vΔ vΛ w uA uB uA₂ uB₂ t
 
 namespace Interaction
-namespace Spec
 
-variable {Agent : Type a}
-variable {Γ : Node.Context}
+open PFunctor
+
+variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
+variable {α : Type t}
 
 /--
-`ShapeOver Agent Γ` is a functorial local-syntax object over realized node
-contexts `Γ`.
+`ShapeOver l Agent Γ` is functorial local syntax over an arbitrary control
+polynomial executed through a runtime lens `l`.
 
-It answers the following question:
-
-> Suppose we are standing at one protocol node whose move space is `X`.
-> The node carries realized node-local context `γ : Γ X`.
-> If the protocol continues with family `Cont : X → Type w`, what is the type
-> of the local object that agent `a` stores at this node?
-
-Unlike bare `SyntaxOver`, a `ShapeOver` also provides a generic continuation
-map. So a shape is syntax that is *functorial in its recursive continuations*.
-
-This is the right abstraction when node objects support a generic reindexing of
-their continuation payload, for example when those continuations remain exposed
-or are stored under constructors with a functorial action.
+It refines `SyntaxOver l Agent Γ` with a node-level continuation map. At a
+control position `pos : P.A`, recursive continuations are indexed by runtime
+directions `Q.B (l.toFunA pos)`, and the lens determines which control child
+each runtime direction selects.
 -/
 structure ShapeOver
+    (l : PFunctor.Lens P Q)
     (Agent : Type a)
-    (Γ : Node.Context) extends SyntaxOver Agent Γ where
+    (Γ : P.A → Type vΓ) extends SyntaxOver l Agent Γ where
   /--
-  `map` expresses that a node object is functorial in its continuation family.
-
-If we know how to transform each continuation value `A x` into a
-continuation value `B x`, then we can transform a local node object with
-  continuation family `A` into one with continuation family `B`.
-
-  Importantly, `map` does **not** change:
-  * the agent,
-  * the move space,
-  * the node-local context,
-  * or the move `x` that will eventually be chosen.
-
-  It only reinterprets what happens *after* each possible move.
-  This is the local ingredient needed to define the generic whole-tree
-  `ShapeOver.mapOutput` below.
+  Transform the recursive continuation payload of one local node object.
+  The agent, control position, node-local context, and runtime move shape are
+  unchanged.
   -/
   map :
     {agent : Agent} →
-    {X : Type u} →
-    {γ : Γ X} →
-    {A B : X → Type w} →
-    (∀ x, A x → B x) →
-    Node agent X γ A →
-    Node agent X γ B
+    {pos : P.A} →
+    {γ : Γ pos} →
+    {A B : Q.B (l.toFunA pos) → Type w} →
+    (∀ d, A d → B d) →
+    Node agent pos γ A →
+    Node agent pos γ B
 
-/--
-`Shape Agent` is the specialization of `ShapeOver` with no node-local context.
+namespace ShapeOver
 
-This is the right facade when the protocol tree carries no node metadata at all.
-Equivalently, it is `ShapeOver Agent Spec.Node.Context.empty`.
--/
-abbrev Shape
-    (Agent : Type a) :=
-  ShapeOver Agent Node.Context.empty
+variable {l : PFunctor.Lens P Q}
+variable {Agent : Type a} {Γ : P.A → Type vΓ}
 
-instance : Coe (ShapeOver Agent Γ) (SyntaxOver Agent Γ) where
+instance : Coe (ShapeOver l Agent Γ) (SyntaxOver l Agent Γ) where
   coe := ShapeOver.toSyntaxOver
 
 /--
-View a functorial shape as a local strategy homomorphism on one agent fiber.
+Restrict a participant-indexed shape to one fixed agent.
 
-The homomorphism keeps the syntax and agent fixed; it only applies the shape's
-node-level continuation map.
+The resulting singleton-agent shape has the same node objects and continuation
+map as `shape` at `agent`; the dummy `PUnit` agent argument is ignored.
 -/
-def ShapeOver.toStrategyHom
-    (shape : ShapeOver Agent Γ) (agent : Agent) :
-    StrategyOver.Hom shape.toSyntaxOver agent shape.toSyntaxOver agent where
-  mapNode f node := shape.map f node
+def forAgent (shape : ShapeOver l Agent Γ) (agent : Agent) :
+    ShapeOver l PUnit Γ where
+  toSyntaxOver := SyntaxOver.forAgent shape.toSyntaxOver agent
+  map f node := shape.map (agent := agent) f node
 
 /--
-Reindex a local syntax object contravariantly along a node-context morphism.
-
-If `f : Γ → Δ`, then any shape over `Δ` can be viewed as a shape over `Γ` by
-first viewing its underlying syntax through `SyntaxOver.comap f`.
+Reindex a functorial local syntax object contravariantly along a node metadata
+map.
 -/
-def ShapeOver.comap {Δ : Node.Context}
-    (f : Node.ContextHom Γ Δ) (shape : ShapeOver Agent Δ) :
-    ShapeOver Agent Γ where
+def comap {Δ : P.A → Type vΔ}
+    (f : ∀ pos, Γ pos → Δ pos) (shape : ShapeOver l Agent Δ) :
+    ShapeOver l Agent Γ where
   toSyntaxOver := SyntaxOver.comap f shape.toSyntaxOver
   map h := shape.map h
 
-/--
-Reindex a local syntax object contravariantly along a schema morphism, using
-the underlying realized context morphism.
--/
-abbrev ShapeOver.comapSchema
-    {Δ : Node.Context} {S : Node.Schema Γ} {T : Node.Schema Δ}
-    (f : Node.Schema.SchemaMap S T) (shape : ShapeOver Agent Δ) :
-    ShapeOver Agent Γ :=
-  ShapeOver.comap f.toContextHom shape
-
 @[simp]
-theorem ShapeOver.comap_id
-    (shape : ShapeOver Agent Γ) :
-    ShapeOver.comap (Node.ContextHom.id Γ) shape = shape := by
+theorem comap_id (shape : ShapeOver l Agent Γ) :
+    comap (fun _ γ => γ) shape = shape := by
   cases shape
   rfl
 
-theorem ShapeOver.comap_comp
-    {Δ : Node.Context} {Λ : Node.Context}
-    (shape : ShapeOver Agent Λ)
-    (g : Node.ContextHom Δ Λ) (f : Node.ContextHom Γ Δ) :
-    ShapeOver.comap f (ShapeOver.comap g shape) =
-      ShapeOver.comap (Node.ContextHom.comp g f) shape := by
+theorem comap_comp {Δ : P.A → Type vΔ} {Λ : P.A → Type vΛ}
+    (shape : ShapeOver l Agent Λ)
+    (g : ∀ pos, Δ pos → Λ pos) (f : ∀ pos, Γ pos → Δ pos) :
+    comap f (comap g shape) = comap (fun pos => g pos ∘ f pos) shape := by
   cases shape
   rfl
 
-/--
-`ShapeOver.mapOutput` lifts a pointwise transformation of leaf outputs to a
-transformation of whole-tree participant objects.
+end ShapeOver
 
-This is the recursive global form of the local `ShapeOver.map` field.
-It leaves the underlying interactive structure unchanged and only rewrites the
-terminal output family.
--/
-def ShapeOver.mapOutput
-    (shape : ShapeOver Agent Γ)
-    {agent : Agent}
-    {spec : Spec}
-    (ctxs : Decoration Γ spec)
-    :
-    {A B : Transcript spec → Type w} →
-    (∀ tr, A tr → B tr) →
-    StrategyOver shape.toSyntaxOver agent spec ctxs A →
-    StrategyOver shape.toSyntaxOver agent spec ctxs B
-  :=
-    match spec, ctxs with
-    | .done, _ => fun f out => f ⟨⟩ out
-    | .node _ _, ⟨γ, ctxsRest⟩ => fun f node =>
-        shape.map
-          (agent := agent)
-          (γ := γ)
-          (fun x =>
-            mapOutput shape (ctxs := ctxsRest x) (fun tr => f ⟨x, tr⟩))
-          node
-
-/--
-Whole-tree families for `ShapeOver.comap f shape` are exactly families for `shape`
-evaluated on the mapped decoration `Decoration.map f ctxs`.
--/
-theorem ShapeOver.family_comap {Δ : Node.Context}
-    (shape : ShapeOver Agent Δ) (f : Node.ContextHom Γ Δ) :
-    {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
-    {Out : Transcript spec → Type w} →
-    StrategyOver (ShapeOver.comap f shape).toSyntaxOver agent spec ctxs Out =
-      StrategyOver shape.toSyntaxOver agent spec (Decoration.map f spec ctxs) Out
-  := by
-    intro agent spec ctxs Out
-    simpa using
-      (StrategyOver.comap shape.toSyntaxOver f
-        (agent := agent) (spec := spec) (ctxs := ctxs) (Out := Out))
-
-theorem ShapeOver.family_comapSchema
-    {Δ : Node.Context} {S : Node.Schema Γ} {T : Node.Schema Δ}
-    (shape : ShapeOver Agent Δ) (f : Node.Schema.SchemaMap S T) :
-    {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
-    {Out : Transcript spec → Type w} →
-    StrategyOver (ShapeOver.comapSchema f shape).toSyntaxOver agent spec ctxs Out =
-      StrategyOver shape.toSyntaxOver agent spec (Decoration.Schema.map f spec ctxs) Out :=
-  by
-    intro agent spec ctxs Out
-    simpa using
-      (StrategyOver.comapSchema shape.toSyntaxOver f
-        (agent := agent) (spec := spec) (ctxs := ctxs) (Out := Out))
-
-end Spec
 end Interaction
