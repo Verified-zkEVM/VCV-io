@@ -13,7 +13,7 @@ import ToMathlib.Data.IndexedBinaryTree.Lemmas
 
 This file collects reusable structural lemmas about the inductive Merkle tree
 operations defined in `Defs.lean`. In particular, it provides total-query-bound
-lemmas for `singleHash`, `getPutativeRoot`, and `verifyProof.run`, plus a generic
+lemmas for `singleHash`, `getPutativeRoot`, and `verifyProof`, plus a generic
 bind-extraction utility on `IsTotalQueryBound` used to combine them.
 -/
 
@@ -42,7 +42,7 @@ lemma _root_.IsTotalQueryBound.of_bind_left
 /-- `singleHash` makes exactly one oracle query, hence has total query bound `1`. -/
 lemma singleHash_isTotalQueryBound (left right : α) :
     IsTotalQueryBound (singleHash (m := OracleComp (spec α)) left right) 1 := by
-  simp only [singleHash]
+  simp only [singleHash, HasQuery.instOfMonadLift_query]
   rw [isTotalQueryBound_query_bind_iff]
   exact ⟨Nat.zero_lt_one, fun _ => trivial⟩
 
@@ -70,40 +70,31 @@ lemma getPutativeRoot_isTotalQueryBound {s : Skeleton}
       · intro h
         exact singleHash_isTotalQueryBound proof.head h
 
-/-- `verifyProof.run` makes the same `idx.depth` queries as `getPutativeRoot`; the
-trailing `guard` is a pure conditional. -/
-lemma verifyProof_run_isTotalQueryBound
+/-- `verifyProof` makes the same `idx.depth` queries as `getPutativeRoot`; the
+trailing equality test is pure. -/
+lemma verifyProof_isTotalQueryBound
     [DecidableEq α] {s : Skeleton}
     (idx : SkeletonLeafIndex s) (leafValue rootValue : α)
     (proof : List.Vector α idx.depth) :
     IsTotalQueryBound
-      (verifyProof (m := OracleComp (spec α)) idx leafValue rootValue proof).run
+      (verifyProof (m := OracleComp (spec α)) idx leafValue rootValue proof)
       idx.depth := by
-  have heq : (verifyProof (m := OracleComp (spec α)) idx leafValue rootValue proof).run =
-      (do let r ← getPutativeRoot (m := OracleComp (spec α)) idx leafValue proof
-          if r = rootValue then pure (some ()) else pure none) := by
-    unfold verifyProof
-    simp [OptionT.run_bind, OptionT.run_monadLift, guard]
-    rfl
-  rw [heq]
+  unfold verifyProof
   refine isTotalQueryBound_bind (n₁ := idx.depth) (n₂ := 0) ?_ ?_
   · exact getPutativeRoot_isTotalQueryBound idx leafValue proof
-  · intro r
-    by_cases h : r = rootValue
-    · simp only [h, if_true]; trivial
-    · simp only [h, if_false]; trivial
+  · intro _; trivial
 
-/-- Coarser form of `verifyProof_run_isTotalQueryBound` bounded by the full skeleton
+/-- Coarser form of `verifyProof_isTotalQueryBound` bounded by the full skeleton
 depth `s.depth` rather than the per-leaf `idx.depth`. Useful when the bound must be
 uniform across all leaf indices of `s`. -/
-lemma verifyProof_run_isTotalQueryBound_skeleton_depth
+lemma verifyProof_isTotalQueryBound_skeleton_depth
     [DecidableEq α] {s : Skeleton}
     (idx : SkeletonLeafIndex s) (leafValue rootValue : α)
     (proof : List.Vector α idx.depth) :
     IsTotalQueryBound
-      (verifyProof (m := OracleComp (spec α)) idx leafValue rootValue proof).run
+      (verifyProof (m := OracleComp (spec α)) idx leafValue rootValue proof)
       s.depth :=
-  (verifyProof_run_isTotalQueryBound idx leafValue rootValue proof).mono
+  (verifyProof_isTotalQueryBound idx leafValue rootValue proof).mono
     idx.depth_le_skeleton_depth
 
 end InductiveMerkleTree

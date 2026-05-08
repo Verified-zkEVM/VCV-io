@@ -357,8 +357,7 @@ def extractability_game
     let extractedTree := extractor s queryLog root
     let ⟨idx, leaf, proof⟩ ← openingAdv aux
     let extractedProof := generateProof extractedTree idx
-    let verifiedOpt ← (verifyProof idx leaf root proof).run
-    let verified := verifiedOpt.isSome
+    let verified ← verifyProof idx leaf root proof
     return (root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, verified⟩)
 
 
@@ -424,17 +423,17 @@ theorem extractability_game_IsTotalQueryBound
         (qb + s.depth) := by
   -- Re-associate `extractability_game` as `prefix >>= suffix`, where the prefix
   -- bundles `committingAdv.withQueryLog ; openingAdv` and the suffix runs
-  -- `verifyProof.run` and assembles the final return tuple.
+  -- `verifyProof` and assembles the final return tuple.
   have heq : extractability_game committingAdv openingAdv =
       (committingAdv.withQueryLog >>= fun p =>
         openingAdv p.1.2 >>= fun q => pure (p, q)) >>=
       fun pq =>
-        (verifyProof pq.2.1 pq.2.2.1 pq.1.1.1 pq.2.2.2).run >>= fun verifiedOpt =>
+        verifyProof pq.2.1 pq.2.2.1 pq.1.1.1 pq.2.2.2 >>= fun verified =>
           pure (pq.1.1.1, pq.1.1.2,
                 ⟨pq.2.1, pq.2.2.1, pq.2.2.2,
                  extractor s pq.1.2 pq.1.1.1,
                  generateProof (extractor s pq.1.2 pq.1.1.1) pq.2.1,
-                 verifiedOpt.isSome⟩) := by
+                 verified⟩) := by
     unfold extractability_game
     simp only [bind_assoc, pure_bind]
   rw [heq]
@@ -450,10 +449,10 @@ theorem extractability_game_IsTotalQueryBound
       exact loggingOracle.run_simulateQ_bind_fst committingAdv
         (fun r => openingAdv r.2 >>= fun _ => pure ())
     exact (isQueryBound_iff_of_map_eq hmap (fun _ b => 0 < b) (fun _ b => b - 1)).mpr h
-  · -- Suffix bound: verifyProof.run + pure ≤ s.depth.
+  · -- Suffix bound: verifyProof + pure ≤ s.depth.
     rintro ⟨p, q⟩
     refine isTotalQueryBound_bind (n₁ := s.depth) (n₂ := 0) ?_ ?_
-    · exact verifyProof_run_isTotalQueryBound_skeleton_depth q.1 q.2.1 p.1.1 q.2.2
+    · exact verifyProof_isTotalQueryBound_skeleton_depth q.1 q.2.1 p.1.1 q.2.2
     · intro _; trivial
 
 
@@ -630,42 +629,36 @@ lemma getPutativeRoot_support_chain
     · simp
     · exact chainInLog_mono _ (fun q hq => List.mem_append_left _ hq) h_chain_rec
 
-/-- A successful `verifyProof.run` evaluation in the support of its `withQueryLog`
+/-- A successful `verifyProof` evaluation in the support of its `withQueryLog`
 witnesses a chain in the verifier's log from `root` down to `leaf` along `idx`. -/
-lemma verifyProof_run_support_chain
+lemma verifyProof_support_chain
     {α : Type} [DecidableEq α] [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} (idx : SkeletonLeafIndex s)
     (leaf root : α) (proof : List.Vector α idx.depth)
     (log_v : (spec α).QueryLog)
-    (hmem : (some (), log_v) ∈ support
-        ((verifyProof (m := OracleComp (spec α)) idx leaf root proof).run).withQueryLog) :
+    (hmem : (true, log_v) ∈ support
+        (verifyProof (m := OracleComp (spec α)) idx leaf root proof).withQueryLog) :
     chainInLog log_v root idx leaf proof := by
-  -- Reshape `verifyProof.run` to `getPutativeRoot >>= guard`.
-  have heq : (verifyProof (m := OracleComp (spec α)) idx leaf root proof).run =
+  -- Reshape `verifyProof` to `getPutativeRoot >>= (· == root)`.
+  have heq : verifyProof (m := OracleComp (spec α)) idx leaf root proof =
       (do let r ← getPutativeRoot (m := OracleComp (spec α)) idx leaf proof
-          if r = root then pure (some ()) else pure none) := by
+          pure (r == root)) := by
     unfold verifyProof
-    simp [OptionT.run_bind, OptionT.run_monadLift, guard]
     rfl
   rw [heq, OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
   obtain ⟨⟨r, log_g⟩, h_g, hmem⟩ := hmem
   rw [support_map, Set.mem_image] at hmem
-  obtain ⟨⟨_vOpt, log_x⟩, h_x, h_eq⟩ := hmem
-  -- `Prod.map id (log_g ++ ·) (_vOpt, log_x) = (some (), log_v)` gives `_vOpt = some ()`,
+  obtain ⟨⟨b, log_x⟩, h_x, h_eq⟩ := hmem
+  -- `Prod.map id (log_g ++ ·) (b, log_x) = (true, log_v)` gives `b = true`,
   -- `log_g ++ log_x = log_v`.
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_eq
-  by_cases hroot : r = root
-  · -- Verification succeeds: `r = root`. The `if`-branch is `pure (some ())`, so log is `[]`.
-    subst hroot
-    rw [if_pos rfl, OracleComp.withQueryLog_pure, mem_support_pure_iff] at h_x
-    obtain ⟨_, rfl⟩ := Prod.mk.inj h_x
-    simp only [List.append_nil]
-    exact getPutativeRoot_support_chain idx leaf proof r log_g h_g
-  · -- Verification fails: `r ≠ root`. Then `_vOpt` would have to be `none`, contradicting
-    -- `_vOpt = some ()`.
-    rw [if_neg hroot, OracleComp.withQueryLog_pure, mem_support_pure_iff] at h_x
-    obtain ⟨h_some_eq_none, _⟩ := Prod.mk.inj h_x
-    cases h_some_eq_none
+  rw [OracleComp.withQueryLog_pure, mem_support_pure_iff] at h_x
+  obtain ⟨h_b_eq, rfl⟩ := Prod.mk.inj h_x
+  -- `r == root = true` implies `r = root`.
+  have hroot : r = root := by simpa using h_b_eq.symm
+  subst hroot
+  simp only [List.append_nil]
+  exact getPutativeRoot_support_chain idx leaf proof r log_g h_g
 
 /--
 **Support → chain.** When the game's combined log `log` contains a successful
@@ -712,7 +705,7 @@ theorem support_implies_chainInLog
   simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_v
   obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_v
-  obtain ⟨⟨verifiedOpt, log_v⟩, h_vp, h_v⟩ := h_v
+  obtain ⟨⟨verified, log_v⟩, h_vp, h_v⟩ := h_v
   rw [support_map, Set.mem_image] at h_v
   obtain ⟨⟨_unit, log_p⟩, h_p, h_eq_p⟩ := h_v
   rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_p
@@ -729,17 +722,11 @@ theorem support_implies_chainInLog
   obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
   subst h_idx_eq
   simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
-  obtain ⟨h_leaf_eq, h_proof_eq, _h_tree_eq, _h_proof_ext_eq, h_isSome_eq⟩ := h_rest_eq
+  obtain ⟨h_leaf_eq, h_proof_eq, _h_tree_eq, _h_proof_ext_eq, h_verified_eq⟩ := h_rest_eq
   subst h_leaf_eq
   subst h_proof_eq
-  have h_verifiedOpt : verifiedOpt = some () := by
-    cases verifiedOpt with
-    | none => simp at h_isSome_eq
-    | some u =>
-      cases u
-      rfl
-  subst h_verifiedOpt
-  have h_chain_v := verifyProof_run_support_chain idx_o leaf_o root_c.1 proof_o log_v h_vp
+  subst h_verified_eq
+  have h_chain_v := verifyProof_support_chain idx_o leaf_o root_c.1 proof_o log_v h_vp
   apply chainInLog_mono idx_o _ h_chain_v
   intro q hq
   rw [← h_eq_co2]
@@ -1082,7 +1069,7 @@ theorem extractability_game_no_coll_match
   simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_v
   obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_v
-  obtain ⟨⟨verifiedOpt, log_v⟩, h_vp, h_v⟩ := h_v
+  obtain ⟨⟨verified, log_v⟩, h_vp, h_v⟩ := h_v
   rw [support_map, Set.mem_image] at h_v
   obtain ⟨⟨_unit, log_p⟩, h_p, h_eq_p⟩ := h_v
   rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_p
@@ -1099,7 +1086,7 @@ theorem extractability_game_no_coll_match
   obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
   subst h_idx_eq
   simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
-  obtain ⟨h_leaf_eq, h_proof_eq, h_tree_eq, h_proof_ext_eq, h_isSome_eq⟩ := h_rest_eq
+  obtain ⟨h_leaf_eq, h_proof_eq, h_tree_eq, h_proof_ext_eq, _h_verified_eq⟩ := h_rest_eq
   subst h_leaf_eq
   subst h_proof_eq
   -- Bridge `aux_c = log_c`: the inner queryLog (paired with the result of
