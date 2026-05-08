@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.QueryTracking.Tracing
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.SimSemantics.Append
 import ToMathlib.Control.WriterT
 
@@ -122,22 +122,22 @@ variable {m₀ : Type → Type v} [Monad m₀]
 
 This is the state-transformer analogue of `withLogging` when only the query
 inputs are needed: responses are returned exactly as in the base
-implementation, while the state records the input sequence in order. -/
+implementation, while the state records the input sequence in order.
+
+Defined as the response-independent `preInsert` instrumentation that appends
+the queried input `t` to the state list before delegating to `so`. -/
 def appendInputLog (so : QueryImpl loggedSpec m₀) :
-    QueryImpl loggedSpec (StateT (List loggedSpec.Domain) m₀) := fun t => do
-  let inputs ← get
-  let u ← liftM (so t)
-  set (inputs ++ [t])
-  pure u
+    QueryImpl loggedSpec (StateT (List loggedSpec.Domain) m₀) :=
+  so.preInsert (fun t => modify (· ++ [t]))
+
+lemma appendInputLog_eq_preInsert (so : QueryImpl loggedSpec m₀) :
+    appendInputLog so = so.preInsert (fun t => modify (· ++ [t])) := rfl
 
 @[simp, grind =]
-lemma appendInputLog_apply (so : QueryImpl loggedSpec m₀)
+lemma appendInputLog_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
     (t : loggedSpec.Domain) :
-    appendInputLog so t = (do
-      let inputs ← get
-      let u ← liftM (so t)
-      set (inputs ++ [t])
-      pure u) := rfl
+    appendInputLog so t = (do modify (· ++ [t]); liftM (so t)) := by
+  simp [appendInputLog]
 
 @[simp]
 lemma run_withLogging_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
@@ -151,8 +151,8 @@ lemma run_appendInputLog_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m�
     (t : loggedSpec.Domain) (inputs : List loggedSpec.Domain) :
     (appendInputLog so t).run inputs =
       (so t >>= fun u => pure (u, inputs ++ [t])) := by
-  simp [QueryImpl.appendInputLog_apply, StateT.run_bind, StateT.run_get,
-    StateT.run_set, StateT.run_monadLift]
+  simp [QueryImpl.appendInputLog_apply, StateT.run_bind, StateT.run_modifyGet,
+    StateT.run_monadLift, modify]
 
 /-- A `WriterT` query log can be replayed as a `StateT` input log.
 
@@ -210,8 +210,8 @@ theorem map_run_withLogging_inputs_eq_run_appendInputLog
             bind_pure_comp, map_bind, monad_norm,
             WriterT.run_bind', WriterT.run_liftM, List.empty_eq, WriterT.run_tell,
             List.cons_append, List.nil_append,
-            appendInputLog_apply, StateT.run_bind, StateT.run_get, StateT.run_monadLift,
-            monadLift_self, StateT.run_set]
+            appendInputLog_apply, modify, StateT.run_bind, StateT.run_modifyGet,
+            StateT.run_monadLift, monadLift_self]
           refine bind_congr fun u => ?_
           simpa [List.append_assoc] using ih u (initialInputs ++ [t'])
 
@@ -227,7 +227,6 @@ def OracleSpec.loggingOracle {spec : OracleSpec ι} :
   (QueryImpl.ofLift spec (OracleComp spec)).withLogging
 
 namespace loggingOracle
-
 
 /-- Specialization of `QueryImpl.probFailure_run_simulateQ_withLogging` to `loggingOracle`. -/
 @[simp]
@@ -289,11 +288,7 @@ lemma run_simulateQ_loggingOracle_query_bind
   simp [loggingOracle, QueryImpl.withLogging_apply, OracleQuery.cont_query,
     Function.id_def]
 
-/-! ### Bidirectional query-bound transfer for `loggingOracle` / `withLogging`
-
-The writer log overlay leaves the underlying query structure untouched, so all three
-query-bound flavors transfer biconditionally via `fst_map_run_simulateQ` /
-`QueryImpl.fst_map_run_withLogging` and `isXQueryBound_iff_of_map_eq`. -/
+section isQueryBound
 
 theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
     {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
@@ -399,6 +394,8 @@ theorem log_length_le_of_mem_support_run_simulateQ
         ih qu.1 (m - 1) (hrest qu.1) z' hz'
       have hm : 1 + (m - 1) = m := by omega
       simpa [List.length_append, hqu_log, hm] using Nat.add_le_add_left hz'_len 1
+
+end isQueryBound
 
 end OracleComp
 

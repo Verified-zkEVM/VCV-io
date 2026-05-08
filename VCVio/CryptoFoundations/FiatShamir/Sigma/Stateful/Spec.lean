@@ -6,7 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.SimpAttr
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.QueryTracking.Structures
-import VCVio.OracleComp.SimSemantics.StateSeparating
+import VCVio.OracleComp.SimSemantics.StateT.StateSeparating
 
 /-!
 # Oracle interfaces and plain states for the stateful Fiat-Shamir CMA proof

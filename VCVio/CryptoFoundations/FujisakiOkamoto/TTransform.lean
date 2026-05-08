@@ -8,7 +8,7 @@ import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.HasQuery.Morphism
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
-import VCVio.OracleComp.SimSemantics.BundledSemantics
+import VCVio.OracleComp.SimSemantics.StateT.BundledSemantics
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 
 /-!

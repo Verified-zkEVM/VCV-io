@@ -8,7 +8,7 @@
 | `[]ₒ` | Empty oracle spec (`emptySpec`) | `VCVio/OracleComp/OracleSpec.lean` |
 | `spec₁ + spec₂` | Combine specs via `Sum.elim` | `VCVio/OracleComp/OracleSpec.lean` |
 | `⊂ₒ` | SubSpec relation | `VCVio/OracleComp/Coercions/SubSpec.lean` |
-| `∘ₛ` | QueryImpl composition | `VCVio/OracleComp/SimSemantics/Constructions.lean` |
+| `∘ₛ` | QueryImpl composition | `VCVio/OracleComp/SimSemantics/QueryImpl/Constructions.lean` |
 
 ## Probability Notations
 
