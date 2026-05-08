@@ -248,37 +248,37 @@ def FullData.rightSubtree {α : Type _} {s_left s_right : Skeleton}
   | FullData.internal _ _left right =>
     right
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.leftSubtree_internal {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right) :
     (LeafData.internal left right).leftSubtree = left := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.rightSubtree_internal {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right) :
     (LeafData.internal left right).rightSubtree = right := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem InternalData.leftSubtree_internal {α} {s_left s_right : Skeleton}
     (value : α) (left : InternalData α s_left) (right : InternalData α s_right) :
     (InternalData.internal value left right).leftSubtree = left := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem InternalData.rightSubtree_internal {α} {s_left s_right : Skeleton}
     (value : α) (left : InternalData α s_left) (right : InternalData α s_right) :
     (InternalData.internal value left right).rightSubtree = right := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.leftSubtree_internal {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right) :
     (FullData.internal value left right).leftSubtree = left := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.rightSubtree_internal {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right) :
     (FullData.internal value left right).rightSubtree = right := by
@@ -319,12 +319,12 @@ def FullData.get {s} {α : Type _}
   | FullData.internal _ _ right, SkeletonNodeIndex.ofRight idxRight =>
     FullData.get right idxRight
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.get_leaf {α} (a : α) :
     (LeafData.leaf a).get SkeletonLeafIndex.ofLeaf = a := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.get_ofLeft {s_left s_right : Skeleton} {α : Type _}
     (tree : LeafData α (Skeleton.internal s_left s_right))
     (idxLeft : SkeletonLeafIndex s_left) :
@@ -334,7 +334,7 @@ theorem LeafData.get_ofLeft {s_left s_right : Skeleton} {α : Type _}
   | LeafData.internal left _ =>
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.get_ofRight {s_left s_right : Skeleton} {α : Type _}
     (tree : LeafData α (Skeleton.internal s_left s_right))
     (idxRight : SkeletonLeafIndex s_right) :
@@ -344,7 +344,7 @@ theorem LeafData.get_ofRight {s_left s_right : Skeleton} {α : Type _}
   | LeafData.internal _ right =>
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (idxLeft : SkeletonLeafIndex s_left) :
@@ -352,7 +352,7 @@ theorem LeafData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
       left.get idxLeft := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.get_internal_ofRight {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (idxRight : SkeletonLeafIndex s_right) :
@@ -360,18 +360,18 @@ theorem LeafData.get_internal_ofRight {α} {s_left s_right : Skeleton}
       right.get idxRight := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.get_leaf {α} (a : α) :
     (FullData.leaf a).get SkeletonNodeIndex.ofLeaf = a := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem InternalData.get_internal {α} {s_left s_right : Skeleton}
     (value : α) (left : InternalData α s_left) (right : InternalData α s_right) :
     (InternalData.internal value left right).get SkeletonInternalIndex.ofInternal = value := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem InternalData.get_ofLeft {s_left s_right : Skeleton} {α}
     (tree : InternalData α (Skeleton.internal s_left s_right))
     (idxLeft : SkeletonInternalIndex s_left) :
@@ -381,7 +381,7 @@ theorem InternalData.get_ofLeft {s_left s_right : Skeleton} {α}
   | InternalData.internal _ left _ =>
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem InternalData.get_ofRight {s_left s_right : Skeleton} {α}
     (tree : InternalData α (Skeleton.internal s_left s_right))
     (idxRight : SkeletonInternalIndex s_right) :
@@ -391,7 +391,7 @@ theorem InternalData.get_ofRight {s_left s_right : Skeleton} {α}
   | InternalData.internal _ _ right =>
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem InternalData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
     (value : α) (left : InternalData α s_left) (right : InternalData α s_right)
     (idxLeft : SkeletonInternalIndex s_left) :
@@ -399,7 +399,7 @@ theorem InternalData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
       left.get idxLeft := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem InternalData.get_internal_ofRight {α} {s_left s_right : Skeleton}
     (value : α) (left : InternalData α s_left) (right : InternalData α s_right)
     (idxRight : SkeletonInternalIndex s_right) :
@@ -407,13 +407,13 @@ theorem InternalData.get_internal_ofRight {α} {s_left s_right : Skeleton}
       right.get idxRight := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.get_internal {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right) :
     (FullData.internal value left right).get SkeletonNodeIndex.ofInternal = value := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.get_ofLeft {s_left s_right : Skeleton} {α}
     (tree : FullData α (Skeleton.internal s_left s_right))
     (idxLeft : SkeletonNodeIndex s_left) :
@@ -423,7 +423,7 @@ theorem FullData.get_ofLeft {s_left s_right : Skeleton} {α}
   | FullData.internal _ left _ =>
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.get_ofRight {s_left s_right : Skeleton} {α}
     (tree : FullData α (Skeleton.internal s_left s_right))
     (idxRight : SkeletonNodeIndex s_right) :
@@ -433,7 +433,7 @@ theorem FullData.get_ofRight {s_left s_right : Skeleton} {α}
   | FullData.internal _ _ right =>
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right)
     (idxLeft : SkeletonNodeIndex s_left) :
@@ -441,7 +441,7 @@ theorem FullData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
       left.get idxLeft := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.get_internal_ofRight {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right)
     (idxRight : SkeletonNodeIndex s_right) :
@@ -469,12 +469,12 @@ def FullData.toInternalData {α : Type _} {s : Skeleton}
   | FullData.internal value left right =>
     InternalData.internal value (left.toInternalData) (right.toInternalData)
 
-@[simp]
+@[simp, grind =]
 theorem FullData.toLeafData_leaf {α} (a : α) :
     (FullData.leaf a).toLeafData = LeafData.leaf a := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.toLeafData_leftSubtree {α} {s_left s_right : Skeleton}
     (tree : FullData α (Skeleton.internal s_left s_right)) :
     tree.toLeafData.leftSubtree =
@@ -483,7 +483,7 @@ theorem FullData.toLeafData_leftSubtree {α} {s_left s_right : Skeleton}
   | FullData.internal _ left _right =>
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.toLeafData_rightSubtree {α} {s_left s_right : Skeleton}
     (tree : FullData α (Skeleton.internal s_left s_right)) :
     tree.toLeafData.rightSubtree =
@@ -501,7 +501,7 @@ theorem FullData.toLeafData_eq_leaf {α} (a : α) (tree : FullData α Skeleton.l
     cases h
     rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.toLeafData_internal {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right) :
     (FullData.internal value left right).toLeafData =
@@ -522,12 +522,12 @@ def getRootIndex (s : Skeleton) : SkeletonNodeIndex s := match s with
 def FullData.getRootValue {s} {α : Type _} (tree : FullData α s) :=
   tree.get (getRootIndex s)
 
-@[simp]
+@[simp, grind =]
 theorem FullData.getRootValue_leaf {α} (a : α) :
     (FullData.leaf a).getRootValue = a := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.internal_getRootValue {s_left s_right : Skeleton} {α : Type _}
     (value : α) (left : FullData α s_left) (right : FullData α s_right) :
     (FullData.internal value left right).getRootValue =
@@ -684,24 +684,24 @@ def FullData.map {α β : Type _} (f : α → β) {s : Skeleton}
   | FullData.internal value left right =>
     FullData.internal (f value) (left.map f) (right.map f)
 
-@[simp]
+@[simp, grind =]
 theorem FullData.map_leaf {α β} (f : α → β) (a : α) :
     (FullData.leaf a).map f = FullData.leaf (f a) := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem FullData.map_internal {α β} {s_left s_right : Skeleton}
     (f : α → β) (value : α) (left : FullData α s_left) (right : FullData α s_right) :
     (FullData.internal value left right).map f =
       FullData.internal (f value) (left.map f) (right.map f) := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.map_leaf {α β} (f : α → β) (a : α) :
     (LeafData.leaf a).map f = LeafData.leaf (f a) := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem LeafData.map_internal {α β} {s_left s_right : Skeleton}
     (f : α → β) (left : LeafData α s_left) (right : LeafData α s_right) :
     (LeafData.internal left right).map f =
@@ -747,13 +747,13 @@ def populateUp {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
       leftTree
       rightTree
 
-@[simp]
+@[simp, grind =]
 theorem populateUp_leaf {α} (a : α)
     (compose : α → α → α) :
     populateUp (LeafData.leaf a) compose = FullData.leaf a := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem populateUp_internal {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :
@@ -764,7 +764,7 @@ theorem populateUp_internal {α} {s_left s_right : Skeleton}
         (populateUp right compose) := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem populateUp_getRootValue {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :
@@ -794,7 +794,7 @@ whose subtrees are recursively populated from the projections of `children root`
 This holds by `rfl` thanks to Prod-eta: the `let ⟨l, r⟩ := children root` in the
 definition is `Prod.casesOn (children root) _`, and Prod-eta makes
 `Prod.casesOn p f = f p.1 p.2` definitional. -/
-@[simp] lemma populateDown_internal_def {β : Type _} {sl sr : Skeleton}
+@[simp, grind =] lemma populateDown_internal_def {β : Type _} {sl sr : Skeleton}
     (children : β → β × β) (root : β) :
     populateDown (.internal sl sr) children root =
       FullData.internal root
@@ -802,7 +802,7 @@ definition is `Prod.casesOn (children root) _`, and Prod-eta makes
         (populateDown sr children (children root).2) := rfl
 
 /-- The root value of `populateDown` is the input `root`. -/
-@[simp] lemma populateDown_getRootValue {β : Type _} {s : Skeleton}
+@[simp, grind =] lemma populateDown_getRootValue {β : Type _} {s : Skeleton}
     (children : β → β × β) (root : β) :
     (populateDown s children root).getRootValue = root := by
   cases s with
@@ -820,13 +820,13 @@ def optionPopulateUp {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α 
     FullData (Option α) s :=
   populateUp (leaf_data_tree.map (.some)) (Option.doubleBind compose)
 
-@[simp]
+@[simp, grind =]
 theorem optionPopulateUp_leaf {α} (a : α)
     (compose : α → α → Option α) :
     optionPopulateUp (LeafData.leaf a) compose = FullData.leaf (.some a) := by
   rfl
 
-@[simp]
+@[simp, grind =]
 theorem optionPopulateUp_internal {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → Option α) :
