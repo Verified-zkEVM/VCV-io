@@ -63,6 +63,7 @@ import ToMathlib.PFunctor.Free.Displayed
 import ToMathlib.PFunctor.Free.Displayed.Append
 import ToMathlib.PFunctor.Free.Displayed.Decoration
 import ToMathlib.PFunctor.Free.Path
+import ToMathlib.PFunctor.Free.Replicate
 import ToMathlib.PFunctor.Lens.Basic
 import ToMathlib.PFunctor.Lens.Cartesian
 import ToMathlib.PFunctor.Lens.State

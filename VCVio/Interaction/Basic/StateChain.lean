@@ -59,7 +59,7 @@ theorem replicate_eq_stateChain (spec : Spec) (n : Nat) (i : Nat) :
   induction n generalizing i with
   | zero => rfl
   | succ n ih =>
-    simp only [replicate, stateChain]
+    simp only [replicate_succ, stateChain]
     congr 1; funext _; exact ih (i + 1)
 
 /-- Decompose a `(n+1)`-stage state chain transcript into the first-stage transcript and

@@ -164,7 +164,8 @@ theorem map_replicate {S T : Type u → Type v} (f : ∀ X, S X → T X)
   induction n with
   | zero => rfl
   | succ n ih =>
-    simp only [replicate, Spec.replicate_succ, Spec.Decoration.replicate]
+    simp only [replicate, Spec.replicate_succ,
+      PFunctor.FreeM.Displayed.Decoration.replicate_succ]
     rw [map_append f sd (fun _ => replicate sd n)]
     refine congrArg (append (map f spec roles sd)) ?_
     funext _
