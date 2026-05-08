@@ -7,7 +7,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 
-/-
+/-!
 # Completeness of Inductive Merkle Trees
 
 This file proves the completeness theorem for the inductive Merkle tree
