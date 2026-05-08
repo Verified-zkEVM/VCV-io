@@ -17,11 +17,9 @@ For a polynomial/container `P`, `PFunctor.FreeM P α` is the inductive type of
 well-founded `P`-branching trees with leaves labelled by `α`. The definitions
 below isolate the branch-object pattern of such a tree:
 
-* `FreeM.PathView` describes how to present one observed node step.
-* `FreeM.PathWith view s` records a complete root-to-leaf branch through `s`
-  using that presentation.
-* `FreeM.Path s` is the canonical path view, recording an explicit polynomial
-  direction at every node.
+* `FreeM.Path s` records an explicit polynomial direction at every node.
+* `FreeM.PathAlong l s` is the canonical path through `s.mapLens l`, i.e. the
+  runtime branch through a control tree executed along a polynomial lens.
 * `FreeM.output s path` recovers the leaf payload selected by that path.
 * `FreeM.append s k` grafts a suffix tree selected by the canonical path of `s`.
 * `FreeM.TelescopeWith` is the state-indexed initial algebra obtained by
@@ -56,60 +54,57 @@ Relevant references include:
 
 @[expose] public section
 
-universe v w z t uA uB
+universe v w z t uA uB uA₂ uB₂
 
 namespace PFunctor
 namespace FreeM
 
 variable {P : PFunctor.{uA, uB}} {α : Type v}
 
-/-- Presentation of one observed path step at a `FreeM` node.
+/-! ## Canonical paths -/
 
-For a node `roll a rest`, a recursive path algebra first supplies a family
-`K : P.B a → Type w` of path tails for each child. A `PathView` chooses a
-presentation of the one-step path data over that family. The `pack` and
-`unpack` maps connect that presentation to the canonical sigma view. -/
-structure PathView (P : PFunctor.{uA, uB}) where
-  Step : (a : P.A) → (P.B a → Type w) → Type w
-  pack : {a : P.A} → {K : P.B a → Type w} → ((b : P.B a) × K b) → Step a K
-  unpack : {a : P.A} → {K : P.B a → Type w} → Step a K → (b : P.B a) × K b
+variable {Q : PFunctor.{uA₂, uB₂}}
 
-namespace PathView
-
-/-- The canonical path view records the chosen polynomial direction together
-with the recursive path tail. -/
-def canonical (P : PFunctor.{uA, uB}) : PathView.{uB} P where
-  Step _ K := (b : _) × K b
-  pack x := x
-  unpack x := x
-
-end PathView
-
-/-- A complete branch through a `FreeM` tree, presented through a chosen
-`PathView`. For a terminal `pure` leaf the path is trivial; for a `roll` node,
-the path is one observed step whose tails are recursive paths through the
-children. -/
-def PathWith (view : PathView.{w} P) {α : Type v} : FreeM P α → Type w
+/-- The canonical root-to-leaf path through a `FreeM` tree. -/
+def Path {α : Type v} : FreeM P α → Type uB
   | .pure _ => PUnit
-  | .roll a rest => view.Step a (fun b => PathWith view (rest b))
+  | .roll a rest => (b : P.B a) × Path (rest b)
 
-/-- The canonical root-to-leaf path through a `FreeM` tree. This records an
-explicit polynomial direction at every `roll` node. -/
-abbrev Path {α : Type v} (s : FreeM P α) : Type uB :=
-  PathWith (PathView.canonical P) s
+/-! ## Runtime paths along a lens -/
+
+/-- Runtime path through a `P`-tree executed along a lens `l : Lens P Q`.
+
+This is definitionally the canonical path through the lens-mapped runtime tree
+`s.mapLens l`. The source tree's control flow is still governed by `P`, while
+the mapped tree exposes each node through `Q`; a runtime direction
+`d : Q.B (l.toFunA a)` selects the source branch `l.toFunB a d`. -/
+abbrev PathAlong (l : Lens P Q) (s : FreeM P α) : Type uB₂ :=
+  Path (s.mapLens l)
 
 /-- The leaf payload selected by a path. Although the path itself records only
 branch choices, the tree and path together determine the terminal `pure`
 payload. -/
-def outputWith (view : PathView.{w} P) : (s : FreeM P α) → PathWith view s → α
+def output : (s : FreeM P α) → Path s → α
   | .pure x, _ => x
-  | .roll _ rest, path =>
-      let ⟨b, tail⟩ := view.unpack path
-      outputWith view (rest b) tail
+  | .roll _ rest, ⟨b, path⟩ => output (rest b) path
 
-/-- The leaf payload selected by a canonical path. -/
-def output : (s : FreeM P α) → Path s → α :=
-  outputWith (PathView.canonical P)
+/-- The leaf payload selected by a runtime path along a lens. -/
+def outputAlong (l : Lens P Q) (s : FreeM P α) (path : PathAlong l s) : α :=
+  output (s.mapLens l) path
+
+@[simp]
+theorem outputAlong_pure (l : Lens P Q) (x : α)
+    (path : PathAlong l (FreeM.pure x : FreeM P α)) :
+    outputAlong l (FreeM.pure x) path = x :=
+  rfl
+
+@[simp]
+theorem outputAlong_roll (l : Lens P Q) (a : P.A)
+    (rest : P.B a → FreeM P α)
+    (d : Q.B (l.toFunA a)) (path : PathAlong l (rest (l.toFunB a d))) :
+    outputAlong l (FreeM.roll a rest) ⟨d, path⟩ =
+      outputAlong l (rest (l.toFunB a d)) path :=
+  rfl
 
 @[simp]
 theorem output_pure (x : α) (path : Path (FreeM.pure (P := P) x)) :
@@ -120,19 +115,115 @@ theorem output_roll (a : P.A) (rest : P.B a → FreeM P α)
     (b : P.B a) (path : Path (rest b)) :
     output (FreeM.roll a rest) ⟨b, path⟩ = output (rest b) path := rfl
 
-/-- Dependent sequential composition for `FreeM` trees using an arbitrary path
-view. Run `s₁`, then continue with a suffix selected by the observed path of
-`s₁`; the suffix may change the leaf payload from `α` to `β`.
+/-- Project a concrete runtime path along a lens back to the abstract
+canonical branch path of the control tree. -/
+def projectPathAlong (l : Lens P Q) :
+    (s : FreeM P α) → PathAlong l s → Path s
+  | .pure _, _ => ⟨⟩
+  | .roll a rest, ⟨d, path⟩ =>
+      ⟨l.toFunB a d, projectPathAlong l (rest (l.toFunB a d)) path⟩
 
-The payload produced by `s₁` is still available to the suffix as
-`FreeM.outputWith view s₁ path`, since it is determined by the tree and path. -/
-def appendWith (view : PathView.{w} P) {β : Type t} :
-    (s₁ : FreeM P α) →
-    (PathWith view s₁ → FreeM P β) →
-    FreeM P β
-  | .pure _, s₂ => s₂ ⟨⟩
-  | .roll a rest, s₂ =>
-      .roll a fun b => appendWith view (rest b) (fun path => s₂ (view.pack ⟨b, path⟩))
+@[simp]
+theorem projectPathAlong_pure (l : Lens P Q) (x : α)
+    (path : PathAlong l (FreeM.pure x : FreeM P α)) :
+    projectPathAlong l (FreeM.pure x) path = ⟨⟩ :=
+  rfl
+
+@[simp]
+theorem projectPathAlong_roll (l : Lens P Q) (a : P.A)
+    (rest : P.B a → FreeM P α)
+    (path : PathAlong l (FreeM.roll a rest)) :
+    projectPathAlong l (FreeM.roll a rest) path =
+      ⟨l.toFunB a path.1,
+        projectPathAlong l (rest (l.toFunB a path.1)) path.2⟩ :=
+  rfl
+
+@[simp]
+theorem output_projectPathAlong (l : Lens P Q) :
+    (s : FreeM P α) → (path : PathAlong l s) →
+      output s (projectPathAlong l s path) = outputAlong l s path
+  | .pure _, _ => rfl
+  | .roll a rest, ⟨d, path⟩ =>
+      output_projectPathAlong l (rest (l.toFunB a d)) path
+
+/-! ## Runtime paths and lens-mapped trees -/
+
+/--
+View a runtime path through `s` along `l` as the canonical path through the
+lens-mapped runtime tree `s.mapLens l`.
+
+Since `PathAlong l s` is definitionally `Path (s.mapLens l)`, this map is the
+identity. It remains named so downstream code can state intent explicitly.
+-/
+def pathAlongToMapLensPath (l : Lens P Q)
+    (s : FreeM P α) (path : PathAlong l s) : Path (s.mapLens l) :=
+  path
+
+@[simp]
+theorem pathAlongToMapLensPath_pure (l : Lens P Q) (x : α)
+    (path : PathAlong l (FreeM.pure x : FreeM P α)) :
+    pathAlongToMapLensPath l (FreeM.pure x) path = ⟨⟩ :=
+  rfl
+
+@[simp]
+theorem pathAlongToMapLensPath_roll (l : Lens P Q) (a : P.A)
+    (rest : P.B a → FreeM P α)
+    (d : Q.B (l.toFunA a)) (path : PathAlong l (rest (l.toFunB a d))) :
+    pathAlongToMapLensPath l (FreeM.roll a rest) ⟨d, path⟩ =
+      ⟨d, pathAlongToMapLensPath l (rest (l.toFunB a d)) path⟩ :=
+  rfl
+
+/--
+View a canonical path through the lens-mapped runtime tree `s.mapLens l` as a
+runtime path through the original control tree `s` along `l`.
+
+Since `PathAlong l s` is definitionally `Path (s.mapLens l)`, this map is the
+identity. It remains named so downstream code can state intent explicitly.
+-/
+def mapLensPathToPathAlong (l : Lens P Q)
+    (s : FreeM P α) (path : Path (s.mapLens l)) : PathAlong l s :=
+  path
+
+@[simp]
+theorem mapLensPathToPathAlong_pure (l : Lens P Q) (x : α)
+    (path : Path ((FreeM.pure x : FreeM P α).mapLens l)) :
+    mapLensPathToPathAlong l (FreeM.pure x) path = ⟨⟩ :=
+  rfl
+
+@[simp]
+theorem mapLensPathToPathAlong_roll (l : Lens P Q) (a : P.A)
+    (rest : P.B a → FreeM P α)
+    (d : Q.B (l.toFunA a))
+    (path : Path ((rest (l.toFunB a d)).mapLens l)) :
+    mapLensPathToPathAlong l (FreeM.roll a rest) ⟨d, path⟩ =
+      ⟨d, mapLensPathToPathAlong l (rest (l.toFunB a d)) path⟩ :=
+  rfl
+
+@[simp]
+theorem mapLensPathToPathAlong_toMapLensPath (l : Lens P Q) :
+    (s : FreeM P α) → (path : PathAlong l s) →
+      mapLensPathToPathAlong l s (pathAlongToMapLensPath l s path) = path
+  | _, _ => rfl
+
+@[simp]
+theorem pathAlongToMapLensPath_toPathAlong (l : Lens P Q) :
+    (s : FreeM P α) → (path : Path (s.mapLens l)) →
+      pathAlongToMapLensPath l s (mapLensPathToPathAlong l s path) = path
+  | _, _ => rfl
+
+@[simp]
+theorem output_mapLens_pathAlongToMapLensPath (l : Lens P Q) :
+    (s : FreeM P α) → (path : PathAlong l s) →
+      output (s.mapLens l) (pathAlongToMapLensPath l s path) =
+        outputAlong l s path
+  | _, _ => rfl
+
+@[simp]
+theorem outputAlong_mapLensPathToPathAlong (l : Lens P Q) :
+    (s : FreeM P α) → (path : Path (s.mapLens l)) →
+      outputAlong l s (mapLensPathToPathAlong l s path) =
+        output (s.mapLens l) path
+  | _, _ => rfl
 
 /-- Dependent sequential composition for `FreeM` trees using canonical paths. -/
 def append {β : Type t} :

@@ -90,6 +90,23 @@ coalgebraic semantics of `ProcessOver`).
 universe u v w w₂
 
 namespace Interaction
+
+open PFunctor
+
+variable {P : PFunctor.{u, v}} {α : Type w}
+
+/--
+Node-local metadata over an arbitrary polynomial free tree.
+
+At a control node `a : P.A`, the decoration stores one value of type `Γ a`
+and recursively decorates every abstract control continuation `b : P.B a`.
+The plain `Spec.Decoration` below is the specialization to
+`Spec.basePFunctor` and terminal payload `PUnit`.
+-/
+def Decoration (Γ : P.A → Type w₂) : PFunctor.FreeM P α → Type (max v w₂)
+  | .pure _ => PUnit
+  | .roll a rest => Γ a × ((b : P.B a) → Decoration Γ (rest b))
+
 namespace Spec
 
 private theorem prod_mk_heq {α : Type u} {β β' : Type v} {a : α} {b : β} {b' : β'}
@@ -111,6 +128,11 @@ This is different from `Spec.SyntaxOver`:
 def Decoration (Γ : Node.Context.{u, v}) : Spec → Type (max u v)
   | .done => PUnit
   | .node X rest => Γ X × (∀ x, Decoration Γ (rest x))
+
+/-- The unique decoration by the empty node context. -/
+def Decoration.empty : (spec : Spec) → Decoration Node.Context.empty spec
+  | .done => PUnit.unit
+  | .node _ rest => ⟨PUnit.unit, fun x => Decoration.empty (rest x)⟩
 
 /-- Natural transformation between per-node decorations, applied recursively. -/
 def Decoration.map {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}}

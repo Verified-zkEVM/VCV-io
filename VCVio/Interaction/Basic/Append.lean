@@ -45,7 +45,7 @@ would need explicit casts between the two-argument and single-argument views.
 This combinator propagates up through the entire stack:
 - `Transcript.stateChainFamily` uses it at each stage of a state chain
 - `Chain.outputFamily` uses it at each round of a continuation chain
-- `Strategy.comp` / `Strategy.compWithRoles` use it for the output type
+- `Strategy.comp` / `Focal.comp` use it for the output type
 - All security composition theorems factor through it -/
 def Transcript.liftAppend :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
@@ -235,9 +235,8 @@ theorem Transcript.collapseAppend_append :
       (fun tr₁ tr₂ => F (Transcript.append s₁ s₂ tr₁ tr₂))
       (Transcript.append s₁ s₂ tr₁ tr₂)) →
     collapseAppend s₁ s₂ F (Transcript.append s₁ s₂ tr₁ tr₂) x =
-      cast (Transcript.liftAppend_append s₁ s₂
-        (fun tr₁ tr₂ => F (Transcript.append s₁ s₂ tr₁ tr₂))
-        tr₁ tr₂) x
+      Transcript.unpackAppend s₁ s₂
+        (fun tr₁ tr₂ => F (Transcript.append s₁ s₂ tr₁ tr₂)) tr₁ tr₂ x
   | .done, _, _, ⟨⟩, _, _ => rfl
   | .node _ rest, s₂, F, ⟨xm, tail₁⟩, tr₂, x => by
       simpa [Transcript.collapseAppend, Transcript.append] using
@@ -454,9 +453,9 @@ def Strategy.comp {m : Type u → Type u} [Monad m] :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
     {Mid : Transcript s₁ → Type u} →
     {F : (tr₁ : Transcript s₁) → Transcript (s₂ tr₁) → Type u} →
-    Strategy m s₁ Mid →
-    ((tr₁ : Transcript s₁) → Mid tr₁ → m (Strategy m (s₂ tr₁) (F tr₁))) →
-    m (Strategy m (s₁.append s₂) (Transcript.liftAppend s₁ s₂ F))
+    Strategy.Plain m s₁ Mid →
+    ((tr₁ : Transcript s₁) → Mid tr₁ → m (Strategy.Plain m (s₂ tr₁) (F tr₁))) →
+    m (Strategy.Plain m (s₁.append s₂) (Transcript.liftAppend s₁ s₂ F))
   | .done, _, _, _, mid, f => f ⟨⟩ mid
   | .node _ rest, s₂, _, _, ⟨x, cont⟩, f => pure ⟨x, do
       let next ← cont
@@ -474,10 +473,10 @@ def Strategy.compFlat {m : Type u → Type u} [Monad m] :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
     {Mid : Transcript s₁ → Type u} →
     {Output : Transcript (s₁.append s₂) → Type u} →
-    Strategy m s₁ Mid →
+    Strategy.Plain m s₁ Mid →
     ((tr₁ : Transcript s₁) → Mid tr₁ →
-      m (Strategy m (s₂ tr₁) (fun tr₂ => Output (Transcript.append s₁ s₂ tr₁ tr₂)))) →
-    m (Strategy m (s₁.append s₂) Output)
+      m (Strategy.Plain m (s₂ tr₁) (fun tr₂ => Output (Transcript.append s₁ s₂ tr₁ tr₂)))) →
+    m (Strategy.Plain m (s₁.append s₂) Output)
   | .done, _, _, _, mid, f => f ⟨⟩ mid
   | .node _ rest, s₂, _, _, ⟨x, cont⟩, f => pure ⟨x, do
       let next ← cont
@@ -489,9 +488,9 @@ with output indexed by `Transcript.append`. -/
 def Strategy.splitPrefix {m : Type u → Type u} [Functor m] :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
     {Output : Transcript (s₁.append s₂) → Type u} →
-    Strategy m (s₁.append s₂) Output →
-    Strategy m s₁ (fun tr₁ =>
-      Strategy m (s₂ tr₁) (fun tr₂ => Output (Transcript.append s₁ s₂ tr₁ tr₂)))
+    Strategy.Plain m (s₁.append s₂) Output →
+    Strategy.Plain m s₁ (fun tr₁ =>
+      Strategy.Plain m (s₂ tr₁) (fun tr₂ => Output (Transcript.append s₁ s₂ tr₁ tr₂)))
   | .done, _, _, p => p
   | .node _ rest, s₂, _, ⟨x, cont⟩ =>
       ⟨x, (splitPrefix (rest x) (fun p => s₂ ⟨x, p⟩) ·) <$> cont⟩
