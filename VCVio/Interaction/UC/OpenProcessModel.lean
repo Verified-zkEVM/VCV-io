@@ -41,6 +41,7 @@ that carry a per-step nodewise-monadic sampler in the intermediate monad
 universe u v w w'
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace UC
 
 open Concurrent
@@ -102,7 +103,7 @@ instance lawfulMap_openTheory :
     funext s
     simp only [StepOver.mapContext]
     exact congrArg₂ (StepOver.mk _)
-      (Interaction.Spec.Decoration.map_id _ _) rfl
+      (PFunctor.FreeM.Displayed.Decoration.map_id _ _) rfl
   map_comp {Δ₁} {Δ₂} {Δ₃} g f W := by
     change W.mapBoundary (PortBoundary.Hom.comp g f) =
       (W.mapBoundary f).mapBoundary g
@@ -113,7 +114,7 @@ instance lawfulMap_openTheory :
     funext s
     simp only [StepOver.mapContext]
     exact congrArg₂ (StepOver.mk _)
-      (Interaction.Spec.Decoration.map_comp _ _ _ _).symm rfl
+      (PFunctor.FreeM.Displayed.Decoration.map_comp _ _ _ _).symm rfl
 
 /-- Extensionality for `OpenProcess` when both sides share the same
 residual state type `Proc` definitionally, the `step` fields are equal
@@ -295,9 +296,9 @@ theorem openTheory_par_assoc_iso
       match b' with
       | true =>
         refine ⟨⟨⟨true⟩, rest'⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
-        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
         simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-          Spec.Decoration.map] at h
+          Decoration.map] at h
         refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
           ((isSilentDecoration_iff_map _ ?_ _ _).mpr
             ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
@@ -305,9 +306,9 @@ theorem openTheory_par_assoc_iso
         all_goals simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
       | false =>
         refine ⟨⟨⟨false⟩, ⟨⟨true⟩, rest'⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
-        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
         simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-          Spec.Decoration.map] at h
+          Decoration.map] at h
         refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
           ((isSilentDecoration_iff_map _ ?_ _ _).mpr
             ((isSilentDecoration_iff_map _ ?_ _ _).mp
@@ -319,9 +320,9 @@ theorem openTheory_par_assoc_iso
         · simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
     | false =>
       refine ⟨⟨⟨false⟩, ⟨⟨false⟩, rest⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-        Spec.Decoration.map] at h
+        Decoration.map] at h
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
         ((isSilentDecoration_iff_map _ ?_ _ _).mp
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2))⟩
@@ -340,9 +341,9 @@ theorem openTheory_par_assoc_iso
     | true =>
       refine ⟨⟨⟨true⟩, ⟨⟨true⟩, rest⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
       rw [isSilentStep_mapBoundary_iff] at h
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-        Spec.Decoration.map] at h
+        Decoration.map] at h
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
         ((isSilentDecoration_iff_map _ ?_ _ _).mp
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2))⟩
@@ -354,9 +355,9 @@ theorem openTheory_par_assoc_iso
       | true =>
         refine ⟨⟨⟨true⟩, ⟨⟨false⟩, rest'⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
         rw [isSilentStep_mapBoundary_iff] at h
-        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
         simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-          Spec.Decoration.map] at h
+          Decoration.map] at h
         refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
           ((isSilentDecoration_iff_map _ ?_ _ _).mpr
             ((isSilentDecoration_iff_map _ ?_ _ _).mp
@@ -369,9 +370,9 @@ theorem openTheory_par_assoc_iso
       | false =>
         refine ⟨⟨⟨false⟩, rest'⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
         rw [isSilentStep_mapBoundary_iff] at h
-        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
         simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-          Spec.Decoration.map] at h
+          Decoration.map] at h
         refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
           ((isSilentDecoration_iff_map _ ?_ _ _).mpr
             ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
@@ -477,11 +478,11 @@ theorem openTheory_par_leftUnit_iso
     match b with
     | true =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
-        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        IsSilentDecoration, schedulerNode,
         BoundaryAction.internal]) hvisible
     | false =>
       refine ⟨rest, fun h => hvisible ?_, rfl⟩
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
       simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
@@ -491,7 +492,7 @@ theorem openTheory_par_leftUnit_iso
     refine ⟨⟨⟨false⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
     rw [isSilentStep_mapBoundary_iff] at h
     simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-      Spec.Decoration.map] at h
+      Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
     simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
@@ -521,13 +522,13 @@ theorem openTheory_par_rightUnit_iso
     match b with
     | true =>
       refine ⟨rest, fun h => hvisible ?_, rfl⟩
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
       simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
     | false =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
-        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        IsSilentDecoration, schedulerNode,
         BoundaryAction.internal]) hvisible
   · intro tr₂ _
     exact .inl ⟨⟨⟨true⟩, tr₂⟩, rfl⟩
@@ -535,7 +536,7 @@ theorem openTheory_par_rightUnit_iso
     refine ⟨⟨⟨true⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
     rw [isSilentStep_mapBoundary_iff] at h
     simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-      Spec.Decoration.map] at h
+      Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
     simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
@@ -576,11 +577,11 @@ theorem openTheory_wire_idWire_iso
     match b with
     | true =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
-        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        IsSilentDecoration, schedulerNode,
         BoundaryAction.internal]) hvisible
     | false =>
       refine ⟨rest, fun h => hvisible ?_, rfl⟩
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
       simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
@@ -589,7 +590,7 @@ theorem openTheory_wire_idWire_iso
   · intro tr₂ hvisible
     refine ⟨⟨⟨false⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
     simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-      Spec.Decoration.map] at h
+      Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
     simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
@@ -618,20 +619,20 @@ theorem openTheory_wire_idWire_right_iso
     match b with
     | true =>
       refine ⟨rest, fun h => hvisible ?_, rfl⟩
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
       simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]
     | false =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
-        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        IsSilentDecoration, schedulerNode,
         BoundaryAction.internal]) hvisible
   · intro tr₂ _
     exact .inl ⟨⟨⟨true⟩, tr₂⟩, rfl⟩
   · intro tr₂ hvisible
     refine ⟨⟨⟨true⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
     simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-      Spec.Decoration.map] at h
+      Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
     simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]

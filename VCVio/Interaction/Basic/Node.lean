@@ -30,9 +30,9 @@ References informing this terminology:
 The rest of the interaction core consumes realized node contexts, not schemas:
 * `Spec.Decoration Γ spec` decorates a protocol tree by concrete values in
   context `Γ`;
-* `Spec.SyntaxOver` and `Spec.InteractionOver` define syntax and execution over
+* `SyntaxOver` and `InteractionOver` define syntax and execution over
   those realized contexts.
-* `Spec.ShapeOver` is the functorial refinement of `Spec.SyntaxOver`, used
+* `ShapeOver` is the functorial refinement of `SyntaxOver`, used
   when node objects support generic continuation reindexing.
 * `Spec.Node.ContextHom` records structure-preserving maps between realized
   contexts, so forgetting or repackaging metadata can be expressed explicitly.

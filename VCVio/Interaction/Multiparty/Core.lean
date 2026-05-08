@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.Decoration
-import VCVio.Interaction.Basic.Syntax
+import VCVio.Interaction.Basic.StrategyOver
 import VCVio.Interaction.Multiparty.Observation
 
 /-!
@@ -38,7 +38,7 @@ The definitions in this file are intentionally local and minimal.
   single-projection form `Multiparty.Observation`.
 * `Observation.toViewMode` lifts an arbitrary observation back into `ViewMode`
   via the universal `.react` constructor.
-* `localSyntax` packages the four-mode `Action` shape as a `Spec.SyntaxOver`.
+* `localSyntax` packages the four-mode `Action` shape as a `SyntaxOver`.
 * `Strategy` is the induced whole-tree local endpoint type, obtained from
   arbitrary node-local metadata through `SyntaxOver.comap`.
 
@@ -379,7 +379,8 @@ endpoint of one fixed participant viewpoint rather than a whole participant
 profile.
 -/
 def localSyntax (m : Type u → Type u) :
-    Spec.SyntaxOver (PUnit : Type) (fun X : Type u => ViewMode X) where
+    SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) (PUnit : Type) (fun X : Type u => ViewMode X) where
   Node _ _ view Cont := view.Action m Cont
 
 /--
@@ -407,7 +408,7 @@ abbrev Strategy
     (resolve : Spec.Node.ContextHom Γ (fun X : Type u => ViewMode X))
     (spec : Spec) (ctxs : Spec.Decoration Γ spec)
     (Output : Spec.Transcript spec → Type u) :=
-  Spec.StrategyOver ((localSyntax m).comap resolve) PUnit.unit spec ctxs Output
+  StrategyOver ((localSyntax m).comap resolve) PUnit.unit spec ctxs Output
 
 end Multiparty
 end Interaction

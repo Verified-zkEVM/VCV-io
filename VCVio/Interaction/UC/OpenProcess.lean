@@ -53,6 +53,7 @@ the constant-`[]` trace.
 universe u v w w'
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace UC
 
 open Concurrent
@@ -850,10 +851,10 @@ theorem isSilentDecoration_iff_map {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
       (f X ons).boundary.isActivated = ons.boundary.isActivated) :
     {spec : Spec.{w}} → (d : Spec.Decoration (OpenNodeContext Party Δ₁) spec) →
     (tr : spec.Transcript) →
-    IsSilentDecoration (Spec.Decoration.map f spec d) tr ↔ IsSilentDecoration d tr
+    IsSilentDecoration (Decoration.map f spec d) tr ↔ IsSilentDecoration d tr
   | .done, _, _ => Iff.rfl
   | .node _ _, ⟨ons, drest⟩, ⟨x, tr⟩ => by
-    simp only [IsSilentDecoration, Spec.Decoration.map]
+    simp only [IsSilentDecoration, Decoration.map]
     constructor
     · rintro ⟨h1, h2⟩
       exact ⟨by rwa [hAct] at h1,

@@ -175,7 +175,7 @@ play the role of the symmetric monoidal unit.
 This is purely a data class. Whether `unit` actually behaves as a left/right
 unit for `par` (up to boundary equivalence) is the content of `IsMonoidal`.
 -/
-class HasUnit (T : _root_.Interaction.UC.OpenTheory.{u}) where
+class HasUnit (T : UC.OpenTheory.{u}) where
   /-- The distinguished unit object on the empty boundary. -/
   unit : T.Obj PortBoundary.empty
 
@@ -187,7 +187,7 @@ unit of duality between `Γ` and `swap Γ`.
 This is purely a data class. Whether `idWire` actually satisfies the
 zig-zag (snake) identities is the content of `IsCompactClosed`.
 -/
-class HasIdWire (T : _root_.Interaction.UC.OpenTheory.{u}) where
+class HasIdWire (T : UC.OpenTheory.{u}) where
   /-- The identity-wire / coevaluation on boundary `Γ`: a process exposing
   `swap Γ ⊗ Γ` that behaves as a bidirectional relay. -/
   idWire : ∀ (Γ : PortBoundary),
@@ -201,7 +201,7 @@ class HasIdWire (T : _root_.Interaction.UC.OpenTheory.{u}) where
 This is the first law layer for `OpenTheory`, and the one we can state without
 committing to any further monoidal/coherence structure on boundaries.
 -/
-class IsLawfulMap (T : _root_.Interaction.UC.OpenTheory.{u}) :
+class IsLawfulMap (T : UC.OpenTheory.{u}) :
     Prop where
   /--
   Adapting a system along the identity boundary morphism does nothing.
@@ -229,7 +229,7 @@ This is the first structural law for `par` that does not require introducing a
 separate theory of boundary isomorphisms. Associativity and unit laws can be
 added later once that boundary-equivalence vocabulary is in place.
 -/
-class IsLawfulPar (T : _root_.Interaction.UC.OpenTheory.{u}) :
+class IsLawfulPar (T : UC.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Mapping a side-by-side composite along a tensor boundary morphism is the same
@@ -255,7 +255,7 @@ Transporting the shared middle boundary itself is a subtler question because
 `PortBoundary.Hom.swap` is contravariant. The corresponding law should be
 stated later using boundary equivalences or a more symmetric vocabulary.
 -/
-class IsLawfulWire (T : _root_.Interaction.UC.OpenTheory.{u}) :
+class IsLawfulWire (T : UC.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Partial wiring is natural in its still-exposed outer boundaries.
@@ -286,7 +286,7 @@ boundary adaptation.
 This is the first structural law for `plug`: adapting the open side before
 closure is equivalent to adapting the matching plug on the swapped boundary.
 -/
-class IsLawfulPlug (T : _root_.Interaction.UC.OpenTheory.{u}) :
+class IsLawfulPlug (T : UC.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Boundary adaptation may be pushed across a plug by swapping the same
@@ -313,7 +313,7 @@ At this stage it only records:
 Unit, associativity, and symmetry laws for open composition should be added
 later, once the library settles on the right notion of boundary equivalence.
 -/
-class IsLawful (T : _root_.Interaction.UC.OpenTheory.{u}) :
+class IsLawful (T : UC.OpenTheory.{u}) :
     Prop extends IsLawfulPar T, IsLawfulWire T, IsLawfulPlug T
 
 /-! ### Symmetric monoidal coherence -/
@@ -327,7 +327,7 @@ Pentagon and hexagon coherence conditions are deferred: they are derivable
 in the free models and hold trivially for the concrete model up to process
 isomorphism.
 -/
-class IsMonoidal (T : _root_.Interaction.UC.OpenTheory.{u})
+class IsMonoidal (T : UC.OpenTheory.{u})
     extends IsLawful T, HasUnit T where
   par_assoc :
     ∀ {Δ₁ Δ₂ Δ₃ : PortBoundary}
@@ -363,7 +363,7 @@ A model satisfies `IsTraced` exactly when its `wire` operation behaves like
 a JSV trace; the existence of duals (i.e., compact closure) is a separate
 class layered on top.
 -/
-class IsTraced (T : _root_.Interaction.UC.OpenTheory.{u})
+class IsTraced (T : UC.OpenTheory.{u})
     extends IsMonoidal T where
   /-- Wire associativity: sequential wiring can be reassociated.
 
@@ -418,7 +418,7 @@ from η/ε), so `IsCompactClosed` extends `IsTraced` rather than living
 side-by-side with it: a model that satisfies `IsCompactClosed` also has a
 JSV trace.
 -/
-class IsCompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
+class IsCompactClosed (T : UC.OpenTheory.{u})
     extends IsTraced T, HasIdWire T where
   /-- Left zig-zag: wiring the identity wire on the left is a no-op. -/
   wire_idWire :
@@ -449,7 +449,7 @@ This is the "everything bundle" used by downstream UC composition theorems:
 `IsTraced T`, `IsMonoidal T`, `IsLawful T`, `HasUnit T`, and `HasIdWire T`
 through the inheritance chain.
 -/
-class HasPlugWireFactor (T : _root_.Interaction.UC.OpenTheory.{u})
+class HasPlugWireFactor (T : UC.OpenTheory.{u})
     extends IsCompactClosed T where
   /-- `plug` is derivable from `wire` plus boundary reshaping. -/
   plug_eq_wire :
@@ -509,7 +509,7 @@ class HasPlugWireFactor (T : _root_.Interaction.UC.OpenTheory.{u})
 These are precisely the systems with no remaining exposed inputs or outputs.
 -/
 abbrev Closed
-    (T : _root_.Interaction.UC.OpenTheory.{u}) :
+    (T : UC.OpenTheory.{u}) :
     Type u :=
   T.Obj (PortBoundary.empty)
 
@@ -521,7 +521,7 @@ Such a context exposes the swapped boundary: it accepts what the open system
 emits, and emits what the open system accepts.
 -/
 abbrev Plug
-    (T : _root_.Interaction.UC.OpenTheory.{u})
+    (T : UC.OpenTheory.{u})
     (Δ : PortBoundary) : Type u :=
   T.Obj (PortBoundary.swap Δ)
 
@@ -533,7 +533,7 @@ This is just the `plug` operation restated using the helper names `Closed` and
 than the raw swapped-boundary formulation.
 -/
 abbrev close
-    (T : _root_.Interaction.UC.OpenTheory.{u})
+    (T : UC.OpenTheory.{u})
     {Δ : PortBoundary} :
     T.Obj Δ →
     T.Plug Δ →
@@ -550,7 +550,7 @@ drop empty boundary fragments once those facts have been expressed as
 `PortBoundary.Equiv`s.
 -/
 abbrev mapEquiv
-    (T : _root_.Interaction.UC.OpenTheory.{u})
+    (T : UC.OpenTheory.{u})
     {Δ₁ Δ₂ : PortBoundary} :
     PortBoundary.Equiv Δ₁ Δ₂ →
     T.Obj Δ₁ →
@@ -559,7 +559,7 @@ abbrev mapEquiv
 
 section Laws
 
-variable {T : _root_.Interaction.UC.OpenTheory.{u}}
+variable {T : UC.OpenTheory.{u}}
 
 /--
 Adapting along the identity boundary morphism leaves an open system unchanged.
