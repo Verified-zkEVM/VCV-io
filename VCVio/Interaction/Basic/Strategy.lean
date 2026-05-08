@@ -24,6 +24,7 @@ Dependent sequential composition `Strategy.comp` requires `Spec.append` from
 universe u
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace Spec
 
 variable {m : Type u → Type u}
@@ -88,15 +89,12 @@ theorem Strategy.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunctor
     rcases σ with ⟨x, cont⟩
     simp only [Strategy.mapOutput]
     congr 1
-    have hid :
-        (mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) :
-            Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩) →
-              Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩)) =
-          id := by
-      funext s
-      exact ih x s
-    rw [hid]
-    exact LawfulFunctor.id_map cont
+    have hid : ∀ s : Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩),
+        mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) s = s :=
+      fun s => ih x s
+    calc (mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) ·) <$> cont
+        = id <$> cont := by congr 1; funext s; exact hid s
+      _ = cont := LawfulFunctor.id_map cont
 
 /-- `mapOutput` respects composition of output maps (needs a lawful functor). -/
 theorem Strategy.mapOutput_comp {m : Type u → Type u} [Functor m] [LawfulFunctor m] {spec : Spec}
@@ -110,16 +108,21 @@ theorem Strategy.mapOutput_comp {m : Type u → Type u} [Functor m] [LawfulFunct
     rcases σ with ⟨x, cont⟩
     simp only [Strategy.mapOutput]
     congr 1
-    have hcomp :
-        (@mapOutput m _ (rest x) (fun p => A ⟨x, p⟩) (fun p => C ⟨x, p⟩)
-            fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => g ⟨x, p⟩ (f ⟨x, p⟩ y)) =
+    have hcomp : ∀ s : Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩),
+        @mapOutput m _ (rest x) (fun p => A ⟨x, p⟩) (fun p => C ⟨x, p⟩)
+            (fun p y => g ⟨x, p⟩ (f ⟨x, p⟩ y)) s =
           (@mapOutput m _ (rest x) (fun p => B ⟨x, p⟩) (fun p => C ⟨x, p⟩)
               (fun p y => g ⟨x, p⟩ y) ∘
             @mapOutput m _ (rest x) (fun p => A ⟨x, p⟩) (fun p => B ⟨x, p⟩)
-              (fun p y => f ⟨x, p⟩ y)) := by
-      funext s
-      exact ih x (fun p y => g ⟨x, p⟩ y) (fun p y => f ⟨x, p⟩ y) s
-    rw [hcomp, LawfulFunctor.comp_map]
+              (fun p y => f ⟨x, p⟩ y)) s :=
+      fun s => ih x (fun p y => g ⟨x, p⟩ y) (fun p y => f ⟨x, p⟩ y) s
+    calc (mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => g ⟨x, p⟩ (f ⟨x, p⟩ y)) ·)
+              <$> cont
+        = ((mapOutput (fun p y => g ⟨x, p⟩ y) ·) ∘ (mapOutput (fun p y => f ⟨x, p⟩ y) ·))
+              <$> cont := by congr 1; funext s; exact hcomp s
+      _ = (mapOutput (fun p y => g ⟨x, p⟩ y) ·) <$>
+            ((mapOutput (fun p y => f ⟨x, p⟩ y) ·) <$> cont) := by
+            rw [LawfulFunctor.comp_map]
 
 end Spec
 end Interaction

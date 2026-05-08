@@ -39,6 +39,7 @@ universe u a vΓ vΔ vΛ w uA uB uA₂ uB₂ t
 namespace Interaction
 
 open PFunctor
+open PFunctor.FreeM.Displayed (Decoration)
 
 variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
 variable {α : Type t}

@@ -460,8 +460,8 @@ theorem Decoration.Over.map_append {L : Type u → Type v} {F G : ∀ X, L X →
   | .done, _, _, _, r₁, r₂ => rfl
   | .node X rest, s₂, ⟨l, dRest⟩, d₂, ⟨fData, rRest⟩, r₂ => by
       simp only [Spec.append, PFunctor.FreeM.append, Decoration.append, Decoration.Over.append,
-        Decoration.Over.map, _root_.Interaction.Decoration.Over.map,
-        _root_.Interaction.Decoration.Over.mapLocalHom,
+        Decoration.Over.map, PFunctor.FreeM.Displayed.Decoration.Over.map,
+        PFunctor.FreeM.Displayed.Decoration.Over.mapLocalHom,
         PFunctor.FreeM.Displayed.Over.FiberLocalHom.toHom_roll]
       congr 1; funext x
       exact map_append η (rest x) (fun p => s₂ ⟨x, p⟩) (dRest x) (fun p => d₂ ⟨x, p⟩)
@@ -478,7 +478,7 @@ theorem Decoration.map_append {S : Type u → Type v} {T : Type u → Type w}
   | .done, _, _, _ => rfl
   | .node X rest, s₂, ⟨s, dRest⟩, d₂ => by
       simp only [Spec.append, PFunctor.FreeM.append, Decoration.append, Decoration.map,
-        _root_.Interaction.Decoration.map, _root_.Interaction.Decoration.mapLocalHom,
+        PFunctor.FreeM.Displayed.Decoration.map, PFunctor.FreeM.Displayed.Decoration.mapLocalHom,
         PFunctor.FreeM.Displayed.LocalHom.toHom_roll]
       congr 1; funext x
       exact map_append f (rest x) (fun p => s₂ ⟨x, p⟩) (dRest x) (fun p => d₂ ⟨x, p⟩)

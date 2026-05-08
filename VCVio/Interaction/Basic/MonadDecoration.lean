@@ -25,6 +25,7 @@ universe u uA uB t
 namespace Interaction
 
 open PFunctor
+open PFunctor.FreeM.Displayed (Decoration)
 
 variable {P : PFunctor.{uA, uB}} {α : Type t}
 
@@ -131,7 +132,7 @@ end MonadDecoration
 At each node the strategy chooses a move `x` immediately, then supplies the
 continuation in the `BundledMonad` stored by the node decoration. -/
 def Strategy.monadicSyntax :
-    SyntaxOver.{u, u, u, u + 1} PUnit (fun (_ : Type u) => BundledMonad.{u, u}) where
+    SyntaxOver PUnit (fun (_ : Type u) => BundledMonad.{u, u}) where
   Node _ (X : Type u) bm (Cont : X → Type u) :=
     (x : X) × bm.M (Cont x)
 

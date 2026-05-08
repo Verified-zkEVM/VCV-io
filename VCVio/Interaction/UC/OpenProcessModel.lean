@@ -41,6 +41,7 @@ that carry a per-step nodewise-monadic sampler in the intermediate monad
 universe u v w w'
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace UC
 
 open Concurrent
@@ -102,7 +103,7 @@ instance lawfulMap_openTheory :
     funext s
     simp only [StepOver.mapContext]
     exact congrArg₂ (StepOver.mk _)
-      (Interaction.Decoration.map_id _ _) rfl
+      (PFunctor.FreeM.Displayed.Decoration.map_id _ _) rfl
   map_comp {Δ₁} {Δ₂} {Δ₃} g f W := by
     change W.mapBoundary (PortBoundary.Hom.comp g f) =
       (W.mapBoundary f).mapBoundary g
@@ -113,7 +114,7 @@ instance lawfulMap_openTheory :
     funext s
     simp only [StepOver.mapContext]
     exact congrArg₂ (StepOver.mk _)
-      (Interaction.Decoration.map_comp _ _ _ _).symm rfl
+      (PFunctor.FreeM.Displayed.Decoration.map_comp _ _ _ _).symm rfl
 
 /-- Extensionality for `OpenProcess` when both sides share the same
 residual state type `Proc` definitionally, the `step` fields are equal

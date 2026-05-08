@@ -47,6 +47,7 @@ state type, while each individual step remains a finite `Interaction.Spec`.
 universe u v w w₂ w₃
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace Concurrent
 
 /--
@@ -179,7 +180,7 @@ def mapContext
     (f : Interaction.Spec.Node.ContextHom Γ Δ)
     (step : StepOver Γ P) : StepOver Δ P where
   spec := step.spec
-  semantics := Interaction.Decoration.map f step.spec step.semantics
+  semantics := PFunctor.FreeM.Displayed.Decoration.map f step.spec step.semantics
   next := step.next
 
 end StepOver
@@ -323,8 +324,8 @@ def interleave
         | ⟨false⟩ => step₂.spec
       semantics :=
         ⟨schedulerCtx, fun
-          | ⟨true⟩ => Interaction.Decoration.map f₁ step₁.spec step₁.semantics
-          | ⟨false⟩ => Interaction.Decoration.map f₂ step₂.spec step₂.semantics⟩
+          | ⟨true⟩ => PFunctor.FreeM.Displayed.Decoration.map f₁ step₁.spec step₁.semantics
+          | ⟨false⟩ => PFunctor.FreeM.Displayed.Decoration.map f₂ step₂.spec step₂.semantics⟩
       next := fun
         | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
         | ⟨⟨false⟩, tr⟩ => (s₁, step₂.next tr) }
@@ -346,14 +347,14 @@ theorem mapContext_interleave
   simp only [mapContext, interleave, StepOver.mapContext]
   congr 1; funext ⟨s₁, s₂⟩; dsimp only []
   congr 1
-  simp only [Interaction.Decoration.map, Interaction.Decoration.mapLocalHom,
+  simp only [PFunctor.FreeM.Displayed.Decoration.map, PFunctor.FreeM.Displayed.Decoration.mapLocalHom,
     PFunctor.FreeM.Displayed.LocalHom.toHom_roll]
   congr 1; funext ⟨b⟩
   cases b <;> dsimp
-  · exact Interaction.Decoration.map_comp
+  · exact PFunctor.FreeM.Displayed.Decoration.map_comp
         (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
         g f₂ _ _
-  · exact Interaction.Decoration.map_comp
+  · exact PFunctor.FreeM.Displayed.Decoration.map_comp
         (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
         g f₁ _ _
 
@@ -377,10 +378,10 @@ theorem interleave_mapContext
   congr 1
   · congr 1; funext ⟨b⟩
     cases b <;> dsimp
-    · exact Interaction.Decoration.map_comp
+    · exact PFunctor.FreeM.Displayed.Decoration.map_comp
         (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
         f₂ g₂ _ _
-    · exact Interaction.Decoration.map_comp
+    · exact PFunctor.FreeM.Displayed.Decoration.map_comp
         (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
         f₁ g₁ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
@@ -404,7 +405,7 @@ theorem interleave_mapContext_left
   congr 1
   · congr 1; funext ⟨b⟩
     cases b <;> dsimp
-    exact Interaction.Decoration.map_comp
+    exact PFunctor.FreeM.Displayed.Decoration.map_comp
         (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
         f₁ g₁ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
@@ -428,7 +429,7 @@ theorem interleave_mapContext_right
   congr 1
   · congr 1; funext ⟨b⟩
     cases b <;> dsimp
-    exact Interaction.Decoration.map_comp
+    exact PFunctor.FreeM.Displayed.Decoration.map_comp
         (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
         f₂ g₂ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl

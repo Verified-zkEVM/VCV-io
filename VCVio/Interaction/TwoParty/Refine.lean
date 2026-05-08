@@ -21,6 +21,7 @@ to `Decoration.Over` with fiber `Role.SenderData` is an equivalence; `map` laws 
 universe u v w w₂
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace TwoParty
 
 open _root_.Interaction.TwoParty
@@ -275,7 +276,7 @@ theorem ofDecorationOver_map {S T : Type u → Type v} (f : ∀ X, S X → T X) 
   | .done, _, _ => rfl
   | .node _ rest, ⟨.sender, rRest⟩, ⟨s, rr⟩ => by
       simp only [ofDecorationOver, Decoration.Over.map,
-        _root_.Interaction.Decoration.Over.mapLocalHom,
+        PFunctor.FreeM.Displayed.Decoration.Over.mapLocalHom,
         PFunctor.FreeM.Displayed.Over.FiberLocalHom.toHom_roll, map]
       congr 1; funext x
       exact ofDecorationOver_map f (rest x) (rRest x) (rr x)
@@ -283,7 +284,7 @@ theorem ofDecorationOver_map {S T : Type u → Type v} (f : ∀ X, S X → T X) 
       cases u
       funext x
       simp only [ofDecorationOver, Decoration.Over.map,
-        _root_.Interaction.Decoration.Over.mapLocalHom,
+        PFunctor.FreeM.Displayed.Decoration.Over.mapLocalHom,
         PFunctor.FreeM.Displayed.Over.FiberLocalHom.toHom_roll, map]
       exact ofDecorationOver_map f (rest x) (rRest x) (rr x)
 

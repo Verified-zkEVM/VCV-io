@@ -53,6 +53,7 @@ the constant-`[]` trace.
 universe u v w w'
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace UC
 
 open Concurrent

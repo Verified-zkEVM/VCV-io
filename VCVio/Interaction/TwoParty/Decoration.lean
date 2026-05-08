@@ -35,6 +35,7 @@ move, and monad decorations say which node effect is used by each participant.
 universe u uA uB t
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace TwoParty
 
 open _root_.Interaction.TwoParty
