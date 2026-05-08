@@ -347,7 +347,8 @@ theorem mapContext_interleave
   simp only [mapContext, interleave, StepOver.mapContext]
   congr 1; funext ⟨s₁, s₂⟩; dsimp only []
   congr 1
-  simp only [PFunctor.FreeM.Displayed.Decoration.map, PFunctor.FreeM.Displayed.Decoration.mapLocalHom,
+  simp only [PFunctor.FreeM.Displayed.Decoration.map,
+    PFunctor.FreeM.Displayed.Decoration.mapLocalHom,
     PFunctor.FreeM.Displayed.LocalHom.toHom_roll]
   congr 1; funext ⟨b⟩
   cases b <;> dsimp
@@ -531,7 +532,8 @@ structure Ticketed (Γ : Interaction.Spec.Node.Context.{w, w₂}) where
 `ProcessOver.System Γ` augments a process over context `Γ` by the standard
 verification predicates used throughout VCVio.
 -/
-structure System (Γ : Interaction.Spec.Node.Context.{w, w₂}) extends toProcess : ProcessOver Γ where
+structure System (Γ : Interaction.Spec.Node.Context.{w, w₂}) extends
+    toProcess : ProcessOver Γ where
   init : Proc → Prop
   assumptions : Proc → Prop := fun _ => True
   safe : Proc → Prop := fun _ => True
