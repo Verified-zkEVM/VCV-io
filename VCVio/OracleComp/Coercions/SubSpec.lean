@@ -244,10 +244,8 @@ lemma liftComp_bind (mx : OracleComp spec α) (ob : α → OracleComp spec β) :
 lemma liftComp_self (mx : OracleComp spec α) :
     liftComp mx spec = mx := by
   induction mx using OracleComp.inductionOn with
-  | pure x =>
-      rfl
-  | query_bind t k ih =>
-      simp [liftComp_bind, liftComp_query, ih]
+  | pure x => rfl
+  | query_bind t k ih => simp [liftComp_bind, liftComp_query, ih]
 
 @[simp]
 lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
@@ -258,6 +256,16 @@ lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
 lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
     liftComp (og <*> mx) superSpec = liftComp og superSpec <*> liftComp mx superSpec := by
   simp [liftComp, monad_norm]
+
+@[simp]
+lemma liftComp_seqLeft (mx : OracleComp spec α) (my : OracleComp spec β) :
+    liftComp (mx <* my) superSpec = liftComp mx superSpec <* liftComp my superSpec := by
+  simp [seqLeft_eq]
+
+@[simp]
+lemma liftComp_seqRight (mx : OracleComp spec α) (my : OracleComp spec β) :
+    liftComp (mx *> my) superSpec = liftComp mx superSpec *> liftComp my superSpec := by
+  simp [seqRight_eq]
 
 -- NOTE: `liftComp_failure` cannot be stated for `OracleComp spec` because `failure` only exists
 -- in `OptionT (OracleComp spec)`, not in `OracleComp spec` itself. `OracleComp` is
@@ -273,7 +281,7 @@ variable {ι : Type u} {τ : Type v}
 variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited]
     [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
-@[simp] lemma evalDist_liftComp (mx : OracleComp spec α) :
+@[simp, grind =] lemma evalDist_liftComp (mx : OracleComp spec α) :
     𝒟[liftComp mx superSpec] = 𝒟[mx] := by
   induction mx using OracleComp.inductionOn with
   | pure x => simp
@@ -287,15 +295,20 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
     congr 1
     exact LawfulSubSpec.evalDist_liftM_query t
 
-@[simp] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
+@[simp, grind =] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
     Pr[= x | liftComp mx superSpec] = Pr[= x | mx] :=
   congrFun (congrArg DFunLike.coe (evalDist_liftComp mx)) x
 
-@[simp] lemma probEvent_liftComp (mx : OracleComp spec α) (p : α → Prop) :
+@[simp, grind =] lemma probEvent_liftComp (mx : OracleComp spec α) (p : α → Prop) :
     Pr[ p | liftComp mx superSpec] = Pr[ p | mx] := by
   simp only [probEvent_eq_tsum_indicator]
   congr 1; funext x
   simp only [probOutput_liftComp]
+
+omit [spec ˡ⊂ₒ superSpec] in
+lemma probFailure_liftComp (mx : OracleComp spec α) :
+    Pr[⊥ | liftComp mx superSpec] = Pr[⊥ | mx] := by
+  rw [probFailure_eq_zero, probFailure_eq_zero]
 
 end liftComp_evalDist
 
@@ -331,7 +344,7 @@ does not change which outputs are reachable. This is the support analogue of
     dsimp [OracleSpec.query, OracleQuery.cont, OracleQuery.input]
     rw [Set.range_id]; rfl
 
-@[simp] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
+@[simp, grind =] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
     x ∈ support (liftComp mx superSpec) ↔ x ∈ support mx := by
   simp [support_liftComp]
 
