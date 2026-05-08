@@ -363,20 +363,23 @@ namespace Schema
 /--
 Map decorations along a schema morphism.
 
-This is just `Decoration.map` viewed through schema-level sources and targets.
+This is just `PFunctor.FreeM.Displayed.Decoration.map` viewed through
+schema-level sources and targets.
 -/
 abbrev map
     {Γ Δ : Node.Context.{u, v}} {S : Node.Schema Γ} {T : Node.Schema Δ}
     (f : Node.Schema.SchemaMap S T) :
     (spec : Spec) → Decoration S.toContext spec → Decoration T.toContext spec :=
-  Decoration.map f
+  PFunctor.FreeM.Displayed.Decoration.map (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) f
 
 @[simp]
 theorem map_id
     {Γ : Node.Context.{u, v}} {S : Node.Schema Γ} :
     (spec : Spec) → (d : Decoration S.toContext spec) →
     Decoration.Schema.map (Node.Schema.SchemaMap.id S) spec d = d :=
-  Decoration.map_id
+  PFunctor.FreeM.Displayed.Decoration.map_id (P := Spec.basePFunctor)
+    (α := PUnit.{u+1})
 
 theorem map_comp
     {Γ Δ Λ : Node.Context.{u, v}}
@@ -385,7 +388,8 @@ theorem map_comp
     (spec : Spec) → (d : Decoration S.toContext spec) →
     Decoration.Schema.map g spec (Decoration.Schema.map f spec d) =
       Decoration.Schema.map (Node.Schema.SchemaMap.comp g f) spec d :=
-  Decoration.map_comp g f
+  PFunctor.FreeM.Displayed.Decoration.map_comp (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) g f
 
 theorem map_ofOver
     {Γ Δ : Node.Context.{u, v}}
@@ -395,11 +399,16 @@ theorem map_ofOver
     (g : ∀ X γ, A X γ → B X (f X γ)) :
     (spec : Spec) → (d : Decoration Γ spec) → (r : Decoration.Over A spec d) →
     Decoration.Schema.map (Node.Schema.SchemaMap.extend (S := S) (T := T) f g) spec
-        (Decoration.ofOver A spec d r) =
-      Decoration.ofOver B spec
+        (PFunctor.FreeM.Displayed.Decoration.ofOver (P := Spec.basePFunctor)
+          (α := PUnit.{u+1}) (A := A) spec d r) =
+      PFunctor.FreeM.Displayed.Decoration.ofOver (P := Spec.basePFunctor)
+        (α := PUnit.{u+1}) (A := B) spec
         (Decoration.Schema.map f spec d)
-        (Decoration.Over.mapBase f g spec d r)
-  | spec, d, r => Decoration.map_ofOver f g spec d r
+        (PFunctor.FreeM.Displayed.Decoration.Over.mapBase (P := Spec.basePFunctor)
+          (α := PUnit.{u+1}) f g spec d r)
+  | spec, d, r =>
+      PFunctor.FreeM.Displayed.Decoration.map_ofOver (P := Spec.basePFunctor)
+        (α := PUnit.{u+1}) f g spec d r
 
 /--
 `Decoration.Schema.telescope S spec` packages the staged telescope view of
@@ -418,7 +427,8 @@ def telescope :
   | _, .snoc S A, spec =>
       let recView := telescope S spec
       ⟨Sigma fun t : recView.1 => Decoration.Over A spec (recView.2.symm t),
-        (Decoration.equivOver A spec).trans recView.2.symm.sigmaCongrLeft.symm⟩
+        (PFunctor.FreeM.Displayed.Decoration.equivOver (P := Spec.basePFunctor)
+          (α := PUnit.{u+1}) A spec).trans recView.2.symm.sigmaCongrLeft.symm⟩
 
 /--
 `Decoration.Schema.View S spec` is the staged telescope view carried by the
