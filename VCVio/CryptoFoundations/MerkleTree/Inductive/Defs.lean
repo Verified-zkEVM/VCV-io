@@ -74,14 +74,14 @@ variable {α : Type _}
 
 /-- Example: a single hash computation -/
 @[simp, grind]
-def singleHash {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
+def singleHash {m : Type _ → Type _} [Monad m] [hq : HasQuery (spec α) m]
     (left : α) (right : α) : m α := do
-  let out ← (spec α).query ⟨left, right⟩
+  let out ← hq.query ⟨left, right⟩
   return out
 
 /-- Build the full Merkle tree, returning the tree populated with data on all its nodes -/
 @[simp, grind]
-def buildMerkleTree {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
+def buildMerkleTree {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
     {s} (leaf_tree : LeafData α s) : m (FullData α s) :=
   match leaf_tree with
   | LeafData.leaf a => do return (FullData.leaf a)
@@ -154,7 +154,7 @@ i.e. the hash obtained by combining the leaf in sequence with each member of the
 according to its index.
 -/
 @[simp, grind]
-def getPutativeRoot {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m] {s} :
+def getPutativeRoot {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m] {s} :
     (idx : BinaryTree.SkeletonLeafIndex s) → (leafValue : α) →
       List.Vector α idx.depth → m α
   | BinaryTree.SkeletonLeafIndex.ofLeaf, leafValue, _ => do
@@ -210,13 +210,13 @@ lemma simulateQ_getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s)
 Verify a Merkle proof `proof` that a given `leaf` at index `i` is in the Merkle tree with given
 `root`.
 Works by computing the putative root based on the branch, and comparing that to the actual root.
-Outputs `failure` if the proof is invalid.
+Returns `true` if the proof is valid, and `false` otherwise.
 -/
 @[simp, grind]
-def verifyProof {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
+def verifyProof {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
     [DecidableEq α] {s} (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α) (rootValue : α)
-    (proof : List.Vector α idx.depth) : OptionT m Unit := do
+    (proof : List.Vector α idx.depth) : m Bool := do
   let putative_root ← (getPutativeRoot idx leafValue proof : m α)
-  guard (putative_root = rootValue)
+  return (putative_root == rootValue)
 
 end InductiveMerkleTree

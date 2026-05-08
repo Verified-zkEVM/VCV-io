@@ -45,7 +45,8 @@ import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.MacAlg
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Completeness
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
-import VCVio.CryptoFoundations.MerkleTree.Vector.Basic
+import VCVio.CryptoFoundations.MerkleTree.Vector.Completeness
+import VCVio.CryptoFoundations.MerkleTree.Vector.Defs
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
 import VCVio.CryptoFoundations.ReplayFork
