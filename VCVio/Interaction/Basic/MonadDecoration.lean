@@ -144,7 +144,9 @@ decorated node monad into the ambient execution monad before the generic runner
 continues with the selected subtree. -/
 def Strategy.monadicInteraction {m : Type u → Type u} [Monad m]
     (liftM : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
-    InteractionOver PUnit (fun (_ : Type u) => BundledMonad.{u, u}) Strategy.monadicSyntax m where
+    _root_.Interaction.InteractionOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit
+      (fun (_ : Type u) => BundledMonad.{u, u}) Strategy.monadicSyntax m where
   interact := fun {_X} {γ} {_Cont} {_Result} profile k => do
     let node := profile PUnit.unit
     let next ← liftM γ node.2

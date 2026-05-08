@@ -15,7 +15,7 @@ transcript-dependent output.
 
 This is the singleton-agent specialization of `StrategyOver` over the empty
 node context. `Strategy.run` is the corresponding specialization of the
-generic `InteractionOver.run` runner.
+generic `InteractionOver.runSpec` runner.
 
 Dependent sequential composition `Strategy.comp` requires `Spec.append` from
 `VCVio.Interaction.Basic.Append`.
@@ -46,7 +46,8 @@ abbrev Strategy.Plain (m : Type u → Type u)
 
 /-- One-step execution law for ordinary one-player strategies. -/
 def Strategy.interaction (m : Type u → Type u) [Monad m] :
-    Interaction PUnit (Strategy.syntax m) m where
+    _root_.Interaction.InteractionOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit Node.Context.empty (Strategy.syntax m) m where
   interact := fun {_X} {_γ} {_Cont} {_Result} profile k => do
     let node := profile PUnit.unit
     let next ← node.2
@@ -57,7 +58,7 @@ def Strategy.run {m : Type u → Type u} [Monad m] :
     (spec : Spec) → {Output : Transcript spec → Type u} →
     Strategy.Plain m spec Output → m ((tr : Transcript spec) × Output tr)
   | spec, Output, strat =>
-      InteractionOver.run
+      _root_.Interaction.InteractionOver.runSpec
         (Agent := PUnit.{u+1})
         (Γ := Node.Context.empty)
         (syn := Strategy.syntax m)

@@ -516,7 +516,7 @@ example :
       (fun _ => α)
     = ((_ : Secret) → m α) := by
   unfold Multiparty.Strategy
-  change Spec.StrategyOver (Multiparty.localSyntax m) PUnit.unit
+  change _root_.Interaction.StrategyOver (Multiparty.localSyntax m) PUnit.unit
     (Spec.node Secret fun _ => .done) (aliceAfterSelfCorruptionViews Secret)
     (fun _ => α) = ((_ : Secret) → m α)
   rfl
@@ -531,7 +531,7 @@ example :
       (fun _ => α)
     = m ((_ : Secret) → α) := by
   unfold Multiparty.Strategy
-  change Spec.StrategyOver (Multiparty.localSyntax m) PUnit.unit
+  change _root_.Interaction.StrategyOver (Multiparty.localSyntax m) PUnit.unit
     (Spec.node Secret fun _ => .done) (aliceAfterBobCorruptionViews Secret)
     (fun _ => α) = m ((_ : Secret) → α)
   rfl

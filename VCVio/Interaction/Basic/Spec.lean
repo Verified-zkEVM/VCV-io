@@ -125,8 +125,8 @@ Those additional layers are supplied separately by:
 * `Spec.Decoration`, for concrete nodewise metadata;
 * `SyntaxOver`, for the most general local participant syntax over
   realized node contexts;
-* `Spec.ShapeOver`, for the functorial refinement of such syntax;
-* `Spec.InteractionOver`, for local execution laws over such syntax.
+* `ShapeOver`, for the functorial refinement of such syntax;
+* `InteractionOver`, for local execution laws over such syntax.
 
 `Spec` is **definitionally** the free monad on `Spec.basePFunctor` at the
 unit payload, exposing the polynomial substrate that the rest of the
