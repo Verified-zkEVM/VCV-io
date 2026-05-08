@@ -179,7 +179,7 @@ def mapContext
     (f : Interaction.Spec.Node.ContextHom Γ Δ)
     (step : StepOver Γ P) : StepOver Δ P where
   spec := step.spec
-  semantics := Interaction.Spec.Decoration.map f step.spec step.semantics
+  semantics := Interaction.Decoration.map f step.spec step.semantics
   next := step.next
 
 end StepOver
@@ -323,8 +323,8 @@ def interleave
         | ⟨false⟩ => step₂.spec
       semantics :=
         ⟨schedulerCtx, fun
-          | ⟨true⟩ => Interaction.Spec.Decoration.map f₁ step₁.spec step₁.semantics
-          | ⟨false⟩ => Interaction.Spec.Decoration.map f₂ step₂.spec step₂.semantics⟩
+          | ⟨true⟩ => Interaction.Decoration.map f₁ step₁.spec step₁.semantics
+          | ⟨false⟩ => Interaction.Decoration.map f₂ step₂.spec step₂.semantics⟩
       next := fun
         | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
         | ⟨⟨false⟩, tr⟩ => (s₁, step₂.next tr) }
@@ -346,11 +346,16 @@ theorem mapContext_interleave
   simp only [mapContext, interleave, StepOver.mapContext]
   congr 1; funext ⟨s₁, s₂⟩; dsimp only []
   congr 1
-  simp only [Interaction.Spec.Decoration.map]
+  simp only [Interaction.Decoration.map, Interaction.Decoration.mapLocalHom,
+    PFunctor.FreeM.Displayed.LocalHom.toHom_roll]
   congr 1; funext ⟨b⟩
   cases b <;> dsimp
-  · exact Interaction.Spec.Decoration.map_comp g f₂ _ _
-  · exact Interaction.Spec.Decoration.map_comp g f₁ _ _
+  · exact Interaction.Decoration.map_comp
+        (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
+        g f₂ _ _
+  · exact Interaction.Decoration.map_comp
+        (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
+        g f₁ _ _
 
 /-- Pre-composing both operands with `mapContext` distributes into the
 `interleave` injections via `ContextHom.comp`. -/
@@ -372,8 +377,12 @@ theorem interleave_mapContext
   congr 1
   · congr 1; funext ⟨b⟩
     cases b <;> dsimp
-    · exact Interaction.Spec.Decoration.map_comp f₂ g₂ _ _
-    · exact Interaction.Spec.Decoration.map_comp f₁ g₁ _ _
+    · exact Interaction.Decoration.map_comp
+        (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
+        f₂ g₂ _ _
+    · exact Interaction.Decoration.map_comp
+        (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
+        f₁ g₁ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
 
 /-- Specialization of `interleave_mapContext` when only the left operand
@@ -395,7 +404,9 @@ theorem interleave_mapContext_left
   congr 1
   · congr 1; funext ⟨b⟩
     cases b <;> dsimp
-    exact Interaction.Spec.Decoration.map_comp f₁ g₁ _ _
+    exact Interaction.Decoration.map_comp
+        (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
+        f₁ g₁ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
 
 /-- Specialization of `interleave_mapContext` when only the right operand
@@ -417,7 +428,9 @@ theorem interleave_mapContext_right
   congr 1
   · congr 1; funext ⟨b⟩
     cases b <;> dsimp
-    exact Interaction.Spec.Decoration.map_comp f₂ g₂ _ _
+    exact Interaction.Decoration.map_comp
+        (P := Interaction.Spec.basePFunctor) (α := PUnit.{w+1})
+        f₂ g₂ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
 
 /--

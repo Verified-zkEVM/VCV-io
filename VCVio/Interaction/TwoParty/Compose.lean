@@ -162,8 +162,8 @@ private theorem Focal.compFlat_eq_pure_compFlatPure
     | .node X rest, ⟨.sender, rRest⟩ =>
         rw [Focal.compFlat.eq_2]
         refine congrArg pure ?_
-        refine congrArg (fun k => strat₁ >>= k) ?_
-        funext xc
+        apply bind_congr
+        intro xc
         cases xc with
         | mk x next =>
             simp only [bind_pure_comp]
@@ -262,7 +262,7 @@ theorem Focal.compFlat_splitPrefix
                 let Suffix : X → Type u := fun y =>
                   Spec.StrategyOver (pairedSyntax m) TwoParty.Participant.focal
                     ((fun b => PFunctor.FreeM.append (rest b) (fun path => s₂ ⟨b, path⟩)) y)
-                    ((fun y => (rRest y).append fun p => r₂ ⟨y, p⟩) y)
+                    ((fun y => Spec.Decoration.append (rRest y) fun p => r₂ ⟨y, p⟩) y)
                     (fun tr => Output ⟨y, tr⟩)
                 have hgo :
                     (Focal.compFlat (Focal.splitPrefix tail)
@@ -439,11 +439,13 @@ theorem run_compFlat_appendFlat_pure
           run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.compFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
-          run_sender]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
+        conv_lhs => rw [run_sender]
+        conv_rhs => rw [run_sender]
+        simp only [bind_assoc, pure_bind]
         erw [bind_assoc]
-        refine congrArg (fun k => strat₁ >>= k) ?_
-        funext xc
+        apply bind_congr
+        intro xc
         have hpure := @Focal.compFlat_eq_pure_compFlatPure m _ _
           (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) (rRest xc.fst) (fun p => r₂ ⟨xc.fst, p⟩)
           (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => OutputP ⟨xc.fst, tr⟩)
@@ -483,11 +485,13 @@ theorem run_compFlat_appendFlat_pure
         exact ih
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Focal.compFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
-          run_receiver]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
+        conv_lhs => rw [run_receiver]
+        conv_rhs => rw [run_receiver]
+        simp only [bind_assoc, pure_bind]
         erw [bind_assoc]
-        refine congrArg (fun k => cpt₁ >>= k) ?_
-        funext xc
+        apply bind_congr
+        intro xc
         simp only [id_eq]
         refine (LawfulMonad.do_pure_bind_sigma (m := m) (x := xc.fst) ?_ ?_).trans ?_
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
@@ -575,17 +579,19 @@ theorem run_compFlat_appendFlat
           run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.compFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
-          run_sender]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
+        conv_lhs => rw [run_sender]
+        conv_rhs => rw [run_sender]
+        simp only [bind_assoc, pure_bind]
         erw [bind_assoc]
-        refine congrArg (fun k => strat₁ >>= k) ?_
-        funext xc
+        apply bind_congr
+        intro xc
         erw [bind_assoc]
         simp only [id_eq]
         let Suffix : X → Type u := fun y =>
           Spec.StrategyOver (pairedSyntax m) Participant.focal
             ((rest y).append fun path => s₂ ⟨y, path⟩)
-            ((rRest y).append fun p => r₂ ⟨y, p⟩)
+            (Spec.Decoration.append (rRest y) fun p => r₂ ⟨y, p⟩)
             (fun tr => OutputP ⟨y, tr⟩)
         refine (LawfulMonad.do_bind_do_pure_bind_sigma (m := m) (α := X) (β := Suffix) (x := xc.fst)
           (action := Focal.compFlat xc.snd (fun tr₁ mid => f ⟨xc.fst, tr₁⟩ mid)) ?_).trans ?_
@@ -614,11 +620,13 @@ theorem run_compFlat_appendFlat
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Focal.compFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
-          run_receiver]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
+        conv_lhs => rw [run_receiver]
+        conv_rhs => rw [run_receiver]
+        simp only [bind_assoc, pure_bind]
         erw [bind_assoc]
-        refine congrArg (fun k => cpt₁ >>= k) ?_
-        funext xc
+        apply bind_congr
+        intro xc
         simp only [id_eq, PFunctor.FreeM.Displayed.roll_eq, Prod.mk.eta]
         refine (LawfulMonad.do_pure_bind_sigma (m := m) (x := xc.fst) ?_ ?_).trans ?_
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
@@ -711,17 +719,19 @@ theorem run_comp_append
         rfl
     | .node X rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.comp, Counterpart.append]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
-          run_sender]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
+        conv_lhs => rw [run_sender]
+        conv_rhs => rw [run_sender]
+        simp only [bind_assoc, pure_bind]
         erw [bind_assoc]
-        refine congrArg (fun k => strat₁ >>= k) ?_
-        funext xc
+        apply bind_congr
+        intro xc
         erw [bind_assoc]
         simp only [id_eq]
         let Suffix : X → Type u := fun y =>
           Spec.StrategyOver (pairedSyntax m) Participant.focal
             ((rest y).append fun path => s₂ ⟨y, path⟩)
-            ((rRest y).append fun p => r₂ ⟨y, p⟩)
+            (Spec.Decoration.append (rRest y) fun p => r₂ ⟨y, p⟩)
             (Spec.Transcript.liftAppend (rest y) (fun path => s₂ ⟨y, path⟩)
               (fun tr₁ tr₂ => FP ⟨y, tr₁⟩ tr₂))
         refine (LawfulMonad.do_bind_do_pure_bind_sigma (m := m) (α := X) (β := Suffix) (x := xc.fst)
@@ -750,11 +760,13 @@ theorem run_comp_append
           (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         simp only [Focal.comp, Counterpart.append]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append,
-          run_receiver]
+        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
+        conv_lhs => rw [run_receiver]
+        conv_rhs => rw [run_receiver]
+        simp only [bind_assoc, pure_bind]
         erw [bind_assoc]
-        refine congrArg (fun k => cpt₁ >>= k) ?_
-        funext xc
+        apply bind_congr
+        intro xc
         simp only [id_eq, PFunctor.FreeM.Displayed.roll_eq]
         refine (LawfulMonad.do_pure_bind_sigma (m := m) (x := xc.fst) ?_ ?_).trans ?_
         refine congrArg (fun k => strat₁ xc.1 >>= k) ?_

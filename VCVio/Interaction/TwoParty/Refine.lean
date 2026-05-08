@@ -14,7 +14,7 @@ import VCVio.Interaction.Basic.StateChain
 # Role-aware refinement and bridge to `Decoration.Over`
 
 `Role.Refine S` carries sender data `S X` and skips receiver nodes (no `PUnit` padding). Conversion
-to `Spec.Decoration.Over` with fiber `Role.SenderData` is an equivalence; `map` laws commute with
+to `Decoration.Over` with fiber `Role.SenderData` is an equivalence; `map` laws commute with
 `append`, `replicate`, and `stateChain`.
 -/
 
@@ -190,7 +190,7 @@ theorem map_stateChain {S T : Type u → Type v} (f : ∀ X, S X → T X)
 def toDecorationOver {S : Type u → Type v} :
     (spec : Spec) → (roles : RoleDecoration spec) →
     Role.Refine S spec roles →
-    Spec.Decoration.Over (fun X r => Role.SenderData S X r) spec roles
+    Decoration.Over (fun _ => Role) (fun X r => Role.SenderData S X r) spec roles
   | .done, _, _ => ⟨⟩
   | .node _ rest, ⟨.sender, rRest⟩, ⟨s, rr⟩ =>
       ⟨s, fun x => toDecorationOver (rest x) (rRest x) (rr x)⟩
@@ -199,7 +199,7 @@ def toDecorationOver {S : Type u → Type v} :
 
 def ofDecorationOver {S : Type u → Type v} :
     (spec : Spec) → (roles : RoleDecoration spec) →
-    Spec.Decoration.Over (fun X r => Role.SenderData S X r) spec roles →
+    Decoration.Over (fun _ => Role) (fun X r => Role.SenderData S X r) spec roles →
     Role.Refine S spec roles
   | .done, _, _ => ⟨⟩
   | .node _ rest, ⟨.sender, rRest⟩, ⟨s, rr⟩ =>
@@ -210,7 +210,7 @@ def ofDecorationOver {S : Type u → Type v} :
 @[simp]
 theorem toDecorationOver_ofDecorationOver {S : Type u → Type v} :
     ∀ (spec : Spec) (roles : RoleDecoration spec)
-      (dr : Spec.Decoration.Over (fun X r => Role.SenderData S X r) spec roles),
+      (dr : Decoration.Over (fun _ => Role) (fun X r => Role.SenderData S X r) spec roles),
       toDecorationOver spec roles (ofDecorationOver spec roles dr) = dr
   | .done, _, ⟨⟩ => rfl
   | .node _ rest, ⟨.sender, rRest⟩, ⟨s, rr⟩ => by
@@ -245,7 +245,7 @@ theorem ofDecorationOver_toDecorationOver {S : Type u → Type v} :
 def equivDecorationOver {S : Type u → Type v}
     (spec : Spec) (roles : RoleDecoration spec) :
     Equiv (Role.Refine S spec roles)
-      (Spec.Decoration.Over (fun X r => Role.SenderData S X r) spec roles) where
+      (Decoration.Over (fun _ => Role) (fun X r => Role.SenderData S X r) spec roles) where
   toFun := toDecorationOver spec roles
   invFun := ofDecorationOver spec roles
   left_inv rr := ofDecorationOver_toDecorationOver spec roles rr
@@ -254,35 +254,37 @@ def equivDecorationOver {S : Type u → Type v}
 theorem toDecorationOver_map {S T : Type u → Type v} (f : ∀ X, S X → T X) :
     (spec : Spec) → (roles : RoleDecoration spec) → (rr : Role.Refine S spec roles) →
     toDecorationOver spec roles (map f spec roles rr) =
-      Spec.Decoration.Over.map (fun X r => Role.SenderData.map f X r) spec roles
+      Decoration.Over.map (fun X r => Role.SenderData.map f X r) spec roles
         (toDecorationOver spec roles rr)
   | .done, _, _ => rfl
   | .node _ rest, ⟨.sender, rRest⟩, ⟨s, rr⟩ => by
-      simp only [toDecorationOver, map, Spec.Decoration.Over.map]
+      simp only [toDecorationOver, map, Decoration.Over.map]
       congr 1; funext x
       exact toDecorationOver_map f (rest x) (rRest x) (rr x)
   | .node _ rest, ⟨.receiver, rRest⟩, rr => by
-      simp only [toDecorationOver, map, Spec.Decoration.Over.map,
-        Role.SenderData.map]
+      simp only [toDecorationOver, map, Decoration.Over.map]
       congr 1; funext x
       exact toDecorationOver_map f (rest x) (rRest x) (rr x)
 
 theorem ofDecorationOver_map {S T : Type u → Type v} (f : ∀ X, S X → T X) :
     (spec : Spec) → (roles : RoleDecoration spec) →
-    (dr : Spec.Decoration.Over (fun X r => Role.SenderData S X r) spec roles) →
+    (dr : Decoration.Over (fun _ => Role) (fun X r => Role.SenderData S X r) spec roles) →
     ofDecorationOver spec roles
-        (Spec.Decoration.Over.map (fun X r => Role.SenderData.map f X r) spec roles dr) =
+        (Decoration.Over.map (fun X r => Role.SenderData.map f X r) spec roles dr) =
       map f spec roles (ofDecorationOver spec roles dr)
   | .done, _, _ => rfl
   | .node _ rest, ⟨.sender, rRest⟩, ⟨s, rr⟩ => by
-      simp only [ofDecorationOver, Spec.Decoration.Over.map, map]
+      simp only [ofDecorationOver, Decoration.Over.map,
+        _root_.Interaction.Decoration.Over.mapLocalHom,
+        PFunctor.FreeM.Displayed.Over.FiberLocalHom.toHom_roll, map]
       congr 1; funext x
       exact ofDecorationOver_map f (rest x) (rRest x) (rr x)
   | .node _ rest, ⟨.receiver, rRest⟩, ⟨u, rr⟩ => by
       cases u
       funext x
-      simp only [ofDecorationOver, Spec.Decoration.Over.map, map,
-        Role.SenderData.map]
+      simp only [ofDecorationOver, Decoration.Over.map,
+        _root_.Interaction.Decoration.Over.mapLocalHom,
+        PFunctor.FreeM.Displayed.Over.FiberLocalHom.toHom_roll, map]
       exact ofDecorationOver_map f (rest x) (rRest x) (rr x)
 
 end Role.Refine

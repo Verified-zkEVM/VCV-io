@@ -32,7 +32,9 @@ theorem RoleDecoration.swap_swap :
     roles.swap.swap = roles
   | .done, _ => rfl
   | .node _ rest, ⟨r, rRest⟩ => by
-      simp only [RoleDecoration.swap, Spec.Decoration.map, Role.swap_swap]
+      simp only [RoleDecoration.swap, Interaction.Decoration.map,
+        Interaction.Decoration.mapLocalHom, PFunctor.FreeM.Displayed.LocalHom.toHom_roll,
+        Role.swap_swap]
       congr 1; funext x
       exact RoleDecoration.swap_swap (rest x) (rRest x)
 

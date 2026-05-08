@@ -195,14 +195,14 @@ abbrev RoleDecoration := Spec.Decoration (fun _ => Role)
 /-- Swap sender and receiver at each node of a role decoration. -/
 def RoleDecoration.swap {spec : Spec} (roles : RoleDecoration spec) :
     RoleDecoration spec :=
-  Spec.Decoration.map (fun _ => Role.swap) spec roles
+  Decoration.map (fun _ => Role.swap) spec roles
 
 namespace RoleDecoration
 
 /-- View a plain monad decoration as one displayed layer over an existing role decoration. -/
 def monadsOver :
     (spec : Spec.{u}) → (roles : RoleDecoration spec) → (md : Spec.MonadDecoration spec) →
-    Spec.Decoration.Over (fun _ (_ : Role) => BundledMonad.{u, u}) spec roles
+    Decoration.Over (fun _ => Role) (fun _ (_ : Role) => BundledMonad.{u, u}) spec roles
   | .done, _, _ => ⟨⟩
   | .node _ rest, ⟨_, rRest⟩, ⟨bm, mRest⟩ =>
       ⟨bm, fun x => monadsOver (rest x) (rRest x) (mRest x)⟩
@@ -211,15 +211,14 @@ def monadsOver :
 def withMonads {spec : Spec.{u}}
     (roles : RoleDecoration spec) (md : Spec.MonadDecoration spec) :
     Spec.Decoration RoleMonadContext spec :=
-  Spec.Decoration.ofOver (fun _ (_ : Role) => BundledMonad.{u, u}) spec roles
-    (monadsOver spec roles md)
+  Decoration.ofOver spec roles (monadsOver spec roles md)
 
 /-- View a pair of monad decorations as one displayed layer over an existing role decoration. -/
 def pairedMonadsOver :
     (spec : Spec.{u}) → (roles : RoleDecoration spec) →
     (stratDeco : Spec.MonadDecoration spec) → (cptDeco : Spec.MonadDecoration spec) →
-    Spec.Decoration.Over
-      (fun _ (_ : Role) => BundledMonad.{u, u} × BundledMonad.{u, u}) spec roles
+    Decoration.Over
+      (fun _ => Role) (fun _ (_ : Role) => BundledMonad.{u, u} × BundledMonad.{u, u}) spec roles
   | .done, _, _, _ => ⟨⟩
   | .node _ rest, ⟨_, rRest⟩, ⟨bmS, mRestS⟩, ⟨bmC, mRestC⟩ =>
       ⟨(bmS, bmC), fun x => pairedMonadsOver (rest x) (rRest x) (mRestS x) (mRestC x)⟩
@@ -229,15 +228,13 @@ def withPairedMonads {spec : Spec.{u}}
     (roles : RoleDecoration spec) (stratDeco : Spec.MonadDecoration spec)
     (cptDeco : Spec.MonadDecoration spec) :
     Spec.Decoration RolePairedMonadContext spec :=
-  Spec.Decoration.ofOver
-    (fun _ (_ : Role) => BundledMonad.{u, u} × BundledMonad.{u, u})
-    spec roles (pairedMonadsOver spec roles stratDeco cptDeco)
+  Decoration.ofOver spec roles (pairedMonadsOver spec roles stratDeco cptDeco)
 
 @[simp]
 theorem withPairedMonads_map_fst :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {stratDeco cptDeco : Spec.MonadDecoration spec} →
-    Spec.Decoration.map RolePairedMonadContext.fst spec
+    Decoration.map RolePairedMonadContext.fst spec
         (RoleDecoration.withPairedMonads roles stratDeco cptDeco) =
       RoleDecoration.withMonads roles stratDeco
   | .done, _, _, _ => rfl
@@ -256,7 +253,7 @@ theorem withPairedMonads_map_fst :
 theorem withPairedMonads_map_snd :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
     {stratDeco cptDeco : Spec.MonadDecoration spec} →
-    Spec.Decoration.map RolePairedMonadContext.snd spec
+    Decoration.map RolePairedMonadContext.snd spec
         (RoleDecoration.withPairedMonads roles stratDeco cptDeco) =
       RoleDecoration.withMonads roles cptDeco
   | .done, _, _, _ => rfl

@@ -418,20 +418,9 @@ end Decoration
 
 namespace Spec
 
-/-- `Decoration Γ spec` is concrete nodewise metadata on the fixed protocol
-tree `spec`, for a realized node context `Γ`.
-
-If a node of `spec` has move space `X`, then the decoration stores one value of
-type `Γ X` at that node, and recursively stores decorations on every subtree.
-
-This is different from `Spec.SyntaxOver`:
-* a decoration is **data on a tree**;
-* syntax is a **specification of local participant objects** that consumes such
-  data;
-* `Spec.ShapeOver` is the functorial refinement of that syntax layer. -/
-def Decoration (Γ : Node.Context.{u, v}) : Spec → Type (max u v)
-  | .done => PUnit
-  | .node X rest => Γ X × (∀ x, Decoration Γ (rest x))
+/-- Nodewise metadata on a plain `Spec`, specialized from the generic decoration API. -/
+abbrev Decoration (Γ : Node.Context.{u, v}) (spec : Spec) : Type (max u v) :=
+  _root_.Interaction.Decoration (P := Spec.basePFunctor) (α := PUnit.{u+1}) Γ spec
 
 /-- The unique decoration by the empty node context. -/
 def Decoration.empty : (spec : Spec) → Decoration Node.Context.empty spec
@@ -439,70 +428,54 @@ def Decoration.empty : (spec : Spec) → Decoration Node.Context.empty spec
   | .node _ rest => ⟨PUnit.unit, fun x => Decoration.empty (rest x)⟩
 
 /-- Natural transformation between per-node decorations, applied recursively. -/
-def Decoration.map {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}}
+abbrev Decoration.map {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}}
     (f : Interaction.Spec.Node.ContextHom Γ Δ) :
-    (spec : Spec) → Decoration Γ spec → Decoration Δ spec
-  | .done, _ => ⟨⟩
-  | .node X rest, ⟨s, dRest⟩ => ⟨f X s, fun x => Decoration.map f (rest x) (dRest x)⟩
+    (spec : Spec) → Decoration Γ spec → Decoration Δ spec :=
+  _root_.Interaction.Decoration.map (P := Spec.basePFunctor) (α := PUnit.{u+1}) f
 
 @[simp, grind =]
 theorem Decoration.map_id {Γ : Node.Context.{u, v}} :
     (spec : Spec) → (d : Decoration Γ spec) →
-    Decoration.map (Node.ContextHom.id Γ) spec d = d
-  | .done, ⟨⟩ => rfl
-  | .node _ rest, ⟨s, dRest⟩ => by
-      simp only [Decoration.map]; congr 1; funext x; exact map_id (rest x) (dRest x)
+    Decoration.map (Node.ContextHom.id Γ) spec d = d :=
+  _root_.Interaction.Decoration.map_id (P := Spec.basePFunctor) (α := PUnit.{u+1})
 
 theorem Decoration.map_comp
     {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}} {Λ : Node.Context.{u, w₂}}
     (g : Node.ContextHom Δ Λ) (f : Node.ContextHom Γ Δ) :
     (spec : Spec) → (d : Decoration Γ spec) →
     Decoration.map g spec (Decoration.map f spec d) =
-      Decoration.map (Node.ContextHom.comp g f) spec d
-  | .done, ⟨⟩ => rfl
-  | .node _ rest, ⟨s, dRest⟩ => by
-      simp only [Decoration.map]; congr 1; funext x
-      exact map_comp g f (rest x) (dRest x)
+      Decoration.map (Node.ContextHom.comp g f) spec d :=
+  _root_.Interaction.Decoration.map_comp (P := Spec.basePFunctor) (α := PUnit.{u+1}) g f
 
 /-- Dependent decoration over `d : Decoration Γ spec`: at each node, data in
 `F X γ` where `γ` is the context value from `d`, plus recursive decorations on
 subtrees. -/
-def Decoration.Over {Γ : Node.Context.{u, v}} (F : ∀ X, Γ X → Type w) :
-    (spec : Spec) → Decoration Γ spec → Type (max u w)
-  | .done, _ => PUnit
-  | .node X rest, ⟨γ, dRest⟩ =>
-      F X γ × (∀ x, Decoration.Over F (rest x) (dRest x))
+abbrev Decoration.Over {Γ : Node.Context.{u, v}} (F : ∀ X, Γ X → Type w)
+    (spec : Spec) (d : Decoration Γ spec) : Type (max u w) :=
+  _root_.Interaction.Decoration.Over (P := Spec.basePFunctor) (α := PUnit.{u+1}) Γ F spec d
 
 /-- Fiberwise map between dependent decoration families over the same base
 decoration. -/
-def Decoration.Over.map {Γ : Node.Context.{u, v}}
+abbrev Decoration.Over.map {Γ : Node.Context.{u, v}}
     {F : ∀ X, Γ X → Type w} {G : ∀ X, Γ X → Type w}
     (f : ∀ X γ, F X γ → G X γ) :
     (spec : Spec) → (d : Decoration Γ spec) →
-    Decoration.Over F spec d → Decoration.Over G spec d
-  | .done, _, _ => ⟨⟩
-  | .node X rest, ⟨γ, dRest⟩, ⟨fData, rRest⟩ =>
-      ⟨f X γ fData, fun x => Over.map f (rest x) (dRest x) (rRest x)⟩
+    Decoration.Over F spec d → Decoration.Over G spec d :=
+  _root_.Interaction.Decoration.Over.map (P := Spec.basePFunctor) (α := PUnit.{u+1}) f
 
 @[simp, grind =]
 theorem Decoration.Over.map_id {Γ : Node.Context.{u, v}} {F : ∀ X, Γ X → Type w} :
     (spec : Spec) → (d : Decoration Γ spec) → (r : Decoration.Over F spec d) →
-    Decoration.Over.map (fun _ _ x => x) spec d r = r
-  | .done, ⟨⟩, ⟨⟩ => rfl
-  | .node _ rest, ⟨γ, dRest⟩, ⟨fd, rr⟩ => by
-      simp only [Decoration.Over.map]; congr 1; funext x
-      exact map_id (rest x) (dRest x) (rr x)
+    Decoration.Over.map (fun _ _ x => x) spec d r = r :=
+  _root_.Interaction.Decoration.Over.map_id (P := Spec.basePFunctor) (α := PUnit.{u+1})
 
 theorem Decoration.Over.map_comp {Γ : Node.Context.{u, v}}
     {F G H : ∀ X, Γ X → Type w}
     (g : ∀ X γ, G X γ → H X γ) (f : ∀ X γ, F X γ → G X γ) :
     (spec : Spec) → (d : Decoration Γ spec) → (r : Decoration.Over F spec d) →
     Decoration.Over.map g spec d (Decoration.Over.map f spec d r) =
-      Decoration.Over.map (fun X γ => g X γ ∘ f X γ) spec d r
-  | .done, ⟨⟩, ⟨⟩ => rfl
-  | .node _ rest, ⟨γ, dRest⟩, ⟨fd, rr⟩ => by
-      simp only [Decoration.Over.map]; congr 1; funext x
-      exact map_comp g f (rest x) (dRest x) (rr x)
+      Decoration.Over.map (fun X γ => g X γ ∘ f X γ) spec d r :=
+  _root_.Interaction.Decoration.Over.map_comp (P := Spec.basePFunctor) (α := PUnit.{u+1}) g f
 
 /--
 Transport a dependent decoration across a map of base contexts.
@@ -514,30 +487,21 @@ Given:
 this sends a displayed decoration over `d : Decoration Γ spec` to a displayed
 decoration over `Decoration.map f spec d`.
 -/
-def Decoration.Over.mapBase
+abbrev Decoration.Over.mapBase
     {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}}
     {A : ∀ X, Γ X → Type w₂} {B : ∀ X, Δ X → Type w₂}
     (f : Node.ContextHom Γ Δ)
     (g : ∀ X γ, A X γ → B X (f X γ)) :
     (spec : Spec) → (d : Decoration Γ spec) →
     Decoration.Over A spec d →
-    Decoration.Over B spec (Decoration.map f spec d)
-  | .done, _, _ => ⟨⟩
-  | .node X rest, ⟨γ, dRest⟩, ⟨a, rRest⟩ =>
-      ⟨g X γ a, fun x => Over.mapBase f g (rest x) (dRest x) (rRest x)⟩
+    Decoration.Over B spec (Decoration.map f spec d) :=
+  _root_.Interaction.Decoration.Over.mapBase (P := Spec.basePFunctor) (α := PUnit.{u+1}) f g
 
 theorem Decoration.Over.mapBase_id
     {Γ : Node.Context.{u, v}} {A : ∀ X, Γ X → Type w} :
     (spec : Spec) → (d : Decoration Γ spec) → (r : Decoration.Over A spec d) →
-    HEq (Decoration.Over.mapBase (Node.ContextHom.id Γ) (fun _ _ x => x) spec d r) r
-  | .done, ⟨⟩, ⟨⟩ => HEq.rfl
-  | .node _ rest, ⟨γ, dRest⟩, ⟨a, rRest⟩ => by
-      simp only [Decoration.Over.mapBase]
-      refine Prod.mk_heq ?_
-      refine Function.hfunext rfl ?_
-      intro x y hxy
-      cases hxy
-      exact mapBase_id (rest x) (dRest x) (rRest x)
+    HEq (Decoration.Over.mapBase (Node.ContextHom.id Γ) (fun _ _ x => x) spec d r) r :=
+  _root_.Interaction.Decoration.Over.mapBase_id (P := Spec.basePFunctor) (α := PUnit.{u+1})
 
 theorem Decoration.Over.mapBase_comp
     {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}} {Λ : Node.Context.{u, w₂}}
@@ -553,15 +517,9 @@ theorem Decoration.Over.mapBase_comp
       (Decoration.Over.mapBase g gOver spec (Decoration.map f spec d)
         (Decoration.Over.mapBase f fOver spec d r))
       (Decoration.Over.mapBase (Node.ContextHom.comp g f)
-        (fun X γ => gOver X (f X γ) ∘ fOver X γ) spec d r)
-  | .done, ⟨⟩, ⟨⟩ => HEq.rfl
-  | .node _ rest, ⟨γ, dRest⟩, ⟨a, rRest⟩ => by
-      simp only [Decoration.Over.mapBase]
-      refine Prod.mk_heq ?_
-      refine Function.hfunext rfl ?_
-      intro x y hxy
-      cases hxy
-      exact mapBase_comp f g fOver gOver (rest x) (dRest x) (rRest x)
+        (fun X γ => gOver X (f X γ) ∘ fOver X γ) spec d r) :=
+  _root_.Interaction.Decoration.Over.mapBase_comp
+    (P := Spec.basePFunctor) (α := PUnit.{u+1}) f g fOver gOver
 
 /--
 Pack a base decoration and one dependent `Over` layer into a decoration of the
@@ -569,12 +527,10 @@ extended context `Γ.extend A`.
 
 This is the tree-level realization of a single schema extension step.
 -/
-def Decoration.ofOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w) :
+abbrev Decoration.ofOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w) :
     (spec : Spec) → (d : Decoration Γ spec) → Decoration.Over A spec d →
-    Decoration (Node.Context.extend Γ A) spec
-  | .done, _, _ => ⟨⟩
-  | .node _ rest, ⟨γ, dRest⟩, ⟨a, rRest⟩ =>
-      ⟨⟨γ, a⟩, fun x => ofOver A (rest x) (dRest x) (rRest x)⟩
+    Decoration (Node.Context.extend Γ A) spec :=
+  _root_.Interaction.Decoration.ofOver (P := Spec.basePFunctor) (α := PUnit.{u+1})
 
 theorem Decoration.map_ofOver
     {Γ : Node.Context.{u, v}} {Δ : Node.Context.{u, w}}
@@ -585,13 +541,8 @@ theorem Decoration.map_ofOver
     Decoration.map (Node.Context.extendMap f g) spec (Decoration.ofOver A spec d r) =
       Decoration.ofOver B spec
         (Decoration.map f spec d)
-        (Decoration.Over.mapBase f g spec d r)
-  | .done, ⟨⟩, ⟨⟩ => rfl
-  | .node _ rest, ⟨γ, dRest⟩, ⟨a, rRest⟩ => by
-      simp only [Decoration.map, Decoration.ofOver, Decoration.Over.mapBase]
-      congr 1
-      funext x
-      exact map_ofOver f g (rest x) (dRest x) (rRest x)
+        (Decoration.Over.mapBase f g spec d r) :=
+  _root_.Interaction.Decoration.map_ofOver (P := Spec.basePFunctor) (α := PUnit.{u+1}) f g
 
 /--
 Unpack a decoration of the extended context `Γ.extend A` into:
@@ -600,45 +551,22 @@ Unpack a decoration of the extended context `Γ.extend A` into:
 
 This is the inverse structural view to `Decoration.ofOver`.
 -/
-def Decoration.toOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w) :
+abbrev Decoration.toOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w) :
     (spec : Spec) → Decoration (Node.Context.extend Γ A) spec →
-    Σ d : Decoration Γ spec, Decoration.Over A spec d
-  | .done, _ => ⟨⟨⟩, ⟨⟩⟩
-  | .node _ rest, ⟨⟨γ, a⟩, dRest⟩ =>
-      let ih := fun x => toOver A (rest x) (dRest x)
-      ⟨⟨γ, fun x => (ih x).1⟩, ⟨a, fun x => (ih x).2⟩⟩
+    Σ d : Decoration Γ spec, Decoration.Over A spec d :=
+  _root_.Interaction.Decoration.toOver (P := Spec.basePFunctor) (α := PUnit.{u+1})
 
 @[simp]
 theorem Decoration.toOver_ofOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w) :
     (spec : Spec) → (d : Decoration Γ spec) → (r : Decoration.Over A spec d) →
-    Decoration.toOver A spec (Decoration.ofOver A spec d r) = ⟨d, r⟩
-  | .done, ⟨⟩, ⟨⟩ => rfl
-  | .node _ rest, ⟨γ, dRest⟩, ⟨a, rRest⟩ => by
-      rw [Sigma.ext_iff]
-      let baseTail :=
-        fun x => (Decoration.toOver A (rest x)
-          (Decoration.ofOver A (rest x) (dRest x) (rRest x))).1
-      let overTail :=
-        fun x => (Decoration.toOver A (rest x)
-          (Decoration.ofOver A (rest x) (dRest x) (rRest x))).2
-      have hbaseTail : baseTail = dRest := by
-        funext x
-        exact (Sigma.ext_iff.mp (toOver_ofOver A (rest x) (dRest x) (rRest x))).1
-      have hoverTail : HEq overTail rRest := by
-        refine Function.hfunext rfl ?_
-        intro x y hxy
-        cases hxy
-        exact (Sigma.ext_iff.mp (toOver_ofOver A (rest x) (dRest x) (rRest x))).2
-      have hpair : HEq (a, overTail) (a, rRest) := Prod.mk_heq hoverTail
-      exact ⟨Prod.ext rfl hbaseTail, hpair⟩
+    Decoration.toOver A spec (Decoration.ofOver A spec d r) = ⟨d, r⟩ :=
+  _root_.Interaction.Decoration.toOver_ofOver (P := Spec.basePFunctor) (α := PUnit.{u+1})
 
 @[simp]
 theorem Decoration.ofOver_toOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w) :
     (spec : Spec) → (d : Decoration (Node.Context.extend Γ A) spec) →
-    Decoration.ofOver A spec (Decoration.toOver A spec d).1 (Decoration.toOver A spec d).2 = d
-  | .done, ⟨⟩ => rfl
-  | .node _ rest, ⟨⟨γ, a⟩, dRest⟩ => by
-      simp [Decoration.toOver, Decoration.ofOver, ofOver_toOver A]
+    Decoration.ofOver A spec (Decoration.toOver A spec d).1 (Decoration.toOver A spec d).2 = d :=
+  _root_.Interaction.Decoration.ofOver_toOver (P := Spec.basePFunctor) (α := PUnit.{u+1})
 
 /--
 Equivalence between:
@@ -658,15 +586,8 @@ equivalent to pairs consisting of:
 def Decoration.equivOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w)
     (spec : Spec) :
     Equiv (Decoration (Node.Context.extend Γ A) spec)
-      (Sigma fun d : Decoration Γ spec => Decoration.Over A spec d) := by
-  refine
-    { toFun := Decoration.toOver A spec
-      invFun := fun ⟨d, r⟩ => Decoration.ofOver A spec d r
-      left_inv := Decoration.ofOver_toOver A spec
-      right_inv := ?_ }
-  intro x
-  cases x with
-  | mk d r => exact Decoration.toOver_ofOver A spec d r
+      (Sigma fun d : Decoration Γ spec => Decoration.Over A spec d) :=
+  _root_.Interaction.Decoration.equivOver (P := Spec.basePFunctor) (α := PUnit.{u+1}) A spec
 
 /-! ## Polynomial substrate `DecoratedSpec`
 

@@ -575,6 +575,24 @@ def participantProfile
   | .focal => strat
   | .counterpart => cpt
 
+@[simp]
+theorem participantProfile_focal
+    {m : Type u → Type u} {spec : Spec} {roles : RoleDecoration spec}
+    {OutputP OutputC : Spec.Transcript spec → Type u}
+    (strat : Spec.StrategyOver (pairedSyntax m) Participant.focal spec roles OutputP)
+    (cpt : Spec.StrategyOver (pairedSyntax m) Participant.counterpart spec roles OutputC) :
+    participantProfile strat cpt Participant.focal = strat :=
+  rfl
+
+@[simp]
+theorem participantProfile_counterpart
+    {m : Type u → Type u} {spec : Spec} {roles : RoleDecoration spec}
+    {OutputP OutputC : Spec.Transcript spec → Type u}
+    (strat : Spec.StrategyOver (pairedSyntax m) Participant.focal spec roles OutputP)
+    (cpt : Spec.StrategyOver (pairedSyntax m) Participant.counterpart spec roles OutputC) :
+    participantProfile strat cpt Participant.counterpart = cpt :=
+  rfl
+
 /-- Execute a focal/counterpart pair over a role-decorated interaction tree.
 
 This is the generic `InteractionOver.run` specialized to `pairedSyntax`, with the
@@ -700,7 +718,9 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
     | .node X rest, ⟨.sender, rRest⟩ =>
         simp only [Focal.mapOutput, Counterpart.mapOutput, Counterpart.mapReceiver,
           Counterpart.mapSender]
-        simp only [InteractionOver.run_paired_sender, bind_pure_comp]
+        simp only [Spec.InteractionOver.run, Spec.InteractionOver.ofGeneric, pairedInteraction,
+          pairedInteractionOver, pairedSyntax, participantOutputFamily, participantProfile,
+          collectParticipantOutputs, bind_pure_comp]
         refine (bind_map_left
           (fun xc =>
             (⟨xc.1, Focal.mapOutput (fun p => fP ⟨xc.1, p⟩) xc.2⟩ :
@@ -727,7 +747,9 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
     | .node X rest, ⟨.receiver, rRest⟩ =>
         simp only [Focal.mapOutput, Counterpart.mapOutput,
           Counterpart.mapReceiver]
-        simp only [InteractionOver.run_paired_receiver, bind_pure_comp]
+        simp only [Spec.InteractionOver.run, Spec.InteractionOver.ofGeneric, pairedInteraction,
+          pairedInteractionOver, pairedSyntax, participantOutputFamily, participantProfile,
+          collectParticipantOutputs, bind_pure_comp]
         refine (bind_map_left
           (fun xc =>
             (⟨xc.1, Counterpart.mapOutput (fun p => fC ⟨xc.1, p⟩) xc.2⟩ :
@@ -890,7 +912,7 @@ theorem Focal.toConstantMonads_mapOutput
       simp only [Focal.mapOutput, Counterpart.mapReceiver,
         toConstantMonads, Spec.ShapeOver.mapOutput, focalMonadicShape,
         focalMonadicSyntax, RoleDecoration.withMonads, RoleDecoration.monadsOver,
-        MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
+        MonadDecoration.constant, Decoration.ofOver, Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat)
       funext msgAndRest
       rw [toConstantMonads_mapOutput
@@ -901,7 +923,7 @@ theorem Focal.toConstantMonads_mapOutput
       simp only [Focal.mapOutput, toConstantMonads,
         Spec.ShapeOver.mapOutput, focalMonadicShape, focalMonadicSyntax,
         RoleDecoration.withMonads, RoleDecoration.monadsOver,
-        MonadDecoration.constant, Spec.Decoration.ofOver, Functor.map_map]
+        MonadDecoration.constant, Decoration.ofOver, Decoration.ofOver, Functor.map_map]
       apply congrArg (fun g => g <$> strat x)
       funext next
       rw [toConstantMonads_mapOutput (rest x) (rRest x)]
