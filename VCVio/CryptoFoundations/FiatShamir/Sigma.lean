@@ -12,7 +12,7 @@ import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.Coercions.Add
-import VCVio.OracleComp.SimSemantics.BundledSemantics
+import VCVio.OracleComp.SimSemantics.StateT.BundledSemantics
 import VCVio.ProgramLogic.NotationCore
 import VCVio.ProgramLogic.Tactics.Unary
 

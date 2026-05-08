@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
-import VCVio.OracleComp.SimSemantics.StateSeparating
+import VCVio.OracleComp.SimSemantics.StateT.StateSeparating
 
 /-!
 # State-separating handlers: advantage and `evalDist` congruences
