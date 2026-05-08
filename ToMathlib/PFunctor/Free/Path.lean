@@ -262,12 +262,12 @@ def append {β : Type t} :
   | .roll a rest, s₂ =>
       .roll a fun b => append (rest b) (fun path => s₂ ⟨b, path⟩)
 
-@[simp]
+@[simp, freeM_unfold]
 theorem append_pure {β : Type t} (x : α)
     (s₂ : Path (FreeM.pure (P := P) x) → FreeM P β) :
     append (FreeM.pure x) s₂ = s₂ ⟨⟩ := rfl
 
-@[simp]
+@[simp, freeM_unfold]
 theorem append_roll {β : Type t} (a : P.A) (rest : P.B a → FreeM P α)
     (s₂ : Path (FreeM.roll a rest) → FreeM P β) :
     append (FreeM.roll a rest) s₂ =
@@ -296,6 +296,14 @@ def append {β : Type t} :
   | .pure _, _, _, path₂ => path₂
   | .roll _ rest, s₂, ⟨b, path₁⟩, path₂ =>
       ⟨b, append (rest b) (fun path => s₂ ⟨b, path⟩) path₁ path₂⟩
+
+@[simp]
+theorem append_done {β : Type t}
+    (x : α)
+    (s₂ : Path (FreeM.pure (P := P) x) → FreeM P β)
+    (path₂ : Path (s₂ ⟨⟩)) :
+    append (FreeM.pure x) s₂ ⟨⟩ path₂ = path₂ :=
+  rfl
 
 /-- Split a canonical path through an appended tree into prefix and suffix
 canonical paths. -/
@@ -356,6 +364,15 @@ def packAppend {β : Type t} :
   | .roll _ rest, s₂, F, ⟨b, path₁⟩, path₂, x =>
       packAppend (rest b) (fun path => s₂ ⟨b, path⟩)
         (fun path₁ path₂ => F ⟨b, path₁⟩ path₂) path₁ path₂ x
+
+@[simp]
+theorem packAppend_done {β : Type t}
+    (x : α)
+    (s₂ : Path (FreeM.pure (P := P) x) → FreeM P β)
+    (F : (path₁ : Path (FreeM.pure (P := P) x)) → Path (s₂ path₁) → Type w)
+    (path₂ : Path (s₂ ⟨⟩)) (y : F ⟨⟩ path₂) :
+    packAppend (FreeM.pure x) s₂ F ⟨⟩ path₂ y = y :=
+  rfl
 
 /-- Transport a value from the `liftAppend` family at an appended canonical path
 back to the original two-argument family. -/

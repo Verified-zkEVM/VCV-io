@@ -41,9 +41,9 @@ theorem RoleDecoration.swap_swap :
 
 /-- Swapping commutes with appended role decorations. -/
 theorem RoleDecoration.swap_append
-    {s₁ : Spec.{u}} {s₂ : Spec.Transcript s₁ → Spec.{u}}
+    {s₁ : Spec.{u}} {s₂ : PFunctor.FreeM.Path s₁ → Spec.{u}}
     (r₁ : RoleDecoration s₁)
-    (r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)) :
+    (r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)) :
     RoleDecoration.swap (r₁.append r₂) =
       (RoleDecoration.swap r₁).append (fun tr₁ => RoleDecoration.swap (r₂ tr₁)) :=
   PFunctor.FreeM.Displayed.Decoration.map_append

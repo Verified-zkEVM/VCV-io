@@ -15,12 +15,12 @@ import VCVio.Interaction.Basic.StateChain
 /-!
 # Composing two-party protocols
 
-Role-aware composition of strategies and counterparts along `Spec.append`, `Spec.replicate`,
-and `Spec.stateChain`. Each combinator dispatches on the role at each node (sending or receiving)
-to compose the two-party strategies correctly.
+Role-aware composition of strategies and counterparts along `PFunctor.FreeM.append`,
+`Spec.replicate`, and `Spec.stateChain`. Each combinator dispatches on the role at
+each node (sending or receiving) to compose the two-party strategies correctly.
 
 For binary composition, `StrategyOver.TwoParty.Focal.comp` and
-`StrategyOver.TwoParty.Counterpart.append` use `Spec.Transcript.liftAppend`
+`StrategyOver.TwoParty.Counterpart.append` use `PFunctor.FreeM.Path.liftAppend`
 for the output type (factored form). The flat variants (`compFlat`,
 `StrategyOver.TwoParty.Counterpart.appendFlat`) take a single output
 family on the combined transcript.
@@ -58,22 +58,22 @@ class LawfulCommMonad (m : Type u → Type u) [Monad m] extends LawfulMonad m wh
       let a ← ma
       k a b)
 
-/-- Compose role-aware strategies along `Spec.append` with a two-argument output family
-lifted through `Spec.Transcript.liftAppend`. The continuation receives the first phase's
+/-- Compose role-aware strategies along `PFunctor.FreeM.append` with a two-argument output family
+lifted through `PFunctor.FreeM.Path.liftAppend`. The continuation receives the first phase's
 output and produces a second-phase strategy. -/
 def _root_.Interaction.StrategyOver.TwoParty.Focal.comp {m : Type u → Type u} [Monad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {Mid : Spec.Transcript s₁ → Type u}
-    {F : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {Mid : PFunctor.FreeM.Path s₁ → Type u}
+    {F : (tr₁ : PFunctor.FreeM.Path s₁) → PFunctor.FreeM.Path (s₂ tr₁) → Type u}
     (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ Mid)
-    (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → Mid tr₁ →
       m (StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁) (F tr₁))) :
     m (StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₁.append s₂) (r₁.append r₂)
-        (Spec.Transcript.liftAppend s₁ s₂ F)) :=
+        (PFunctor.FreeM.Path.liftAppend s₁ s₂ F)) :=
   match s₁, r₁ with
   | .done, _ => f ⟨⟩ strat₁
   | .node _ _, ⟨.sender, _⟩ =>
@@ -86,18 +86,18 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.comp {m : Type u → Type u} 
         let next ← strat₁ x
         comp next (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
 
-/-- Compose role-aware strategies along `Spec.append` with a single output family
-on the combined transcript. The continuation indexes via `Spec.Transcript.append`. -/
+/-- Compose role-aware strategies along `PFunctor.FreeM.append` with a single output family
+on the combined transcript. The continuation indexes via `PFunctor.FreeM.Path.append`. -/
 def _root_.Interaction.StrategyOver.TwoParty.Focal.compFlat {m : Type u → Type u} [Monad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {Mid : Spec.Transcript s₁ → Type u}
-    {Output : Spec.Transcript (s₁.append s₂) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {Mid : PFunctor.FreeM.Path s₁ → Type u}
+    {Output : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
     (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ Mid)
-    (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → Mid tr₁ →
       m (StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))) :
+        (fun tr₂ => Output (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂)))) :
     m (StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₁.append s₂) (r₁.append r₂) Output) :=
   match s₁, r₁ with
@@ -116,15 +116,15 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.compFlat {m : Type u → Type
 it only serves the weaker `[LawfulMonad]` execution theorem below. -/
 private def _root_.Interaction.StrategyOver.TwoParty.Focal.compFlatPure
     {m : Type u → Type u} [Monad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {Mid : Spec.Transcript s₁ → Type u}
-    {Output : Spec.Transcript (s₁.append s₂) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {Mid : PFunctor.FreeM.Path s₁ → Type u}
+    {Output : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
     (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ Mid)
-    (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → Mid tr₁ →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
+        (fun tr₂ => Output (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))) :
     StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₁.append s₂) (r₁.append r₂) Output :=
   match s₁, r₁ with
@@ -139,27 +139,27 @@ private def _root_.Interaction.StrategyOver.TwoParty.Focal.compFlatPure
 
 private theorem _root_.Interaction.StrategyOver.TwoParty.Focal.compFlat_eq_pure_compFlatPure
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {Mid : Spec.Transcript s₁ → Type u}
-    {Output : Spec.Transcript (s₁.append s₂) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {Mid : PFunctor.FreeM.Path s₁ → Type u}
+    {Output : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
     (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ Mid)
-    (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → Mid tr₁ →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
+        (fun tr₂ => Output (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))) :
     StrategyOver.TwoParty.Focal.compFlat strat₁ (fun tr₁ mid => pure (f tr₁ mid)) =
       pure (StrategyOver.TwoParty.Focal.compFlatPure strat₁ f) := by
   let rec go
       (s₁ : Spec) (r₁ : RoleDecoration s₁)
-      {s₂ : Spec.Transcript s₁ → Spec}
-      {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-      {Mid : Spec.Transcript s₁ → Type u}
-      {Output : Spec.Transcript (s₁.append s₂) → Type u}
+      {s₂ : PFunctor.FreeM.Path s₁ → Spec}
+      {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+      {Mid : PFunctor.FreeM.Path s₁ → Type u}
+      {Output : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
       (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ Mid)
-      (f : (tr₁ : Spec.Transcript s₁) → Mid tr₁ →
+      (f : (tr₁ : PFunctor.FreeM.Path s₁) → Mid tr₁ →
         StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-          (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
+          (fun tr₂ => Output (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))) :
       StrategyOver.TwoParty.Focal.compFlat strat₁ (fun tr₁ mid => pure (f tr₁ mid)) =
         pure (StrategyOver.TwoParty.Focal.compFlatPure strat₁ f) := by
     match s₁, r₁ with
@@ -197,17 +197,17 @@ private theorem _root_.Interaction.StrategyOver.TwoParty.Focal.compFlat_eq_pure_
 
 /-- Extract the first-phase role-aware strategy from a strategy on a composed
 interaction. At each first-phase transcript `tr₁`, the remainder is the
-second-phase strategy with output indexed by `Spec.Transcript.append`. -/
+second-phase strategy with output indexed by `PFunctor.FreeM.Path.append`. -/
 def _root_.Interaction.StrategyOver.TwoParty.Focal.splitPrefix {m : Type u → Type u} [Functor m] :
-    {s₁ : Spec} → {s₂ : Spec.Transcript s₁ → Spec} →
+    {s₁ : Spec} → {s₂ : PFunctor.FreeM.Path s₁ → Spec} →
     {r₁ : RoleDecoration s₁} →
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)} →
-    {Output : Spec.Transcript (s₁.append s₂) → Type u} →
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)} →
+    {Output : PFunctor.FreeM.Path (s₁.append s₂) → Type u} →
     StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₁.append s₂) (r₁.append r₂) Output →
     StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ (fun tr₁ =>
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => Output (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
+        (fun tr₂ => Output (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂)))
   | .done, _, _, _, _, strat => strat
   | .node _ _, s₂, ⟨.sender, rRest⟩, r₂, _, strat =>
       (fun ⟨x, cont⟩ =>
@@ -224,10 +224,10 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.splitPrefix {m : Type u → T
 /-- Recompose a role-aware strategy from its prefix decomposition. -/
 theorem _root_.Interaction.StrategyOver.TwoParty.Focal.compFlat_splitPrefix
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {Output : Spec.Transcript (s₁.append s₂) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {Output : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
     (strat :
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
         (s₁.append s₂) (r₁.append r₂) Output) :
@@ -236,9 +236,9 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.compFlat_splitPrefix
       (fun _ strat₂ => pure strat₂) = pure strat := by
   let rec go
       (s₁ : Spec) (r₁ : RoleDecoration s₁)
-      {s₂ : Spec.Transcript s₁ → Spec}
-      {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-      {Output : Spec.Transcript (s₁.append s₂) → Type u}
+      {s₂ : PFunctor.FreeM.Path s₁ → Spec}
+      {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+      {Output : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
       (strat : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
         (s₁.append s₂) (r₁.append r₂) Output) :
       StrategyOver.TwoParty.Focal.compFlat
@@ -312,23 +312,23 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.compFlat_splitPrefix
         simpa [monad_norm] using hcont
   exact go s₁ r₁ strat
 
-/-- Compose counterparts along `Spec.append` with a two-argument output family
-lifted through `Spec.Transcript.liftAppend`. The continuation maps the first phase's
+/-- Compose counterparts along `PFunctor.FreeM.append` with a two-argument output family
+lifted through `PFunctor.FreeM.Path.liftAppend`. The continuation maps the first phase's
 output to a second-phase counterpart. -/
 def _root_.Interaction.StrategyOver.TwoParty.Counterpart.append {m : Type u → Type u} [Monad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {Output₁ : Spec.Transcript s₁ → Type u}
-    {F : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u} :
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {Output₁ : PFunctor.FreeM.Path s₁ → Type u}
+    {F : (tr₁ : PFunctor.FreeM.Path s₁) → PFunctor.FreeM.Path (s₂ tr₁) → Type u} :
     StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ Output₁ →
-    ((tr₁ : Spec.Transcript s₁) → Output₁ tr₁ →
+    ((tr₁ : PFunctor.FreeM.Path s₁) → Output₁ tr₁ →
       StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (F tr₁)) →
     StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₁.append s₂) (r₁.append r₂)
-        (Spec.Transcript.liftAppend s₁ s₂ F) :=
+        (PFunctor.FreeM.Path.liftAppend s₁ s₂ F) :=
   match s₁, r₁ with
   | .done, _ => fun out₁ c₂ => c₂ ⟨⟩ out₁
   | .node _ _, ⟨.sender, _⟩ => fun c₁ c₂ =>
@@ -339,18 +339,18 @@ def _root_.Interaction.StrategyOver.TwoParty.Counterpart.append {m : Type u → 
       let ⟨x, cRest⟩ ← c₁
       return ⟨x, StrategyOver.TwoParty.Counterpart.append cRest (fun p o => c₂ ⟨x, p⟩ o)⟩
 
-/-- Compose counterparts along `Spec.append` with a single output family on the
-combined transcript. The continuation indexes via `Spec.Transcript.append`. -/
+/-- Compose counterparts along `PFunctor.FreeM.append` with a single output family on the
+combined transcript. The continuation indexes via `PFunctor.FreeM.Path.append`. -/
 def _root_.Interaction.StrategyOver.TwoParty.Counterpart.appendFlat {m : Type u → Type u} [Monad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {Output₁ : Spec.Transcript s₁ → Type u}
-    {Output₂ : Spec.Transcript (s₁.append s₂) → Type u} :
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {Output₁ : PFunctor.FreeM.Path s₁ → Type u}
+    {Output₂ : PFunctor.FreeM.Path (s₁.append s₂) → Type u} :
     StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ Output₁ →
-    ((tr₁ : Spec.Transcript s₁) → Output₁ tr₁ →
+    ((tr₁ : PFunctor.FreeM.Path s₁) → Output₁ tr₁ →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => Output₂ (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) →
+        (fun tr₂ => Output₂ (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))) →
     StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
       (s₁.append s₂) (r₁.append r₂) Output₂ :=
   match s₁, r₁ with
@@ -369,23 +369,23 @@ This lets proofs that decompose an arbitrary strategy via `splitPrefix` +
 `appendFlat` still work when `Reduction.comp` uses the non-flat `append`. -/
 theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.append_eq_appendFlat_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulMonad m] :
-    {s₁ : Spec} → {s₂ : Spec.Transcript s₁ → Spec} →
+    {s₁ : Spec} → {s₂ : PFunctor.FreeM.Path s₁ → Spec} →
     {r₁ : RoleDecoration s₁} →
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)} →
-    {Output₁ : Spec.Transcript s₁ → Type u} →
-    {F : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u} →
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)} →
+    {Output₁ : PFunctor.FreeM.Path s₁ → Type u} →
+    {F : (tr₁ : PFunctor.FreeM.Path s₁) → PFunctor.FreeM.Path (s₂ tr₁) → Type u} →
     (c₁ : StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ Output₁) →
-    (c₂ : (tr₁ : Spec.Transcript s₁) → Output₁ tr₁ →
+    (c₂ : (tr₁ : PFunctor.FreeM.Path s₁) → Output₁ tr₁ →
       StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (F tr₁)) →
     StrategyOver.TwoParty.Counterpart.append c₁ c₂ =
       StrategyOver.TwoParty.Counterpart.appendFlat c₁ (fun tr₁ o =>
         StrategyOver.TwoParty.Counterpart.mapOutput
-          (fun tr₂ x => Spec.Transcript.packAppend s₁ s₂ F tr₁ tr₂ x) (c₂ tr₁ o))
+          (fun tr₂ x => PFunctor.FreeM.Path.packAppend s₁ s₂ F tr₁ tr₂ x) (c₂ tr₁ o))
   | .done, _, _, _, _, _, c₁, c₂ => by
       simp only [StrategyOver.TwoParty.Counterpart.append,
-        StrategyOver.TwoParty.Counterpart.appendFlat, Spec.Transcript.packAppend]
+        StrategyOver.TwoParty.Counterpart.appendFlat, PFunctor.FreeM.Path.packAppend]
       exact (StrategyOver.TwoParty.Counterpart.mapOutput_id _).symm
   | .node _ rest, _, ⟨.sender, rRest⟩, _, _, _, c₁, c₂ => by
       funext x
@@ -398,27 +398,27 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.append_eq_appendFla
       simp only [StrategyOver.TwoParty.Counterpart.append,
         StrategyOver.TwoParty.Counterpart.appendFlat]
       congr 1; funext ⟨x, cRest⟩; congr 1
-      simp only [Spec.Transcript.packAppend]; congr 1
+      simp only [PFunctor.FreeM.Path.packAppend]; congr 1
       exact append_eq_appendFlat_mapOutput cRest (fun p o => c₂ ⟨x, p⟩ o)
 
 /-- Executing a flat composed strategy/counterpart factors into first executing
 the prefix interaction and then executing the suffix continuation. -/
 theorem run_compFlat_appendFlat_pure
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {MidP MidC : Spec.Transcript s₁ → Type u}
-    {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {MidP MidC : PFunctor.FreeM.Path s₁ → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
     (strat₁ : StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ MidP)
-    (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → MidP tr₁ →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
+        (fun tr₂ => OutputP (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂)))
     (cpt₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ MidC)
-    (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
+    (cpt₂ : (tr₁ : PFunctor.FreeM.Path s₁) → MidC tr₁ →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
+        (fun tr₂ => OutputC (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))) :
     (do
       let strat ← StrategyOver.TwoParty.Focal.compFlat strat₁ (fun tr₁ mid => pure (f tr₁ mid))
       run (s₁.append s₂) (r₁.append r₂) strat
@@ -427,23 +427,23 @@ theorem run_compFlat_appendFlat_pure
         let ⟨tr₁, mid, out₁⟩ ← run s₁ r₁ strat₁ cpt₁
         let ⟨tr₂, outP, outC⟩ ←
           run (s₂ tr₁) (r₂ tr₁) (f tr₁ mid) (cpt₂ tr₁ out₁)
-        pure ⟨Spec.Transcript.append s₁ s₂ tr₁ tr₂, outP, outC⟩) := by
+        pure ⟨PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂, outP, outC⟩) := by
   let rec go
       (s₁ : Spec) (r₁ : RoleDecoration s₁)
-      {MidP MidC : Spec.Transcript s₁ → Type u}
-      {s₂ : Spec.Transcript s₁ → Spec}
-      {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-      {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
+      {MidP MidC : PFunctor.FreeM.Path s₁ → Type u}
+      {s₂ : PFunctor.FreeM.Path s₁ → Spec}
+      {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+      {OutputP OutputC : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
       {β : Type u}
       (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ MidP)
-      (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
+      (f : (tr₁ : PFunctor.FreeM.Path s₁) → MidP tr₁ →
         StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-          (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
+          (fun tr₂ => OutputP (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂)))
       (cpt₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ MidC)
-      (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
+      (cpt₂ : (tr₁ : PFunctor.FreeM.Path s₁) → MidC tr₁ →
         StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
-          (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
-      (g : ((tr : Spec.Transcript (s₁.append s₂)) × OutputP tr × OutputC tr) → m β) :
+          (fun tr₂ => OutputC (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂)))
+      (g : ((tr : PFunctor.FreeM.Path (s₁.append s₂)) × OutputP tr × OutputC tr) → m β) :
       (do
         let r ←
           do let strat ← StrategyOver.TwoParty.Focal.compFlat strat₁
@@ -455,13 +455,13 @@ theorem run_compFlat_appendFlat_pure
           let r₁ ← run s₁ r₁ strat₁ cpt₁
           let r₂ ←
             run (s₂ r₁.1) (r₂ r₁.1) (f r₁.1 r₁.2.1) (cpt₂ r₁.1 r₁.2.2)
-          g ⟨Spec.Transcript.append s₁ s₂ r₁.1 r₂.1, r₂.2.1, r₂.2.2⟩) := by
+          g ⟨PFunctor.FreeM.Path.append s₁ s₂ r₁.1 r₂.1, r₂.2.1, r₂.2.2⟩) := by
     match s₁, r₁ with
     | .done, r₁ =>
         cases r₁
         simp [StrategyOver.TwoParty.Focal.compFlat.eq_1,
-          StrategyOver.TwoParty.Counterpart.appendFlat.eq_1, run_done, Spec.append,
-          Spec.Transcript.append_done]
+          StrategyOver.TwoParty.Counterpart.appendFlat.eq_1, run_done,
+          PFunctor.FreeM.Path.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
@@ -474,19 +474,19 @@ theorem run_compFlat_appendFlat_pure
 the prefix interaction and then executing the suffix continuation. -/
 theorem run_compFlat_appendFlat
     {m : Type u → Type u} [Monad m] [LawfulCommMonad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {MidP MidC : Spec.Transcript s₁ → Type u}
-    {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {MidP MidC : PFunctor.FreeM.Path s₁ → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
     (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ MidP)
-    (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → MidP tr₁ →
       m (StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂))))
+        (fun tr₂ => OutputP (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))))
     (cpt₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ MidC)
-    (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
+    (cpt₂ : (tr₁ : PFunctor.FreeM.Path s₁) → MidC tr₁ →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
-        (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂))) :
+        (fun tr₂ => OutputC (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))) :
     (do
       let strat ← StrategyOver.TwoParty.Focal.compFlat strat₁ f
       run (s₁.append s₂) (r₁.append r₂) strat
@@ -496,23 +496,23 @@ theorem run_compFlat_appendFlat
         let strat₂ ← f tr₁ mid
         let ⟨tr₂, outP, outC⟩ ←
           run (s₂ tr₁) (r₂ tr₁) strat₂ (cpt₂ tr₁ out₁)
-        pure ⟨Spec.Transcript.append s₁ s₂ tr₁ tr₂, outP, outC⟩) := by
+        pure ⟨PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂, outP, outC⟩) := by
   let rec go
       (s₁ : Spec) (r₁ : RoleDecoration s₁)
-      {MidP MidC : Spec.Transcript s₁ → Type u}
-      {s₂ : Spec.Transcript s₁ → Spec}
-      {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-      {OutputP OutputC : Spec.Transcript (s₁.append s₂) → Type u}
+      {MidP MidC : PFunctor.FreeM.Path s₁ → Type u}
+      {s₂ : PFunctor.FreeM.Path s₁ → Spec}
+      {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+      {OutputP OutputC : PFunctor.FreeM.Path (s₁.append s₂) → Type u}
       {β : Type u}
       (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ MidP)
-      (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
+      (f : (tr₁ : PFunctor.FreeM.Path s₁) → MidP tr₁ →
         m (StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁)
-          (fun tr₂ => OutputP (Spec.Transcript.append s₁ s₂ tr₁ tr₂))))
+          (fun tr₂ => OutputP (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂))))
       (cpt₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ MidC)
-      (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
+      (cpt₂ : (tr₁ : PFunctor.FreeM.Path s₁) → MidC tr₁ →
         StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁)
-          (fun tr₂ => OutputC (Spec.Transcript.append s₁ s₂ tr₁ tr₂)))
-      (g : ((tr : Spec.Transcript (s₁.append s₂)) × OutputP tr × OutputC tr) → m β) :
+          (fun tr₂ => OutputC (PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂)))
+      (g : ((tr : PFunctor.FreeM.Path (s₁.append s₂)) × OutputP tr × OutputC tr) → m β) :
       (do
         let r ←
           do let strat ← StrategyOver.TwoParty.Focal.compFlat strat₁ f
@@ -524,13 +524,13 @@ theorem run_compFlat_appendFlat
           let strat₂ ← f r₁.1 r₁.2.1
           let r₂ ←
             run (s₂ r₁.1) (r₂ r₁.1) strat₂ (cpt₂ r₁.1 r₁.2.2)
-          g ⟨Spec.Transcript.append s₁ s₂ r₁.1 r₂.1, r₂.2.1, r₂.2.2⟩) := by
+          g ⟨PFunctor.FreeM.Path.append s₁ s₂ r₁.1 r₂.1, r₂.2.1, r₂.2.2⟩) := by
     match s₁, r₁ with
     | .done, r₁ =>
         cases r₁
         simp [StrategyOver.TwoParty.Focal.compFlat.eq_1,
-          StrategyOver.TwoParty.Counterpart.appendFlat.eq_1, run_done, Spec.append,
-          Spec.Transcript.append_done]
+          StrategyOver.TwoParty.Counterpart.appendFlat.eq_1, run_done,
+          PFunctor.FreeM.Path.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
@@ -545,18 +545,18 @@ prefix interaction and then
 executing the suffix continuation. Outputs are transported via `packAppend`. -/
 theorem run_comp_append
     {m : Type u → Type u} [Monad m] [LawfulCommMonad m]
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec} {s₂ : PFunctor.FreeM.Path s₁ → Spec}
     {r₁ : RoleDecoration s₁}
-    {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-    {MidP MidC : Spec.Transcript s₁ → Type u}
-    {FP FC : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u}
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+    {MidP MidC : PFunctor.FreeM.Path s₁ → Type u}
+    {FP FC : (tr₁ : PFunctor.FreeM.Path s₁) → PFunctor.FreeM.Path (s₂ tr₁) → Type u}
     (strat₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ MidP)
-    (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → MidP tr₁ →
       m (StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁) (FP tr₁)))
     (cpt₁ : StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ MidC)
-    (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
+    (cpt₂ : (tr₁ : PFunctor.FreeM.Path s₁) → MidC tr₁ →
       StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (FC tr₁)) :
     (do
@@ -568,29 +568,29 @@ theorem run_comp_append
         let strat₂ ← f tr₁ mid
         let ⟨tr₂, outP, outC⟩ ←
           run (s₂ tr₁) (r₂ tr₁) strat₂ (cpt₂ tr₁ out₁)
-        pure ⟨Spec.Transcript.append s₁ s₂ tr₁ tr₂,
-          Spec.Transcript.packAppend s₁ s₂ FP tr₁ tr₂ outP,
-          Spec.Transcript.packAppend s₁ s₂ FC tr₁ tr₂ outC⟩) := by
+        pure ⟨PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂,
+          PFunctor.FreeM.Path.packAppend s₁ s₂ FP tr₁ tr₂ outP,
+          PFunctor.FreeM.Path.packAppend s₁ s₂ FC tr₁ tr₂ outC⟩) := by
   let rec go
       (s₁ : Spec) (r₁ : RoleDecoration s₁)
-      {MidP MidC : Spec.Transcript s₁ → Type u}
-      {s₂ : Spec.Transcript s₁ → Spec}
-      {r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)}
-      {FP FC : (tr₁ : Spec.Transcript s₁) → Spec.Transcript (s₂ tr₁) → Type u}
+      {MidP MidC : PFunctor.FreeM.Path s₁ → Type u}
+      {s₂ : PFunctor.FreeM.Path s₁ → Spec}
+      {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
+      {FP FC : (tr₁ : PFunctor.FreeM.Path s₁) → PFunctor.FreeM.Path (s₂ tr₁) → Type u}
       {β : Type u}
       (strat₁ : StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ MidP)
-      (f : (tr₁ : Spec.Transcript s₁) → MidP tr₁ →
+      (f : (tr₁ : PFunctor.FreeM.Path s₁) → MidP tr₁ →
         m (StrategyOver
           (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁) (FP tr₁)))
       (cpt₁ : StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ MidC)
-      (cpt₂ : (tr₁ : Spec.Transcript s₁) → MidC tr₁ →
+      (cpt₂ : (tr₁ : PFunctor.FreeM.Path s₁) → MidC tr₁ →
         StrategyOver
           (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (FC tr₁))
-      (g : ((tr : Spec.Transcript (s₁.append s₂)) ×
-        Spec.Transcript.liftAppend s₁ s₂ FP tr ×
-        Spec.Transcript.liftAppend s₁ s₂ FC tr) → m β) :
+      (g : ((tr : PFunctor.FreeM.Path (s₁.append s₂)) ×
+        PFunctor.FreeM.Path.liftAppend s₁ s₂ FP tr ×
+        PFunctor.FreeM.Path.liftAppend s₁ s₂ FC tr) → m β) :
       (do
         let r ←
           do let strat ← StrategyOver.TwoParty.Focal.comp strat₁ f
@@ -602,16 +602,16 @@ theorem run_comp_append
           let strat₂ ← f r₁.1 r₁.2.1
           let r₂ ←
             run (s₂ r₁.1) (r₂ r₁.1) strat₂ (cpt₂ r₁.1 r₁.2.2)
-          g ⟨Spec.Transcript.append s₁ s₂ r₁.1 r₂.1,
-            Spec.Transcript.packAppend s₁ s₂ FP r₁.1 r₂.1 r₂.2.1,
-            Spec.Transcript.packAppend s₁ s₂ FC r₁.1 r₂.1 r₂.2.2⟩) := by
+          g ⟨PFunctor.FreeM.Path.append s₁ s₂ r₁.1 r₂.1,
+            PFunctor.FreeM.Path.packAppend s₁ s₂ FP r₁.1 r₂.1 r₂.2.1,
+            PFunctor.FreeM.Path.packAppend s₁ s₂ FC r₁.1 r₂.1 r₂.2.2⟩) := by
     match s₁, r₁ with
     | .done, r₁ =>
         cases r₁
         simp [monad_norm, StrategyOver.TwoParty.Focal.comp,
-          StrategyOver.TwoParty.Counterpart.append, run_done, Spec.append,
-          Spec.Transcript.liftAppend, Spec.Transcript.append_done, Spec.Transcript.packAppend_done]
-        rfl
+          StrategyOver.TwoParty.Counterpart.append, run_done,
+          PFunctor.FreeM.Path.liftAppend, PFunctor.FreeM.Path.append_done,
+          PFunctor.FreeM.Path.packAppend_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
@@ -674,11 +674,11 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.iterate {m : Type u → Type 
 /-- Compose counterparts along a state chain with stage-dependent output. At each stage,
 the step transforms `Family i s` into a counterpart whose output is
 `Family (i+1) (advance i s tr)`. The full state chain output is
-`Spec.Transcript.stateChainFamily Family`. -/
+`PFunctor.FreeM.Path.stateChainFamily Family`. -/
 def _root_.Interaction.StrategyOver.TwoParty.Counterpart.stateChainComp
     {m : Type u → Type u} [Monad m]
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
-    {advance : (i : Nat) → (s : Stage i) → Spec.Transcript (spec i s) → Stage (i + 1)}
+    {advance : (i : Nat) → (s : Stage i) → PFunctor.FreeM.Path (spec i s) → Stage (i + 1)}
     {roles : (i : Nat) → (s : Stage i) → RoleDecoration (spec i s)}
     {Family : (i : Nat) → Stage i → Type u}
     (step : (i : Nat) → (s : Stage i) → Family i s →
@@ -686,11 +686,11 @@ def _root_.Interaction.StrategyOver.TwoParty.Counterpart.stateChainComp
         (spec i s) (roles i s) (fun tr => Family (i + 1) (advance i s tr))) :
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
     StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
-      (Spec.stateChain Stage spec advance n i s)
+      (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)
       (PFunctor.FreeM.Displayed.Decoration.stateChain
         (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
         (advance := advance) roles n i s)
-      (Spec.Transcript.stateChainFamily Family n i s)
+      (PFunctor.FreeM.Path.stateChainFamily Family n i s)
   | 0, _, _, b => b
   | n + 1, i, s, b =>
       StrategyOver.TwoParty.Counterpart.append (step i s b)
@@ -699,10 +699,10 @@ def _root_.Interaction.StrategyOver.TwoParty.Counterpart.stateChainComp
 /-- Compose role-aware strategies along a state chain with stage-dependent output.
 At each stage, the step transforms `Family i s` into a strategy whose output is
 `Family (i+1) (advance i s tr)`. The full state chain output is
-`Spec.Transcript.stateChainFamily Family`. -/
+`PFunctor.FreeM.Path.stateChainFamily Family`. -/
 def _root_.Interaction.StrategyOver.TwoParty.Focal.stateChainComp {m : Type u → Type u} [Monad m]
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
-    {advance : (i : Nat) → (s : Stage i) → Spec.Transcript (spec i s) → Stage (i + 1)}
+    {advance : (i : Nat) → (s : Stage i) → PFunctor.FreeM.Path (spec i s) → Stage (i + 1)}
     {roles : (i : Nat) → (s : Stage i) → RoleDecoration (spec i s)}
     {Family : (i : Nat) → Stage i → Type u}
     (step : (i : Nat) → (s : Stage i) → Family i s →
@@ -711,11 +711,11 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.stateChainComp {m : Type u �
         (fun tr => Family (i + 1) (advance i s tr)))) :
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
     m (StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
-      (Spec.stateChain Stage spec advance n i s)
+      (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)
       (PFunctor.FreeM.Displayed.Decoration.stateChain
         (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
         (advance := advance) roles n i s)
-      (Spec.Transcript.stateChainFamily Family n i s))
+      (PFunctor.FreeM.Path.stateChainFamily Family n i s))
   | 0, _, _, a => pure a
   | n + 1, i, s, a => do
     let strat ← step i s a

@@ -122,7 +122,7 @@ It does **not** say
 Those additional layers are supplied separately by:
 * `Spec.Node.Context` / `Spec.Node.Schema`, for node-local semantic contexts
   and their telescope-style descriptions;
-* `Spec.Decoration`, for concrete nodewise metadata;
+* `PFunctor.FreeM.Displayed.Decoration`, for concrete nodewise metadata;
 * `SyntaxOver`, for the most general local participant syntax over
   realized node contexts;
 * `ShapeOver`, for the functorial refinement of such syntax;

@@ -463,7 +463,7 @@ It is written explicitly so that the resulting endpoint computation reduces by
 `rfl`.
 -/
 private def corruptionAdversaryViews :
-    Spec.Decoration (fun X : Type u => ViewMode X) (corruptionSpec Secret) :=
+    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X) (corruptionSpec Secret) :=
   ⟨.pick, fun _ => ⟨.pick, fun _ => ⟨⟩⟩⟩
 
 /--
@@ -474,7 +474,7 @@ The monitor learns the public corruption decision but is hidden from the later
 secret-bearing move in every branch.
 -/
 private def corruptionMonitorViews :
-    Spec.Decoration (fun X : Type u => ViewMode X) (corruptionSpec Secret) :=
+    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X) (corruptionSpec Secret) :=
   ⟨.observe, fun _ => ⟨.hidden, fun _ => ⟨⟩⟩⟩
 
 /--
@@ -482,7 +482,7 @@ The post-corruption secret-bearing node viewed from the branch where Alice is
 the corrupted party.
 -/
 private def aliceAfterSelfCorruptionViews :
-    Spec.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
+    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
   ⟨.observe, fun _ => ⟨⟩⟩
 
 /--
@@ -490,7 +490,7 @@ The same post-corruption secret-bearing node viewed from the branch where Bob
 is corrupted instead, so Alice is hidden from the move.
 -/
 private def aliceAfterBobCorruptionViews :
-    Spec.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
+    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
   ⟨.hidden, fun _ => ⟨⟩⟩
 
 /--
