@@ -3,14 +3,14 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 
 /-!
-# Query Implementations with State Monads
+# Query Implementations with Reader Monads
 
-This file gives lemmas about `QueryImpl spec m` when `m` is something like `StateT σ n`.
+This file gives lemmas about `QueryImpl spec m` when `m` is something like `ReaderT ρ n`.
 
-TODO: should generalize things to `MonadState` once laws for it exist.
+TODO: should generalize things to `MonadReader` once laws for it exist.
 -/
 
 universe u v w
@@ -40,5 +40,14 @@ def sigmaReaderT {τ : Type} {ι : τ → Type _}
     QueryImpl (OracleSpec.sigma spec) (ReaderT ((t : τ) → ρ t) m)
   | ⟨t, q⟩ => ReaderT.mk fun s => (impl t q).run (s t)
 
+/-- Reassociate a nested reader transformer into one product context.
+
+The outer context is the first component of the product; the inner/base context is the
+second. This is the reader-transformer analogue of `flattenStateT` and `flattenWriterT`. -/
+def flattenReaderT {ι : Type _} {spec : OracleSpec ι}
+    {m : Type _ → Type _} {ρ₁ ρ₂ : Type _}
+    (impl : QueryImpl spec (ReaderT ρ₁ (ReaderT ρ₂ m))) :
+    QueryImpl spec (ReaderT (ρ₁ × ρ₂) m) := fun t =>
+  ReaderT.mk fun (r₁, r₂) => ((impl t).run r₁).run r₂
 
 end QueryImpl

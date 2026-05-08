@@ -6,7 +6,7 @@ Authors: Quang Dao
 import VCVio.OracleComp.QueryTracking.CachingLoggingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
-import VCVio.OracleComp.SimSemantics.StateProjection
+import VCVio.OracleComp.SimSemantics.StateT.StateProjection
 
 /-!
 # `handler_simp` for Query Handlers
