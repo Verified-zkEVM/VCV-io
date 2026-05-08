@@ -33,19 +33,22 @@ theorem RoleDecoration.swap_swap :
   | .done, _ => rfl
   | .node _ rest, ⟨r, rRest⟩ => by
       simp only [RoleDecoration.swap, PFunctor.FreeM.Displayed.Decoration.map,
-        PFunctor.FreeM.Displayed.Decoration.mapLocalHom, PFunctor.FreeM.Displayed.LocalHom.toHom_roll,
+        PFunctor.FreeM.Displayed.Decoration.mapLocalHom,
+        PFunctor.FreeM.Displayed.LocalHom.toHom_roll,
         Role.swap_swap]
       congr 1; funext x
       exact RoleDecoration.swap_swap (rest x) (rRest x)
 
 /-- Swapping commutes with appended role decorations. -/
 theorem RoleDecoration.swap_append
-    {s₁ : Spec} {s₂ : Spec.Transcript s₁ → Spec}
+    {s₁ : Spec.{u}} {s₂ : Spec.Transcript s₁ → Spec.{u}}
     (r₁ : RoleDecoration s₁)
     (r₂ : (tr₁ : Spec.Transcript s₁) → RoleDecoration (s₂ tr₁)) :
     RoleDecoration.swap (r₁.append r₂) =
       (RoleDecoration.swap r₁).append (fun tr₁ => RoleDecoration.swap (r₂ tr₁)) :=
-  Spec.Decoration.map_append (fun _ => Role.swap) s₁ s₂ r₁ r₂
+  PFunctor.FreeM.Displayed.Decoration.map_append
+    (P := Spec.basePFunctor) (α := PUnit.{u+1}) (β := PUnit.{u+1})
+    (fun _ => Role.swap) s₁ s₂ r₁ r₂
 
 end TwoParty
 end Interaction

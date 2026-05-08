@@ -63,11 +63,13 @@ def append {S : Type u → Type v}
   | .node _ _rest, ⟨.receiver, _rRest⟩ => fun rr sd₂ =>
       fun x => append (rr x) (fun p => sd₂ ⟨x, p⟩)
 
-/-- Replicate along `Spec.replicate` / `Spec.Decoration.replicate`. -/
+/-- Replicate along `Spec.replicate` and generic displayed-decoration replication. -/
 def replicate {S : Type u → Type v}
     {spec : Spec} {roles : RoleDecoration spec}
     (sd : Role.Refine S spec roles) : (n : Nat) →
-    Role.Refine S (spec.replicate n) (roles.replicate n)
+    Role.Refine S (spec.replicate n)
+      (PFunctor.FreeM.Displayed.Decoration.replicate
+        (P := Spec.basePFunctor) (α := PUnit.{u+1}) PUnit.unit roles n)
   | 0 => ⟨⟩
   | n + 1 => append sd (fun _ => replicate sd n)
 
@@ -79,7 +81,9 @@ def stateChain {S : Type u → Type v}
     (sdeco : (i : Nat) → (s : Stage i) → Role.Refine S (spec i s) (roles i s)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
     Role.Refine S (Spec.stateChain Stage spec advance n i s)
-      (Spec.Decoration.stateChain roles n i s)
+      (PFunctor.FreeM.Displayed.Decoration.stateChain
+        (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
+        (advance := advance) roles n i s)
   | 0, _, _ => ⟨⟩
   | n + 1, i, s =>
       append (sdeco i s)
@@ -159,7 +163,10 @@ theorem map_append {S T : Type u → Type v} (f : ∀ X, S X → T X)
 theorem map_replicate {S T : Type u → Type v} (f : ∀ X, S X → T X)
     {spec : Spec} {roles : RoleDecoration spec}
     (sd : Role.Refine S spec roles) (n : Nat) :
-    map f (spec.replicate n) (roles.replicate n) (replicate sd n) =
+    map f (spec.replicate n)
+        (PFunctor.FreeM.Displayed.Decoration.replicate
+          (P := Spec.basePFunctor) (α := PUnit.{u+1}) PUnit.unit roles n)
+        (replicate sd n) =
       replicate (map f spec roles sd) n := by
   induction n with
   | zero => rfl
@@ -178,7 +185,10 @@ theorem map_stateChain {S T : Type u → Type v} (f : ∀ X, S X → T X)
     (sdeco : (i : Nat) → (s : Stage i) → Role.Refine S (spec i s) (roles i s)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
     map f (Spec.stateChain Stage spec advance n i s)
-        (Spec.Decoration.stateChain roles n i s) (stateChain sdeco n i s) =
+        (PFunctor.FreeM.Displayed.Decoration.stateChain
+          (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
+          (advance := advance) roles n i s)
+        (stateChain sdeco n i s) =
       stateChain (fun j t => map f (spec j t) (roles j t) (sdeco j t)) n i s
   | 0, _, _ => rfl
   | n + 1, i, s => by

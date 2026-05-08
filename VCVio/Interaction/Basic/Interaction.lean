@@ -9,7 +9,7 @@ import VCVio.Interaction.Basic.Syntax
 /-!
 # Generic local execution laws over interaction trees
 
-This file introduces the execution-side counterpart to `Spec.SyntaxOver`.
+This file introduces the execution-side counterpart to `SyntaxOver`.
 
 `Spec.InteractionOver` is a local operational law for agent-indexed node
 objects. It says how a whole profile of local objects, one for each agent, is
@@ -167,7 +167,7 @@ synchronize, and how effects in `m` are used.
 structure InteractionOver
     (Agent : Type a)
     (Γ : Node.Context)
-    (syn : SyntaxOver Agent Γ)
+    (syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ)
     (m : Type w → Type w) where
   /--
   `interact` executes one protocol node.
@@ -217,10 +217,11 @@ If `f : Γ → Δ`, then an execution law for `Δ`-contexts can be reused on
 At each node, the translated context value `f X γ` is what the original
 execution law sees.
 -/
-def InteractionOver.comap {Δ : Node.Context} {syn : SyntaxOver Agent Δ}
+def InteractionOver.comap {Δ : Node.Context}
+    {syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Δ}
     {m : Type w → Type w}
     (f : Node.ContextHom Γ Δ) (I : InteractionOver Agent Δ syn m) :
-    InteractionOver Agent Γ (SyntaxOver.comap f syn) m where
+    InteractionOver Agent Γ (_root_.Interaction.SyntaxOver.comap f syn) m where
   interact profile k := I.interact profile k
 
 /--
@@ -229,15 +230,15 @@ the underlying realized context morphism.
 -/
 abbrev InteractionOver.comapSchema
     {Δ : Node.Context} {S : Node.Schema Γ} {T : Node.Schema Δ}
-    {syn : SyntaxOver Agent Δ}
+    {syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Δ}
     {m : Type w → Type w}
     (f : Node.Schema.SchemaMap S T) (I : InteractionOver Agent Δ syn m) :
-    InteractionOver Agent Γ (SyntaxOver.comapSchema f syn) m :=
+    InteractionOver Agent Γ (_root_.Interaction.SyntaxOver.comap f.toContextHom syn) m :=
   InteractionOver.comap f.toContextHom I
 
 @[simp]
 theorem InteractionOver.comap_id
-    {syn : SyntaxOver Agent Γ}
+    {syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ}
     {m : Type w → Type w}
     (I : InteractionOver Agent Γ syn m) :
     InteractionOver.comap (Node.ContextHom.id Γ) I = I := by
@@ -246,7 +247,7 @@ theorem InteractionOver.comap_id
 
 theorem InteractionOver.comap_comp
     {Δ : Node.Context} {Λ : Node.Context}
-    {syn : SyntaxOver Agent Λ}
+    {syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Λ}
     {m : Type w → Type w}
     (I : InteractionOver Agent Λ syn m)
     (g : Node.ContextHom Δ Λ) (f : Node.ContextHom Γ Δ) :
@@ -259,19 +260,19 @@ section Run
 
 variable {Agent : Type u}
 variable {Γ : Node.Context}
-variable {syn : SyntaxOver Agent Γ}
+variable {syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ}
 variable {m : Type u → Type u}
 
 /-- View a plain `Spec` execution law as the identity-lens generic execution law. -/
 def InteractionOver.toGeneric (I : InteractionOver Agent Γ syn m) :
     _root_.Interaction.InteractionOver
-      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ (SyntaxOver.toGeneric syn) m where
+      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ syn m where
   interact profile k := I.interact profile k
 
 /-- View an identity-lens generic execution law as a plain `Spec` execution law. -/
 def InteractionOver.ofGeneric
     (I : _root_.Interaction.InteractionOver
-      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ (SyntaxOver.toGeneric syn) m) :
+      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ syn m) :
     InteractionOver Agent Γ syn m where
   interact profile k := I.interact profile k
 
@@ -284,7 +285,7 @@ theorem InteractionOver.ofGeneric_toGeneric (I : InteractionOver Agent Γ syn m)
 @[simp]
 theorem InteractionOver.toGeneric_ofGeneric
     (I : _root_.Interaction.InteractionOver
-      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ (SyntaxOver.toGeneric syn) m) :
+      (PFunctor.Lens.id Spec.basePFunctor) Agent Γ syn m) :
     InteractionOver.toGeneric (InteractionOver.ofGeneric I) = I := by
   cases I
   rfl

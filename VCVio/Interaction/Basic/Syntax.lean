@@ -12,7 +12,7 @@ import VCVio.Interaction.Basic.Decoration
 This file introduces the most general local syntax layer in the `Interaction`
 framework.
 
-`Spec.SyntaxOver` is the base local-syntax object:
+`SyntaxOver` is the base local-syntax object:
 it says what kind of node object an agent has at one protocol node, as a
 function of
 * the agent,
@@ -105,6 +105,16 @@ theorem comap_comp {Δ : P.A → Type vΔ} {Λ : P.A → Type vΛ}
   cases syn
   rfl
 
+/--
+Restrict a participant-indexed syntax to one fixed agent.
+
+The resulting singleton-agent syntax has the same node objects as `syn` at
+`agent`; the dummy `PUnit` agent argument is ignored.
+-/
+def forAgent (syn : SyntaxOver l Agent Γ) (agent : Agent) :
+    SyntaxOver l PUnit Γ where
+  Node _ pos γ Cont := syn.Node agent pos γ Cont
+
 end SyntaxOver
 
 variable {Agent : Type a} {Γ : P.A → Type vΓ}
@@ -178,6 +188,26 @@ def map
         stratNode
 
 /--
+The whole-tree strategy induced by `SyntaxOver.forAgent syn agent` is the
+`agent` fiber of the original participant-indexed whole-tree strategy.
+-/
+theorem forAgent
+    (syn : SyntaxOver l Agent Γ) (agent : Agent) :
+    {spec : PFunctor.FreeM P α} →
+    (ctxs : Decoration Γ spec) →
+    {Out : PFunctor.FreeM.PathAlong l spec → Type w} →
+    StrategyOver (SyntaxOver.forAgent syn agent) PUnit.unit spec ctxs Out =
+      StrategyOver syn agent spec ctxs Out
+  | .pure _, _, _ => rfl
+  | .roll pos rest, ⟨γ, ctxs⟩, Out => by
+      change syn.Node agent pos γ _ = syn.Node agent pos γ _
+      congr 1
+      funext d
+      exact forAgent syn agent
+        (ctxs := ctxs (l.toFunB pos d))
+        (Out := fun path => Out ⟨d, path⟩)
+
+/--
 Whole-tree families for `SyntaxOver.comap f syn` are exactly families for `syn`
 evaluated on the mapped decoration.
 -/
@@ -203,74 +233,20 @@ namespace Spec
 variable {Agent : Type a}
 variable {Γ : Node.Context.{u, vΓ}}
 
-/-- Plain-`Spec` local syntax, specialized from the identity-lens generic API. -/
-abbrev SyntaxOver (Agent : Type a) (Γ : Node.Context.{u, vΓ}) :=
-  _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ
-
-/-- View generic identity-lens syntax as syntax over plain `Spec` trees. -/
-abbrev SyntaxOver.ofGeneric
-    (syn : Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ) :
-    SyntaxOver Agent Γ :=
-  syn
-
-/-- View plain `Spec` syntax as generic syntax over the identity lens. -/
-abbrev SyntaxOver.toGeneric
-    (syn : SyntaxOver Agent Γ) :
-    Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ :=
-  syn
-
 /--
-`Syntax Agent` is the specialization of `SyntaxOver` with no node-local
-context.
+`Syntax Agent` is the specialization of generic `SyntaxOver` to plain `Spec`
+trees with no node-local context.
 
 This is the right facade when the protocol tree carries no node metadata at
-all. Equivalently, it is `SyntaxOver Agent Spec.Node.Context.empty`.
+all.
 -/
 abbrev Syntax
     (Agent : Type a) :=
-  SyntaxOver Agent Node.Context.empty
-
-/--
-Reindex a local syntax object contravariantly along a node-context morphism.
-
-If `f : Γ → Δ`, then any syntax over `Δ` can be viewed as syntax over `Γ` by
-first translating the local context value `γ : Γ X` into `f X γ : Δ X` and
-then using the original `Δ`-syntax there.
-
-So `SyntaxOver` is contravariant in its context parameter.
--/
-abbrev SyntaxOver.comap {Δ : Node.Context.{u, vΔ}}
-    (f : Node.ContextHom Γ Δ) (syn : SyntaxOver Agent Δ) :
-    SyntaxOver Agent Γ :=
-  _root_.Interaction.SyntaxOver.comap f syn
-
-/--
-Reindex a local syntax object contravariantly along a schema morphism, using
-the underlying realized context morphism.
--/
-abbrev SyntaxOver.comapSchema
-    {Δ : Node.Context.{u, vΓ}} {S : Node.Schema Γ} {T : Node.Schema Δ}
-    (f : Node.Schema.SchemaMap S T) (syn : SyntaxOver Agent Δ) :
-    SyntaxOver Agent Γ :=
-  SyntaxOver.comap f.toContextHom syn
-
-@[simp]
-theorem SyntaxOver.comap_id
-    (syn : SyntaxOver Agent Γ) :
-    SyntaxOver.comap (Node.ContextHom.id Γ) syn = syn :=
-  _root_.Interaction.SyntaxOver.comap_id syn
-
-theorem SyntaxOver.comap_comp
-    {Δ : Node.Context.{u, vΔ}} {Λ : Node.Context.{u, vΛ}}
-    (syn : SyntaxOver Agent Λ)
-    (g : Node.ContextHom Δ Λ) (f : Node.ContextHom Γ Δ) :
-    SyntaxOver.comap f (SyntaxOver.comap g syn) =
-      SyntaxOver.comap (Node.ContextHom.comp g f) syn :=
-  _root_.Interaction.SyntaxOver.comap_comp syn g f
+  _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Node.Context.empty
 
 /-- Whole-tree local strategy induced by plain-`Spec` identity-lens syntax. -/
 abbrev StrategyOver
-    (syn : SyntaxOver Agent Γ) :
+    (syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ) :
     (agent : Agent) →
     (spec : Spec) →
     Decoration Γ spec →
@@ -287,14 +263,18 @@ variable {Agent₁ : Type a} {Agent₂ : Type uA}
 
 /-- Local homomorphism between two plain-`Spec` `StrategyOver` fibers. -/
 abbrev Hom
-    (syn₁ : SyntaxOver Agent₁ Γ) (agent₁ : Agent₁)
-    (syn₂ : SyntaxOver Agent₂ Γ) (agent₂ : Agent₂) :=
+    (syn₁ : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent₁ Γ)
+    (agent₁ : Agent₁)
+    (syn₂ : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent₂ Γ)
+    (agent₂ : Agent₂) :=
   _root_.Interaction.StrategyOver.Hom syn₁ agent₁ syn₂ agent₂
 
 /-- Map a whole-tree strategy along a local homomorphism and output map. -/
 abbrev map
-    {syn₁ : SyntaxOver Agent₁ Γ} {agent₁ : Agent₁}
-    {syn₂ : SyntaxOver Agent₂ Γ} {agent₂ : Agent₂}
+    {syn₁ : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent₁ Γ}
+    {agent₁ : Agent₁}
+    {syn₂ : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent₂ Γ}
+    {agent₂ : Agent₂}
     (η : Hom syn₁ agent₁ syn₂ agent₂) :
     {spec : Spec} → {ctxs : Decoration Γ spec} →
     {A B : Transcript spec → Type w} →
@@ -306,12 +286,31 @@ abbrev map
       (P := Spec.basePFunctor) (Q := Spec.basePFunctor) (α := PUnit.{u+1})
       (l := PFunctor.Lens.id Spec.basePFunctor) η f strat
 
+/--
+The whole-tree strategy induced by `Interaction.SyntaxOver.forAgent syn agent` is the
+`agent` fiber of the original participant-indexed whole-tree strategy.
+-/
+theorem forAgent
+    (syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent₁ Γ)
+    (agent : Agent₁) :
+    {spec : Spec} →
+    (ctxs : Decoration Γ spec) →
+    {Out : Transcript spec → Type w} →
+    StrategyOver (_root_.Interaction.SyntaxOver.forAgent syn agent) PUnit.unit spec ctxs Out =
+      StrategyOver syn agent spec ctxs Out := by
+  intro spec ctxs Out
+  simpa using
+    (_root_.Interaction.StrategyOver.forAgent
+      (P := Spec.basePFunctor) (Q := Spec.basePFunctor) (α := PUnit.{u+1})
+      (l := PFunctor.Lens.id Spec.basePFunctor)
+      syn agent (spec := spec) (ctxs := ctxs) (Out := Out))
+
 end StrategyOver
 
 /-- At an internal node, `StrategyOver` unfolds to the local node object
 whose continuations are the recursively induced strategies for each child. -/
 theorem StrategyOver.node
-    (syn : SyntaxOver Agent Γ)
+    (syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ)
     {agent : Agent} {X : Type u} {next : X → Spec}
     {γ : Γ X} {ctxs : (x : X) → Decoration Γ (next x)}
     {Out : Transcript (Spec.node X next) → Type w} :
@@ -321,30 +320,35 @@ theorem StrategyOver.node
   rfl
 
 /--
-Whole-tree families for `SyntaxOver.comap f syn` are exactly families for `syn`
-evaluated on the mapped decoration `Decoration.map f ctxs`.
+Whole-tree families for `Interaction.SyntaxOver.comap f syn` are exactly families for `syn`
+evaluated on the mapped decoration.
 -/
 theorem StrategyOver.comap {Δ : Node.Context.{u, vΔ}}
-    (syn : SyntaxOver Agent Δ) (f : Node.ContextHom Γ Δ) :
+    (syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Δ)
+    (f : Node.ContextHom Γ Δ) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    StrategyOver (SyntaxOver.comap f syn) agent spec ctxs Out =
-      StrategyOver syn agent spec (Decoration.map f spec ctxs) Out
+    StrategyOver (_root_.Interaction.SyntaxOver.comap f syn) agent spec ctxs Out =
+      StrategyOver syn agent spec
+        (PFunctor.FreeM.Displayed.Decoration.map
+          (P := Spec.basePFunctor) (α := PUnit.{u+1}) f spec ctxs)
+        Out
   | _, .done, _, _ => rfl
   | agent, .node _ next, ⟨γ, ctxs⟩, Out => by
       simp only [StrategyOver, _root_.Interaction.StrategyOver,
-        SyntaxOver.comap, _root_.Interaction.SyntaxOver.comap, Decoration.map,
-        PFunctor.FreeM.Displayed.Decoration.map_roll]
+        _root_.Interaction.SyntaxOver.comap,
+        PFunctor.FreeM.Displayed.Decoration.map]
       congr 1
       funext x
       exact StrategyOver.comap syn f (agent := agent) (ctxs := ctxs x)
 
 theorem StrategyOver.comapSchema
     {Δ : Node.Context.{u, vΓ}} {S : Node.Schema Γ} {T : Node.Schema Δ}
-    (syn : SyntaxOver Agent Δ) (f : Node.Schema.SchemaMap S T) :
+    (syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Δ)
+    (f : Node.Schema.SchemaMap S T) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
-    StrategyOver (SyntaxOver.comapSchema f syn) agent spec ctxs Out =
+    StrategyOver (_root_.Interaction.SyntaxOver.comap f.toContextHom syn) agent spec ctxs Out =
       StrategyOver syn agent spec (Decoration.Schema.map f spec ctxs) Out :=
   StrategyOver.comap syn f.toContextHom
 

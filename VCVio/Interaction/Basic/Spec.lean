@@ -123,7 +123,7 @@ Those additional layers are supplied separately by:
 * `Spec.Node.Context` / `Spec.Node.Schema`, for node-local semantic contexts
   and their telescope-style descriptions;
 * `Spec.Decoration`, for concrete nodewise metadata;
-* `Spec.SyntaxOver`, for the most general local participant syntax over
+* `SyntaxOver`, for the most general local participant syntax over
   realized node contexts;
 * `Spec.ShapeOver`, for the functorial refinement of such syntax;
 * `Spec.InteractionOver`, for local execution laws over such syntax.
@@ -133,7 +133,7 @@ unit payload, exposing the polynomial substrate that the rest of the
 `Interaction` library builds on. The `Spec.done` / `Spec.node` aliases
 are tagged with `@[match_pattern]`, so definitions can use constructor-style
 patterns without exposing the underlying `FreeM` representation. -/
-def Spec : Type (u+1) :=
+abbrev Spec : Type (u+1) :=
   PFunctor.FreeM Spec.basePFunctor.{u} PUnit.{u+1}
 
 namespace Spec

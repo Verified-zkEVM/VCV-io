@@ -47,70 +47,10 @@ namespace TwoParty
 variable {m : Type u → Type u}
 open _root_.Interaction.TwoParty
 
-private def focalView (m : Type u → Type u) (X : Type u) :
-    Spec.Ownership.LocalView X where
-  own Cont := m ((x : X) × Cont x)
-  other Cont := (x : X) → m (Cont x)
-
-private def counterpartView (m : Type u → Type u) (X : Type u) :
-    Spec.Ownership.LocalView X where
-  own Cont := m ((x : X) × Cont x)
-  other Cont := (x : X) → m (Cont x)
-
-private def focalMonadicView (bm : BundledMonad.{u, u}) (X : Type u) :
-    Spec.Ownership.LocalView X where
-  own Cont := bm.M ((x : X) × Cont x)
-  other Cont := (x : X) → bm.M (Cont x)
-
-private def counterpartMonadicView (bm : BundledMonad.{u, u}) (X : Type u) :
-    Spec.Ownership.LocalView X where
-  own Cont := bm.M ((x : X) × Cont x)
-  other Cont := (x : X) → bm.M (Cont x)
-
-private def focalRunner (m : Type u → Type u) [Monad m] (X : Type u) :
-    Spec.Ownership.LocalRunner m (focalView m X) where
-  runOwn {Cont} (node : m ((x : X) × Cont x)) := node
-  runOther {Cont} (node : (x : X) → m (Cont x)) x := node x
-
-private def counterpartRunner (m : Type u → Type u) [Monad m] (X : Type u) :
-    Spec.Ownership.LocalRunner m (counterpartView m X) where
-  runOwn {Cont} (node : m ((x : X) × Cont x)) := node
-  runOther {Cont} (node : (x : X) → m (Cont x)) x := node x
-
-private def strategySyntax (m : Type u → Type u) :
-    Spec.SyntaxOver.{u, 0, 0, u} PUnit (fun _ => Role) where
-  Node _ (X : Type u) (role : Role) (Cont : X → Type u) := role.Action m X Cont
-
-private def syntaxOverForAgent {Agent : Type u} {Γ : Spec.Node.Context}
-    (syn : Spec.SyntaxOver Agent Γ) (agent : Agent) :
-    Spec.SyntaxOver PUnit Γ where
-  Node _ X γ Cont := syn.Node agent X γ Cont
-
-private theorem strategyOverForAgent {Agent : Type u} {Γ : Spec.Node.Context}
-    (syn : Spec.SyntaxOver Agent Γ) (agent : Agent) :
-    {spec : Spec} → {ctxs : Spec.Decoration Γ spec} → {Out : Spec.Transcript spec → Type u} →
-    Spec.StrategyOver (syntaxOverForAgent syn agent) PUnit.unit spec ctxs Out =
-      Spec.StrategyOver syn agent spec ctxs Out
-  | .done, _, _ => rfl
-  | .node _ next, ⟨γ, ctxs⟩, Out => by
-      show syn.Node agent _ γ _ = syn.Node agent _ γ _
-      congr 1
-      funext x
-      exact strategyOverForAgent syn agent (spec := next x) (ctxs := ctxs x)
-        (Out := fun tr => Out ⟨x, tr⟩)
-
-private def counterpartFamilySyntax
-    (Sender Receiver : (X : Type u) → (X → Type u) → Type u) :
-    Spec.SyntaxOver.{u, 0, 0, u} PUnit (fun _ => Role) where
-  Node _ (X : Type u) (role : Role) (Cont : X → Type u) :=
-    match role with
-    | .sender => Sender X Cont
-    | .receiver => Receiver X Cont
-
 def pairedSyntax (m : Type u → Type u) :
-    Spec.SyntaxOver.{u, u, 0, u} Participant.{u} (fun _ => Role) :=
-  Spec.SyntaxOver.ofGeneric
-    (pairedSyntaxOver (PFunctor.Lens.id Spec.basePFunctor) m)
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) Participant.{u} (fun _ => Role) :=
+  SyntaxOver.paired (PFunctor.Lens.id Spec.basePFunctor) m
 
 @[simp]
 theorem pairedSyntax_focal_sender
@@ -144,15 +84,18 @@ theorem pairedSyntax_eq_ownerBased (m : Type u → Type u) :
     pairedSyntax m =
       Spec.Ownership.syntaxOver
         (fun role agent => perspectiveSpec role agent)
-        (fun {X} _role agent =>
-          match agent with
-          | .focal => focalView m X
-          | .counterpart => counterpartView m X) := by
+        (fun {X} _role _agent =>
+          { own := fun Cont => m ((x : X) × Cont x)
+            other := fun Cont => (x : X) → m (Cont x) }) := by
   apply congrArg Interaction.SyntaxOver.mk
   funext agent X role Cont
   cases agent <;> cases role <;>
-        simp [pairedSyntaxOver, PFunctor.Lens.id, Spec.Ownership.LocalView.node,
-          perspective, perspectiveSpec, focalView, counterpartView]
+        simp [PFunctor.Lens.id, Spec.Ownership.LocalView.node, perspective, perspectiveSpec]
+
+/-- Functorial shape for the ordinary paired two-party syntax over plain specs. -/
+def pairedShape (m : Type u → Type u) [Functor m] :
+    Spec.ShapeOver.{u, u, u, 0} Participant.{u} (fun _ => Role) :=
+  Spec.ShapeOver.ofGeneric (ShapeOver.paired (PFunctor.Lens.id Spec.basePFunctor) m)
 
 /-- Local execution law for the two participants of `pairedSyntax`.
 
@@ -165,7 +108,18 @@ for two-party role-decorated strategies.
 def pairedInteraction (m : Type u → Type u) [Monad m] :
     Spec.InteractionOver Participant.{u} (fun _ => Role) (pairedSyntax m) m :=
   Spec.InteractionOver.ofGeneric
-    (pairedInteractionOver (PFunctor.Lens.id Spec.basePFunctor) m)
+    (InteractionOver.paired (PFunctor.Lens.id Spec.basePFunctor) m)
+
+def pairedMonadicSyntax :
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) Participant.{u} RolePairedMonadContext :=
+  SyntaxOver.pairedMonadic (PFunctor.Lens.id Spec.basePFunctor)
+
+/-- Functorial shape for paired role/monad two-party syntax over plain specs. -/
+def pairedMonadicShape :
+    Spec.ShapeOver.{u, u, u, u + 1} Participant.{u} RolePairedMonadContext :=
+  Spec.ShapeOver.ofGeneric
+    (ShapeOver.pairedMonadic (PFunctor.Lens.id Spec.basePFunctor))
 
 /--
 One-participant syntax for the focal side of a role-decorated tree with
@@ -176,10 +130,11 @@ together with the continuation in the node monad. At receiver nodes it observes
 the counterpart's message and returns the continuation in the node monad.
 -/
 def focalMonadicSyntax :
-    Spec.SyntaxOver.{u, 0, u + 1, u} PUnit RoleMonadContext where
-  Node _ (X : Type u) γ (Cont : X → Type u) :=
-    match γ with
-    | ⟨role, bm⟩ => role.Action bm.M X Cont
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit RoleMonadContext :=
+  _root_.Interaction.SyntaxOver.comap RoleMonadContext.diagonal
+    (_root_.Interaction.SyntaxOver.forAgent pairedMonadicSyntax
+      (Participant.focal : Participant.{u}))
 
 /--
 Functorial shape for the focal side of a role-decorated tree with per-node
@@ -190,20 +145,9 @@ only recursive continuations, leaving the role, node monad, and selected move
 unchanged.
 -/
 def focalMonadicShape :
-    Spec.ShapeOver.{u, 0, u, u + 1} PUnit RoleMonadContext where
-  toSyntaxOver := focalMonadicSyntax
-  map := fun {agent} {X} {γ} {A} {B} f node =>
-    match γ with
-    | ⟨.sender, bm⟩ =>
-        let send : bm.M ((x : X) × A x) := by
-          simpa [focalMonadicSyntax] using node
-        show focalMonadicSyntax.Node agent X ⟨.sender, bm⟩ B from
-          ((fun xa => ⟨xa.1, f xa.1 xa.2⟩) <$> send : bm.M ((x : X) × B x))
-    | ⟨.receiver, bm⟩ =>
-        let observe : (x : X) → bm.M (A x) := by
-          simpa [focalMonadicSyntax] using node
-        show focalMonadicSyntax.Node agent X ⟨.receiver, bm⟩ B from
-          (fun x => f x <$> observe x : (x : X) → bm.M (B x))
+    Spec.ShapeOver.{u, 0, u, u + 1} PUnit RoleMonadContext :=
+  Spec.ShapeOver.comap RoleMonadContext.diagonal
+    (Spec.ShapeOver.forAgent pairedMonadicShape Participant.focal)
 
 /--
 One-participant syntax for the counterpart side of a role-decorated tree with
@@ -214,11 +158,11 @@ receiver nodes it owns the move and returns a message together with the
 continuation in the node monad.
 -/
 def counterpartMonadicSyntax :
-    Spec.SyntaxOver.{u, 0, u + 1, u} PUnit RoleMonadContext where
-  Node _ (X : Type u) γ (Cont : X → Type u) :=
-    match γ with
-    | ⟨.sender, bm⟩ => (x : X) → bm.M (Cont x)
-    | ⟨.receiver, bm⟩ => bm.M ((x : X) × Cont x)
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit RoleMonadContext :=
+  _root_.Interaction.SyntaxOver.comap RoleMonadContext.diagonal
+    (_root_.Interaction.SyntaxOver.forAgent pairedMonadicSyntax
+      (Participant.counterpart : Participant.{u}))
 
 /--
 Functorial shape for the counterpart side of a role-decorated tree with
@@ -229,80 +173,23 @@ transports only recursive continuations, preserving the role, node monad, and
 message/challenge choice.
 -/
 def counterpartMonadicShape :
-    Spec.ShapeOver.{u, 0, u, u + 1} PUnit RoleMonadContext where
-  toSyntaxOver := counterpartMonadicSyntax
-  map := fun {agent} {X} {γ} {A} {B} f node =>
-    match γ with
-    | ⟨.sender, bm⟩ =>
-        let observe : (x : X) → bm.M (A x) := by
-          simpa [counterpartMonadicSyntax] using node
-        show counterpartMonadicSyntax.Node agent X ⟨.sender, bm⟩ B from
-          (fun x => f x <$> observe x : (x : X) → bm.M (B x))
-    | ⟨.receiver, bm⟩ =>
-        let receive : bm.M ((x : X) × A x) := by
-          simpa [counterpartMonadicSyntax] using node
-        show counterpartMonadicSyntax.Node agent X ⟨.receiver, bm⟩ B from
-          ((fun xc => ⟨xc.1, f xc.1 xc.2⟩) <$> receive : bm.M ((x : X) × B x))
-
-def pairedMonadicSyntax :
-    Spec.SyntaxOver.{u, u, u + 1, u} Participant.{u} RolePairedMonadContext where
-  Node agent X γ Cont :=
-    match agent, γ with
-    | .focal, ⟨.sender, ⟨bmP, _⟩⟩ => bmP.M ((x : X) × Cont x)
-    | .focal, ⟨.receiver, ⟨bmP, _⟩⟩ => (x : X) → bmP.M (Cont x)
-    | .counterpart, ⟨.sender, ⟨_, bmC⟩⟩ => (x : X) → bmC.M (Cont x)
-    | .counterpart, ⟨.receiver, ⟨_, bmC⟩⟩ => bmC.M ((x : X) × Cont x)
+    Spec.ShapeOver.{u, 0, u, u + 1} PUnit RoleMonadContext :=
+  Spec.ShapeOver.comap RoleMonadContext.diagonal
+    (Spec.ShapeOver.forAgent pairedMonadicShape Participant.counterpart)
 
 theorem pairedMonadicSyntax_eq_ownerBased :
     pairedMonadicSyntax =
       Spec.Ownership.syntaxOver (fun γ agent => perspectiveSpec γ.1 agent) (fun {X} γ agent =>
         match agent, γ with
-        | .focal, ⟨_, ⟨bmP, _⟩⟩ => focalMonadicView bmP X
-        | .counterpart, ⟨_, ⟨_, bmC⟩⟩ => counterpartMonadicView bmC X) := by
+        | .focal, ⟨_, ⟨bmP, _⟩⟩ => Spec.Ownership.LocalView.monadic bmP X
+        | .counterpart, ⟨_, ⟨_, bmC⟩⟩ => Spec.Ownership.LocalView.monadic bmC X) := by
   apply congrArg Interaction.SyntaxOver.mk
   funext agent X γ Cont
   cases agent <;> cases γ with
       | mk role bms =>
           cases role <;>
-            simp [Spec.Ownership.LocalView.node, perspective, perspectiveSpec, focalMonadicView,
-              counterpartMonadicView]
-
-/-- A generic counterpart family parameterized by separate sender- and
-receiver-side node representations.
-
-Sender nodes model how the environment follows a move chosen by the focal
-party. Receiver nodes model how the environment chooses a move itself. Both
-ordinary counterpart syntax and replayable public-coin syntax are direct
-`Spec.StrategyOver` specializations. -/
-private def counterpartFamilyShape
-    (Sender : (X : Type u) → (X → Type u) → Type u)
-    (Receiver : (X : Type u) → (X → Type u) → Type u)
-    (mapSender :
-      {X : Type u} → {A B : X → Type u} →
-      (∀ x, A x → B x) → Sender X A → Sender X B)
-    (mapReceiver :
-      {X : Type u} → {A B : X → Type u} →
-      (∀ x, A x → B x) → Receiver X A → Receiver X B) :
-    Spec.ShapeOver PUnit (fun _ => Role) where
-  toSyntaxOver := counterpartFamilySyntax Sender Receiver
-  map := fun {_agent} {_X} {γ} {_A} {_B} f node =>
-    match γ with
-    | .sender =>
-        mapSender f node
-    | .receiver =>
-        mapReceiver f node
-
-/-- Map a receiver-family output through a sender-owned sampled move. -/
-def Counterpart.mapReceiver {m : Type u → Type u} [Functor m] :
-    {X : Type u} → {A B : X → Type u} →
-    (∀ x, A x → B x) → m ((x : X) × A x) → m ((x : X) × B x)
-  | _, _, _, f, sample => (fun ⟨x, c⟩ => ⟨x, f x c⟩) <$> sample
-
-/-- Map outputs through an effectful sender-side observation. -/
-def Counterpart.mapSender {m : Type u → Type u} [Functor m] :
-    {X : Type u} → {A B : X → Type u} →
-    (∀ x, A x → B x) → ((x : X) → m (A x)) → ((x : X) → m (B x))
-  | _, _, _, f, observe => fun x => f x <$> observe x
+            simp [PFunctor.Lens.id, Spec.Ownership.LocalView.node, perspective, perspectiveSpec,
+              Spec.Ownership.LocalView.monadic]
 
 /-- Functorial output map for role-dependent strategies. -/
 def Focal.mapOutput {m : Type u → Type u} [Functor m] :
@@ -311,11 +198,13 @@ def Focal.mapOutput {m : Type u → Type u} [Functor m] :
     (∀ tr, A tr → B tr) →
       Spec.StrategyOver (pairedSyntax m) Participant.focal spec roles A →
       Spec.StrategyOver (pairedSyntax m) Participant.focal spec roles B
-  | .done, _, _, _, f, a => f ⟨⟩ a
-  | .node _ _, ⟨.sender, _⟩, _, _, f, send =>
-      Counterpart.mapReceiver (fun x => mapOutput (fun p => f ⟨x, p⟩)) send
-  | .node _ _, ⟨.receiver, _⟩, _, _, f, respond =>
-      fun x => (mapOutput (fun p => f ⟨x, p⟩) ·) <$> respond x
+  := fun {spec} {roles} {A} {B} f =>
+    Spec.ShapeOver.mapOutput (pairedShape m)
+      (agent := Participant.focal)
+      (spec := spec)
+      (ctxs := roles)
+      (A := A) (B := B)
+      f
 
 /-- Pointwise identity on outputs is the identity on role-dependent strategies. -/
 @[simp]
@@ -343,7 +232,8 @@ theorem Focal.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunctor m]
             simp only [F]
             rw [Focal.mapOutput_id]
             rfl
-      rw [Focal.mapOutput, Counterpart.mapReceiver]
+      simp only [Focal.mapOutput, Spec.ShapeOver.mapOutput, pairedShape,
+        Spec.ShapeOver.ofGeneric, ShapeOver.paired, PFunctor.Lens.id]
       change F <$> σ = σ
       rw [hpair]
       exact LawfulFunctor.id_map σ
@@ -353,7 +243,8 @@ theorem Focal.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunctor m]
             (rest x) (rRest x) (fun p => A ⟨x, p⟩),
           mapOutput (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) s = s :=
         fun s => @mapOutput_id m _ _ (rest x) (rRest x) (fun p => A ⟨x, p⟩) s
-      simp only [Focal.mapOutput]
+      simp only [Focal.mapOutput, Spec.ShapeOver.mapOutput, pairedShape,
+        Spec.ShapeOver.ofGeneric, ShapeOver.paired, PFunctor.Lens.id]
       calc (mapOutput (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) ·) <$> σ x
           = id <$> σ x := by congr 1; funext s; exact hid s
         _ = σ x := LawfulFunctor.id_map (σ x)
@@ -365,11 +256,13 @@ def Counterpart.mapOutput {m : Type u → Type u} [Functor m] :
     (∀ tr, A tr → B tr) →
       Spec.StrategyOver (pairedSyntax m) Participant.counterpart spec roles A →
       Spec.StrategyOver (pairedSyntax m) Participant.counterpart spec roles B
-  | .done, _, _, _, f, a => f ⟨⟩ a
-  | .node _ _, ⟨.sender, _⟩, _, _, f, observe =>
-      Counterpart.mapSender (fun x => mapOutput (fun p => f ⟨x, p⟩)) observe
-  | .node _ _, ⟨.receiver, _⟩, _, _, f, receive =>
-      Counterpart.mapReceiver (fun x => mapOutput (fun p => f ⟨x, p⟩)) receive
+  := fun {spec} {roles} {A} {B} f =>
+    Spec.ShapeOver.mapOutput (pairedShape m)
+      (agent := Participant.counterpart)
+      (spec := spec)
+      (ctxs := roles)
+      (A := A) (B := B)
+      f
 
 namespace PublicCoinCounterpart
 
@@ -389,20 +282,9 @@ separately.
 This is exactly the extra structure needed to replay a prescribed transcript
 through the verifier. -/
 def counterpartSyntax (m : Type u → Type u) :
-    Spec.SyntaxOver.{u, 0, 0, u} PUnit (fun _ => Role) :=
-  counterpartFamilySyntax (fun X Cont => (x : X) → m (Cont x))
-    (fun X Cont => m X × ((x : X) → Cont x))
-
-private def mapReceiver {m : Type u → Type u} :
-    {X : Type u} → {A B : X → Type u} →
-    (∀ x, A x → B x) → (m X × ((x : X) → A x)) → (m X × ((x : X) → B x))
-  | _, _, _, f, ⟨sample, next⟩ => ⟨sample, fun x => f x (next x)⟩
-
-private def counterpartShape (m : Type u → Type u) [Functor m] :
-    Spec.ShapeOver PUnit (fun _ => Role) :=
-  counterpartFamilyShape (fun X Cont => (x : X) → m (Cont x))
-    (fun X Cont => m X × ((x : X) → Cont x))
-    Counterpart.mapSender mapReceiver
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit (fun _ => Role) :=
+  PublicCoinCounterpart.SyntaxOver.counterpart (PFunctor.Lens.id Spec.basePFunctor) m
 
 /--
 Local syntax-forgetting map from replayable public-coin counterparts to
@@ -415,18 +297,9 @@ the translated continuation for that challenge.
 -/
 def toCounterpartHom {m : Type u → Type u} [Monad m] :
     Spec.StrategyOver.Hom (counterpartSyntax m) PUnit.unit
-      (pairedSyntax m) Participant.counterpart where
-  mapNode := fun {X} {γ} {A} {B} f node =>
-    match γ with
-    | .sender =>
-        Counterpart.mapSender f node
-    | .receiver =>
-        let receiver : m X × ((x : X) → A x) := by
-          simpa [counterpartSyntax, counterpartFamilySyntax] using node
-        show (pairedSyntax m).Node Participant.counterpart X .receiver B from
-          do
-            let x ← receiver.1
-            pure ⟨x, f x (receiver.2 x)⟩
+      (pairedSyntax m) Participant.counterpart :=
+  PublicCoinCounterpart.StrategyOver.toCounterpartHom
+    (PFunctor.Lens.id Spec.basePFunctor)
 
 /-- Functorial output map for public-coin counterparts. The challenge samplers
 are unchanged; only the terminal output carried by continuations is mapped. -/
@@ -437,7 +310,9 @@ def mapOutput {m : Type u → Type u} [Functor m] :
     Spec.StrategyOver (counterpartSyntax m) PUnit.unit spec roles A →
     Spec.StrategyOver (counterpartSyntax m) PUnit.unit spec roles B :=
   fun {spec} {roles} {A} {B} f =>
-    Spec.ShapeOver.mapOutput (counterpartShape m)
+    Spec.ShapeOver.mapOutput
+      (Spec.ShapeOver.ofGeneric
+        (PublicCoinCounterpart.ShapeOver.counterpart (PFunctor.Lens.id Spec.basePFunctor) m))
       (agent := PUnit.unit) (spec := spec) roles
       (A := A) (B := B) f
 
@@ -481,13 +356,15 @@ theorem Counterpart.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunc
   match spec, roles with
   | .done, roles =>
       cases roles
-      simp [Counterpart.mapOutput]
+      simp [Counterpart.mapOutput, Spec.ShapeOver.mapOutput]
   | .node _ rest, ⟨.sender, rRest⟩ =>
       funext x
       have hid : ∀ c' : Spec.StrategyOver (pairedSyntax m) Participant.counterpart
             (rest x) (rRest x) (fun p => A ⟨x, p⟩),
           Counterpart.mapOutput (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) c' = c' :=
         fun c' => @Counterpart.mapOutput_id m _ _ (rest x) (rRest x) (fun p => A ⟨x, p⟩) c'
+      simp only [Counterpart.mapOutput, Spec.ShapeOver.mapOutput, pairedShape,
+        Spec.ShapeOver.ofGeneric, ShapeOver.paired, PFunctor.Lens.id]
       change
         (Counterpart.mapOutput
           (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y)) <$> c x = c x
@@ -511,7 +388,8 @@ theorem Counterpart.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunc
             simp only [F]
             rw [Counterpart.mapOutput_id]
             rfl
-      rw [Counterpart.mapOutput, Counterpart.mapReceiver]
+      simp only [Counterpart.mapOutput, Spec.ShapeOver.mapOutput, pairedShape,
+        Spec.ShapeOver.ofGeneric, ShapeOver.paired, PFunctor.Lens.id]
       change F <$> c = c
       rw [hpair]
       exact LawfulFunctor.id_map c
@@ -688,13 +566,13 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
     match spec, roles with
     | .done, roles =>
         cases roles
-        simp [Focal.mapOutput, Counterpart.mapOutput, Spec.InteractionOver.run,
+        simp [Focal.mapOutput, Counterpart.mapOutput, Spec.ShapeOver.mapOutput,
+          Spec.InteractionOver.run,
           participantProfile, collectParticipantOutputs]
     | .node X rest, ⟨.sender, rRest⟩ =>
-        simp only [Focal.mapOutput, Counterpart.mapOutput, Counterpart.mapReceiver,
-          Counterpart.mapSender]
+        simp only [Focal.mapOutput, Counterpart.mapOutput]
         simp only [Spec.InteractionOver.run, Spec.InteractionOver.ofGeneric, pairedInteraction,
-          pairedInteractionOver, pairedSyntax, participantOutputFamily, participantProfile,
+          InteractionOver.paired, pairedSyntax, participantOutputFamily, participantProfile,
           collectParticipantOutputs, bind_pure_comp]
         refine (bind_map_left
           (fun xc =>
@@ -720,10 +598,9 @@ theorem InteractionOver.run_paired_mapOutput_mapOutput
             (go (rest xc.1) (rRest xc.1) (fun tr => fP ⟨xc.1, tr⟩) (fun tr => fC ⟨xc.1, tr⟩)
               xc.2 cNext)
     | .node X rest, ⟨.receiver, rRest⟩ =>
-        simp only [Focal.mapOutput, Counterpart.mapOutput,
-          Counterpart.mapReceiver]
+        simp only [Focal.mapOutput, Counterpart.mapOutput]
         simp only [Spec.InteractionOver.run, Spec.InteractionOver.ofGeneric, pairedInteraction,
-          pairedInteractionOver, pairedSyntax, participantOutputFamily, participantProfile,
+          InteractionOver.paired, pairedSyntax, participantOutputFamily, participantProfile,
           collectParticipantOutputs, bind_pure_comp]
         refine (bind_map_left
           (fun xc =>
@@ -957,27 +834,10 @@ tree runner. -/
 def pairedMonadicInteraction {m : Type u → Type u} [Monad m]
     (liftStrat : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α)
     (liftCpt : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
-    Spec.InteractionOver Participant.{u} RolePairedMonadContext pairedMonadicSyntax m where
-  interact := fun {X} {γ : RolePairedMonadContext X} {Cont} {Result} profile k =>
-    match γ with
-    | ⟨.sender, ⟨bmP, bmC⟩⟩ => do
-        let pNode : bmP.M ((x : X) × Cont Participant.focal x) := by
-          simpa [pairedMonadicSyntax, Spec.Ownership.syntaxOver, perspectiveSpec, Participant.focal,
-            focalMonadicView] using profile Participant.focal
-        let cNode : (x : X) → bmC.M (Cont Participant.counterpart x) := by
-          simpa [pairedMonadicSyntax, Spec.Ownership.syntaxOver, perspectiveSpec, Participant.focal,
-            Participant.counterpart, counterpartMonadicView] using profile Participant.counterpart
-        let ⟨x, pCont⟩ ← liftStrat bmP pNode
-        let cCont ← liftCpt bmC (cNode x)
-        k x (fun
-          | .focal => pCont
-          | .counterpart => cCont)
-    | ⟨.receiver, ⟨bmP, bmC⟩⟩ => do
-        let ⟨x, cCont⟩ ← liftCpt bmC (profile Participant.counterpart)
-        let pCont ← liftStrat bmP ((profile Participant.focal) x)
-        k x (fun
-          | .focal => pCont
-          | .counterpart => cCont)
+    Spec.InteractionOver Participant.{u} RolePairedMonadContext pairedMonadicSyntax m :=
+  Spec.InteractionOver.ofGeneric
+    (InteractionOver.pairedMonadic
+      (PFunctor.Lens.id Spec.basePFunctor) liftStrat liftCpt)
 
 end TwoParty
 end Interaction

@@ -12,7 +12,7 @@ import VCVio.Interaction.Basic.Syntax
 
 This file introduces the functorial refinement of the local syntax core.
 
-`Spec.SyntaxOver` in `Basic/Syntax` is the most general local syntax object: it
+`SyntaxOver` in `Basic/Syntax` is the most general local syntax object: it
 describes which node object an agent has at one protocol node, with no
 assumption that recursive continuations can be reindexed generically.
 
@@ -86,6 +86,17 @@ def toStrategyHom
     (shape : ShapeOver l Agent Γ) (agent : Agent) :
     StrategyOver.Hom shape.toSyntaxOver agent shape.toSyntaxOver agent where
   mapNode f node := shape.map f node
+
+/--
+Restrict a participant-indexed shape to one fixed agent.
+
+The resulting singleton-agent shape has the same node objects and continuation
+map as `shape` at `agent`; the dummy `PUnit` agent argument is ignored.
+-/
+def forAgent (shape : ShapeOver l Agent Γ) (agent : Agent) :
+    ShapeOver l PUnit Γ where
+  toSyntaxOver := SyntaxOver.forAgent shape.toSyntaxOver agent
+  map f node := shape.map (agent := agent) f node
 
 /--
 Reindex a functorial local syntax object contravariantly along a node metadata
@@ -181,7 +192,8 @@ or are stored under constructors with a functorial action.
 -/
 structure ShapeOver
     (Agent : Type a)
-    (Γ : Node.Context) extends SyntaxOver Agent Γ where
+    (Γ : Node.Context)
+    extends _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
   /--
   `map` expresses that a node object is functorial in its continuation family.
 
@@ -213,14 +225,14 @@ def ShapeOver.ofGeneric
     (shape : _root_.Interaction.ShapeOver
       (PFunctor.Lens.id Spec.basePFunctor) Agent Γ) :
     ShapeOver Agent Γ where
-  toSyntaxOver := SyntaxOver.ofGeneric shape.toSyntaxOver
+  toSyntaxOver := shape.toSyntaxOver
   map f node := shape.map f node
 
 /-- View plain `Spec` shapes as generic shapes over the identity lens. -/
 def ShapeOver.toGeneric
     (shape : ShapeOver Agent Γ) :
     _root_.Interaction.ShapeOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
-  toSyntaxOver := SyntaxOver.toGeneric shape.toSyntaxOver
+  toSyntaxOver := shape.toSyntaxOver
   map f node := shape.map f node
 
 /--
@@ -233,7 +245,8 @@ abbrev Shape
     (Agent : Type a) :=
   ShapeOver Agent Node.Context.empty
 
-instance : Coe (ShapeOver Agent Γ) (SyntaxOver Agent Γ) where
+instance : Coe (ShapeOver Agent Γ)
+    (_root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ) where
   coe := ShapeOver.toSyntaxOver
 
 /--
@@ -248,15 +261,23 @@ def ShapeOver.toStrategyHom
   mapNode f node := shape.map f node
 
 /--
+Restrict a participant-indexed shape over plain `Spec` trees to one fixed agent.
+-/
+def ShapeOver.forAgent (shape : ShapeOver Agent Γ) (agent : Agent) :
+    ShapeOver PUnit Γ where
+  toSyntaxOver := _root_.Interaction.SyntaxOver.forAgent shape.toSyntaxOver agent
+  map f node := shape.map (agent := agent) f node
+
+/--
 Reindex a local syntax object contravariantly along a node-context morphism.
 
 If `f : Γ → Δ`, then any shape over `Δ` can be viewed as a shape over `Γ` by
-first viewing its underlying syntax through `SyntaxOver.comap f`.
+first viewing its underlying syntax through `Interaction.SyntaxOver.comap f`.
 -/
 def ShapeOver.comap {Δ : Node.Context}
     (f : Node.ContextHom Γ Δ) (shape : ShapeOver Agent Δ) :
     ShapeOver Agent Γ where
-  toSyntaxOver := SyntaxOver.comap f shape.toSyntaxOver
+  toSyntaxOver := _root_.Interaction.SyntaxOver.comap f shape.toSyntaxOver
   map h := shape.map h
 
 /--
@@ -316,14 +337,17 @@ def ShapeOver.mapOutput
 
 /--
 Whole-tree families for `ShapeOver.comap f shape` are exactly families for `shape`
-evaluated on the mapped decoration `Decoration.map f ctxs`.
+evaluated on the mapped decoration.
 -/
 theorem ShapeOver.family_comap {Δ : Node.Context}
     (shape : ShapeOver Agent Δ) (f : Node.ContextHom Γ Δ) :
     {agent : Agent} → {spec : Spec} → (ctxs : Decoration Γ spec) →
     {Out : Transcript spec → Type w} →
     StrategyOver (ShapeOver.comap f shape).toSyntaxOver agent spec ctxs Out =
-      StrategyOver shape.toSyntaxOver agent spec (Decoration.map f spec ctxs) Out
+      StrategyOver shape.toSyntaxOver agent spec
+        (PFunctor.FreeM.Displayed.Decoration.map
+          (P := Spec.basePFunctor) (α := PUnit.{u+1}) f spec ctxs)
+        Out
   := by
     intro agent spec ctxs Out
     simpa using

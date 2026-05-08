@@ -38,7 +38,7 @@ The definitions in this file are intentionally local and minimal.
   single-projection form `Multiparty.Observation`.
 * `Observation.toViewMode` lifts an arbitrary observation back into `ViewMode`
   via the universal `.react` constructor.
-* `localSyntax` packages the four-mode `Action` shape as a `Spec.SyntaxOver`.
+* `localSyntax` packages the four-mode `Action` shape as a `SyntaxOver`.
 * `Strategy` is the induced whole-tree local endpoint type, obtained from
   arbitrary node-local metadata through `SyntaxOver.comap`.
 
@@ -379,7 +379,8 @@ endpoint of one fixed participant viewpoint rather than a whole participant
 profile.
 -/
 def localSyntax (m : Type u → Type u) :
-    Spec.SyntaxOver (PUnit : Type) (fun X : Type u => ViewMode X) where
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) (PUnit : Type) (fun X : Type u => ViewMode X) where
   Node _ _ view Cont := view.Action m Cont
 
 /--

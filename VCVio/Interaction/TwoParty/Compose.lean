@@ -262,7 +262,10 @@ theorem Focal.compFlat_splitPrefix
                 let Suffix : X → Type u := fun y =>
                   Spec.StrategyOver (pairedSyntax m) TwoParty.Participant.focal
                     ((fun b => PFunctor.FreeM.append (rest b) (fun path => s₂ ⟨b, path⟩)) y)
-                    ((fun y => Spec.Decoration.append (rRest y) fun p => r₂ ⟨y, p⟩) y)
+                    ((fun y =>
+                      PFunctor.FreeM.Displayed.Decoration.append
+                        (P := Spec.basePFunctor) (α := PUnit.{u+1}) (β := PUnit.{u+1})
+                        (rRest y) (fun p => r₂ ⟨y, p⟩)) y)
                     (fun tr => Output ⟨y, tr⟩)
                 have hgo :
                     (Focal.compFlat (Focal.splitPrefix tail)
@@ -436,94 +439,13 @@ theorem run_compFlat_appendFlat_pure
     | .done, r₁ =>
         cases r₁
         simp [Focal.compFlat.eq_1, Counterpart.appendFlat.eq_1,
-          run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append_done]
+          run_done, Spec.append, Spec.Transcript.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-        -- Restore once `monad_norm`/`do_pure_bind_sigma` interplay is resolved.
-        /-
-        simp only [Focal.compFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
-        conv_lhs => rw [run_sender]
-        conv_rhs => rw [run_sender]
-        simp only [bind_assoc, pure_bind]
-        erw [bind_assoc]
-        apply bind_congr
-        intro xc
-        have hpure := @Focal.compFlat_eq_pure_compFlatPure m _ _
-          (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) (rRest xc.fst) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => OutputP ⟨xc.fst, tr⟩)
-          xc.snd
-          (fun tr₁ mid =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.focal
-                (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
-              (fun tr₂ => OutputP ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩)
-            from f ⟨xc.fst, tr₁⟩ mid)
-        erw [hpure]
-        simp only [id_eq, bind_pure_comp, map_pure, PFunctor.FreeM.Displayed.roll_eq,
-          Prod.mk.eta]
-        refine (LawfulMonad.do_pure_bind_sigma (m := m) (x := xc.fst) ?_ ?_).trans ?_
-        refine congrArg (fun k => cpt₁ xc.1 >>= k) ?_
-        funext cRest
-        have ih := @go (rest xc.fst) (rRest xc.fst)
-          (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
-          (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
-          β xc.snd
-          (fun tr₁ mid =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.focal
-                (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
-              (fun tr₂ => OutputP ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩)
-            from f ⟨xc.fst, tr₁⟩ mid)
-          cRest
-          (fun p o =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.counterpart
-                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
-              (fun tr₂ => OutputC ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
-            from cpt₂ ⟨xc.fst, p⟩ o)
-          (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-        simp only [Focal.compFlat_eq_pure_compFlatPure, pure_bind] at ih
-        exact ih
-        -/
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-        /-
-        simp only [Focal.compFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
-        conv_lhs => rw [run_receiver]
-        conv_rhs => rw [run_receiver]
-        simp only [bind_assoc, pure_bind]
-        erw [bind_assoc]
-        apply bind_congr
-        intro xc
-        simp only [id_eq]
-        refine (LawfulMonad.do_pure_bind_sigma (m := m) (x := xc.fst) ?_ ?_).trans ?_
-        refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
-        funext next
-        exact @go (rest xc.fst) (rRest xc.fst)
-          (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
-          (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
-          β next
-          (fun tr₁ mid =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.focal
-                (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
-              (fun tr₂ => OutputP ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩)
-            from f ⟨xc.fst, tr₁⟩ mid)
-          xc.snd
-          (fun p o =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.counterpart
-                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
-              (fun tr₂ => OutputC ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
-            from cpt₂ ⟨xc.fst, p⟩ o)
-          (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-        -/
   simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Executing a flat composed strategy/counterpart factors into first executing
@@ -585,88 +507,13 @@ theorem run_compFlat_appendFlat
     | .done, r₁ =>
         cases r₁
         simp [Focal.compFlat.eq_1, Counterpart.appendFlat.eq_1,
-          run_done, Spec.append, Spec.Decoration.append, Spec.Transcript.append_done]
+          run_done, Spec.append, Spec.Transcript.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-        /-
-        simp only [Focal.compFlat.eq_2, Counterpart.appendFlat.eq_2]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
-        conv_lhs => rw [run_sender]
-        conv_rhs => rw [run_sender]
-        simp only [bind_assoc, pure_bind]
-        erw [bind_assoc]
-        apply bind_congr
-        intro xc
-        erw [bind_assoc]
-        simp only [id_eq]
-        let Suffix : X → Type u := fun y =>
-          Spec.StrategyOver (pairedSyntax m) Participant.focal
-            ((rest y).append fun path => s₂ ⟨y, path⟩)
-            (Spec.Decoration.append (rRest y) fun p => r₂ ⟨y, p⟩)
-            (fun tr => OutputP ⟨y, tr⟩)
-        refine (LawfulMonad.do_bind_do_pure_bind_sigma (m := m) (α := X) (β := Suffix) (x := xc.fst)
-          (action := Focal.compFlat xc.snd (fun tr₁ mid => f ⟨xc.fst, tr₁⟩ mid)) ?_).trans ?_
-        simp only [id_eq]
-        rw [LawfulCommMonad.bind_comm]
-        refine congrArg (fun k => cpt₁ xc.1 >>= k) ?_
-        funext cRest
-        exact @go (rest xc.fst) (rRest xc.fst)
-          (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
-          (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
-          β xc.snd
-          (fun tr₁ mid =>
-            show m (Spec.StrategyOver (pairedSyntax m) Participant.focal
-              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
-              (fun tr₂ => OutputP ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩))
-            from f ⟨xc.fst, tr₁⟩ mid)
-          cRest
-          (fun p o =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.counterpart
-                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
-              (fun tr₂ => OutputC ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
-            from cpt₂ ⟨xc.fst, p⟩ o)
-          (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-        -/
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-        /-
-        simp only [Focal.compFlat.eq_3, Counterpart.appendFlat.eq_3]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
-        conv_lhs => rw [run_receiver]
-        conv_rhs => rw [run_receiver]
-        simp only [bind_assoc, pure_bind]
-        erw [bind_assoc]
-        apply bind_congr
-        intro xc
-        simp only [id_eq, PFunctor.FreeM.Displayed.roll_eq, Prod.mk.eta]
-        refine (LawfulMonad.do_pure_bind_sigma (m := m) (x := xc.fst) ?_ ?_).trans ?_
-        refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
-        funext next
-        exact @go (rest xc.fst) (rRest xc.fst)
-          (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
-          (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr => OutputP ⟨xc.fst, tr⟩) (fun tr => OutputC ⟨xc.fst, tr⟩)
-          β next
-          (fun tr₁ mid =>
-            show m (Spec.StrategyOver (pairedSyntax m) Participant.focal
-              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
-              (fun tr₂ => OutputP ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun p => s₂ ⟨xc.fst, p⟩) tr₁ tr₂⟩))
-            from f ⟨xc.fst, tr₁⟩ mid)
-          xc.snd
-          (fun p o =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.counterpart
-                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
-              (fun tr₂ => OutputC ⟨xc.fst,
-                Spec.Transcript.append (rest xc.fst) (fun q => s₂ ⟨xc.fst, q⟩) p tr₂⟩)
-            from cpt₂ ⟨xc.fst, p⟩ o)
-          (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-        -/
   simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Executing a factored composed strategy/counterpart (using `comp` and
@@ -731,96 +578,28 @@ theorem run_comp_append
     | .done, r₁ =>
         cases r₁
         simp [monad_norm, Focal.comp, Counterpart.append,
-          run_done, Spec.append, Spec.Decoration.append,
+          run_done, Spec.append,
           Spec.Transcript.liftAppend, Spec.Transcript.append_done, Spec.Transcript.packAppend_done]
         rfl
     | .node X rest, ⟨.sender, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-        /-
-        simp only [Focal.comp, Counterpart.append]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
-        conv_lhs => rw [run_sender]
-        conv_rhs => rw [run_sender]
-        simp only [bind_assoc, pure_bind]
-        erw [bind_assoc]
-        apply bind_congr
-        intro xc
-        erw [bind_assoc]
-        simp only [id_eq]
-        let Suffix : X → Type u := fun y =>
-          Spec.StrategyOver (pairedSyntax m) Participant.focal
-            ((rest y).append fun path => s₂ ⟨y, path⟩)
-            (Spec.Decoration.append (rRest y) fun p => r₂ ⟨y, p⟩)
-            (Spec.Transcript.liftAppend (rest y) (fun path => s₂ ⟨y, path⟩)
-              (fun tr₁ tr₂ => FP ⟨y, tr₁⟩ tr₂))
-        refine (LawfulMonad.do_bind_do_pure_bind_sigma (m := m) (α := X) (β := Suffix) (x := xc.fst)
-          (action := Focal.comp xc.snd (fun tr₁ mid => f ⟨xc.fst, tr₁⟩ mid)) ?_).trans ?_
-        simp only [id_eq]
-        rw [LawfulCommMonad.bind_comm]
-        refine congrArg (fun k => cpt₁ xc.1 >>= k) ?_
-        funext cRest
-        exact @go (rest xc.fst) (rRest xc.fst)
-          (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
-          (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr₁ tr₂ => FP ⟨xc.fst, tr₁⟩ tr₂)
-          (fun tr₁ tr₂ => FC ⟨xc.fst, tr₁⟩ tr₂)
-          β xc.snd
-          (fun tr₁ mid =>
-            show m (Spec.StrategyOver (pairedSyntax m) Participant.focal
-              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
-              (FP ⟨xc.fst, tr₁⟩))
-            from f ⟨xc.fst, tr₁⟩ mid)
-          cRest
-          (fun p o =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.counterpart
-                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
-              (FC ⟨xc.fst, p⟩)
-            from cpt₂ ⟨xc.fst, p⟩ o)
-          (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-        -/
     | .node _ rest, ⟨.receiver, rRest⟩ =>
         sorry
         -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-        /-
-        simp only [Focal.comp, Counterpart.append]
-        simp only [monad_norm, Spec.append, PFunctor.FreeM.append, Spec.Decoration.append]
-        conv_lhs => rw [run_receiver]
-        conv_rhs => rw [run_receiver]
-        simp only [bind_assoc, pure_bind]
-        erw [bind_assoc]
-        apply bind_congr
-        intro xc
-        simp only [id_eq, PFunctor.FreeM.Displayed.roll_eq]
-        refine (LawfulMonad.do_pure_bind_sigma (m := m) (x := xc.fst) ?_ ?_).trans ?_
-        refine congrArg (fun k => strat₁ xc.1 >>= k) ?_
-        funext next
-        exact @go (rest xc.fst) (rRest xc.fst)
-          (fun tr => MidP ⟨xc.fst, tr⟩) (fun tr => MidC ⟨xc.fst, tr⟩)
-          (fun p => s₂ ⟨xc.fst, p⟩) (fun p => r₂ ⟨xc.fst, p⟩)
-          (fun tr₁ tr₂ => FP ⟨xc.fst, tr₁⟩ tr₂)
-          (fun tr₁ tr₂ => FC ⟨xc.fst, tr₁⟩ tr₂)
-          β next
-          (fun tr₁ mid =>
-            show m (Spec.StrategyOver (pairedSyntax m) Participant.focal
-              (s₂ ⟨xc.fst, tr₁⟩) (r₂ ⟨xc.fst, tr₁⟩)
-              (FP ⟨xc.fst, tr₁⟩))
-            from f ⟨xc.fst, tr₁⟩ mid)
-          xc.snd
-          (fun p o =>
-            show Spec.StrategyOver (pairedSyntax m) Participant.counterpart
-                (s₂ ⟨xc.fst, p⟩) (r₂ ⟨xc.fst, p⟩)
-              (FC ⟨xc.fst, p⟩)
-            from cpt₂ ⟨xc.fst, p⟩ o)
-          (fun r => g ⟨⟨xc.fst, r.1⟩, r.2.1, r.2.2⟩)
-        -/
   simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Role swapping commutes with replication. -/
 theorem RoleDecoration.swap_replicate {spec : Spec}
     (roles : RoleDecoration spec) (n : Nat) :
-    RoleDecoration.swap (roles.replicate n) = (RoleDecoration.swap roles).replicate n :=
-  Spec.Decoration.map_replicate (fun _ => Role.swap) roles n
+    RoleDecoration.swap
+        (PFunctor.FreeM.Displayed.Decoration.replicate
+          (P := Spec.basePFunctor) (α := PUnit.{u+1}) PUnit.unit roles n) =
+      PFunctor.FreeM.Displayed.Decoration.replicate
+        (P := Spec.basePFunctor) (α := PUnit.{u+1}) PUnit.unit (RoleDecoration.swap roles) n :=
+  PFunctor.FreeM.Displayed.Decoration.map_replicate
+    (P := Spec.basePFunctor) (α := PUnit.{u+1})
+    (fun _ => Role.swap) PUnit.unit roles n
 
 /-- `n`-fold counterpart iteration on `spec.replicate n`, threading state `β`
 through each round. -/
@@ -831,7 +610,10 @@ def Counterpart.iterate {m : Type u → Type u} [Monad m]
       Spec.StrategyOver (pairedSyntax m) Participant.counterpart spec roles (fun _ => β)) →
     β →
     Spec.StrategyOver (pairedSyntax m) Participant.counterpart
-      (spec.replicate n) (roles.replicate n) (fun _ => β)
+      (spec.replicate n)
+      (PFunctor.FreeM.Displayed.Decoration.replicate
+        (P := Spec.basePFunctor) (α := PUnit.{u+1}) PUnit.unit roles n)
+      (fun _ => β)
   | 0, _, b => b
   | n + 1, step, b =>
       Counterpart.appendFlat (step 0 b) (fun _ b' => iterate n (fun i => step i.succ) b')
@@ -845,7 +627,10 @@ def Focal.iterate {m : Type u → Type u} [Monad m]
       m (Spec.StrategyOver (pairedSyntax m) Participant.focal spec roles (fun _ => α))) →
     α →
     m (Spec.StrategyOver (pairedSyntax m) Participant.focal
-      (spec.replicate n) (roles.replicate n) (fun _ => α))
+      (spec.replicate n)
+      (PFunctor.FreeM.Displayed.Decoration.replicate
+        (P := Spec.basePFunctor) (α := PUnit.{u+1}) PUnit.unit roles n)
+      (fun _ => α))
   | 0, _, a => pure a
   | n + 1, step, a => do
     let strat ← step 0 a
@@ -866,7 +651,10 @@ def Counterpart.stateChainComp {m : Type u → Type u} [Monad m]
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
     Spec.StrategyOver (pairedSyntax m) Participant.counterpart
       (Spec.stateChain Stage spec advance n i s)
-      (Spec.Decoration.stateChain roles n i s) (Spec.Transcript.stateChainFamily Family n i s)
+      (PFunctor.FreeM.Displayed.Decoration.stateChain
+        (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
+        (advance := advance) roles n i s)
+      (Spec.Transcript.stateChainFamily Family n i s)
   | 0, _, _, b => b
   | n + 1, i, s, b =>
       Counterpart.append (step i s b)
@@ -887,7 +675,9 @@ def Focal.stateChainComp {m : Type u → Type u} [Monad m]
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
     m (Spec.StrategyOver (pairedSyntax m) Participant.focal
       (Spec.stateChain Stage spec advance n i s)
-      (Spec.Decoration.stateChain roles n i s)
+      (PFunctor.FreeM.Displayed.Decoration.stateChain
+        (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
+        (advance := advance) roles n i s)
       (Spec.Transcript.stateChainFamily Family n i s))
   | 0, _, _, a => pure a
   | n + 1, i, s, a => do

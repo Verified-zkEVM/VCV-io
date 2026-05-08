@@ -132,7 +132,8 @@ end MonadDecoration
 At each node the strategy chooses a move `x` immediately, then supplies the
 continuation in the `BundledMonad` stored by the node decoration. -/
 def Strategy.monadicSyntax :
-    SyntaxOver PUnit (fun (_ : Type u) => BundledMonad.{u, u}) where
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit (fun (_ : Type u) => BundledMonad.{u, u}) where
   Node _ (X : Type u) bm (Cont : X → Type u) :=
     (x : X) × bm.M (Cont x)
 

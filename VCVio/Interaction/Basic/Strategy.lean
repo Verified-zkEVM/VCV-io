@@ -34,13 +34,15 @@ variable {m : Type u → Type u}
 At each node the strategy chooses a move `x` and provides the continuation in
 the ambient monad `m`. -/
 def Strategy.syntax (m : Type u → Type u) :
-    SyntaxOver.{u, u, u, u} PUnit Node.Context.empty where
+    _root_.Interaction.SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit.{u+1} Node.Context.empty.{u, u} where
   Node _ X _ Cont := (x : X) × m (Cont x)
 
 /-- One-player strategy with monadic effects. -/
 abbrev Strategy.Plain (m : Type u → Type u)
-    (spec : Spec) (Output : Transcript spec → Type u) :=
-  StrategyOver (Strategy.syntax m) PUnit.unit spec (Decoration.empty spec) Output
+    (spec : Spec.{u}) (Output : Transcript spec → Type u) :=
+  StrategyOver (Strategy.syntax m) (PUnit.unit : PUnit.{u+1}) spec
+    (Decoration.empty.{u, u} spec) Output
 
 /-- One-step execution law for ordinary one-player strategies. -/
 def Strategy.interaction (m : Type u → Type u) [Monad m] :
@@ -56,7 +58,7 @@ def Strategy.run {m : Type u → Type u} [Monad m] :
     Strategy.Plain m spec Output → m ((tr : Transcript spec) × Output tr)
   | spec, Output, strat =>
       InteractionOver.run
-        (Agent := PUnit)
+        (Agent := PUnit.{u+1})
         (Γ := Node.Context.empty)
         (syn := Strategy.syntax m)
         (m := m)
