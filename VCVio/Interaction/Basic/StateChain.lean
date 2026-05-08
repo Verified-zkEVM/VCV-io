@@ -239,7 +239,7 @@ at each step. Reduces **definitionally** when the transcript is built via
 `Transcript.append`, avoiding Nat-arithmetic casts.
 
 This is the canonical output type for `Strategy.stateChainComp` and
-`Counterpart.stateChainComp`. -/
+`StrategyOver.TwoParty.Counterpart.stateChainComp`. -/
 def Transcript.stateChainFamily
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}

@@ -46,7 +46,7 @@ would need explicit casts between the two-argument and single-argument views.
 This combinator propagates up through the entire stack:
 - `Transcript.stateChainFamily` uses it at each stage of a state chain
 - `Chain.outputFamily` uses it at each round of a continuation chain
-- `Strategy.comp` / `Focal.comp` use it for the output type
+- `Strategy.comp` / `StrategyOver.TwoParty.Focal.comp` use it for the output type
 - All security composition theorems factor through it -/
 def Transcript.liftAppend :
     (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
