@@ -98,13 +98,7 @@ This receives an explicit hash function
 @[simp, grind]
 def buildMerkleTreeWithHash {s} (leaf_tree : LeafData α s) (hashFn : α → α → α) :
     (FullData α s) :=
-  match leaf_tree with
-  | LeafData.leaf a => FullData.leaf a
-  | LeafData.internal left right =>
-    let leftTree := buildMerkleTreeWithHash left hashFn
-    let rightTree := buildMerkleTreeWithHash right hashFn
-    let rootHash := hashFn (leftTree.getRootValue) (rightTree.getRootValue)
-    FullData.internal rootHash leftTree rightTree
+  populateUp leaf_tree hashFn
 
 /--
 Running the monadic version of `buildMerkleTree` with an oracle function `f`
