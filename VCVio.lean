@@ -49,6 +49,8 @@ import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Extractability
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Lemmas
 import VCVio.CryptoFoundations.MerkleTree.Vector.Basic
+import VCVio.CryptoFoundations.MerkleTree.Vector.Completeness
+import VCVio.CryptoFoundations.MerkleTree.Vector.Defs
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
 import VCVio.CryptoFoundations.ReplayFork
