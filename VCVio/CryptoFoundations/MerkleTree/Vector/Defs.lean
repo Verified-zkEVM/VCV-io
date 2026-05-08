@@ -5,10 +5,16 @@ Authors: Quang Dao, Fawad Haider
 -/
 
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
-import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 
 /-!
   # Merkle Trees as a vector commitment
+
+  This file defines the vector-style Merkle tree API: the oracle `spec`, the
+  layered cache, monadic and purely functional builders (`buildMerkleTree`,
+  `buildMerkleTree_with_hash`), proof generation and verification, and the
+  bridging `simulateQ` lemmas that translate the monadic operations into their
+  hash-function counterparts. Completeness of this construction is proven in
+  `VCVio.CryptoFoundations.MerkleTree.Vector.Completeness`.
 
   ## Notes & TODOs
 
@@ -47,9 +53,10 @@ section
 variable [DecidableEq α] [Inhabited α] [Fintype α]
 
 /-- Example: a single hash computation -/
-def singleHash {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
-    (left : α) (right : α) : m α :=
-  (spec α).query ⟨left, right⟩
+def singleHash {m : Type _ → Type _} [Monad m] [hq : HasQuery (spec α) m]
+    (left : α) (right : α) : m α := do
+  let out ← hq.query ⟨left, right⟩
+  return out
 
 /-- Cache for Merkle tree. Indexed by `j : Fin (n + 1)`, i.e. `j = 0, 1, ..., n`. -/
 def Cache (n : ℕ) := (layer : Fin (n + 1)) → List.Vector α (2 ^ layer.val)
@@ -81,7 +88,7 @@ lemma Cache.leaves_cons (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (cache
   simp [Cache.leaves, Cache.cons]
 
 /-- Compute the next layer of the Merkle tree -/
-def buildLayer {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
+def buildLayer {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
     (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) :
     m (List.Vector α (2 ^ n)) := do
   let leaves : List.Vector α (2 ^ n * 2) := cast (by rw [pow_succ]) leaves
@@ -89,11 +96,11 @@ def buildLayer {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec 
     List.Vector.ofFn (fun i =>
       (leaves.get ⟨2 * i, by omega⟩, leaves.get ⟨2 * i + 1, by omega⟩))
   let hashes : List.Vector α (2 ^ n) ←
-    List.Vector.mmap (fun ⟨left, right⟩ => (spec α).query ⟨left, right⟩) pairs
+    List.Vector.mmap (fun ⟨left, right⟩ => singleHash α left right) pairs
   return hashes
 
 /-- Build the full Merkle tree, returning the cache -/
-def buildMerkleTree (α) {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
+def buildMerkleTree (α) {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
     (n : ℕ) (leaves : List.Vector α (2 ^ n)) :
     m (Cache α n) := do
   match n with
@@ -133,7 +140,7 @@ end
 
 @[simp, grind =]
 theorem getRoot_trivial {m : Type _ → Type _} [Monad m] [LawfulMonad m]
-    [MonadLiftT (OracleQuery (spec α)) m] (a : α) :
+    [HasQuery (spec α) m] (a : α) :
     getRoot α <$> (buildMerkleTree (m := m) α 0 ⟨[a], rfl⟩) = pure a := by
   simp [getRoot, buildMerkleTree, List.Vector.head]
 
@@ -141,7 +148,7 @@ theorem getRoot_trivial {m : Type _ → Type _} [Monad m] [LawfulMonad m]
 theorem getRoot_single (a b : α) :
     getRoot α <$> buildMerkleTree (m := OracleComp (spec α)) α 1 ⟨[a, b], rfl⟩ =
       ((spec α).query (a, b)) := by
-  simp [buildMerkleTree, buildLayer, List.Vector.ofFn, List.Vector.get]
+  simp [buildMerkleTree, buildLayer, singleHash, List.Vector.ofFn, List.Vector.get]
   rfl
 
 section
@@ -191,7 +198,7 @@ returns the hash that would be the root of the tree if the proof was valid.
 i.e. the hash obtained by combining the leaf in sequence with each member of the proof,
 according to its index.
 -/
-def getPutativeRoot {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
+def getPutativeRoot {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
     {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (proof : List.Vector α n) :
     m α := do
   match h : n with
@@ -201,43 +208,21 @@ def getPutativeRoot {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (
     let signBit := i.val % 2
     let i' : Fin (2 ^ n) := ⟨i.val / 2, by omega⟩
     if signBit = 0 then
-      let newLeaf ← (spec α).query ⟨leaf, proof.head⟩
+      let newLeaf ← singleHash α leaf proof.head
       getPutativeRoot i' newLeaf proof.tail
     else
-      let newLeaf ← (spec α).query ⟨proof.head, leaf⟩
+      let newLeaf ← singleHash α proof.head leaf
       getPutativeRoot i' newLeaf proof.tail
 
 /-- Verify a Merkle proof `proof` that a given `leaf` at index `i` is in the Merkle tree with given
   `root`.
   Works by computing the putative root based on the branch, and comparing that to the actual root.
   Returns `true` if the proof is valid, and `false` otherwise. -/
-def verifyProof {m : Type _ → Type _} [Monad m] [MonadLiftT (OracleQuery (spec α)) m]
+def verifyProof {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
     {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (root : α) (proof : List.Vector α n) :
     m Bool := do
   let putative_root ← (getPutativeRoot α i leaf proof : m α)
   return (putative_root == root)
-
-@[grind .]
-theorem buildLayer_neverFails (α : Type _) [DecidableEq α]
-    [SampleableType α] [(spec α).DecidableEq]
-    (preexisting_cache : (spec α).QueryCache) (n : ℕ)
-    (leaves : List.Vector α (2 ^ (n + 1))) : NeverFail
-      ((simulateQ (spec α).randomOracle
-        (buildLayer α n leaves)).run preexisting_cache) := by
-  grind only [buildLayer, = HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
-
-/--
-Building a Merkle tree never results in failure
-(no matter what queries have already been made to the oracle before it runs).
--/
-@[grind .]
-theorem buildMerkleTree_neverFails (α : Type _) [DecidableEq α]
-    [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
-    (leaves : List.Vector α (2 ^ n)) (preexisting_cache : (spec α).QueryCache) :
-    NeverFail
-      ((simulateQ (spec α).randomOracle
-        (buildMerkleTree α n leaves)).run preexisting_cache) := by
-  grind only [= HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
 
 /-- A purely functional version of `buildLayer`, given an explicit hash function. -/
 def buildLayer_with_hash (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (hashFn : α × α → α) :
@@ -280,26 +265,27 @@ def getPutativeRoot_with_hash {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (proof : L
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
 @[simp, grind =]
-lemma simulateQ_query_eq (f : QueryImpl (spec α) Id) (x : α × α) :
-    simulateQ f (liftM (query x)) = f x := by
-  rw [simulateQ_query (impl := f) (q := query x)]
+lemma simulateQ_singleHash (f : QueryImpl (spec α) Id) (left right : α) :
+    simulateQ f (singleHash (m := OracleComp (spec α)) α left right) = f ⟨left, right⟩ := by
+  simp only [singleHash, bind_pure, HasQuery.instOfMonadLift_query]
+  rw [simulateQ_query (impl := f) (q := OracleSpec.query (left, right))]
   rfl
-
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
 @[simp, grind =]
-lemma simulateQ_listVector_mmap_query (f : QueryImpl (spec α) Id) {m : ℕ}
+lemma simulateQ_listVector_mmap_singleHash (f : QueryImpl (spec α) Id) {m : ℕ}
     (xs : List.Vector (α × α) m) :
-    simulateQ f (List.Vector.mmap (fun x => liftM (query x)) xs) =
+    simulateQ f (List.Vector.mmap
+        (fun x => (singleHash α x.1 x.2 : OracleComp (spec α) α)) xs) =
       xs.map f := by
   induction xs using List.Vector.inductionOn with
   | nil =>
     unfold simulateQ List.Vector.mmap
-    simp_all only [vector_eq_nil, domain_def]
+    simp_all only [vector_eq_nil]
   | @cons m x xs ih =>
     obtain ⟨fst, snd⟩ := x
     simp only [Vector.mmap_cons, Vector.map_cons]
-    rw [simulateQ_bind, simulateQ_query_eq]
+    rw [simulateQ_bind, simulateQ_singleHash]
     simp only [simulateQ_bind, simulateQ_pure, ih]; rfl
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
@@ -309,7 +295,7 @@ lemma simulateQ_buildLayer_eq (f : QueryImpl (spec α) Id) (n : ℕ)
     simulateQ f (buildLayer α n leaves) =
       buildLayer_with_hash (α := α) n leaves f := by
   unfold buildLayer
-  simp_all only [bind_pure, simulateQ_listVector_mmap_query, domain_def]
+  simp_all only [bind_pure, simulateQ_listVector_mmap_singleHash, domain_def]
   rfl
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
@@ -354,102 +340,6 @@ lemma simulateQ_getPutativeRoot_eq (f : QueryImpl (spec α) Id) {n : ℕ} (i : F
     · simp [getPutativeRoot, getPutativeRoot_with_hash, hsign, ih]
       simp_all only [Nat.mod_two_not_eq_zero]
       rfl
-
-omit [DecidableEq α] [Inhabited α] [Fintype α] in
-/-- A functional completeness theorem for Merkle proofs built from `buildMerkleTree_with_hash`. -/
-theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i : Fin (2 ^ n))
-    (hashFn : α × α → α) :
-    getPutativeRoot_with_hash (α := α) i leaves[i]
-        (generateProof α i (buildMerkleTree_with_hash (α := α) n leaves hashFn)) hashFn =
-      getRoot α (buildMerkleTree_with_hash (α := α) n leaves hashFn) := by
-  induction n with
-  | zero =>
-    have hi : i = 0 := Fin.eq_zero i
-    subst hi
-    simp only [buildMerkleTree_with_hash, Fin.isValue, Nat.pow_zero, getPutativeRoot_with_hash,
-      getRoot]
-    simp
-  | succ n ih =>
-    -- Abbreviate the upper layer and the upper tree.
-    let lastLayer := buildLayer_with_hash (α := α) n leaves hashFn
-    let upperCache := buildMerkleTree_with_hash (α := α) n lastLayer hashFn
-    -- Split on whether `i` is a left or right child at the bottom layer.
-    by_cases hsign : i.val % 2 = 0
-    · -- Left child: sibling is `i + 1`.
-      have hdiv : 2 * (i.val / 2) = i.val := by
-        have h := Nat.mod_add_div i.val 2
-        -- `i % 2 = 0` implies `2 * (i / 2) = i`.
-        simpa [hsign] using h
-      have hright : 2 * (i.val / 2) + 1 = i.val + 1 := by grind only
-      have hnew :
-          hashFn (leaves.get i, leaves.get (siblingIndex i)) =
-            lastLayer.get ⟨i.val / 2, by grind only⟩ := by
-        simp [lastLayer, buildLayer_with_hash, siblingIndex, hsign, hdiv]
-        congr
-      -- Unfold and apply the induction hypothesis on the upper tree.
-      -- `generateProof` and `getRoot` reduce via `Cache.upper_cons` and `Cache.leaves_cons`.
-      simp [buildMerkleTree_with_hash, lastLayer, generateProof,
-        getPutativeRoot_with_hash, getRoot, hsign, hnew]
-      simpa [getRoot, Cache.cons, lastLayer, upperCache] using
-        (ih (leaves := lastLayer) (i := ⟨i.val / 2, by grind only⟩))
-    · -- Right child: sibling is `i - 1`.
-      have hmod1 : i.val % 2 = 1 := by
-        rcases Nat.mod_two_eq_zero_or_one i.val with h0 | h1
-        · exact (hsign h0).elim
-        · exact h1
-      have hdiv : 2 * (i.val / 2) = i.val - 1 := by
-        have h := Nat.mod_add_div i.val 2
-        -- `i % 2 = 1` implies `1 + 2 * (i / 2) = i`.
-        have : 1 + 2 * (i.val / 2) = i.val := by simpa [hmod1] using h
-        grind only
-      have hright : 2 * (i.val / 2) + 1 = i.val := by grind only
-      have hnew :
-          hashFn (leaves.get (siblingIndex i), leaves.get i) =
-            lastLayer.get ⟨i.val / 2, by grind only⟩ := by
-        have hiPos : 1 ≤ i.val := by grind only
-        have hi' :
-            (⟨i.val - 1 + 1, by simp [Nat.sub_add_cancel hiPos]⟩ :
-                Fin (2 ^ (n + 1))) =
-              i := by
-          ext
-          simp [Nat.sub_add_cancel hiPos]
-        simpa [lastLayer, buildLayer_with_hash, siblingIndex, hmod1, hdiv] using
-          congrArg (fun j => hashFn (leaves.get ⟨i.val - 1, by grind only⟩, leaves.get j)) hi'.symm
-      simp [buildMerkleTree_with_hash, lastLayer, generateProof,
-        getPutativeRoot_with_hash, getRoot, hsign, hnew]
-      simpa [getRoot, Cache.cons, lastLayer, upperCache] using
-        (ih (leaves := lastLayer) (i := ⟨i.val / 2, by grind only⟩))
-
-omit [Fintype α] in
-/-- Completeness theorem for Merkle trees: for any full binary tree with `2 ^ n` leaves, and for
-  any index `i`, the honestly-generated opening proof verifies against the honestly-built root
-  with probability one.
--/
-theorem completeness [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
-    (leaves : List.Vector α (2 ^ n)) (i : Fin (2 ^ n))
-    (preexisting_cache : (spec α).QueryCache) :
-    Pr[fun v => v.1 = true | (simulateQ (spec α).randomOracle (do
-      let cache ← buildMerkleTree α n leaves
-      let proof := generateProof α i cache
-      let verified ← (verifyProof (m := OracleComp (spec α)) α i leaves[i]
-        (getRoot α cache) proof)
-      return verified)).run preexisting_cache] = 1 := by
-  refine (probEvent_eq_one_simulateQ_randomOracle_run_iff (spec := spec α)
-    (p := fun b : Bool => b = true) _ _).mpr ?_
-  intro f _hf
-  -- Reduce simulation through the do-block to a deterministic computation, then apply
-  -- `functional_completeness`.
-  change (simulateQ f (do
-    let cache ← buildMerkleTree α n leaves
-    let proof := generateProof α i cache
-    let verified ← (verifyProof (m := OracleComp (spec α)) α i leaves[i]
-      (getRoot α cache) proof)
-    return verified) : Id Bool) = (true : Bool)
-  simp only [verifyProof, simulateQ_bind, simulateQ_pure,
-    simulateQ_buildMerkleTree_eq, simulateQ_getPutativeRoot_eq]
-  change ((_ : α) == _) = true
-  rw [beq_iff_eq]
-  exact functional_completeness α leaves i f
 
 end
 
