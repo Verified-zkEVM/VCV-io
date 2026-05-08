@@ -788,13 +788,20 @@ def populateDown {α : Type _} (s : Skeleton)
       (populateDown s_left children left_root)
       (populateDown s_right children right_root)
 
+/-- For a leaf skeleton, `populateDown` returns a single-leaf `FullData` carrying `root`. -/
+@[simp, grind =]
+lemma populateDown_leaf {β : Type _}
+    (children : β → β × β) (root : β) :
+    populateDown .leaf children root = FullData.leaf root := rfl
+
 /-- For an internal skeleton, `populateDown` unfolds to a `FullData.internal`
 whose subtrees are recursively populated from the projections of `children root`.
 
 This holds by `rfl` thanks to Prod-eta: the `let ⟨l, r⟩ := children root` in the
 definition is `Prod.casesOn (children root) _`, and Prod-eta makes
 `Prod.casesOn p f = f p.1 p.2` definitional. -/
-@[simp, grind =] lemma populateDown_internal_def {β : Type _} {sl sr : Skeleton}
+@[simp, grind =]
+lemma populateDown_internal_def {β : Type _} {sl sr : Skeleton}
     (children : β → β × β) (root : β) :
     populateDown (.internal sl sr) children root =
       FullData.internal root
@@ -802,7 +809,8 @@ definition is `Prod.casesOn (children root) _`, and Prod-eta makes
         (populateDown sr children (children root).2) := rfl
 
 /-- The root value of `populateDown` is the input `root`. -/
-@[simp, grind =] lemma populateDown_getRootValue {β : Type _} {s : Skeleton}
+@[simp, grind =]
+lemma populateDown_getRootValue {β : Type _} {s : Skeleton}
     (children : β → β × β) (root : β) :
     (populateDown s children root).getRootValue = root := by
   cases s with
@@ -813,6 +821,21 @@ definition is `Prod.casesOn (children root) _`, and Prod-eta makes
 def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
     (x : Option α) (y : Option β) : Option γ := do
   f (← x) (← y)
+
+/-- Lift a partial child-decomposition function `α → Option (β × β)` through `Option`,
+returning a pair of `Option`s. If the input or `f` fails, both projections are `none`. -/
+def Option.bindPair {α β : Type _} (f : α → Option (β × β))
+    (x : Option α) : Option β × Option β :=
+  let p : Option (β × β) := x.bind f
+  (p.map Prod.fst, p.map Prod.snd)
+
+@[simp, grind =]
+theorem Option.bindPair_some {α β : Type _} (f : α → Option (β × β)) (a : α) :
+    Option.bindPair f (some a) = ((f a).map Prod.fst, (f a).map Prod.snd) := rfl
+
+@[simp, grind =]
+theorem Option.bindPair_none {α β : Type _} (f : α → Option (β × β)) :
+    Option.bindPair f (none : Option α) = ((none : Option β), (none : Option β)) := rfl
 
 /-- Build a tree while allowing failures in the composition function. -/
 def optionPopulateUp {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
@@ -838,6 +861,33 @@ theorem optionPopulateUp_internal {α} {s_left s_right : Skeleton}
         (optionPopulateUp left compose)
         (optionPopulateUp right compose) := by
   rfl
+
+/-- Build a tree top-down while allowing failures in the children-decomposition function.
+`children` may return `none` to indicate failure; failure propagates to all descendants
+in the corresponding subtree. -/
+def optionPopulateDown {α : Type _} (s : Skeleton)
+    (children : α → Option (α × α))
+    (root : α) :
+    FullData (Option α) s :=
+  populateDown s (Option.bindPair children) (some root)
+
+@[simp, grind =]
+theorem optionPopulateDown_leaf {α} (children : α → Option (α × α)) (root : α) :
+    optionPopulateDown .leaf children root = FullData.leaf (some root) := rfl
+
+@[simp, grind =]
+theorem optionPopulateDown_internal {α} {sl sr : Skeleton}
+    (children : α → Option (α × α)) (root : α) :
+    optionPopulateDown (.internal sl sr) children root =
+      FullData.internal (some root)
+        (populateDown sl (Option.bindPair children) ((children root).map Prod.fst))
+        (populateDown sr (Option.bindPair children) ((children root).map Prod.snd)) := rfl
+
+@[simp, grind =]
+theorem optionPopulateDown_getRootValue {α} {s : Skeleton}
+    (children : α → Option (α × α)) (root : α) :
+    (optionPopulateDown s children root).getRootValue = some root := by
+  cases s <;> rfl
 
 end Populate
 
