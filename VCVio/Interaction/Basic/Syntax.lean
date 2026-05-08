@@ -3,8 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.Node
-import VCVio.Interaction.Basic.Decoration
 
 /-!
 # Generic local syntax over interaction trees
@@ -50,7 +50,6 @@ universe u a vΓ vΔ vΛ w uA uB uA₂ uB₂ t
 namespace Interaction
 
 open PFunctor
-open PFunctor.FreeM.Displayed (Decoration)
 
 variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
 variable {α : Type t}
@@ -117,116 +116,6 @@ def forAgent (syn : SyntaxOver l Agent Γ) (agent : Agent) :
 
 end SyntaxOver
 
-variable {Agent : Type a} {Γ : P.A → Type vΓ}
-
-/--
-Whole-tree local strategy induced by lens-indexed local syntax.
-
-At leaves it returns the output family. At a control node it presents the local
-node object supplied by `syn`, whose continuation family is recursively the
-strategy for the abstract branch selected by the lens.
--/
-def StrategyOver {l : PFunctor.Lens P Q}
-    (syn : SyntaxOver l Agent Γ) :
-    (agent : Agent) →
-    (spec : PFunctor.FreeM P α) →
-    Decoration Γ spec →
-    (PFunctor.FreeM.PathAlong l spec → Type w) →
-    Type w
-  | _, .pure _, _, Out => Out ⟨⟩
-  | agent, .roll pos rest, ⟨γ, ctxs⟩, Out =>
-      syn.Node agent pos γ (fun d =>
-        StrategyOver syn agent (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d))
-          (fun path => Out ⟨d, path⟩))
-
-namespace StrategyOver
-
-variable {Agent₁ : Type a} {Agent₂ : Type u}
-variable {l : PFunctor.Lens P Q}
-
-/--
-A local homomorphism between two lens-executed `StrategyOver` fibers.
-
-The source and target may use different local syntax objects and different
-agents, while sharing the same control lens and node-context decoration.
-At each node, `mapNode` translates the source node object into the target node
-object after recursive continuations have already been translated.
--/
-structure Hom
-    (syn₁ : SyntaxOver l Agent₁ Γ) (agent₁ : Agent₁)
-    (syn₂ : SyntaxOver l Agent₂ Γ) (agent₂ : Agent₂) where
-  mapNode :
-    {pos : P.A} →
-    {γ : Γ pos} →
-    {A B : Q.B (l.toFunA pos) → Type w} →
-    (∀ d, A d → B d) →
-    syn₁.Node agent₁ pos γ A →
-    syn₂.Node agent₂ pos γ B
-
-/--
-Map a lens-executed whole-tree strategy along a local homomorphism, while also
-mapping its leaf output family.
-
-The recursion follows runtime directions through `PathAlong l spec`; the lens
-maps each runtime direction back to the corresponding control branch.
--/
-def map
-    {syn₁ : SyntaxOver l Agent₁ Γ} {agent₁ : Agent₁}
-    {syn₂ : SyntaxOver l Agent₂ Γ} {agent₂ : Agent₂}
-    (η : Hom syn₁ agent₁ syn₂ agent₂) :
-    {spec : PFunctor.FreeM P α} → {ctxs : Decoration Γ spec} →
-    {A B : PFunctor.FreeM.PathAlong l spec → Type w} →
-    (∀ path, A path → B path) →
-    StrategyOver syn₁ agent₁ spec ctxs A →
-    StrategyOver syn₂ agent₂ spec ctxs B
-  | PFunctor.FreeM.pure _, _, _, _, f, out => f ⟨⟩ out
-  | PFunctor.FreeM.roll pos _, ⟨_, ctxs⟩, _, _, f, stratNode =>
-      η.mapNode
-        (fun d =>
-          map η (ctxs := ctxs (l.toFunB pos d))
-            (fun path => f ⟨d, path⟩))
-        stratNode
-
-/--
-The whole-tree strategy induced by `SyntaxOver.forAgent syn agent` is the
-`agent` fiber of the original participant-indexed whole-tree strategy.
--/
-theorem forAgent
-    (syn : SyntaxOver l Agent Γ) (agent : Agent) :
-    {spec : PFunctor.FreeM P α} →
-    (ctxs : Decoration Γ spec) →
-    {Out : PFunctor.FreeM.PathAlong l spec → Type w} →
-    StrategyOver (SyntaxOver.forAgent syn agent) PUnit.unit spec ctxs Out =
-      StrategyOver syn agent spec ctxs Out
-  | .pure _, _, _ => rfl
-  | .roll pos rest, ⟨γ, ctxs⟩, Out => by
-      change syn.Node agent pos γ _ = syn.Node agent pos γ _
-      congr 1
-      funext d
-      exact forAgent syn agent
-        (ctxs := ctxs (l.toFunB pos d))
-        (Out := fun path => Out ⟨d, path⟩)
-
-/--
-Whole-tree families for `SyntaxOver.comap f syn` are exactly families for `syn`
-evaluated on the mapped decoration.
--/
-theorem comap {Δ : P.A → Type vΔ}
-    (syn : SyntaxOver l Agent Δ) (f : ∀ pos, Γ pos → Δ pos) :
-    {agent : Agent} →
-    {spec : PFunctor.FreeM P α} →
-    (ctxs : Decoration Γ spec) →
-    {Out : PFunctor.FreeM.PathAlong l spec → Type w} →
-    StrategyOver (SyntaxOver.comap f syn) agent spec ctxs Out =
-      StrategyOver syn agent spec (Decoration.map f spec ctxs) Out
-  | _, .pure _, _, _ => rfl
-  | agent, .roll pos rest, ⟨γ, ctxs⟩, Out => by
-      simp only [StrategyOver, SyntaxOver.comap, Decoration.map_roll]
-      congr 1
-      funext d
-      exact comap syn f (agent := agent) (ctxs := ctxs (l.toFunB pos d))
-
-end StrategyOver
 
 namespace Spec
 
@@ -242,7 +131,7 @@ all.
 -/
 abbrev Syntax
     (Agent : Type a) :=
-  _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Node.Context.empty
+  SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Node.Context.empty
 
 end Spec
 end Interaction

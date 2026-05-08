@@ -21,7 +21,7 @@ universe u
 namespace Interaction
 namespace TwoParty
 
-open _root_.Interaction.TwoParty
+open TwoParty
 
 @[simp, grind =]
 theorem Role.swap_swap (r : Role) : r.swap.swap = r := by cases r <;> rfl

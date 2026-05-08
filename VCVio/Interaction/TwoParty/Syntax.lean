@@ -57,7 +57,7 @@ This is weaker than `SyntaxOver.monadic`: it records the same owner/observer nod
 shapes but does not require a `Monad` instance for `m`. Execution laws can add
 that instance only at the point where effects are actually run. -/
 def SyntaxOver.paired (m : Type uB₂ → Type uB₂) :
-    _root_.Interaction.SyntaxOver l Participant (fun _ : P.A => Role) where
+    SyntaxOver l Participant (fun _ : P.A => Role) where
   Node agent pos role Cont :=
     match agent, role with
     | .focal, .sender => m ((d : Q.B (l.toFunA pos)) × Cont d)
@@ -69,7 +69,7 @@ def SyntaxOver.paired (m : Type uB₂ → Type uB₂) :
 def ShapeOver.paired (m : Type uB₂ → Type uB₂) [Functor m] :
     Interaction.ShapeOver l Participant (fun _ : P.A => Role) where
   toSyntaxOver := (SyntaxOver.paired l m :
-    _root_.Interaction.SyntaxOver l Participant.{u} (fun _ : P.A => Role))
+    SyntaxOver l Participant.{u} (fun _ : P.A => Role))
   map := fun {agent} {pos} {γ} {A} {B} f node =>
     match agent, γ with
     | Participant.focal, Role.sender =>
@@ -97,7 +97,7 @@ At sender nodes, the focal participant chooses the runtime direction. At
 receiver nodes, the counterpart chooses it. The other participant follows the
 chosen direction with its observer continuation. -/
 def InteractionOver.paired (m : Type uB₂ → Type uB₂) [Monad m] :
-    _root_.Interaction.InteractionOver l Participant.{uB₂} (fun _ : P.A => Role)
+    InteractionOver l Participant.{uB₂} (fun _ : P.A => Role)
       (SyntaxOver.paired l m) m where
   interact := fun {pos} {γ} {Cont} {_Result} profile k =>
     match γ with
@@ -131,7 +131,7 @@ def SyntaxOver.monadic
     (monad :
       (pos : P.A) → Role → Participant →
         BundledMonad.{max uB₂ w, max uB₂ w}) :
-    _root_.Interaction.SyntaxOver l Participant (fun _ : P.A => Role) :=
+    SyntaxOver l Participant (fun _ : P.A => Role) :=
   Ownership.monadicSyntax l (fun role agent => perspective role agent)
     (fun {pos} role agent => monad pos role agent)
 
@@ -179,7 +179,7 @@ def ShapeOver.monadic
 
 /-- Two-party syntax over a paired focal/counterpart monad context. -/
 def SyntaxOver.pairedMonadic :
-    _root_.Interaction.SyntaxOver l Participant
+    SyntaxOver l Participant
       (RolePairedMonadContextOver.{uB₂, uA, uB} P) where
   Node agent pos γ Cont :=
     match agent, γ with
@@ -222,7 +222,7 @@ def ShapeOver.pairedMonadic :
 def InteractionOver.pairedMonadic {m : Type uB₂ → Type uB₂} [Monad m]
     (liftFocal : ∀ (bm : BundledMonad.{uB₂, uB₂}) {α : Type uB₂}, bm.M α → m α)
     (liftCounterpart : ∀ (bm : BundledMonad.{uB₂, uB₂}) {α : Type uB₂}, bm.M α → m α) :
-    _root_.Interaction.InteractionOver l Participant
+    InteractionOver l Participant
       (RolePairedMonadContextOver.{uB₂, uA, uB} P)
       (SyntaxOver.pairedMonadic l) m where
   interact := fun {pos} {γ} {Cont} {_Result} profile k =>
@@ -263,7 +263,7 @@ and challenge-indexed continuation separately, which supports replay against a
 prescribed public transcript.
 -/
 def SyntaxOver.counterpart (m : Type uB₂ → Type uB₂) :
-    _root_.Interaction.SyntaxOver l PUnit (fun _ : P.A => Role) where
+    SyntaxOver l PUnit (fun _ : P.A => Role) where
   Node _ pos role Cont :=
     match role with
     | .sender => (d : Q.B (l.toFunA pos)) → m (Cont d)
@@ -271,7 +271,7 @@ def SyntaxOver.counterpart (m : Type uB₂ → Type uB₂) :
 
 /-- Functorial shape for `PublicCoinCounterpart.SyntaxOver.counterpart`. -/
 def ShapeOver.counterpart (m : Type uB₂ → Type uB₂) [Functor m] :
-    _root_.Interaction.ShapeOver l PUnit (fun _ : P.A => Role) where
+    ShapeOver l PUnit (fun _ : P.A => Role) where
   toSyntaxOver := SyntaxOver.counterpart l m
   map := fun {_agent} {pos} {γ} {A} {_B} f node =>
     match γ with
@@ -289,7 +289,7 @@ Local syntax-forgetting map from replayable public-coin counterparts to
 ordinary executable counterparts over the same lens.
 -/
 def StrategyOver.toCounterpartHom {m : Type uB₂ → Type uB₂} [Monad m] :
-    _root_.Interaction.StrategyOver.Hom
+    StrategyOver.Hom
       (SyntaxOver.counterpart l m) PUnit.unit
       (SyntaxOver.paired l m) Participant.counterpart where
   mapNode := fun {pos} {γ} {A} {B} f node =>

@@ -27,11 +27,11 @@ private def exSpec := Spec.node T fun _ => .node U fun _ => .done
 private def exRoles : TwoParty.RoleDecoration (exSpec T U) :=
   ⟨.sender, fun _ => ⟨.receiver, fun _ => ⟨⟩⟩⟩
 
-example : _root_.Interaction.StrategyOver (TwoParty.pairedSyntax m) TwoParty.Participant.focal
+example : StrategyOver (TwoParty.pairedSyntax m) TwoParty.Participant.focal
     (exSpec T U) (exRoles T U) (fun _ => α)
     = m ((_ : T) × ((_ : U) → m α)) := rfl
 
-example : _root_.Interaction.StrategyOver (TwoParty.pairedSyntax m) TwoParty.Participant.counterpart
+example : StrategyOver (TwoParty.pairedSyntax m) TwoParty.Participant.counterpart
     (exSpec T U) (exRoles T U) (fun _ => α)
     = ((_ : T) → m (m ((_ : U) × α))) := rfl
 

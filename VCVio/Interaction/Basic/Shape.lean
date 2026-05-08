@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Node
-import VCVio.Interaction.Basic.Decoration
 import VCVio.Interaction.Basic.Syntax
 
 /-!
@@ -39,7 +38,6 @@ universe u a vΓ vΔ vΛ w uA uB uA₂ uB₂ t
 namespace Interaction
 
 open PFunctor
-open PFunctor.FreeM.Displayed (Decoration)
 
 variable {P : PFunctor.{uA, uB}} {Q : PFunctor.{uA₂, uB₂}}
 variable {α : Type t}
@@ -80,14 +78,6 @@ instance : Coe (ShapeOver l Agent Γ) (SyntaxOver l Agent Γ) where
   coe := ShapeOver.toSyntaxOver
 
 /--
-View a functorial shape as a local strategy homomorphism on one agent fiber.
--/
-def toStrategyHom
-    (shape : ShapeOver l Agent Γ) (agent : Agent) :
-    StrategyOver.Hom shape.toSyntaxOver agent shape.toSyntaxOver agent where
-  mapNode f node := shape.map f node
-
-/--
 Restrict a participant-indexed shape to one fixed agent.
 
 The resulting singleton-agent shape has the same node objects and continuation
@@ -120,50 +110,6 @@ theorem comap_comp {Δ : P.A → Type vΔ} {Λ : P.A → Type vΛ}
     comap f (comap g shape) = comap (fun pos => g pos ∘ f pos) shape := by
   cases shape
   rfl
-
-/--
-Map leaf outputs through a whole lens-executed strategy.
-
-This is the recursive global form of the local `ShapeOver.map` field. The
-runtime path index is `PathAlong l spec`, so it applies equally to plain specs
-and to control specs such as `Oracle.Spec` executed through a lens.
--/
-def mapOutput
-    (shape : ShapeOver l Agent Γ)
-    {agent : Agent}
-    {spec : PFunctor.FreeM P α}
-    (ctxs : Decoration Γ spec) :
-    {A B : PFunctor.FreeM.PathAlong l spec → Type w} →
-    (∀ path, A path → B path) →
-    StrategyOver shape.toSyntaxOver agent spec ctxs A →
-    StrategyOver shape.toSyntaxOver agent spec ctxs B :=
-  match spec, ctxs with
-  | .pure _, _ => fun f out => f ⟨⟩ out
-  | .roll pos _, ⟨γ, ctxsRest⟩ => fun f node =>
-      shape.map
-        (agent := agent)
-        (γ := γ)
-        (fun d =>
-          mapOutput shape (ctxs := ctxsRest (l.toFunB pos d))
-            (fun path => f ⟨d, path⟩))
-        node
-
-/--
-Whole-tree families for `ShapeOver.comap f shape` are exactly families for
-`shape` evaluated on the mapped decoration.
--/
-theorem family_comap {Δ : P.A → Type vΔ}
-    (shape : ShapeOver l Agent Δ) (f : ∀ pos, Γ pos → Δ pos) :
-    {agent : Agent} →
-    {spec : PFunctor.FreeM P α} →
-    (ctxs : Decoration Γ spec) →
-    {Out : PFunctor.FreeM.PathAlong l spec → Type w} →
-    StrategyOver (ShapeOver.comap f shape).toSyntaxOver agent spec ctxs Out =
-      StrategyOver shape.toSyntaxOver agent spec (Decoration.map f spec ctxs) Out := by
-  intro agent spec ctxs Out
-  simpa using
-    (StrategyOver.comap shape.toSyntaxOver f
-      (agent := agent) (spec := spec) (ctxs := ctxs) (Out := Out))
 
 end ShapeOver
 

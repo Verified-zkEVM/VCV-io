@@ -196,7 +196,7 @@ the definitional hot path and avoids equality tests such as
 def syntaxOver
     (perspective : ∀ {X}, Γ X → Agent → Perspective)
     (view : ∀ {X}, (γ : Γ X) → Agent → LocalView X) :
-    _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
+    SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
   Node agent _ γ Cont :=
     (view γ agent).node (perspective γ agent) Cont
 
@@ -204,7 +204,7 @@ def syntaxOver
 def monadicSyntax
     (perspective : ∀ {X}, Γ X → Agent → Perspective)
     (monad : ∀ {X}, Γ X → Agent → BundledMonad.{u, u}) :
-    _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
+    SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ where
   Node agent X γ Cont :=
     match perspective γ agent with
     | .owner => (monad γ agent).M ((x : X) × Cont x)

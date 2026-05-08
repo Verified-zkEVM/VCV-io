@@ -132,7 +132,7 @@ end MonadDecoration
 At each node the strategy chooses a move `x` immediately, then supplies the
 continuation in the `BundledMonad` stored by the node decoration. -/
 def Strategy.monadicSyntax :
-    _root_.Interaction.SyntaxOver
+    SyntaxOver
       (PFunctor.Lens.id Spec.basePFunctor) PUnit (fun (_ : Type u) => BundledMonad.{u, u}) where
   Node _ (X : Type u) bm (Cont : X → Type u) :=
     (x : X) × bm.M (Cont x)
@@ -144,7 +144,7 @@ decorated node monad into the ambient execution monad before the generic runner
 continues with the selected subtree. -/
 def Strategy.monadicInteraction {m : Type u → Type u} [Monad m]
     (liftM : ∀ (bm : BundledMonad.{u, u}) {α : Type u}, bm.M α → m α) :
-    _root_.Interaction.InteractionOver
+    InteractionOver
       (PFunctor.Lens.id Spec.basePFunctor) PUnit
       (fun (_ : Type u) => BundledMonad.{u, u}) Strategy.monadicSyntax m where
   interact := fun {_X} {γ} {_Cont} {_Result} profile k => do

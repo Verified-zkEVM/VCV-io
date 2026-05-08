@@ -38,7 +38,7 @@ namespace Interaction
 open PFunctor.FreeM.Displayed (Decoration)
 namespace TwoParty
 
-open _root_.Interaction.TwoParty
+open TwoParty
 open PFunctor
 
 variable {P : PFunctor.{uA, uB}} {α : Type t}

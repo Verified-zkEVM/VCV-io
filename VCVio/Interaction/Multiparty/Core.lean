@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.Decoration
-import VCVio.Interaction.Basic.Syntax
+import VCVio.Interaction.Basic.StrategyOver
 import VCVio.Interaction.Multiparty.Observation
 
 /-!
@@ -379,7 +379,7 @@ endpoint of one fixed participant viewpoint rather than a whole participant
 profile.
 -/
 def localSyntax (m : Type u → Type u) :
-    _root_.Interaction.SyntaxOver
+    SyntaxOver
       (PFunctor.Lens.id Spec.basePFunctor) (PUnit : Type) (fun X : Type u => ViewMode X) where
   Node _ _ view Cont := view.Action m Cont
 
@@ -408,7 +408,7 @@ abbrev Strategy
     (resolve : Spec.Node.ContextHom Γ (fun X : Type u => ViewMode X))
     (spec : Spec) (ctxs : Spec.Decoration Γ spec)
     (Output : Spec.Transcript spec → Type u) :=
-  _root_.Interaction.StrategyOver ((localSyntax m).comap resolve) PUnit.unit spec ctxs Output
+  StrategyOver ((localSyntax m).comap resolve) PUnit.unit spec ctxs Output
 
 end Multiparty
 end Interaction

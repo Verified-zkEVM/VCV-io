@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Node
-import VCVio.Interaction.Basic.Syntax
+import VCVio.Interaction.Basic.StrategyOver
 
 /-!
 # Generic local execution laws over interaction trees
@@ -138,7 +138,7 @@ def run
 
 variable {Agent : Type u}
 variable {Γ : Spec.Node.Context}
-variable {syn : _root_.Interaction.SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ}
+variable {syn : SyntaxOver (PFunctor.Lens.id Spec.basePFunctor) Agent Γ}
 variable {m : Type u → Type u}
 
 /--
@@ -157,7 +157,7 @@ def runSpec
     (profile :
       (agent : Agent) → StrategyOver syn agent spec ctxs (Out agent))
     (collect : (tr : Spec.Transcript spec) → ((agent : Agent) → Out agent tr) → Result tr)
-    (I : _root_.Interaction.InteractionOver
+    (I : InteractionOver
       (PFunctor.Lens.id Spec.basePFunctor) Agent Γ syn m) :
     m ((tr : Spec.Transcript spec) × Result tr) :=
   match spec, ctxs with
