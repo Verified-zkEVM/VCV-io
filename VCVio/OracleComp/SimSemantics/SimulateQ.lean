@@ -66,6 +66,32 @@ lemma simulateQ_spec_query [LawfulMonad r] (t : spec.Domain) :
     simulateQ impl (liftM (spec.query t)) = impl t := by
   rw [simulateQ_query]; simp
 
+/-- Evaluate an oracle computation by answering each query with a total answer function.
+
+This is the `Id`-valued specialization of `simulateQ`: each query in `mx` is replaced by the
+corresponding value returned by `f`. -/
+def evalWithAnswerFn {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    {α : Type u} (mx : OracleComp spec α) : α :=
+  simulateQ f mx
+
+@[simp]
+theorem evalWithAnswerFn_pure {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id) (a : α) :
+    evalWithAnswerFn f (pure a : OracleComp spec α) = a := rfl
+
+@[simp]
+theorem evalWithAnswerFn_bind {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    (mx : OracleComp spec α) (my : α → OracleComp spec β) :
+    evalWithAnswerFn f (mx >>= my) = evalWithAnswerFn f (my (evalWithAnswerFn f mx)) := by
+  change simulateQ f (mx >>= my) = simulateQ f (my (simulateQ f mx))
+  rw [simulateQ_bind]; rfl
+
+@[simp]
+theorem evalWithAnswerFn_query {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    (t : spec.Domain) :
+    evalWithAnswerFn f (query t : OracleComp spec _) = f t := by
+  change simulateQ f (liftM (spec.query t)) = f t
+  rw [simulateQ_spec_query]
+
 @[simp]
 lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
     (ou : α → OracleComp spec β) : simulateQ impl (liftM q >>= ou) =
@@ -75,6 +101,13 @@ lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
 lemma simulateQ_map [LawfulMonad r] (mx : OracleComp spec α) (f : α → β) :
     simulateQ impl (f <$> mx) = f <$> simulateQ impl mx := by
   simp [monad_norm]
+
+@[simp]
+theorem evalWithAnswerFn_map {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    (g : α → β) (mx : OracleComp spec α) :
+    evalWithAnswerFn f (g <$> mx) = g (evalWithAnswerFn f mx) := by
+  change simulateQ f (g <$> mx) = g (simulateQ f mx)
+  rw [simulateQ_map]; rfl
 
 @[simp]
 lemma simulateQ_seq [LawfulMonad r] (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :

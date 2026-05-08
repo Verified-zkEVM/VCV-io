@@ -38,6 +38,19 @@ lemma empty_apply (t : spec.Domain) : (∅ : QueryCache spec) t = none := rfl
 protected lemma ext {c₁ c₂ : QueryCache spec} (h : ∀ t, c₁ t = c₂ t) : c₁ = c₂ :=
   funext h
 
+/-! ### Agreement with answer functions -/
+
+/-- A total answer function agrees with a cache if it returns every cached response. -/
+def AgreesWithFn (f : QueryImpl spec Id) (cache : QueryCache spec) : Prop :=
+  ∀ ⦃t : spec.Domain⦄ ⦃r : spec.Range t⦄, cache t = some r → f t = r
+
+/-- Every cache is extended by some total answer function. -/
+lemma exists_agreesWithFn [spec.Inhabited] (cache : QueryCache spec) :
+    ∃ f : QueryImpl spec Id, cache.AgreesWithFn f := by
+  refine ⟨fun t => (cache t).getD default, ?_⟩
+  intro t r h
+  simp [h]
+
 /-! ### Partial Order
 
 A `QueryCache` carries a natural partial order where `c₁ ≤ c₂` means every cached entry
@@ -122,6 +135,30 @@ omit [spec.DecidableEq] in
 lemma cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
     (cache.cacheQuery t u) t' = cache t' := by
   simp [cacheQuery, h]
+
+omit [spec.DecidableEq] in
+/-- An answer function agrees with `cache.cacheQuery t u` iff it agrees with `cache` and returns
+`u` on `t`, provided `t` was not already cached. -/
+lemma agreesWithFn_cacheQuery_iff (t : spec.Domain) (u : spec.Range t) (f : QueryImpl spec Id)
+    (hcache : cache t = none) :
+    (cache.cacheQuery t u).AgreesWithFn f ↔ cache.AgreesWithFn f ∧ f t = u := by
+  classical
+  refine ⟨fun h => ⟨?_, ?_⟩, fun ⟨h1, h2⟩ => ?_⟩
+  · intro t' r' hr'
+    by_cases htt : t' = t
+    · subst htt
+      rw [hcache] at hr'
+      exact absurd hr' (by simp)
+    · exact h (by rw [cacheQuery_of_ne _ _ htt]; exact hr')
+  · exact h (by simp)
+  · intro t' r' hr'
+    by_cases htt : t' = t
+    · subst htt
+      have hrun : (cache.cacheQuery t' u) t' = some u := by simp
+      rw [hrun] at hr'
+      cases hr'
+      exact h2
+    · exact h1 (by rw [cacheQuery_of_ne _ _ htt] at hr'; exact hr')
 
 omit [spec.DecidableEq] in
 lemma toSet_cacheQuery_subset_insert (t : spec.Domain) (u : spec.Range t) :
