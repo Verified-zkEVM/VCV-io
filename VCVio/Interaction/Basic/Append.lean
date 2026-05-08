@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Decoration
 import VCVio.Interaction.Basic.Strategy
+import ToMathlib.PFunctor.Free.Displayed.Append
 
 /-!
 # Dependent append of interaction specs
@@ -421,67 +422,50 @@ def Strategy.splitPrefix {m : Type u → Type u} [Functor m] :
       ⟨x, (splitPrefix (rest x) (fun p => s₂ ⟨x, p⟩) ·) <$> cont⟩
 
 /-- Concatenate per-node labels along `Spec.append`. -/
-def Decoration.append {S : Type u → Type v}
+abbrev Decoration.append {S : Type u → Type v}
     {s₁ : Spec} {s₂ : Transcript s₁ → Spec}
     (d₁ : Decoration S s₁)
     (d₂ : (tr₁ : Transcript s₁) → Decoration S (s₂ tr₁)) :
     Decoration S (s₁.append s₂) :=
-  match s₁, d₁ with
-  | .done, _ => d₂ ⟨⟩
-  | .node _ _, ⟨s, dRest⟩ =>
-      ⟨s, fun x => Decoration.append (dRest x)
-        (fun p => d₂ ⟨x, p⟩)⟩
+  PFunctor.FreeM.Displayed.Decoration.append (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) (β := PUnit.{u+1}) d₁ d₂
 
 /-- Concatenate dependent decoration layers along `Spec.append`, over appended
 base decorations. -/
-def Decoration.Over.append {L : Type u → Type v} {F : ∀ X, L X → Type w}
+abbrev Decoration.Over.append {L : Type u → Type v} {F : ∀ X, L X → Type w}
     {s₁ : Spec} {s₂ : Transcript s₁ → Spec}
     {d₁ : Decoration L s₁}
     {d₂ : (tr₁ : Transcript s₁) → Decoration L (s₂ tr₁)}
     (r₁ : Decoration.Over F s₁ d₁)
     (r₂ : (tr₁ : Transcript s₁) → Decoration.Over F (s₂ tr₁) (d₂ tr₁)) :
     Decoration.Over F (s₁.append s₂) (d₁.append d₂) :=
-  match s₁, d₁, r₁ with
-  | .done, _, _ => r₂ ⟨⟩
-  | .node _ _, ⟨_, _⟩, ⟨fData, rRest⟩ =>
-      ⟨fData, fun x => Over.append (rRest x) (fun p => r₂ ⟨x, p⟩)⟩
+  PFunctor.FreeM.Displayed.Decoration.Over.append (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) (β := PUnit.{u+1}) r₁ r₂
 
 /-- `Decoration.Over.map` commutes with `Over.append`. -/
 theorem Decoration.Over.map_append {L : Type u → Type v} {F G : ∀ X, L X → Type w}
-    (η : ∀ X l, F X l → G X l) :
-    (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
-    (d₁ : Decoration L s₁) →
-    (d₂ : (tr₁ : Transcript s₁) → Decoration L (s₂ tr₁)) →
-    (r₁ : Decoration.Over F s₁ d₁) →
-    (r₂ : (tr₁ : Transcript s₁) → Decoration.Over F (s₂ tr₁) (d₂ tr₁)) →
+    (η : ∀ X l, F X l → G X l)
+    (s₁ : Spec) (s₂ : Transcript s₁ → Spec)
+    (d₁ : Decoration L s₁)
+    (d₂ : (tr₁ : Transcript s₁) → Decoration L (s₂ tr₁))
+    (r₁ : Decoration.Over F s₁ d₁)
+    (r₂ : (tr₁ : Transcript s₁) → Decoration.Over F (s₂ tr₁) (d₂ tr₁)) :
     Decoration.Over.map η (s₁.append s₂) (d₁.append d₂) (Over.append r₁ r₂) =
       Over.append (Over.map η s₁ d₁ r₁)
-        (fun tr₁ => Over.map η (s₂ tr₁) (d₂ tr₁) (r₂ tr₁))
-  | .done, _, _, _, r₁, r₂ => rfl
-  | .node X rest, s₂, ⟨l, dRest⟩, d₂, ⟨fData, rRest⟩, r₂ => by
-      simp only [Spec.append, PFunctor.FreeM.append, Decoration.append, Decoration.Over.append,
-        Decoration.Over.map, PFunctor.FreeM.Displayed.Decoration.Over.map,
-        PFunctor.FreeM.Displayed.Decoration.Over.mapLocalHom,
-        PFunctor.FreeM.Displayed.Over.FiberLocalHom.toHom_roll]
-      congr 1; funext x
-      exact map_append η (rest x) (fun p => s₂ ⟨x, p⟩) (dRest x) (fun p => d₂ ⟨x, p⟩)
-        (rRest x) (fun p => r₂ ⟨x, p⟩)
+        (fun tr₁ => Over.map η (s₂ tr₁) (d₂ tr₁) (r₂ tr₁)) :=
+  PFunctor.FreeM.Displayed.Decoration.Over.map_append (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) (β := PUnit.{u+1}) η s₁ s₂ d₁ d₂ r₁ r₂
 
 /-- `Decoration.map` commutes with `Decoration.append`. -/
 theorem Decoration.map_append {S : Type u → Type v} {T : Type u → Type w}
-    (f : ∀ X, S X → T X) :
-    (s₁ : Spec) → (s₂ : Transcript s₁ → Spec) →
-    (d₁ : Decoration S s₁) →
-    (d₂ : (tr₁ : Transcript s₁) → Decoration S (s₂ tr₁)) →
+    (f : ∀ X, S X → T X)
+    (s₁ : Spec) (s₂ : Transcript s₁ → Spec)
+    (d₁ : Decoration S s₁)
+    (d₂ : (tr₁ : Transcript s₁) → Decoration S (s₂ tr₁)) :
     Decoration.map f (s₁.append s₂) (d₁.append d₂) =
-      (Decoration.map f s₁ d₁).append (fun tr₁ => Decoration.map f (s₂ tr₁) (d₂ tr₁))
-  | .done, _, _, _ => rfl
-  | .node X rest, s₂, ⟨s, dRest⟩, d₂ => by
-      simp only [Spec.append, PFunctor.FreeM.append, Decoration.append, Decoration.map,
-        PFunctor.FreeM.Displayed.Decoration.map, PFunctor.FreeM.Displayed.Decoration.mapLocalHom,
-        PFunctor.FreeM.Displayed.LocalHom.toHom_roll]
-      congr 1; funext x
-      exact map_append f (rest x) (fun p => s₂ ⟨x, p⟩) (dRest x) (fun p => d₂ ⟨x, p⟩)
+      (Decoration.map f s₁ d₁).append (fun tr₁ => Decoration.map f (s₂ tr₁) (d₂ tr₁)) :=
+  PFunctor.FreeM.Displayed.Decoration.map_append (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) (β := PUnit.{u+1}) f s₁ s₂ d₁ d₂
 
 end Spec
 end Interaction
