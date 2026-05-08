@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.Prelude
 import ToMathlib.Control.OptionT
 
@@ -66,6 +66,32 @@ lemma simulateQ_spec_query [LawfulMonad r] (t : spec.Domain) :
     simulateQ impl (liftM (spec.query t)) = impl t := by
   rw [simulateQ_query]; simp
 
+/-- Evaluate an oracle computation by answering each query with a total answer function.
+
+This is the `Id`-valued specialization of `simulateQ`: each query in `mx` is replaced by the
+corresponding value returned by `f`. -/
+def evalWithAnswerFn {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    {α : Type u} (mx : OracleComp spec α) : α :=
+  simulateQ f mx
+
+@[simp]
+theorem evalWithAnswerFn_pure {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id) (a : α) :
+    evalWithAnswerFn f (pure a : OracleComp spec α) = a := rfl
+
+@[simp]
+theorem evalWithAnswerFn_bind {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    (mx : OracleComp spec α) (my : α → OracleComp spec β) :
+    evalWithAnswerFn f (mx >>= my) = evalWithAnswerFn f (my (evalWithAnswerFn f mx)) := by
+  change simulateQ f (mx >>= my) = simulateQ f (my (simulateQ f mx))
+  rw [simulateQ_bind]; rfl
+
+@[simp]
+theorem evalWithAnswerFn_query {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    (t : spec.Domain) :
+    evalWithAnswerFn f (query t : OracleComp spec _) = f t := by
+  change simulateQ f (liftM (spec.query t)) = f t
+  rw [simulateQ_spec_query]
+
 @[simp]
 lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
     (ou : α → OracleComp spec β) : simulateQ impl (liftM q >>= ou) =
@@ -75,6 +101,13 @@ lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
 lemma simulateQ_map [LawfulMonad r] (mx : OracleComp spec α) (f : α → β) :
     simulateQ impl (f <$> mx) = f <$> simulateQ impl mx := by
   simp [monad_norm]
+
+@[simp]
+theorem evalWithAnswerFn_map {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
+    (g : α → β) (mx : OracleComp spec α) :
+    evalWithAnswerFn f (g <$> mx) = g (evalWithAnswerFn f mx) := by
+  change simulateQ f (g <$> mx) = g (simulateQ f mx)
+  rw [simulateQ_map]; rfl
 
 @[simp]
 lemma simulateQ_seq [LawfulMonad r] (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
@@ -153,55 +186,6 @@ example (mx : OptionT (OracleComp spec₁) α)
   simulateQ impl₂ <| simulateQ impl₁ <| mx
 
 end tests
-
-section OptionT
-
-omit [LawfulMonad n] in
-@[simp] lemma simulateQ_option_elim (x : Option α) (my : OracleComp spec β)
-    (my' : α → OracleComp spec β) : simulateQ impl (x.elim my my') =
-    x.elim (simulateQ impl my) (fun x => simulateQ impl (my' x)) := by
-  cases x <;> simp
-
-@[simp] lemma simulateQ_option_elimM (mx : OracleComp spec (Option α))
-    (my : OracleComp spec β) (my' : α → OracleComp spec β) :
-    simulateQ impl (Option.elimM mx my my') =
-    Option.elimM (simulateQ impl mx) (simulateQ impl my) (fun x => simulateQ impl (my' x)) := by
-  unfold Option.elimM
-  rw [simulateQ_bind]
-  exact bind_congr fun x => simulateQ_option_elim impl x my my'
-
-/-- `simulateQ` distributes through `OptionT.bind`, stated via `OptionT.run`. -/
-lemma simulateQ_optionT_bind'
-    (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
-    simulateQ impl (mx >>= f).run =
-    (simulateQ impl mx.run >>= fun a => simulateQ impl (f a).run : OptionT n β) := by
-  rw [OptionT.run_bind, Option.elimM, simulateQ_bind]
-  refine bind_congr fun x => ?_
-  induction x <;> simp only [Option.elim_none, Option.elim_some, simulateQ_pure]
-
-/-- `simulateQ` distributes through `OptionT.bind`, stated via `Option.elimM`. -/
-lemma simulateQ_optionT_bind''
-    (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
-    simulateQ impl (mx >>= f).run =
-    Option.elimM (simulateQ impl mx.run) (pure none) (fun a => simulateQ impl (f a).run) := by
-  simp
-
-/-- `simulateQ` distributes through `OptionT.bind`: the simulated OptionT-bind is the
-    OptionT-bind of the simulated pieces. -/
-lemma simulateQ_optionT_bind
-    (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
-    simulateQ impl (mx >>= f : OptionT (OracleComp spec) β) =
-    (simulateQ impl mx >>= fun a => simulateQ impl (f a) : OptionT n β) := by
-  apply simulateQ_optionT_bind'
-
-/-- `simulateQ` commutes with `OptionT.lift`. -/
-@[simp] lemma simulateQ_optionT_lift
-    (comp : OracleComp spec α) :
-    simulateQ impl (OptionT.lift comp : OptionT (OracleComp spec) α) =
-      (OptionT.lift (simulateQ impl comp) : OptionT n α) := by
-  simp only [OptionT.lift, OptionT.mk, simulateQ_bind, simulateQ_pure]
-
-end OptionT
 
 /-! ## List / ForM distributivity -/
 

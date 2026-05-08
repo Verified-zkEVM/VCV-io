@@ -8,8 +8,8 @@ import VCVio.ProgramLogic.Relational.Basic
 import VCVio.EvalDist.TVDist
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.QueryTracking.QueryBound
-import VCVio.OracleComp.SimSemantics.StateProjection
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.StateProjection
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
 # Relational `simulateQ` Rules
