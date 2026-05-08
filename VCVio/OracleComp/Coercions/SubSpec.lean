@@ -299,6 +299,44 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
 
 end liftComp_evalDist
 
+section liftComp_support
+
+variable {ι : Type u} {τ : Type v}
+  {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α : Type w}
+  [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
+
+/-- Support is preserved by `liftComp`: lifting a computation to a larger oracle spec
+does not change which outputs are reachable. This is the support analogue of
+`evalDist_liftComp` and does not require `Fintype`/`Inhabited` instances. -/
+@[simp] lemma support_liftComp (mx : OracleComp spec α) :
+    support (liftComp mx superSpec) = support mx := by
+  simp only [liftComp]
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa ih =>
+    simp only [simulateQ_query_bind, support_bind]
+    simp only [OracleQuery.input_query, monadLift_self]
+    simp_rw [ih]
+    have hs : support (liftM (OracleSpec.query t) : OracleComp superSpec (spec.Range t)) =
+        Set.univ := by
+      change support ((liftM : OracleQuery superSpec _ → OracleComp superSpec _)
+        ((monadLift : OracleQuery spec _ → OracleQuery superSpec _) (OracleSpec.query t))) = _
+      simp only [support_liftM]
+      rw [show (monadLift (OracleSpec.query t) : OracleQuery superSpec _) =
+        ⟨h.onQuery t, h.onResponse t⟩ from by
+          have := h.liftM_eq_lift (OracleSpec.query t)
+          simp only [ofPFunctor_toPFunctor] at this; exact this]
+      exact (LawfulSubSpec.onResponse_bijective (h := h) t).surjective.range_eq
+    rw [hs]; simp only [support_liftM]
+    dsimp [OracleSpec.query, OracleQuery.cont, OracleQuery.input]
+    rw [Set.range_id]; rfl
+
+@[simp] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
+    x ∈ support (liftComp mx superSpec) ↔ x ∈ support mx := by
+  simp [support_liftComp]
+
+end liftComp_support
+
 /-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`.
 
 Registered as a low-priority `MonadLift` (not `MonadLiftT`) so that:
