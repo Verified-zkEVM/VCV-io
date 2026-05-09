@@ -868,11 +868,6 @@ private lemma noColl_bad_iff_caseA_or_caseB
   · simp [h]
   · simp [h]
 
--- private lemma one_le_two_mul_succ_depth_mul_leafCount_aux (s : Skeleton) :
---     1 ≤ 2 * (s.depth + 1) * s.leafCount := by
---   have h := leafCount_pos_aux s
---   nlinarith
-
 private theorem extractability_game_noColl_caseA_eq_zero
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -888,8 +883,7 @@ private theorem extractability_game_noColl_caseA_eq_zero
           let (_root, aux) ← committingAdv
           let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
           pure ())
-        qb)
-    (_h_le_qb : 4 * s.leafCount + 1 ≤ qb) :
+        qb) :
     Pr[noColl_caseA_event |
         (extractability_game committingAdv openingAdv).withQueryLog] = 0 := by
   apply probEvent_eq_zero
@@ -1047,7 +1041,6 @@ private theorem extractability_game_noColl_caseB_le_inv_card_aux
           let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
           pure ())
         qb)
-    (_h_le_qb : 4 * s.leafCount + 1 ≤ qb)
     (_h_card : 1 < (Fintype.card α : ENNReal)) :
     Pr[(fun x : (α × AuxState ×
         ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
@@ -1117,8 +1110,7 @@ private theorem extractability_game_noColl_caseB_le_inv_card
           let (_root, aux) ← committingAdv
           let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
           pure ())
-        qb)
-    (h_le_qb : 4 * s.leafCount + 1 ≤ qb) :
+        qb) :
     Pr[noColl_caseB_event |
         (extractability_game committingAdv openingAdv).withQueryLog] ≤
       (1 : ENNReal) / (Fintype.card α : ENNReal) := by
@@ -1135,22 +1127,12 @@ private theorem extractability_game_noColl_caseB_le_inv_card
         verified = true ∧ extractedTree.get idx.toNodeIndex = none) ?_) ?_
   · rintro ⟨⟨_, _, _, _, _, _, _, _⟩, _⟩ ⟨_, ⟨h_v, _⟩, h_extract_none⟩
     exact ⟨h_v, h_extract_none⟩
-  /-
-  Substantive obligation: bound
-    `Pr[fun x => verified x.1 = true ∧ extractedTree x.1 .get idx x.1 = none |
-        game.withQueryLog] ≤ 1 / |α|`.
-
-  We split by cardinality: if `Fintype.card α ≤ 1`, the bound `1/|α|` is `⊤`
-  (when `|α| = 0`) or `1` (when `|α| = 1`), so `probEvent_le_one` suffices. The
-  substantive case `1 < Fintype.card α` is encapsulated as the helper
-  `extractability_game_noColl_caseB_le_inv_card_aux`.
-  -/
   by_cases h_card : (Fintype.card α : ENNReal) ≤ 1
   · refine probEvent_le_one.trans ?_
     rw [ENNReal.le_div_iff_mul_le (Or.inr one_ne_zero) (Or.inr ENNReal.one_ne_top)]
     simpa using h_card
   · exact extractability_game_noColl_caseB_le_inv_card_aux
-      committingAdv openingAdv qb h_IsQueryBound_qb h_le_qb (by push Not at h_card; exact h_card)
+      committingAdv openingAdv qb h_IsQueryBound_qb (by push Not at h_card; exact h_card)
 
 private theorem extractability_game_noCollision_wins_le_inv_card
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -1167,8 +1149,7 @@ private theorem extractability_game_noCollision_wins_le_inv_card
           let (_root, aux) ← committingAdv
           let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
           pure ())
-        qb)
-    (h_le_qb : 4 * s.leafCount + 1 ≤ qb) :
+        qb) :
     Pr[fun (vals, log) =>
         ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
@@ -1195,9 +1176,9 @@ private theorem extractability_game_noCollision_wins_le_inv_card
     _ ≤ 0 + (1 : ENNReal) / (Fintype.card α : ENNReal) := by
         gcongr
         · exact (extractability_game_noColl_caseA_eq_zero committingAdv openingAdv
-            qb h_IsQueryBound_qb h_le_qb).le
+            qb h_IsQueryBound_qb).le
         · exact extractability_game_noColl_caseB_le_inv_card committingAdv openingAdv
-            qb h_IsQueryBound_qb h_le_qb
+            qb h_IsQueryBound_qb
     _ = (1 : ENNReal) / (Fintype.card α : ENNReal) := zero_add _
 
 private theorem extractability_game_noCollision_wins_le
@@ -1215,18 +1196,16 @@ private theorem extractability_game_noCollision_wins_le
           let (_root, aux) ← committingAdv
           let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
           pure ())
-        qb)
-    (h_le_qb : 4 * s.leafCount + 1 ≤ qb) :
+        qb) :
     Pr[fun (vals, log) =>
         ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
         1 / (Fintype.card α : ENNReal) := by
   refine le_trans
     (extractability_game_noCollision_wins_le_inv_card committingAdv openingAdv
-      qb h_IsQueryBound_qb h_le_qb) ?_
+      qb h_IsQueryBound_qb) ?_
   apply ENNReal.div_le_div_right
   grind
-  -- exact_mod_cast one_le_two_mul_succ_depth_mul_leafCount_aux s
 
 /--
 The extractability theorem for Merkle trees.
@@ -1269,9 +1248,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
           let (_root, aux) ← committingAdv
           let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
           pure ())
-        qb)
-    (h_le_qb : 4 * s.leafCount + 1 ≤ qb)
-          :
+        qb) :
     Pr[adversary_wins_extractability_game_event |
         extractability_game committingAdv openingAdv] ≤
         ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α)
@@ -1319,7 +1296,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
           (extractability_game committingAdv openingAdv).withQueryLog] ≤
             1 / (Fintype.card α : ENNReal) :=
         mod_cast extractability_game_noCollision_wins_le committingAdv openingAdv
-          (s := s) (AuxState := AuxState) qb h_IsQueryBound_qb h_le_qb
+          (s := s) (AuxState := AuxState) qb h_IsQueryBound_qb
       gcongr
       norm_cast
 
