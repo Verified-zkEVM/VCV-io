@@ -328,7 +328,7 @@ theorem extractability_game_IsTotalQueryBound
         ((extractability_game committingAdv openingAdv))
         (qb + s.depth) := by
   -- Re-associate `extractability_game` as `prefix >>= suffix`, where the prefix
-  -- bundles `committingAdv.withQueryLog ; openingAdv` and the suffix runs
+  -- bundles `committingAdv.withQueryLog; openingAdv` and the suffix runs
   -- `verifyProof` and assembles the final return tuple.
   rw [show extractability_game committingAdv openingAdv =
       (committingAdv.withQueryLog >>= fun p =>
