@@ -1,3 +1,0 @@
-- [2026-05-06] Started: prove support_implies_chainInLog in MerkleTree/Inductive/Extractability.lean
-- [2026-05-06] Proved: support_implies_chainInLog (module builds, no new sorries)
-- [2026-05-06] Completed: support_implies_chainInLog merged into Extractability.lean
