@@ -482,7 +482,8 @@ The post-corruption secret-bearing node viewed from the branch where Alice is
 the corrupted party.
 -/
 private def aliceAfterSelfCorruptionViews :
-    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
+    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X)
+      (Spec.node Secret fun _ => .done) :=
   ⟨.observe, fun _ => ⟨⟩⟩
 
 /--
@@ -490,7 +491,8 @@ The same post-corruption secret-bearing node viewed from the branch where Bob
 is corrupted instead, so Alice is hidden from the move.
 -/
 private def aliceAfterBobCorruptionViews :
-    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
+    PFunctor.FreeM.Displayed.Decoration (fun X : Type u => ViewMode X)
+      (Spec.node Secret fun _ => .done) :=
   ⟨.hidden, fun _ => ⟨⟩⟩
 
 /--
