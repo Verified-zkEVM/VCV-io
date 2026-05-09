@@ -401,6 +401,66 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.append_eq_appendFla
       simp only [PFunctor.FreeM.Path.packAppend]; congr 1
       exact append_eq_appendFlat_mapOutput cRest (fun p o => c₂ ⟨x, p⟩ o)
 
+/-- `StrategyOver.TwoParty.Focal.comp` equals `compFlat` composed with
+`mapOutput packAppend` on the suffix strategy produced by the continuation. -/
+theorem _root_.Interaction.StrategyOver.TwoParty.Focal.comp_eq_compFlat_mapOutput
+    {m : Type u → Type u} [Monad m] [LawfulMonad m] :
+    {s₁ : Spec} → {s₂ : PFunctor.FreeM.Path s₁ → Spec} →
+    {r₁ : RoleDecoration s₁} →
+    {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)} →
+    {Mid : PFunctor.FreeM.Path s₁ → Type u} →
+    {F : (tr₁ : PFunctor.FreeM.Path s₁) → PFunctor.FreeM.Path (s₂ tr₁) → Type u} →
+    (strat₁ : StrategyOver
+      (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ Mid) →
+    (f : (tr₁ : PFunctor.FreeM.Path s₁) → Mid tr₁ →
+      m (StrategyOver
+        (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁) (F tr₁))) →
+    StrategyOver.TwoParty.Focal.comp strat₁ f =
+      StrategyOver.TwoParty.Focal.compFlat strat₁ (fun tr₁ mid => do
+        let strat₂ ← f tr₁ mid
+        pure (StrategyOver.TwoParty.Focal.mapOutput
+          (fun tr₂ x => PFunctor.FreeM.Path.packAppend s₁ s₂ F tr₁ tr₂ x) strat₂))
+  | .done, s₂, r₁, r₂, Mid, F, strat₁, f => by
+      simp only [StrategyOver.TwoParty.Focal.comp, StrategyOver.TwoParty.Focal.compFlat,
+        PFunctor.FreeM.Path.packAppend]
+      symm
+      calc
+        (do
+          let strat₂ ← f ⟨⟩ strat₁
+          pure (StrategyOver.TwoParty.Focal.mapOutput (fun tr₂ x => x) strat₂)) =
+            (fun strat₂ =>
+              StrategyOver.TwoParty.Focal.mapOutput (fun tr₂ x => x) strat₂) <$>
+              f ⟨⟩ strat₁ := bind_pure_comp _ _
+        _ = (fun strat₂ => strat₂) <$> f ⟨⟩ strat₁ := by
+          congr 1
+          funext strat₂
+          rw [StrategyOver.TwoParty.Focal.mapOutput_id]
+        _ = f ⟨⟩ strat₁ := LawfulFunctor.id_map _
+  | .node X rest, s₂, ⟨.sender, rRest⟩, r₂, Mid, F, strat₁, f => by
+      simp only [StrategyOver.TwoParty.Focal.comp, StrategyOver.TwoParty.Focal.compFlat]
+      refine congrArg pure ?_
+      apply bind_congr
+      intro xc
+      cases xc with
+      | mk x next =>
+          let Tail : X → Type u := fun x =>
+            StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+              (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+              (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                (fun path => r₂ ⟨x, path⟩))
+              (fun tr => PFunctor.FreeM.Path.liftAppend (Spec.node X rest) s₂ F ⟨x, tr⟩)
+          simpa [monad_norm, PFunctor.Lens.id, PFunctor.FreeM.Path.packAppend] using
+            congrArg (fun z => z >>= fun tail => pure (⟨x, tail⟩ : (x : X) × Tail x))
+              (comp_eq_compFlat_mapOutput next (fun p o => f ⟨x, p⟩ o))
+  | .node X rest, s₂, ⟨.receiver, rRest⟩, r₂, Mid, F, strat₁, f => by
+      simp only [StrategyOver.TwoParty.Focal.comp, StrategyOver.TwoParty.Focal.compFlat]
+      refine congrArg pure ?_
+      funext x
+      apply bind_congr
+      intro next
+      simpa [monad_norm, PFunctor.FreeM.Path.packAppend] using
+        comp_eq_compFlat_mapOutput next (fun p o => f ⟨x, p⟩ o)
+
 /-- Executing a flat composed strategy/counterpart factors into first executing
 the prefix interaction and then executing the suffix continuation. -/
 theorem run_compFlat_appendFlat_pure
@@ -446,10 +506,9 @@ theorem run_compFlat_appendFlat_pure
       (g : ((tr : PFunctor.FreeM.Path (s₁.append s₂)) × OutputP tr × OutputC tr) → m β) :
       (do
         let r ←
-          do let strat ← StrategyOver.TwoParty.Focal.compFlat strat₁
-               (fun tr₁ mid => pure (f tr₁ mid))
-             run (s₁.append s₂) (r₁.append r₂) strat
-               (StrategyOver.TwoParty.Counterpart.appendFlat cpt₁ cpt₂)
+          run (s₁.append s₂) (r₁.append r₂)
+            (StrategyOver.TwoParty.Focal.compFlatPure strat₁ f)
+            (StrategyOver.TwoParty.Counterpart.appendFlat cpt₁ cpt₂)
         g r) =
         (do
           let r₁ ← run s₁ r₁ strat₁ cpt₁
@@ -459,15 +518,122 @@ theorem run_compFlat_appendFlat_pure
     match s₁, r₁ with
     | .done, r₁ =>
         cases r₁
-        simp [StrategyOver.TwoParty.Focal.compFlat.eq_1,
+        simp [StrategyOver.TwoParty.Focal.compFlatPure,
           StrategyOver.TwoParty.Counterpart.appendFlat.eq_1, run_done,
           PFunctor.FreeM.Path.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
-        sorry
-        -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-    | .node _ rest, ⟨.receiver, rRest⟩ =>
-        sorry
-        -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
+        simp only [StrategyOver.TwoParty.Focal.compFlatPure,
+          StrategyOver.TwoParty.Counterpart.appendFlat,
+          PFunctor.FreeM.append_roll, PFunctor.FreeM.Displayed.Decoration.append_roll,
+          run, InteractionOver.runSpec, InteractionOver.TwoParty.pairedSpec,
+          InteractionOver.TwoParty.paired, participantProfile, collectParticipantOutputs,
+          participantOutputFamily, bind_assoc, pure_bind]
+        let mapStrat :
+            ((x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+              (rest x) (rRest x) (fun tr => MidP ⟨x, tr⟩)) →
+            ((x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+              (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+              (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                (fun path => r₂ ⟨x, path⟩))
+              (fun tr => OutputP ⟨x, tr⟩)) :=
+          fun a => ⟨a.1, StrategyOver.TwoParty.Focal.compFlatPure a.2
+            (fun tr₁ mid => f ⟨a.1, tr₁⟩ mid)⟩
+        simp only [LawfulMonad.do_bind_pure_comp]
+        refine (bind_map_left mapStrat strat₁ _).trans ?_
+        apply bind_congr
+        intro xc
+        cases xc with
+        | mk x next =>
+            let mapCpt :
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+                  (rest x) (rRest x) (fun tr => MidC ⟨x, tr⟩) →
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputC ⟨x, tr⟩) :=
+              fun a => StrategyOver.TwoParty.Counterpart.appendFlat a
+                (fun p o => cpt₂ ⟨x, p⟩ o)
+            refine (bind_map_left mapCpt (cpt₁ x) _).trans ?_
+            apply bind_congr
+            intro cNext
+            let addPrefix :
+                ((tr : PFunctor.FreeM.Path (PFunctor.FreeM.append (rest x)
+                  (fun path => s₂ ⟨x, path⟩))) ×
+                  (fun tr => OutputP ⟨x, tr⟩) tr ×
+                  (fun tr => OutputC ⟨x, tr⟩) tr) →
+                ((tr : PFunctor.FreeM.Path
+                  (PFunctor.FreeM.append (Spec.node X rest) s₂)) ×
+                  OutputP tr × OutputC tr) :=
+              fun a => ⟨⟨x, a.1⟩, a.2.1, a.2.2⟩
+            simpa [monad_norm, addPrefix, PFunctor.FreeM.Path.append] using
+              go (rest x) (rRest x)
+                (s₂ := fun path => s₂ ⟨x, path⟩)
+                (r₂ := fun path => r₂ ⟨x, path⟩)
+                (OutputP := fun tr => OutputP ⟨x, tr⟩)
+                (OutputC := fun tr => OutputC ⟨x, tr⟩)
+                next
+                (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+                cNext
+                (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out)
+                (fun a => g (addPrefix a))
+    | .node X rest, ⟨.receiver, rRest⟩ =>
+        simp only [StrategyOver.TwoParty.Focal.compFlatPure,
+          StrategyOver.TwoParty.Counterpart.appendFlat,
+          PFunctor.FreeM.append_roll, PFunctor.FreeM.Displayed.Decoration.append_roll,
+          run, InteractionOver.runSpec, InteractionOver.TwoParty.pairedSpec,
+          InteractionOver.TwoParty.paired, participantProfile, collectParticipantOutputs,
+          participantOutputFamily, bind_assoc, pure_bind]
+        let mapCpt :
+            ((x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+              (rest x) (rRest x) (fun tr => MidC ⟨x, tr⟩)) →
+            ((x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+              (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+              (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                (fun path => r₂ ⟨x, path⟩))
+              (fun tr => OutputC ⟨x, tr⟩)) :=
+          fun a => ⟨a.1, StrategyOver.TwoParty.Counterpart.appendFlat a.2
+            (fun p o => cpt₂ ⟨a.1, p⟩ o)⟩
+        simp only [LawfulMonad.do_bind_pure_comp]
+        refine (bind_map_left mapCpt cpt₁ _).trans ?_
+        apply bind_congr
+        intro xc
+        cases xc with
+        | mk x cNext =>
+            let mapStrat :
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (rest x) (rRest x) (fun tr => MidP ⟨x, tr⟩) →
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputP ⟨x, tr⟩) :=
+              fun a => StrategyOver.TwoParty.Focal.compFlatPure a
+                (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+            refine (bind_map_left mapStrat (strat₁ x) _).trans ?_
+            apply bind_congr
+            intro next
+            let addPrefix :
+                ((tr : PFunctor.FreeM.Path (PFunctor.FreeM.append (rest x)
+                  (fun path => s₂ ⟨x, path⟩))) ×
+                  (fun tr => OutputP ⟨x, tr⟩) tr ×
+                  (fun tr => OutputC ⟨x, tr⟩) tr) →
+                ((tr : PFunctor.FreeM.Path
+                  (PFunctor.FreeM.append (Spec.node X rest) s₂)) ×
+                  OutputP tr × OutputC tr) :=
+              fun a => ⟨⟨x, a.1⟩, a.2.1, a.2.2⟩
+            simpa [monad_norm, addPrefix, PFunctor.FreeM.Path.append] using
+              go (rest x) (rRest x)
+                (s₂ := fun path => s₂ ⟨x, path⟩)
+                (r₂ := fun path => r₂ ⟨x, path⟩)
+                (OutputP := fun tr => OutputP ⟨x, tr⟩)
+                (OutputC := fun tr => OutputC ⟨x, tr⟩)
+                next
+                (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+                cNext
+                (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out)
+                (fun a => g (addPrefix a))
+  rw [StrategyOver.TwoParty.Focal.compFlat_eq_pure_compFlatPure strat₁ f]
   simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Executing a flat composed strategy/counterpart factors into first executing
@@ -532,11 +698,303 @@ theorem run_compFlat_appendFlat
           StrategyOver.TwoParty.Counterpart.appendFlat.eq_1, run_done,
           PFunctor.FreeM.Path.append_done]
     | .node X rest, ⟨.sender, rRest⟩ =>
-        sorry
-        -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-    | .node _ rest, ⟨.receiver, rRest⟩ =>
-        sorry
-        -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
+        simp only [StrategyOver.TwoParty.Focal.compFlat,
+          StrategyOver.TwoParty.Counterpart.appendFlat,
+          PFunctor.FreeM.append_roll, PFunctor.FreeM.Displayed.Decoration.append_roll,
+          run, InteractionOver.runSpec, InteractionOver.TwoParty.pairedSpec,
+          InteractionOver.TwoParty.paired, participantProfile, collectParticipantOutputs,
+          participantOutputFamily, LawfulMonad.do_bind_assoc,
+          LawfulMonad.do_bind_pure_comp, pure_bind]
+        refine (LawfulMonad.do_bind_assoc strat₁
+          (fun xc =>
+            (fun restStrat =>
+              (⟨xc.1, restStrat⟩ :
+                (x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputP ⟨x, tr⟩))) <$>
+              StrategyOver.TwoParty.Focal.compFlat xc.2
+                (fun tr₁ mid => f ⟨xc.1, tr₁⟩ mid))
+          _).trans ?_
+        apply bind_congr
+        intro xc
+        cases xc with
+        | mk x next =>
+            let mapCpt :
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+                  (rest x) (rRest x) (fun tr => MidC ⟨x, tr⟩) →
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputC ⟨x, tr⟩) :=
+              fun a => StrategyOver.TwoParty.Counterpart.appendFlat a
+                (fun p o => cpt₂ ⟨x, p⟩ o)
+            let mapStratTail :
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputP ⟨x, tr⟩) →
+                (x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputP ⟨x, tr⟩) :=
+              fun restStrat => ⟨x, restStrat⟩
+            refine (bind_map_left mapStratTail
+              (StrategyOver.TwoParty.Focal.compFlat next
+                (s₂ := fun path => s₂ ⟨x, path⟩)
+                (r₂ := fun path => r₂ ⟨x, path⟩)
+                (Output := fun tr => OutputP ⟨x, tr⟩)
+                (fun tr₁ mid => f ⟨x, tr₁⟩ mid)) _).trans ?_
+            simp only [mapStratTail]
+            let comp :=
+              StrategyOver.TwoParty.Focal.compFlat next
+                (s₂ := fun path => s₂ ⟨x, path⟩)
+                (r₂ := fun path => r₂ ⟨x, path⟩)
+                (Output := fun tr => OutputP ⟨x, tr⟩)
+                (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+            let obs := mapCpt <$> cpt₁ x
+            let k :=
+              fun
+                (a : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputP ⟨x, tr⟩))
+                (a₁ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputC ⟨x, tr⟩)) => do
+                  let y ←
+                    (fun (a₂ :
+                      (tr : PFunctor.FreeM.Path
+                        (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))) ×
+                        (fun tr => OutputP ⟨x, tr⟩) tr ×
+                        (fun tr => OutputC ⟨x, tr⟩) tr) =>
+                      (⟨⟨x, a₂.1⟩, a₂.2.1, a₂.2.2⟩ :
+                      (tr : PFunctor.FreeM.Path
+                        (PFunctor.FreeM.append (Spec.node X rest) s₂)) ×
+                        OutputP tr × OutputC tr)) <$>
+                      run (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                        (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                          (fun path => r₂ ⟨x, path⟩))
+                        a a₁
+                  g y
+            change (do let a ← comp; let a₁ ← obs; k a a₁) = _
+            refine (LawfulCommMonad.bind_comm comp obs k).trans ?_
+            refine (bind_map_left mapCpt (cpt₁ x) _).trans ?_
+            apply bind_congr
+            intro cNext
+            let addPrefix :
+                ((tr : PFunctor.FreeM.Path (PFunctor.FreeM.append (rest x)
+                  (fun path => s₂ ⟨x, path⟩))) ×
+                  (fun tr => OutputP ⟨x, tr⟩) tr ×
+                  (fun tr => OutputC ⟨x, tr⟩) tr) →
+                ((tr : PFunctor.FreeM.Path
+                  (PFunctor.FreeM.append (Spec.node X rest) s₂)) ×
+                  OutputP tr × OutputC tr) :=
+              fun a => ⟨⟨x, a.1⟩, a.2.1, a.2.2⟩
+            simp only [comp, k, mapCpt]
+            calc
+              (do
+                let strat ←
+                  StrategyOver.TwoParty.Focal.compFlat next
+                    (s₂ := fun path => s₂ ⟨x, path⟩)
+                    (r₂ := fun path => r₂ ⟨x, path⟩)
+                    (Output := fun tr => OutputP ⟨x, tr⟩)
+                    (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+                let y ←
+                  addPrefix <$> run
+                    (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                    (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                      (fun path => r₂ ⟨x, path⟩))
+                    strat
+                    (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                      (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out))
+                g y) =
+                  (do
+                    let strat ←
+                      StrategyOver.TwoParty.Focal.compFlat next
+                        (s₂ := fun path => s₂ ⟨x, path⟩)
+                        (r₂ := fun path => r₂ ⟨x, path⟩)
+                        (Output := fun tr => OutputP ⟨x, tr⟩)
+                        (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+                    let y ← run
+                      (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                      (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                        (fun path => r₂ ⟨x, path⟩))
+                      strat
+                      (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                        (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out))
+                    g (addPrefix y)) := by
+                      apply bind_congr
+                      intro strat
+                      exact bind_map_left addPrefix
+                        (run
+                          (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                          (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                            (fun path => r₂ ⟨x, path⟩))
+                          strat
+                          (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                            (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out)))
+                        g
+              _ = _ := by
+                simpa [monad_norm, addPrefix, PFunctor.FreeM.Path.append] using
+                  go (rest x) (rRest x)
+                    (s₂ := fun path => s₂ ⟨x, path⟩)
+                    (r₂ := fun path => r₂ ⟨x, path⟩)
+                    (OutputP := fun tr => OutputP ⟨x, tr⟩)
+                    (OutputC := fun tr => OutputC ⟨x, tr⟩)
+                    next
+                    (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+                    cNext
+                    (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out)
+                    (fun a => g (addPrefix a))
+    | .node X rest, ⟨.receiver, rRest⟩ =>
+        simp only [StrategyOver.TwoParty.Focal.compFlat,
+          StrategyOver.TwoParty.Counterpart.appendFlat,
+          PFunctor.FreeM.append_roll, PFunctor.FreeM.Displayed.Decoration.append_roll,
+          run, InteractionOver.runSpec, InteractionOver.TwoParty.pairedSpec,
+          InteractionOver.TwoParty.paired, participantProfile, collectParticipantOutputs,
+          participantOutputFamily, LawfulMonad.do_bind_assoc,
+          LawfulMonad.do_bind_pure_comp, pure_bind]
+        let mapCpt :
+            ((x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+              (rest x) (rRest x) (fun tr => MidC ⟨x, tr⟩)) →
+            ((x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
+              (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+              (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                (fun path => r₂ ⟨x, path⟩))
+              (fun tr => OutputC ⟨x, tr⟩)) :=
+          fun a => ⟨a.1, StrategyOver.TwoParty.Counterpart.appendFlat a.2
+            (fun p o => cpt₂ ⟨a.1, p⟩ o)⟩
+        refine (bind_map_left mapCpt cpt₁ _).trans ?_
+        apply bind_congr
+        intro xc
+        cases xc with
+        | mk x cNext =>
+            let comp :
+                StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (rest x) (rRest x) (fun tr => MidP ⟨x, tr⟩) →
+                m (StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
+                  (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                  (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                    (fun path => r₂ ⟨x, path⟩))
+                  (fun tr => OutputP ⟨x, tr⟩)) :=
+              fun next =>
+                StrategyOver.TwoParty.Focal.compFlat next
+                  (s₂ := fun path => s₂ ⟨x, path⟩)
+                  (r₂ := fun path => r₂ ⟨x, path⟩)
+                  (Output := fun tr => OutputP ⟨x, tr⟩)
+                  (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+            let addPrefix :
+                ((tr : PFunctor.FreeM.Path (PFunctor.FreeM.append (rest x)
+                  (fun path => s₂ ⟨x, path⟩))) ×
+                  (fun tr => OutputP ⟨x, tr⟩) tr ×
+                  (fun tr => OutputC ⟨x, tr⟩) tr) →
+                ((tr : PFunctor.FreeM.Path
+                  (PFunctor.FreeM.append (Spec.node X rest) s₂)) ×
+                  OutputP tr × OutputC tr) :=
+              fun a => ⟨⟨x, a.1⟩, a.2.1, a.2.2⟩
+            simp only [mapCpt]
+            refine (LawfulMonad.do_bind_assoc (strat₁ x) comp
+              (fun strat => do
+                let y ←
+                  addPrefix <$> run
+                    (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                    (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                      (fun path => r₂ ⟨x, path⟩))
+                    strat
+                    (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                      (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out))
+                g y)).trans ?_
+            calc
+              (do
+                let next ← strat₁ x
+                let strat ← comp next
+                let y ←
+                  addPrefix <$> run
+                    (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                    (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                      (fun path => r₂ ⟨x, path⟩))
+                    strat
+                    (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                      (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out))
+                g y) =
+                  (do
+                    let next ← strat₁ x
+                    let strat ← comp next
+                    let y ← run
+                      (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                      (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                        (fun path => r₂ ⟨x, path⟩))
+                      strat
+                      (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                        (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out))
+                    g (addPrefix y)) := by
+                      apply bind_congr
+                      intro next
+                      apply bind_congr
+                      intro strat
+                      exact bind_map_left addPrefix
+                        (run
+                          (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                          (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                            (fun path => r₂ ⟨x, path⟩))
+                          strat
+                          (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                            (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out)))
+                        g
+              _ = _ := by
+                apply bind_congr
+                intro next
+                let addPrefix₁ :
+                    ((tr : PFunctor.FreeM.Path (rest x)) ×
+                      (fun tr => MidP ⟨x, tr⟩) tr × (fun tr => MidC ⟨x, tr⟩) tr) →
+                    ((tr : PFunctor.FreeM.Path (Spec.node X rest)) × MidP tr × MidC tr) :=
+                  fun a => ⟨⟨x, a.1⟩, a.2.1, a.2.2⟩
+                calc
+                  (do
+                    let strat ← comp next
+                    let y ← run
+                      (PFunctor.FreeM.append (rest x) (fun path => s₂ ⟨x, path⟩))
+                      (PFunctor.FreeM.Displayed.Decoration.append (rRest x)
+                        (fun path => r₂ ⟨x, path⟩))
+                      strat
+                      (StrategyOver.TwoParty.Counterpart.appendFlat cNext
+                        (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out))
+                    g (addPrefix y)) =
+                      (do
+                        let r₁ ← run (rest x) (rRest x) next cNext
+                        let strat₂ ← f ⟨x, r₁.1⟩ r₁.2.1
+                        let r₂ ←
+                          run (s₂ ⟨x, r₁.1⟩) (r₂ ⟨x, r₁.1⟩) strat₂
+                            (cpt₂ ⟨x, r₁.1⟩ r₁.2.2)
+                        g ⟨⟨x, PFunctor.FreeM.Path.append (rest x)
+                            (fun path => s₂ ⟨x, path⟩) r₁.1 r₂.1⟩,
+                          r₂.2.1, r₂.2.2⟩) := by
+                            simpa [monad_norm, comp, addPrefix, PFunctor.FreeM.Path.append] using
+                              go (rest x) (rRest x)
+                                (s₂ := fun path => s₂ ⟨x, path⟩)
+                                (r₂ := fun path => r₂ ⟨x, path⟩)
+                                (OutputP := fun tr => OutputP ⟨x, tr⟩)
+                                (OutputC := fun tr => OutputC ⟨x, tr⟩)
+                                next
+                                (fun tr₁ mid => f ⟨x, tr₁⟩ mid)
+                                cNext
+                                (fun tr₁ out => cpt₂ ⟨x, tr₁⟩ out)
+                                (fun a => g (addPrefix a))
+                  _ = _ := by
+                    exact (bind_map_left addPrefix₁ (run (rest x) (rRest x) next cNext)
+                      (fun r₁ => do
+                        let strat₂ ← f r₁.1 r₁.2.1
+                        let r₂ ← run (s₂ r₁.1) (r₂ r₁.1) strat₂ (cpt₂ r₁.1 r₁.2.2)
+                        g ⟨PFunctor.FreeM.Path.append (Spec.node X rest) s₂ r₁.1 r₂.1,
+                          r₂.2.1, r₂.2.2⟩)).symm
   simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
 
 /-- Executing a factored composed strategy/counterpart (using `comp` and
@@ -571,54 +1029,21 @@ theorem run_comp_append
         pure ⟨PFunctor.FreeM.Path.append s₁ s₂ tr₁ tr₂,
           PFunctor.FreeM.Path.packAppend s₁ s₂ FP tr₁ tr₂ outP,
           PFunctor.FreeM.Path.packAppend s₁ s₂ FC tr₁ tr₂ outC⟩) := by
-  let rec go
-      (s₁ : Spec) (r₁ : RoleDecoration s₁)
-      {MidP MidC : PFunctor.FreeM.Path s₁ → Type u}
-      {s₂ : PFunctor.FreeM.Path s₁ → Spec}
-      {r₂ : (tr₁ : PFunctor.FreeM.Path s₁) → RoleDecoration (s₂ tr₁)}
-      {FP FC : (tr₁ : PFunctor.FreeM.Path s₁) → PFunctor.FreeM.Path (s₂ tr₁) → Type u}
-      {β : Type u}
-      (strat₁ : StrategyOver
-        (SyntaxOver.TwoParty.pairedSpec m) Participant.focal s₁ r₁ MidP)
-      (f : (tr₁ : PFunctor.FreeM.Path s₁) → MidP tr₁ →
-        m (StrategyOver
-          (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (s₂ tr₁) (r₂ tr₁) (FP tr₁)))
-      (cpt₁ : StrategyOver
-        (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart s₁ r₁ MidC)
-      (cpt₂ : (tr₁ : PFunctor.FreeM.Path s₁) → MidC tr₁ →
-        StrategyOver
-          (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart (s₂ tr₁) (r₂ tr₁) (FC tr₁))
-      (g : ((tr : PFunctor.FreeM.Path (s₁.append s₂)) ×
-        PFunctor.FreeM.Path.liftAppend s₁ s₂ FP tr ×
-        PFunctor.FreeM.Path.liftAppend s₁ s₂ FC tr) → m β) :
-      (do
-        let r ←
-          do let strat ← StrategyOver.TwoParty.Focal.comp strat₁ f
-             run (s₁.append s₂) (r₁.append r₂) strat
-               (StrategyOver.TwoParty.Counterpart.append cpt₁ cpt₂)
-        g r) =
-        (do
-          let r₁ ← run s₁ r₁ strat₁ cpt₁
-          let strat₂ ← f r₁.1 r₁.2.1
-          let r₂ ←
-            run (s₂ r₁.1) (r₂ r₁.1) strat₂ (cpt₂ r₁.1 r₁.2.2)
-          g ⟨PFunctor.FreeM.Path.append s₁ s₂ r₁.1 r₂.1,
-            PFunctor.FreeM.Path.packAppend s₁ s₂ FP r₁.1 r₂.1 r₂.2.1,
-            PFunctor.FreeM.Path.packAppend s₁ s₂ FC r₁.1 r₂.1 r₂.2.2⟩) := by
-    match s₁, r₁ with
-    | .done, r₁ =>
-        cases r₁
-        simp [monad_norm, StrategyOver.TwoParty.Focal.comp,
-          StrategyOver.TwoParty.Counterpart.append, run_done,
-          PFunctor.FreeM.Path.liftAppend, PFunctor.FreeM.Path.append_done,
-          PFunctor.FreeM.Path.packAppend_done]
-    | .node X rest, ⟨.sender, rRest⟩ =>
-        sorry
-        -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-    | .node _ rest, ⟨.receiver, rRest⟩ =>
-        sorry
-        -- TODO(spec-cutover): proof broken by post-Decoration normalization shift.
-  simpa [monad_norm] using go s₁ r₁ strat₁ f cpt₁ cpt₂ pure
+    rw [StrategyOver.TwoParty.Focal.comp_eq_compFlat_mapOutput]
+    rw [StrategyOver.TwoParty.Counterpart.append_eq_appendFlat_mapOutput]
+    simpa [monad_norm, run_mapOutput_mapOutput] using
+      (run_compFlat_appendFlat
+        (s₁ := s₁) (s₂ := s₂) (r₁ := r₁) (r₂ := r₂)
+        (strat₁ := strat₁)
+        (f := fun tr₁ mid => do
+          let strat₂ ← f tr₁ mid
+          pure (StrategyOver.TwoParty.Focal.mapOutput
+            (fun tr₂ x => PFunctor.FreeM.Path.packAppend s₁ s₂ FP tr₁ tr₂ x) strat₂))
+        (cpt₁ := cpt₁)
+        (cpt₂ := fun tr₁ out =>
+          StrategyOver.TwoParty.Counterpart.mapOutput
+            (fun tr₂ x => PFunctor.FreeM.Path.packAppend s₁ s₂ FC tr₁ tr₂ x)
+            (cpt₂ tr₁ out)))
 
 /-- Role swapping commutes with replication. -/
 theorem RoleDecoration.swap_replicate {spec : Spec}

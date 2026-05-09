@@ -96,6 +96,75 @@ def map
         stratNode
 
 /--
+A local homomorphism between two `StrategyOver` fibers while changing the
+node-local context through `φ`.
+
+This is the context-changing analogue of `StrategyOver.Hom`: the source node
+at context value `γ` is translated to a target node at context value `φ γ`.
+-/
+structure ContextHom
+    {Δ : P.A → Type vΔ}
+    (syn₁ : SyntaxOver l Agent₁ Γ) (agent₁ : Agent₁)
+    (syn₂ : SyntaxOver l Agent₂ Δ) (agent₂ : Agent₂)
+    (φ : ∀ pos, Γ pos → Δ pos) where
+  mapNode :
+    {pos : P.A} →
+    {γ : Γ pos} →
+    {A B : Q.B (l.toFunA pos) → Type w} →
+    (∀ d, A d → B d) →
+    syn₁.Node agent₁ pos γ A →
+    syn₂.Node agent₂ pos (φ pos γ) B
+
+/--
+Map a whole-tree strategy across a local context-changing homomorphism.
+
+The context decoration is mapped structurally by the same context map `φ`.
+-/
+def mapContext
+    {Δ : P.A → Type vΔ}
+    {syn₁ : SyntaxOver l Agent₁ Γ} {agent₁ : Agent₁}
+    {syn₂ : SyntaxOver l Agent₂ Δ} {agent₂ : Agent₂}
+    {φ : ∀ pos, Γ pos → Δ pos}
+    (η : ContextHom syn₁ agent₁ syn₂ agent₂ φ) :
+    {spec : PFunctor.FreeM P α} → {ctxs : Decoration Γ spec} →
+    {Out : PFunctor.FreeM.PathAlong l spec → Type w} →
+    StrategyOver syn₁ agent₁ spec ctxs Out →
+    StrategyOver syn₂ agent₂ spec (Decoration.map φ spec ctxs) Out
+  | PFunctor.FreeM.pure _, _, _, out => out
+  | PFunctor.FreeM.roll pos _, ⟨_, ctxs⟩, _, stratNode =>
+      η.mapNode
+        (fun d =>
+          mapContext η (ctxs := ctxs (l.toFunB pos d)))
+        stratNode
+
+/--
+A context-changing homomorphism between functorial shapes, natural in recursive
+continuation maps.
+
+The naturality field is the reason `mapContext` commutes with
+`ShapeOver.mapOutput`: translating a node after mapping its continuations is
+the same as mapping continuations after translating the node.
+-/
+structure ShapeContextHom
+    {Δ : P.A → Type vΔ}
+    (shape₁ : ShapeOver l Agent₁ Γ) (agent₁ : Agent₁)
+    (shape₂ : ShapeOver l Agent₂ Δ) (agent₂ : Agent₂)
+    (φ : ∀ pos, Γ pos → Δ pos)
+    extends ContextHom shape₁.toSyntaxOver agent₁ shape₂.toSyntaxOver agent₂ φ where
+  mapNode_map :
+    {pos : P.A} →
+    {γ : Γ pos} →
+    {A B C D : Q.B (l.toFunA pos) → Type w} →
+    (f₁ : ∀ d, A d → B d) →
+    (f₂ : ∀ d, A d → C d) →
+    (g₁ : ∀ d, B d → D d) →
+    (g₂ : ∀ d, C d → D d) →
+    (comm : ∀ d x, g₁ d (f₁ d x) = g₂ d (f₂ d x)) →
+    (node : shape₁.Node agent₁ pos γ A) →
+    mapNode g₁ (shape₁.map f₁ node) =
+      shape₂.map g₂ (mapNode f₂ node)
+
+/--
 The whole-tree strategy induced by `SyntaxOver.forAgent syn agent` is the
 `agent` fiber of the original participant-indexed whole-tree strategy.
 -/
@@ -175,6 +244,46 @@ def mapOutput
           mapOutput shape (ctxs := ctxsRest (l.toFunB pos d))
             (fun path => f ⟨d, path⟩))
         node
+
+/--
+Context-changing strategy maps commute with functorial output maps.
+-/
+theorem _root_.Interaction.StrategyOver.mapContext_mapOutput
+    {Agent₁ : Type a} {Agent₂ : Type u}
+    {Δ : P.A → Type vΔ}
+    {shape₁ : ShapeOver l Agent₁ Γ} {agent₁ : Agent₁}
+    {shape₂ : ShapeOver l Agent₂ Δ} {agent₂ : Agent₂}
+    {φ : ∀ pos, Γ pos → Δ pos}
+    (η : StrategyOver.ShapeContextHom shape₁ agent₁ shape₂ agent₂ φ) :
+    {spec : PFunctor.FreeM P α} → {ctxs : Decoration Γ spec} →
+    {A B : PFunctor.FreeM.PathAlong l spec → Type w} →
+    (f : ∀ path, A path → B path) →
+    (strat : StrategyOver shape₁.toSyntaxOver agent₁ spec ctxs A) →
+    StrategyOver.mapContext η.toContextHom (ctxs := ctxs)
+        (ShapeOver.mapOutput shape₁ (ctxs := ctxs) f strat) =
+      ShapeOver.mapOutput shape₂ (ctxs := Decoration.map φ spec ctxs) f
+        (StrategyOver.mapContext η.toContextHom (ctxs := ctxs) strat)
+  | PFunctor.FreeM.pure _, _, _, _, _, _ => rfl
+  | PFunctor.FreeM.roll pos rest, ⟨_, ctxs⟩, _, _, f, stratNode => by
+      simp only [StrategyOver.mapContext, ShapeOver.mapOutput, Decoration.map_roll]
+      exact η.mapNode_map
+        (fun d =>
+          ShapeOver.mapOutput shape₁ (ctxs := ctxs (l.toFunB pos d))
+            (fun path => f ⟨d, path⟩))
+        (fun d =>
+          StrategyOver.mapContext η.toContextHom
+            (ctxs := ctxs (l.toFunB pos d)))
+        (fun d =>
+          StrategyOver.mapContext η.toContextHom
+            (ctxs := ctxs (l.toFunB pos d)))
+        (fun d =>
+          ShapeOver.mapOutput shape₂
+            (ctxs := Decoration.map φ (rest (l.toFunB pos d)) (ctxs (l.toFunB pos d)))
+            (fun path => f ⟨d, path⟩))
+        (fun d x =>
+          StrategyOver.mapContext_mapOutput η (ctxs := ctxs (l.toFunB pos d))
+            (fun path => f ⟨d, path⟩) x)
+        stratNode
 
 /--
 Whole-tree families for `ShapeOver.comap f shape` are exactly families for

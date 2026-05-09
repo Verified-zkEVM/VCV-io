@@ -768,26 +768,79 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.ofConstantMonads {m : Type u 
 View an ordinary single-monad role strategy as a strategy over a constant monad
 decoration.
 -/
-def _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonads {m : Type u → Type u} [Monad m]
+def _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonadsHom
+    {m : Type u → Type u} [Monad m] [LawfulFunctor m] :
+    StrategyOver.ShapeContextHom
+      (ShapeOver.TwoParty.pairedSpec m) (Participant.focal : Participant.{u})
+      ShapeOver.TwoParty.Focal.monadicSpec PUnit.unit
+      (RoleContext.withMonad ⟨m, inferInstance⟩) where
+  mapNode := by
+    intro X role A B f node
+    cases role
+    · simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic]
+        using (ShapeOver.TwoParty.pairedSpec m).map
+          (agent := Participant.focal) (γ := Role.sender) f node
+    · simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic]
+        using (ShapeOver.TwoParty.pairedSpec m).map
+          (agent := Participant.focal) (γ := Role.receiver) f node
+  mapNode_map := by
+    intro X role A B C D f₁ f₂ g₁ g₂ comm node
+    cases role
+    · have hfun :
+          (fun dx : (d : (PFunctor.Lens.id Spec.basePFunctor).toFunA X) × A d =>
+            Sigma.mk dx.1 (g₁ dx.1 (f₁ dx.1 dx.2))) =
+          (fun dx : (d : (PFunctor.Lens.id Spec.basePFunctor).toFunA X) × A d =>
+            Sigma.mk dx.1 (g₂ dx.1 (f₂ dx.1 dx.2))) := by
+          funext dx
+          exact Sigma.ext rfl (heq_of_eq (comm dx.1 dx.2))
+      simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        RoleMonadContext.diagonal, Spec.Node.Context.extendMap, Spec.Node.ContextHom.id,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic,
+        Functor.map_map]
+        using congrArg (fun h => h <$> node) hfun
+    · funext x
+      have hfun : (fun y : A x => g₁ x (f₁ x y)) = (fun y : A x => g₂ x (f₂ x y)) := by
+        funext y
+        exact comm x y
+      simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        RoleMonadContext.diagonal, Spec.Node.Context.extendMap, Spec.Node.ContextHom.id,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic,
+        Functor.map_map]
+        using congrArg (fun h => h <$> node x) hfun
+
+/--
+View an ordinary single-monad role strategy as a monadic focal strategy by
+structurally pairing every role label with the same bundled monad.
+-/
+def _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonads
+    {m : Type u → Type u} [Monad m] [LawfulFunctor m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {Output : PFunctor.FreeM.Path spec → Type u} :
     StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles Output →
-    StrategyOver SyntaxOver.TwoParty.Focal.monadicSpec PUnit.unit spec
-      (RoleDecoration.withMonads roles (Spec.MonadDecoration.constant ⟨m, inferInstance⟩ spec))
+    StrategyOver ShapeOver.TwoParty.Focal.monadicSpec.toSyntaxOver PUnit.unit spec
+      (Decoration.map (RoleContext.withMonad ⟨m, inferInstance⟩) spec roles)
       Output :=
-  match spec, roles with
-  | .done, _ => fun strat => strat
-  | .node _ rest, ⟨.sender, rRest⟩ =>
-      fun strat =>
-        Functor.map
-          (fun msgAndRest =>
-            ⟨msgAndRest.1,
-              toConstantMonads
-                (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
-          strat
-  | .node _ rest, ⟨.receiver, rRest⟩ =>
-      fun strat x =>
-        Functor.map (toConstantMonads (rest x) (rRest x)) (strat x)
+  StrategyOver.mapContext
+    StrategyOver.TwoParty.Focal.toConstantMonadsHom.toContextHom
+    (spec := spec) (ctxs := roles)
 
 /--
 Lifting an ordinary role strategy into a constant monad decoration commutes
@@ -809,17 +862,11 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonads_mapOutpu
       ShapeOver.mapOutput ShapeOver.TwoParty.Focal.monadicSpec
         (agent := PUnit.unit)
         (spec := spec)
-        (ctxs := RoleDecoration.withMonads roles
-          (Spec.MonadDecoration.constant ⟨m, inferInstance⟩ spec))
+        (ctxs := Decoration.map (RoleContext.withMonad ⟨m, inferInstance⟩) spec roles)
         f
-        (StrategyOver.TwoParty.Focal.toConstantMonads spec roles strat) := by
-  match spec, roles with
-  | .done, _ =>
-      rfl
-  | .node _ rest, ⟨.sender, rRest⟩ =>
-      sorry
-  | .node _ rest, ⟨.receiver, rRest⟩ =>
-      sorry
+        (StrategyOver.TwoParty.Focal.toConstantMonads spec roles strat) :=
+  StrategyOver.mapContext_mapOutput StrategyOver.TwoParty.Focal.toConstantMonadsHom
+    (ctxs := roles) f strat
 
 /--
 Retarget a monadic focal strategy along a nodewise monad homomorphism.
