@@ -868,10 +868,10 @@ private lemma noColl_bad_iff_caseA_or_caseB
   · simp [h]
   · simp [h]
 
-private lemma one_le_two_mul_succ_depth_mul_leafCount_aux (s : Skeleton) :
-    1 ≤ 2 * (s.depth + 1) * s.leafCount := by
-  have h := leafCount_pos_aux s
-  nlinarith
+-- private lemma one_le_two_mul_succ_depth_mul_leafCount_aux (s : Skeleton) :
+--     1 ≤ 2 * (s.depth + 1) * s.leafCount := by
+--   have h := leafCount_pos_aux s
+--   nlinarith
 
 private theorem extractability_game_noColl_caseA_eq_zero
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -1220,12 +1220,13 @@ private theorem extractability_game_noCollision_wins_le
     Pr[fun (vals, log) =>
         ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
-        2 * (s.depth + 1) * s.leafCount / (Fintype.card α : ENNReal) := by
+        1 / (Fintype.card α : ENNReal) := by
   refine le_trans
     (extractability_game_noCollision_wins_le_inv_card committingAdv openingAdv
       qb h_IsQueryBound_qb h_le_qb) ?_
   apply ENNReal.div_le_div_right
-  exact_mod_cast one_le_two_mul_succ_depth_mul_leafCount_aux s
+  grind
+  -- exact_mod_cast one_le_two_mul_succ_depth_mul_leafCount_aux s
 
 /--
 The extractability theorem for Merkle trees.
@@ -1274,7 +1275,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     Pr[adversary_wins_extractability_game_event |
         extractability_game committingAdv openingAdv] ≤
         ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α)
-        + 2 * (s.depth + 1) * s.leafCount / (Fintype.card α)
+        + 1 / (Fintype.card α)
     := by
   calc
     -- We first rewrite the game to include the combined query log
@@ -1312,11 +1313,11 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
       rfl
     -- We bound the no-collision bad event probability
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
-        2 * (s.depth + 1) * s.leafCount / (Fintype.card α) := by
+        1 / (Fintype.card α) := by
       have h' : Pr[fun (vals, log) =>
             ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
           (extractability_game committingAdv openingAdv).withQueryLog] ≤
-            2 * (s.depth + 1) * s.leafCount / (Fintype.card α : ENNReal) :=
+            1 / (Fintype.card α : ENNReal) :=
         mod_cast extractability_game_noCollision_wins_le committingAdv openingAdv
           (s := s) (AuxState := AuxState) qb h_IsQueryBound_qb h_le_qb
       gcongr
