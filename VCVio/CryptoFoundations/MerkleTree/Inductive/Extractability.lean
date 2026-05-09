@@ -48,6 +48,8 @@ section ToVCV
 /--
 Convenience corrolary to `probEvent_mono` for when the implication holds everywhere,
 not just on the support of the distribution.
+
+TODO move to same file as `probEvent_mono`
 -/
 lemma probEvent_mono''.{u, v} {m : Type u → Type v} [Monad m] {α : Type u} [HasEvalSPMF m]
     {mx : m α} {p q : α → Prop}
@@ -84,6 +86,8 @@ skeleton `s`, build a partial tree of type `FullData (Option α) s` by walking d
 `root`. A node with value `some a` looks up the unique log entry whose response is `a`
 and uses its input pair as the children's values; in every other case (node is `none`,
 no matching entry, or no unique match) both children are `none`.
+
+TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
 -/
 def extractor {α : Type} [DecidableEq α] [SampleableType α]
     [OracleSpec.Fintype (spec α)]
@@ -104,9 +108,7 @@ def extractor {α : Type} [DecidableEq α] [SampleableType α]
         (some child_hashes.1, some child_hashes.2)
   populate_down s children (some root)
 
-/-- Under no-collision, `List.find?` on a `q.2`-matcher returns the unique
-log entry with that response. -/
-lemma find?_response_eq_some_of_no_collision_mem
+private lemma find?_response_eq_some_of_no_collision_mem
     [DecidableEq α] {log : (spec α).QueryLog} {q : (_i : (α × α)) × α}
     (h_no_coll : ¬ collisionIn log) (h_mem : q ∈ log) :
     log.find? (fun q' => q'.2 == q.2) = some q := by
@@ -304,15 +306,6 @@ def adversary_wins_extractability_game_with_logging_event
   adversary_wins_extractability_game_event ∘ Prod.fst
 
 /--
-`adversary_wins_extractability_game_with_logging_event` is
-`adversary_wins_extractability_game_event` composed with `Prod.fst`.
--/
-lemma adversary_wins_extractability_game_with_logging_event_eq
-    {α : Type} [BEq α] {s : Skeleton} {AuxState : Type} :
-    @adversary_wins_extractability_game_with_logging_event α _ s AuxState =
-    adversary_wins_extractability_game_event ∘ Prod.fst := rfl
-
-/--
 If the combined adversary pair `(committingAdv, openingAdv)` has total query bound `qb`,
 then the full extractability game has total query bound `qb + s.depth`.
 
@@ -364,7 +357,7 @@ theorem extractability_game_IsTotalQueryBound
       (verifyProof_isTotalQueryBound_skeleton_depth q.1 q.2.1 p.1.1 q.2.2) (fun _ => trivial)
 
 
-theorem evalDist_extractability_game_eq
+private theorem evalDist_extractability_game_eq
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited] {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
@@ -376,9 +369,7 @@ theorem evalDist_extractability_game_eq
   congr 1
   exact (loggingOracle.fst_map_run_simulateQ _).symm
 
-/-- `chainInLog` is monotone in the log: enlarging the log only adds more entries
-to draw chain witnesses from. -/
-lemma chainInLog_mono {α : Type} {s : Skeleton} (idx : SkeletonLeafIndex s) :
+private lemma chainInLog_mono {α : Type} {s : Skeleton} (idx : SkeletonLeafIndex s) :
     ∀ {log1 log2 : (spec α).QueryLog} {root leaf : α}
       {proof : List.Vector α idx.depth},
     (∀ q, q ∈ log1 → q ∈ log2) →
@@ -391,7 +382,10 @@ lemma chainInLog_mono {α : Type} {s : Skeleton} (idx : SkeletonLeafIndex s) :
     exact ⟨ancestor, h_sub _ h_mem, ih h_sub h_rec⟩
 
 /-- `OracleComp.withQueryLog` distributes over `bind`: the combined log is the
-concatenation of the prefix's log and the continuation's log. -/
+concatenation of the prefix's log and the continuation's log.
+
+TODO move to appropriate file, maybe same file as `withQueryLog`.
+-/
 lemma OracleComp.withQueryLog_bind
     {ι : Type} {spec : OracleSpec.{0, 0} ι} {α β : Type}
     (mx : OracleComp spec α) (my : α → OracleComp spec β) :
@@ -402,7 +396,10 @@ lemma OracleComp.withQueryLog_bind
   rw [simulateQ_bind, WriterT.run_bind']
 
 /-- `OracleComp.withQueryLog` of `pure x` produces `(x, [])` — no oracle queries,
-empty log. -/
+empty log.
+
+TODO move to appropriate file, maybe same file as `withQueryLog_bind`.
+-/
 lemma OracleComp.withQueryLog_pure
     {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
     (x : α) :
@@ -422,9 +419,7 @@ lemma OracleComp.withQueryLog_query
   simp only [simulateQ_pure, WriterT.run_pure', map_pure]
   rfl
 
-/-- `singleHash a b` makes a single oracle query on input `(a, b)`; therefore
-its `withQueryLog` produces `(u, [⟨(a, b), u⟩])` where `u` is the response. -/
-lemma singleHash_withQueryLog
+private lemma singleHash_withQueryLog
     [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
     (a b : α) :
     (singleHash (m := OracleComp (spec α)) a b).withQueryLog =
@@ -438,10 +433,7 @@ lemma singleHash_withQueryLog
     rw [bind_pure]
   rw [h, OracleComp.withQueryLog_query]
 
-/-- The verifier's `getPutativeRoot` evaluation, in the support of its
-`withQueryLog`, witnesses a chain in the log from the produced putative root `r`
-back through the proof's siblings to `leaf`. -/
-lemma getPutativeRoot_support_chain
+private lemma getPutativeRoot_support_chain
     [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} (idx : SkeletonLeafIndex s) :
     ∀ (leaf : α) (proof : List.Vector α idx.depth) (r : α)
@@ -494,9 +486,7 @@ lemma getPutativeRoot_support_chain
       chainInLog_mono _ (fun _ hq => List.mem_append_left _ hq)
         (ih leaf proof.tail a log_a h_rec)⟩
 
-/-- A successful `verifyProof` evaluation in the support of its `withQueryLog`
-witnesses a chain in the verifier's log from `root` down to `leaf` along `idx`. -/
-lemma verifyProof_support_chain
+private lemma verifyProof_support_chain
     {α : Type} [DecidableEq α] [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} (idx : SkeletonLeafIndex s)
     (leaf root : α) (proof : List.Vector α idx.depth)
@@ -521,19 +511,7 @@ lemma verifyProof_support_chain
   obtain rfl : r = root := by simpa using h_b_eq.symm
   simpa using getPutativeRoot_support_chain idx leaf proof r log_g h_g
 
-/--
-**Support → chain.** When the game's combined log `log` contains a successful
-verification (`verified = true`), the verifier's queries form a chain in the log
-from `root` down to `leaf` along `idx`. This is the bridge from the oracle's
-operational semantics to the pure structural predicate `chainInLog`.
-
-The proof unfolds `extractability_game.withQueryLog` via
-`OracleComp.withQueryLog_bind`, peels off `committingAdv`, `openingAdv`, and the
-final return step, and applies `getPutativeRoot_support_chain` to the verifier's
-contribution. The committing/opening prefix only enlarges the log, which
-`chainInLog_mono` lifts past.
--/
-theorem support_implies_chainInLog
+private theorem support_implies_chainInLog
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} {AuxState : Type}
@@ -584,9 +562,6 @@ theorem support_implies_chainInLog
   rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
   simpa using List.mem_append_right _ (List.mem_append_right _ hq)
 
-/-- If `populate_down` is called with input value `none` (under a `children`
-function that maps `none` to `(none, none)`), then every node of the resulting
-tree has value `none`. -/
 private lemma populate_down_none_get_eq_none {s : Skeleton}
     (children : Option α → Option α × Option α)
     (h_none : children none = (none, none))
@@ -604,7 +579,10 @@ private lemma populate_down_none_get_eq_none {s : Skeleton}
       rw [populate_down_internal_def, FullData.get_internal_ofRight, h_none]
       exact ihR idxR
 
-/-- A localized abbreviation for the `extractor`'s children function over a log. -/
+/-- A localized abbreviation for the `extractor`'s children function over a log.
+
+TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
+-/
 private def extractorChildren [DecidableEq α]
     (log_c : (spec α).QueryLog) :
     Option α → Option α × Option α := fun node =>
@@ -615,15 +593,18 @@ private def extractorChildren [DecidableEq α]
     | none => (none, none)
     | some q => (some q.1.1, some q.1.2)
 
+-- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
 @[simp] private lemma extractorChildren_none [DecidableEq α]
     (log_c : (spec α).QueryLog) :
     extractorChildren log_c none = (none, none) := rfl
 
+-- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
 private lemma extractor_eq_populate [DecidableEq α] [SampleableType α]
     [(spec α).Fintype]
     (s : Skeleton) (log_c : (spec α).QueryLog) (root : α) :
     extractor s log_c root = populate_down s (extractorChildren log_c) (some root) := rfl
 
+-- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
 private lemma extractorChildren_some [DecidableEq α]
     (log_c : (spec α).QueryLog) (a : α) :
     extractorChildren log_c (some a) =
@@ -631,12 +612,7 @@ private lemma extractorChildren_some [DecidableEq α]
       | none => (none, none)
       | some q => (some q.1.1, some q.1.2) := rfl
 
-/-- **Chain restriction.** If the extractor's path to `idx` is intact in `log_c`,
-then any chain in the larger collision-free `log` from `root` along `idx` also
-lives in `log_c`. This is the key bridge from chains in the full game log down
-to chains in the committing prefix, used in
-`extractability_game_no_coll_match`. -/
-theorem chainInLog_restrict
+private theorem chainInLog_restrict
     [DecidableEq α] [SampleableType α] [(spec α).Fintype]
     {s : Skeleton} (idx : SkeletonLeafIndex s) :
     ∀ (log log_c : (spec α).QueryLog) (root : α) (leaf : α)
@@ -775,25 +751,7 @@ theorem withQueryLog_self_log_eq
       obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_eq_X
       rw [ih u' h_inner]
 
-/--
-**Extractor matches in support.** Bundled helper combining
-`support_implies_chainInLog` with `extractor_chain_match`. From the game's
-support with `verified = true` plus no-collision and an intact extractor path,
-this lemma derives that the extracted leaf and proof exactly match the opened
-leaf and proof.
-
-This is the form directly consumable by `extractability_game_noColl_caseA_eq_zero`:
-the extracted-tree and extracted-proof equalities suffice to falsify
-`adversary_wins_extractability_game_event`.
-
-Implementation outline. Inside the support, `extractedTree` is concretely
-`extractor s log_c root` for the committing log `log_c`. We derive that the
-verifier's chain restricts to `log_c` via `chainInLog_restrict` (using the
-intact extractor path and no-collision), and apply `extractor_chain_match` to
-this restricted chain. The inner/outer query logs of `committingAdv.withQueryLog
-.withQueryLog` agree by `withQueryLog_self_log_eq`.
--/
-theorem extractability_game_no_coll_match
+private theorem extractability_game_no_coll_match
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} {AuxState : Type}
@@ -869,20 +827,11 @@ theorem extractability_game_no_coll_match
       h_no_coll_lc h_ne_none_lc h_chain_lc
   exact ⟨h_tree_eq ▸ h_get, h_proof_ext_eq ▸ h_proof_match.symm⟩
 
-/-- Every skeleton has at least one leaf. -/
+--TODO move to the same folder/file where binary trees are defined
 private lemma leafCount_pos_aux : ∀ s : Skeleton, 0 < s.leafCount
   | Skeleton.leaf => Nat.zero_lt_one
   | Skeleton.internal left _ => Nat.add_pos_left (leafCount_pos_aux left) _
 
-/--
-Sub-event of `bad event` where the extractor's path from `root` to the opened leaf
-index is *intact* in committingAdv's log. Equivalently: the extracted leaf at `idx`
-is `some _` rather than `none`.
-
-This is the "Case A" of the no-collision case decomposition: when the chain from
-root to leaf is intact in committingLog, no-collision forces the verifier's chain
-to coincide with the extractor's, so the win condition fails.
--/
 private def noColl_caseA_event {α : Type} [BEq α] [DecidableEq α]
     {s : Skeleton} {AuxState : Type} :
     (α × AuxState ×
@@ -894,17 +843,6 @@ private def noColl_caseA_event {α : Type} [BEq α] [DecidableEq α]
     ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals ∧
       extractedTree.get idx.toNodeIndex ≠ none
 
-/--
-Sub-event of `bad event` where the extractor's path from `root` to the opened leaf
-index is *broken* in committingAdv's log. Equivalently: the extracted leaf at `idx`
-is `none`.
-
-This is the "Case B" of the no-collision case decomposition: when the chain is
-broken, the leaf-mismatch disjunct of `adversary_wins_extractability_game_event`
-fires automatically, reducing the bad event to `verified = true`. Verification
-then requires the random oracle to coincidentally produce a chain reaching `root`,
-which is the `1/|α|` lucky-guess event.
--/
 private def noColl_caseB_event {α : Type} [BEq α] [DecidableEq α]
     {s : Skeleton} {AuxState : Type} :
     (α × AuxState ×
@@ -916,11 +854,6 @@ private def noColl_caseB_event {α : Type} [BEq α] [DecidableEq α]
     ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals ∧
       extractedTree.get idx.toNodeIndex = none
 
-/--
-The bad event `¬ collisionIn log ∧ adversary_wins_extractability_game_event vals`
-decomposes as the disjoint union of `noColl_caseA_event` and `noColl_caseB_event`,
-according to whether the extracted leaf at the opened index is `some _` or `none`.
--/
 private lemma noColl_bad_iff_caseA_or_caseB
     {α : Type} [BEq α] [DecidableEq α] {s : Skeleton} {AuxState : Type}
     (x : (α × AuxState ×
@@ -935,29 +868,11 @@ private lemma noColl_bad_iff_caseA_or_caseB
   · simp [h]
   · simp [h]
 
-/--
-Auxiliary arithmetic fact: every skeleton has positive leaf count and non-negative
-depth, so `1 ≤ 2 * (s.depth + 1) * s.leafCount`. Used to bridge a tight `1/|α|`
-probability bound to the looser `2 * (s.depth + 1) * s.leafCount / |α|` form
-demanded by `extractability_game_noCollision_wins_le`.
--/
 private lemma one_le_two_mul_succ_depth_mul_leafCount_aux (s : Skeleton) :
     1 ≤ 2 * (s.depth + 1) * s.leafCount := by
   have h := leafCount_pos_aux s
   nlinarith
 
-/--
-**Case A bound: probability 0.** When the extractor's path from `root` to the opened
-leaf index is intact in committingAdv's log (i.e. the extracted leaf at `idx` is
-`some _`), no-collision forces the verifier's chain to coincide with the extractor's
-path, so opened `(leaf, proof)` matches the extracted pair and the win condition
-fails. Hence the joint event "intact extracted path ∧ no collision ∧ adversary wins"
-has probability `0`.
-
-The proof delegates the level-by-level induction to
-`extractability_game_no_coll_match`, which derives the leaf and proof match from
-the support hypothesis under no-collision and an intact extractor path.
--/
 private theorem extractability_game_noColl_caseA_eq_zero
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -985,11 +900,6 @@ private theorem extractability_game_noColl_caseA_eq_zero
     extractability_game_no_coll_match committingAdv openingAdv h_no_coll h_ne_none hsupport
   simp [h_map, h_eq_leaf] at h_adv_wins
 
-/-! ### Probability bounds on the verifier (helpers for case B) -/
-
-/-- Generic helper: if `Pr[q | my x] ≤ ε` for every `x ∈ support mx`, then
-`Pr[q | mx >>= my] ≤ ε`. The total-probability tsum is dominated termwise by
-`ε`, and the marginal sum collapses to at most `1`. -/
 private lemma probEvent_bind_le_of_forall_le
     {ι' : Type} {oSpec' : OracleSpec ι'}
     [oSpec'.Fintype] [oSpec'.Inhabited]
@@ -1008,8 +918,6 @@ private lemma probEvent_bind_le_of_forall_le
     _ ≤ 1 * ε := mul_le_mul' tsum_probOutput_le_one le_rfl
     _ = ε := one_mul _
 
-/-- A single hash query produces any specific value with probability `1/|α|`:
-the random oracle response is uniformly distributed on `α`. -/
 private lemma probOutput_singleHash_eq_inv_card
     [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
     (a b root : α) :
@@ -1023,9 +931,6 @@ private lemma probOutput_singleHash_eq_inv_card
   rw [h, probOutput_query (spec := spec α) (a, b) root]
   congr!
 
-/-- Under positive `idx.depth`, `getPutativeRoot` produces any specific target
-value with probability at most `1/|α|`: the topmost hash query has uniform
-output over `α`, regardless of the inductive subroot value. -/
 private lemma probOutput_getPutativeRoot_le_inv_card_of_pos_depth
     [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
@@ -1066,9 +971,6 @@ private lemma probOutput_getPutativeRoot_le_inv_card_of_pos_depth
     refine le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl) ?_
     rw [one_mul]
 
-/-- Under positive `idx.depth`, `verifyProof` returns `true` with probability
-at most `1/|α|`: verification requires the verifier's hash chain to coincide
-with `root`, and the topmost output is uniform on `α`. -/
 private lemma probEvent_verifyProof_eq_true_le_inv_card_of_pos_depth
     [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -1091,14 +993,6 @@ private lemma probEvent_verifyProof_eq_true_le_inv_card_of_pos_depth
   rw [h_eq, probEvent_eq_eq_probOutput]
   exact probOutput_getPutativeRoot_le_inv_card_of_pos_depth h_pos leaf proof root
 
-/-- Bound on the verifier's contribution to the case-B bad event. For any fixed
-`(root, log_c, idx, leaf, proof)`, the probability that
-`verifyProof` returns `true` and the extractor's path is broken at `idx` is at
-most `1/|α|`. The argument splits on whether the extractor's path is intact:
-if intact, the joint event is impossible (`Pr = 0`); if broken, then
-`idx.depth > 0` (since `idx.depth = 0` forces `s = Skeleton.leaf` and the
-extractor returns `FullData.leaf (some root)`), and we apply the verifyProof
-bound. -/
 private lemma probEvent_verifyProof_extractor_none_le_inv_card
     [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -1137,18 +1031,6 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     rw [h_zero]
     exact zero_le _
 
-/--
-**Case B substantive obligation, `1 < |α|` branch.** Same statement as
-`extractability_game_noColl_caseB_le_inv_card`, but specialized to the
-non-trivial cardinality regime `1 < Fintype.card α`. The full case-B bound
-discharges `|α| ≤ 1` by `probEvent_le_one` and delegates to this helper for
-the substantive probabilistic argument.
-
-The proof reduces (via `probEvent_withQueryLog`) to bounding
-`Pr[verified = true ∧ extractedTree.get idx = none | game]` and decomposes
-the bind, applying `probEvent_verifyProof_extractor_none_le_inv_card` to the
-verifier's terminal step.
--/
 private theorem extractability_game_noColl_caseB_le_inv_card_aux
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -1220,18 +1102,6 @@ private theorem extractability_game_noColl_caseB_le_inv_card_aux
   -- The composed event simplifies to `verified = true ∧ extractor.get = none`.
   exact probEvent_verifyProof_extractor_none_le_inv_card idx leaf root proof log_c
 
-/--
-**Case B bound: probability `≤ 1/|α|`.** When the extractor's path from `root` to
-the opened leaf index is broken in committingAdv's log (i.e. the extracted leaf at
-`idx` is `none`), verification succeeding requires the random oracle to produce a
-chain reaching `root` whose terminal hash query has a fresh input pair (under no
-collision). Since the random oracle's output on a fresh input is uniform on `α`,
-the probability of hitting any specific target value is `1/|α|`.
-
-The trivial small-cardinality case (`|α| ≤ 1`) is handled by `probEvent_le_one`;
-the substantive `1 < |α|` branch is delegated to
-`extractability_game_noColl_caseB_le_inv_card_aux`.
--/
 private theorem extractability_game_noColl_caseB_le_inv_card
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -1282,14 +1152,6 @@ private theorem extractability_game_noColl_caseB_le_inv_card
   · exact extractability_game_noColl_caseB_le_inv_card_aux
       committingAdv openingAdv qb h_IsQueryBound_qb h_le_qb (by push Not at h_card; exact h_card)
 
-/--
-**Tight no-collision bound.** Conditional on the combined query log of
-`extractability_game` containing no collision, the adversary wins with probability at
-most `1 / |α|`. Combines `extractability_game_noColl_caseA_eq_zero` (probability 0
-when the extractor's path is intact) and `extractability_game_noColl_caseB_le_inv_card`
-(probability `≤ 1/|α|` when the path is broken) via the case decomposition
-`noColl_bad_iff_caseA_or_caseB` and `probEvent_or_le`.
--/
 private theorem extractability_game_noCollision_wins_le_inv_card
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -1338,54 +1200,7 @@ private theorem extractability_game_noCollision_wins_le_inv_card
             qb h_IsQueryBound_qb h_le_qb
     _ = (1 : ENNReal) / (Fintype.card α : ENNReal) := zero_add _
 
-/--
-**No-collision lucky-guess bound.** Conditional on the combined query log of
-`extractability_game` containing no collision, the adversary still wins only by a
-"lucky guess": the committer publishes a `root` it never computed via the random
-oracle, and the verifier's hash chain coincidentally produces that `root` at the top.
-The total probability of this joint event is bounded by
-`2 * (s.depth + 1) * s.leafCount / |α|`.
-
-Proof. We first establish the tighter `1/|α|` bound in
-`extractability_game_noCollision_wins_le_inv_card` (which carries the actual
-probabilistic content), then loosen via `1 ≤ 2 * (s.depth + 1) * s.leafCount`.
-
-Outline of the tight bound (formalized in
-`extractability_game_noCollision_wins_le_inv_card`):
-
-  Case A — `root ∈ committingLog.outputs`.
-    Under no-collision, committingAdv's query producing `root` is the *unique*
-    combined-log query producing it, so any chain reaching `root` must use that
-    exact input pair. Inducting down the tree from `root`, the verifier's level-`k`
-    query input must agree with committingAdv's level-`k` query (for k = s.depth,
-    …, 1): if it did not, the verifier's level-`k` output would either equal the
-    extracted node value at that position (forcing input agreement by no-collision)
-    or differ (breaking the chain to `root`). By induction the verifier's chain
-    traces exactly the path `extractor` builds, so opened (leaf, proof) equals
-    extracted (leaf, proof) and the win condition fails. Hence
-    `Pr[case A ∧ no-collision ∧ win] = 0`.
-
-  Case B — `root ∉ committingLog.outputs`.
-    Then `extractor s queryLog root` returns the all-`none` extension below the
-    root, so the leaf-mismatch disjunct of `adversary_wins_extractability_game_event`
-    is automatic whenever `idx.depth > 0`, reducing the win event to
-    `verified = true`. Verification succeeding requires the random oracle to produce
-    `root` at the verifier's terminal hash query. Since by case hypothesis no prior
-    committingAdv query produced `root`, that terminal output is uniform on `α`
-    (conditional on its input pair being fresh, which no-collision guarantees up to
-    duplicate-query reuse), so it equals `root` with probability `1/|α|`.
-
-Formalization sketch (for the tight bound).
-  1. Decompose the event via `probEvent_or_le` along the `root ∈ committingLog`
-     boolean disjunction.
-  2. Case A: show the joint event is empty (probability `0`) by constructing, from
-     a no-collision committing log and a chain reaching `root`, an explicit
-     induction on the skeleton that exhibits the verifier's chain coinciding with
-     `extractor`'s path.
-  3. Case B: bound by `probOutput_query` / `evalDist_query` on the verifier's
-     terminal hash query, whose input is fresh and output is uniform on `α`.
--/
-theorem extractability_game_noCollision_wins_le
+private theorem extractability_game_noCollision_wins_le
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} {AuxState : Type}
@@ -1506,42 +1321,5 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
           (s := s) (AuxState := AuxState) qb h_IsQueryBound_qb h_le_qb
       gcongr
       norm_cast
-
-  /-
-  Now we can break down the bad event into smaller events
-  In the SNARGS book, they define
-  E_col = the event that there is a collision in committingLog
-  E_tree = the event that the tree extraction with committingLog
-           is different from the tree extraction
-           with the combined committingLog and openingLog
-  E_sub = the event that The verificationLog contains a query to a node not in the committingLog
-          and verification succeeds
-
-  The SNARGs book makes the observation that
-
-  Pr[Adversary wins] ≤ Pr[E_col]
-                       + Pr[E_tree | not E_col]
-                       + Pr[E_sub | not E_col and not E_tree]
-                       + Pr[Adversary wins | not E_col and not E_tree and not E_sub]
-
-  But I think this really stands in for the tighter version, which might be easier to reason about.
-
-  Pr[Adversary wins] ≤ Pr[E_col]
-                       + Pr[E_tree and not E_col]
-                       + Pr[E_sub and not E_col and not E_tree]
-                       + Pr[Adversary wins and not E_col and not E_tree and not E_sub]
-
-  TODO: does the proof really have to be this complicated?
-  Can't we simply look at the event of any collision at all happening?
-
-  * Does a collision happen in the adversary's queries and verification combined?
-    * Probability of YES is small by query bound
-    * If not, then consider whether the index opened exists in the extracted tree.
-      * If yes, then if the proof differs at all, we must leave the extracted tree
-        * After which, we can't return without a collision, so we don't verify.
-      * If no, then the only way to verify is to have a collision in the verification proof.
-
-  -/
-
 
 end InductiveMerkleTree
