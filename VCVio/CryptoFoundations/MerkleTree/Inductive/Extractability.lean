@@ -28,17 +28,20 @@ that disagrees with the extracted tree.
 
 ## Main results
 
-* `extractability_game_IsTotalQueryBound`: the full game has total query bound `qb +
-  s.depth`, with the extra `s.depth` accounting for `verifyProof`.
-* `extractor_chain_match` and `extractability_game_no_coll_match`: under no-collision, an
-  intact extractor path forces the opened `(leaf, proof)` to match the extracted pair.
 * `extractability`: an adversary wins the extractability game with probability at most
-  `(qb + s.depth)^2 / (2|α|) + 2 (s.depth + 1) s.leafCount / |α|`, by union-bounding
-  collision probability against the no-collision lucky-guess bound.
+  `(qb + s.depth)^2 / (2|α|) + 1 / |α|`, by union-bounding collision probability against
+  the no-collision lucky-guess bound.
+
+Note that out bound is looser than from the SNARGs book's bound in Lemma 18.5.1 of
+`((qb - 1) * qb))/2 /|α| + (depth + 1) * 2 size / |α|`.
+This is because we have simplified the proof at the expense of tightness by analyzing collisons
+for the full game at once.
+A useful TODO might be to re-structure the proof to get the tighter bound.
 
 ## References
 
-* SNARGs book, Lemma 18.5.1.
+* [Building Cryptographic Proofs from Hash Functions by Chiesa and Yogev](https://snargsbook.org/), Lemma 18.5.1.
+
 -/
 
 open scoped NNReal
