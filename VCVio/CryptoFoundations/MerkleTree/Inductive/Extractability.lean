@@ -511,7 +511,7 @@ private lemma verifyProof_support_chain
   obtain rfl : r = root := by simpa using h_b_eq.symm
   simpa using getPutativeRoot_support_chain idx leaf proof r log_g h_g
 
-private theorem support_implies_chainInLog
+private theorem extractability_game_verifyProof_log_subset
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} {AuxState : Type}
@@ -524,11 +524,13 @@ private theorem support_implies_chainInLog
     {extractedTree : FullData (Option α) s}
     {extractedProof : List.Vector (Option α) idx.depth}
     {log : (spec α).QueryLog}
-    (_hsupport : ((root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩),
+    (hsup : ((root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩),
                   log) ∈
       support (extractability_game committingAdv openingAdv).withQueryLog) :
-    chainInLog log root idx leaf proof := by
-  have hsup := _hsupport
+    ∃ log_v : (spec α).QueryLog,
+      (true, log_v) ∈ support
+          (verifyProof (m := OracleComp (spec α)) idx leaf root proof).withQueryLog ∧
+      ∀ q, q ∈ log_v → q ∈ log := by
   unfold extractability_game at hsup
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at hsup
   obtain ⟨⟨⟨root_c, _⟩, _⟩, _, hsup⟩ := hsup
@@ -542,25 +544,30 @@ private theorem support_implies_chainInLog
   obtain ⟨⟨_, log_v⟩, h_vp, h_v⟩ := h_v
   rw [support_map, Set.mem_image] at h_v
   obtain ⟨⟨_, _⟩, h_p, h_eq_p⟩ := h_v
-  rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_p
-  obtain ⟨h_p1, rfl⟩ := h_p
-  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_co h_eq_v h_eq_p
-  obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
-  obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
-  obtain ⟨h_eq_p1, h_eq_p2⟩ := h_eq_p
-  rw [← h_eq_p1, h_p1] at h_eq_v1
-  rw [← h_eq_v1] at h_eq_co1
-  simp only [Prod.mk.injEq] at h_eq_co1
-  obtain ⟨rfl, _, h_sigma_eq⟩ := h_eq_co1
-  obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
-  subst h_idx_eq
-  simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
-  obtain ⟨rfl, rfl, _, _, rfl⟩ := h_rest_eq
-  refine chainInLog_mono idx_o ?_
-    (verifyProof_support_chain idx_o leaf_o root_c.1 proof_o log_v h_vp)
-  intro q hq
-  rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
-  simpa using List.mem_append_right _ (List.mem_append_right _ hq)
+  grind [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq]
+
+private theorem support_implies_chainInLog
+    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
+    [(spec α).Fintype] [(spec α).Inhabited]
+    {s : Skeleton} {AuxState : Type}
+    (committingAdv : OracleComp (spec α) (α × AuxState))
+    (openingAdv : AuxState →
+        OracleComp (spec α)
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
+    {root : α} {aux : AuxState} {idx : SkeletonLeafIndex s} {leaf : α}
+    {proof : List.Vector α idx.depth}
+    {extractedTree : FullData (Option α) s}
+    {extractedProof : List.Vector (Option α) idx.depth}
+    {log : (spec α).QueryLog}
+    (hsup : ((root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩),
+                  log) ∈
+      support (extractability_game committingAdv openingAdv).withQueryLog) :
+    chainInLog log root idx leaf proof := by
+  obtain ⟨log_v, h_vp, h_sub⟩ :=
+    extractability_game_verifyProof_log_subset committingAdv openingAdv hsup
+  exact chainInLog_mono idx h_sub
+    (verifyProof_support_chain idx leaf root proof log_v h_vp)
+
 
 private lemma populate_down_none_get_eq_none {s : Skeleton}
     (children : Option α → Option α × Option α)
@@ -894,6 +901,7 @@ private theorem extractability_game_noColl_caseA_eq_zero
     extractability_game_no_coll_match committingAdv openingAdv h_no_coll h_ne_none hsupport
   simp [h_map, h_eq_leaf] at h_adv_wins
 
+-- TODO move
 private lemma probEvent_bind_le_of_forall_le
     {ι' : Type} {oSpec' : OracleSpec ι'}
     [oSpec'.Fintype] [oSpec'.Inhabited]
