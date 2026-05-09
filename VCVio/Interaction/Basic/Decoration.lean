@@ -54,10 +54,9 @@ of that schema's realized context is the same as a base decoration by `Γ`
 plus one displayed layer over it.
 
 The file concludes by lifting this one-step bridge recursively to arbitrary
-schemas: `PFunctor.FreeM.Displayed.Decoration.Schema.View` is the staged telescope view of a
-decoration by `S.toContext`, and `PFunctor.FreeM.Displayed.Decoration.Schema.equivView`
-identifies that staged view with an ordinary decoration of the realized
-context.
+schemas: `Decoration.Schema.View` is the staged telescope view of a decoration
+by `S.toContext`, and `Decoration.Schema.equivView` identifies that staged view
+with an ordinary decoration of the realized context.
 
 ## Polynomial substrate (`DecoratedSpec`)
 
