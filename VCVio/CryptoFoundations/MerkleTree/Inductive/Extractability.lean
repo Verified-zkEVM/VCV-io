@@ -79,25 +79,11 @@ open List OracleSpec OracleComp BinaryTree
 variable {α : Type}
 
 /--
-The extraction algorithm for Merkle trees.
-
-This algorithm takes a merkle tree cache, a root, and a skeleton, and
-returns (optionally?) a FullData of Option α.
-
-* It starts with the root and constructs a tree down to the leaves.
-* If a node is not in the cache, its children are None
-* If a node is in the cache twice (a collision), its children are None
-* If a node is None, its children are None
-* Otherwise, a nodes children are the children in the cache.
-
-
-TODO, if there is a collision, but it isn't used or is only used in a subtree,
-should the rest of the tree work? Or should it all fail?
-
-(I think, after my conversation with Mattias and Felix, this doesn't matter.
-If there is a collision, we are already in the bad case.
-What is just needed is that the extractor gives some default value in the ablated case.
-)
+The extraction algorithm for Merkle trees: from a query log `cache`, a `root`, and a
+skeleton `s`, build a partial tree of type `FullData (Option α) s` by walking down from
+`root`. A node with value `some a` looks up the unique log entry whose response is `a`
+and uses its input pair as the children's values; in every other case (node is `none`,
+no matching entry, or no unique match) both children are `none`.
 -/
 def extractor {α : Type} [DecidableEq α] [SampleableType α]
     [OracleSpec.Fintype (spec α)]
@@ -968,8 +954,9 @@ path, so opened `(leaf, proof)` matches the extracted pair and the win condition
 fails. Hence the joint event "intact extracted path ∧ no collision ∧ adversary wins"
 has probability `0`.
 
-The proof requires an induction on the skeleton tracing the chain level-by-level
-under no-collision; left as `sorry` for now.
+The proof delegates the level-by-level induction to
+`extractability_game_no_coll_match`, which derives the leaf and proof match from
+the support hypothesis under no-collision and an intact extractor path.
 -/
 private theorem extractability_game_noColl_caseA_eq_zero
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -998,6 +985,158 @@ private theorem extractability_game_noColl_caseA_eq_zero
     extractability_game_no_coll_match committingAdv openingAdv h_no_coll h_ne_none hsupport
   simp [h_map, h_eq_leaf] at h_adv_wins
 
+/-! ### Probability bounds on the verifier (helpers for case B) -/
+
+/-- Generic helper: if `Pr[q | my x] ≤ ε` for every `x ∈ support mx`, then
+`Pr[q | mx >>= my] ≤ ε`. The total-probability tsum is dominated termwise by
+`ε`, and the marginal sum collapses to at most `1`. -/
+private lemma probEvent_bind_le_of_forall_le
+    {ι' : Type} {oSpec' : OracleSpec ι'}
+    [oSpec'.Fintype] [oSpec'.Inhabited]
+    {α' β' : Type} {mx : OracleComp oSpec' α'} {my : α' → OracleComp oSpec' β'}
+    {q : β' → Prop} {ε : ENNReal}
+    (h : ∀ x ∈ support mx, Pr[ q | my x] ≤ ε) :
+    Pr[q | mx >>= my] ≤ ε := by
+  rw [probEvent_bind_eq_tsum]
+  calc ∑' x : α', Pr[= x | mx] * Pr[q | my x]
+      ≤ ∑' x : α', Pr[= x | mx] * ε := by
+        refine ENNReal.tsum_le_tsum fun x => ?_
+        by_cases hx : x ∈ support mx
+        · exact mul_le_mul' le_rfl (h x hx)
+        · simp [probOutput_eq_zero_of_not_mem_support hx]
+    _ = (∑' x : α', Pr[= x | mx]) * ε := ENNReal.tsum_mul_right
+    _ ≤ 1 * ε := mul_le_mul' tsum_probOutput_le_one le_rfl
+    _ = ε := one_mul _
+
+/-- A single hash query produces any specific value with probability `1/|α|`:
+the random oracle response is uniformly distributed on `α`. -/
+private lemma probOutput_singleHash_eq_inv_card
+    [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
+    (a b root : α) :
+    Pr[= root | (singleHash (m := OracleComp (spec α)) a b
+                  : OracleComp (spec α) α)] =
+      (Fintype.card α : ENNReal)⁻¹ := by
+  have h : (singleHash (m := OracleComp (spec α)) a b : OracleComp (spec α) α) =
+      (liftM ((spec α).query (a, b)) : OracleComp (spec α) α) := by
+    change (liftM ((spec α).query (a, b)) : OracleComp (spec α) α) >>= pure = _
+    rw [bind_pure]
+  rw [h, probOutput_query (spec := spec α) (a, b) root]
+  congr!
+
+/-- Under positive `idx.depth`, `getPutativeRoot` produces any specific target
+value with probability at most `1/|α|`: the topmost hash query has uniform
+output over `α`, regardless of the inductive subroot value. -/
+private lemma probOutput_getPutativeRoot_le_inv_card_of_pos_depth
+    [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
+    {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
+    (leaf : α) (proof : List.Vector α idx.depth) (root : α) :
+    Pr[= root | (getPutativeRoot (m := OracleComp (spec α)) idx leaf proof
+                  : OracleComp (spec α) α)] ≤
+      (Fintype.card α : ENNReal)⁻¹ := by
+  cases idx with
+  | ofLeaf => exact absurd h_pos (Nat.lt_irrefl _)
+  | @ofLeft sl sr idxLeft =>
+    rw [show (getPutativeRoot (m := OracleComp (spec α))
+              (SkeletonLeafIndex.ofLeft idxLeft) leaf proof
+              : OracleComp (spec α) α) =
+        (getPutativeRoot (m := OracleComp (spec α)) idxLeft leaf proof.tail) >>=
+          fun a => (singleHash a proof.head : OracleComp (spec α) α) from rfl,
+      probOutput_bind_eq_tsum]
+    have key : ∀ a : α,
+        Pr[= root | (singleHash (m := OracleComp (spec α)) a proof.head
+                      : OracleComp (spec α) α)] = (Fintype.card α : ENNReal)⁻¹ :=
+      fun a => probOutput_singleHash_eq_inv_card a proof.head root
+    simp_rw [key]
+    rw [ENNReal.tsum_mul_right]
+    refine le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl) ?_
+    rw [one_mul]
+  | @ofRight sl sr idxRight =>
+    rw [show (getPutativeRoot (m := OracleComp (spec α))
+              (SkeletonLeafIndex.ofRight idxRight) leaf proof
+              : OracleComp (spec α) α) =
+        (getPutativeRoot (m := OracleComp (spec α)) idxRight leaf proof.tail) >>=
+          fun a => (singleHash proof.head a : OracleComp (spec α) α) from rfl,
+      probOutput_bind_eq_tsum]
+    have key : ∀ a : α,
+        Pr[= root | (singleHash (m := OracleComp (spec α)) proof.head a
+                      : OracleComp (spec α) α)] = (Fintype.card α : ENNReal)⁻¹ :=
+      fun a => probOutput_singleHash_eq_inv_card proof.head a root
+    simp_rw [key]
+    rw [ENNReal.tsum_mul_right]
+    refine le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl) ?_
+    rw [one_mul]
+
+/-- Under positive `idx.depth`, `verifyProof` returns `true` with probability
+at most `1/|α|`: verification requires the verifier's hash chain to coincide
+with `root`, and the topmost output is uniform on `α`. -/
+private lemma probEvent_verifyProof_eq_true_le_inv_card_of_pos_depth
+    [DecidableEq α] [SampleableType α] [Fintype α]
+    [(spec α).Fintype] [(spec α).Inhabited]
+    {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
+    (leaf root : α) (proof : List.Vector α idx.depth) :
+    Pr[(· = true) | (verifyProof (m := OracleComp (spec α)) idx leaf root proof
+                      : OracleComp (spec α) Bool)] ≤
+      (Fintype.card α : ENNReal)⁻¹ := by
+  rw [show (verifyProof (m := OracleComp (spec α)) idx leaf root proof
+              : OracleComp (spec α) Bool) =
+        (getPutativeRoot (m := OracleComp (spec α)) idx leaf proof) >>=
+          fun r => (pure (r == root) : OracleComp (spec α) Bool) from rfl]
+  rw [show (fun r : α => (pure (r == root) : OracleComp (spec α) Bool)) =
+        pure ∘ (fun r : α => (r == root)) from rfl,
+    probEvent_bind_pure_comp]
+  have h_eq : ((fun b : Bool => b = true) ∘ (fun r : α => (r == root)) : α → Prop) =
+      (fun r : α => r = root) := by
+    funext r
+    exact propext beq_iff_eq
+  rw [h_eq, probEvent_eq_eq_probOutput]
+  exact probOutput_getPutativeRoot_le_inv_card_of_pos_depth h_pos leaf proof root
+
+/-- Bound on the verifier's contribution to the case-B bad event. For any fixed
+`(root, log_c, idx, leaf, proof)`, the probability that
+`verifyProof` returns `true` and the extractor's path is broken at `idx` is at
+most `1/|α|`. The argument splits on whether the extractor's path is intact:
+if intact, the joint event is impossible (`Pr = 0`); if broken, then
+`idx.depth > 0` (since `idx.depth = 0` forces `s = Skeleton.leaf` and the
+extractor returns `FullData.leaf (some root)`), and we apply the verifyProof
+bound. -/
+private lemma probEvent_verifyProof_extractor_none_le_inv_card
+    [DecidableEq α] [SampleableType α] [Fintype α]
+    [(spec α).Fintype] [(spec α).Inhabited]
+    {s : Skeleton} (idx : SkeletonLeafIndex s) (leaf root : α)
+    (proof : List.Vector α idx.depth) (log_c : (spec α).QueryLog) :
+    Pr[fun verified : Bool => verified = true ∧
+         (extractor s log_c root).get idx.toNodeIndex = none |
+       (verifyProof (m := OracleComp (spec α)) idx leaf root proof
+         : OracleComp (spec α) Bool)] ≤
+      (Fintype.card α : ENNReal)⁻¹ := by
+  by_cases h_get : (extractor s log_c root).get idx.toNodeIndex = none
+  · -- Extractor's path is broken: derive `0 < idx.depth` and apply verifyProof bound.
+    have h_pos : 0 < idx.depth := by
+      cases idx with
+      | ofLeaf =>
+        -- `s = Skeleton.leaf`, so `extractor` returns `FullData.leaf (some root)` and
+        -- `.get .ofLeaf` is `some root`, contradicting `h_get`.
+        exfalso
+        have h_extractor_eq :
+            (extractor Skeleton.leaf log_c root) = FullData.leaf (some root : Option α) := rfl
+        rw [h_extractor_eq] at h_get
+        change (some root : Option α) = none at h_get
+        exact Option.some_ne_none _ h_get
+      | ofLeft _ => exact Nat.succ_pos _
+      | ofRight _ => exact Nat.succ_pos _
+    refine (probEvent_mono'' (q := fun b : Bool => b = true) ?_).trans
+      (probEvent_verifyProof_eq_true_le_inv_card_of_pos_depth h_pos leaf root proof)
+    rintro _ ⟨h_v, _⟩; exact h_v
+  · -- Extractor's path is intact: the bad event is impossible.
+    have h_zero : Pr[fun verified : Bool => verified = true ∧
+            (extractor s log_c root).get idx.toNodeIndex = none |
+          (verifyProof (m := OracleComp (spec α)) idx leaf root proof
+            : OracleComp (spec α) Bool)] = 0 := by
+      refine probEvent_eq_zero ?_
+      rintro _ _ ⟨_, h⟩; exact h_get h
+    rw [h_zero]
+    exact zero_le _
+
 /--
 **Case B substantive obligation, `1 < |α|` branch.** Same statement as
 `extractability_game_noColl_caseB_le_inv_card`, but specialized to the
@@ -1005,16 +1144,10 @@ non-trivial cardinality regime `1 < Fintype.card α`. The full case-B bound
 discharges `|α| ≤ 1` by `probEvent_le_one` and delegates to this helper for
 the substantive probabilistic argument.
 
-This helper isolates the genuinely substantive content (a `probOutput_query`
-style bound on the verifier's terminal hash query) from the trivial small-card
-boilerplate. It is left as `sorry`: the proof requires a level-by-level
-analysis of the verifier's hash chain that "leaves" committingAdv's tree —
-specifically, identifying the highest level `k` at which the chain's
-hash-input pair is fresh in the combined log (modulo no-collision /
-duplicate-query reuse, controlled by `h_le_qb : 4 * s.leafCount + 1 ≤ qb`)
-and using uniformity of the random oracle's response at that fresh input to
-bound the probability of producing any specific target value (here `root`)
-by `1/|α|`.
+The proof reduces (via `probEvent_withQueryLog`) to bounding
+`Pr[verified = true ∧ extractedTree.get idx = none | game]` and decomposes
+the bind, applying `probEvent_verifyProof_extractor_none_le_inv_card` to the
+verifier's terminal step.
 -/
 private theorem extractability_game_noColl_caseB_le_inv_card_aux
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -1042,7 +1175,50 @@ private theorem extractability_game_noColl_caseB_le_inv_card_aux
         verified = true ∧ extractedTree.get idx.toNodeIndex = none) |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
         (1 : ENNReal) / (Fintype.card α : ENNReal) := by
-  sorry
+  rw [one_div]
+  -- Step 1: Drop the outer log via `probEvent_withQueryLog`. We first convert
+  -- `fun x => ... x.1 ...` to the equivalent `(fun vals => ...) ∘ Prod.fst`
+  -- (defeq), then rewrite via the lemma.
+  change Pr[((fun vals : α × AuxState ×
+            ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
+             FullData (Option α) s × List.Vector (Option α) idx.depth × Bool) =>
+            let ⟨_, _, idx, _, _, extractedTree, _, verified⟩ := vals
+            verified = true ∧ extractedTree.get idx.toNodeIndex = none) ∘ Prod.fst) |
+        (extractability_game committingAdv openingAdv).withQueryLog] ≤ _
+  rw [← probEvent_withQueryLog]
+  -- Step 2: Restructure the game as a triple bind so we can decompose it via
+  -- `probEvent_bind_le_of_forall_le`.
+  rw [show extractability_game committingAdv openingAdv =
+        committingAdv.withQueryLog >>= fun rootAuxLog =>
+          openingAdv rootAuxLog.1.2 >>= fun ilp =>
+            verifyProof ilp.1 ilp.2.1 rootAuxLog.1.1 ilp.2.2 >>= fun verified =>
+              pure (rootAuxLog.1.1, rootAuxLog.1.2,
+                ⟨ilp.1, ilp.2.1, ilp.2.2,
+                 extractor s rootAuxLog.2 rootAuxLog.1.1,
+                 generateProof (extractor s rootAuxLog.2 rootAuxLog.1.1) ilp.1,
+                 verified⟩) by
+        unfold extractability_game; rfl]
+  -- Step 3: peel off `committingAdv.withQueryLog`.
+  refine probEvent_bind_le_of_forall_le ?_
+  rintro ⟨⟨root, aux⟩, log_c⟩ _
+  -- Peel off `openingAdv aux`.
+  refine probEvent_bind_le_of_forall_le ?_
+  rintro ⟨idx, leaf, proof⟩ _
+  -- Inner: `verifyProof idx leaf root proof >>= fun verified => pure (...)`.
+  -- Reshape the pure as `pure ∘ wrap_verified` and apply `probEvent_bind_pure_comp`.
+  rw [show (fun verified : Bool =>
+        (pure (root, aux,
+          ⟨idx, leaf, proof, extractor s log_c root,
+           generateProof (extractor s log_c root) idx, verified⟩) :
+          OracleComp (spec α) (α × AuxState ×
+            ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
+             FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)))) =
+        pure ∘ (fun verified : Bool => (root, aux,
+          ⟨idx, leaf, proof, extractor s log_c root,
+           generateProof (extractor s log_c root) idx, verified⟩)) from rfl]
+  rw [probEvent_bind_pure_comp]
+  -- The composed event simplifies to `verified = true ∧ extractor.get = none`.
+  exact probEvent_verifyProof_extractor_none_le_inv_card idx leaf root proof log_c
 
 /--
 **Case B bound: probability `≤ 1/|α|`.** When the extractor's path from `root` to
