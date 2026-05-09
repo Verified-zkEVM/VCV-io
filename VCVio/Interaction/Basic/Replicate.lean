@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Append
+import ToMathlib.PFunctor.Free.Replicate
 
 /-!
 # `Spec.replicate` and transcript operations
@@ -19,9 +20,8 @@ namespace Interaction
 namespace Spec
 
 /-- `n`-fold dependent append of `spec` with trivial continuation (`fun _ => replicate …`). -/
-def replicate (spec : Spec) : (n : Nat) → Spec
-  | 0 => .done
-  | n + 1 => spec.append (fun _ => replicate spec n)
+abbrev replicate (spec : Spec) : (n : Nat) → Spec :=
+  PFunctor.FreeM.replicate PUnit.unit spec
 
 @[simp, grind =] theorem replicate_zero (spec : Spec) : spec.replicate 0 = .done := rfl
 
@@ -113,33 +113,28 @@ theorem Transcript.replicateJoin_replicateSplit (spec : Spec) (n : Nat)
 variable {S : Type u → Type v}
 
 /-- Replicate a decoration `n` times along `Spec.replicate`. -/
-def Decoration.replicate {S : Type u → Type v}
+abbrev Decoration.replicate {S : Type u → Type v}
     {spec : Spec} (d : Decoration S spec) : (n : Nat) →
-    Decoration S (spec.replicate n)
-  | 0 => ⟨⟩
-  | n + 1 => Decoration.append d (fun _ => Decoration.replicate d n)
+    Decoration S (spec.replicate n) :=
+  PFunctor.FreeM.Displayed.Decoration.replicate (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) (a := PUnit.unit) d
 
 /-- Replicate a dependent decoration `n` times along replicated base
 decorations. -/
-def Decoration.Over.replicate {L : Type u → Type v} {F : ∀ X, L X → Type w}
+abbrev Decoration.Over.replicate {L : Type u → Type v} {F : ∀ X, L X → Type w}
     {spec : Spec} {d : Decoration L spec}
     (r : Decoration.Over F spec d) : (n : Nat) →
-    Decoration.Over F (spec.replicate n) (d.replicate n)
-  | 0 => ⟨⟩
-  | n + 1 => Over.append r (fun _ => Over.replicate r n)
+    Decoration.Over F (spec.replicate n) (d.replicate n) :=
+  PFunctor.FreeM.Displayed.Decoration.Over.replicate (P := Spec.basePFunctor)
+    (α := PUnit.{u+1}) (a := PUnit.unit) r
 
 /-- `Decoration.map` commutes with `Decoration.replicate`. -/
 theorem Decoration.map_replicate {S : Type u → Type v} {T : Type u → Type w}
-    (f : ∀ X, S X → T X) {spec : Spec} (d : Decoration S spec) :
-    (n : Nat) →
+    (f : ∀ X, S X → T X) {spec : Spec} (d : Decoration S spec) (n : Nat) :
     Decoration.map f (spec.replicate n) (d.replicate n) =
-      (Decoration.map f spec d).replicate n
-  | 0 => rfl
-  | n + 1 => by
-      simp only [Spec.replicate, Decoration.replicate]
-      rw [Decoration.map_append]
-      congr 1; funext _
-      exact map_replicate f d n
+      (Decoration.map f spec d).replicate n :=
+  PFunctor.FreeM.Displayed.Decoration.map_replicate
+    (P := Spec.basePFunctor) (α := PUnit.{u+1}) f PUnit.unit d n
 
 /-- `Decoration.Over.map` commutes with `Over.replicate`. -/
 theorem Decoration.Over.map_replicate {L : Type u → Type v} {F G : ∀ X, L X → Type w}
@@ -147,16 +142,9 @@ theorem Decoration.Over.map_replicate {L : Type u → Type v} {F G : ∀ X, L X 
     (r : Decoration.Over F spec d) (n : Nat) :
     Decoration.Over.map η (Spec.replicate spec n) (Decoration.replicate d n)
         (Decoration.Over.replicate r n) =
-      Decoration.Over.replicate (Decoration.Over.map η spec d r) n := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    simp only [Decoration.Over.replicate, Spec.replicate_succ, Decoration.replicate]
-    rw [Decoration.Over.map_append η spec (fun _ => Spec.replicate spec n) d
-          (fun _ => Decoration.replicate d n) r (fun _ => Decoration.Over.replicate r n)]
-    refine congrArg (Decoration.Over.append (Decoration.Over.map η spec d r)) ?_
-    funext _
-    exact ih
+      Decoration.Over.replicate (Decoration.Over.map η spec d r) n :=
+  PFunctor.FreeM.Displayed.Decoration.Over.map_replicate
+    (P := Spec.basePFunctor) (α := PUnit.{u+1}) η PUnit.unit r n
 
 variable {m : Type u → Type u}
 

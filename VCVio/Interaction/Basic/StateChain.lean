@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Replicate
+import ToMathlib.PFunctor.Free.Displayed.StateChain
 
 /-!
 # State-indexed dependent chains (`Spec.stateChain`)
@@ -28,13 +29,12 @@ namespace Spec
 
 /-- `n`-stage dependent composition: run `spec i s`, then advance to state
 `advance i s tr` and repeat for `n` total stages. -/
-def stateChain (Stage : Nat → Type u)
+abbrev stateChain (Stage : Nat → Type u)
     (spec : (i : Nat) → Stage i → Spec)
     (advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)) :
-    (n : Nat) → (i : Nat) → Stage i → Spec
-  | 0, _, _ => .done
-  | n + 1, i, s =>
-      (spec i s).append (fun tr => stateChain Stage spec advance n (i + 1) (advance i s tr))
+    (n : Nat) → (i : Nat) → Stage i → Spec :=
+  PFunctor.FreeM.stateChain (P := Spec.basePFunctor) (α := PUnit.{u+1})
+    PUnit.unit Stage spec advance
 
 @[simp, grind =]
 theorem stateChain_zero (Stage : Nat → Type u)
@@ -59,7 +59,7 @@ theorem replicate_eq_stateChain (spec : Spec) (n : Nat) (i : Nat) :
   induction n generalizing i with
   | zero => rfl
   | succ n ih =>
-    simp only [replicate, stateChain]
+    simp only [replicate_succ, stateChain]
     congr 1; funext _; exact ih (i + 1)
 
 /-- Decompose a `(n+1)`-stage state chain transcript into the first-stage transcript and
@@ -192,31 +192,29 @@ def Transcript.stateChainLiftJoin (Stage : Nat → Type u)
 variable {S : Type u → Type v} {L : Type u → Type v} {F : ∀ X, L X → Type w}
 
 /-- Per-node labels along a state chain: at each stage, use `deco i s`. -/
-def Decoration.stateChain {S : Type u → Type v}
+abbrev Decoration.stateChain {S : Type u → Type v}
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (deco : (i : Nat) → (s : Stage i) → Decoration S (spec i s)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
-    Decoration S (Spec.stateChain Stage spec advance n i s)
-  | 0, _, _ => ⟨⟩
-  | n + 1, i, s =>
-      Decoration.append (deco i s)
-        (fun tr => Decoration.stateChain deco n (i + 1) (advance i s tr))
+    Decoration S (Spec.stateChain Stage spec advance n i s) :=
+  PFunctor.FreeM.Displayed.Decoration.stateChain
+    (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
+    (advance := advance) deco
 
 /-- Dependent decoration layer along a state chain, fibered over
 `Decoration.stateChain`. -/
-def Decoration.Over.stateChain {L : Type u → Type v} {F : ∀ X, L X → Type w}
+abbrev Decoration.Over.stateChain {L : Type u → Type v} {F : ∀ X, L X → Type w}
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     {deco : (i : Nat) → (s : Stage i) → Decoration L (spec i s)}
     (rDeco : (i : Nat) → (s : Stage i) → Decoration.Over F (spec i s) (deco i s)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
     Decoration.Over F (Spec.stateChain Stage spec advance n i s)
-      (Decoration.stateChain deco n i s)
-  | 0, _, _ => ⟨⟩
-  | n + 1, i, s =>
-      Over.append (rDeco i s)
-        (fun tr => Over.stateChain rDeco n (i + 1) (advance i s tr))
+      (Decoration.stateChain deco n i s) :=
+  PFunctor.FreeM.Displayed.Decoration.Over.stateChain
+    (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
+    (advance := advance) rDeco
 
 /-- `Over.map` commutes with `Over.stateChain`. -/
 theorem Decoration.Over.map_stateChain {L : Type u → Type v} {F G : ∀ X, L X → Type w}
@@ -224,25 +222,14 @@ theorem Decoration.Over.map_stateChain {L : Type u → Type v} {F G : ∀ X, L X
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     {deco : (i : Nat) → (s : Stage i) → Decoration L (spec i s)}
-    (rDeco : (i : Nat) → (s : Stage i) → Decoration.Over F (spec i s) (deco i s)) :
-    (n : Nat) → (i : Nat) → (s : Stage i) →
+    (rDeco : (i : Nat) → (s : Stage i) → Decoration.Over F (spec i s) (deco i s))
+    (n : Nat) (i : Nat) (s : Stage i) :
     Decoration.Over.map η (Spec.stateChain Stage spec advance n i s)
         (Decoration.stateChain deco n i s) (Decoration.Over.stateChain rDeco n i s) =
       Decoration.Over.stateChain (fun j t => Decoration.Over.map η (spec j t) (deco j t)
-        (rDeco j t)) n i s
-  | 0, _, _ => rfl
-  | n + 1, i, s => by
-      simp only [stateChain_succ, Decoration.stateChain, Decoration.Over.stateChain]
-      rw [Decoration.Over.map_append η (spec i s)
-            (fun tr => Spec.stateChain Stage spec advance n (i + 1) (advance i s tr))
-            (deco i s)
-            (fun tr => Decoration.stateChain deco n (i + 1) (advance i s tr))
-            (rDeco i s)
-            (fun tr => Decoration.Over.stateChain rDeco n (i + 1) (advance i s tr))]
-      refine congrArg (Decoration.Over.append (Decoration.Over.map η (spec i s) (deco i s)
-            (rDeco i s))) ?_
-      funext tr
-      exact Decoration.Over.map_stateChain η rDeco n (i + 1) (advance i s tr)
+        (rDeco j t)) n i s :=
+  PFunctor.FreeM.Displayed.Decoration.Over.map_stateChain
+    (P := Spec.basePFunctor) (α := PUnit.{u+1}) η rDeco n i s
 
 /-! ## State chain families -/
 
@@ -252,7 +239,7 @@ at each step. Reduces **definitionally** when the transcript is built via
 `Transcript.append`, avoiding Nat-arithmetic casts.
 
 This is the canonical output type for `Strategy.stateChainComp` and
-`Counterpart.stateChainComp`. -/
+`StrategyOver.TwoParty.Counterpart.stateChainComp`. -/
 def Transcript.stateChainFamily
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}

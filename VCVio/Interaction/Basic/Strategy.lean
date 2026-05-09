@@ -15,7 +15,7 @@ transcript-dependent output.
 
 This is the singleton-agent specialization of `StrategyOver` over the empty
 node context. `Strategy.run` is the corresponding specialization of the
-generic `InteractionOver.run` runner.
+generic `InteractionOver.runSpec` runner.
 
 Dependent sequential composition `Strategy.comp` requires `Spec.append` from
 `VCVio.Interaction.Basic.Append`.
@@ -24,6 +24,7 @@ Dependent sequential composition `Strategy.comp` requires `Spec.append` from
 universe u
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace Spec
 
 variable {m : Type u → Type u}
@@ -33,17 +34,20 @@ variable {m : Type u → Type u}
 At each node the strategy chooses a move `x` and provides the continuation in
 the ambient monad `m`. -/
 def Strategy.syntax (m : Type u → Type u) :
-    SyntaxOver.{u, u, u, u} PUnit Node.Context.empty where
+    SyntaxOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit.{u+1} Node.Context.empty.{u, u} where
   Node _ X _ Cont := (x : X) × m (Cont x)
 
 /-- One-player strategy with monadic effects. -/
 abbrev Strategy.Plain (m : Type u → Type u)
-    (spec : Spec) (Output : Transcript spec → Type u) :=
-  StrategyOver (Strategy.syntax m) PUnit.unit spec (Decoration.empty spec) Output
+    (spec : Spec.{u}) (Output : Transcript spec → Type u) :=
+  StrategyOver (Strategy.syntax m) (PUnit.unit : PUnit.{u+1}) spec
+    (Decoration.empty.{u, u} spec) Output
 
 /-- One-step execution law for ordinary one-player strategies. -/
 def Strategy.interaction (m : Type u → Type u) [Monad m] :
-    Interaction PUnit (Strategy.syntax m) m where
+    InteractionOver
+      (PFunctor.Lens.id Spec.basePFunctor) PUnit Node.Context.empty (Strategy.syntax m) m where
   interact := fun {_X} {_γ} {_Cont} {_Result} profile k => do
     let node := profile PUnit.unit
     let next ← node.2
@@ -54,8 +58,8 @@ def Strategy.run {m : Type u → Type u} [Monad m] :
     (spec : Spec) → {Output : Transcript spec → Type u} →
     Strategy.Plain m spec Output → m ((tr : Transcript spec) × Output tr)
   | spec, Output, strat =>
-      InteractionOver.run
-        (Agent := PUnit)
+      InteractionOver.runSpec
+        (Agent := PUnit.{u+1})
         (Γ := Node.Context.empty)
         (syn := Strategy.syntax m)
         (m := m)
@@ -88,15 +92,12 @@ theorem Strategy.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunctor
     rcases σ with ⟨x, cont⟩
     simp only [Strategy.mapOutput]
     congr 1
-    have hid :
-        (mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) :
-            Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩) →
-              Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩)) =
-          id := by
-      funext s
-      exact ih x s
-    rw [hid]
-    exact LawfulFunctor.id_map cont
+    have hid : ∀ s : Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩),
+        mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) s = s :=
+      fun s => ih x s
+    calc (mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => y) ·) <$> cont
+        = id <$> cont := by congr 1; funext s; exact hid s
+      _ = cont := LawfulFunctor.id_map cont
 
 /-- `mapOutput` respects composition of output maps (needs a lawful functor). -/
 theorem Strategy.mapOutput_comp {m : Type u → Type u} [Functor m] [LawfulFunctor m] {spec : Spec}
@@ -110,16 +111,21 @@ theorem Strategy.mapOutput_comp {m : Type u → Type u} [Functor m] [LawfulFunct
     rcases σ with ⟨x, cont⟩
     simp only [Strategy.mapOutput]
     congr 1
-    have hcomp :
-        (@mapOutput m _ (rest x) (fun p => A ⟨x, p⟩) (fun p => C ⟨x, p⟩)
-            fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => g ⟨x, p⟩ (f ⟨x, p⟩ y)) =
+    have hcomp : ∀ s : Strategy.Plain m (rest x) (fun p => A ⟨x, p⟩),
+        @mapOutput m _ (rest x) (fun p => A ⟨x, p⟩) (fun p => C ⟨x, p⟩)
+            (fun p y => g ⟨x, p⟩ (f ⟨x, p⟩ y)) s =
           (@mapOutput m _ (rest x) (fun p => B ⟨x, p⟩) (fun p => C ⟨x, p⟩)
               (fun p y => g ⟨x, p⟩ y) ∘
             @mapOutput m _ (rest x) (fun p => A ⟨x, p⟩) (fun p => B ⟨x, p⟩)
-              (fun p y => f ⟨x, p⟩ y)) := by
-      funext s
-      exact ih x (fun p y => g ⟨x, p⟩ y) (fun p y => f ⟨x, p⟩ y) s
-    rw [hcomp, LawfulFunctor.comp_map]
+              (fun p y => f ⟨x, p⟩ y)) s :=
+      fun s => ih x (fun p y => g ⟨x, p⟩ y) (fun p y => f ⟨x, p⟩ y) s
+    calc (mapOutput (fun (p : Transcript (rest x)) (y : A ⟨x, p⟩) => g ⟨x, p⟩ (f ⟨x, p⟩ y)) ·)
+              <$> cont
+        = ((mapOutput (fun p y => g ⟨x, p⟩ y) ·) ∘ (mapOutput (fun p y => f ⟨x, p⟩ y) ·))
+              <$> cont := by congr 1; funext s; exact hcomp s
+      _ = (mapOutput (fun p y => g ⟨x, p⟩ y) ·) <$>
+            ((mapOutput (fun p y => f ⟨x, p⟩ y) ·) <$> cont) := by
+            rw [LawfulFunctor.comp_map]
 
 end Spec
 end Interaction

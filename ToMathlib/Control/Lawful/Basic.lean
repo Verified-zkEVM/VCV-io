@@ -49,6 +49,39 @@ theorem do_map_bind {α β γ : Type u} (f : β → γ) (x : m α) (g : α → m
 theorem do_bind_map_left {α β γ : Type u} (f : α → β) (x : m α) (g : β → m γ) :
     (do let b ← f <$> x; g b) = (do let a ← x; g (f a)) := by simp
 
+@[simp]
+theorem do_bind_do_pure_bind {α β γ : Type u} (x : m α) (f : α → β) (g : β → m γ) :
+    (do let a ← x; let b ← (pure (f a) : m β); g b) =
+      (do let a ← x; g (f a)) := by simp
+
+theorem bind_pure_sigma_mk {α : Type u} {β : α → Type u} (x : α)
+    {tail : β x} {action : m (β x)} (h : action = pure tail) :
+    (do
+      let rest ← action
+      pure (Sigma.mk x rest)) = pure (Sigma.mk x tail) := by
+  rw [h]
+  simp
+
+@[simp]
+theorem do_pure_bind_sigma {α : Type u} {β : α → Type u} {γ : Type u}
+    (x : α) (tail : β x) (k : ((x : α) × β x) → m γ) :
+    (do
+      let pair ← (pure (⟨x, tail⟩ : (x : α) × β x) : m ((x : α) × β x))
+      k pair) = k ⟨x, tail⟩ :=
+  do_pure_bind (m := m) (a := (⟨x, tail⟩ : (x : α) × β x)) k
+
+@[simp]
+theorem do_bind_do_pure_bind_sigma {α : Type u} {β : α → Type u} {γ : Type u}
+    (x : α) (action : m (β x)) (k : ((x : α) × β x) → m γ) :
+    (do
+      let tail ← action
+      let pair ← (pure (⟨x, tail⟩ : (x : α) × β x) : m ((x : α) × β x))
+      k pair) =
+    (do
+      let tail ← action
+      k ⟨x, tail⟩) := by
+  simp only [do_bind_do_pure_bind]
+
 end LawfulMonad
 
 end

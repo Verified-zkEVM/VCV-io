@@ -25,6 +25,7 @@ This is the most direct structured way to describe multiparty nodes with:
 universe u
 
 namespace Interaction
+open PFunctor.FreeM.Displayed (Decoration)
 namespace Multiparty
 namespace Profile
 
