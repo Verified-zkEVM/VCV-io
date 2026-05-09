@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2024 ArkLib Contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao
+Authors: Quang Dao, Bolton Bailey
 -/
 
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Collision
@@ -11,6 +11,34 @@ import ToMathlib.Data.IndexedBinaryTree.Lemmas
 /-!
 # Inductive Merkle Tree Extractability
 
+This file develops extractability for the inductive Merkle tree commitment scheme. The
+extractor reconstructs a partial tree from the committing adversary's query log and the
+opened root, and the main theorem bounds the probability that an adversary opens a leaf
+that disagrees with the extracted tree.
+
+## Main definitions
+
+* `extractor`: builds a `FullData (Option α) s` from a query log, root, and skeleton by
+  walking down from the root and pulling each node's children from the unique log entry
+  whose response matches.
+* `extractability_game`: the bundled game pairing a committing adversary with an opening
+  adversary and recording the verifier's outcome along with the extracted tree and proof.
+* `chainInLog`: structural predicate witnessing that a query log contains the hash chain
+  from `root` down to `leaf` along the path determined by `idx`.
+
+## Main results
+
+* `extractability_game_IsTotalQueryBound`: the full game has total query bound `qb +
+  s.depth`, with the extra `s.depth` accounting for `verifyProof`.
+* `extractor_chain_match` and `extractability_game_no_coll_match`: under no-collision, an
+  intact extractor path forces the opened `(leaf, proof)` to match the extracted pair.
+* `extractability`: an adversary wins the extractability game with probability at most
+  `(qb + s.depth)^2 / (2|α|) + 2 (s.depth + 1) s.leafCount / |α|`, by union-bounding
+  collision probability against the no-collision lucky-guess bound.
+
+## References
+
+* SNARGs book, Lemma 18.5.1.
 -/
 
 open scoped NNReal
@@ -90,27 +118,6 @@ def extractor {α : Type} [DecidableEq α] [SampleableType α]
         (some child_hashes.1, some child_hashes.2)
   populate_down s children (some root)
 
-/-! ### Chain predicate and consistency lemma
-
-The proof of `extractability_game_noColl_caseA_eq_zero` relies on three
-substantive helper facts:
-
-1.  A *structural predicate* `chainInLog` capturing what it means for the
-    verifier's `getPutativeRoot` chain to actually appear in the combined log.
-2.  A *pure consistency lemma* `extractor_chain_match` showing that under
-    no-collision, an intact extractor path plus a `chainInLog` witness force
-    the opened `(leaf, proof)` to match the extracted pair.
-3.  A *support-to-chain bridge* `support_implies_chainInLog` translating
-    `verified = true` (in the game's support) into `chainInLog`.
-
-(2) is a pure structural induction on `idx` (no probability content) and (3)
-follows from unfolding the game's monadic structure and applying the
-`WriterT.run_bind'` decomposition of `withQueryLog` plus the structural
-characterisation of `run_simulateQ_loggingOracle_query_bind`. Both are
-factored out as helper theorems below; their proofs are documented but
-elided as `sorry` here.
--/
-
 /-- Under no-collision, `List.find?` on a `q.2`-matcher returns the unique
 log entry with that response. -/
 lemma find?_response_eq_some_of_no_collision_mem
@@ -119,24 +126,16 @@ lemma find?_response_eq_some_of_no_collision_mem
     log.find? (fun q' => q'.2 == q.2) = some q := by
   -- `find?` returns the first matching entry; under no-collision, all matching
   -- entries are equal as Sigma values, so the first one must be `q`.
-  have h_some : ∃ y, log.find? (fun q' => q'.2 == q.2) = some y := by
+  obtain ⟨y, hy⟩ : ∃ y, log.find? (fun q' => q'.2 == q.2) = some y := by
     cases hf : log.find? (fun q' => q'.2 == q.2) with
-    | none =>
-      exfalso
-      rw [List.find?_eq_none] at hf
-      exact hf q h_mem (by simp)
+    | none => exact (List.find?_eq_none.mp hf q h_mem (by simp)).elim
     | some y => exact ⟨y, rfl⟩
-  obtain ⟨y, hy⟩ := h_some
   rw [hy]
   congr 1
-  have h_y_mem : y ∈ log := List.mem_of_find?_eq_some hy
-  have h_y_match : (fun q' : (_i : (α × α)) × α => q'.2 == q.2) y = true :=
-    List.find?_eq_some_iff_getElem.mp hy |>.1
   have h_y_eq : y.2 = q.2 := by
-    simp only [beq_iff_eq] at h_y_match
-    exact h_y_match
+    simpa using (List.find?_eq_some_iff_getElem.mp hy).1
   by_contra h_ne
-  exact h_no_coll ⟨y, q, h_ne, h_y_mem, h_mem, by simp [h_y_eq]⟩
+  exact h_no_coll ⟨y, q, h_ne, List.mem_of_find?_eq_some hy, h_mem, by simp [h_y_eq]⟩
 
 /--
 Predicate stating that `log` contains a hash chain from `root` (combined with the
@@ -194,35 +193,23 @@ theorem extractor_chain_match
       (generateProof (extractor s log root) idx).toList = proof.toList.map some := by
   induction idx with
   | ofLeaf =>
-    -- Base case: `s = .leaf`, `idx = .ofLeaf`.
-    -- `extractor .leaf log root = FullData.leaf (some root)`, so the get is `some root`.
-    -- `chainInLog … .ofLeaf` reduces to `leaf = root`, so the get equals `some leaf`.
-    -- The proof has length 0, hence is empty; `generateProof` on `.ofLeaf` is `nil`.
-    intro log root leaf proof _h_no_coll _h_ne_none h_chain
+    intro log root leaf proof _ _ h_chain
     simp only [chainInLog] at h_chain
     refine ⟨?_, ?_⟩
     · change (FullData.leaf (some root) : FullData (Option α) Skeleton.leaf).get
             SkeletonNodeIndex.ofLeaf = some leaf
       rw [FullData.get_leaf, h_chain]
-    · rcases proof with ⟨l, hl⟩
-      have : l = [] := List.length_eq_zero_iff.mp hl
-      subst this
-      rfl
+    · obtain ⟨_ | _, hl⟩ := proof
+      · rfl
+      · exact absurd hl (Nat.succ_ne_zero _)
   | @ofLeft sl sr idxLeft ih =>
     intro log root leaf proof h_no_coll h_ne_none h_chain
-    -- Step 1. Destructure the chain to obtain the witness `ancestor` and the log entry.
     obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    -- Step 2. Under no-collision, `find?` on the response-`root` matcher returns
-    --   exactly the chain's log entry.
     have h_find :
         log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
           some ⟨(ancestor, proof.head), root⟩ := by
-      have :=
-        find?_response_eq_some_of_no_collision_mem
-          (q := (⟨(ancestor, proof.head), root⟩ : (_i : (α × α)) × α))
-          h_no_coll h_log_mem
-      simpa using this
-    -- Step 3. The extractor decomposes via `populate_down_internal_def`.
+      simpa using find?_response_eq_some_of_no_collision_mem
+        (q := (⟨(ancestor, proof.head), root⟩ : (_i : (α × α)) × α)) h_no_coll h_log_mem
     have h_extractor_decomp :
         extractor (Skeleton.internal sl sr) log root =
           FullData.internal (some root)
@@ -232,62 +219,28 @@ theorem extractor_chain_match
       simp only [h_find, FullData.internal.injEq, true_and]
       exact ⟨rfl, rfl⟩
     rw [h_extractor_decomp]
-    -- Step 4. Transfer ne-none into the recursive subcall.
-    have h_ne_none_inner :
-        (extractor sl log ancestor).get idxLeft.toNodeIndex ≠ none := by
-      intro hne
-      apply h_ne_none
-      rw [h_extractor_decomp]
-      change (FullData.internal (some root) (extractor sl log ancestor)
-              (extractor sr log proof.head)).get
-            (SkeletonNodeIndex.ofLeft idxLeft.toNodeIndex) = none
-      rw [FullData.get_internal_ofLeft]
-      exact hne
-    -- Step 5. Apply IH for the left subtree with new root `ancestor`.
+    have h_ne_none_inner : (extractor sl log ancestor).get idxLeft.toNodeIndex ≠ none :=
+      fun hne => h_ne_none (by rw [h_extractor_decomp]; exact hne)
     obtain ⟨ih_get, ih_proof⟩ :=
       ih log ancestor leaf proof.tail h_no_coll h_ne_none_inner h_chain_rec
-    refine ⟨?_, ?_⟩
-    · change (FullData.internal (some root) (extractor sl log ancestor)
-              (extractor sr log proof.head)).get
-            (SkeletonNodeIndex.ofLeft idxLeft.toNodeIndex) = some leaf
-      rw [FullData.get_internal_ofLeft]
-      exact ih_get
-    · -- generateProof for ofLeft prepends `extractedTree.rightSubtree.getRootValue`
-      -- to `generateProof extractedTree.leftSubtree idxLeft`.
-      change (generateProof
-              (FullData.internal (some root) (extractor sl log ancestor)
-                (extractor sr log proof.head))
-              (SkeletonLeafIndex.ofLeft idxLeft)).toList =
-          proof.toList.map some
-      simp only [generateProof, FullData.rightSubtree_internal,
-        FullData.leftSubtree_internal]
-      -- `(extractor sr log proof.head).getRootValue = some proof.head`.
-      have h_root_value : (extractor sr log proof.head).getRootValue = some proof.head := by
-        change (populate_down sr _ (some proof.head)).getRootValue = some proof.head
-        rw [populate_down_getRootValue]
-      -- `(a ::ᵥ v).toList = a :: v.toList` definitionally.
-      change (extractor sr log proof.head).getRootValue ::
-            (generateProof (extractor sl log ancestor) idxLeft).toList =
-          proof.toList.map some
-      rw [h_root_value, ih_proof]
-      rcases proof with ⟨l, hl⟩
-      cases l with
-      | nil => exact absurd hl.symm (Nat.succ_ne_zero _)
-      | cons hd tl =>
-        change some hd :: List.map some tl = List.map some (hd :: tl)
-        rfl
+    refine ⟨ih_get, ?_⟩
+    change (extractor sr log proof.head).getRootValue ::
+          (generateProof (extractor sl log ancestor) idxLeft).toList =
+        proof.toList.map some
+    have h_root_value : (extractor sr log proof.head).getRootValue = some proof.head :=
+      populate_down_getRootValue _ _
+    rw [h_root_value, ih_proof]
+    obtain ⟨_ | _, hl⟩ := proof
+    · exact absurd hl.symm (Nat.succ_ne_zero _)
+    · rfl
   | @ofRight sl sr idxRight ih =>
-    -- Symmetric to the `.ofLeft` case.
     intro log root leaf proof h_no_coll h_ne_none h_chain
     obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
     have h_find :
         log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
           some ⟨(proof.head, ancestor), root⟩ := by
-      have :=
-        find?_response_eq_some_of_no_collision_mem
-          (q := (⟨(proof.head, ancestor), root⟩ : (_i : (α × α)) × α))
-          h_no_coll h_log_mem
-      simpa using this
+      simpa using find?_response_eq_some_of_no_collision_mem
+        (q := (⟨(proof.head, ancestor), root⟩ : (_i : (α × α)) × α)) h_no_coll h_log_mem
     have h_extractor_decomp :
         extractor (Skeleton.internal sl sr) log root =
           FullData.internal (some root)
@@ -297,44 +250,20 @@ theorem extractor_chain_match
       simp only [h_find, FullData.internal.injEq, true_and]
       exact ⟨rfl, rfl⟩
     rw [h_extractor_decomp]
-    have h_ne_none_inner :
-        (extractor sr log ancestor).get idxRight.toNodeIndex ≠ none := by
-      intro hne
-      apply h_ne_none
-      rw [h_extractor_decomp]
-      change (FullData.internal (some root) (extractor sl log proof.head)
-              (extractor sr log ancestor)).get
-            (SkeletonNodeIndex.ofRight idxRight.toNodeIndex) = none
-      rw [FullData.get_internal_ofRight]
-      exact hne
+    have h_ne_none_inner : (extractor sr log ancestor).get idxRight.toNodeIndex ≠ none :=
+      fun hne => h_ne_none (by rw [h_extractor_decomp]; exact hne)
     obtain ⟨ih_get, ih_proof⟩ :=
       ih log ancestor leaf proof.tail h_no_coll h_ne_none_inner h_chain_rec
-    refine ⟨?_, ?_⟩
-    · change (FullData.internal (some root) (extractor sl log proof.head)
-              (extractor sr log ancestor)).get
-            (SkeletonNodeIndex.ofRight idxRight.toNodeIndex) = some leaf
-      rw [FullData.get_internal_ofRight]
-      exact ih_get
-    · change (generateProof
-              (FullData.internal (some root) (extractor sl log proof.head)
-                (extractor sr log ancestor))
-              (SkeletonLeafIndex.ofRight idxRight)).toList =
-          proof.toList.map some
-      simp only [generateProof, FullData.leftSubtree_internal,
-        FullData.rightSubtree_internal]
-      have h_root_value : (extractor sl log proof.head).getRootValue = some proof.head := by
-        change (populate_down sl _ (some proof.head)).getRootValue = some proof.head
-        rw [populate_down_getRootValue]
-      change (extractor sl log proof.head).getRootValue ::
-            (generateProof (extractor sr log ancestor) idxRight).toList =
-          proof.toList.map some
-      rw [h_root_value, ih_proof]
-      rcases proof with ⟨l, hl⟩
-      cases l with
-      | nil => exact absurd hl.symm (Nat.succ_ne_zero _)
-      | cons hd tl =>
-        change some hd :: List.map some tl = List.map some (hd :: tl)
-        rfl
+    refine ⟨ih_get, ?_⟩
+    change (extractor sl log proof.head).getRootValue ::
+          (generateProof (extractor sr log ancestor) idxRight).toList =
+        proof.toList.map some
+    have h_root_value : (extractor sl log proof.head).getRootValue = some proof.head :=
+      populate_down_getRootValue _ _
+    rw [h_root_value, ih_proof]
+    obtain ⟨_ | _, hl⟩ := proof
+    · exact absurd hl.symm (Nat.succ_ne_zero _)
+    · rfl
 
 /--
 The game for extractability.
@@ -397,8 +326,6 @@ lemma adversary_wins_extractability_game_with_logging_event_eq
     @adversary_wins_extractability_game_with_logging_event α _ s AuxState =
     adversary_wins_extractability_game_event ∘ Prod.fst := rfl
 
-/-! ### Query bound for `extractability_game` -/
-
 /--
 If the combined adversary pair `(committingAdv, openingAdv)` has total query bound `qb`,
 then the full extractability game has total query bound `qb + s.depth`.
@@ -424,7 +351,7 @@ theorem extractability_game_IsTotalQueryBound
   -- Re-associate `extractability_game` as `prefix >>= suffix`, where the prefix
   -- bundles `committingAdv.withQueryLog ; openingAdv` and the suffix runs
   -- `verifyProof` and assembles the final return tuple.
-  have heq : extractability_game committingAdv openingAdv =
+  rw [show extractability_game committingAdv openingAdv =
       (committingAdv.withQueryLog >>= fun p =>
         openingAdv p.1.2 >>= fun q => pure (p, q)) >>=
       fun pq =>
@@ -433,11 +360,7 @@ theorem extractability_game_IsTotalQueryBound
                 ⟨pq.2.1, pq.2.2.1, pq.2.2.2,
                  extractor s pq.1.2 pq.1.1.1,
                  generateProof (extractor s pq.1.2 pq.1.1.1) pq.2.1,
-                 verified⟩) := by
-    unfold extractability_game
-    simp only [bind_assoc, pure_bind]
-  rw [heq]
-  clear heq
+                 verified⟩) by unfold extractability_game; simp only [bind_assoc, pure_bind]]
   refine isTotalQueryBound_bind (n₁ := qb) (n₂ := s.depth) ?_ ?_
   · -- Prefix bound: same queries as `h`'s computation, hence bounded by `qb`.
     have hmap : (fun _ => ()) <$>
@@ -451,9 +374,8 @@ theorem extractability_game_IsTotalQueryBound
     exact (isQueryBound_iff_of_map_eq hmap (fun _ b => 0 < b) (fun _ b => b - 1)).mpr h
   · -- Suffix bound: verifyProof + pure ≤ s.depth.
     rintro ⟨p, q⟩
-    refine isTotalQueryBound_bind (n₁ := s.depth) (n₂ := 0) ?_ ?_
-    · exact verifyProof_isTotalQueryBound_skeleton_depth q.1 q.2.1 p.1.1 q.2.2
-    · intro _; trivial
+    exact isTotalQueryBound_bind (n₁ := s.depth) (n₂ := 0)
+      (verifyProof_isTotalQueryBound_skeleton_depth q.1 q.2.1 p.1.1 q.2.2) (fun _ => trivial)
 
 
 theorem evalDist_extractability_game_eq
@@ -468,26 +390,6 @@ theorem evalDist_extractability_game_eq
   congr 1
   exact (loggingOracle.fst_map_run_simulateQ _).symm
 
-/-! ### Support → chain bridge and bundled match lemma
-
-The proof of `support_implies_chainInLog` requires three substantive ingredients:
-
-* `chainInLog_mono` — monotonicity in the log (proved below).
-* `OracleComp.withQueryLog_bind`, `OracleComp.withQueryLog_pure` — structural
-  properties of `withQueryLog` (proved below) that decompose the support of a
-  bind into intermediate values + log concatenations.
-* `getPutativeRoot_support_chain` — induction on `idx` showing that any
-  `(r, log_v)` in the support of the verifier's `withQueryLog'd` evaluation
-  yields a `chainInLog log_v r idx leaf proof` witness. The base case is
-  proved; the inductive cases require a more delicate analysis of
-  `(singleHash _ _).withQueryLog` than the bind decomposition supplies and
-  are left as `sorry`.
-
-The final theorem `support_implies_chainInLog` then plumbs the game's monadic
-structure through these helpers, peeling off `committingAdv`, `openingAdv`,
-and the verifier's contribution to extract the chain witness.
--/
-
 /-- `chainInLog` is monotone in the log: enlarging the log only adds more entries
 to draw chain witnesses from. -/
 lemma chainInLog_mono {α : Type} {s : Skeleton} (idx : SkeletonLeafIndex s) :
@@ -497,16 +399,9 @@ lemma chainInLog_mono {α : Type} {s : Skeleton} (idx : SkeletonLeafIndex s) :
     chainInLog log1 root idx leaf proof →
     chainInLog log2 root idx leaf proof := by
   induction idx with
-  | ofLeaf =>
-    intros _ _ _ _ _ _ h
-    exact h
-  | @ofLeft sl sr idxLeft ih =>
-    intros _ _ _ _ _ h_sub h
-    obtain ⟨ancestor, h_mem, h_rec⟩ := h
-    exact ⟨ancestor, h_sub _ h_mem, ih h_sub h_rec⟩
-  | @ofRight sl sr idxRight ih =>
-    intros _ _ _ _ _ h_sub h
-    obtain ⟨ancestor, h_mem, h_rec⟩ := h
+  | ofLeaf => intros _ _ _ _ _ _ h; exact h
+  | @ofLeft sl sr idxLeft ih | @ofRight sl sr idxRight ih =>
+    intro _ _ _ _ _ h_sub ⟨ancestor, h_mem, h_rec⟩
     exact ⟨ancestor, h_sub _ h_mem, ih h_sub h_rec⟩
 
 /-- `OracleComp.withQueryLog` distributes over `bind`: the combined log is the
@@ -571,63 +466,47 @@ lemma getPutativeRoot_support_chain
   induction idx with
   | ofLeaf =>
     intros leaf _proof r log_v hmem
-    have h_eq : (getPutativeRoot (m := OracleComp (spec α))
-        SkeletonLeafIndex.ofLeaf leaf _proof) = pure leaf := rfl
-    rw [h_eq, OracleComp.withQueryLog_pure, mem_support_pure_iff] at hmem
+    rw [show (getPutativeRoot (m := OracleComp (spec α))
+        SkeletonLeafIndex.ofLeaf leaf _proof) = pure leaf from rfl,
+      OracleComp.withQueryLog_pure, mem_support_pure_iff] at hmem
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj hmem
     simp only [chainInLog]
   | @ofLeft sl sr idxLeft ih =>
     intros leaf proof r log_v hmem
-    -- `getPutativeRoot .ofLeft idxLeft leaf proof = rec >>= singleHash · proof.head`.
-    have h_eq : (getPutativeRoot (m := OracleComp (spec α))
+    rw [show (getPutativeRoot (m := OracleComp (spec α))
         (SkeletonLeafIndex.ofLeft idxLeft) leaf proof) =
         getPutativeRoot (m := OracleComp (spec α)) idxLeft leaf proof.tail >>=
-          fun a => singleHash a proof.head := rfl
-    rw [h_eq, OracleComp.withQueryLog_bind] at hmem
-    rw [mem_support_bind_iff] at hmem
+          fun a => singleHash a proof.head from rfl,
+      OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
     obtain ⟨⟨a, log_a⟩, h_rec, hmem⟩ := hmem
-    rw [singleHash_withQueryLog] at hmem
-    -- After unfolding singleHash: `(r, log_v) ∈ support
-    --   (Prod.map id (log_a ++ ·) <$>
-    --     (liftM (query (a, proof.head)) >>= fun u => pure (u, [⟨(a, proof.head), u⟩])))`.
-    rw [support_map, Set.mem_image] at hmem
-    obtain ⟨⟨r', log_b⟩, h_q, h_eq2⟩ := hmem
+    rw [singleHash_withQueryLog, support_map, Set.mem_image] at hmem
+    obtain ⟨⟨_, _⟩, h_q, h_eq2⟩ := hmem
     rw [mem_support_bind_iff] at h_q
-    obtain ⟨u, _, h_pure⟩ := h_q
+    obtain ⟨_, _, h_pure⟩ := h_q
     rw [mem_support_pure_iff, Prod.mk.injEq] at h_pure
     obtain ⟨rfl, rfl⟩ := h_pure
-    -- `h_eq2 : (r', [⟨(a, proof.head), r'⟩]).map id (log_a ++ ·) = (r, log_v)` reduces
-    -- to `r = r'` and `log_v = log_a ++ [⟨(a, proof.head), r⟩]`.
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_eq2
-    -- Apply IH to the recursive part to get `chainInLog log_a a idxLeft leaf proof.tail`.
-    have h_chain_rec := ih leaf proof.tail a log_a h_rec
-    -- Assemble the chain at the current level.
-    refine ⟨a, ?_, ?_⟩
-    · -- `⟨(a, proof.head), r⟩ ∈ log_a ++ [⟨(a, proof.head), r⟩]`.
-      simp
-    · -- Extend `chainInLog log_a a ...` to the larger `log_a ++ [⟨...⟩]`.
-      exact chainInLog_mono _ (fun q hq => List.mem_append_left _ hq) h_chain_rec
+    exact ⟨a, by simp,
+      chainInLog_mono _ (fun _ hq => List.mem_append_left _ hq)
+        (ih leaf proof.tail a log_a h_rec)⟩
   | @ofRight sl sr idxRight ih =>
     intros leaf proof r log_v hmem
-    have h_eq : (getPutativeRoot (m := OracleComp (spec α))
+    rw [show (getPutativeRoot (m := OracleComp (spec α))
         (SkeletonLeafIndex.ofRight idxRight) leaf proof) =
         getPutativeRoot (m := OracleComp (spec α)) idxRight leaf proof.tail >>=
-          fun a => singleHash proof.head a := rfl
-    rw [h_eq, OracleComp.withQueryLog_bind] at hmem
-    rw [mem_support_bind_iff] at hmem
+          fun a => singleHash proof.head a from rfl,
+      OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
     obtain ⟨⟨a, log_a⟩, h_rec, hmem⟩ := hmem
-    rw [singleHash_withQueryLog] at hmem
-    rw [support_map, Set.mem_image] at hmem
-    obtain ⟨⟨r', log_b⟩, h_q, h_eq2⟩ := hmem
+    rw [singleHash_withQueryLog, support_map, Set.mem_image] at hmem
+    obtain ⟨⟨_, _⟩, h_q, h_eq2⟩ := hmem
     rw [mem_support_bind_iff] at h_q
-    obtain ⟨u, _, h_pure⟩ := h_q
+    obtain ⟨_, _, h_pure⟩ := h_q
     rw [mem_support_pure_iff, Prod.mk.injEq] at h_pure
     obtain ⟨rfl, rfl⟩ := h_pure
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_eq2
-    have h_chain_rec := ih leaf proof.tail a log_a h_rec
-    refine ⟨a, ?_, ?_⟩
-    · simp
-    · exact chainInLog_mono _ (fun q hq => List.mem_append_left _ hq) h_chain_rec
+    exact ⟨a, by simp,
+      chainInLog_mono _ (fun _ hq => List.mem_append_left _ hq)
+        (ih leaf proof.tail a log_a h_rec)⟩
 
 /-- A successful `verifyProof` evaluation in the support of its `withQueryLog`
 witnesses a chain in the verifier's log from `root` down to `leaf` along `idx`. -/
@@ -640,12 +519,10 @@ lemma verifyProof_support_chain
         (verifyProof (m := OracleComp (spec α)) idx leaf root proof).withQueryLog) :
     chainInLog log_v root idx leaf proof := by
   -- Reshape `verifyProof` to `getPutativeRoot >>= (· == root)`.
-  have heq : verifyProof (m := OracleComp (spec α)) idx leaf root proof =
+  rw [show verifyProof (m := OracleComp (spec α)) idx leaf root proof =
       (do let r ← getPutativeRoot (m := OracleComp (spec α)) idx leaf proof
-          pure (r == root)) := by
-    unfold verifyProof
-    rfl
-  rw [heq, OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
+          pure (r == root)) from rfl,
+    OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
   obtain ⟨⟨r, log_g⟩, h_g, hmem⟩ := hmem
   rw [support_map, Set.mem_image] at hmem
   obtain ⟨⟨b, log_x⟩, h_x, h_eq⟩ := hmem
@@ -655,10 +532,8 @@ lemma verifyProof_support_chain
   rw [OracleComp.withQueryLog_pure, mem_support_pure_iff] at h_x
   obtain ⟨h_b_eq, rfl⟩ := Prod.mk.inj h_x
   -- `r == root = true` implies `r = root`.
-  have hroot : r = root := by simpa using h_b_eq.symm
-  subst hroot
-  simp only [List.append_nil]
-  exact getPutativeRoot_support_chain idx leaf proof r log_g h_g
+  obtain rfl : r = root := by simpa using h_b_eq.symm
+  simpa using getPutativeRoot_support_chain idx leaf proof r log_g h_g
 
 /--
 **Support → chain.** When the game's combined log `log` contains a successful
@@ -689,51 +564,39 @@ theorem support_implies_chainInLog
                   log) ∈
       support (extractability_game committingAdv openingAdv).withQueryLog) :
     chainInLog log root idx leaf proof := by
-  have hsupport := _hsupport
-  unfold extractability_game at hsupport
-  rw [OracleComp.withQueryLog_bind] at hsupport
-  rw [mem_support_bind_iff] at hsupport
-  obtain ⟨⟨⟨root_c, aux_c⟩, log_c⟩, h_c, hsupport⟩ := hsupport
-  rw [support_map, Set.mem_image] at hsupport
-  obtain ⟨⟨resCO, log_co⟩, h_co, h_eq_co⟩ := hsupport
-  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_co
-  obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
+  have hsup := _hsupport
+  unfold extractability_game at hsup
+  rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at hsup
+  obtain ⟨⟨⟨root_c, _⟩, _⟩, _, hsup⟩ := hsup
+  rw [support_map, Set.mem_image] at hsup
+  obtain ⟨⟨_, _⟩, h_co, h_eq_co⟩ := hsup
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_co
-  obtain ⟨⟨⟨idx_o, leaf_o, proof_o⟩, log_o⟩, h_o, h_co⟩ := h_co
+  obtain ⟨⟨⟨idx_o, leaf_o, proof_o⟩, _⟩, _, h_co⟩ := h_co
   rw [support_map, Set.mem_image] at h_co
-  obtain ⟨⟨resV, log_v_inner⟩, h_v, h_eq_v⟩ := h_co
-  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_v
-  obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
+  obtain ⟨⟨_, _⟩, h_v, h_eq_v⟩ := h_co
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_v
-  obtain ⟨⟨verified, log_v⟩, h_vp, h_v⟩ := h_v
+  obtain ⟨⟨_, log_v⟩, h_vp, h_v⟩ := h_v
   rw [support_map, Set.mem_image] at h_v
-  obtain ⟨⟨_unit, log_p⟩, h_p, h_eq_p⟩ := h_v
+  obtain ⟨⟨_, _⟩, h_p, h_eq_p⟩ := h_v
   rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_p
-  obtain ⟨h_p1, h_p2⟩ := h_p
-  subst h_p2
-  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_p
+  obtain ⟨h_p1, rfl⟩ := h_p
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_co h_eq_v h_eq_p
+  obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
+  obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
   obtain ⟨h_eq_p1, h_eq_p2⟩ := h_eq_p
   rw [← h_eq_p1, h_p1] at h_eq_v1
   rw [← h_eq_v1] at h_eq_co1
   simp only [Prod.mk.injEq] at h_eq_co1
-  obtain ⟨h_root_eq, h_aux_eq, h_sigma_eq⟩ := h_eq_co1
-  subst h_root_eq
-  subst h_aux_eq
+  obtain ⟨rfl, _, h_sigma_eq⟩ := h_eq_co1
   obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
   subst h_idx_eq
   simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
-  obtain ⟨h_leaf_eq, h_proof_eq, _h_tree_eq, _h_proof_ext_eq, h_verified_eq⟩ := h_rest_eq
-  subst h_leaf_eq
-  subst h_proof_eq
-  subst h_verified_eq
-  have h_chain_v := verifyProof_support_chain idx_o leaf_o root_c.1 proof_o log_v h_vp
-  apply chainInLog_mono idx_o _ h_chain_v
+  obtain ⟨rfl, rfl, _, _, rfl⟩ := h_rest_eq
+  refine chainInLog_mono idx_o ?_
+    (verifyProof_support_chain idx_o leaf_o root_c.1 proof_o log_v h_vp)
   intro q hq
-  rw [← h_eq_co2]
-  rw [← h_eq_v2]
-  rw [← h_eq_p2]
-  simp only [List.append_nil]
-  exact List.mem_append_right _ (List.mem_append_right _ hq)
+  rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
+  simpa using List.mem_append_right _ (List.mem_append_right _ hq)
 
 /-- If `populate_down` is called with input value `none` (under a `children`
 function that maps `none` to `(none, none)`), then every node of the resulting
@@ -749,14 +612,10 @@ private lemma populate_down_none_get_eq_none {s : Skeleton}
     cases idx with
     | ofInternal => rfl
     | ofLeft idxL =>
-      rw [populate_down_internal_def, FullData.get_internal_ofLeft]
-      have : (children none).1 = none := by rw [h_none]
-      rw [this]
+      rw [populate_down_internal_def, FullData.get_internal_ofLeft, h_none]
       exact ihL idxL
     | ofRight idxR =>
-      rw [populate_down_internal_def, FullData.get_internal_ofRight]
-      have : (children none).2 = none := by rw [h_none]
-      rw [this]
+      rw [populate_down_internal_def, FullData.get_internal_ofRight, h_none]
       exact ihR idxR
 
 /-- A localized abbreviation for the `extractor`'s children function over a log. -/
@@ -802,139 +661,71 @@ theorem chainInLog_restrict
     chainInLog log root idx leaf proof →
     chainInLog log_c root idx leaf proof := by
   induction idx with
-  | ofLeaf =>
-    intros _ _ _ _ _ _ _ _ h_chain
-    exact h_chain
+  | ofLeaf => intros _ _ _ _ _ _ _ _ h_chain; exact h_chain
   | @ofLeft sl sr idxLeft ih =>
     intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
     obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    have h_find_some :
+    obtain ⟨q_c, h_find_c⟩ :
         ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
       rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
-      · exfalso
-        apply h_ne_none
-        rw [extractor_eq_populate, populate_down_internal_def]
-        change (FullData.internal (some root)
-            (populate_down sl (extractorChildren log_c)
-              (extractorChildren log_c (some root)).1)
-            (populate_down sr (extractorChildren log_c)
-              (extractorChildren log_c (some root)).2)).get
-            (SkeletonNodeIndex.ofLeft idxLeft.toNodeIndex) = none
-        rw [FullData.get_internal_ofLeft]
-        have hch : extractorChildren log_c (some root) = (none, none) := by
-          rw [extractorChildren_some, hf]
-        rw [show (extractorChildren log_c (some root)).1 = none from by rw [hch]]
+      · refine absurd ?_ h_ne_none
+        change (populate_down sl (extractorChildren log_c)
+            (extractorChildren log_c (some root)).1).get idxLeft.toNodeIndex = none
+        rw [show (extractorChildren log_c (some root)).1 = none by
+              rw [extractorChildren_some, hf]]
         exact populate_down_none_get_eq_none (extractorChildren log_c)
           (extractorChildren_none log_c) idxLeft.toNodeIndex
       · exact ⟨q, rfl⟩
-    obtain ⟨q_c, h_find_c⟩ := h_find_some
     have h_qc_mem_lc : q_c ∈ log_c := List.mem_of_find?_eq_some h_find_c
-    have h_qc_mem_log : q_c ∈ log := h_sub _ h_qc_mem_lc
     have h_qc_resp : q_c.2 = root := by
-      have h := List.find?_eq_some_iff_getElem.mp h_find_c |>.1
-      simp only [beq_iff_eq] at h
-      exact h
+      simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
     have h_qc_eq : q_c = ⟨(ancestor, proof.head), root⟩ := by
       by_contra h_ne
-      apply h_no_coll
-      refine ⟨q_c, ⟨(ancestor, proof.head), root⟩, h_ne, h_qc_mem_log, h_log_mem, ?_⟩
-      simp [h_qc_resp]
-    have h_chain_entry_in_lc :
-        (⟨(ancestor, proof.head), root⟩ : (_i : (α × α)) × α) ∈ log_c := by
-      rw [← h_qc_eq]; exact h_qc_mem_lc
+      exact h_no_coll ⟨q_c, ⟨(ancestor, proof.head), root⟩, h_ne,
+        h_sub _ h_qc_mem_lc, h_log_mem, by simp [h_qc_resp]⟩
     have h_find_c' :
         log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
-          some ⟨(ancestor, proof.head), root⟩ := by
-      rw [h_find_c, h_qc_eq]
-    have h_extr_decomp :
-        extractor (Skeleton.internal sl sr) log_c root =
-          FullData.internal (some root)
-            (extractor sl log_c ancestor) (extractor sr log_c proof.head) := by
-      rw [extractor_eq_populate, populate_down_internal_def]
-      have hch : extractorChildren log_c (some root) =
-          (some ancestor, some proof.head) := by
-        rw [extractorChildren_some, h_find_c']
-      rw [show (extractorChildren log_c (some root)).1 = some ancestor from by rw [hch],
-          show (extractorChildren log_c (some root)).2 = some proof.head from by rw [hch]]
-      rfl
-    have h_ne_none_inner :
-        (extractor sl log_c ancestor).get idxLeft.toNodeIndex ≠ none := by
-      intro hne
-      apply h_ne_none
-      rw [h_extr_decomp]
-      change (FullData.internal (some root)
-          (extractor sl log_c ancestor) (extractor sr log_c proof.head)).get
-        (SkeletonNodeIndex.ofLeft idxLeft.toNodeIndex) = none
-      rw [FullData.get_internal_ofLeft]
-      exact hne
-    have h_chain_inner :=
-      ih log log_c ancestor leaf proof.tail h_sub h_no_coll h_ne_none_inner h_chain_rec
-    refine ⟨ancestor, h_chain_entry_in_lc, h_chain_inner⟩
+          some ⟨(ancestor, proof.head), root⟩ := by rw [h_find_c, h_qc_eq]
+    refine ⟨ancestor, h_qc_eq ▸ h_qc_mem_lc,
+      ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
+        h_chain_rec⟩
+    change (populate_down sl (extractorChildren log_c)
+        (extractorChildren log_c (some root)).1).get idxLeft.toNodeIndex = none
+    rw [show (extractorChildren log_c (some root)).1 = some ancestor by
+          rw [extractorChildren_some, h_find_c']]
+    exact hne
   | @ofRight sl sr idxRight ih =>
     intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
     obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    have h_find_some :
+    obtain ⟨q_c, h_find_c⟩ :
         ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
       rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
-      · exfalso
-        apply h_ne_none
-        rw [extractor_eq_populate, populate_down_internal_def]
-        change (FullData.internal (some root)
-            (populate_down sl (extractorChildren log_c)
-              (extractorChildren log_c (some root)).1)
-            (populate_down sr (extractorChildren log_c)
-              (extractorChildren log_c (some root)).2)).get
-            (SkeletonNodeIndex.ofRight idxRight.toNodeIndex) = none
-        rw [FullData.get_internal_ofRight]
-        have hch : extractorChildren log_c (some root) = (none, none) := by
-          rw [extractorChildren_some, hf]
-        rw [show (extractorChildren log_c (some root)).2 = none from by rw [hch]]
+      · refine absurd ?_ h_ne_none
+        change (populate_down sr (extractorChildren log_c)
+            (extractorChildren log_c (some root)).2).get idxRight.toNodeIndex = none
+        rw [show (extractorChildren log_c (some root)).2 = none by
+              rw [extractorChildren_some, hf]]
         exact populate_down_none_get_eq_none (extractorChildren log_c)
           (extractorChildren_none log_c) idxRight.toNodeIndex
       · exact ⟨q, rfl⟩
-    obtain ⟨q_c, h_find_c⟩ := h_find_some
     have h_qc_mem_lc : q_c ∈ log_c := List.mem_of_find?_eq_some h_find_c
-    have h_qc_mem_log : q_c ∈ log := h_sub _ h_qc_mem_lc
     have h_qc_resp : q_c.2 = root := by
-      have h := List.find?_eq_some_iff_getElem.mp h_find_c |>.1
-      simp only [beq_iff_eq] at h
-      exact h
+      simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
     have h_qc_eq : q_c = ⟨(proof.head, ancestor), root⟩ := by
       by_contra h_ne
-      apply h_no_coll
-      refine ⟨q_c, ⟨(proof.head, ancestor), root⟩, h_ne, h_qc_mem_log, h_log_mem, ?_⟩
-      simp [h_qc_resp]
-    have h_chain_entry_in_lc :
-        (⟨(proof.head, ancestor), root⟩ : (_i : (α × α)) × α) ∈ log_c := by
-      rw [← h_qc_eq]; exact h_qc_mem_lc
+      exact h_no_coll ⟨q_c, ⟨(proof.head, ancestor), root⟩, h_ne,
+        h_sub _ h_qc_mem_lc, h_log_mem, by simp [h_qc_resp]⟩
     have h_find_c' :
         log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
-          some ⟨(proof.head, ancestor), root⟩ := by
-      rw [h_find_c, h_qc_eq]
-    have h_extr_decomp :
-        extractor (Skeleton.internal sl sr) log_c root =
-          FullData.internal (some root)
-            (extractor sl log_c proof.head) (extractor sr log_c ancestor) := by
-      rw [extractor_eq_populate, populate_down_internal_def]
-      have hch : extractorChildren log_c (some root) =
-          (some proof.head, some ancestor) := by
-        rw [extractorChildren_some, h_find_c']
-      rw [show (extractorChildren log_c (some root)).1 = some proof.head from by rw [hch],
-          show (extractorChildren log_c (some root)).2 = some ancestor from by rw [hch]]
-      rfl
-    have h_ne_none_inner :
-        (extractor sr log_c ancestor).get idxRight.toNodeIndex ≠ none := by
-      intro hne
-      apply h_ne_none
-      rw [h_extr_decomp]
-      change (FullData.internal (some root)
-          (extractor sl log_c proof.head) (extractor sr log_c ancestor)).get
-        (SkeletonNodeIndex.ofRight idxRight.toNodeIndex) = none
-      rw [FullData.get_internal_ofRight]
-      exact hne
-    have h_chain_inner :=
-      ih log log_c ancestor leaf proof.tail h_sub h_no_coll h_ne_none_inner h_chain_rec
-    refine ⟨ancestor, h_chain_entry_in_lc, h_chain_inner⟩
+          some ⟨(proof.head, ancestor), root⟩ := by rw [h_find_c, h_qc_eq]
+    refine ⟨ancestor, h_qc_eq ▸ h_qc_mem_lc,
+      ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
+        h_chain_rec⟩
+    change (populate_down sr (extractorChildren log_c)
+        (extractorChildren log_c (some root)).2).get idxRight.toNodeIndex = none
+    rw [show (extractorChildren log_c (some root)).2 = some ancestor by
+          rw [extractorChildren_some, h_find_c']]
+    exact hne
 
 /-- **Self-log fixed point.** The two log layers produced by
 `oa.withQueryLog.withQueryLog` agree on every support point: simulating the
@@ -955,61 +746,48 @@ theorem withQueryLog_self_log_eq
         ((pure x : OracleComp spec α).withQueryLog.withQueryLog) at hmem
       rw [OracleComp.withQueryLog_pure, OracleComp.withQueryLog_pure,
         mem_support_pure_iff] at hmem
-      obtain ⟨hv1, hl2⟩ := Prod.mk.inj hmem
-      obtain ⟨_, hl1⟩ := Prod.mk.inj hv1
-      subst hl1; subst hl2
+      obtain ⟨⟨_, rfl⟩, rfl⟩ := Prod.mk.inj hmem |>.imp_left Prod.mk.inj
       rfl
   | query_bind t mx ih =>
       intros v l₁ l₂ hmem
       change ((v, l₁), l₂) ∈ support
         (((liftM (OracleSpec.query t) : OracleComp spec _) >>=
           fun u => mx u).withQueryLog.withQueryLog) at hmem
-      rw [OracleComp.withQueryLog_bind] at hmem
-      rw [OracleComp.withQueryLog_bind] at hmem
-      rw [mem_support_bind_iff] at hmem
+      rw [OracleComp.withQueryLog_bind, OracleComp.withQueryLog_bind,
+        mem_support_bind_iff] at hmem
       obtain ⟨⟨⟨u₁, log_q1⟩, log_q2⟩, h₁, hmem⟩ := hmem
-      rw [OracleComp.withQueryLog_query] at h₁
-      rw [OracleComp.withQueryLog_bind] at h₁
-      rw [mem_support_bind_iff] at h₁
+      rw [OracleComp.withQueryLog_query, OracleComp.withQueryLog_bind,
+        mem_support_bind_iff] at h₁
       obtain ⟨⟨u₂, log_qa⟩, h₁a, h₁b⟩ := h₁
-      rw [OracleComp.withQueryLog_query, mem_support_bind_iff] at h₁a
-      obtain ⟨u, hu_q, h_pa⟩ := h₁a
-      rw [mem_support_pure_iff, Prod.mk.injEq] at h_pa
-      obtain ⟨h_u2_eq, h_qa_eq⟩ := h_pa
-      subst h_u2_eq; subst h_qa_eq
+      simp only [OracleComp.withQueryLog_query, mem_support_bind_iff,
+        mem_support_pure_iff, Prod.mk.injEq] at h₁a
+      obtain ⟨u, _, rfl, rfl⟩ := h₁a
       rw [support_map, Set.mem_image] at h₁b
       obtain ⟨⟨⟨u', l_inner⟩, l_outer⟩, h_pure, h_eq_b⟩ := h₁b
-      rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_pure
-      obtain ⟨h_pure1, h_pure2⟩ := h_pure
-      obtain ⟨h_pure1a, h_pure1b⟩ := Prod.mk.inj h_pure1
-      subst h_pure1a; subst h_pure1b; subst h_pure2
+      simp only [OracleComp.withQueryLog_pure, mem_support_pure_iff,
+        Prod.mk.injEq] at h_pure
+      obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_pure
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq, List.append_nil] at h_eq_b
-      obtain ⟨⟨h_eq_b1a, h_eq_b1b⟩, h_eq_b2⟩ := h_eq_b
-      subst h_eq_b1a; subst h_eq_b1b; subst h_eq_b2
+      obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_eq_b
       rw [support_map, Set.mem_image] at hmem
       obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner_outer, h_eq⟩ := hmem
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq
-      obtain ⟨⟨h_eq_v', h_eq_l₁'⟩, h_eq_l₂⟩ := h_eq
-      subst h_eq_v'; subst h_eq_l₁'; subst h_eq_l₂
+      obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_eq
       simp only at h_inner_outer
       rw [show (Prod.map id (fun x => ([⟨t, u'⟩] ++ x : (spec).QueryLog)) <$>
               (mx u').withQueryLog) =
             ((mx u').withQueryLog >>=
               fun p => pure (Prod.map id (fun x => [⟨t, u'⟩] ++ x) p))
-          from by rw [map_eq_pure_bind]] at h_inner_outer
-      rw [OracleComp.withQueryLog_bind] at h_inner_outer
-      rw [mem_support_bind_iff] at h_inner_outer
+          by rw [map_eq_pure_bind],
+        OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_inner_outer
       obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_rest⟩ := h_inner_outer
       rw [support_map, Set.mem_image] at h_rest
       obtain ⟨⟨pX, lX⟩, h_pX, h_eq_X⟩ := h_rest
       rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_pX
-      obtain ⟨h_pX1, h_pX2⟩ := h_pX
-      subst h_pX1; subst h_pX2
+      obtain ⟨rfl, rfl⟩ := h_pX
       simp only [Prod.map_apply, id_eq, List.append_nil, Prod.mk.injEq] at h_eq_X
-      obtain ⟨⟨h_eq_X1a, h_eq_X1b⟩, h_eq_X2⟩ := h_eq_X
-      subst h_eq_X1a; subst h_eq_X1b; subst h_eq_X2
-      have h_ih := ih u' h_inner
-      rw [h_ih]
+      obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_eq_X
+      rw [ih u' h_inner]
 
 /--
 **Extractor matches in support.** Bundled helper combining
@@ -1055,75 +833,55 @@ theorem extractability_game_no_coll_match
   -- `extractedProof` to the committing log.
   have hsup := hsupport
   unfold extractability_game at hsup
-  rw [OracleComp.withQueryLog_bind] at hsup
-  rw [mem_support_bind_iff] at hsup
+  rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at hsup
   obtain ⟨⟨⟨root_c, aux_c⟩, log_c⟩, h_c, hsup⟩ := hsup
   rw [support_map, Set.mem_image] at hsup
-  obtain ⟨⟨resCO, log_co⟩, h_co, h_eq_co⟩ := hsup
-  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_co
-  obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
+  obtain ⟨⟨_, _⟩, h_co, h_eq_co⟩ := hsup
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_co
   obtain ⟨⟨⟨idx_o, leaf_o, proof_o⟩, log_o⟩, h_o, h_co⟩ := h_co
   rw [support_map, Set.mem_image] at h_co
-  obtain ⟨⟨resV, log_v_inner⟩, h_v, h_eq_v⟩ := h_co
-  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_v
-  obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
+  obtain ⟨⟨_, _⟩, h_v, h_eq_v⟩ := h_co
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at h_v
   obtain ⟨⟨verified, log_v⟩, h_vp, h_v⟩ := h_v
   rw [support_map, Set.mem_image] at h_v
-  obtain ⟨⟨_unit, log_p⟩, h_p, h_eq_p⟩ := h_v
+  obtain ⟨⟨_, _⟩, h_p, h_eq_p⟩ := h_v
   rw [OracleComp.withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_p
-  obtain ⟨h_p1, h_p2⟩ := h_p
-  subst h_p2
-  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_p
+  obtain ⟨h_p1, rfl⟩ := h_p
+  simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq_co h_eq_v h_eq_p
+  obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
+  obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
   obtain ⟨h_eq_p1, h_eq_p2⟩ := h_eq_p
   rw [← h_eq_p1, h_p1] at h_eq_v1
   rw [← h_eq_v1] at h_eq_co1
   simp only [Prod.mk.injEq] at h_eq_co1
-  obtain ⟨h_root_eq, h_aux_eq, h_sigma_eq⟩ := h_eq_co1
-  subst h_root_eq
-  subst h_aux_eq
+  obtain ⟨rfl, rfl, h_sigma_eq⟩ := h_eq_co1
   obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
   subst h_idx_eq
   simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
-  obtain ⟨h_leaf_eq, h_proof_eq, h_tree_eq, h_proof_ext_eq, _h_verified_eq⟩ := h_rest_eq
-  subst h_leaf_eq
-  subst h_proof_eq
+  obtain ⟨rfl, rfl, h_tree_eq, h_proof_ext_eq, _⟩ := h_rest_eq
   -- Bridge `aux_c = log_c`: the inner queryLog (paired with the result of
   -- `committingAdv.withQueryLog`) equals the outer queryLog from the second
   -- `withQueryLog`. This is `withQueryLog_self_log_eq` applied to `committingAdv`.
   have h_aux_eq_log_c : aux_c = log_c :=
     withQueryLog_self_log_eq committingAdv h_c
-  rw [h_aux_eq_log_c] at h_tree_eq h_proof_ext_eq h_eq_v1 h_p1 h_sigma_eq h_c
+  rw [h_aux_eq_log_c] at h_tree_eq h_proof_ext_eq
   -- Now `extractedTree = extractor s log_c root_c.1` and
   -- `extractedProof = generateProof (extractor s log_c root_c.1) idx_o`.
-  have h_log_eq : log = log_c ++ log_o ++ log_v := by
+  have h_sub : ∀ q, q ∈ log_c → q ∈ log := fun q hq => by
     rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
-    simp [List.append_nil]
-  have h_sub : ∀ q, q ∈ log_c → q ∈ log := by
-    intro q hq
-    rw [h_log_eq]
-    exact List.mem_append_left _ (List.mem_append_left _ hq)
-  have h_chain : chainInLog log root_c.1 idx_o leaf_o proof_o :=
-    support_implies_chainInLog committingAdv openingAdv hsupport
-  have h_ne_none_lc :
-      (extractor s log_c root_c.1).get idx_o.toNodeIndex ≠ none := by
+    simpa using List.mem_append_left _ (List.mem_append_left _ hq)
+  have h_ne_none_lc : (extractor s log_c root_c.1).get idx_o.toNodeIndex ≠ none := by
     rw [h_tree_eq]; exact h_ne_none
   have h_chain_lc : chainInLog log_c root_c.1 idx_o leaf_o proof_o :=
     chainInLog_restrict idx_o log log_c root_c.1 leaf_o proof_o
-      h_sub h_no_coll h_ne_none_lc h_chain
-  have h_no_coll_lc : ¬ collisionIn log_c := by
-    intro ⟨q1, q2, hne, hm1, hm2, hresp⟩
-    exact h_no_coll ⟨q1, q2, hne, h_sub _ hm1, h_sub _ hm2, hresp⟩
+      h_sub h_no_coll h_ne_none_lc
+      (support_implies_chainInLog committingAdv openingAdv hsupport)
+  have h_no_coll_lc : ¬ collisionIn log_c := fun ⟨q1, q2, hne, hm1, hm2, hresp⟩ =>
+    h_no_coll ⟨q1, q2, hne, h_sub _ hm1, h_sub _ hm2, hresp⟩
   obtain ⟨h_get, h_proof_match⟩ :=
     extractor_chain_match idx_o log_c root_c.1 leaf_o proof_o
       h_no_coll_lc h_ne_none_lc h_chain_lc
-  refine ⟨?_, ?_⟩
-  · rw [← h_tree_eq]; exact h_get
-  · rw [← h_proof_ext_eq]
-    exact h_proof_match.symm
-
-/-! ### No-collision lucky-guess bound -/
+  exact ⟨h_tree_eq ▸ h_get, h_proof_ext_eq ▸ h_proof_match.symm⟩
 
 /-- Every skeleton has at least one leaf. -/
 private lemma leafCount_pos_aux : ∀ s : Skeleton, 0 < s.leafCount
@@ -1234,24 +992,11 @@ private theorem extractability_game_noColl_caseA_eq_zero
         (extractability_game committingAdv openingAdv).withQueryLog] = 0 := by
   apply probEvent_eq_zero
   rintro ⟨vals, log⟩ hsupport
-  obtain ⟨root, aux, idx, leaf, proof, extractedTree, extractedProof, verified⟩ := vals
-  rintro ⟨h_no_coll, h_adv_wins, h_ne_none⟩
-  -- Extract `verified = true` from `h_adv_wins` and substitute it everywhere.
-  have h_verified : verified = true := h_adv_wins.1
-  subst h_verified
-  -- Apply the bundled support → match helper to derive the leaf and proof equalities.
+  obtain ⟨root, aux, idx, leaf, proof, _, _, verified⟩ := vals
+  rintro ⟨h_no_coll, ⟨rfl, h_adv_wins⟩, h_ne_none⟩
   obtain ⟨h_eq_leaf, h_map⟩ :=
     extractability_game_no_coll_match committingAdv openingAdv h_no_coll h_ne_none hsupport
-  -- Now contradict `adversary_wins_extractability_game_event`. After `subst h_verified`,
-  -- the `verified = true` conjunct is `True` and gets eliminated. The proof-mismatch
-  -- disjunct is killed by `h_map`; the leaf-mismatch disjunct is killed by `h_eq_leaf`.
-  simp only [adversary_wins_extractability_game_event, true_and, Bool.not_eq_true',
-    h_map] at h_adv_wins
-  rcases h_adv_wins with h | h
-  · rw [h_eq_leaf, beq_self_eq_true] at h
-    exact Bool.noConfusion h
-  · rw [beq_self_eq_true] at h
-    exact Bool.noConfusion h
+  simp [h_map, h_eq_leaf] at h_adv_wins
 
 /--
 **Case B substantive obligation, `1 < |α|` branch.** Same statement as
@@ -1342,14 +1087,8 @@ private theorem extractability_game_noColl_caseB_le_inv_card
       (spec α).QueryLog) =>
         let ⟨_, _, idx, _, _, extractedTree, _, verified⟩ := x.1
         verified = true ∧ extractedTree.get idx.toNodeIndex = none) ?_) ?_
-  · rintro ⟨vals, log⟩
-    obtain ⟨root, aux, idx, leaf, proof, extractedTree, extractedProof, verified⟩ := vals
-    rintro ⟨_, h_adv_wins, h_extract_none⟩
-    -- `adversary_wins_extractability_game_event` always carries `verified` as its
-    -- outermost conjunct.
-    refine ⟨?_, h_extract_none⟩
-    rcases h_adv_wins with ⟨h_v, _⟩
-    exact h_v
+  · rintro ⟨⟨_, _, _, _, _, _, _, _⟩, _⟩ ⟨_, ⟨h_v, _⟩, h_extract_none⟩
+    exact ⟨h_v, h_extract_none⟩
   /-
   Substantive obligation: bound
     `Pr[fun x => verified x.1 = true ∧ extractedTree x.1 .get idx x.1 = none |
@@ -1361,12 +1100,11 @@ private theorem extractability_game_noColl_caseB_le_inv_card
   `extractability_game_noColl_caseB_le_inv_card_aux`.
   -/
   by_cases h_card : (Fintype.card α : ENNReal) ≤ 1
-  · refine le_trans probEvent_le_one ?_
+  · refine probEvent_le_one.trans ?_
     rw [ENNReal.le_div_iff_mul_le (Or.inr one_ne_zero) (Or.inr ENNReal.one_ne_top)]
     simpa using h_card
-  · push Not at h_card
-    exact extractability_game_noColl_caseB_le_inv_card_aux
-      committingAdv openingAdv qb h_IsQueryBound_qb h_le_qb h_card
+  · exact extractability_game_noColl_caseB_le_inv_card_aux
+      committingAdv openingAdv qb h_IsQueryBound_qb h_le_qb (by push Not at h_card; exact h_card)
 
 /--
 **Tight no-collision bound.** Conditional on the combined query log of
@@ -1397,48 +1135,32 @@ private theorem extractability_game_noCollision_wins_le_inv_card
         ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
         (1 : ENNReal) / (Fintype.card α : ENNReal) := by
-  -- The combined log of the entire game has at most `qb + s.depth` entries: the
-  -- committingAdv/openingAdv pair contribute at most `qb` queries (by
-  -- `h_IsQueryBound_qb`), and `verifyProof` adds at most `s.depth` more.
-  have game_query_bound :=
-    extractability_game_IsTotalQueryBound committingAdv openingAdv qb h_IsQueryBound_qb
   -- Trivially handle the small-cardinality cases where the bound `1/|α|` is
   -- already `≥ 1`, so `Pr[…] ≤ 1` (via `probEvent_le_one`) suffices. This isolates
   -- the substantive work to `Fintype.card α ≥ 2`.
   by_cases h_card : (Fintype.card α : ENNReal) ≤ 1
-  · refine le_trans probEvent_le_one ?_
+  · refine probEvent_le_one.trans ?_
     rw [ENNReal.le_div_iff_mul_le (Or.inr one_ne_zero) (Or.inr ENNReal.one_ne_top)]
     simpa using h_card
-  push Not at h_card
-  -- Rewrite the bad event as `caseA ∨ caseB`.
-  have hbad_eq : (fun x : (α × AuxState ×
-        ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
-         FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) ×
-      (spec α).QueryLog =>
-        ¬ collisionIn x.2 ∧ adversary_wins_extractability_game_event x.1) =
-      (fun x => noColl_caseA_event x ∨ noColl_caseB_event x) :=
-    funext fun x => propext (noColl_bad_iff_caseA_or_caseB x)
-  -- Apply union bound and dispatch to the case sub-lemmas.
+  -- Rewrite the bad event as `caseA ∨ caseB`, apply union bound, dispatch to sub-lemmas.
   calc Pr[fun (vals, log) =>
             ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
             (extractability_game committingAdv openingAdv).withQueryLog]
       = Pr[fun x => noColl_caseA_event x ∨ noColl_caseB_event x |
             (extractability_game committingAdv openingAdv).withQueryLog] := by
-        rw [hbad_eq]
+        rw [funext fun x => propext (noColl_bad_iff_caseA_or_caseB x)]
     _ ≤ Pr[noColl_caseA_event |
             (extractability_game committingAdv openingAdv).withQueryLog] +
         Pr[noColl_caseB_event |
-            (extractability_game committingAdv openingAdv).withQueryLog] := by
-        apply probEvent_or_le
-    _ = 0 + Pr[noColl_caseB_event |
-            (extractability_game committingAdv openingAdv).withQueryLog] := by
-        rw [extractability_game_noColl_caseA_eq_zero committingAdv openingAdv
-              qb h_IsQueryBound_qb h_le_qb]
-    _ = Pr[noColl_caseB_event |
-            (extractability_game committingAdv openingAdv).withQueryLog] := zero_add _
-    _ ≤ (1 : ENNReal) / (Fintype.card α : ENNReal) :=
-        extractability_game_noColl_caseB_le_inv_card committingAdv openingAdv
-          qb h_IsQueryBound_qb h_le_qb
+            (extractability_game committingAdv openingAdv).withQueryLog] :=
+        probEvent_or_le ..
+    _ ≤ 0 + (1 : ENNReal) / (Fintype.card α : ENNReal) := by
+        gcongr
+        · exact (extractability_game_noColl_caseA_eq_zero committingAdv openingAdv
+            qb h_IsQueryBound_qb h_le_qb).le
+        · exact extractability_game_noColl_caseB_le_inv_card committingAdv openingAdv
+            qb h_IsQueryBound_qb h_le_qb
+    _ = (1 : ENNReal) / (Fintype.card α : ENNReal) := zero_add _
 
 /--
 **No-collision lucky-guess bound.** Conditional on the combined query log of
@@ -1563,7 +1285,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
         ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α)
         + 2 * (s.depth + 1) * s.leafCount / (Fintype.card α)
     := by
-      calc
+  calc
     -- We first rewrite the game to include the combined query log
     _ = Pr[adversary_wins_extractability_game_with_logging_event |
           (extractability_game committingAdv openingAdv).withQueryLog] := by
@@ -1575,8 +1297,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
             collisionIn log ∨
             (¬ collisionIn log ∧ adversary_wins_extractability_game_event vals) |
           (extractability_game committingAdv openingAdv).withQueryLog] := by
-      apply probEvent_mono''
-      intro ⟨vals, log⟩
+      refine probEvent_mono'' fun ⟨vals, log⟩ => ?_
       simp [adversary_wins_extractability_game_with_logging_event]
       tauto
     -- We apply the union bound
@@ -1584,31 +1305,29 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
             (extractability_game committingAdv openingAdv).withQueryLog] +
         Pr[fun (vals, log) =>
             ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
-          (extractability_game committingAdv openingAdv).withQueryLog] := by
-      apply probEvent_or_le
+          (extractability_game committingAdv openingAdv).withQueryLog] :=
+      probEvent_or_le ..
     -- We bound the collision event probability with a collision bound
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         Pr[fun (vals, log) =>
             ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
           (extractability_game committingAdv openingAdv).withQueryLog] := by
       gcongr
-      have game_query_bound :=
-        extractability_game_IsTotalQueryBound committingAdv openingAdv qb h_IsQueryBound_qb
       have hbound := collision_probability_bound
-        (extractability_game committingAdv openingAdv) (qb + s.depth) game_query_bound
+        (extractability_game committingAdv openingAdv) (qb + s.depth)
+        (extractability_game_IsTotalQueryBound committingAdv openingAdv qb h_IsQueryBound_qb)
       convert hbound using 2
       push_cast
       rfl
     -- We bound the no-collision bad event probability
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         2 * (s.depth + 1) * s.leafCount / (Fintype.card α) := by
-      have h := extractability_game_noCollision_wins_le committingAdv openingAdv
-        (s := s) (AuxState := AuxState) qb h_IsQueryBound_qb h_le_qb
       have h' : Pr[fun (vals, log) =>
             ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
           (extractability_game committingAdv openingAdv).withQueryLog] ≤
-            2 * (s.depth + 1) * s.leafCount / (Fintype.card α : ENNReal) := by
-        exact_mod_cast h
+            2 * (s.depth + 1) * s.leafCount / (Fintype.card α : ENNReal) :=
+        mod_cast extractability_game_noCollision_wins_le committingAdv openingAdv
+          (s := s) (AuxState := AuxState) qb h_IsQueryBound_qb h_le_qb
       gcongr
       norm_cast
 
