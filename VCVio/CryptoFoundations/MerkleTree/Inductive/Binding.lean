@@ -9,35 +9,33 @@ import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
 # Merkle Binding (Collision Lemma)
 
 The structural collision lemma for inductive Merkle trees, often called the
-"Collision Lemma" (see SNARGs book §18.3): two distinct verifying openings of
-the same Merkle root, taken at the same leaf index with the same sibling
-proof, entail a collision in the underlying hash function.
+"Collision Lemma" (see SNARGs book §18.3): two distinct leaf values that
+verify against the same Merkle root — under possibly different sibling
+proofs — entail a collision in the underlying hash function.
 
-Stated against `InductiveMerkleTree.getPutativeRootWithHash` from
-[`VCVio/CryptoFoundations/MerkleTree/Inductive/Defs.lean`](Defs.lean): if
-recomputed roots agree on inputs `x ≠ y` along an identical path, the proof
-extracts an explicit pair witnessing a hash collision.
+The hypothesis `x ≠ y` captures that the adversary equivocates on the
+*committed value*, which is what binding requires; the case `x = y` with
+different sibling proofs is not a binding break, since the committer is
+allowed to know multiple valid proofs of the same value.
 
-This is the pure / structural layer of binding; a probabilistic-level
-binding-from-collision-resistance reduction is intended to be layered on top
-following the `bindingAdvantage_toCommitment_le_keyedCRAdvantage` pattern in
-[`VCVio/CryptoFoundations/HashCommitment.lean`](../HashCommitment.lean).
+The hash function is taken in curried form `α → α → α`, matching the
+convention used by `getPutativeRootWithHash` and the rest of the Merkle tree
+API.
 
 ## Main Definitions
 
-- `InductiveMerkleTree.Collision` — predicate stating that two pairs of
-  inputs collide under a hash function `H : α × α → α`.
+- `InductiveMerkleTree.Collision` — a hash collision under `H : α → α → α`.
 
 ## Main Results
 
-- `InductiveMerkleTree.getPutativeRootWithHash_binding` — from two distinct
-  leaf values producing the same putative root, extract a hash collision.
+- `InductiveMerkleTree.getPutativeRootWithHash_binding` — from any two
+  distinct leaf values producing the same root at the same leaf index under
+  (possibly different) sibling proofs, extract a hash collision.
 
 ## References
 
 - Justin Thaler. *Proofs, Arguments, and Zero-Knowledge.* §18.3 (Collision
   Lemma for Merkle trees).
-
 -/
 
 
@@ -47,28 +45,33 @@ open BinaryTree
 
 variable {α : Type _}
 
-/-- Two distinct inputs producing the same hash output: a collision for `H`. -/
-def Collision (H : α × α → α) (L₁ R₁ L₂ R₂ : α) : Prop :=
-  (L₁, R₁) ≠ (L₂, R₂) ∧ H (L₁, R₁) = H (L₂, R₂)
+/-- Two distinct input pairs producing the same hash output: a collision for
+    the curried hash `H : α → α → α`. -/
+def Collision (H : α → α → α) (L₁ R₁ L₂ R₂ : α) : Prop :=
+  (L₁, R₁) ≠ (L₂, R₂) ∧ H L₁ R₁ = H L₂ R₂
 
-/-- The Merkle binding theorem.
+/-- Merkle binding: from two distinct leaf values `x ≠ y` that produce the
+    same putative root at the same leaf index under (possibly different)
+    sibling proofs, extract a hash collision.
 
-    If two distinct leaf values `x ≠ y` produce the same putative root under
-    *the same path `idx` and the same sibling proof*, then we can extract a
-    collision in the hash function.
+    Note that `idx` is shared — this is binding *at a fixed position*. The
+    distinct-position case requires walking down both paths to the lowest
+    common ancestor and is handled separately.
 
     Proof strategy: induction on `idx`. At each non-leaf step, the recursion
-    of `getPutativeRootWithHash` exposes the topmost hash. Either its two
-    arguments already coincide (recurse on the subtree) or they differ
-    (collision at this level). -/
+    of `getPutativeRootWithHash` exposes a top-level hash. Either the two
+    pairs `(subL, proof₁.head)` and `(subR, proof₂.head)` it consumes already
+    differ (top-level collision) or they agree component-wise — in which case
+    the inputs to the inner recursive calls disagree, justifying the
+    inductive call with `subL = subR`. -/
 theorem getPutativeRootWithHash_binding
-    (H : α × α → α)
+    (H : α → α → α)
     {s : Skeleton} (idx : SkeletonLeafIndex s)
-    (proof : List.Vector α idx.depth)
+    (proof₁ proof₂ : List.Vector α idx.depth)
     (x y : α)
     (hne : x ≠ y)
-    (heq : getPutativeRootWithHash idx x proof (fun a b => H (a, b))
-         = getPutativeRootWithHash idx y proof (fun a b => H (a, b))) :
+    (heq : getPutativeRootWithHash idx x proof₁ H
+         = getPutativeRootWithHash idx y proof₂ H) :
     ∃ L₁ R₁ L₂ R₂, Collision H L₁ R₁ L₂ R₂ := by
   induction idx generalizing x y with
   | ofLeaf =>
@@ -76,21 +79,23 @@ theorem getPutativeRootWithHash_binding
       exact absurd heq hne
   | ofLeft idxLeft ih =>
       simp only [getPutativeRootWithHash] at heq
-      set subL := getPutativeRootWithHash idxLeft x proof.tail (fun a b => H (a, b))
-      set subR := getPutativeRootWithHash idxLeft y proof.tail (fun a b => H (a, b))
-      rcases eq_or_ne subL subR with hsub | hsub
-      · exact ih proof.tail x y hne hsub
-      · refine ⟨subL, proof.head, subR, proof.head, ?_, heq⟩
-        intro hpair
-        exact hsub ((Prod.mk.injEq subL proof.head subR proof.head).mp hpair).1
+      set subL := getPutativeRootWithHash idxLeft x proof₁.tail H
+      set subR := getPutativeRootWithHash idxLeft y proof₂.tail H
+      -- Top hash arguments: (subL, proof₁.head) and (subR, proof₂.head).
+      by_cases hpair : (subL, proof₁.head) = (subR, proof₂.head)
+      · -- Inputs to top hash agree component-wise: subL = subR.
+        -- Recurse on the smaller index using the (still-distinct) leaf values.
+        obtain ⟨hsub, _⟩ := Prod.mk.injEq .. |>.mp hpair
+        exact ih proof₁.tail proof₂.tail x y hne hsub
+      · -- Inputs to top hash differ: top-level collision.
+        exact ⟨subL, proof₁.head, subR, proof₂.head, hpair, heq⟩
   | ofRight idxRight ih =>
       simp only [getPutativeRootWithHash] at heq
-      set subL := getPutativeRootWithHash idxRight x proof.tail (fun a b => H (a, b))
-      set subR := getPutativeRootWithHash idxRight y proof.tail (fun a b => H (a, b))
-      rcases eq_or_ne subL subR with hsub | hsub
-      · exact ih proof.tail x y hne hsub
-      · refine ⟨proof.head, subL, proof.head, subR, ?_, heq⟩
-        intro hpair
-        exact hsub ((Prod.mk.injEq proof.head subL proof.head subR).mp hpair).2
+      set subL := getPutativeRootWithHash idxRight x proof₁.tail H
+      set subR := getPutativeRootWithHash idxRight y proof₂.tail H
+      by_cases hpair : (proof₁.head, subL) = (proof₂.head, subR)
+      · obtain ⟨_, hsub⟩ := Prod.mk.injEq .. |>.mp hpair
+        exact ih proof₁.tail proof₂.tail x y hne hsub
+      · exact ⟨proof₁.head, subL, proof₂.head, subR, hpair, heq⟩
 
 end InductiveMerkleTree
