@@ -24,7 +24,7 @@ API.
 
 ## Main Definitions
 
-- `InductiveMerkleTree.Collision` — a hash collision under `H : α → α → α`.
+- `InductiveMerkleTree.Collision` — a hash collision under `h : α → α → α`.
 
 ## Main Results
 
@@ -46,9 +46,9 @@ open BinaryTree
 variable {α : Type _}
 
 /-- Two distinct input pairs producing the same hash output: a collision for
-    the curried hash `H : α → α → α`. -/
-def Collision (H : α → α → α) (L₁ R₁ L₂ R₂ : α) : Prop :=
-  (L₁, R₁) ≠ (L₂, R₂) ∧ H L₁ R₁ = H L₂ R₂
+    the curried hash `h : α → α → α`. -/
+def Collision (h : α → α → α) (l₁ r₁ l₂ r₂ : α) : Prop :=
+  (l₁, r₁) ≠ (l₂, r₂) ∧ h l₁ r₁ = h l₂ r₂
 
 /-- Merkle binding: from two distinct leaf values `x ≠ y` that produce the
     same putative root at the same leaf index under (possibly different)
@@ -65,22 +65,22 @@ def Collision (H : α → α → α) (L₁ R₁ L₂ R₂ : α) : Prop :=
     the inputs to the inner recursive calls disagree, justifying the
     inductive call with `subL = subR`. -/
 theorem getPutativeRootWithHash_binding
-    (H : α → α → α)
+    (h : α → α → α)
     {s : Skeleton} (idx : SkeletonLeafIndex s)
     (proof₁ proof₂ : List.Vector α idx.depth)
     (x y : α)
     (hne : x ≠ y)
-    (heq : getPutativeRootWithHash idx x proof₁ H
-         = getPutativeRootWithHash idx y proof₂ H) :
-    ∃ L₁ R₁ L₂ R₂, Collision H L₁ R₁ L₂ R₂ := by
+    (heq : getPutativeRootWithHash idx x proof₁ h
+         = getPutativeRootWithHash idx y proof₂ h) :
+    ∃ l₁ r₁ l₂ r₂, Collision h l₁ r₁ l₂ r₂ := by
   induction idx generalizing x y with
   | ofLeaf =>
       simp only [getPutativeRootWithHash] at heq
       exact absurd heq hne
   | ofLeft idxLeft ih =>
       simp only [getPutativeRootWithHash] at heq
-      set subL := getPutativeRootWithHash idxLeft x proof₁.tail H
-      set subR := getPutativeRootWithHash idxLeft y proof₂.tail H
+      set subL := getPutativeRootWithHash idxLeft x proof₁.tail h
+      set subR := getPutativeRootWithHash idxLeft y proof₂.tail h
       -- Top hash arguments: (subL, proof₁.head) and (subR, proof₂.head).
       by_cases hpair : (subL, proof₁.head) = (subR, proof₂.head)
       · -- Inputs to top hash agree component-wise: subL = subR.
@@ -91,8 +91,8 @@ theorem getPutativeRootWithHash_binding
         exact ⟨subL, proof₁.head, subR, proof₂.head, hpair, heq⟩
   | ofRight idxRight ih =>
       simp only [getPutativeRootWithHash] at heq
-      set subL := getPutativeRootWithHash idxRight x proof₁.tail H
-      set subR := getPutativeRootWithHash idxRight y proof₂.tail H
+      set subL := getPutativeRootWithHash idxRight x proof₁.tail h
+      set subR := getPutativeRootWithHash idxRight y proof₂.tail h
       by_cases hpair : (proof₁.head, subL) = (proof₂.head, subR)
       · obtain ⟨_, hsub⟩ := Prod.mk.injEq .. |>.mp hpair
         exact ih proof₁.tail proof₂.tail x y hne hsub
