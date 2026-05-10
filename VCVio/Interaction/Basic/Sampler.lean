@@ -10,7 +10,7 @@ import VCVio.Interaction.Basic.Decoration
 
 A `Spec.Sampler m spec` equips every node of a protocol tree `spec : Spec.{w}`
 with an `m`-computation producing that node's move. Structurally it is a
-`Spec.Decoration` whose per-node context is `fun X => m X`, so the full
+`PFunctor.FreeM.Displayed.Decoration` whose per-node context is `fun X => m X`, so the full
 `Decoration` API (map, map_id, map_comp, …) applies unchanged.
 
 This file defines the `Sampler` abbreviation, the universal `sampleTranscript`
@@ -38,7 +38,7 @@ namespace Spec
 A `Sampler` for `spec : Spec.{w}` provides an `m X` computation at each
 node whose move space is `X`, plus recursive samplers for every subtree.
 
-Structurally this is exactly a `Spec.Decoration` whose node context is
+Structurally this is exactly a `PFunctor.FreeM.Displayed.Decoration` whose node context is
 `fun X => m X`: the per-node decoration stores an `m`-computation in
 the move type of that node, and the functorial `Decoration.map` /
 `Decoration.map_id` / `Decoration.map_comp` API applies immediately.

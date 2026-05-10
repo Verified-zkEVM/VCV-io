@@ -17,7 +17,7 @@ This is the singleton-agent specialization of `StrategyOver` over the empty
 node context. `Strategy.run` is the corresponding specialization of the
 generic `InteractionOver.runSpec` runner.
 
-Dependent sequential composition `Strategy.comp` requires `Spec.append` from
+Dependent sequential composition `Strategy.comp` requires `PFunctor.FreeM.append` from
 `VCVio.Interaction.Basic.Append`.
 -/
 

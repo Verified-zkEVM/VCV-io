@@ -70,7 +70,7 @@ abbrev extend (s : St)
     Telescope round step s :=
   PFunctor.FreeM.Telescope.extend s cont
 
-/-- Flatten a `Telescope` into a concrete `Spec` by iterated `Spec.append`.
+/-- Flatten a `Telescope` into a concrete `Spec` by iterated `PFunctor.FreeM.append`.
 Each `extend` step contributes its round spec to the head, with the tail
 expanding through the recursive continuation. -/
 def toSpec : {s : St} → Telescope round step s → Spec

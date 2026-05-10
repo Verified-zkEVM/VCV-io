@@ -391,7 +391,7 @@ Inputs:
 * `Γ` is any chosen node-local metadata context;
 * `resolve : Γ → ViewMode` explains how the fixed participant locally sees a
   node carrying metadata `γ : Γ X`;
-* `ctxs : Spec.Decoration Γ spec` supplies that metadata across the protocol
+* `ctxs : PFunctor.FreeM.Displayed.Decoration Γ spec` supplies that metadata across the protocol
   tree.
 
 The endpoint type is then obtained by reusing `localSyntax m` through
@@ -406,8 +406,8 @@ abbrev Strategy
     (m : Type u → Type u)
     {Γ : Spec.Node.Context.{u, v}}
     (resolve : Spec.Node.ContextHom Γ (fun X : Type u => ViewMode X))
-    (spec : Spec) (ctxs : Spec.Decoration Γ spec)
-    (Output : Spec.Transcript spec → Type u) :=
+    (spec : Spec) (ctxs : PFunctor.FreeM.Displayed.Decoration Γ spec)
+    (Output : PFunctor.FreeM.Path spec → Type u) :=
   StrategyOver ((localSyntax m).comap resolve) PUnit.unit spec ctxs Output
 
 end Multiparty

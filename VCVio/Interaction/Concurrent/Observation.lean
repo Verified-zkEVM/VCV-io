@@ -57,8 +57,8 @@ one complete sequential step transcript.
 -/
 def toList {Party : Type u} [DecidableEq Party] {me : Party} :
     {spec : Interaction.Spec.{w}} →
-      {semantics : Interaction.Spec.Decoration (StepContext Party) spec} →
-      {tr : Interaction.Spec.Transcript spec} →
+      {semantics : PFunctor.FreeM.Displayed.Decoration (StepContext Party) spec} →
+      {tr : PFunctor.FreeM.Path spec} →
       Interaction.Concurrent.Step.Observed me semantics tr →
       List PackedObs
   | .done, _, _, .done => []
@@ -78,7 +78,7 @@ step.
 -/
 def obsList {Party : Type u} [DecidableEq Party] (me : Party)
     {P : Type v} (step : Interaction.Concurrent.Step Party P)
-    (tr : Interaction.Spec.Transcript step.spec) : List PackedObs :=
+    (tr : PFunctor.FreeM.Path step.spec) : List PackedObs :=
   Observed.toList (Interaction.Concurrent.Step.observe me step tr)
 
 end Step

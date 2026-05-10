@@ -41,14 +41,14 @@ def stateChain (a : α) (Stage : Nat → Type w)
       (s i state).append
         (fun path => stateChain a Stage s advance n (i + 1) (advance i state path))
 
-@[simp, grind =]
+@[simp, grind =, freeM_unfold]
 theorem stateChain_zero (a : α) (Stage : Nat → Type w)
     (s : (i : Nat) → Stage i → FreeM P α)
     (advance : (i : Nat) → (state : Stage i) → Path (s i state) → Stage (i + 1))
     (i : Nat) (state : Stage i) :
     FreeM.stateChain a Stage s advance 0 i state = FreeM.pure a := rfl
 
-@[simp]
+@[simp, freeM_unfold]
 theorem stateChain_succ (a : α) (Stage : Nat → Type w)
     (s : (i : Nat) → Stage i → FreeM P α)
     (advance : (i : Nat) → (state : Stage i) → Path (s i state) → Stage (i + 1))
@@ -57,6 +57,28 @@ theorem stateChain_succ (a : α) (Stage : Nat → Type w)
       (s i state).append
         (fun path => FreeM.stateChain a Stage s advance n (i + 1) (advance i state path)) :=
   rfl
+
+namespace Path
+
+/--
+Lift a family on state-chain states to a family on the combined path selected
+through the chained tree.
+-/
+def stateChainFamily {a : α} {Stage : Nat → Type w}
+    {s : (i : Nat) → Stage i → FreeM P α}
+    {advance : (i : Nat) → (state : Stage i) → Path (s i state) → Stage (i + 1)}
+    (Family : (i : Nat) → Stage i → Type w₂) :
+    (n : Nat) → (i : Nat) → (state : Stage i) →
+    Path (FreeM.stateChain a Stage s advance n i state) → Type w₂
+  | 0, i, state, _ => Family i state
+  | n + 1, i, state, path =>
+      Path.liftAppend (s i state)
+        (fun path₁ => FreeM.stateChain a Stage s advance n (i + 1) (advance i state path₁))
+        (fun path₁ pathRest =>
+          stateChainFamily Family n (i + 1) (advance i state path₁) pathRest)
+        path
+
+end Path
 
 namespace Displayed
 namespace Decoration
@@ -75,7 +97,7 @@ def stateChain {Γ : P.A → Type w₂}
       Decoration.append (deco i state)
         (fun path => Decoration.stateChain deco n (i + 1) (advance i state path))
 
-@[simp]
+@[simp, freeM_unfold]
 theorem stateChain_zero {Γ : P.A → Type w₂}
     {a : α} {Stage : Nat → Type w}
     {s : (i : Nat) → Stage i → FreeM P α}
@@ -86,7 +108,7 @@ theorem stateChain_zero {Γ : P.A → Type w₂}
       (⟨⟩ : Decoration Γ (FreeM.stateChain a Stage s advance 0 i state)) :=
   rfl
 
-@[simp]
+@[simp, freeM_unfold]
 theorem stateChain_succ {Γ : P.A → Type w₂}
     {a : α} {Stage : Nat → Type w}
     {s : (i : Nat) → Stage i → FreeM P α}
@@ -119,7 +141,7 @@ def stateChain {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Type w₃}
       Decoration.Over.append (rDeco i state)
         (fun path => Over.stateChain rDeco n (i + 1) (advance i state path))
 
-@[simp]
+@[simp, freeM_unfold]
 theorem stateChain_zero {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Type w₃}
     {a : α} {Stage : Nat → Type w}
     {s : (i : Nat) → Stage i → FreeM P α}
@@ -134,7 +156,7 @@ theorem stateChain_zero {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Typ
         (Decoration.stateChain deco 0 i state)) :=
   rfl
 
-@[simp]
+@[simp, freeM_unfold]
 theorem stateChain_succ {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Type w₃}
     {a : α} {Stage : Nat → Type w}
     {s : (i : Nat) → Stage i → FreeM P α}

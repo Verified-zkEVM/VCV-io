@@ -13,7 +13,7 @@ at each level it carries the current round's `Spec` and a transcript-indexed
 continuation to the next level. There is **no external state type**, no
 `Stage : Nat → Type`, and no round index family.
 
-Converting to a `Spec` via `Chain.toSpec` uses only `Spec.append`.
+Converting to a `Spec` via `Chain.toSpec` uses only `PFunctor.FreeM.append`.
 State-machine constructions are *derived*: `Chain.ofStateMachine`
 builds a chain from `(σ, step, next, s₀)` and then forgets `σ`.
 
@@ -63,7 +63,7 @@ def toSpec : (n : Nat) → Chain n → Spec
   | n + 1, ⟨spec, cont⟩ => spec.append (fun tr => toSpec n (cont tr))
 
 @[simp, grind =]
-theorem toSpec_zero (c : Chain 0) : toSpec 0 c = .done := rfl
+theorem toSpec_zero (c : Chain 0) : toSpec 0 c = Spec.done := rfl
 
 theorem toSpec_succ {n : Nat} (spec : Spec)
     (cont : Transcript spec → Chain n) :
@@ -92,7 +92,7 @@ theorem toSpec_replicate (spec : Spec) :
     (n : Nat) → toSpec n (Chain.replicate spec n) = spec.replicate n
   | 0 => rfl
   | n + 1 => by
-      simp only [Chain.replicate, toSpec, Spec.replicate]
+      simp only [Chain.replicate, toSpec, PFunctor.FreeM.replicate]
       congr 1; funext _; exact toSpec_replicate spec n
 
 /-- Converting a state-machine chain recovers `Spec.stateChain` with
@@ -101,10 +101,10 @@ theorem toSpec_ofStateMachine {σ : Type u} (step : σ → Spec)
     (next : (s : σ) → Transcript (step s) → σ) :
     (n : Nat) → (i : Nat) → (s : σ) →
     toSpec n (Chain.ofStateMachine step next n s) =
-      Spec.stateChain (fun _ => σ) (fun _ => step) (fun _ => next) n i s
+      PFunctor.FreeM.stateChain PUnit.unit (fun _ => σ) (fun _ => step) (fun _ => next) n i s
   | 0, _, _ => rfl
   | n + 1, i, s => by
-      simp only [Chain.ofStateMachine, toSpec, Spec.stateChain]
+      simp only [Chain.ofStateMachine, toSpec, PFunctor.FreeM.stateChain]
       congr 1; funext tr
       exact toSpec_ofStateMachine step next n (i + 1) (next s tr)
 
@@ -115,19 +115,19 @@ transcript and the remainder. -/
 def splitTranscript (n : Nat) (c : Chain (n + 1)) :
     Transcript (toSpec (n + 1) c) →
     (tr₁ : Transcript c.1) × Transcript (toSpec n (c.2 tr₁)) :=
-  Transcript.split c.1 (fun tr => toSpec n (c.2 tr))
+  PFunctor.FreeM.Path.split c.1 (fun tr => toSpec n (c.2 tr))
 
 /-- Combine a first-round transcript with a remainder. -/
 def appendTranscript (n : Nat) (c : Chain (n + 1))
     (tr₁ : Transcript c.1) (tr₂ : Transcript (toSpec n (c.2 tr₁))) :
     Transcript (toSpec (n + 1) c) :=
-  Transcript.append c.1 (fun tr => toSpec n (c.2 tr)) tr₁ tr₂
+  PFunctor.FreeM.Path.append c.1 (fun tr => toSpec n (c.2 tr)) tr₁ tr₂
 
 @[simp, grind =]
 theorem splitTranscript_appendTranscript (n : Nat) (c : Chain (n + 1))
     (tr₁ : Transcript c.1) (tr₂ : Transcript (toSpec n (c.2 tr₁))) :
     splitTranscript n c (appendTranscript n c tr₁ tr₂) = ⟨tr₁, tr₂⟩ :=
-  Transcript.split_append _ _ _ _
+  PFunctor.FreeM.Path.split_append _ _ _ _
 
 /-! ## Strategy composition -/
 
@@ -139,7 +139,7 @@ def outputFamily
     (n : Nat) → (c : Chain n) → Transcript (toSpec n c) → Type u
   | 0, c, _ => Family c
   | n + 1, ⟨spec, cont⟩, tr =>
-      Transcript.liftAppend spec (fun tr₁ => toSpec n (cont tr₁))
+      PFunctor.FreeM.Path.liftAppend spec (fun tr₁ => toSpec n (cont tr₁))
         (fun tr₁ tr₂ => outputFamily Family n (cont tr₁) tr₂)
         tr
 
@@ -226,11 +226,11 @@ private def prefixDependent : Chain.{0} 3 :=
     ⟨secondRound tr₁, fun tr₂ =>
       ⟨thirdRound tr₁ tr₂, fun _ => ⟨⟩⟩⟩⟩
 
-/-- Flattening the chain is just iterated `Spec.append` over transcript-indexed tails. -/
+/-- Flattening the chain is just iterated `PFunctor.FreeM.append` over transcript-indexed tails. -/
 example : Chain.toSpec 3 prefixDependent =
     branchingRound.append (fun tr₁ =>
       (secondRound tr₁).append (fun tr₂ =>
-        (thirdRound tr₁ tr₂).append (fun _ => .done))) := rfl
+        (thirdRound tr₁ tr₂).append (fun _ => Spec.done))) := rfl
 
 /-- After a `true` prefix, the remainder remembers the earlier `Nat` choice. -/
 example (n : Nat) :

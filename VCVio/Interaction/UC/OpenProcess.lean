@@ -827,7 +827,7 @@ ensures the predicate is invariant under *all* context morphisms, including
 `List.filterMap`. -/
 def IsSilentDecoration {Party : Type u} {Δ : PortBoundary} :
     {spec : Interaction.Spec.{w}} →
-    Interaction.Spec.Decoration (OpenNodeContext.{u, w} Party Δ) spec →
+    PFunctor.FreeM.Displayed.Decoration (OpenNodeContext.{u, w} Party Δ) spec →
     spec.Transcript → Prop
   | .done, _, _ => True
   | .node _ _, ⟨ons, drest⟩, ⟨x, tr⟩ =>
@@ -849,7 +849,7 @@ theorem isSilentDecoration_iff_map {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
       (OpenNodeContext.{u, w} Party Δ₂))
     (hAct : ∀ (X : Type w) (ons : OpenNodeContext Party Δ₁ X),
       (f X ons).boundary.isActivated = ons.boundary.isActivated) :
-    {spec : Spec.{w}} → (d : Spec.Decoration (OpenNodeContext Party Δ₁) spec) →
+    {spec : Spec.{w}} → (d : PFunctor.FreeM.Displayed.Decoration (OpenNodeContext Party Δ₁) spec) →
     (tr : spec.Transcript) →
     IsSilentDecoration (Decoration.map f spec d) tr ↔ IsSilentDecoration d tr
   | .done, _, _ => Iff.rfl

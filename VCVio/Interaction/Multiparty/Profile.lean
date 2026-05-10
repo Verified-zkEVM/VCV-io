@@ -47,8 +47,9 @@ A `Decoration Party spec` assigns one local-view profile to every node of
 At a node with move space `X`, the attached profile says, for each party, how
 that party locally sees the chosen move `x : X`.
 -/
-abbrev Decoration (Party : Type u) :=
-  Spec.Decoration (ViewProfile Party)
+abbrev Decoration (Party : Type u) (spec : Spec.{u}) : Type (u + 1) :=
+  PFunctor.FreeM.Displayed.Decoration (P := Spec.basePFunctor) (α := PUnit.{u + 1})
+    (ViewProfile Party) spec
 
 /--
 `Profile.Strategy m me spec views Output` is the local endpoint type of the
@@ -62,7 +63,7 @@ abbrev Strategy
     {Party : Type u}
     (me : Party)
     (spec : Spec) (views : Decoration Party spec)
-    (Output : Spec.Transcript spec → Type u) :=
+    (Output : PFunctor.FreeM.Path spec → Type u) :=
   Multiparty.Strategy m (resolve := fun _ profile => profile me) spec views Output
 
 end Profile

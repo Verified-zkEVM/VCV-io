@@ -162,8 +162,8 @@ are definitionally equal to `s.spec`.
 -/
 structure StepOver (Γ : Interaction.Spec.Node.Context.{w, w₂}) (P : Type v) where
   spec : Interaction.Spec.{w}
-  semantics : Interaction.Spec.Decoration Γ spec
-  next : Interaction.Spec.Transcript spec → P
+  semantics : PFunctor.FreeM.Displayed.Decoration Γ spec
+  next : PFunctor.FreeM.Path spec → P
 
 namespace StepOver
 
@@ -226,8 +226,8 @@ unit payload. -/
 @[reducible]
 def toPFunctor (Γ : Interaction.Spec.Node.Context.{w, w₂}) :
     PFunctor.{max (w+1) w₂, w} where
-  A := Σ spec : Interaction.Spec.{w}, Interaction.Spec.Decoration Γ spec
-  B := fun p => Interaction.Spec.Transcript p.1
+  A := Σ spec : Interaction.Spec.{w}, PFunctor.FreeM.Displayed.Decoration Γ spec
+  B := fun p => PFunctor.FreeM.Path p.1
 
 /-- `StepOver Γ P` is exactly `(StepOver.toPFunctor Γ).Obj P`, exhibiting
 the step-over structure as a polynomial application.
@@ -444,7 +444,7 @@ contains.
 -/
 abbrev EventMap {Γ : Interaction.Spec.Node.Context.{w, w₂}}
     (process : ProcessOver.{v, w, w₂} Γ) (Event : Type w₃) :=
-  (p : process.Proc) → Interaction.Spec.Transcript (process.step p).spec → Event
+  (p : process.Proc) → PFunctor.FreeM.Path (process.step p).spec → Event
 
 /--
 A stable ticket for each complete step transcript of a process.
@@ -455,7 +455,7 @@ semantic layers can talk about these stable identifiers.
 -/
 abbrev Tickets {Γ : Interaction.Spec.Node.Context.{w, w₂}}
     (process : ProcessOver.{v, w, w₂} Γ) (Ticket : Type w₃) :=
-  (p : process.Proc) → Interaction.Spec.Transcript (process.step p).spec → Ticket
+  (p : process.Proc) → PFunctor.FreeM.Path (process.step p).spec → Ticket
 
 /--
 `TranscriptRel left right` is a relation between one complete step transcript
@@ -471,8 +471,8 @@ abbrev TranscriptRel
     {Δ : Interaction.Spec.Node.Context.{w, w₃}}
     (left : ProcessOver Γ) (right : ProcessOver Δ) :=
   {pL : left.Proc} → {pR : right.Proc} →
-    Interaction.Spec.Transcript (left.step pL).spec →
-    Interaction.Spec.Transcript (right.step pR).spec →
+    PFunctor.FreeM.Path (left.step pL).spec →
+    PFunctor.FreeM.Path (right.step pR).spec →
     Prop
 
 namespace TranscriptRel
@@ -657,11 +657,11 @@ then Alice chooses a payload", the controller path records both pieces in
 order.
 -/
 def controllerPath {Party : Type u} {P : Type v} (step : Step Party P) :
-    Interaction.Spec.Transcript step.spec → List Party := by
+    PFunctor.FreeM.Path step.spec → List Party := by
   let rec go :
       {spec : Interaction.Spec.{w}} →
-      Interaction.Spec.Decoration (StepContext Party) spec →
-      Interaction.Spec.Transcript spec →
+      PFunctor.FreeM.Displayed.Decoration (StepContext Party) spec →
+      PFunctor.FreeM.Path spec →
       List Party
     | .done, _, _ => []
     | .node _ rest, ⟨node, restSemantics⟩, ⟨x, tail⟩ =>
@@ -678,7 +678,7 @@ the first controller because one step may internally contain several
 controlled subchoices.
 -/
 def currentController? {Party : Type u} {P : Type v} (step : Step Party P)
-    (tr : Interaction.Spec.Transcript step.spec) : Option Party :=
+    (tr : PFunctor.FreeM.Path step.spec) : Option Party :=
   step.controllerPath tr |>.head?
 end Step
 
@@ -694,7 +694,7 @@ cutover: downstream closed-world code can still write
 -/
 abbrev controllerPath {Party : Type u} {P : Type v}
     (step : StepOver (StepContext Party) P) :
-    Interaction.Spec.Transcript step.spec → List Party :=
+    PFunctor.FreeM.Path step.spec → List Party :=
   Step.controllerPath step
 
 /--
@@ -703,7 +703,7 @@ Closed-world current-controller projection for a `StepOver` specialized to
 -/
 abbrev currentController? {Party : Type u} {P : Type v}
     (step : StepOver (StepContext Party) P)
-    (tr : Interaction.Spec.Transcript step.spec) : Option Party :=
+    (tr : PFunctor.FreeM.Path step.spec) : Option Party :=
   Step.currentController? step tr
 
 end StepOver
