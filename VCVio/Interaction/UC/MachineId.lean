@@ -42,7 +42,7 @@ CJSV22 *subroutine respecting* condition:
   shares a session with `owner` (per `MachineId.sameSession`).
 * **`MachineProcess.SubroutineRespectingAt sid P`.** A `Prop`-valued
   property saying every reachable step's decoration only attributes
-  controllers in session `sid`. Built recursively over `Spec.Decoration`
+  controllers in session `sid`. Built recursively over `PFunctor.FreeM.Displayed.Decoration`
   via `OpenNodeProfile.SessionCoherentAtMove` and
   `DecorationSessionCoherentAt`.
 
@@ -259,7 +259,8 @@ checks.
 def DecorationSessionCoherentAt
     {Sid Pid : Type u} {Δ : PortBoundary} (sid : Sid) :
     {spec : Interaction.Spec.{w}} →
-    Interaction.Spec.Decoration
+    PFunctor.FreeM.Displayed.Decoration
+      (P := Spec.basePFunctor) (α := PUnit.{w + 1})
       (OpenNodeContext.{u, w} (MachineId Sid Pid) Δ) spec →
     spec.Transcript → Prop
   | .done, _, _ => True
@@ -288,8 +289,9 @@ def MachineProcess.SubroutineRespectingAt
 @[simp]
 theorem DecorationSessionCoherentAt_done
     {Sid Pid : Type u} {Δ : PortBoundary} (sid : Sid)
-    (d : Interaction.Spec.Decoration
-      (OpenNodeContext.{u, w} (MachineId Sid Pid) Δ) .done)
+    (d : PFunctor.FreeM.Displayed.Decoration
+      (P := Spec.basePFunctor) (α := PUnit.{w + 1})
+      (OpenNodeContext.{u, w} (MachineId Sid Pid) Δ) Spec.done)
     (tr : (Interaction.Spec.done : Interaction.Spec.{w}).Transcript) :
     DecorationSessionCoherentAt sid d tr := by
   trivial
@@ -298,9 +300,10 @@ theorem DecorationSessionCoherentAt_done
 theorem DecorationSessionCoherentAt_node
     {Sid Pid : Type u} {Δ : PortBoundary} (sid : Sid)
     {Moves : Type w} {residual : Moves → Interaction.Spec.{w}}
-    (d : Interaction.Spec.Decoration
+    (d : PFunctor.FreeM.Displayed.Decoration
+      (P := Spec.basePFunctor) (α := PUnit.{w + 1})
       (OpenNodeContext.{u, w} (MachineId Sid Pid) Δ)
-      (.node Moves residual))
+      (Spec.node Moves residual))
     (x : Moves)
     (tr : (residual x).Transcript) :
     DecorationSessionCoherentAt sid d ⟨x, tr⟩ ↔

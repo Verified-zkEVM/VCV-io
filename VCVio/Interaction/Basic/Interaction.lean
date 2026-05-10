@@ -152,14 +152,14 @@ def runSpec
     [Monad m]
     {spec : Spec}
     (ctxs : Decoration Γ spec)
-    {Out : Agent → Spec.Transcript spec → Type u}
-    {Result : Spec.Transcript spec → Type u}
+    {Out : Agent → PFunctor.FreeM.Path spec → Type u}
+    {Result : PFunctor.FreeM.Path spec → Type u}
     (profile :
       (agent : Agent) → StrategyOver syn agent spec ctxs (Out agent))
-    (collect : (tr : Spec.Transcript spec) → ((agent : Agent) → Out agent tr) → Result tr)
+    (collect : (tr : PFunctor.FreeM.Path spec) → ((agent : Agent) → Out agent tr) → Result tr)
     (I : InteractionOver
       (PFunctor.Lens.id Spec.basePFunctor) Agent Γ syn m) :
-    m ((tr : Spec.Transcript spec) × Result tr) :=
+    m ((tr : PFunctor.FreeM.Path spec) × Result tr) :=
   match spec, ctxs with
   | .done, _ => pure ⟨PUnit.unit, collect PUnit.unit profile⟩
   | .node _ next, ⟨γ, ctxs⟩ =>

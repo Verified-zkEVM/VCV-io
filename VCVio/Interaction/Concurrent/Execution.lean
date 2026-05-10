@@ -51,8 +51,9 @@ observation type at every node.
 -/
 inductive Observed {Party : Type u} [DecidableEq Party] (me : Party) :
     {spec : Interaction.Spec.{w}} →
-      Interaction.Spec.Decoration (StepContext Party) spec →
-      Interaction.Spec.Transcript spec →
+      PFunctor.FreeM.Displayed.Decoration (P := Spec.basePFunctor)
+        (α := PUnit.{w + 1}) (StepContext Party) spec →
+      PFunctor.FreeM.Path spec →
       Sort _ where
   | /-- The unique observed transcript of a completed sequential step. -/
     done :
@@ -64,15 +65,17 @@ inductive Observed {Party : Type u} [DecidableEq Party] (me : Party) :
       {rest : Moves → Interaction.Spec.{w}}
       {node : NodeProfile Party Moves}
       {semantics : (x : Moves) →
-        Interaction.Spec.Decoration (StepContext Party) (rest x)}
+        PFunctor.FreeM.Displayed.Decoration (P := Spec.basePFunctor)
+          (α := PUnit.{w + 1}) (StepContext Party) (rest x)}
       {x : Moves}
-      {tail : Interaction.Spec.Transcript (rest x)}
+      {tail : PFunctor.FreeM.Path (rest x)}
       (obs : (node.views me).ObsType)
       (restObs : Observed me (semantics x) tail) :
-      Observed (spec := .node Moves rest) me
-        (show Interaction.Spec.Decoration (StepContext Party) (.node Moves rest) from
+      Observed (spec := Spec.node Moves rest) me
+        (show PFunctor.FreeM.Displayed.Decoration (P := Spec.basePFunctor)
+            (α := PUnit.{w + 1}) (StepContext Party) (Spec.node Moves rest) from
           ⟨node, semantics⟩)
-        (show Interaction.Spec.Transcript (.node Moves rest) from
+        (show PFunctor.FreeM.Path (Spec.node Moves rest) from
           ⟨x, tail⟩)
 
 namespace Observed
@@ -82,8 +85,9 @@ The number of visited nodes recorded by an observed sequential transcript.
 -/
 def length {Party : Type u} [DecidableEq Party] {me : Party} :
     {spec : Interaction.Spec.{w}} →
-      {semantics : Interaction.Spec.Decoration (StepContext Party) spec} →
-      {tr : Interaction.Spec.Transcript spec} →
+      {semantics : PFunctor.FreeM.Displayed.Decoration (P := Spec.basePFunctor)
+        (α := PUnit.{w + 1}) (StepContext Party) spec} →
+      {tr : PFunctor.FreeM.Path spec} →
       Observed me semantics tr →
       Nat
   | .done, _, _, Observed.done => 0
@@ -98,8 +102,9 @@ observation that the local view for `me` exposes there.
 -/
 def ofTranscript {Party : Type u} [DecidableEq Party] (me : Party) :
     {spec : Interaction.Spec.{w}} →
-      (semantics : Interaction.Spec.Decoration (StepContext Party) spec) →
-      (tr : Interaction.Spec.Transcript spec) →
+      (semantics : PFunctor.FreeM.Displayed.Decoration (P := Spec.basePFunctor)
+        (α := PUnit.{w + 1}) (StepContext Party) spec) →
+      (tr : PFunctor.FreeM.Path spec) →
       Observed me semantics tr
   | .done, _, _ =>
       show Observed (Party := Party) me (spec := .done) PUnit.unit PUnit.unit from
@@ -117,7 +122,7 @@ This is the most convenient step-level type when working with concrete process
 steps rather than raw decorations.
 -/
 abbrev ObservedTranscript {Party : Type u} [DecidableEq Party] (me : Party)
-    {P : Type v} (step : Step Party P) (tr : Interaction.Spec.Transcript step.spec) :=
+    {P : Type v} (step : Step Party P) (tr : PFunctor.FreeM.Path step.spec) :=
   Observed me step.semantics tr
 
 /--
@@ -125,7 +130,7 @@ abbrev ObservedTranscript {Party : Type u} [DecidableEq Party] (me : Party)
 running `step` along `tr`.
 -/
 abbrev observe {Party : Type u} [DecidableEq Party] (me : Party)
-    {P : Type v} (step : Step Party P) (tr : Interaction.Spec.Transcript step.spec) :
+    {P : Type v} (step : Step Party P) (tr : PFunctor.FreeM.Path step.spec) :
     ObservedTranscript me step tr :=
   Observed.ofTranscript me step.semantics tr
 
@@ -145,7 +150,7 @@ abbrev ObservedTranscript
     (resolve : Interaction.Spec.Node.ContextHom Γ (StepContext Party))
     {P : Type v}
     (step : StepOver Γ P)
-    (tr : Interaction.Spec.Transcript step.spec) :=
+    (tr : PFunctor.FreeM.Path step.spec) :=
   Step.ObservedTranscript me (step.mapContext resolve) tr
 
 /--
@@ -160,7 +165,7 @@ abbrev observe
     (resolve : Interaction.Spec.Node.ContextHom Γ (StepContext Party))
     {P : Type v}
     (step : StepOver Γ P)
-    (tr : Interaction.Spec.Transcript step.spec) :
+    (tr : PFunctor.FreeM.Path step.spec) :
     ObservedTranscript me resolve step tr :=
   Step.observe me (step.mapContext resolve) tr
 

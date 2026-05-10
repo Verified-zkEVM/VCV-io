@@ -32,11 +32,11 @@ def replicate (a : α) (s : FreeM P α) : (n : Nat) → FreeM P α
   | 0 => FreeM.pure a
   | n + 1 => s.append (fun _ => replicate a s n)
 
-@[simp, grind =]
+@[simp, grind =, freeM_unfold]
 theorem replicate_zero (a : α) (s : FreeM P α) :
     replicate a s 0 = FreeM.pure a := rfl
 
-@[simp]
+@[simp, freeM_unfold]
 theorem replicate_succ (a : α) (s : FreeM P α) (n : Nat) :
     replicate a s (n + 1) = s.append (fun _ => replicate a s n) := rfl
 
@@ -49,14 +49,14 @@ def replicate {Γ : P.A → Type w₂} (a : α) {s : FreeM P α}
   | 0 => ⟨⟩
   | n + 1 => Decoration.append d (fun _ => Decoration.replicate a d n)
 
-@[simp]
+@[simp, freeM_unfold]
 theorem replicate_zero {Γ : P.A → Type w₂} (a : α) {s : FreeM P α}
     (d : Decoration Γ s) :
     Decoration.replicate a d 0 =
       (⟨⟩ : Decoration Γ (FreeM.replicate a s 0)) :=
   rfl
 
-@[simp]
+@[simp, freeM_unfold]
 theorem replicate_succ {Γ : P.A → Type w₂} (a : α) {s : FreeM P α}
     (d : Decoration Γ s) (n : Nat) :
     Decoration.replicate a d (n + 1) =
@@ -73,7 +73,7 @@ def replicate {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Type w₃}
   | 0 => ⟨⟩
   | n + 1 => Decoration.Over.append r (fun _ => Over.replicate a r n)
 
-@[simp]
+@[simp, freeM_unfold]
 theorem replicate_zero {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Type w₃}
     (a : α) {s : FreeM P α} {d : Decoration Γ s}
     (r : Decoration.Over Γ F s d) :
@@ -81,7 +81,7 @@ theorem replicate_zero {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Type
       (⟨⟩ : Decoration.Over Γ F (FreeM.replicate a s 0) (d.replicate a 0)) :=
   rfl
 
-@[simp]
+@[simp, freeM_unfold]
 theorem replicate_succ {Γ : P.A → Type w₂} {F : (a : P.A) → Γ a → Type w₃}
     (a : α) {s : FreeM P α} {d : Decoration Γ s}
     (r : Decoration.Over Γ F s d) (n : Nat) :

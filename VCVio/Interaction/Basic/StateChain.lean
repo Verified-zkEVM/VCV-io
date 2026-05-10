@@ -16,7 +16,7 @@ the state advances to `advance i s tr : Stage (i + 1)`.
 This file provides the spec-level state chain (`Spec.stateChain`), a transcript telescope type
 (`Transcript.stateChain`), flattening operations (`Transcript.stateChainJoin` /
 `stateChainUnjoin`), type-level lifting (`Transcript.stateChainLiftJoin`,
-`Transcript.stateChainFamily`), decorations, and strategy composition along state chains.
+`PFunctor.FreeM.Path.stateChainFamily`), decorations, and strategy composition along state chains.
 
 For the primary (stateless, continuation-style) chain API see `Spec.Chain` in
 `VCVio.Interaction.Basic.Chain`.
@@ -41,51 +41,59 @@ theorem stateChain_zero (Stage : Nat → Type u)
     (spec : (i : Nat) → Stage i → Spec)
     (advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1))
     (i : Nat) (s : Stage i) :
-    Spec.stateChain Stage spec advance 0 i s = .done := rfl
+    PFunctor.FreeM.stateChain PUnit.unit Stage spec advance 0 i s = Spec.done := rfl
 
 theorem stateChain_succ (Stage : Nat → Type u)
     (spec : (i : Nat) → Stage i → Spec)
     (advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1))
     (n : Nat) (i : Nat) (s : Stage i) :
-    Spec.stateChain Stage spec advance (n + 1) i s =
+    PFunctor.FreeM.stateChain PUnit.unit Stage spec advance (n + 1) i s =
       (spec i s).append
-        (fun tr => Spec.stateChain Stage spec advance n (i + 1) (advance i s tr)) :=
+        (fun tr =>
+          PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1)
+            (advance i s tr)) :=
   rfl
 
 /-- `replicate` is `stateChain` with trivial state `PUnit`. -/
 theorem replicate_eq_stateChain (spec : Spec) (n : Nat) (i : Nat) :
-    spec.replicate n = Spec.stateChain (fun _ => PUnit) (fun _ _ => spec)
+    spec.replicate n = PFunctor.FreeM.stateChain PUnit.unit (fun _ => PUnit) (fun _ _ => spec)
       (fun _ _ _ => ⟨⟩) n i ⟨⟩ := by
   induction n generalizing i with
   | zero => rfl
   | succ n ih =>
-    simp only [replicate_succ, stateChain]
+    simp only [replicate_succ]
     congr 1; funext _; exact ih (i + 1)
 
 /-- Decompose a `(n+1)`-stage state chain transcript into the first-stage transcript and
-the remainder. Specialization of `Transcript.split` to the state chain structure. -/
+the remainder. Specialization of `PFunctor.FreeM.Path.split` to the state chain structure. -/
 def Transcript.stateChainSplit
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (n : Nat) (i : Nat) (s : Stage i) :
-    Transcript (Spec.stateChain Stage spec advance (n + 1) i s) →
+    Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance (n + 1) i s) →
     (tr₁ : Transcript (spec i s)) ×
-      Transcript (Spec.stateChain Stage spec advance n (i + 1) (advance i s tr₁)) :=
-  Transcript.split (spec i s)
-    (fun tr => Spec.stateChain Stage spec advance n (i + 1) (advance i s tr))
+      Transcript
+        (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1)
+          (advance i s tr₁)) :=
+  PFunctor.FreeM.Path.split (spec i s)
+    (fun tr => PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1) (advance i s tr))
 
 /-- Combine a first-stage transcript with a remainder state chain transcript into a
-`(n+1)`-stage state chain transcript. Specialization of `Transcript.append` to
+`(n+1)`-stage state chain transcript. Specialization of `PFunctor.FreeM.Path.append` to
 state chains. -/
 def Transcript.stateChainAppend
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (n : Nat) (i : Nat) (s : Stage i)
     (tr₁ : Transcript (spec i s))
-    (tr₂ : Transcript (Spec.stateChain Stage spec advance n (i + 1) (advance i s tr₁))) :
-    Transcript (Spec.stateChain Stage spec advance (n + 1) i s) :=
-  Transcript.append (spec i s)
-    (fun tr => Spec.stateChain Stage spec advance n (i + 1) (advance i s tr)) tr₁ tr₂
+    (tr₂ : Transcript
+      (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1)
+        (advance i s tr₁))) :
+    Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance (n + 1) i s) :=
+  PFunctor.FreeM.Path.append (spec i s)
+    (fun tr =>
+      PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1) (advance i s tr))
+    tr₁ tr₂
 
 /-- Splitting after appending at the state chain level recovers the components. -/
 @[simp, grind =]
@@ -94,9 +102,11 @@ theorem Transcript.stateChainSplit_stateChainAppend
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (n : Nat) (i : Nat) (s : Stage i)
     (tr₁ : Transcript (spec i s))
-    (tr₂ : Transcript (Spec.stateChain Stage spec advance n (i + 1) (advance i s tr₁))) :
+    (tr₂ : Transcript
+      (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1)
+        (advance i s tr₁))) :
     Transcript.stateChainSplit n i s (Transcript.stateChainAppend n i s tr₁ tr₂) = ⟨tr₁, tr₂⟩ :=
-  Transcript.split_append _ _ _ _
+  PFunctor.FreeM.Path.split_append _ _ _ _
 
 /-! ## N-ary transcript operations -/
 
@@ -114,13 +124,13 @@ def Transcript.stateChain (Stage : Nat → Type u)
 
 /-- Flatten a transcript telescope into the combined state chain transcript,
 concatenating each per-stage transcript via `Transcript.stateChainAppend`.
-The n-ary analog of `Transcript.append`, mirroring `List.join`. -/
+The n-ary analog of `PFunctor.FreeM.Path.append`, mirroring `List.join`. -/
 def Transcript.stateChainJoin (Stage : Nat → Type u)
     (spec : (i : Nat) → Stage i → Spec)
     (advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
     Transcript.stateChain Stage spec advance n i s →
-    Transcript (Spec.stateChain Stage spec advance n i s)
+    Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)
   | 0, _, _, _ => ⟨⟩
   | n + 1, i, s, ⟨tr₁, rest⟩ =>
       Transcript.stateChainAppend n i s tr₁
@@ -132,7 +142,7 @@ def Transcript.stateChainUnjoin (Stage : Nat → Type u)
     (spec : (i : Nat) → Stage i → Spec)
     (advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
-    Transcript (Spec.stateChain Stage spec advance n i s) →
+    Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s) →
     Transcript.stateChain Stage spec advance n i s
   | 0, _, _, _ => ⟨⟩
   | n + 1, i, s, tr =>
@@ -161,17 +171,17 @@ theorem Transcript.stateChainJoin_unjoin
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)} :
     (n : Nat) → (i : Nat) → (s : Stage i) →
-    (tr : Transcript (Spec.stateChain Stage spec advance n i s)) →
+    (tr : Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)) →
     Transcript.stateChainJoin Stage spec advance n i s
       (Transcript.stateChainUnjoin Stage spec advance n i s tr) = tr
   | 0, _, _, ⟨⟩ => rfl
   | n + 1, i, s, tr => by
       dsimp only [Transcript.stateChainUnjoin, Transcript.stateChainJoin]
       rw [stateChainJoin_unjoin n (i + 1)]
-      exact Transcript.append_split _ _ tr
+      exact PFunctor.FreeM.Path.append_split _ _ tr
 
 /-- Lift a family indexed by the transcript telescope to a family on the combined
-state chain transcript. Uses `Transcript.liftAppend` at each stage, ensuring that
+state chain transcript. Uses `PFunctor.FreeM.Path.liftAppend` at each stage, ensuring that
 `stateChainLiftJoin ... F (stateChainJoin ... trs)` reduces **definitionally**
 to `F trs`. -/
 def Transcript.stateChainLiftJoin (Stage : Nat → Type u)
@@ -179,11 +189,13 @@ def Transcript.stateChainLiftJoin (Stage : Nat → Type u)
     (advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
     (Transcript.stateChain Stage spec advance n i s → Type u) →
-    Transcript (Spec.stateChain Stage spec advance n i s) → Type u
+    Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s) → Type u
   | 0, _, _, F, _ => F ⟨⟩
   | n + 1, i, s, F, tr =>
-      Transcript.liftAppend (spec i s)
-        (fun tr₁ => Spec.stateChain Stage spec advance n (i + 1) (advance i s tr₁))
+      PFunctor.FreeM.Path.liftAppend (spec i s)
+        (fun tr₁ =>
+          PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1)
+            (advance i s tr₁))
         (fun tr₁ trRest =>
           Transcript.stateChainLiftJoin Stage spec advance n (i + 1) (advance i s tr₁)
             (fun rest => F ⟨tr₁, rest⟩) trRest)
@@ -197,7 +209,7 @@ abbrev Decoration.stateChain {S : Type u → Type v}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (deco : (i : Nat) → (s : Stage i) → Decoration S (spec i s)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
-    Decoration S (Spec.stateChain Stage spec advance n i s) :=
+    Decoration S (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s) :=
   PFunctor.FreeM.Displayed.Decoration.stateChain
     (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
     (advance := advance) deco
@@ -210,7 +222,7 @@ abbrev Decoration.Over.stateChain {L : Type u → Type v} {F : ∀ X, L X → Ty
     {deco : (i : Nat) → (s : Stage i) → Decoration L (spec i s)}
     (rDeco : (i : Nat) → (s : Stage i) → Decoration.Over F (spec i s) (deco i s)) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
-    Decoration.Over F (Spec.stateChain Stage spec advance n i s)
+    Decoration.Over F (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)
       (Decoration.stateChain deco n i s) :=
   PFunctor.FreeM.Displayed.Decoration.Over.stateChain
     (P := Spec.basePFunctor) (α := PUnit.{u+1}) (a := PUnit.unit)
@@ -224,7 +236,7 @@ theorem Decoration.Over.map_stateChain {L : Type u → Type v} {F G : ∀ X, L X
     {deco : (i : Nat) → (s : Stage i) → Decoration L (spec i s)}
     (rDeco : (i : Nat) → (s : Stage i) → Decoration.Over F (spec i s) (deco i s))
     (n : Nat) (i : Nat) (s : Stage i) :
-    Decoration.Over.map η (Spec.stateChain Stage spec advance n i s)
+    Decoration.Over.map η (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)
         (Decoration.stateChain deco n i s) (Decoration.Over.stateChain rDeco n i s) =
       Decoration.Over.stateChain (fun j t => Decoration.Over.map η (spec j t) (deco j t)
         (rDeco j t)) n i s :=
@@ -234,48 +246,50 @@ theorem Decoration.Over.map_stateChain {L : Type u → Type v} {F G : ∀ X, L X
 /-! ## State chain families -/
 
 /-- The output type of state chain composition. Given a per-stage family `Family i s`,
-this computes the type at the terminal stage by threading through `Transcript.liftAppend`
+this computes the type at the terminal stage by threading through `PFunctor.FreeM.Path.liftAppend`
 at each step. Reduces **definitionally** when the transcript is built via
-`Transcript.append`, avoiding Nat-arithmetic casts.
+`PFunctor.FreeM.Path.append`, avoiding Nat-arithmetic casts.
 
 This is the canonical output type for `Strategy.stateChainComp` and
 `StrategyOver.TwoParty.Counterpart.stateChainComp`. -/
-def Transcript.stateChainFamily
+def PFunctor.FreeM.Path.stateChainFamily
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (Family : (i : Nat) → Stage i → Type u) :
     (n : Nat) → (i : Nat) → (stage : Stage i) →
-    Transcript (Spec.stateChain Stage spec advance n i stage) → Type u
+    Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i stage) → Type u
   | 0, i, stage, _ => Family i stage
   | n + 1, i, stage, tr =>
-      Transcript.liftAppend (spec i stage)
-        (fun tr₁ => Spec.stateChain Stage spec advance n (i + 1) (advance i stage tr₁))
+      PFunctor.FreeM.Path.liftAppend (spec i stage)
+        (fun tr₁ =>
+          PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1)
+            (advance i stage tr₁))
         (fun tr₁ trRest =>
-          Transcript.stateChainFamily Family n (i + 1) (advance i stage tr₁) trRest)
+          PFunctor.FreeM.Path.stateChainFamily Family n (i + 1) (advance i stage tr₁) trRest)
         tr
 
 @[simp]
-theorem Transcript.stateChainFamily_zero
+theorem PFunctor.FreeM.Path.stateChainFamily_zero
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (Family : (i : Nat) → Stage i → Type u) (i : Nat) (s : Stage i) (tr : PUnit) :
-    Transcript.stateChainFamily (advance := advance) Family 0 i s tr = Family i s := rfl
+    PFunctor.FreeM.Path.stateChainFamily (advance := advance) Family 0 i s tr = Family i s := rfl
 
 /-- A constant family is unaffected by `stateChainFamily`. -/
-theorem Transcript.stateChainFamily_const
+theorem PFunctor.FreeM.Path.stateChainFamily_const
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
     (α : Type u) :
     (n : Nat) → (i : Nat) → (s : Stage i) →
-    (tr : Transcript (Spec.stateChain Stage spec advance n i s)) →
-    Transcript.stateChainFamily (advance := advance) (fun _ _ => α) n i s tr = α
+    (tr : Transcript (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)) →
+    PFunctor.FreeM.Path.stateChainFamily (advance := advance) (fun _ _ => α) n i s tr = α
   | 0, _, _, _ => rfl
   | n + 1, i, s, tr => by
-      simp only [Transcript.stateChainFamily]
-      rw [Transcript.liftAppend_congr (spec i s) _ _ _
+      simp only [PFunctor.FreeM.Path.stateChainFamily]
+      rw [PFunctor.FreeM.Path.liftAppend_congr (spec i s) _ _ _
         (fun tr₁ trR =>
-          Transcript.stateChainFamily_const α n (i + 1) (advance i s tr₁) trR)]
-      exact Transcript.liftAppend_const α (spec i s) _ tr
+          PFunctor.FreeM.Path.stateChainFamily_const α n (i + 1) (advance i s tr₁) trR)]
+      exact PFunctor.FreeM.Path.liftAppend_const α (spec i s) _ tr
 
 /-! ## Strategy composition along state chains -/
 
@@ -283,7 +297,7 @@ variable {m : Type u → Type u}
 
 /-- Compose per-stage strategies along a state chain. At each stage, the step function
 transforms `Family i s` into a strategy whose output is `Family (i+1) (advance i s tr)`.
-The full state chain output is `Transcript.stateChainFamily Family`. -/
+The full state chain output is `PFunctor.FreeM.Path.stateChainFamily Family`. -/
 def Strategy.stateChainComp {m : Type u → Type u} [Monad m]
     {Stage : Nat → Type u} {spec : (i : Nat) → Stage i → Spec}
     {advance : (i : Nat) → (s : Stage i) → Transcript (spec i s) → Stage (i + 1)}
@@ -291,13 +305,13 @@ def Strategy.stateChainComp {m : Type u → Type u} [Monad m]
     (step : (i : Nat) → (s : Stage i) → Family i s →
       m (Strategy.Plain m (spec i s) (fun tr => Family (i + 1) (advance i s tr)))) :
     (n : Nat) → (i : Nat) → (s : Stage i) → Family i s →
-    m (Strategy.Plain m (Spec.stateChain Stage spec advance n i s)
-      (Transcript.stateChainFamily Family n i s))
+    m (Strategy.Plain m (PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n i s)
+      (PFunctor.FreeM.Path.stateChainFamily Family n i s))
   | 0, _, _, a => pure a
   | n + 1, i, s, a => do
     let strat ← step i s a
     Strategy.comp (spec i s)
-      (fun tr => Spec.stateChain Stage spec advance n (i + 1) (advance i s tr))
+      (fun tr => PFunctor.FreeM.stateChain PUnit.unit Stage spec advance n (i + 1) (advance i s tr))
       strat (fun tr mid => stateChainComp step n (i + 1) (advance i s tr) mid)
 
 end Spec
