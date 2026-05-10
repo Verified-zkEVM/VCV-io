@@ -74,7 +74,7 @@ def currentStep {Party : Type u} [DecidableEq Party] (st : State Party) :
 transcript and recovers the scheduled structural frontier event.
 -/
 def eventOfTranscript {Party : Type u} [DecidableEq Party] (st : State Party) :
-    Interaction.Spec.Transcript st.currentStep.spec → Front st.spec
+    PFunctor.FreeM.Path st.currentStep.spec → Front st.spec
   | ⟨event, _⟩ => event
 
 /--
@@ -82,7 +82,7 @@ def eventOfTranscript {Party : Type u} [DecidableEq Party] (st : State Party) :
 corresponding one-step process transcript.
 -/
 def transcriptOfEvent {Party : Type u} [DecidableEq Party] (st : State Party) :
-    Front st.spec → Interaction.Spec.Transcript st.currentStep.spec
+    Front st.spec → PFunctor.FreeM.Path st.currentStep.spec
   | event => ⟨event, PUnit.unit⟩
 
 end State

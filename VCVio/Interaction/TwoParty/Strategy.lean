@@ -200,7 +200,7 @@ theorem _root_.Interaction.SyntaxOver.TwoParty.pairedMonadicSpec_eq_ownerBased :
 /-- Functorial output map for role-dependent strategies. -/
 def _root_.Interaction.StrategyOver.TwoParty.Focal.mapOutput {m : Type u → Type u} [Functor m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
-    {A B : Spec.Transcript spec → Type u} →
+    {A B : PFunctor.FreeM.Path spec → Type u} →
     (∀ tr, A tr → B tr) →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles A →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles B
@@ -216,7 +216,7 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.mapOutput {m : Type u → Typ
 @[simp]
 theorem _root_.Interaction.StrategyOver.TwoParty.Focal.mapOutput_id
     {m : Type u → Type u} [Functor m] [LawfulFunctor m]
-    {spec : Spec} {roles : RoleDecoration spec} {A : Spec.Transcript spec → Type u}
+    {spec : Spec} {roles : RoleDecoration spec} {A : PFunctor.FreeM.Path spec → Type u}
     (σ : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles A) :
     StrategyOver.TwoParty.Focal.mapOutput (fun _ x => x) σ = σ := by
   match spec, roles with
@@ -231,7 +231,7 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.mapOutput_id
             (rest x) (rRest x) (fun p => A ⟨x, p⟩)) :=
         fun xc => ⟨xc.1,
           StrategyOver.TwoParty.Focal.mapOutput
-            (fun (p : Spec.Transcript (rest xc.1)) (y : A ⟨xc.1, p⟩) => y) xc.2⟩
+            (fun (p : PFunctor.FreeM.Path (rest xc.1)) (y : A ⟨xc.1, p⟩) => y) xc.2⟩
       have hpair : F = id := by
         funext xc
         cases xc with
@@ -239,7 +239,7 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.mapOutput_id
             simp only [F]
             have h :
                 StrategyOver.TwoParty.Focal.mapOutput
-                  (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) σ' = σ' := by
+                  (fun (p : PFunctor.FreeM.Path (rest x)) (y : A ⟨x, p⟩) => y) σ' = σ' := by
               simpa using
                 (@StrategyOver.TwoParty.Focal.mapOutput_id m _ _
                   (rest x) (rRest x) (fun p => A ⟨x, p⟩) σ')
@@ -254,14 +254,14 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.mapOutput_id
       have hid : ∀ s : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
             (rest x) (rRest x) (fun p => A ⟨x, p⟩),
           StrategyOver.TwoParty.Focal.mapOutput
-            (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) s = s :=
+            (fun (p : PFunctor.FreeM.Path (rest x)) (y : A ⟨x, p⟩) => y) s = s :=
         fun s =>
           @StrategyOver.TwoParty.Focal.mapOutput_id m _ _
             (rest x) (rRest x) (fun p => A ⟨x, p⟩) s
       simp only [StrategyOver.TwoParty.Focal.mapOutput, ShapeOver.mapOutput,
         ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired, PFunctor.Lens.id]
       calc (StrategyOver.TwoParty.Focal.mapOutput
-              (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) ·) <$> σ x
+              (fun (p : PFunctor.FreeM.Path (rest x)) (y : A ⟨x, p⟩) => y) ·) <$> σ x
           = id <$> σ x := by congr 1; funext s; exact hid s
         _ = σ x := LawfulFunctor.id_map (σ x)
 
@@ -269,7 +269,7 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.mapOutput_id
 def _root_.Interaction.StrategyOver.TwoParty.Counterpart.mapOutput
     {m : Type u → Type u} [Functor m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
-    {A B : Spec.Transcript spec → Type u} →
+    {A B : PFunctor.FreeM.Path spec → Type u} →
     (∀ tr, A tr → B tr) →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart spec roles A →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart spec roles B
@@ -322,7 +322,7 @@ def toCounterpartHom {m : Type u → Type u} [Monad m] :
 are unchanged; only the terminal output carried by continuations is mapped. -/
 def mapOutput {m : Type u → Type u} [Functor m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
-    {A B : Spec.Transcript spec → Type u} →
+    {A B : PFunctor.FreeM.Path spec → Type u} →
     (∀ tr, A tr → B tr) →
     StrategyOver (counterpartSyntax m) PUnit.unit spec roles A →
     StrategyOver (counterpartSyntax m) PUnit.unit spec roles B :=
@@ -336,7 +336,7 @@ def mapOutput {m : Type u → Type u} [Functor m] :
 counterpart. -/
 def toCounterpart {m : Type u → Type u} [Monad m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
-    {Output : Spec.Transcript spec → Type u} →
+    {Output : PFunctor.FreeM.Path spec → Type u} →
     StrategyOver (counterpartSyntax m) PUnit.unit spec roles Output →
     StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart spec roles Output
   :=
@@ -350,9 +350,9 @@ messages are read from the transcript; receiver samplers are ignored and the
 stored continuation family is followed at the recorded challenge. -/
 def replay {m : Type u → Type u} [Monad m] :
     {spec : Spec.{u}} → {roles : RoleDecoration spec} →
-    {Output : Spec.Transcript spec → Type u} →
+    {Output : PFunctor.FreeM.Path spec → Type u} →
     StrategyOver (counterpartSyntax m) PUnit.unit spec roles Output →
-    (tr : Spec.Transcript spec) → m (Output tr)
+    (tr : PFunctor.FreeM.Path spec) → m (Output tr)
   | .done, _, _, c, _ => pure c
   | .node _ _, ⟨.sender, _⟩, _, observe, ⟨x, tr⟩ =>
       do
@@ -367,7 +367,7 @@ end PublicCoinCounterpart
 @[simp]
 theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.mapOutput_id
     {m : Type u → Type u} [Functor m] [LawfulFunctor m]
-    {spec : Spec} {roles : RoleDecoration spec} {A : Spec.Transcript spec → Type u}
+    {spec : Spec} {roles : RoleDecoration spec} {A : PFunctor.FreeM.Path spec → Type u}
     (c : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart spec roles A) :
     StrategyOver.TwoParty.Counterpart.mapOutput (fun _ x => x) c = c := by
   match spec, roles with
@@ -379,7 +379,7 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.mapOutput_id
       have hid : ∀ c' : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart
             (rest x) (rRest x) (fun p => A ⟨x, p⟩),
           StrategyOver.TwoParty.Counterpart.mapOutput
-            (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) c' = c' :=
+            (fun (p : PFunctor.FreeM.Path (rest x)) (y : A ⟨x, p⟩) => y) c' = c' :=
         fun c' =>
           @StrategyOver.TwoParty.Counterpart.mapOutput_id m _ _
             (rest x) (rRest x) (fun p => A ⟨x, p⟩) c'
@@ -387,7 +387,7 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.mapOutput_id
         ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired, PFunctor.Lens.id]
       change
         (StrategyOver.TwoParty.Counterpart.mapOutput
-          (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y)) <$> c x = c x
+          (fun (p : PFunctor.FreeM.Path (rest x)) (y : A ⟨x, p⟩) => y)) <$> c x = c x
       calc (StrategyOver.TwoParty.Counterpart.mapOutput (fun p y => y) ·) <$> c x
           = id <$> c x := by congr 1; funext c'; exact hid c'
         _ = c x := LawfulFunctor.id_map (c x)
@@ -399,7 +399,7 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.mapOutput_id
             (rest x) (rRest x) (fun p => A ⟨x, p⟩)) :=
         fun xc => ⟨xc.1,
           StrategyOver.TwoParty.Counterpart.mapOutput
-            (fun (p : Spec.Transcript (rest xc.1)) (y : A ⟨xc.1, p⟩) => y) xc.2⟩
+            (fun (p : PFunctor.FreeM.Path (rest xc.1)) (y : A ⟨xc.1, p⟩) => y) xc.2⟩
       have hpair :
           F = id := by
         funext xc
@@ -408,7 +408,7 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Counterpart.mapOutput_id
             simp only [F]
             have h :
                 StrategyOver.TwoParty.Counterpart.mapOutput
-                  (fun (p : Spec.Transcript (rest x)) (y : A ⟨x, p⟩) => y) c' = c' := by
+                  (fun (p : PFunctor.FreeM.Path (rest x)) (y : A ⟨x, p⟩) => y) c' = c' := by
               simpa using
                 (@StrategyOver.TwoParty.Counterpart.mapOutput_id m _ _
                   (rest x) (rRest x) (fun p => A ⟨x, p⟩) c')
@@ -427,7 +427,7 @@ generic utility for reusing deterministic environments inside monadic execution
 machinery built from `InteractionOver.run`. -/
 def _root_.Interaction.StrategyOver.TwoParty.Counterpart.liftId {m : Type u → Type u} [Monad m] :
     {spec : Spec} → {roles : RoleDecoration spec} →
-    {Output : Spec.Transcript spec → Type u} →
+    {Output : PFunctor.FreeM.Path spec → Type u} →
     StrategyOver (SyntaxOver.TwoParty.pairedSpec Id) Participant.counterpart spec roles Output →
       StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart spec roles Output
   | .done, _, _, c => c
@@ -443,8 +443,8 @@ The focal participant carries `OutputP`, while the counterpart carries
 rules a single canonical shape for participant outputs, which keeps dependent
 function arguments definitionally aligned. -/
 def participantOutputFamily
-    {spec : Spec} (OutputP OutputC : Spec.Transcript spec → Type u)
-    (agent : Participant.{u}) (tr : Spec.Transcript spec) : Type u :=
+    {spec : Spec} (OutputP OutputC : PFunctor.FreeM.Path spec → Type u)
+    (agent : Participant.{u}) (tr : PFunctor.FreeM.Path spec) : Type u :=
   match agent with
   | .focal => OutputP tr
   | .counterpart => OutputC tr
@@ -452,8 +452,8 @@ def participantOutputFamily
 /-- Collect the two participant-indexed outputs into the result pair of a
 two-party run. -/
 def collectParticipantOutputs
-    {spec : Spec} {OutputP OutputC : Spec.Transcript spec → Type u} :
-    (tr : Spec.Transcript spec) →
+    {spec : Spec} {OutputP OutputC : PFunctor.FreeM.Path spec → Type u} :
+    (tr : PFunctor.FreeM.Path spec) →
       ((agent : Participant.{u}) → participantOutputFamily OutputP OutputC agent tr) →
       OutputP tr × OutputC tr :=
   fun _ out => (out Participant.focal, out Participant.counterpart)
@@ -462,7 +462,7 @@ def collectParticipantOutputs
 participant-indexed profile for the generic runner. -/
 def participantProfile
     {m : Type u → Type u} {spec : Spec} {roles : RoleDecoration spec}
-    {OutputP OutputC : Spec.Transcript spec → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path spec → Type u}
     (strat : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles OutputP)
     (cpt : StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart spec roles OutputC) :
@@ -480,32 +480,32 @@ two participant fibers assembled by `participantProfile` and collected by
 -/
 def run {m : Type u → Type u} [Monad m]
     (spec : Spec) (roles : RoleDecoration spec)
-    {OutputP : Spec.Transcript spec → Type u}
-    {OutputC : Spec.Transcript spec → Type u}
+    {OutputP : PFunctor.FreeM.Path spec → Type u}
+    {OutputC : PFunctor.FreeM.Path spec → Type u}
     (strat : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles OutputP)
     (cpt : StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.counterpart spec roles OutputC) :
-    m ((tr : Spec.Transcript spec) × OutputP tr × OutputC tr) :=
+    m ((tr : PFunctor.FreeM.Path spec) × OutputP tr × OutputC tr) :=
   InteractionOver.runSpec
     (I := InteractionOver.TwoParty.pairedSpec m) roles (participantProfile strat cpt)
     collectParticipantOutputs
 
 @[simp]
 theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_done {m : Type u → Type u} [Monad m]
-    {OutputP OutputC : Spec.Transcript Spec.done → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path Spec.done → Type u}
     (outP : OutputP ⟨⟩) (outC : OutputC ⟨⟩) :
     InteractionOver.runSpec
       (I := InteractionOver.TwoParty.pairedSpec m) (spec := Spec.done) (ctxs := PUnit.unit)
       (participantProfile outP outC) collectParticipantOutputs =
       (pure ⟨⟨⟩, outP, outC⟩ :
-        m ((tr : Spec.Transcript Spec.done) × OutputP tr × OutputC tr)) := by
+        m ((tr : PFunctor.FreeM.Path Spec.done) × OutputP tr × OutputC tr)) := by
   rfl
 
 @[simp]
 theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_sender
     {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
-    {OutputP OutputC : Spec.Transcript (Spec.node X rest) → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path (Spec.node X rest) → Type u}
     (send :
       m ((x : X) × StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
         (rest x) (rRest x) (fun tr => OutputP ⟨x, tr⟩)))
@@ -540,7 +540,7 @@ theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_sender
 theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_receiver
     {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
-    {OutputP OutputC : Spec.Transcript (Spec.node X rest) → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path (Spec.node X rest) → Type u}
     (respond : (x : X) → m (StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
       (rest x) (rRest x) (fun tr => OutputP ⟨x, tr⟩)))
     (dualSample :
@@ -576,7 +576,7 @@ as running first and mapping the final triple. -/
 theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_mapOutput_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
     {spec : Spec} {roles : RoleDecoration spec}
-    {OutputP OutputP' OutputC OutputC' : Spec.Transcript spec → Type u}
+    {OutputP OutputP' OutputC OutputC' : PFunctor.FreeM.Path spec → Type u}
     (fP : ∀ tr, OutputP tr → OutputP' tr)
     (fC : ∀ tr, OutputC tr → OutputC' tr)
     (strat : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles OutputP)
@@ -594,7 +594,7 @@ theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_mapOutput_mapOutp
           (participantProfile strat cpt) collectParticipantOutputs := by
   let rec go
       (spec : Spec) (roles : RoleDecoration spec)
-      {OutputP OutputP' OutputC OutputC' : Spec.Transcript spec → Type u}
+      {OutputP OutputP' OutputC OutputC' : PFunctor.FreeM.Path spec → Type u}
       (fP : ∀ tr, OutputP tr → OutputP' tr)
       (fC : ∀ tr, OutputC tr → OutputC' tr)
       (strat : StrategyOver
@@ -639,9 +639,9 @@ theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_mapOutput_mapOutp
         refine congrArg (fun k => cpt xc.1 >>= k) ?_
         funext cNext
         let addPrefix :
-            ((tr : Spec.Transcript (rest xc.1)) × (fun tr => OutputP' ⟨xc.1, tr⟩) tr ×
+            ((tr : PFunctor.FreeM.Path (rest xc.1)) × (fun tr => OutputP' ⟨xc.1, tr⟩) tr ×
               (fun tr => OutputC' ⟨xc.1, tr⟩) tr) →
-            ((tr : Spec.Transcript (Spec.node _ rest)) × OutputP' tr × OutputC' tr) :=
+            ((tr : PFunctor.FreeM.Path (Spec.node _ rest)) × OutputP' tr × OutputC' tr) :=
           fun a => ⟨⟨xc.1, a.1⟩, a.2.1, a.2.2⟩
         simpa [monad_norm, addPrefix, PFunctor.Lens.id, InteractionOver.TwoParty.pairedSpec,
           InteractionOver.TwoParty.paired] using
@@ -669,9 +669,9 @@ theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_mapOutput_mapOutp
         refine congrArg (fun k => strat xc.1 >>= k) ?_
         funext next
         let addPrefix :
-            ((tr : Spec.Transcript (rest xc.1)) × (fun tr => OutputP' ⟨xc.1, tr⟩) tr ×
+            ((tr : PFunctor.FreeM.Path (rest xc.1)) × (fun tr => OutputP' ⟨xc.1, tr⟩) tr ×
               (fun tr => OutputC' ⟨xc.1, tr⟩) tr) →
-            ((tr : Spec.Transcript (Spec.node _ rest)) × OutputP' tr × OutputC' tr) :=
+            ((tr : PFunctor.FreeM.Path (Spec.node _ rest)) × OutputP' tr × OutputC' tr) :=
           fun a => ⟨⟨xc.1, a.1⟩, a.2.1, a.2.2⟩
         simpa [monad_norm, addPrefix, PFunctor.Lens.id, InteractionOver.TwoParty.pairedSpec,
           InteractionOver.TwoParty.paired] using
@@ -682,17 +682,17 @@ theorem _root_.Interaction.InteractionOver.TwoParty.run_paired_mapOutput_mapOutp
 
 @[simp]
 theorem run_done {m : Type u → Type u} [Monad m]
-    {OutputP OutputC : Spec.Transcript Spec.done → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path Spec.done → Type u}
     (outP : OutputP ⟨⟩) (outC : OutputC ⟨⟩) :
     run .done PUnit.unit outP outC =
       (pure ⟨⟨⟩, outP, outC⟩ :
-        m ((tr : Spec.Transcript Spec.done) × OutputP tr × OutputC tr)) := by
+        m ((tr : PFunctor.FreeM.Path Spec.done) × OutputP tr × OutputC tr)) := by
   rfl
 
 @[simp]
 theorem run_sender {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
-    {OutputP OutputC : Spec.Transcript (Spec.node X rest) → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path (Spec.node X rest) → Type u}
     (send :
       m ((x : X) × StrategyOver
         (SyntaxOver.TwoParty.pairedSpec m) Participant.focal (rest x) (rRest x)
@@ -709,7 +709,7 @@ theorem run_sender {m : Type u → Type u} [Monad m]
 @[simp]
 theorem run_receiver {m : Type u → Type u} [Monad m]
     {X : Type u} {rest : X → Spec} {rRest : (x : X) → RoleDecoration (rest x)}
-    {OutputP OutputC : Spec.Transcript (Spec.node X rest) → Type u}
+    {OutputP OutputC : PFunctor.FreeM.Path (Spec.node X rest) → Type u}
     (respond : (x : X) → m (StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal
       (rest x) (rRest x) (fun tr => OutputP ⟨x, tr⟩)))
     (dualSample :
@@ -725,7 +725,7 @@ theorem run_receiver {m : Type u → Type u} [Monad m]
 theorem run_mapOutput_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulMonad m]
     {spec : Spec} {roles : RoleDecoration spec}
-    {OutputP OutputP' OutputC OutputC' : Spec.Transcript spec → Type u}
+    {OutputP OutputP' OutputC OutputC' : PFunctor.FreeM.Path spec → Type u}
     (fP : ∀ tr, OutputP tr → OutputP' tr)
     (fC : ∀ tr, OutputC tr → OutputC' tr)
     (strat : StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles OutputP)
@@ -745,7 +745,7 @@ role strategy.
 -/
 def _root_.Interaction.StrategyOver.TwoParty.Focal.ofConstantMonads {m : Type u → Type u} [Monad m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
-    {Output : Spec.Transcript spec → Type u} :
+    {Output : PFunctor.FreeM.Path spec → Type u} :
     StrategyOver SyntaxOver.TwoParty.Focal.monadicSpec PUnit.unit spec
       (RoleDecoration.withMonads roles (Spec.MonadDecoration.constant ⟨m, inferInstance⟩ spec))
       Output →
@@ -768,26 +768,79 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.ofConstantMonads {m : Type u 
 View an ordinary single-monad role strategy as a strategy over a constant monad
 decoration.
 -/
-def _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonads {m : Type u → Type u} [Monad m]
+def _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonadsHom
+    {m : Type u → Type u} [Monad m] [LawfulFunctor m] :
+    StrategyOver.ShapeContextHom
+      (ShapeOver.TwoParty.pairedSpec m) (Participant.focal : Participant.{u})
+      ShapeOver.TwoParty.Focal.monadicSpec PUnit.unit
+      (RoleContext.withMonad ⟨m, inferInstance⟩) where
+  mapNode := by
+    intro X role A B f node
+    cases role
+    · simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic]
+        using (ShapeOver.TwoParty.pairedSpec m).map
+          (agent := Participant.focal) (γ := Role.sender) f node
+    · simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic]
+        using (ShapeOver.TwoParty.pairedSpec m).map
+          (agent := Participant.focal) (γ := Role.receiver) f node
+  mapNode_map := by
+    intro X role A B C D f₁ f₂ g₁ g₂ comm node
+    cases role
+    · have hfun :
+          (fun dx : (d : (PFunctor.Lens.id Spec.basePFunctor).toFunA X) × A d =>
+            Sigma.mk dx.1 (g₁ dx.1 (f₁ dx.1 dx.2))) =
+          (fun dx : (d : (PFunctor.Lens.id Spec.basePFunctor).toFunA X) × A d =>
+            Sigma.mk dx.1 (g₂ dx.1 (f₂ dx.1 dx.2))) := by
+          funext dx
+          exact Sigma.ext rfl (heq_of_eq (comm dx.1 dx.2))
+      simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        RoleMonadContext.diagonal, Spec.Node.Context.extendMap, Spec.Node.ContextHom.id,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic,
+        Functor.map_map]
+        using congrArg (fun h => h <$> node) hfun
+    · funext x
+      have hfun : (fun y : A x => g₁ x (f₁ x y)) = (fun y : A x => g₂ x (f₂ x y)) := by
+        funext y
+        exact comm x y
+      simpa [ShapeOver.TwoParty.Focal.monadicSpec, SyntaxOver.TwoParty.Focal.monadicSpec,
+        ShapeOver.comap, SyntaxOver.comap, ShapeOver.forAgent, SyntaxOver.forAgent,
+        ShapeOver.TwoParty.pairedSpec, ShapeOver.TwoParty.paired,
+        SyntaxOver.TwoParty.pairedSpec, SyntaxOver.TwoParty.paired,
+        RoleMonadContext.diagonal, Spec.Node.Context.extendMap, Spec.Node.ContextHom.id,
+        ShapeOver.TwoParty.pairedMonadicSpec, ShapeOver.TwoParty.pairedMonadic,
+        SyntaxOver.TwoParty.pairedMonadicSpec, SyntaxOver.TwoParty.pairedMonadic,
+        Functor.map_map]
+        using congrArg (fun h => h <$> node x) hfun
+
+/--
+View an ordinary single-monad role strategy as a monadic focal strategy by
+structurally pairing every role label with the same bundled monad.
+-/
+def _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonads
+    {m : Type u → Type u} [Monad m] [LawfulFunctor m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
-    {Output : Spec.Transcript spec → Type u} :
+    {Output : PFunctor.FreeM.Path spec → Type u} :
     StrategyOver (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles Output →
-    StrategyOver SyntaxOver.TwoParty.Focal.monadicSpec PUnit.unit spec
-      (RoleDecoration.withMonads roles (Spec.MonadDecoration.constant ⟨m, inferInstance⟩ spec))
+    StrategyOver ShapeOver.TwoParty.Focal.monadicSpec.toSyntaxOver PUnit.unit spec
+      (Decoration.map (RoleContext.withMonad ⟨m, inferInstance⟩) spec roles)
       Output :=
-  match spec, roles with
-  | .done, _ => fun strat => strat
-  | .node _ rest, ⟨.sender, rRest⟩ =>
-      fun strat =>
-        Functor.map
-          (fun msgAndRest =>
-            ⟨msgAndRest.1,
-              toConstantMonads
-                (rest msgAndRest.1) (rRest msgAndRest.1) msgAndRest.2⟩)
-          strat
-  | .node _ rest, ⟨.receiver, rRest⟩ =>
-      fun strat x =>
-        Functor.map (toConstantMonads (rest x) (rRest x)) (strat x)
+  StrategyOver.mapContext
+    StrategyOver.TwoParty.Focal.toConstantMonadsHom.toContextHom
+    (spec := spec) (ctxs := roles)
 
 /--
 Lifting an ordinary role strategy into a constant monad decoration commutes
@@ -800,7 +853,7 @@ monad decorations.
 theorem _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonads_mapOutput
     {m : Type u → Type u} [Monad m] [LawfulFunctor m]
     (spec : Spec.{u}) (roles : RoleDecoration spec)
-    {Output Output' : Spec.Transcript spec → Type u}
+    {Output Output' : PFunctor.FreeM.Path spec → Type u}
     (f : ∀ tr, Output tr → Output' tr)
     (strat : StrategyOver
       (SyntaxOver.TwoParty.pairedSpec m) Participant.focal spec roles Output) :
@@ -809,17 +862,11 @@ theorem _root_.Interaction.StrategyOver.TwoParty.Focal.toConstantMonads_mapOutpu
       ShapeOver.mapOutput ShapeOver.TwoParty.Focal.monadicSpec
         (agent := PUnit.unit)
         (spec := spec)
-        (ctxs := RoleDecoration.withMonads roles
-          (Spec.MonadDecoration.constant ⟨m, inferInstance⟩ spec))
+        (ctxs := Decoration.map (RoleContext.withMonad ⟨m, inferInstance⟩) spec roles)
         f
-        (StrategyOver.TwoParty.Focal.toConstantMonads spec roles strat) := by
-  match spec, roles with
-  | .done, _ =>
-      rfl
-  | .node _ rest, ⟨.sender, rRest⟩ =>
-      sorry
-  | .node _ rest, ⟨.receiver, rRest⟩ =>
-      sorry
+        (StrategyOver.TwoParty.Focal.toConstantMonads spec roles strat) :=
+  StrategyOver.mapContext_mapOutput StrategyOver.TwoParty.Focal.toConstantMonadsHom
+    (ctxs := roles) f strat
 
 /--
 Retarget a monadic focal strategy along a nodewise monad homomorphism.
@@ -831,7 +878,7 @@ def _root_.Interaction.StrategyOver.TwoParty.Focal.mapMonadDecoration
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {md₁ md₂ : Spec.MonadDecoration spec}
     (hom : Spec.MonadDecoration.Hom spec md₁ md₂)
-    {Output : Spec.Transcript spec → Type u} :
+    {Output : PFunctor.FreeM.Path spec → Type u} :
     StrategyOver SyntaxOver.TwoParty.Focal.monadicSpec PUnit.unit spec
       (RoleDecoration.withMonads roles md₁) Output →
     StrategyOver SyntaxOver.TwoParty.Focal.monadicSpec PUnit.unit spec
@@ -861,7 +908,7 @@ def _root_.Interaction.StrategyOver.TwoParty.Counterpart.mapMonadDecoration
     (spec : Spec.{u}) (roles : RoleDecoration spec)
     {md₁ md₂ : Spec.MonadDecoration spec}
     (hom : Spec.MonadDecoration.Hom spec md₁ md₂)
-    {Output : Spec.Transcript spec → Type u} :
+    {Output : PFunctor.FreeM.Path spec → Type u} :
     StrategyOver SyntaxOver.TwoParty.Counterpart.monadicSpec PUnit.unit spec
       (RoleDecoration.withMonads roles md₁) Output →
     StrategyOver SyntaxOver.TwoParty.Counterpart.monadicSpec PUnit.unit spec

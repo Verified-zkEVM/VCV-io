@@ -431,9 +431,7 @@ example :
 
 example :
     Process.Ticketed.enabledAt loopTicketed trueRun true 7 := by
-  refine ⟨by
-    change Interaction.Spec.Transcript (.node Bool fun _ => .done)
-    exact ⟨true, PUnit.unit⟩, ?_⟩
+  refine ⟨⟨true, PUnit.unit⟩, ?_⟩
   simp [loopTicketed]
 
 example :

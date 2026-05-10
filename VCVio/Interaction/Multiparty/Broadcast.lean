@@ -39,8 +39,9 @@ The intended semantics are broadcast / public-transcript:
 the labeled party chooses the next move, and every other participant observes
 that same move and continues along the corresponding branch.
 -/
-abbrev PartyDecoration (Party : Type u) :=
-  Spec.Decoration (fun _ => Party)
+abbrev PartyDecoration (Party : Type u) (spec : Spec.{u}) : Type u :=
+  PFunctor.FreeM.Displayed.Decoration (P := Spec.basePFunctor) (α := PUnit.{u+1})
+    (fun _ => Party) spec
 
 /--
 `Broadcast.Strategy m spec parties resolve Output` is the local endpoint type
@@ -61,7 +62,7 @@ abbrev Strategy
     {Party : Type u}
     (spec : Spec) (parties : PartyDecoration Party spec)
     (resolve : ∀ {X : Type u}, Party → ViewMode X)
-    (Output : Spec.Transcript spec → Type u) :=
+    (Output : PFunctor.FreeM.Path spec → Type u) :=
   Multiparty.Strategy m (resolve := fun X owner => resolve (X := X) owner) spec parties Output
 
 end Broadcast

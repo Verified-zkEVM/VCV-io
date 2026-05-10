@@ -18,6 +18,16 @@ We define the free monad on a **polynomial functor** (`PFunctor`), and prove som
 
 @[expose] public section
 
+/--
+Simp set for structurally unfolding `FreeM` and displayed-family operations.
+
+This set is reserved for one-way unfolding lemmas: constructor equations for
+`FreeM` operations, displayed-family operations, and local-hom recursion through
+`roll`. Folding and normalization lemmas should not be tagged with this
+attribute.
+-/
+register_simp_attr freeM_unfold
+
 universe u v uA uB uA₂ uB₂ uA₃ uB₃
 
 namespace PFunctor

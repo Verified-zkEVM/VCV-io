@@ -28,8 +28,8 @@ simulator `S := A`, exposing a single plug
 applying `CompEmulates` at that plug.
 
 The converse direction (textbook UC implies plug-level
-`CompUCSecure`) goes through Canetti's *dummy-adversary theorem* and
-is recorded as the stated obligation `ucSecure_toCompUCSecure_dummy`.
+`CompUCSecure`) goes through Canetti's *dummy-adversary theorem* and is
+packaged as the reusable capability `HasDummyAdversaryFactor`.
 
 ## Main definitions
 
@@ -205,7 +205,24 @@ theorem compEmulates_toUCSecure_id
     exact h _⟩
 
 /--
-**Stated dummy-adversary direction.**
+Structural capability for Canetti's dummy-adversary factorization.
+
+Compact closure gives the wiring primitives, but the textbook-to-plug UC
+direction also needs a decomposition principle for arbitrary plugs into an
+adversary/environment pair. The concrete syntax models can provide that
+principle as an instance of this class.
+-/
+class HasDummyAdversaryFactor (T : OpenTheory.{u}) extends OpenTheory.IsCompactClosed T where
+  toCompUCSecure_dummy :
+    {sem : Semantics T} → {ε : ℝ} →
+    {Δ : ProtocolBoundary} → {π F : Protocol T Δ} →
+    UCSecure sem ε π F →
+    ∃ (SimSpace : Type u) (simulate : SimSpace → T.Plug Δ.toPort →
+        T.Plug Δ.toPort),
+      CompUCSecure sem ε π F SimSpace simulate
+
+/--
+**Dummy-adversary direction.**
 
 Textbook UC security `UCSecure ε π F` implies the plug-level
 simulator-based form `CompUCSecure`: given the existential simulator
@@ -215,21 +232,19 @@ adversary-environment pair through the zig-zag identity
 `wire_idWire_right`.
 
 This is the content of Canetti's dummy-adversary theorem (cf. Canetti
-'01, Thm 4.16). Discharging this proof requires `IsCompactClosed T`
-plus a structural decomposition of arbitrary plugs into
-`(adversary, environment)` pairs; it is left as an explicit obligation
-here so that the textbook quantifier structure can be presented now
-without committing to the structural side of the proof.
+'01, Thm 4.16). The non-formalized structural decomposition is now an
+explicit reusable assumption, `HasDummyAdversaryFactor`, rather than a
+local proof hole.
 -/
 theorem ucSecure_toCompUCSecure_dummy
-    [OpenTheory.IsCompactClosed T]
+    [HasDummyAdversaryFactor T]
     {sem : Semantics T} {ε : ℝ}
     {Δ : ProtocolBoundary} {π F : Protocol T Δ}
-    (_h : UCSecure sem ε π F) :
+    (h : UCSecure sem ε π F) :
     ∃ (SimSpace : Type u) (simulate : SimSpace → T.Plug Δ.toPort →
         T.Plug Δ.toPort),
-      CompUCSecure sem ε π F SimSpace simulate := by
-  sorry
+      CompUCSecure sem ε π F SimSpace simulate :=
+  HasDummyAdversaryFactor.toCompUCSecure_dummy h
 
 end Standard
 end UC

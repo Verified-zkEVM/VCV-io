@@ -10,7 +10,7 @@ import ToMathlib.PFunctor.Free.Displayed.Decoration
 /-!
 # Decorations and dependent decorations (`Over`)
 
-`Spec.Decoration Γ spec` is concrete nodewise metadata attached to a fixed
+`PFunctor.FreeM.Displayed.Decoration Γ spec` is concrete nodewise metadata attached to a fixed
 protocol tree `spec`, where `Γ : Spec.Node.Context` is the realized family of
 node-local information. If a node of `spec` has move space `X`, then a
 decoration provides one value of type `Γ X` at that node, and recursively
@@ -35,7 +35,7 @@ suffix form because they are the primary generalized syntax and semantics
 layers, not dependent objects over a fixed base `Shape` or `Interaction`.
 
 Functorial `map` / `map_id` / `map_comp` for both layers are in this file.
-Composition along `Spec.append` is in `VCVio.Interaction.Basic.Append`.
+Composition along `PFunctor.FreeM.append` is in `VCVio.Interaction.Basic.Append`.
 
 Because decorations are concrete tree data, they are covariant in node-local
 contexts: a context morphism `Γ → Δ` induces a map from decorations by `Γ`
@@ -54,10 +54,9 @@ of that schema's realized context is the same as a base decoration by `Γ`
 plus one displayed layer over it.
 
 The file concludes by lifting this one-step bridge recursively to arbitrary
-schemas: `Spec.Decoration.Schema.View` is the staged telescope view of a
-decoration by `S.toContext`, and `Spec.Decoration.Schema.equivView`
-identifies that staged view with an ordinary decoration of the realized
-context.
+schemas: `Decoration.Schema.View` is the staged telescope view of a decoration
+by `S.toContext`, and `Decoration.Schema.equivView` identifies that staged view
+with an ordinary decoration of the realized context.
 
 ## Polynomial substrate (`DecoratedSpec`)
 
