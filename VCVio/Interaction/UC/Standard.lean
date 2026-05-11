@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.UC.Computational
-import VCVio.Interaction.UC.Notation
+import PolyFun.Interaction.UC.Notation
 
 /-!
 # Textbook UC vocabulary over the abstract open-system theory

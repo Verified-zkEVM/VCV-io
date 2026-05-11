@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 import Hax.rust_primitives.RustM
 import Interop.Rust.Common
-import ToMathlib.Control.Monad.Hom
+import PolyFun.Control.Monad.Hom
 
 /-!
 # Bridge from `Hax.RustM` to `Interop.Rust.RustOracleComp`

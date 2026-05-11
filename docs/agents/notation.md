@@ -49,7 +49,7 @@
 ## UC Composition Notations
 
 Scoped to `Interaction.UC` (activated by `open Interaction.UC`).
-Defined in `VCVio/Interaction/UC/Notation.lean`.
+Defined in `PolyFun/Interaction/UC/Notation.lean`.
 
 ### Boundary-level
 

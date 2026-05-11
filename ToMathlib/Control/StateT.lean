@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 module
 
-public import ToMathlib.Control.Monad.Free
+public import PolyFun.Control.Monad.Free
 public import ToMathlib.General
 public import Batteries.Control.Lemmas
 

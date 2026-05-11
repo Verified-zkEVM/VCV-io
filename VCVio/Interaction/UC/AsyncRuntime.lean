@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.UC.EnvOpenProcess
+import PolyFun.Interaction.UC.EnvOpenProcess
 import VCVio.Interaction.UC.Runtime
 
 /-!
@@ -13,7 +13,7 @@ This file defines the asynchronous-execution layer of the UC framework.
 The runtime alternates between **process steps** (`processTick`) and
 **environment-driven events** (`envTick e`) according to a pair of
 schedulers; the alphabet of env events is supplied by an
-`EnvAction Event State` (see `EnvAction.lean`).
+`EnvAction m Event State` (see `EnvAction.lean`).
 
 The shape of every definition mirrors the synchronous `processSemantics`
 in `Runtime.lean`: the bundled `SPMFSemantics m` is threaded uniformly,
@@ -203,19 +203,18 @@ samples and env reactions according to `envScheduler`. Returns the
 final joint state and the observable runtime trace.
 
 Mirrors the recursion shape of `Concurrent.ProcessOver.runSteps` with
-explicit env-event interleaving. The env reaction lives in `ProbComp`
-(`EnvAction.react : Event → State → ProbComp State`) and is lifted into
-the runtime monad `m` via `MonadLiftT ProbComp m`. The process sampler
-type is unchanged from the synchronous runtime: the
+explicit env-event interleaving. The env reaction lives in the same
+runtime monad `m` (`EnvAction.react : Event → State → m State`). The
+process sampler type is unchanged from the synchronous runtime: the
 `ProcessScheduler` carries the existing `Spec.Sampler m` from
 `Runtime.lean`.
 -/
 noncomputable def runStepsAsync
-    {m : Type → Type} [Monad m] [MonadLiftT ProbComp m]
+    {m : Type → Type} [Monad m]
     {Γ : Spec.Node.Context}
     {State : Type} {Event : Type}
     (process : ProcessOver Γ)
-    (envAction : Interaction.UC.EnvAction Event State)
+    (envAction : Interaction.UC.EnvAction m Event State)
     (procScheduler :
       Interaction.UC.ProcessScheduler m process.Proc State
         (fun st => (process.step st.proc).spec))
@@ -232,7 +231,7 @@ noncomputable def runStepsAsync
             pure ({ st with proc := s' } :
               AsyncRuntimeState process.Proc State)
         | .envTick e => do
-            let es' ← (envAction.react e st.envState : ProbComp State)
+            let es' ← envAction.react e st.envState
             pure ({ st with envState := es' } :
               AsyncRuntimeState process.Proc State)
         : m (AsyncRuntimeState process.Proc State))
@@ -252,7 +251,7 @@ trace bookkeeping pass, and is reused by
 `UC.processSemantics_eq_processSemanticsAsync_trivial`.
 -/
 theorem runStepsAsync_empty_trivial_eq
-    {m : Type → Type} [Monad m] [LawfulMonad m] [MonadLiftT ProbComp m]
+    {m : Type → Type} [Monad m] [LawfulMonad m]
     {Γ : Spec.Node.Context}
     (process : ProcessOver Γ)
     (sampler : (s : process.Proc) → Spec.Sampler m (process.step s).spec)
@@ -304,11 +303,11 @@ process `p : Closed Party`, matching the shape of the synchronous
 -/
 noncomputable def processSemanticsAsync
     (Party : Type u)
-    {m : Type → Type} [Monad m] [MonadLiftT ProbComp m]
+    {m : Type → Type} [Monad m]
     (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
     {Event : Type} {State : Type}
-    (envAction : EnvAction Event State)
+    (envAction : EnvAction m Event State)
     (initEnvState : State)
     (init : ∀ p : Closed Party m schedulerSampler, p.Proc)
     (envScheduler : ∀ p : Closed Party m schedulerSampler,
@@ -337,7 +336,7 @@ noncomputable def processSemanticsAsyncProbComp
     (Party : Type u)
     (schedulerSampler : ProbComp (ULift Bool))
     {Event : Type} {State : Type}
-    (envAction : EnvAction Event State)
+    (envAction : EnvAction ProbComp Event State)
     (initEnvState : State)
     (init : ∀ p : Closed Party ProbComp schedulerSampler, p.Proc)
     (envScheduler : ∀ p : Closed Party ProbComp schedulerSampler,
@@ -368,7 +367,7 @@ trace and the unit env state.
 -/
 theorem processSemantics_eq_processSemanticsAsync_trivial
     (Party : Type u)
-    {m : Type → Type} [Monad m] [LawfulMonad m] [MonadLiftT ProbComp m]
+    {m : Type → Type} [Monad m] [LawfulMonad m]
     (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
     (init : ∀ p : Closed Party m schedulerSampler, p.Proc)

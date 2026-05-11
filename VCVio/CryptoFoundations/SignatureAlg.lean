@@ -11,7 +11,7 @@ import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.SimSemantics.Append
-import ToMathlib.Control.Monad.Hom
+import PolyFun.Control.Monad.Hom
 
 /-!
 # Signature Algorithms

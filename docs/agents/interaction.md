@@ -53,7 +53,7 @@ vocabulary of the entire `Interaction/` layer.
 
 ### Node — a structural location in the protocol tree
 
-A `Spec` is an interaction tree (`VCVio/Interaction/Basic/Spec.lean`). A **node** is one
+A `Spec` is an interaction tree (`PolyFun/Interaction/Basic/Spec.lean`). A **node** is one
 branching point of that tree: a pair `(Moves : Type, rest : Moves → Spec)`. It is *not*
 an actor; it is a location where some next move gets chosen. At the level of `Spec`
 alone, a node knows its move space and its continuation family, and nothing else: not
@@ -62,7 +62,7 @@ concerns are deferred to companion layers (`Decoration`, `NodeProfile`, `StepOve
 `SyntaxOver`, `InteractionOver`).
 
 The namespace `Spec.Node.*` (`Context`, `Schema`, `ContextHom` in
-`VCVio/Interaction/Basic/Node.lean`) is *generic node-context infrastructure*: for any
+`PolyFun/Interaction/Basic/Node.lean`) is *generic node-context infrastructure*: for any
 type family `Γ : Type → Type`, a `Γ`-decoration attaches one `Γ X` value at every node
 with move space `X`.
 
@@ -435,26 +435,26 @@ Choose the minimal set for your task:
 
 ```lean
 -- Sequential protocol
-import VCVio.Interaction.Basic.Spec
-import VCVio.Interaction.Basic.Strategy
-import VCVio.Interaction.Basic.Append      -- if composing
+import PolyFun.Interaction.Basic.Spec
+import PolyFun.Interaction.Basic.Strategy
+import PolyFun.Interaction.Basic.Append      -- if composing
 
 -- Two-party
-import VCVio.Interaction.TwoParty.Strategy -- includes Role, Decoration
-import VCVio.Interaction.TwoParty.Compose  -- if composing
+import PolyFun.Interaction.TwoParty.Strategy -- includes Role, Decoration
+import PolyFun.Interaction.TwoParty.Compose  -- if composing
 
 -- Multiparty
-import VCVio.Interaction.Multiparty.Core
-import VCVio.Interaction.Multiparty.Broadcast  -- or Directed / Profile
+import PolyFun.Interaction.Multiparty.Core
+import PolyFun.Interaction.Multiparty.Broadcast  -- or Directed / Profile
 
 -- Concurrent
-import VCVio.Interaction.Concurrent.Spec
-import VCVio.Interaction.Concurrent.Process
+import PolyFun.Interaction.Concurrent.Spec
+import PolyFun.Interaction.Concurrent.Process
 
 -- UC / open systems
-import VCVio.Interaction.UC.OpenTheory
-import VCVio.Interaction.UC.OpenProcess
-import VCVio.Interaction.UC.OpenProcessModel
+import PolyFun.Interaction.UC.OpenTheory
+import PolyFun.Interaction.UC.OpenProcess
+import PolyFun.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Runtime
 import VCVio.Interaction.UC.Computational
 ```

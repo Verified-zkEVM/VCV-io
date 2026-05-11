@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 import Mathlib.Algebra.Polynomial.Eval.Defs
 import ToMathlib.General
-import ToMathlib.PFunctor.Bound
+import PolyFun.PFunctor.Bound
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.SimSemantics.Append
