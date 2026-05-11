@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import Examples.OneTimePad.Basic
 import VCVio.Interaction.UC.Computational
-import VCVio.Interaction.UC.OpenProcessModel
+import PolyFun.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Runtime
 import VCVio.OracleComp.Constructions.BitVec
 

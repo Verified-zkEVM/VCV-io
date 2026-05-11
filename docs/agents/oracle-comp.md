@@ -101,7 +101,7 @@ The fields *are* a lens. We extend `MonadLift` for two pragmatic reasons:
 
 ### LawfulSubSpec ↔ cartesian lens
 
-`LawfulSubSpec spec superSpec` extends `SubSpec spec superSpec` with the propositional requirement that **every backward fiber `onResponse t` is a bijection**. This is *exactly* the `PFunctor.Lens.IsCartesian` predicate from `ToMathlib/PFunctor/Lens/Cartesian.lean`:
+`LawfulSubSpec spec superSpec` extends `SubSpec spec superSpec` with the propositional requirement that **every backward fiber `onResponse t` is a bijection**. This is *exactly* the `PFunctor.Lens.IsCartesian` predicate from `PolyFun.PFunctor.Lens.Cartesian`:
 
 ```lean
 def Lens.IsCartesian (l : Lens P Q) : Prop := ∀ a, Function.Bijective (l.toFunB a)

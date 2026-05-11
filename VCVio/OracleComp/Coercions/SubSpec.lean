@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.EvalDist
 import ToMathlib.General
-import ToMathlib.PFunctor.Lens.Cartesian
+import PolyFun.PFunctor.Lens.Cartesian
 
 /-!
 # Coercions Between Computations With Additional Oracles

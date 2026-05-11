@@ -5,10 +5,10 @@ Authors: Devon Tuma
 -/
 module
 
--- import ToMathlib.Control.Monad.Free
+-- import PolyFun.Control.Monad.Free
 public import Batteries.Control.AlternativeMonad
 public import Batteries.Control.OptionT
-public import ToMathlib.Control.Monad.Hom
+public import PolyFun.Control.Monad.Hom
 public import ToMathlib.General
 
 /-!

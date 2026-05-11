@@ -63,6 +63,10 @@ exact diagnostics. Leave this commented until upstream ships a v4.29 build
 
 require "leanprover-community" / "mathlib" @ git "v4.29.0"
 
+require PolyFun from git
+  "https://github.com/Verified-zkEVM/PolyFun.git" @
+  "cdce2864a2a1b34eb18a2f665caba04ac0d2426b"
+
 /-- Main library. -/
 @[default_target] lean_lib VCVio
 

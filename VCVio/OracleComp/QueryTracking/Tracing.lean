@@ -7,7 +7,7 @@ import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.SimSemantics.QueryImpl.Constructions
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.SimSemantics.WriterT.Basic
-import ToMathlib.Control.Trace
+import PolyFun.Control.Trace
 import ToMathlib.Control.WriterT
 
 /-!
