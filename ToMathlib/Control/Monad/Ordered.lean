@@ -7,7 +7,7 @@ module
 
 public import Mathlib.Control.Monad.Cont
 public import Mathlib.CategoryTheory.Monad.Basic
-public import ToMathlib.Control.Monad.Algebra
+public import PolyFun.Control.Monad.Algebra
 public import ToMathlib.Control.Monad.Relation
 public import ToMathlib.Control.Monad.Transformer
 public import Mathlib.Order.Monotone.Basic

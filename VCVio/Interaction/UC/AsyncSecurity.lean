@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.UC.AsyncRuntime
 import VCVio.Interaction.UC.Computational
-import VCVio.Interaction.Concurrent.Fairness
+import PolyFun.Interaction.Concurrent.Fairness
 
 /-!
 # Fair PPT security for asynchronous env-open processes
@@ -107,9 +107,10 @@ runtime distribution, exactly as
 -/
 structure AsyncRun
     {Γ : Spec.Node.Context}
+    {m : Type → Type} [Pure m]
     {State Event : Type}
     (process : Concurrent.ProcessOver Γ)
-    (envAction : EnvAction Event State) where
+    (envAction : EnvAction m Event State) where
   /-- The joint runtime state at each step. -/
   state : ℕ → AsyncRuntimeState process.Proc State
   /-- The runtime event chosen at each step. -/
@@ -134,9 +135,10 @@ structure AsyncRun
 namespace AsyncRun
 
 variable {Γ : Spec.Node.Context}
+variable {m : Type → Type} [Pure m]
 variable {State Event : Type}
 variable {process : Concurrent.ProcessOver Γ}
-variable {envAction : EnvAction Event State}
+variable {envAction : EnvAction m Event State}
 
 /-- The initial joint runtime state of an async run. -/
 def initial (run : AsyncRun process envAction) :
@@ -166,7 +168,7 @@ The bundle pins all relevant universes to `0` to match the
 runtime layer in `AsyncRuntime.lean`.
 -/
 structure Ticketed
-    (Party : Type) (m : Type → Type) (Δ : PortBoundary)
+    (Party : Type) (m : Type → Type) [Pure m] (Δ : PortBoundary)
     (Event : Type) (State : Type) where
   /-- The underlying env-open process. -/
   toEnvProcess : EnvOpenProcess.{0, 0, 0, 0, 0} m Party Δ Event State
@@ -177,7 +179,7 @@ structure Ticketed
 
 namespace Ticketed
 
-variable {Party : Type} {m : Type → Type} {Δ : PortBoundary}
+variable {Party : Type} {m : Type → Type} [Pure m] {Δ : PortBoundary}
   {Event State : Type}
 
 /-- The underlying open process of a ticketed env-open process. -/
@@ -189,7 +191,7 @@ def process (ticketed : Ticketed Party m Δ Event State) :
 /-- The env-action channel of a ticketed env-open process. -/
 @[reducible]
 def envAction (ticketed : Ticketed Party m Δ Event State) :
-    EnvAction Event State :=
+    EnvAction m Event State :=
   ticketed.toEnvProcess.envAction
 
 /--

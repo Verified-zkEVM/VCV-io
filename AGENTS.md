@@ -116,22 +116,22 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Seeded (Bellare-Neven) forking lemma: `VCVio/CryptoFoundations/SeededFork.lean`
 - Replay-based forking lemma: `VCVio/CryptoFoundations/ReplayFork.lean`
 - Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
-- Interaction spec and transcript: `VCVio/Interaction/Basic/Spec.lean`
-- Two-party roles and strategies: `VCVio/Interaction/TwoParty/Strategy.lean`
-- Two-party composition and factorization: `VCVio/Interaction/TwoParty/Compose.lean`
-- Multiparty local views: `VCVio/Interaction/Multiparty/Core.lean`
-- Concurrent specs and frontiers: `VCVio/Interaction/Concurrent/Spec.lean`, `VCVio/Interaction/Concurrent/Frontier.lean`
-- Concurrent processes and execution: `VCVio/Interaction/Concurrent/Process.lean`
-- Open systems (interfaces, composition): `VCVio/Interaction/UC/OpenTheory.lean`
-- Open processes (boundary traffic, UC bridge): `VCVio/Interaction/UC/OpenProcess.lean` (monad-parametric `OpenProcess m Party Δ` with intrinsic `stepSampler` field)
-- Concrete open-theory model: `VCVio/Interaction/UC/OpenProcessModel.lean` (`openTheory m Party schedulerSampler` threads `Spec.Sampler` through `map` / `par` / `wire` / `plug`)
-- UC emulation and security: `VCVio/Interaction/UC/Emulates.lean`
+- Interaction spec and transcript: `PolyFun/Interaction/Basic/Spec.lean`
+- Two-party roles and strategies: `PolyFun/Interaction/TwoParty/Strategy.lean`
+- Two-party composition and factorization: `PolyFun/Interaction/TwoParty/Compose.lean`
+- Multiparty local views: `PolyFun/Interaction/Multiparty/Core.lean`
+- Concurrent specs and frontiers: `PolyFun/Interaction/Concurrent/Spec.lean`, `PolyFun/Interaction/Concurrent/Frontier.lean`
+- Concurrent processes and execution: `PolyFun/Interaction/Concurrent/Process.lean`
+- Open systems (interfaces, composition): `PolyFun/Interaction/UC/OpenTheory.lean`
+- Open processes (boundary traffic, UC bridge): `PolyFun/Interaction/UC/OpenProcess.lean` (monad-parametric `OpenProcess m Party Δ` with intrinsic `stepSampler` field)
+- Concrete open-theory model: `PolyFun/Interaction/UC/OpenProcessModel.lean` (`openTheory m Party schedulerSampler` threads `Spec.Sampler` through `map` / `par` / `wire` / `plug`)
+- UC emulation and security: `PolyFun/Interaction/UC/Emulates.lean`
 - Computational UC observation layer: `VCVio/Interaction/UC/Computational.lean`
-- Per-node samplers as data (`Spec.Sampler m spec` = `Decoration (fun X => m X) spec`): `VCVio/Interaction/Basic/Sampler.lean`
-- `Spec.Fintype` ornament + canonical uniform sampler: `VCVio/Interaction/Basic/SpecFintype.lean`, `VCVio/Interaction/UC/Runtime.lean`
+- Per-node samplers as data (`Spec.Sampler m spec` = `Decoration (fun X => m X) spec`): `PolyFun/Interaction/Basic/Sampler.lean`
+- `Spec.Fintype` ornament + canonical uniform sampler: `PolyFun/Interaction/Basic/SpecFintype.lean`, `VCVio/Interaction/UC/Runtime.lean`
 - Oracle-aware runtime semantics (monad-parametric process execution, `processSemanticsOracle`): `VCVio/Interaction/UC/Runtime.lean` (no `sampler` argument; pulled from `process.stepSampler`)
 - End-to-end UC `CompEmulates 0` at a three-port boundary: `Examples/OneTimePad/UC.lean`
-- Interaction examples: `VCVio/Interaction/TwoParty/Examples.lean`, `VCVio/Interaction/Multiparty/Examples.lean`, `VCVio/Interaction/Concurrent/Examples.lean`
+- Interaction examples: `PolyFun/Interaction/TwoParty/Examples.lean`, `PolyFun/Interaction/Multiparty/Examples.lean`, `PolyFun/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 - Program logic tactic walkthroughs: `Examples/ProgramLogic/`
 - Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
@@ -181,7 +181,7 @@ Lean toolchain and Mathlib must stay in sync (both currently `v4.29.0`). Files s
 
 Before working in a specific area, read the relevant guide in `docs/agents/`:
 
-- **Interaction framework (specs, roles, concurrency)**: [`docs/agents/interaction.md`](docs/agents/interaction.md)
+- **Interaction runtime and UC integration**: [`docs/agents/interaction.md`](docs/agents/interaction.md)
 - **Interop with Rust verification frontends (hax, aeneas)**: [`docs/agents/interop.md`](docs/agents/interop.md)
 - **LatticeCrypto layout and workflows**: [`docs/agents/lattice.md`](docs/agents/lattice.md)
 - **OracleComp / SubSpec / SimSemantics**: [`docs/agents/oracle-comp.md`](docs/agents/oracle-comp.md)

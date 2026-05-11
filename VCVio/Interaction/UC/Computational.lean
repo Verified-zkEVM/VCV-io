@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.UC.Emulates
+import PolyFun.Interaction.UC.Emulates
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.EvalDist.Defs.Semantics

@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.StateT.Basic
-import ToMathlib.PFunctor.Lens.State
+import PolyFun.PFunctor.Lens.State
 
 /-!
 # Stateful query implementations

@@ -11,7 +11,7 @@ public import Mathlib.Data.DFinsupp.BigOperators
 public import Mathlib.Data.FinEnum
 public import Mathlib.Data.NNRat.BigOperators
 public import Std.Data.HashMap.Lemmas
-public import ToMathlib.Control.Monad.Hom
+public import PolyFun.Control.Monad.Hom
 
 /-!
 # Probability mass functions with finite support and non-negative rational weights
