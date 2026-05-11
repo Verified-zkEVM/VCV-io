@@ -295,7 +295,7 @@ to `Process` via `Machine.toProcess`.
 ### Coalgebraic structure
 
 Both `ProcessOver` and `Machine` are instances of the `Coalg` typeclass
-defined in `ToMathlib/Control/Coalgebra.lean`.
+provided by `PolyFun.Control.Coalgebra`.
 An `Coalg F S` is a type `S` together with `out : S → F S`,
 the categorical dual of `MonadAlgebra`.
 
