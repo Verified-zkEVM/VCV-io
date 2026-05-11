@@ -35,7 +35,7 @@ as defined in `ToMathlib.Data.IndexedBinaryTree`.
   - [x] `getPutativeRoot`
   - [x] `verifyProof`
 - [x] Completeness theorem
-- [ ] Collision Lemma (See SNARGs book 18.3)
+- [x] Collision Lemma (See SNARGs book 18.3)
   - (this is really not a lemma about oracles, so it could go with the binary tree API)
 - [ ] Extractibility (See SNARGs book 18.5)
 - [ ] Multi-leaf proofs
