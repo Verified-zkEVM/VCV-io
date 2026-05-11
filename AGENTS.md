@@ -181,7 +181,7 @@ Lean toolchain and Mathlib must stay in sync (both currently `v4.29.0`). Files s
 
 Before working in a specific area, read the relevant guide in `docs/agents/`:
 
-- **Interaction framework (specs, roles, concurrency)**: [`docs/agents/interaction.md`](docs/agents/interaction.md)
+- **Interaction runtime and UC integration**: [`docs/agents/interaction.md`](docs/agents/interaction.md)
 - **Interop with Rust verification frontends (hax, aeneas)**: [`docs/agents/interop.md`](docs/agents/interop.md)
 - **LatticeCrypto layout and workflows**: [`docs/agents/lattice.md`](docs/agents/lattice.md)
 - **OracleComp / SubSpec / SimSemantics**: [`docs/agents/oracle-comp.md`](docs/agents/oracle-comp.md)
