@@ -34,8 +34,8 @@ API.
 
 ## References
 
-- Justin Thaler. *Proofs, Arguments, and Zero-Knowledge.* §18.3 (Collision
-  Lemma for Merkle trees).
+- Alessandro Chiesa, Eylon Yogev.
+  *Building Cryptographic Proofs from Hash Functions* §18.3 (Collision Lemma).
 -/
 
 
@@ -73,29 +73,8 @@ theorem getPutativeRootWithHash_binding
     (heq : getPutativeRootWithHash idx x proof₁ h
          = getPutativeRootWithHash idx y proof₂ h) :
     ∃ l₁ r₁ l₂ r₂, Collision h l₁ r₁ l₂ r₂ := by
+  unfold Collision
   induction idx generalizing x y with
-  | ofLeaf =>
-      simp only [getPutativeRootWithHash] at heq
-      exact absurd heq hne
-  | ofLeft idxLeft ih =>
-      simp only [getPutativeRootWithHash] at heq
-      set subL := getPutativeRootWithHash idxLeft x proof₁.tail h
-      set subR := getPutativeRootWithHash idxLeft y proof₂.tail h
-      -- Top hash arguments: (subL, proof₁.head) and (subR, proof₂.head).
-      by_cases hpair : (subL, proof₁.head) = (subR, proof₂.head)
-      · -- Inputs to top hash agree component-wise: subL = subR.
-        -- Recurse on the smaller index using the (still-distinct) leaf values.
-        obtain ⟨hsub, _⟩ := Prod.mk.injEq .. |>.mp hpair
-        exact ih proof₁.tail proof₂.tail x y hne hsub
-      · -- Inputs to top hash differ: top-level collision.
-        exact ⟨subL, proof₁.head, subR, proof₂.head, hpair, heq⟩
-  | ofRight idxRight ih =>
-      simp only [getPutativeRootWithHash] at heq
-      set subL := getPutativeRootWithHash idxRight x proof₁.tail h
-      set subR := getPutativeRootWithHash idxRight y proof₂.tail h
-      by_cases hpair : (proof₁.head, subL) = (proof₂.head, subR)
-      · obtain ⟨_, hsub⟩ := Prod.mk.injEq .. |>.mp hpair
-        exact ih proof₁.tail proof₂.tail x y hne hsub
-      · exact ⟨proof₁.head, subL, proof₂.head, subR, hpair, heq⟩
+  | _ => grind [getPutativeRootWithHash]
 
 end InductiveMerkleTree
