@@ -1130,7 +1130,6 @@ private theorem highBitsCoeff_eq_of_mid_of_isApproved (p : Params)
     simpa [alpha, m, highBitsCoeff, hdec] using
       highBitsCoeff_lt_useHintModulus_of_isApproved p hp r
   have hr1eq : highBitsCoeff r p.gamma2 = r1 := by simp [highBitsCoeff, hdec]
-  -- Central decomposition: r + z0 = (alpha * r1 : ℕ) + v as Coeff elements
   have hcore : r + z0 = ((alpha * r1 : ℕ) : Coeff) + (v : Coeff) := by
     have hd : ((alpha * r1 : ℕ) : Coeff) + (r0 : Coeff) = r :=
       by simpa [alpha, intToCoeff, hdec] using decomposeCoeff_eq (r := r) (gamma2 := p.gamma2) hγ
@@ -1138,8 +1137,7 @@ private theorem highBitsCoeff_eq_of_mid_of_isApproved (p : Params)
   rw [hr1eq]
   change highBitsCoeff (r + z0) p.gamma2 = r1
   by_cases hvnonneg : 0 ≤ v
-  · -- v ≥ 0: r + z0 = (alpha * r1 + v.natAbs : ℕ)
-    have hvnat_le : v.natAbs ≤ p.gamma2 := by
+  · have hvnat_le : v.natAbs ≤ p.gamma2 := by
       have : (v.natAbs : ℤ) ≤ p.gamma2 :=
         (Int.natAbs_of_nonneg hvnonneg).symm ▸ hvup'
       exact_mod_cast this
@@ -1147,8 +1145,7 @@ private theorem highBitsCoeff_eq_of_mid_of_isApproved (p : Params)
         (congrArg (Int.cast : ℤ → Coeff) (Int.natAbs_of_nonneg hvnonneg)).symm,
       ← Nat.cast_add]
     exact highBitsCoeff_nonneg_repr_of_isApproved p hp r1 v.natAbs hr1lt hvnat_le
-  · -- v < 0
-    have hvneg : v < 0 := lt_of_not_ge hvnonneg
+  · have hvneg : v < 0 := lt_of_not_ge hvnonneg
     have hnatv0 : 0 < v.natAbs := Int.natAbs_pos.mpr (by omega)
     have hnatv_lt : v.natAbs < p.gamma2 := by
       have h1 : (v.natAbs : ℤ) = -v := Int.ofNat_natAbs_of_nonpos hvneg.le
@@ -1159,13 +1156,11 @@ private theorem highBitsCoeff_eq_of_mid_of_isApproved (p : Params)
         simpa using congrArg (Int.cast : ℤ → Coeff) (Int.ofNat_natAbs_of_nonpos hvneg.le)
       simp [h]
     by_cases hr1zero : r1 = 0
-    · -- r1 = 0: r + z0 = -(v.natAbs : ℕ)
-      rw [hr1zero, show r + z0 = -((v.natAbs : ℕ) : Coeff) from by
+    · rw [hr1zero, show r + z0 = -((v.natAbs : ℕ) : Coeff) from by
           rw [hcore, hr1zero]; simp [hvcast]]
       simpa only [Nat.cast_natAbs, intToCoeff, Int.cast_abs, Int.cast_eq, Int.cast_neg] using
         highBitsCoeff_wrap_neg_repr_of_isApproved p hp v.natAbs hnatv0 hnatv_lt.le
-    · -- r1 > 0: r + z0 = (alpha * r1 - v.natAbs : ℕ)
-      have hr1pos : 0 < r1 := Nat.pos_of_ne_zero hr1zero
+    · have hr1pos : 0 < r1 := Nat.pos_of_ne_zero hr1zero
       have hnatv_le : v.natAbs ≤ alpha * r1 := by
         have hlt : v.natAbs < alpha := by
           have h1 : (v.natAbs : ℤ) = -v := Int.ofNat_natAbs_of_nonpos hvneg.le
