@@ -451,6 +451,8 @@ private theorem gamma2_double_lt_modulus_of_isApproved {p : Params} (hp : p.isAp
     2 * p.gamma2 < modulus := by
   rcases hp with rfl | rfl | rfl <;> decide
 
+private theorem gamma2_half (p : Params) : (2 * p.gamma2) / 2 = p.gamma2 := by omega
+
 private theorem useHintModulus_pos_of_isApproved {p : Params} (hp : p.isApproved) :
     0 < (modulus - 1) / (2 * p.gamma2) := by
   rcases hp with rfl | rfl | rfl <;> decide
@@ -1707,10 +1709,8 @@ theorem concreteRounding_lowBits_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
     LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) ≤ (2 * p.gamma2) / 2 := by
   have hbound := concreteRounding_lowBits_bound_of_isApproved p hp r
-  have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
-    omega
   change LatticeCrypto.cInfNorm (lowBits p r) ≤ (2 * p.gamma2) / 2
-  simpa [hhalf] using hbound
+  simpa [gamma2_half] using hbound
 
 theorem concreteRounding_shift_injective_field_of_isApproved (p : Params)
     (hp : p.isApproved) :
@@ -1802,10 +1802,8 @@ theorem concreteRounding_useHint_correct_field_of_isApproved (p : Params)
     (concreteRoundingOps p).useHint ((concreteRoundingOps p).makeHint z r) r =
       (concreteRoundingOps p).highBits (r + z) := by
   intro hz
-  have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
-    omega
   change useHint p (makeHint p z r) r = highBits p (r + z)
-  exact concreteRounding_useHint_correct_of_isApproved p hp z r (by simpa [hhalf] using hz)
+  exact concreteRounding_useHint_correct_of_isApproved p hp z r (by simpa [gamma2_half] using hz)
 
 theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
@@ -1813,10 +1811,8 @@ theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
     LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) + b < (2 * p.gamma2) / 2 →
     (concreteRoundingOps p).highBits (r + s) = (concreteRoundingOps p).highBits r := by
   intro hs hlow
-  have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
-    omega
   change highBits p (r + s) = highBits p r
-  exact concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa [hhalf] using hlow)
+  exact concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa [gamma2_half] using hlow)
 
 theorem concretePower2RoundLaws :
     LatticeCrypto.Power2RoundOps.Laws (ring := coeffRing)
@@ -1843,8 +1839,7 @@ theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
       let cp := concreteRoundingOps p
       change cp.highBits (coeffRing.add r s) = cp.highBits r
       change cInfNorm (lowBits p r) + b < 2 * p.gamma2 / 2 at h2
-      have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by omega
-      rw[hhalf] at h2
+      rw [gamma2_half] at h2
       simp only [coeffRing_add_eq r _] at ⊢ h2
       exact concreteRounding_hide_low_of_isApproved p hp r s b h1 h2
     shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
