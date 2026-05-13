@@ -1820,39 +1820,36 @@ theorem concretePower2RoundLaws :
   refine { power2Round_bound := ?_ }
   intro r
   change cInfNorm (coeffRing.sub _ _) ≤ _
-  simp only [coeffRing_sub_eq r _]
+  simp only [coeffRing_sub_eq]
   exact concretePower2Round_bound_field r
 
 theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     LatticeCrypto.RoundingOps.Laws (ring := coeffRing)
       (concreteRoundingOps p) LatticeCrypto.cInfNorm := by
+  let cp := concreteRoundingOps p
   refine {
     high_low_decomp := by
       intro x
-      let cp := concreteRoundingOps p
       change coeffRing.add (cp.shift (cp.highBits x)) (cp.lowBits x) = x
       simp only [coeffRing_add_eq]
       exact concreteRounding_high_low_decomp_field_of_isApproved p hp x
     lowBits_bound := concreteRounding_lowBits_bound_field_of_isApproved p hp
     hide_low := by
       intro r s b h1 h2
-      let cp := concreteRoundingOps p
       change cp.highBits (coeffRing.add r s) = cp.highBits r
       change cInfNorm (lowBits p r) + b < 2 * p.gamma2 / 2 at h2
-      rw [gamma2_half] at h2
-      simp only [coeffRing_add_eq r _] at ⊢ h2
+      simp only [coeffRing_add_eq, gamma2_half] at ⊢ h2
       exact concreteRounding_hide_low_of_isApproved p hp r s b h1 h2
     shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
     useHint_correct := by
       intro z r h
-      let cp := concreteRoundingOps p
       change cp.useHint (cp.makeHint z r) r = cp.highBits (coeffRing.add r z)
-      simp only [coeffRing_add_eq r _]
+      simp only [coeffRing_add_eq]
       exact concreteRounding_useHint_correct_field_of_isApproved p hp z r h
     useHint_bound := by
       intro r h
       change cInfNorm (coeffRing.sub _ _) ≤ _
-      simp only [coeffRing_sub_eq r _]
+      simp only [coeffRing_sub_eq]
       exact concreteRounding_useHint_bound_of_isApproved p hp r h
   }
 
