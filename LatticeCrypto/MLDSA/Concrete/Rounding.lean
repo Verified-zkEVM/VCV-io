@@ -1708,28 +1708,15 @@ theorem concreteRounding_high_low_decomp_field_of_isApproved (p : Params)
 theorem concreteRounding_lowBits_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
     LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) ≤ (2 * p.gamma2) / 2 := by
-  have hbound := concreteRounding_lowBits_bound_of_isApproved p hp r
   change LatticeCrypto.cInfNorm (lowBits p r) ≤ (2 * p.gamma2) / 2
-  simpa [gamma2_half] using hbound
+  simp only [gamma2_half]
+  exact concreteRounding_lowBits_bound_of_isApproved p hp r
 
 theorem concreteRounding_shift_injective_field_of_isApproved (p : Params)
     (hp : p.isApproved) :
     Function.Injective (concreteRoundingOps p).shift := by
   change Function.Injective (highBitsShift p)
   exact highBitsShift_injective_of_isApproved p hp
-
-private theorem highBitsShift_useHint_get (p : Params) (h : Hint) (r : Rq) (i : Fin ringDegree) :
-    (highBitsShift p (useHint p h r)).get i =
-      ((2 * p.gamma2 : ℕ) : Coeff) * (useHintCoeff (h.get i) (r.get i) p.gamma2 : Coeff) := by
-  simp [highBitsShift, useHint]
-
-private theorem useHint_get (p : Params) (h : Hint) (r : Rq) (i : Fin ringDegree) :
-    (useHint p h r).get i = (useHintCoeff (h.get i) (r.get i) p.gamma2 : Coeff) := by
-  simp [useHint]
-
-private theorem makeHint_get (p : Params) (z r : Rq) (i : Fin ringDegree) :
-    (makeHint p z r).get i = makeHintCoeff (z.get i) (r.get i) p.gamma2 := by
-  simp [makeHint]
 
 theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
     (hp : p.isApproved) (z r : Rq) :
@@ -1739,11 +1726,9 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
   refine Poly.ext_get_eq fun j => ?_
   have hzj : (LatticeCrypto.centeredRepr (z.get j)).natAbs ≤ p.gamma2 :=
     (LatticeCrypto.cInfNorm_le_iff.mp hz) j
-  rw [useHint_get, makeHint_get, highBits, Vector.get_ofFn]
-  have hadd : (r + z).get j = r.get j + z.get j := by rw [Rq.get_add]
-  rw [hadd]
-  exact congrArg (fun n : ℕ => (n : Coeff))
-    (useHintCoeff_correct_of_small_of_isApproved p hp (z := z.get j) (r := r.get j) hzj)
+  simp only [useHint, makeHint, highBits, Vector.get_ofFn, Rq.get_add]
+  apply congrArg (fun n : ℕ => (n : Coeff))
+  exact useHintCoeff_correct_of_small_of_isApproved p hp (z := z.get j) (r := r.get j) hzj
 
 theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
@@ -1754,9 +1739,8 @@ theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
       r.get j -
         (((2 * p.gamma2 : ℕ) : Coeff) *
           (useHintCoeff (h.get j) (r.get j) p.gamma2 : Coeff)) := by
-    rw [Rq.get_sub]
-    congr 1
-    exact highBitsShift_useHint_get p h r j
+    simp only [Rq.get_sub, highBitsShift, Nat.cast_mul, Nat.cast_ofNat, useHint, Vector.map_ofFn,
+      Vector.get_ofFn, Function.comp_apply]
   rw [hcoeff]
   exact useHintCoeff_shift_sub_bound_of_isApproved p hp (h.get j) (r.get j)
 
