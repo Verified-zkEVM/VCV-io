@@ -1766,27 +1766,16 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
     LatticeCrypto.cInfNorm (lowBits p r) + b < p.gamma2 →
     highBits p (r + s) = highBits p r := by
   intro hs hlow
-  have hfin : ∀ j : Fin ringDegree, (highBits p (r + s)).get j = (highBits p r).get j := by
-    intro j
-    have hsj : (LatticeCrypto.centeredRepr (s.get j)).natAbs ≤ b := by
-      exact (LatticeCrypto.cInfNorm_le_iff.mp hs) j
-    have hlowj0 :
-        (LatticeCrypto.centeredRepr ((lowBits p r).get j)).natAbs < p.gamma2 - b := by
-      have hcoeff := LatticeCrypto.coeff_le_cInfNorm (lowBits p r) j
-      omega
-    have hlowj : (lowBitsCoeff (r.get j) p.gamma2).natAbs < p.gamma2 - b := by
-      have hq := gamma2_double_lt_modulus_of_isApproved hp
-      rw [lowBits_get, lowBits_centeredRepr (r := r.get j)
-        (hγ := gamma2_pos_of_isApproved hp) (hq := hq)] at hlowj0
-      exact hlowj0
-    rw [highBits, Vector.get_ofFn, highBits, Vector.get_ofFn]
-    have hadd : (r + s).get j = r.get j + s.get j := by
-      rw [Rq.get_add]
-    rw [hadd]
-    exact congrArg (fun n : ℕ => (n : Coeff))
-      (highBitsCoeff_add_eq_of_small_of_isApproved p hp (r := r.get j)
-        (s := s.get j) (b := b) hsj hlowj)
-  exact Poly.ext_get_eq hfin
+  refine Poly.ext_get_eq fun j => ?_
+  simp only [highBits, Vector.get_ofFn, Rq.get_add]
+  apply congrArg (fun n : ℕ => (n : Coeff))
+  apply highBitsCoeff_add_eq_of_small_of_isApproved p hp (b:=b)
+  · exact (LatticeCrypto.cInfNorm_le_iff.mp hs) j
+  · have hcoeff := LatticeCrypto.coeff_le_cInfNorm (lowBits p r) j
+    rw [lowBits_get, lowBits_centeredRepr (r := r.get j)
+      (hγ := gamma2_pos_of_isApproved hp)
+      (hq := gamma2_double_lt_modulus_of_isApproved hp)] at hcoeff
+    omega
 
 theorem concreteRounding_useHint_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
