@@ -338,7 +338,7 @@ A `QueryLog spec` is morally a free monoid on `Idx spec.toPFunctor`, with
 identity `[]` and product `(++)`. By Mathlib reducibility this is exactly
 `FreeMonoid (Idx spec.toPFunctor) = TraceList spec.toPFunctor`, so a
 trace-valued boundary description such as `BoundaryAction.emit` (in
-`VCVio/Interaction/UC/OpenProcess.lean`) and a per-call `QueryLog`-valued
+`PolyFun/Interaction/UC/OpenProcess.lean`) and a per-call `QueryLog`-valued
 writer share the same underlying free-monoid carrier.
 
 We do *not* declare a global `Monoid (QueryLog spec)` instance: doing so

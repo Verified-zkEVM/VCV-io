@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.UC.Notation
+import PolyFun.Interaction.UC.Notation
 import VCVioWidgets.OpenSyntax.Render
 import VCVioWidgets.OpenSyntax.Panel
 import VCVioWidgets.OpenSyntax.TreePanel
