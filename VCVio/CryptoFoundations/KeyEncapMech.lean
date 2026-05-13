@@ -11,6 +11,7 @@ import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.Append
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Key Encapsulation Mechanisms
@@ -104,6 +105,56 @@ theorem IND_CPA_Advantage_eq_game_bias {kem : KEMScheme (OracleComp spec) K PK S
     (adversary : kem.IND_CPA_Adversary) :
     kem.IND_CPA_Advantage runtime adversary =
       (kem.IND_CPA_Game runtime adversary).boolBiasAdvantage := rfl
+
+/-! ### Game ↔ Exp connector
+
+Under a `LawfulProbCompRuntime` hypothesis, the KEM single-game SPMF factors as a hidden-bit
+guessing game over the two fixed-branch experiments. This is the bridge from the canonical
+advantage definition to the hybrid-friendly form used in composition proofs. -/
+
+/-- The KEM single-game SPMF factors as `bool >>= fun b => Exp b >>= fun b' => pure (b == b')`
+under a `LawfulProbCompRuntime`. -/
+lemma IND_CPA_Game_eq_branch {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (h : LawfulProbCompRuntime runtime)
+    (adversary : kem.IND_CPA_Adversary) :
+    kem.IND_CPA_Game runtime adversary =
+      (liftM (PMF.uniformOfFintype Bool) : SPMF Bool) >>= fun b =>
+        kem.IND_CPA_Exp runtime adversary b >>= fun b' =>
+          pure (b == b') := by
+  -- Factor the game body so that the prefix (keygen, preChallenge) and the bool sample are
+  -- explicit. Then apply the runtime swap helper to pull the bool sample to the top.
+  set pref : OracleComp spec (PK × adversary.State) :=
+    (do let (pk, _sk) ← kem.keygen
+        let st ← adversary.preChallenge pk
+        pure (pk, st)) with hpref
+  set rest : PK × adversary.State → Bool → OracleComp spec Bool :=
+    fun pkst b => do
+      let (cStar, kReal) ← kem.encaps pkst.1
+      let kRand ← runtime.liftProbComp ($ᵗ K)
+      let b' ← adversary.postChallenge pkst.2 cStar (if b then kReal else kRand)
+      pure (b == b') with hrest
+  -- The IND_CPA_Game body equals `pref >>= fun g => liftProbComp bool >>= fun b => rest g b`.
+  have hgame : kem.IND_CPA_Game runtime adversary =
+      runtime.evalDist
+        (pref >>= fun g => runtime.liftProbComp ($ᵗ Bool) >>= fun b => rest g b) := by
+    unfold IND_CPA_Game pref rest
+    congr 1
+    simp [bind_assoc]
+  -- Apply the bool-swap helper.
+  rw [hgame, h.evalDist_bind_bind_liftProbComp_swap pref ($ᵗ Bool) rest]
+  -- Now compute 𝒟[$ᵗ Bool] = liftM (PMF.uniformOfFintype Bool).
+  rw [evalDist_uniformSample]
+  -- Both sides bind on `liftM (PMF.uniformOfFintype Bool)`. Show continuations match.
+  refine bind_congr fun b => ?_
+  -- Goal: runtime.evalDist (pref >>= fun g => rest g b)
+  --     = IND_CPA_Exp runtime adversary b >>= fun b' => pure (b == b')
+  show runtime.evalDist (pref >>= fun g => rest g b) =
+    kem.IND_CPA_Exp runtime adversary b >>= fun b' => pure (b == b')
+  unfold IND_CPA_Exp
+  rw [hpref, hrest]
+  -- Expand both sides via evalDist_bind.
+  simp only [h.evalDist_bind, h.evalDist_pure, pure_bind, bind_assoc]
 
 end IND_CPA
 

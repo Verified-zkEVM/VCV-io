@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Data Encapsulation Mechanisms
@@ -92,6 +93,28 @@ theorem IND_CPA_Advantage_eq_game_bias {dem : DEMScheme (OracleComp spec) K M C}
     (adversary : dem.IND_CPA_Adversary) :
     dem.IND_CPA_Advantage runtime adversary =
       (dem.IND_CPA_Game runtime adversary).boolBiasAdvantage := rfl
+
+/-! ### Game ↔ Exp connector
+
+The DEM single-game SPMF factors directly into a hidden-bit branching game over the two
+fixed-branch experiments. Unlike the KEM case, the challenge bit is already the first sample
+in the DEM game, so no commutativity is needed; only `LawfulProbCompRuntime` bind-distribution
+plus the canonical denotation of the uniform-bool sample. -/
+
+/-- The DEM single-game SPMF factors as `bool >>= fun b => Exp b >>= fun b' => pure (b == b')`
+under a `LawfulProbCompRuntime`. -/
+lemma IND_CPA_Game_eq_branch {dem : DEMScheme (OracleComp spec) K M C}
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (h : LawfulProbCompRuntime runtime)
+    (adversary : dem.IND_CPA_Adversary) :
+    dem.IND_CPA_Game runtime adversary =
+      (liftM (PMF.uniformOfFintype Bool) : SPMF Bool) >>= fun b =>
+        dem.IND_CPA_Exp runtime adversary b >>= fun b' =>
+          pure (b == b') := by
+  unfold IND_CPA_Game IND_CPA_Exp
+  rw [h.evalDist_bind, h.evalDist_liftProbComp, evalDist_uniformSample]
+  refine bind_congr fun b => ?_
+  simp only [h.evalDist_bind, h.evalDist_pure, bind_assoc]
 
 end IND_CPA
 
