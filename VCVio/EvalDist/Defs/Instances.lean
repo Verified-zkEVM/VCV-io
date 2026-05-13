@@ -45,6 +45,16 @@ lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
 lemma evalDist_eq_iff {m} [Monad m] [HasEvalSPMF m] (mx : m α) (p : SPMF α) :
     𝒟[mx] = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
 
+/-- Independent SPMF binds commute as SPMF values. The pointwise probability swap
+`probOutput_bind_bind_swap` lifts to SPMF equality via `SPMF.ext`. -/
+lemma bind_bind_swap {α β γ : Type u}
+    (mx : SPMF α) (my : SPMF β) (f : α → β → SPMF γ) :
+    (mx >>= fun a => my >>= fun b => f a b) =
+      (my >>= fun b => mx >>= fun a => f a b) :=
+  SPMF.ext fun x => by
+    simpa [probOutput_def] using
+      probOutput_bind_bind_swap (m := SPMF) mx my f x
+
 end SPMF
 
 namespace PMF

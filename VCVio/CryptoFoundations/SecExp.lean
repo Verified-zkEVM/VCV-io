@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.EvalDist.TVDist
 import VCVio.EvalDist.Defs.Semantics
@@ -46,11 +47,206 @@ been observed under bundled subprobabilistic semantics. Any remaining mass corre
 and therefore contributes to neither Boolean branch. -/
 noncomputable def SPMF.boolBiasAdvantage (p : SPMF Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= false | p]).toReal|
+
+/-- Distinguishing advantage between two Boolean-valued subdistributions, measured on the `true`
+branch. SPMF analogue of `ProbComp.boolDistAdvantage`. -/
+noncomputable def SPMF.boolDistAdvantage (p q : SPMF Bool) : ℝ :=
+  |(Pr[= true | p]).toReal - (Pr[= true | q]).toReal|
+
 /-- Triangle inequality for Boolean distinguishing advantage. -/
 lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
     p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
   unfold ProbComp.boolDistAdvantage
   exact abs_sub_le _ _ _
+
+/-- Triangle inequality for `SPMF.boolDistAdvantage`. -/
+lemma SPMF.boolDistAdvantage_triangle (p q r : SPMF Bool) :
+    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
+  unfold SPMF.boolDistAdvantage
+  exact abs_sub_le _ _ _
+
+@[simp] lemma SPMF.boolDistAdvantage_self (p : SPMF Bool) :
+    p.boolDistAdvantage p = 0 := by simp [SPMF.boolDistAdvantage]
+
+lemma SPMF.boolDistAdvantage_comm (p q : SPMF Bool) :
+    p.boolDistAdvantage q = q.boolDistAdvantage p := by
+  unfold SPMF.boolDistAdvantage; exact abs_sub_comm _ _
+
+lemma SPMF.boolDistAdvantage_nonneg (p q : SPMF Bool) :
+    0 ≤ p.boolDistAdvantage q := abs_nonneg _
+
+/-- For an `SPMF Bool` game that never fails, the bias advantage equals twice the absolute gap
+between `Pr[true]` and `1/2`. SPMF analogue of
+`ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half`. -/
+lemma SPMF.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : SPMF Bool) [NeverFail p] :
+    p.boolBiasAdvantage = 2 * |(Pr[= true | p]).toReal - 1 / 2| := by
+  have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by
+    have hsum : Pr[= true | p] + Pr[= false | p] = 1 :=
+      probOutput_true_add_false_of_neverFail
+    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  unfold SPMF.boolBiasAdvantage
+  rw [hfalse, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
+  rw [ENNReal.toReal_one]
+  rw [show (Pr[= true | p]).toReal - (1 - (Pr[= true | p]).toReal) =
+      2 * ((Pr[= true | p]).toReal - 1 / 2) by ring]
+  rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2)]
+
+/-- Lifting a `PMF` into `SPMF` never fails: the failure mass comes entirely from `OptionT`
+embedding and is zero on a `liftM`. -/
+instance instNeverFail_liftM_PMF {α : Type _} (p : PMF α) : NeverFail ((liftM p : SPMF α)) :=
+  NeverFail.of_probFailure_eq_zero _ (by simp)
+
+/-- Dropping an unused never-failing SPMF prefix preserves the SPMF as a value. -/
+lemma SPMF.bind_const_of_neverFail {α β : Type _} (p : SPMF α) [NeverFail p] (q : SPMF β) :
+    (p >>= fun _ => q) = q := by
+  refine SPMF.ext fun y => ?_
+  have := probOutput_bind_const (m := SPMF) p q y
+  simp only [probFailure_eq_zero, tsub_zero, one_mul] at this
+  simpa [probOutput_def] using this
+
+namespace LawfulProbCompRuntime
+
+variable {m : Type → Type v} [Monad m] {runtime : ProbCompRuntime m}
+
+/-- A lifted `ProbComp` sample commutes past any earlier `m`-side prefix when the prefix does
+not depend on the sample. The hypothesis `LawfulProbCompRuntime` is essential: it lets us push
+`runtime.evalDist` through binds, and the final SPMF swap is then a pure SPMF identity. -/
+lemma evalDist_bind_bind_liftProbComp_swap [LawfulMonad m]
+    (h : LawfulProbCompRuntime runtime)
+    {γ δ ε : Type} (pref : m γ) (px : ProbComp δ) (rest : γ → δ → m ε) :
+    runtime.evalDist (pref >>= fun g => runtime.liftProbComp px >>= fun d => rest g d) =
+      (𝒟[px] : SPMF δ) >>= fun d =>
+        runtime.evalDist (pref >>= fun g => rest g d) := by
+  have step1 : runtime.evalDist
+        (pref >>= fun g => runtime.liftProbComp px >>= fun d => rest g d) =
+      (runtime.evalDist pref >>= fun g =>
+        ((𝒟[px] : SPMF δ) >>= fun d => runtime.evalDist (rest g d))) := by
+    rw [h.evalDist_bind]
+    congr 1
+    funext g
+    rw [h.evalDist_bind, h.evalDist_liftProbComp]
+  have step2 : (runtime.evalDist pref >>= fun g =>
+        ((𝒟[px] : SPMF δ) >>= fun d => runtime.evalDist (rest g d))) =
+      ((𝒟[px] : SPMF δ) >>= fun d =>
+        runtime.evalDist pref >>= fun g => runtime.evalDist (rest g d)) :=
+    SPMF.bind_bind_swap _ _ _
+  have step3 : ((𝒟[px] : SPMF δ) >>= fun d =>
+        runtime.evalDist pref >>= fun g => runtime.evalDist (rest g d)) =
+      ((𝒟[px] : SPMF δ) >>= fun d =>
+        runtime.evalDist (pref >>= fun g => rest g d)) := by
+    congr 1
+    funext d
+    rw [h.evalDist_bind]
+  rw [step1, step2, step3]
+
+end LawfulProbCompRuntime
+
+/-- The canonical `ProbCompRuntime.probComp` runtime is lawful: its `evalDist` is the global
+`HasEvalSPMF.toSPMF` (already a monad homomorphism), and its `liftProbComp` is the identity. -/
+theorem ProbCompRuntime.probComp_lawful : LawfulProbCompRuntime ProbCompRuntime.probComp where
+  evalDist_pure x := by
+    change 𝒟[(pure x : ProbComp _)] = pure x
+    exact evalDist_pure x
+  evalDist_bind mx my := by
+    change 𝒟[mx >>= my] = 𝒟[mx] >>= fun a => 𝒟[my a]
+    exact evalDist_bind mx my
+  evalDist_liftProbComp _ := rfl
+
+/-- Compute `Pr[= true]` for the uniform-bit branch game in real arithmetic, given the two
+branches never fail. -/
+private lemma SPMF.probOutput_true_uniformBool_branch_toReal
+    (real rand : SPMF Bool) [NeverFail real] [NeverFail rand] :
+    (Pr[= true | (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← if b then real else rand
+      pure (b == z))]).toReal =
+      1 / 2 * (Pr[= true | real]).toReal + 1 / 2 * (Pr[= false | rand]).toReal := by
+  rw [probOutput_bind_eq_tsum, tsum_fintype, Fintype.sum_bool]
+  simp only [probOutput_liftM, PMF.probOutput_eq_apply, PMF.uniformOfFintype_apply,
+    Fintype.card_bool, Nat.cast_ofNat, ↓reduceIte, Bool.true_beq, bind_pure,
+    Bool.false_eq_true, Bool.false_beq, bind_pure_comp, probOutput_not_map, one_div]
+  have hne1 : (2 : ℝ≥0∞)⁻¹ * Pr[= true | real] ≠ ∞ :=
+    ENNReal.mul_ne_top (by simp) probOutput_ne_top
+  have hne2 : (2 : ℝ≥0∞)⁻¹ * Pr[= false | rand] ≠ ∞ :=
+    ENNReal.mul_ne_top (by simp) probOutput_ne_top
+  rw [ENNReal.toReal_add hne1 hne2, ENNReal.toReal_mul, ENNReal.toReal_mul]
+  norm_num
+
+/-- The hidden-bit guessing-game form: for never-failing branches, the bias of the uniform-bit
+branch game equals the distinguishing advantage between the two branches. SPMF analogue of
+`ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch`. -/
+lemma SPMF.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch
+    (real rand : SPMF Bool) [NeverFail real] [NeverFail rand] :
+    (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← if b then real else rand
+      pure (b == z)).boolBiasAdvantage =
+    real.boolDistAdvantage rand := by
+  haveI hbranch : NeverFail (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← if b then real else rand
+      pure (b == z)) :=
+    NeverFail.bind_of_forall (hy := fun b => by
+      cases b <;> exact NeverFail.bind_of_forall (hy := fun _ => inferInstance))
+  rw [SPMF.boolBiasAdvantage_eq_two_mul_abs_sub_half]
+  rw [SPMF.probOutput_true_uniformBool_branch_toReal]
+  -- Pr[= false | rand].toReal = 1 - Pr[= true | rand].toReal
+  have hpf : (Pr[= false | rand]).toReal = 1 - (Pr[= true | rand]).toReal := by
+    have hsum : Pr[= true | rand] + Pr[= false | rand] = 1 :=
+      probOutput_true_add_false_of_neverFail
+    have : (Pr[= true | rand]).toReal + (Pr[= false | rand]).toReal = 1 := by
+      rw [← ENNReal.toReal_add probOutput_ne_top probOutput_ne_top, hsum,
+        ENNReal.toReal_one]
+    linarith
+  rw [hpf, SPMF.boolDistAdvantage]
+  set a := (Pr[= true | real]).toReal
+  set b := (Pr[= true | rand]).toReal
+  rw [show (1 / 2 * a + 1 / 2 * (1 - b) - 1 / 2 : ℝ) = (a - b) / 2 from by ring,
+    abs_div, show |(2 : ℝ)| = 2 from abs_of_pos (by norm_num)]
+  ring
+
+/-- `Pr[= true]` for the function-form uniform-bit branch game. -/
+lemma SPMF.probOutput_true_uniformBool_pi_branch_toReal
+    (E : Bool → SPMF Bool) [NeverFail (E true)] [NeverFail (E false)] :
+    (Pr[= true | (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← E b
+      pure (b == z))]).toReal =
+      1 / 2 * (Pr[= true | E true]).toReal + 1 / 2 * (Pr[= false | E false]).toReal := by
+  have heq : (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← E b
+      pure (b == z)) =
+    (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← if b then E true else E false
+      pure (b == z)) := by
+    refine bind_congr fun b => ?_
+    cases b <;> rfl
+  rw [heq]
+  exact SPMF.probOutput_true_uniformBool_branch_toReal (E true) (E false)
+
+/-- Function-form variant: the bias of `bool >>= fun b => E b >>= fun z => pure (b == z)` for a
+`Bool`-indexed family `E` equals the distinguishing advantage between `E true` and `E false`. -/
+lemma SPMF.boolBiasAdvantage_uniformBool_pi_eq_boolDistAdvantage
+    (E : Bool → SPMF Bool) [NeverFail (E true)] [NeverFail (E false)] :
+    (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← E b
+      pure (b == z)).boolBiasAdvantage =
+    (E true).boolDistAdvantage (E false) := by
+  have heq : (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← E b
+      pure (b == z)) =
+    (do
+      let b ← (liftM (PMF.uniformOfFintype Bool) : SPMF Bool)
+      let z ← if b then E true else E false
+      pure (b == z)) := by
+    refine bind_congr fun b => ?_
+    cases b <;> rfl
+  rw [heq]
+  exact SPMF.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch (E true) (E false)
 
 /-- The `true`-branch probability of one Boolean-valued game is bounded above by the
 `true`-branch probability of another game plus their distinguishing advantage.

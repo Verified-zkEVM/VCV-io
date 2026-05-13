@@ -84,3 +84,22 @@ noncomputable def probComp : ProbCompRuntime ProbComp where
   toProbCompLift := ProbCompLift.id
 
 end ProbCompRuntime
+
+/-- Lawfulness predicate: the runtime's `evalDist` commutes with bind and pure, and the lift of
+a plain `ProbComp` reduces to its canonical SPMF denotation.
+
+This is the bundle of monad-homomorphism properties that hybrid arguments need in order to
+move pure / bind / uniform-sampling operations across the surface monad's denotation. Concrete
+runtimes built from `SPMFSemantics.ofHasEvalSPMF` and `ProbCompLift.ofMonadLift` satisfy this. -/
+structure LawfulProbCompRuntime
+    {m : Type → Type v} [Monad m] (runtime : ProbCompRuntime m) : Prop where
+  /-- The runtime's `evalDist` sends `pure` to `pure`. -/
+  evalDist_pure {α : Type} (x : α) : runtime.evalDist (pure x) = pure x
+  /-- The runtime's `evalDist` commutes with bind. -/
+  evalDist_bind {α β : Type} (mx : m α) (my : α → m β) :
+    runtime.evalDist (mx >>= my) =
+      runtime.evalDist mx >>= fun a => runtime.evalDist (my a)
+  /-- The runtime's `evalDist` of a lifted `ProbComp` equals its canonical SPMF denotation. -/
+  evalDist_liftProbComp {α : Type} (px : ProbComp α) :
+    runtime.evalDist (runtime.liftProbComp px) = 𝒟[px]
+
