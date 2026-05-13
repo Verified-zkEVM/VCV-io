@@ -1813,11 +1813,24 @@ theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
 theorem concretePower2RoundLaws :
     LatticeCrypto.Power2RoundOps.Laws (ring := coeffRing)
       concretePower2RoundOps LatticeCrypto.cInfNorm := by
-  sorry
+  refine { power2Round_bound := ?_ }
+  intro r
+  -- The two `Sub Rq` instances agree coefficient-wise. Rewrite the goal's
+  -- bundled subtraction into the local Vector-based one.
+  have hsub :
+    coeffRing.sub r (concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r)) =
+      (r - concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r): Rq) := by
+    apply Poly.ext_get_eq
+    intro i
+    simp only [vectorRing_sub_get, Rq.get_sub]
+  change cInfNorm (coeffRing.sub _ _) ≤ _
+  rw [hsub]
+  exact concretePower2Round_bound_field r
 
 theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     LatticeCrypto.RoundingOps.Laws (ring := coeffRing)
       (concreteRoundingOps p) LatticeCrypto.cInfNorm := by
+
   sorry
 
 /-
