@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.EvalDist.Defs.Instances
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.ProbCompLift
-import ToMathlib.Control.Monad.Hom
+import PolyFun.Control.Monad.Hom
 
 /-!
 # Asymmetric Encryption Schemes

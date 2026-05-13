@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.HasQuery.Basic
-import ToMathlib.PFunctor.Free.Basic
+import PolyFun.PFunctor.Free.Basic
 
 /-!
 # Computations with Oracle Access

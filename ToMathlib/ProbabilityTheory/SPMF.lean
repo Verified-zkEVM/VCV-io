@@ -7,7 +7,7 @@ module
 
 public import Mathlib.Probability.ProbabilityMassFunction.Monad
 import Batteries.Control.AlternativeMonad
-import ToMathlib.Control.Monad.Hom
+import PolyFun.Control.Monad.Hom
 public import ToMathlib.General
 
 /-!
