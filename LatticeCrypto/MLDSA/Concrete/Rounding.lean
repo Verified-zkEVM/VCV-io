@@ -168,6 +168,14 @@ local instance : Neg Rq := Vector.instNeg
     (a - b).get i = a.get i - b.get i :=
   Vector.getElem_sub a b i.1 i.2
 
+@[simp] theorem coeffRing_sub_eq (r s : Rq) : coeffRing.sub r s = r - s := by
+  apply Poly.ext_get_eq; intro i
+  simp [vectorRing_sub_get, Rq.get_sub]
+
+@[simp] theorem coeffRing_add_eq (r s : Rq) : coeffRing.add r s = r + s := by
+  apply Poly.ext_get_eq; intro i
+  simp [vectorRing_add_get, Rq.get_add]
+
 local instance instRqAddCommGroup : AddCommGroup Rq where
   add := (· + ·)
   add_assoc a b c := Poly.ext_get_eq fun j => by
@@ -1815,23 +1823,33 @@ theorem concretePower2RoundLaws :
       concretePower2RoundOps LatticeCrypto.cInfNorm := by
   refine { power2Round_bound := ?_ }
   intro r
-  -- The two `Sub Rq` instances agree coefficient-wise. Rewrite the goal's
-  -- bundled subtraction into the local Vector-based one.
-  have hsub :
-    coeffRing.sub r (concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r)) =
-      (r - concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r): Rq) := by
-    apply Poly.ext_get_eq
-    intro i
-    simp only [vectorRing_sub_get, Rq.get_sub]
   change cInfNorm (coeffRing.sub _ _) ≤ _
-  rw [hsub]
+  simp only [coeffRing_sub_eq r _]
   exact concretePower2Round_bound_field r
 
 theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     LatticeCrypto.RoundingOps.Laws (ring := coeffRing)
       (concreteRoundingOps p) LatticeCrypto.cInfNorm := by
+  refine { high_low_decomp := ?_
+           lowBits_bound := ?_
+           hide_low := ?_
+           shift_injective := ?_
+           useHint_correct := ?_
+           useHint_bound := ?_ }
+  · intro x
 
-  sorry
+    -- simp [concreteRounding_hide_low_field_of_isApproved p hp ]
+    sorry
+  · sorry
+  · sorry
+  · sorry
+  · intro z r h
+    let cp := concreteRoundingOps p
+    change cp.useHint (cp.makeHint z r) r = cp.highBits (coeffRing.add r z)
+    simp only [coeffRing_add_eq r _]
+    exact concreteRounding_useHint_correct_field_of_isApproved p hp z r h
+  · sorry
+
 
 /-
 The concrete `Power2Round` and approved-parameter `RoundingOps` wrappers now compile.
