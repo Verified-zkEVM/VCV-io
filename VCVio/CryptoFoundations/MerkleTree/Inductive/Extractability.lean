@@ -34,9 +34,10 @@ that disagrees with the extracted tree.
 
 Note that our bound is looser than the SNARGs book's bound in Lemma 18.5.1 of
 `((qb - 1) * qb) / 2 / |α| + (depth + 1) * 2 * size / |α|`.
-This is because we have simplified the proof at the expense of tightness by analyzing
-collisions for the full game at once. A future improvement is to re-structure the proof
-to recover the tighter bound.
+This is because we have simplified the proof at the expense of tightness
+(tighter, that is, in the qb >> size case)
+by analyzing collisions for the full game at once.
+A future improvement might be to re-structure the proof to recover the tighter bound.
 
 ## References
 
@@ -52,13 +53,15 @@ section ToVCV
 For any computation `oa` and predicate `p`, the probability of `p` holding on the output
 equals the probability of `p ∘ Prod.fst` holding on the output of `oa.withQueryLog`.
 This follows from the fact that `withQueryLog` only appends a log without changing the
-output value.
+output value. The lemma exists as a phrasing in terms of `oa.withQueryLog` (which is
+`@[reducible]`) so that `rw` can match it; the underlying fact is
+`loggingOracle.probEvent_fst_run_simulateQ`.
 -/
 lemma probEvent_withQueryLog {ι : Type} {oSpec : OracleSpec ι}
     [oSpec.Fintype] [oSpec.Inhabited] {α : Type}
     (oa : OracleComp oSpec α) (p : α → Prop) :
-    Pr[p | oa] = Pr[p ∘ Prod.fst | oa.withQueryLog] :=
-  (loggingOracle.probEvent_fst_run_simulateQ oa p).symm
+    Pr[p ∘ Prod.fst | oa.withQueryLog] = Pr[p | oa] :=
+  loggingOracle.probEvent_fst_run_simulateQ oa p
 
 end ToVCV
 
@@ -245,6 +248,10 @@ theorem extractor_chain_match
 
 /--
 The game for extractability.
+
+This is represented as a single `OracleComp`
+that runs the committing adversary, extractor, opening adversary, and verifier in sequence and
+returns the transcript of the execution.
 -/
 def extractability_game
     [DecidableEq α] [SampleableType α] [Fintype α] [OracleSpec.Fintype (spec α)]
@@ -964,7 +971,7 @@ private theorem extractability_game_noColl_caseB_le_inv_card_aux
             let ⟨_, _, idx, _, _, extractedTree, _, verified⟩ := vals
             verified = true ∧ extractedTree.get idx.toNodeIndex = none) ∘ Prod.fst) |
         (extractability_game committingAdv openingAdv).withQueryLog] ≤ _
-  rw [← probEvent_withQueryLog]
+  rw [probEvent_withQueryLog]
   -- Step 2: Restructure the game as a triple bind so we can decompose it via
   -- `probEvent_bind_le_of_forall_le`.
   rw [show extractability_game committingAdv openingAdv =
@@ -1116,19 +1123,17 @@ The extractability theorem for Merkle trees.
 
 Adapting from the SNARGs book Lemma 18.5.1:
 
-For any query bound `qb`,
-and for any adversary `committingAdv` that outputs a root and auxiliary data
+For any adversary `committingAdv` that outputs a root and auxiliary data,
 and any `openingAdv` that takes the auxiliary data and outputs a leaf index, leaf value, and proof,
 such that committingAdv and openingAdv together obey the query bound `qb`.
-
 If the `committingAdv` and `openingAdv` are executed, and the `extractor` algorithm is run on the
 resulting cache and root from `committingAdv`,
-then with probability at most κ
-does simultaneously
+then with probability at most κ does the adversary "win the extractability game"
+i.e. simultaneously
 
-* the merkle tree verification pass on the proof from `openingAdv`
-* with the extracted leaf value not matching the opened leaf value
-  or the adversary producing a proof different from the extracted proof.
+* the merkle tree verification passes on the proof from `openingAdv`
+* but the extracted (leaf value, proof) pair
+  does not match the adversary's (leaf value, proof pair)
 
 Where κ is ≤ 1/2 * (qb - 1) * qb / (Fintype.card α)
         + 2 * (s.depth + 1) * s.leafCount / (Fintype.card α)
@@ -1163,7 +1168,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     _ = Pr[adversary_wins_extractability_game_with_logging_event |
           (extractability_game committingAdv openingAdv).withQueryLog] := by
       simp only [adversary_wins_extractability_game_with_logging_event]
-      rw [← probEvent_withQueryLog]
+      rw [probEvent_withQueryLog]
     -- The bad event happens only when there is a collision event
     -- or the bad event happens with no collision
     _ ≤ Pr[fun (vals, log) =>
