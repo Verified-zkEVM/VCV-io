@@ -817,6 +817,25 @@ lemma populateDown_getRootValue {β : Type _} {s : Skeleton}
   | leaf => rfl
   | internal sl sr => rfl
 
+/-- If `children` maps `none ↦ (none, none)`, then `populateDown` started from `none`
+has value `none` at every node index. -/
+theorem populateDown_none_get_eq_none {α : Type _} {s : Skeleton}
+    (children : Option α → Option α × Option α)
+    (h_none : children none = (none, none))
+    (idx : SkeletonNodeIndex s) :
+    (populateDown s children none).get idx = none := by
+  induction s with
+  | leaf => cases idx; rfl
+  | internal sl sr ihL ihR =>
+    cases idx with
+    | ofInternal => rfl
+    | ofLeft idxL =>
+      rw [populateDown_internal_def, FullData.get_internal_ofLeft, h_none]
+      exact ihL idxL
+    | ofRight idxR =>
+      rw [populateDown_internal_def, FullData.get_internal_ofRight, h_none]
+      exact ihR idxR
+
 /-- Lift a binary function through two `Option` arguments. -/
 def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
     (x : Option α) (y : Option β) : Option γ := do

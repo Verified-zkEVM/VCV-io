@@ -49,18 +49,6 @@ open scoped NNReal
 section ToVCV
 
 /--
-Convenience corrolary to `probEvent_mono` for when the implication holds everywhere,
-not just on the support of the distribution.
-
-TODO move to same file as `probEvent_mono`
--/
-lemma probEvent_mono''.{u, v} {m : Type u → Type v} [Monad m] {α : Type u} [HasEvalSPMF m]
-    {mx : m α} {p q : α → Prop}
-    (h : ∀ x, p x → q x) : Pr[p | mx] ≤ Pr[q | mx] := by
-  apply probEvent_mono
-  tauto
-
-/--
 For any computation `oa` and predicate `p`, the probability of `p` holding on the output
 equals the probability of `p ∘ Prod.fst` holding on the output of `oa.withQueryLog`.
 This follows from the fact that `withQueryLog` only appends a log without changing the
@@ -81,27 +69,29 @@ open List OracleSpec OracleComp BinaryTree
 variable {α : Type}
 
 /--
+The child-decomposition function used by the Merkle-tree `extractor`. Given a `cache`
+and a node value `a`, look up the first query in `cache` whose response is `a` and return
+its input pair; if no such entry exists, return `none`.
+-/
+def extractorChildren {α : Type} [DecidableEq α]
+    (cache : (spec α).QueryLog) (a : α) : Option (α × α) :=
+  match cache.find? (fun ⟨_, r⟩ => r == a) with
+  | none => none
+  | some q => some (q.1.1, q.1.2)
+
+/--
 The extraction algorithm for Merkle trees: from a query log `cache`, a `root`, and a
 skeleton `s`, build a partial tree of type `FullData (Option α) s` by walking down from
 `root`. A node with value `some a` looks up the unique log entry whose response is `a`
-and uses its input pair as the children's values; in every other case (node is `none`,
-no matching entry, or no unique match) both children are `none`.
-
-TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
+and uses its input pair as the children's values; in every other case (no matching entry,
+or the parent is already `none`) both children are `none`. Implemented as
+`optionPopulateDown` driven by `extractorChildren`.
 -/
 def extractor {α : Type} [DecidableEq α] [SampleableType α]
     [OracleSpec.Fintype (spec α)]
     (s : Skeleton) (cache : (spec α).QueryLog) (root : α) :
     FullData (Option α) s :=
-  let children (node : Option α) : Option α × Option α :=
-    match node with
-    | none => (none, none)
-    | some a =>
-      -- Find the first query resulting in this value
-      match cache.find? (fun ⟨_, r⟩ => r == a) with
-      | none => (none, none)
-      | some q => (some q.1.1, some q.1.2)
-  populateDown s children (some root)
+  optionPopulateDown s (extractorChildren cache) root
 
 private lemma find?_response_eq_some_of_no_collision_mem
     [DecidableEq α] {log : (spec α).QueryLog} {q : (_i : (α × α)) × α}
@@ -151,10 +141,12 @@ private lemma extractor_internal_eq_of_find?_eq
                 some ⟨(x, y), root⟩) :
     extractor (Skeleton.internal sl sr) log root =
       FullData.internal (some root) (extractor sl log x) (extractor sr log y) := by
-  change populateDown (Skeleton.internal sl sr) _ (some root) = _
-  rw [populateDown_internal_def]
-  simp only [h_find, FullData.internal.injEq, true_and]
-  exact ⟨rfl, rfl⟩
+  have h_children : extractorChildren log root = some (x, y) := by
+    change (match log.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = _
+    rw [h_find]
+  simp only [extractor]
+  rw [optionPopulateDown_internal, h_children]
+  rfl
 
 /--
 **Pure consistency lemma.** Under no-collision, if the extractor's path from
@@ -220,7 +212,7 @@ theorem extractor_chain_match
           (generateProof (extractor sl log ancestor) idxLeft).toList =
         proof.toList.map some
     have h_root_value : (extractor sr log proof.head).getRootValue = some proof.head :=
-      populateDown_getRootValue _ _
+      optionPopulateDown_getRootValue _ _
     rw [h_root_value, ih_proof]
     obtain ⟨_ | _, hl⟩ := proof
     · exact absurd hl.symm (Nat.succ_ne_zero _)
@@ -245,7 +237,7 @@ theorem extractor_chain_match
           (generateProof (extractor sr log ancestor) idxRight).toList =
         proof.toList.map some
     have h_root_value : (extractor sl log proof.head).getRootValue = some proof.head :=
-      populateDown_getRootValue _ _
+      optionPopulateDown_getRootValue _ _
     rw [h_root_value, ih_proof]
     obtain ⟨_ | _, hl⟩ := proof
     · exact absurd hl.symm (Nat.succ_ne_zero _)
@@ -363,44 +355,6 @@ private lemma chainInLog_mono {α : Type} {s : Skeleton} (idx : SkeletonLeafInde
   | @ofLeft sl sr idxLeft ih | @ofRight sl sr idxRight ih =>
     intro _ _ _ _ _ h_sub ⟨ancestor, h_mem, h_rec⟩
     exact ⟨ancestor, h_sub _ h_mem, ih h_sub h_rec⟩
-
-/-- `OracleComp.withQueryLog` distributes over `bind`: the combined log is the
-concatenation of the prefix's log and the continuation's log.
-
-TODO move to appropriate file, maybe same file as `withQueryLog`.
--/
-lemma OracleComp.withQueryLog_bind
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α β : Type}
-    (mx : OracleComp spec α) (my : α → OracleComp spec β) :
-    (mx >>= my).withQueryLog =
-      mx.withQueryLog >>= fun p => Prod.map id (p.2 ++ ·) <$> (my p.1).withQueryLog := by
-  change (WriterT.run (simulateQ _ (mx >>= my)) :
-      OracleComp spec (β × spec.QueryLog)) = _
-  rw [simulateQ_bind, WriterT.run_bind']
-
-/-- `OracleComp.withQueryLog` of `pure x` produces `(x, [])` — no oracle queries,
-empty log.
-
-TODO move to appropriate file, maybe same file as `withQueryLog_bind`.
--/
-lemma OracleComp.withQueryLog_pure
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
-    (x : α) :
-    (pure x : OracleComp spec α).withQueryLog = pure (x, []) := rfl
-
-/-- `OracleComp.withQueryLog` of a single `query t` produces `(u, [⟨t, u⟩])` where
-`u` is the oracle response: one query, one log entry. -/
-lemma OracleComp.withQueryLog_query
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} (t : spec.Domain) :
-    (liftM (OracleSpec.query t) : OracleComp spec _).withQueryLog =
-      liftM (OracleSpec.query t) >>= fun u => pure (u, [⟨t, u⟩]) := by
-  conv_lhs =>
-    rw [show (liftM (OracleSpec.query t) : OracleComp spec _) =
-        liftM (OracleSpec.query t) >>= pure from (bind_pure _).symm]
-  change (simulateQ loggingOracle (liftM (OracleSpec.query t) >>= pure)).run = _
-  rw [run_simulateQ_loggingOracle_query_bind]
-  simp only [simulateQ_pure, WriterT.run_pure', map_pure]
-  rfl
 
 private lemma singleHash_withQueryLog
     [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
@@ -533,56 +487,12 @@ private lemma verifyProof_support_chain
   obtain rfl : r = root := by simpa using h_b_eq.symm
   simpa using getPutativeRoot_support_chain idx leaf proof r log_g h_g
 
--- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
-private lemma populateDown_none_get_eq_none {s : Skeleton}
-    (children : Option α → Option α × Option α)
-    (h_none : children none = (none, none))
-    (idx : SkeletonNodeIndex s) :
-    (populateDown s children none).get idx = none := by
-  induction s with
-  | leaf => cases idx; rfl
-  | internal sl sr ihL ihR =>
-    cases idx with
-    | ofInternal => rfl
-    | ofLeft idxL =>
-      rw [populateDown_internal_def, FullData.get_internal_ofLeft, h_none]
-      exact ihL idxL
-    | ofRight idxR =>
-      rw [populateDown_internal_def, FullData.get_internal_ofRight, h_none]
-      exact ihR idxR
-
-/-- A localized abbreviation for the `extractor`'s children function over a log.
-
-TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
--/
-private def extractorChildren [DecidableEq α]
-    (log_c : (spec α).QueryLog) :
-    Option α → Option α × Option α := fun node =>
-  match node with
-  | none => (none, none)
-  | some a =>
-    match log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) with
-    | none => (none, none)
-    | some q => (some q.1.1, some q.1.2)
-
--- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
-@[simp] private lemma extractorChildren_none [DecidableEq α]
-    (log_c : (spec α).QueryLog) :
-    extractorChildren log_c none = (none, none) := rfl
-
--- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
-private lemma extractor_eq_populate [DecidableEq α] [SampleableType α]
-    [(spec α).Fintype]
-    (s : Skeleton) (log_c : (spec α).QueryLog) (root : α) :
-    extractor s log_c root = populateDown s (extractorChildren log_c) (some root) := rfl
-
--- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
-private lemma extractorChildren_some [DecidableEq α]
-    (log_c : (spec α).QueryLog) (a : α) :
-    extractorChildren log_c (some a) =
-      match log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) with
-      | none => (none, none)
-      | some q => (some q.1.1, some q.1.2) := rfl
+private lemma extractorChildren_eq_none_of_find?_eq_none [DecidableEq α]
+    {log_c : (spec α).QueryLog} {a : α}
+    (hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) = none) :
+    extractorChildren log_c a = none := by
+  change (match log_c.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = none
+  rw [hf]
 
 /-- Under no-collision, if a chain entry `⟨pair, root⟩` lies in `log` and the
 extractor on the subset `log_c` reaches at least the descendant index
@@ -605,12 +515,12 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none
       ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
     rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
     · refine absurd ?_ h_ne_none
-      change (populateDown sl (extractorChildren log_c)
-          (extractorChildren log_c (some root)).1).get idxLeft.toNodeIndex = none
-      rw [show (extractorChildren log_c (some root)).1 = none by
-            rw [extractorChildren_some, hf]]
-      exact populateDown_none_get_eq_none (extractorChildren log_c)
-        (extractorChildren_none log_c) idxLeft.toNodeIndex
+      simp only [extractor]
+      rw [optionPopulateDown_internal, extractorChildren_eq_none_of_find?_eq_none hf]
+      change (populateDown sl (Option.bindPair (extractorChildren log_c)) none).get
+          idxLeft.toNodeIndex = none
+      exact populateDown_none_get_eq_none (Option.bindPair (extractorChildren log_c)) rfl
+        idxLeft.toNodeIndex
     · exact ⟨q, rfl⟩
   have h_qc_resp : q_c.2 = root := by
     simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
@@ -637,12 +547,12 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofRight_ne_none
       ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
     rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
     · refine absurd ?_ h_ne_none
-      change (populateDown sr (extractorChildren log_c)
-          (extractorChildren log_c (some root)).2).get idxRight.toNodeIndex = none
-      rw [show (extractorChildren log_c (some root)).2 = none by
-            rw [extractorChildren_some, hf]]
-      exact populateDown_none_get_eq_none (extractorChildren log_c)
-        (extractorChildren_none log_c) idxRight.toNodeIndex
+      simp only [extractor]
+      rw [optionPopulateDown_internal, extractorChildren_eq_none_of_find?_eq_none hf]
+      change (populateDown sr (Option.bindPair (extractorChildren log_c)) none).get
+          idxRight.toNodeIndex = none
+      exact populateDown_none_get_eq_none (Option.bindPair (extractorChildren log_c)) rfl
+        idxRight.toNodeIndex
     · exact ⟨q, rfl⟩
   have h_qc_resp : q_c.2 = root := by
     simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
@@ -673,10 +583,11 @@ private theorem chainInLog_restrict
     refine ⟨ancestor, List.mem_of_find?_eq_some h_find_c',
       ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
         h_chain_rec⟩
-    change (populateDown sl (extractorChildren log_c)
-        (extractorChildren log_c (some root)).1).get idxLeft.toNodeIndex = none
-    rw [show (extractorChildren log_c (some root)).1 = some ancestor by
-          rw [extractorChildren_some, h_find_c']]
+    have h_children : extractorChildren log_c root = some (ancestor, proof.head) := by
+      change (match log_c.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = _
+      rw [h_find_c']
+    simp only [extractor]
+    rw [optionPopulateDown_internal, h_children]
     exact hne
   | @ofRight sl sr idxRight ih =>
     intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
@@ -686,10 +597,11 @@ private theorem chainInLog_restrict
     refine ⟨ancestor, List.mem_of_find?_eq_some h_find_c',
       ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
         h_chain_rec⟩
-    change (populateDown sr (extractorChildren log_c)
-        (extractorChildren log_c (some root)).2).get idxRight.toNodeIndex = none
-    rw [show (extractorChildren log_c (some root)).2 = some ancestor by
-          rw [extractorChildren_some, h_find_c']]
+    have h_children : extractorChildren log_c root = some (proof.head, ancestor) := by
+      change (match log_c.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = _
+      rw [h_find_c']
+    simp only [extractor]
+    rw [optionPopulateDown_internal, h_children]
     exact hne
 
 /-- **Self-log fixed point.** The two log layers produced by
@@ -700,13 +612,11 @@ queries to the underlying `OracleComp`. -/
 theorem withQueryLog_self_log_eq
     {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
-    (oa : OracleComp spec α) :
-    ∀ {v : α} {l₁ l₂ : spec.QueryLog},
-      ((v, l₁), l₂) ∈ support oa.withQueryLog.withQueryLog →
-      l₁ = l₂ := by
-  induction oa using OracleComp.inductionOn with
+    (oa : OracleComp spec α) {v : α} {l₁ l₂ : spec.QueryLog}
+    (hmem : ((v, l₁), l₂) ∈ support oa.withQueryLog.withQueryLog) :
+    l₁ = l₂ := by
+  induction oa using OracleComp.inductionOn generalizing v l₁ l₂ with
   | pure x =>
-      intros v l₁ l₂ hmem
       change ((v, l₁), l₂) ∈ support
         ((pure x : OracleComp spec α).withQueryLog.withQueryLog) at hmem
       rw [OracleComp.withQueryLog_pure, OracleComp.withQueryLog_pure,
@@ -714,7 +624,6 @@ theorem withQueryLog_self_log_eq
       obtain ⟨⟨_, rfl⟩, rfl⟩ := Prod.mk.inj hmem |>.imp_left Prod.mk.inj
       rfl
   | query_bind t mx ih =>
-      intros v l₁ l₂ hmem
       change ((v, l₁), l₂) ∈ support
         (((liftM (OracleSpec.query t) : OracleComp spec _) >>=
           fun u => mx u).withQueryLog.withQueryLog) at hmem
@@ -854,11 +763,6 @@ private theorem extractability_game_no_coll_match
       h_no_coll_lc h_ne_none_lc h_chain_lc
   exact ⟨h_tree_eq.symm ▸ h_get, h_proof_ext_eq.symm ▸ h_proof_match.symm⟩
 
---TODO move to the same folder/file where binary trees are defined
-private lemma leafCount_pos_aux : ∀ s : Skeleton, 0 < s.leafCount
-  | Skeleton.leaf => Nat.zero_lt_one
-  | Skeleton.internal left _ => Nat.add_pos_left (leafCount_pos_aux left) _
-
 private def noColl_caseA_event {α : Type} [BEq α] [DecidableEq α]
     {s : Skeleton} {AuxState : Type} :
     (α × AuxState ×
@@ -920,25 +824,6 @@ private theorem extractability_game_noColl_caseA_eq_zero
   obtain ⟨h_eq_leaf, h_map⟩ :=
     extractability_game_no_coll_match committingAdv openingAdv h_no_coll h_ne_none hsupport
   simp [h_map, h_eq_leaf] at h_adv_wins
-
--- TODO move
-private lemma probEvent_bind_le_of_forall_le
-    {ι' : Type} {oSpec' : OracleSpec ι'}
-    [oSpec'.Fintype] [oSpec'.Inhabited]
-    {α' β' : Type} {mx : OracleComp oSpec' α'} {my : α' → OracleComp oSpec' β'}
-    {q : β' → Prop} {ε : ENNReal}
-    (h : ∀ x ∈ support mx, Pr[ q | my x] ≤ ε) :
-    Pr[q | mx >>= my] ≤ ε := by
-  rw [probEvent_bind_eq_tsum]
-  calc ∑' x : α', Pr[= x | mx] * Pr[q | my x]
-      ≤ ∑' x : α', Pr[= x | mx] * ε := by
-        refine ENNReal.tsum_le_tsum fun x => ?_
-        by_cases hx : x ∈ support mx
-        · exact mul_le_mul' le_rfl (h x hx)
-        · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (∑' x : α', Pr[= x | mx]) * ε := ENNReal.tsum_mul_right
-    _ ≤ 1 * ε := mul_le_mul' tsum_probOutput_le_one le_rfl
-    _ = ε := one_mul _
 
 private lemma probOutput_singleHash_eq_inv_card
     [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
