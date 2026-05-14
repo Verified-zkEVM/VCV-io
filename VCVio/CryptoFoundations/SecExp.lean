@@ -46,6 +46,95 @@ been observed under bundled subprobabilistic semantics. Any remaining mass corre
 and therefore contributes to neither Boolean branch. -/
 noncomputable def SPMF.boolBiasAdvantage (p : SPMF Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= false | p]).toReal|
+
+/-- Distinguishing advantage between two Boolean-valued subdistributions, measured on the
+`true` branch. SPMF analogue of `ProbComp.boolDistAdvantage`. -/
+noncomputable def SPMF.boolDistAdvantage (p q : SPMF Bool) : ℝ :=
+  |(Pr[= true | p]).toReal - (Pr[= true | q]).toReal|
+
+/-- Re-express SPMF Boolean bias as twice the absolute deviation of `Pr[true]` from `1/2`,
+assuming the SPMF is a full distribution (no failure mass). -/
+lemma SPMF.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : SPMF Bool)
+    (htotal : Pr[= true | p] + Pr[= false | p] = 1) :
+    p.boolBiasAdvantage = 2 * |(Pr[= true | p]).toReal - 1 / 2| := by
+  have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by
+    rw [← htotal, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  unfold SPMF.boolBiasAdvantage
+  rw [hfalse]
+  set t := (Pr[= true | p]).toReal
+  have h1 : (1 : ℝ≥0∞).toReal = 1 := ENNReal.toReal_one
+  have hle : Pr[= true | p] ≤ 1 := by rw [← htotal]; exact le_add_right (le_refl _)
+  rw [ENNReal.toReal_sub_of_le hle ENNReal.one_ne_top, h1]
+  rw [show t - (1 - t) = 2 * (t - 1 / 2) by ring]
+  rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2)]
+
+/-- Hidden-bit decomposition at the SPMF level: the bias of a coin-flip guessing game equals the
+distinguishing advantage between the two branches, assuming the coin is fair and both branches
+have full mass (no failure).
+
+This is the SPMF analogue of `ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch`.
+The ProbComp version holds unconditionally because `ProbComp` distributions always have total mass
+1. For `SPMF` distributions, the totality hypotheses are required because failure mass breaks the
+`Pr[false] = 1 - Pr[true]` identity that the decomposition depends on. -/
+lemma SPMF.boolBiasAdvantage_eq_boolDistAdvantage_coin_branch
+    (coin p q : SPMF Bool)
+    (hcoin_true : Pr[= true | coin] = 1 / 2)
+    (hcoin_false : Pr[= false | coin] = 1 / 2)
+    (hp : Pr[= true | p] + Pr[= false | p] = 1)
+    (hq : Pr[= true | q] + Pr[= false | q] = 1) :
+    (coin >>= fun b =>
+      (if b then p else q) >>= fun z => pure (b == z)).boolBiasAdvantage =
+    p.boolDistAdvantage q := by
+  -- Branch probabilities: true branch preserves, false branch flips
+  have hbt : ∀ x : Bool,
+      Pr[= x | (if (true : Bool) then p else q) >>= fun z =>
+        (pure (true == z) : SPMF Bool)] = Pr[= x | p] := by
+    intro x; cases x <;> simp
+  have hbf : ∀ x : Bool,
+      Pr[= x | (if (false : Bool) then p else q) >>= fun z =>
+        (pure (false == z) : SPMF Bool)] = Pr[= (!x) | q] := by
+    intro x; cases x <;> simp
+  -- Compute Pr[= x | game] for each x
+  have hgame : ∀ x : Bool, Pr[= x | coin >>= fun b =>
+      (if b then p else q) >>= fun z => pure (b == z)] =
+    (Pr[= x | p] + Pr[= (!x) | q]) / 2 := by
+    intro x
+    rw [probOutput_bind_eq_tsum, tsum_fintype (L := .unconditional _), Fintype.sum_bool,
+      hcoin_true, hcoin_false, hbt x, hbf x]
+    rw [← left_distrib, one_div, mul_comm, div_eq_mul_inv]
+  -- Total mass = 1
+  have htotal : Pr[= true | coin >>= fun b =>
+      (if b then p else q) >>= fun z => pure (b == z)] +
+    Pr[= false | coin >>= fun b =>
+      (if b then p else q) >>= fun z => pure (b == z)] = 1 := by
+    rw [hgame true, hgame false]
+    simp only [Bool.not_true, Bool.not_false, ENNReal.div_add_div_same]
+    have : Pr[= true | p] + Pr[= false | q] + (Pr[= false | p] + Pr[= true | q]) =
+        (Pr[= true | p] + Pr[= false | p]) + (Pr[= true | q] + Pr[= false | q]) := by ring
+    rw [this, hp, hq, show (1 : ℝ≥0∞) + 1 = 2 from by norm_num]
+    exact ENNReal.div_self (by positivity) ENNReal.ofNat_ne_top
+  -- Bias = 2 * |Pr[true] - 1/2|, then compute Pr[true] - 1/2
+  rw [SPMF.boolBiasAdvantage_eq_two_mul_abs_sub_half _ htotal, hgame true]
+  simp only [Bool.not_true]
+  have hfalseq : Pr[= false | q] = 1 - Pr[= true | q] := by
+    rw [← hq, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  rw [hfalseq]
+  have hle : Pr[= true | q] ≤ 1 := by rw [← hq]; exact le_add_right (le_refl _)
+  rw [ENNReal.toReal_div, ENNReal.toReal_add probOutput_ne_top
+    (ENNReal.sub_ne_top ENNReal.one_ne_top),
+    ENNReal.toReal_sub_of_le hle ENNReal.one_ne_top, ENNReal.toReal_one, ENNReal.toReal_ofNat]
+  unfold SPMF.boolDistAdvantage
+  set pt := (Pr[= true | p]).toReal; set qt := (Pr[= true | q]).toReal
+  rw [show (pt + (1 - qt)) / 2 - 1 / 2 = (pt - qt) / 2 from by ring,
+    show (2 : ℝ) * |(pt - qt) / 2| = |(2 : ℝ)| * |(pt - qt) / 2| from by norm_num,
+    ← abs_mul, show (2 : ℝ) * ((pt - qt) / 2) = pt - qt from by ring]
+
+/-- Triangle inequality for SPMF Boolean distinguishing advantage. -/
+lemma SPMF.boolDistAdvantage_triangle (p q r : SPMF Bool) :
+    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
+  unfold SPMF.boolDistAdvantage
+  exact abs_sub_le _ _ _
+
 /-- Triangle inequality for Boolean distinguishing advantage. -/
 lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
     p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
