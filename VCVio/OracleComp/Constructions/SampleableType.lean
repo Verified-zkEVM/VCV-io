@@ -387,7 +387,8 @@ instance instFintypeVector (α : Type u) (n : ℕ) [Fintype α] : Fintype (Vecto
       left_inv := fun f => funext fun i => by simp [Vector.get, Vector.ofFn]
       right_inv := fun v => Vector.ext fun i hi => by simp [Vector.ofFn, Vector.get] }
 
-/-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
+/-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. This is the base
+case used by the general `FinEnum`-indexed `instSampleableTypeFunc` below. -/
 instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :
     SampleableType (Fin n → α) :=
   SampleableType.ofEquiv
@@ -396,9 +397,37 @@ instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :
       left_inv := fun v => Vector.ext fun i hi => by simp [Vector.ofFn, Vector.get]
       right_inv := fun f => funext fun i => by simp [Vector.get, Vector.ofFn] }
 
-/-- Select a uniform element from `Matrix α n` by selecting each row independently. -/
-instance (α : Type) (n m : ℕ) [SampleableType α] : SampleableType (Matrix (Fin n) (Fin m) α) :=
-  inferInstanceAs (SampleableType (Fin n → Fin m → α))
+/-- A function `β → α` for `β` finitely enumerable and `α` sampleable is itself sampleable.
+This generalizes the `Fin n → α` instance above: the `FinEnum.fin` instance recovers it. -/
+instance instSampleableTypeFunc {β α : Type} [FinEnum β] [SampleableType α] :
+    SampleableType (β → α) :=
+  SampleableType.ofEquiv (α := Fin (FinEnum.card β) → α)
+    (Equiv.arrowCongr FinEnum.equiv.symm (Equiv.refl α))
+
+/-- Select a uniform element from `List.Vector α n` by independently selecting `α` at each
+index. The construction goes through the equivalence with `Fin n → α`. -/
+instance instSampleableTypeListVector {α : Type} {n : ℕ} [SampleableType α] :
+    SampleableType (List.Vector α n) :=
+  SampleableType.ofEquiv
+    { toFun := List.Vector.ofFn
+      invFun := fun xs i => xs.get i
+      left_inv := fun f => funext fun i => by simp
+      right_inv := fun xs => List.Vector.ext fun i => by simp }
+
+/-- Select a uniform element from `Matrix ι κ α` by independently selecting an entry for each
+`(i, j)`. Both index types only need to be `FinEnum`; the previous `Fin n × Fin m`-indexed
+instance is recovered through `FinEnum.fin`. -/
+instance instSampleableTypeMatrix {α ι κ : Type} [FinEnum ι] [FinEnum κ] [SampleableType α] :
+    SampleableType (Matrix ι κ α) :=
+  inferInstanceAs (SampleableType (ι → κ → α))
+
+/-- Discoverability wrapper: `SampleableType (α ⊕ β)` follows from `FinEnum` on each side
+plus nonemptiness of the sum, via Mathlib's `FinEnum.sum` instance and
+`FinEnum.SampleableType`. Listed explicitly so users can see it in the instance set rather
+than relying on a multi-step search. -/
+instance instSampleableTypeSum {α β : Type} [FinEnum α] [FinEnum β]
+    [Nonempty (α ⊕ β)] : SampleableType (α ⊕ β) :=
+  inferInstance
 
 end instances
 
