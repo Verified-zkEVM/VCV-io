@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao, Bolton Bailey
 -/
 
-import VCVio.CryptoFoundations.MerkleTree.Inductive.Collision
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Lemmas
+import VCVio.OracleComp.QueryTracking.Birthday
 import ToMathlib.Data.IndexedBinaryTree.Lemmas
 
 /-!
@@ -98,7 +98,7 @@ def extractor {α : Type} [DecidableEq α] [SampleableType α]
 
 private lemma find?_response_eq_some_of_no_collision_mem
     [DecidableEq α] {log : (spec α).QueryLog} {q : (_i : (α × α)) × α}
-    (h_no_coll : ¬ collisionIn log) (h_mem : q ∈ log) :
+    (h_no_coll : ¬ LogHasCollision log) (h_mem : q ∈ log) :
     log.find? (fun q' => q'.2 == q.2) = some q := by
   -- `find?` returns the first matching entry; under no-collision, all matching
   -- entries are equal as Sigma values, so the first one must be `q`.
@@ -111,7 +111,8 @@ private lemma find?_response_eq_some_of_no_collision_mem
   have h_y_eq : y.2 = q.2 := by
     simpa using (List.find?_eq_some_iff_getElem.mp hy).1
   by_contra h_ne
-  exact h_no_coll ⟨y, q, h_ne, List.mem_of_find?_eq_some hy, h_mem, by simp [h_y_eq]⟩
+  exact h_no_coll (LogHasCollision.of_mem h_ne (List.mem_of_find?_eq_some hy) h_mem
+    (heq_of_eq h_y_eq))
 
 /--
 Predicate stating that `log` contains a hash chain from `root` (combined with the
@@ -179,7 +180,7 @@ theorem extractor_chain_match
     {s : Skeleton} (idx : SkeletonLeafIndex s) :
     ∀ (log : (spec α).QueryLog) (root : α) (leaf : α)
       (proof : List.Vector α idx.depth),
-    ¬ collisionIn log →
+    ¬ LogHasCollision log →
     (extractor s log root).get idx.toNodeIndex ≠ none →
     chainInLog log root idx leaf proof →
     (extractor s log root).get idx.toNodeIndex = some leaf ∧
@@ -512,7 +513,7 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none
     [DecidableEq α] [SampleableType α] [(spec α).Fintype]
     {sl sr : Skeleton} (idxLeft : SkeletonLeafIndex sl)
     {log log_c : (spec α).QueryLog} {root x y : α}
-    (h_sub : ∀ q, q ∈ log_c → q ∈ log) (h_no_coll : ¬ collisionIn log)
+    (h_sub : ∀ q, q ∈ log_c → q ∈ log) (h_no_coll : ¬ LogHasCollision log)
     (h_chain_mem : (⟨(x, y), root⟩ : (_i : (α × α)) × α) ∈ log)
     (h_ne_none : (extractor (Skeleton.internal sl sr) log_c root).get
         (SkeletonLeafIndex.ofLeft idxLeft).toNodeIndex ≠ none) :
@@ -533,9 +534,8 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none
     simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
   have h_qc_eq : q_c = ⟨(x, y), root⟩ := by
     by_contra h_ne
-    exact h_no_coll ⟨q_c, ⟨(x, y), root⟩, h_ne,
-      h_sub _ (List.mem_of_find?_eq_some h_find_c), h_chain_mem,
-      by simp [h_qc_resp]⟩
+    exact h_no_coll (LogHasCollision.of_mem h_ne
+      (h_sub _ (List.mem_of_find?_eq_some h_find_c)) h_chain_mem (heq_of_eq h_qc_resp))
   rw [h_find_c, h_qc_eq]
 
 /-- Mirror of `find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none`
@@ -544,7 +544,7 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofRight_ne_none
     [DecidableEq α] [SampleableType α] [(spec α).Fintype]
     {sl sr : Skeleton} (idxRight : SkeletonLeafIndex sr)
     {log log_c : (spec α).QueryLog} {root x y : α}
-    (h_sub : ∀ q, q ∈ log_c → q ∈ log) (h_no_coll : ¬ collisionIn log)
+    (h_sub : ∀ q, q ∈ log_c → q ∈ log) (h_no_coll : ¬ LogHasCollision log)
     (h_chain_mem : (⟨(x, y), root⟩ : (_i : (α × α)) × α) ∈ log)
     (h_ne_none : (extractor (Skeleton.internal sl sr) log_c root).get
         (SkeletonLeafIndex.ofRight idxRight).toNodeIndex ≠ none) :
@@ -565,9 +565,8 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofRight_ne_none
     simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
   have h_qc_eq : q_c = ⟨(x, y), root⟩ := by
     by_contra h_ne
-    exact h_no_coll ⟨q_c, ⟨(x, y), root⟩, h_ne,
-      h_sub _ (List.mem_of_find?_eq_some h_find_c), h_chain_mem,
-      by simp [h_qc_resp]⟩
+    exact h_no_coll (LogHasCollision.of_mem h_ne
+      (h_sub _ (List.mem_of_find?_eq_some h_find_c)) h_chain_mem (heq_of_eq h_qc_resp))
   rw [h_find_c, h_qc_eq]
 
 private theorem chainInLog_restrict
@@ -576,7 +575,7 @@ private theorem chainInLog_restrict
     ∀ (log log_c : (spec α).QueryLog) (root : α) (leaf : α)
       (proof : List.Vector α idx.depth),
     (∀ q, q ∈ log_c → q ∈ log) →
-    ¬ collisionIn log →
+    ¬ LogHasCollision log →
     (extractor s log_c root).get idx.toNodeIndex ≠ none →
     chainInLog log root idx leaf proof →
     chainInLog log_c root idx leaf proof := by
@@ -746,7 +745,7 @@ private theorem extractability_game_no_coll_match
     {extractedTree : FullData (Option α) s}
     {extractedProof : List.Vector (Option α) idx.depth}
     {log : (spec α).QueryLog}
-    (h_no_coll : ¬ collisionIn log)
+    (h_no_coll : ¬ LogHasCollision log)
     (h_ne_none : extractedTree.get idx.toNodeIndex ≠ none)
     (hsupport : ((root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩),
                   log) ∈
@@ -763,8 +762,7 @@ private theorem extractability_game_no_coll_match
   have h_chain_lc : chainInLog log_c root idx leaf proof :=
     chainInLog_restrict idx log log_c root leaf proof
       h_sub_c h_no_coll h_ne_none_lc h_chain_log
-  have h_no_coll_lc : ¬ collisionIn log_c := fun ⟨q1, q2, hne, hm1, hm2, hresp⟩ =>
-    h_no_coll ⟨q1, q2, hne, h_sub_c _ hm1, h_sub_c _ hm2, hresp⟩
+  have h_no_coll_lc : ¬ LogHasCollision log_c := fun h => h_no_coll (LogHasCollision.mono h_sub_c h)
   obtain ⟨h_get, h_proof_match⟩ :=
     extractor_chain_match idx log_c root leaf proof
       h_no_coll_lc h_ne_none_lc h_chain_lc
@@ -778,7 +776,7 @@ private def noColl_caseA_event {α : Type} [BEq α] [DecidableEq α]
       (spec α).QueryLog → Prop
   | (vals, log) =>
     let ⟨_, _, idx, _, _, extractedTree, _, _⟩ := vals
-    ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals ∧
+    ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals ∧
       extractedTree.get idx.toNodeIndex ≠ none
 
 private def noColl_caseB_event {α : Type} [BEq α] [DecidableEq α]
@@ -789,7 +787,7 @@ private def noColl_caseB_event {α : Type} [BEq α] [DecidableEq α]
       (spec α).QueryLog → Prop
   | (vals, log) =>
     let ⟨_, _, idx, _, _, extractedTree, _, _⟩ := vals
-    ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals ∧
+    ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals ∧
       extractedTree.get idx.toNodeIndex = none
 
 private lemma noColl_bad_iff_caseA_or_caseB
@@ -798,7 +796,7 @@ private lemma noColl_bad_iff_caseA_or_caseB
             ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
              FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) ×
          (spec α).QueryLog) :
-    (¬ collisionIn x.2 ∧ adversary_wins_extractability_game_event x.1) ↔
+    (¬ LogHasCollision x.2 ∧ adversary_wins_extractability_game_event x.1) ↔
       noColl_caseA_event x ∨ noColl_caseB_event x := by
   rcases x with ⟨⟨_, _, ⟨idx, _, _, extractedTree, _, _⟩⟩, log⟩
   simp only [noColl_caseA_event, noColl_caseB_event]
@@ -1062,7 +1060,7 @@ private theorem extractability_game_noCollision_wins_le_inv_card
           pure ())
         qb) :
     Pr[fun (vals, log) =>
-        ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
+        ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
         (1 : ENNReal) / (Fintype.card α : ENNReal) := by
   -- Trivially handle the small-cardinality cases where the bound `1/|α|` is
@@ -1074,7 +1072,7 @@ private theorem extractability_game_noCollision_wins_le_inv_card
     simpa using h_card
   -- Rewrite the bad event as `caseA ∨ caseB`, apply union bound, dispatch to sub-lemmas.
   calc Pr[fun (vals, log) =>
-            ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
+            ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
             (extractability_game committingAdv openingAdv).withQueryLog]
       = Pr[fun x => noColl_caseA_event x ∨ noColl_caseB_event x |
             (extractability_game committingAdv openingAdv).withQueryLog] := by
@@ -1109,7 +1107,7 @@ private theorem extractability_game_noCollision_wins_le
           pure ())
         qb) :
     Pr[fun (vals, log) =>
-        ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
+        ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
         1 / (Fintype.card α : ENNReal) := by
   refine le_trans
@@ -1167,28 +1165,31 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     -- The bad event happens only when there is a collision event
     -- or the bad event happens with no collision
     _ ≤ Pr[fun (vals, log) =>
-            collisionIn log ∨
-            (¬ collisionIn log ∧ adversary_wins_extractability_game_event vals) |
+            LogHasCollision log ∨
+            (¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals) |
           (extractability_game committingAdv openingAdv).withQueryLog] := by
       refine probEvent_mono'' fun ⟨vals, log⟩ => ?_
       simp [adversary_wins_extractability_game_with_logging_event]
       tauto
     -- We apply the union bound
-    _ ≤ Pr[fun (vals, log) => collisionIn log |
+    _ ≤ Pr[fun (vals, log) => LogHasCollision log |
             (extractability_game committingAdv openingAdv).withQueryLog] +
         Pr[fun (vals, log) =>
-            ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
+            ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
           (extractability_game committingAdv openingAdv).withQueryLog] :=
       probEvent_or_le ..
     -- We bound the collision event probability with a birthday bound
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         Pr[fun (vals, log) =>
-            ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
+            ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
           (extractability_game committingAdv openingAdv).withQueryLog] := by
       gcongr
-      have hbound := collision_probability_bound
+      have hbound := OracleComp.probEvent_logCollision_le_birthday_total (spec := spec α)
         (extractability_game committingAdv openingAdv) (qb + s.depth)
         (extractability_game_IsTotalQueryBound committingAdv openingAdv qb h_IsQueryBound_qb)
+        (fun t => by
+          have heq : (spec α).Range default = (spec α).Range t := rfl
+          exact (Fintype.card_congr (Equiv.cast heq)).le)
       convert hbound using 2
       push_cast
       rfl
@@ -1196,7 +1197,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         1 / (Fintype.card α) := by
       have h' : Pr[fun (vals, log) =>
-            ¬ collisionIn log ∧ adversary_wins_extractability_game_event vals |
+            ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
           (extractability_game committingAdv openingAdv).withQueryLog] ≤
             1 / (Fintype.card α : ENNReal) :=
         mod_cast extractability_game_noCollision_wins_le committingAdv openingAdv
