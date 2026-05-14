@@ -168,6 +168,14 @@ local instance : Neg Rq := Vector.instNeg
     (a - b).get i = a.get i - b.get i :=
   Vector.getElem_sub a b i.1 i.2
 
+@[simp] theorem coeffRing_sub_eq (r s : Rq) : coeffRing.sub r s = r - s := by
+  apply Poly.ext_get_eq; intro i
+  simp [vectorRing_sub_get, Rq.get_sub]
+
+@[simp] theorem coeffRing_add_eq (r s : Rq) : coeffRing.add r s = r + s := by
+  apply Poly.ext_get_eq; intro i
+  simp [vectorRing_add_get, Rq.get_add]
+
 local instance instRqAddCommGroup : AddCommGroup Rq where
   add := (· + ·)
   add_assoc a b c := Poly.ext_get_eq fun j => by
@@ -442,6 +450,8 @@ private theorem gamma2_pos_of_isApproved {p : Params} (hp : p.isApproved) :
 private theorem gamma2_double_lt_modulus_of_isApproved {p : Params} (hp : p.isApproved) :
     2 * p.gamma2 < modulus := by
   rcases hp with rfl | rfl | rfl <;> decide
+
+private theorem gamma2_half (p : Params) : (2 * p.gamma2) / 2 = p.gamma2 := by omega
 
 private theorem useHintModulus_pos_of_isApproved {p : Params} (hp : p.isApproved) :
     0 < (modulus - 1) / (2 * p.gamma2) := by
@@ -1111,119 +1121,55 @@ private theorem highBitsCoeff_eq_of_mid_of_isApproved (p : Params)
     highBitsCoeff (r + intToCoeff z0) p.gamma2 = highBitsCoeff r p.gamma2 := by
   let alpha : ℕ := 2 * p.gamma2
   let m : ℕ := (modulus - 1) / alpha
-  let decr := decomposeCoeff r p.gamma2
-  let r1 : ℕ := decr.1
-  let r0 : ℤ := decr.2
+  rcases hdec : decomposeCoeff r p.gamma2 with ⟨r1, r0⟩
   let v : ℤ := r0 + z0
-  have hvlow' : -(p.gamma2 : ℤ) < v := by
-    simpa [decr, r0, v] using hvlow
-  have hvup' : v ≤ p.gamma2 := by
-    simpa [decr, r0, v] using hvup
+  have hvlow' : -(p.gamma2 : ℤ) < v := by simpa [v, hdec] using hvlow
+  have hvup' : v ≤ p.gamma2 := by simpa [v, hdec] using hvup
   have hγ := gamma2_pos_of_isApproved hp
-  have hdec : decomposeCoeff r p.gamma2 = (r1, r0) := by
-    simp [decr, r1, r0]
   have hr1lt : r1 < m := by
-    simpa [alpha, m, decr, r1] using highBitsCoeff_lt_useHintModulus_of_isApproved p hp r
-  have hr1eq : highBitsCoeff r p.gamma2 = r1 := by
-    simp [highBitsCoeff, decr, r1]
-  have hdecomp :
-      (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0 = r := by
-    simpa [alpha, decr, r1, r0] using decomposeCoeff_eq (r := r) (gamma2 := p.gamma2) hγ
-  have hsum :
-      (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v = r + intToCoeff z0 := by
-    calc
-      (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v
-          = ((((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0) + intToCoeff z0 := by
-              dsimp [v]
-              simp [intToCoeff]
-              ring
-      _ = r + intToCoeff z0 := by rw [hdecomp]
+    simpa [alpha, m, highBitsCoeff, hdec] using
+      highBitsCoeff_lt_useHintModulus_of_isApproved p hp r
+  have hr1eq : highBitsCoeff r p.gamma2 = r1 := by simp [highBitsCoeff, hdec]
+  have hcore : r + z0 = ((alpha * r1 : ℕ) : Coeff) + (v : Coeff) := by
+    have hd : ((alpha * r1 : ℕ) : Coeff) + (r0 : Coeff) = r :=
+      by simpa [alpha, intToCoeff, hdec] using decomposeCoeff_eq (r := r) (gamma2 := p.gamma2) hγ
+    simp only [v, Int.cast_add, ← hd]; ring_nf
+  rw [hr1eq]
+  change highBitsCoeff (r + z0) p.gamma2 = r1
   by_cases hvnonneg : 0 ≤ v
-  · have hvnat : (((v.natAbs : ℕ) : ℤ)) = v := by
-      simpa using (Int.natAbs_of_nonneg hvnonneg)
-    have hvnat_le : v.natAbs ≤ p.gamma2 := by
-      have : (((v.natAbs : ℕ) : ℤ)) ≤ p.gamma2 := by
-        rw [hvnat]
-        exact_mod_cast hvup'
+  · have hvnat_le : v.natAbs ≤ p.gamma2 := by
+      have : (v.natAbs : ℤ) ≤ p.gamma2 :=
+        (Int.natAbs_of_nonneg hvnonneg).symm ▸ hvup'
       exact_mod_cast this
-    have hvcast : intToCoeff v = ((v.natAbs : ℕ) : Coeff) := by
-      simpa [intToCoeff] using (congrArg (fun z : ℤ => (z : Coeff)) hvnat).symm
-    have hcoeff :
-        r + intToCoeff z0 =
-          ((alpha * r1 + v.natAbs : ℕ) : Coeff) := by
-      calc
-        r + intToCoeff z0 = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v := by
-          simpa [add_comm] using hsum.symm
-        _ = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + ((v.natAbs : ℕ) : Coeff) := by
-          rw [hvcast]
-        _ = ((alpha * r1 + v.natAbs : ℕ) : Coeff) := by
-          simp [Nat.cast_add, Nat.cast_mul]
-    have hgoal :
-        highBitsCoeff (r + intToCoeff z0) p.gamma2 = r1 := by
-      rw [hcoeff]
-      simpa [intToCoeff, alpha] using
-        (highBitsCoeff_nonneg_repr_of_isApproved p hp r1 v.natAbs
-          (by simpa [alpha, m] using hr1lt) hvnat_le)
-    simpa [hr1eq] using hgoal
+    rw [hcore, show (v : Coeff) = ((v.natAbs : ℕ) : Coeff) from
+        (congrArg (Int.cast : ℤ → Coeff) (Int.natAbs_of_nonneg hvnonneg)).symm,
+      ← Nat.cast_add]
+    exact highBitsCoeff_nonneg_repr_of_isApproved p hp r1 v.natAbs hr1lt hvnat_le
   · have hvneg : v < 0 := lt_of_not_ge hvnonneg
-    have hnatv : (((v.natAbs : ℕ) : ℤ)) = -v := by
-      simpa using (Int.ofNat_natAbs_of_nonpos hvneg.le)
-    have hnatv0 : 0 < v.natAbs := by
-      have : (0 : ℤ) < (((v.natAbs : ℕ) : ℤ)) := by
-        rw [hnatv]
-        omega
-      exact_mod_cast this
+    have hnatv0 : 0 < v.natAbs := Int.natAbs_pos.mpr (by omega)
     have hnatv_lt : v.natAbs < p.gamma2 := by
-      have : (((v.natAbs : ℕ) : ℤ)) < p.gamma2 := by
-        rw [hnatv]
-        omega
-      exact_mod_cast this
-    have hvcast : intToCoeff v = -((v.natAbs : ℕ) : Coeff) := by
-      calc
-        intToCoeff v = -intToCoeff (-v) := by simp [intToCoeff]
-        _ = -((v.natAbs : ℕ) : Coeff) := by
-          congr 1
-          simpa [intToCoeff] using
-            (congrArg (fun z : ℤ => (z : Coeff)) hnatv).symm
+      have h1 : (v.natAbs : ℤ) = -v := Int.ofNat_natAbs_of_nonpos hvneg.le
+      have h2 : -v < (p.gamma2 : ℤ) := by linarith [hvlow']
+      exact_mod_cast h1.symm ▸ h2
+    have hvcast : (v : Coeff) = -((v.natAbs : ℕ) : Coeff) := by
+      have h : ((v.natAbs : ℕ) : Coeff) = -(v : Coeff) := by
+        simpa using congrArg (Int.cast : ℤ → Coeff) (Int.ofNat_natAbs_of_nonpos hvneg.le)
+      simp [h]
     by_cases hr1zero : r1 = 0
-    · have hcoeff : r + intToCoeff z0 = -((v.natAbs : ℕ) : Coeff) := by
-        calc
-          r + intToCoeff z0 = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v := by
-            simpa [add_comm] using hsum.symm
-          _ = intToCoeff v := by rw [hr1zero]; simp
-          _ = -((v.natAbs : ℕ) : Coeff) := by
-            rw [hvcast]
-      rw [hcoeff, hr1eq, hr1zero]
-      simpa [intToCoeff, alpha] using
-        (highBitsCoeff_wrap_neg_repr_of_isApproved p hp v.natAbs hnatv0 hnatv_lt.le)
+    · rw [hr1zero, show r + z0 = -((v.natAbs : ℕ) : Coeff) from by
+          rw [hcore, hr1zero]; simp [hvcast]]
+      simpa only [Nat.cast_natAbs, intToCoeff, Int.cast_abs, Int.cast_eq, Int.cast_neg] using
+        highBitsCoeff_wrap_neg_repr_of_isApproved p hp v.natAbs hnatv0 hnatv_lt.le
     · have hr1pos : 0 < r1 := Nat.pos_of_ne_zero hr1zero
       have hnatv_le : v.natAbs ≤ alpha * r1 := by
-        have hltα : v.natAbs < alpha := by
-          have : (((v.natAbs : ℕ) : ℤ)) < alpha := by
-            rw [hnatv]
-            dsimp [alpha]
-            omega
-          exact_mod_cast this
-        have hαu : alpha ≤ alpha * r1 := by
-          calc
-            alpha = alpha * 1 := by ring
-            _ ≤ alpha * r1 := Nat.mul_le_mul_left alpha (show 1 ≤ r1 by omega)
-        exact le_trans hltα.le hαu
-      have hcoeff :
-          r + intToCoeff z0 =
-            ((alpha * r1 - v.natAbs : ℕ) : Coeff) := by
-        calc
-          r + intToCoeff z0 = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v := by
-            simpa [add_comm] using hsum.symm
-          _ = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) - ((v.natAbs : ℕ) : Coeff) := by
-            rw [hvcast]
-            ring
-          _ = ((alpha * r1 - v.natAbs : ℕ) : Coeff) := by
-            rw [← Nat.cast_mul, ← Nat.cast_sub hnatv_le]
-      rw [hcoeff, hr1eq]
-      simpa [intToCoeff, alpha] using
-        (highBitsCoeff_neg_repr_of_isApproved p hp r1 v.natAbs
-          (by simpa [alpha, m] using hr1lt) hr1pos hnatv0 hnatv_lt)
+        have hlt : v.natAbs < alpha := by
+          have h1 : (v.natAbs : ℤ) = -v := Int.ofNat_natAbs_of_nonpos hvneg.le
+          exact_mod_cast h1.symm ▸ (show -v < (alpha : ℤ) by dsimp [alpha]; omega)
+        have : alpha ≤ alpha * r1 := Nat.le_mul_of_pos_right alpha hr1pos
+        omega
+      rw [hcore, hvcast, show ((alpha * r1 : ℕ) : Coeff) + -((v.natAbs : ℕ) : Coeff) =
+          ((alpha * r1 - v.natAbs : ℕ) : Coeff) from by rw [Nat.cast_sub hnatv_le]; ring]
+      exact highBitsCoeff_neg_repr_of_isApproved p hp r1 v.natAbs hr1lt hr1pos hnatv0 hnatv_lt
 
 private theorem useHintCoeff_correct_of_small_of_isApproved (p : Params)
     (hp : p.isApproved) (z r : Coeff)
@@ -1698,30 +1644,15 @@ theorem concreteRounding_high_low_decomp_field_of_isApproved (p : Params)
 theorem concreteRounding_lowBits_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
     LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) ≤ (2 * p.gamma2) / 2 := by
-  have hbound := concreteRounding_lowBits_bound_of_isApproved p hp r
-  have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
-    omega
   change LatticeCrypto.cInfNorm (lowBits p r) ≤ (2 * p.gamma2) / 2
-  simpa [hhalf] using hbound
+  simp only [gamma2_half]
+  exact concreteRounding_lowBits_bound_of_isApproved p hp r
 
 theorem concreteRounding_shift_injective_field_of_isApproved (p : Params)
     (hp : p.isApproved) :
     Function.Injective (concreteRoundingOps p).shift := by
   change Function.Injective (highBitsShift p)
   exact highBitsShift_injective_of_isApproved p hp
-
-private theorem highBitsShift_useHint_get (p : Params) (h : Hint) (r : Rq) (i : Fin ringDegree) :
-    (highBitsShift p (useHint p h r)).get i =
-      ((2 * p.gamma2 : ℕ) : Coeff) * (useHintCoeff (h.get i) (r.get i) p.gamma2 : Coeff) := by
-  simp [highBitsShift, useHint]
-
-private theorem useHint_get (p : Params) (h : Hint) (r : Rq) (i : Fin ringDegree) :
-    (useHint p h r).get i = (useHintCoeff (h.get i) (r.get i) p.gamma2 : Coeff) := by
-  simp [useHint]
-
-private theorem makeHint_get (p : Params) (z r : Rq) (i : Fin ringDegree) :
-    (makeHint p z r).get i = makeHintCoeff (z.get i) (r.get i) p.gamma2 := by
-  simp [makeHint]
 
 theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
     (hp : p.isApproved) (z r : Rq) :
@@ -1731,11 +1662,9 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
   refine Poly.ext_get_eq fun j => ?_
   have hzj : (LatticeCrypto.centeredRepr (z.get j)).natAbs ≤ p.gamma2 :=
     (LatticeCrypto.cInfNorm_le_iff.mp hz) j
-  rw [useHint_get, makeHint_get, highBits, Vector.get_ofFn]
-  have hadd : (r + z).get j = r.get j + z.get j := by rw [Rq.get_add]
-  rw [hadd]
-  exact congrArg (fun n : ℕ => (n : Coeff))
-    (useHintCoeff_correct_of_small_of_isApproved p hp (z := z.get j) (r := r.get j) hzj)
+  simp only [useHint, makeHint, highBits, Vector.get_ofFn, Rq.get_add]
+  apply congrArg (fun n : ℕ => (n : Coeff))
+  exact useHintCoeff_correct_of_small_of_isApproved p hp (z := z.get j) (r := r.get j) hzj
 
 theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
@@ -1746,9 +1675,8 @@ theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
       r.get j -
         (((2 * p.gamma2 : ℕ) : Coeff) *
           (useHintCoeff (h.get j) (r.get j) p.gamma2 : Coeff)) := by
-    rw [Rq.get_sub]
-    congr 1
-    exact highBitsShift_useHint_get p h r j
+    simp only [Rq.get_sub, highBitsShift, Nat.cast_mul, Nat.cast_ofNat, useHint, Vector.map_ofFn,
+      Vector.get_ofFn, Function.comp_apply]
   rw [hcoeff]
   exact useHintCoeff_shift_sub_bound_of_isApproved p hp (h.get j) (r.get j)
 
@@ -1758,27 +1686,16 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
     LatticeCrypto.cInfNorm (lowBits p r) + b < p.gamma2 →
     highBits p (r + s) = highBits p r := by
   intro hs hlow
-  have hfin : ∀ j : Fin ringDegree, (highBits p (r + s)).get j = (highBits p r).get j := by
-    intro j
-    have hsj : (LatticeCrypto.centeredRepr (s.get j)).natAbs ≤ b := by
-      exact (LatticeCrypto.cInfNorm_le_iff.mp hs) j
-    have hlowj0 :
-        (LatticeCrypto.centeredRepr ((lowBits p r).get j)).natAbs < p.gamma2 - b := by
-      have hcoeff := LatticeCrypto.coeff_le_cInfNorm (lowBits p r) j
-      omega
-    have hlowj : (lowBitsCoeff (r.get j) p.gamma2).natAbs < p.gamma2 - b := by
-      have hq := gamma2_double_lt_modulus_of_isApproved hp
-      rw [lowBits_get, lowBits_centeredRepr (r := r.get j)
-        (hγ := gamma2_pos_of_isApproved hp) (hq := hq)] at hlowj0
-      exact hlowj0
-    rw [highBits, Vector.get_ofFn, highBits, Vector.get_ofFn]
-    have hadd : (r + s).get j = r.get j + s.get j := by
-      rw [Rq.get_add]
-    rw [hadd]
-    exact congrArg (fun n : ℕ => (n : Coeff))
-      (highBitsCoeff_add_eq_of_small_of_isApproved p hp (r := r.get j)
-        (s := s.get j) (b := b) hsj hlowj)
-  exact Poly.ext_get_eq hfin
+  refine Poly.ext_get_eq fun j => ?_
+  simp only [highBits, Vector.get_ofFn, Rq.get_add]
+  apply congrArg (fun n : ℕ => (n : Coeff))
+  apply highBitsCoeff_add_eq_of_small_of_isApproved p hp (b:=b)
+  · exact (LatticeCrypto.cInfNorm_le_iff.mp hs) j
+  · have hcoeff := LatticeCrypto.coeff_le_cInfNorm (lowBits p r) j
+    rw [lowBits_get, lowBits_centeredRepr (r := r.get j)
+      (hγ := gamma2_pos_of_isApproved hp)
+      (hq := gamma2_double_lt_modulus_of_isApproved hp)] at hcoeff
+    omega
 
 theorem concreteRounding_useHint_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
@@ -1794,10 +1711,8 @@ theorem concreteRounding_useHint_correct_field_of_isApproved (p : Params)
     (concreteRoundingOps p).useHint ((concreteRoundingOps p).makeHint z r) r =
       (concreteRoundingOps p).highBits (r + z) := by
   intro hz
-  have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
-    omega
   change useHint p (makeHint p z r) r = highBits p (r + z)
-  exact concreteRounding_useHint_correct_of_isApproved p hp z r (by simpa [hhalf] using hz)
+  exact concreteRounding_useHint_correct_of_isApproved p hp z r (by simpa [gamma2_half] using hz)
 
 theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
@@ -1805,20 +1720,47 @@ theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
     LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) + b < (2 * p.gamma2) / 2 →
     (concreteRoundingOps p).highBits (r + s) = (concreteRoundingOps p).highBits r := by
   intro hs hlow
-  have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
-    omega
   change highBits p (r + s) = highBits p r
-  exact concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa [hhalf] using hlow)
+  exact concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa [gamma2_half] using hlow)
 
 theorem concretePower2RoundLaws :
     LatticeCrypto.Power2RoundOps.Laws (ring := coeffRing)
       concretePower2RoundOps LatticeCrypto.cInfNorm := by
-  sorry
+  refine { power2Round_bound := ?_ }
+  intro r
+  change cInfNorm (coeffRing.sub _ _) ≤ _
+  simp only [coeffRing_sub_eq]
+  exact concretePower2Round_bound_field r
 
 theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     LatticeCrypto.RoundingOps.Laws (ring := coeffRing)
       (concreteRoundingOps p) LatticeCrypto.cInfNorm := by
-  sorry
+  let cp := concreteRoundingOps p
+  refine {
+    high_low_decomp := by
+      intro x
+      change coeffRing.add (cp.shift (cp.highBits x)) (cp.lowBits x) = x
+      simp only [coeffRing_add_eq]
+      exact concreteRounding_high_low_decomp_field_of_isApproved p hp x
+    lowBits_bound := concreteRounding_lowBits_bound_field_of_isApproved p hp
+    hide_low := by
+      intro r s b h1 h2
+      change cp.highBits (coeffRing.add r s) = cp.highBits r
+      change cInfNorm (lowBits p r) + b < 2 * p.gamma2 / 2 at h2
+      simp only [coeffRing_add_eq, gamma2_half] at ⊢ h2
+      exact concreteRounding_hide_low_of_isApproved p hp r s b h1 h2
+    shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
+    useHint_correct := by
+      intro z r h
+      change cp.useHint (cp.makeHint z r) r = cp.highBits (coeffRing.add r z)
+      simp only [coeffRing_add_eq]
+      exact concreteRounding_useHint_correct_field_of_isApproved p hp z r h
+    useHint_bound := by
+      intro r h
+      change cInfNorm (coeffRing.sub _ _) ≤ _
+      simp only [coeffRing_sub_eq]
+      exact concreteRounding_useHint_bound_of_isApproved p hp r h
+  }
 
 /-
 The concrete `Power2Round` and approved-parameter `RoundingOps` wrappers now compile.
