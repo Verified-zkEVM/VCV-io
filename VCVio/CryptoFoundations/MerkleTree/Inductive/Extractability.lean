@@ -843,12 +843,12 @@ private lemma probOutput_singleHash_eq_inv_card
   rw [h, probOutput_query (spec := spec α) (a, b) root]
   congr!
 
-private lemma probOutput_getPutativeRoot_le_inv_card_of_pos_depth
+private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
     [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
     (leaf : α) (proof : List.Vector α idx.depth) (root : α) :
     Pr[= root | (getPutativeRoot (m := OracleComp (spec α)) idx leaf proof
-                  : OracleComp (spec α) α)] ≤
+                  : OracleComp (spec α) α)] =
       (Fintype.card α : ENNReal)⁻¹ := by
   cases idx with
   | ofLeaf => exact absurd h_pos (Nat.lt_irrefl _)
@@ -864,9 +864,7 @@ private lemma probOutput_getPutativeRoot_le_inv_card_of_pos_depth
                       : OracleComp (spec α) α)] = (Fintype.card α : ENNReal)⁻¹ :=
       fun a => probOutput_singleHash_eq_inv_card a proof.head root
     simp_rw [key]
-    rw [ENNReal.tsum_mul_right]
-    refine le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl) ?_
-    rw [one_mul]
+    rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
   | @ofRight sl sr idxRight =>
     rw [show (getPutativeRoot (m := OracleComp (spec α))
               (SkeletonLeafIndex.ofRight idxRight) leaf proof
@@ -879,17 +877,15 @@ private lemma probOutput_getPutativeRoot_le_inv_card_of_pos_depth
                       : OracleComp (spec α) α)] = (Fintype.card α : ENNReal)⁻¹ :=
       fun a => probOutput_singleHash_eq_inv_card proof.head a root
     simp_rw [key]
-    rw [ENNReal.tsum_mul_right]
-    refine le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl) ?_
-    rw [one_mul]
+    rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
-private lemma probEvent_verifyProof_eq_true_le_inv_card_of_pos_depth
+private lemma probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth
     [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
     (leaf root : α) (proof : List.Vector α idx.depth) :
     Pr[(· = true) | (verifyProof (m := OracleComp (spec α)) idx leaf root proof
-                      : OracleComp (spec α) Bool)] ≤
+                      : OracleComp (spec α) Bool)] =
       (Fintype.card α : ENNReal)⁻¹ := by
   rw [show (verifyProof (m := OracleComp (spec α)) idx leaf root proof
               : OracleComp (spec α) Bool) =
@@ -903,7 +899,7 @@ private lemma probEvent_verifyProof_eq_true_le_inv_card_of_pos_depth
     funext r
     exact propext beq_iff_eq
   rw [h_eq, probEvent_eq_eq_probOutput]
-  exact probOutput_getPutativeRoot_le_inv_card_of_pos_depth h_pos leaf proof root
+  exact probOutput_getPutativeRoot_eq_inv_card_of_pos_depth h_pos leaf proof root
 
 private lemma probEvent_verifyProof_extractor_none_le_inv_card
     [DecidableEq α] [SampleableType α] [Fintype α]
@@ -928,7 +924,7 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
       | ofLeft _ => exact Nat.succ_pos _
       | ofRight _ => exact Nat.succ_pos _
     refine (probEvent_mono'' (q := fun b : Bool => b = true) ?_).trans
-      (probEvent_verifyProof_eq_true_le_inv_card_of_pos_depth h_pos leaf root proof)
+      (probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth h_pos leaf root proof).le
     rintro _ ⟨h_v, _⟩; exact h_v
   · -- Extractor's path is intact: the bad event is impossible.
     refine probEvent_eq_zero ?_ |>.le.trans (zero_le _) |>.trans le_rfl
