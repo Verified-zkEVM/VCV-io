@@ -44,8 +44,6 @@ merely asserting its existence.
 
 ## References
 
-- Justin Thaler. *Proofs, Arguments, and Zero-Knowledge.* §18.3 (Collision
-  Lemma for Merkle trees).
 - Dan Boneh and Victor Shoup. *A Graduate Course in Applied Cryptography.*
   §8.9 (Merkle-Damgård and Merkle trees).
 -/
