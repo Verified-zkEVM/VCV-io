@@ -48,32 +48,15 @@ theorem functional_completeness {s : Skeleton}
   | ofLeaf =>
       cases leaf_data_tree with
       | leaf a =>
-          simp only [buildMerkleTreeWithHash, getPutativeRootWithHash, LeafData.get_leaf,
-            FullData.getRootValue_leaf]
+          grind
   | ofLeft idxLeft ih =>
       cases leaf_data_tree with
       | internal left right =>
-          simp only [getPutativeRootWithHash, LeafData.get_ofLeft, LeafData.leftSubtree_internal,
-            generateProof, buildMerkleTreeWithHash, FullData.rightSubtree_internal,
-            FullData.leftSubtree_internal, List.Vector.head_cons, FullData.internal_getRootValue]
-          have hproof :=
-            congrArg (fun p => getPutativeRootWithHash idxLeft (left.get idxLeft) p hash)
-              (List.Vector.tail_cons (buildMerkleTreeWithHash right hash).getRootValue
-                (generateProof (buildMerkleTreeWithHash left hash) idxLeft))
-          let r := (buildMerkleTreeWithHash right hash).getRootValue
-          exact (congrArg (fun x => hash x r) hproof).trans (congrArg (fun x => hash x r) (ih left))
+          grind [Vector.tail_cons, Vector.head_cons]
   | ofRight idxRight ih =>
       cases leaf_data_tree with
       | internal left right =>
-          simp only [getPutativeRootWithHash, generateProof, buildMerkleTreeWithHash,
-            FullData.leftSubtree_internal, FullData.rightSubtree_internal, List.Vector.head_cons,
-            LeafData.get_ofRight, LeafData.rightSubtree_internal, FullData.internal_getRootValue]
-          have hproof :=
-            congrArg (fun p => getPutativeRootWithHash idxRight (right.get idxRight) p hash)
-              (List.Vector.tail_cons (buildMerkleTreeWithHash left hash).getRootValue
-                (generateProof (buildMerkleTreeWithHash right hash) idxRight))
-          let l := (buildMerkleTreeWithHash left hash).getRootValue
-          exact (congrArg (hash l) hproof).trans (congrArg (hash l) (ih right))
+          grind [Vector.tail_cons, Vector.head_cons]
 
 
 /--
