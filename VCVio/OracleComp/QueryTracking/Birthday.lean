@@ -401,7 +401,6 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
     (oa : OracleComp spec α)
     (n : ℕ)
     (hbound : IsTotalQueryBound oa n)
-    (hC : 0 < Fintype.card (spec.Range default))
     (hrange : ∀ t, Fintype.card (spec.Range default) ≤ Fintype.card (spec.Range t)) :
     Pr[fun z => LogHasCollision z.2 |
       (simulateQ loggingOracle oa).run] ≤
@@ -547,7 +546,7 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
               omega
           have := hcard_nat n; push_cast [this]; rfl
         rw [hcard_eq, Finset.sum_mul]
-        exact ENNReal.gauss_sum_inv_le n C (by exact_mod_cast hC)
+        exact ENNReal.gauss_sum_inv_le n C
 
 /-- **Tight birthday bound for `cachingOracle`** (total query bound):
 The probability of a collision in the cache is ≤ n*(n-1)/(2|C|). -/
