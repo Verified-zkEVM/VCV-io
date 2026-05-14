@@ -90,7 +90,7 @@ theorem collision_probability_bound
       (n ^ 2 : ENNReal) / (2 * Fintype.card ((spec α).Range default)) := by
   refine le_trans (probEvent_mono fun z _ => collisionIn_imp_logHasCollision) ?_
   refine OracleComp.probEvent_logCollision_le_birthday_total (spec := spec α) oa n h
-    Fintype.card_pos (fun t => ?_)
+    (fun t => ?_)
   have heq : (spec α).Range default = (spec α).Range t := rfl
   exact (Fintype.card_congr (Equiv.cast heq)).le
 
