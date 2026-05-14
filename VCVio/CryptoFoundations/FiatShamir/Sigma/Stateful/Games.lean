@@ -10,7 +10,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
 # Stateful Fiat-Shamir CMA games

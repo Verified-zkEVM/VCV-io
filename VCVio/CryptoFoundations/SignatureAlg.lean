@@ -5,13 +5,13 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.EvalDist.Defs.Instances
-import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.SimSemantics.Append
-import ToMathlib.Control.Monad.Hom
+import PolyFun.Control.Monad.Hom
 
 /-!
 # Signature Algorithms

@@ -101,7 +101,7 @@ def extractor {α : Type} [DecidableEq α] [SampleableType α]
       match cache.find? (fun ⟨_, r⟩ => r == a) with
       | none => (none, none)
       | some q => (some q.1.1, some q.1.2)
-  populate_down s children (some root)
+  populateDown s children (some root)
 
 private lemma find?_response_eq_some_of_no_collision_mem
     [DecidableEq α] {log : (spec α).QueryLog} {q : (_i : (α × α)) × α}
@@ -151,8 +151,8 @@ private lemma extractor_internal_eq_of_find?_eq
                 some ⟨(x, y), root⟩) :
     extractor (Skeleton.internal sl sr) log root =
       FullData.internal (some root) (extractor sl log x) (extractor sr log y) := by
-  change populate_down (Skeleton.internal sl sr) _ (some root) = _
-  rw [populate_down_internal_def]
+  change populateDown (Skeleton.internal sl sr) _ (some root) = _
+  rw [populateDown_internal_def]
   simp only [h_find, FullData.internal.injEq, true_and]
   exact ⟨rfl, rfl⟩
 
@@ -168,7 +168,7 @@ the extractor (to descend) and the one used by the verifier's chain (to ascend),
 so their input pairs agree. Specifically, for `idx = .ofLeft idxLeft` we use:
 
 * `chainInLog` produces an entry `⟨(ancestor, proof.head), root⟩ ∈ log`.
-* `_h_ne_none` plus `extractor`'s `populate_down` definition forces
+* `_h_ne_none` plus `extractor`'s `populateDown` definition forces
   `log.find? (·.2 == root)` to be `some _`.
 * No-collision then identifies that `find?` result with the chain entry above,
   giving `extracted leftRoot = some ancestor` and `extracted rightRoot = some proof.head`.
@@ -220,7 +220,7 @@ theorem extractor_chain_match
           (generateProof (extractor sl log ancestor) idxLeft).toList =
         proof.toList.map some
     have h_root_value : (extractor sr log proof.head).getRootValue = some proof.head :=
-      populate_down_getRootValue _ _
+      populateDown_getRootValue _ _
     rw [h_root_value, ih_proof]
     obtain ⟨_ | _, hl⟩ := proof
     · exact absurd hl.symm (Nat.succ_ne_zero _)
@@ -245,7 +245,7 @@ theorem extractor_chain_match
           (generateProof (extractor sr log ancestor) idxRight).toList =
         proof.toList.map some
     have h_root_value : (extractor sl log proof.head).getRootValue = some proof.head :=
-      populate_down_getRootValue _ _
+      populateDown_getRootValue _ _
     rw [h_root_value, ih_proof]
     obtain ⟨_ | _, hl⟩ := proof
     · exact absurd hl.symm (Nat.succ_ne_zero _)
@@ -534,21 +534,21 @@ private lemma verifyProof_support_chain
   simpa using getPutativeRoot_support_chain idx leaf proof r log_g h_g
 
 -- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
-private lemma populate_down_none_get_eq_none {s : Skeleton}
+private lemma populateDown_none_get_eq_none {s : Skeleton}
     (children : Option α → Option α × Option α)
     (h_none : children none = (none, none))
     (idx : SkeletonNodeIndex s) :
-    (populate_down s children none).get idx = none := by
+    (populateDown s children none).get idx = none := by
   induction s with
   | leaf => cases idx; rfl
   | internal sl sr ihL ihR =>
     cases idx with
     | ofInternal => rfl
     | ofLeft idxL =>
-      rw [populate_down_internal_def, FullData.get_internal_ofLeft, h_none]
+      rw [populateDown_internal_def, FullData.get_internal_ofLeft, h_none]
       exact ihL idxL
     | ofRight idxR =>
-      rw [populate_down_internal_def, FullData.get_internal_ofRight, h_none]
+      rw [populateDown_internal_def, FullData.get_internal_ofRight, h_none]
       exact ihR idxR
 
 /-- A localized abbreviation for the `extractor`'s children function over a log.
@@ -574,7 +574,7 @@ private def extractorChildren [DecidableEq α]
 private lemma extractor_eq_populate [DecidableEq α] [SampleableType α]
     [(spec α).Fintype]
     (s : Skeleton) (log_c : (spec α).QueryLog) (root : α) :
-    extractor s log_c root = populate_down s (extractorChildren log_c) (some root) := rfl
+    extractor s log_c root = populateDown s (extractorChildren log_c) (some root) := rfl
 
 -- TODO: Once PR #382 is merged, reimplement this with those defintions/lemmas.
 private lemma extractorChildren_some [DecidableEq α]
@@ -589,7 +589,7 @@ extractor on the subset `log_c` reaches at least the descendant index
 `idx.ofLeft.toNodeIndex` (or `.ofRight`), then `log_c.find?` returns *exactly*
 the chain entry. The proof case-splits on `find?`: the `none` case contradicts
 the "extractor reaches a descendant" hypothesis via
-`populate_down_none_get_eq_none`; the `some` case forces equality with the
+`populateDown_none_get_eq_none`; the `some` case forces equality with the
 chain entry via no-collision. -/
 private lemma find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none
     [DecidableEq α] [SampleableType α] [(spec α).Fintype]
@@ -605,11 +605,11 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none
       ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
     rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
     · refine absurd ?_ h_ne_none
-      change (populate_down sl (extractorChildren log_c)
+      change (populateDown sl (extractorChildren log_c)
           (extractorChildren log_c (some root)).1).get idxLeft.toNodeIndex = none
       rw [show (extractorChildren log_c (some root)).1 = none by
             rw [extractorChildren_some, hf]]
-      exact populate_down_none_get_eq_none (extractorChildren log_c)
+      exact populateDown_none_get_eq_none (extractorChildren log_c)
         (extractorChildren_none log_c) idxLeft.toNodeIndex
     · exact ⟨q, rfl⟩
   have h_qc_resp : q_c.2 = root := by
@@ -637,11 +637,11 @@ private lemma find?_response_eq_chain_entry_of_extractor_get_ofRight_ne_none
       ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
     rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
     · refine absurd ?_ h_ne_none
-      change (populate_down sr (extractorChildren log_c)
+      change (populateDown sr (extractorChildren log_c)
           (extractorChildren log_c (some root)).2).get idxRight.toNodeIndex = none
       rw [show (extractorChildren log_c (some root)).2 = none by
             rw [extractorChildren_some, hf]]
-      exact populate_down_none_get_eq_none (extractorChildren log_c)
+      exact populateDown_none_get_eq_none (extractorChildren log_c)
         (extractorChildren_none log_c) idxRight.toNodeIndex
     · exact ⟨q, rfl⟩
   have h_qc_resp : q_c.2 = root := by
@@ -673,7 +673,7 @@ private theorem chainInLog_restrict
     refine ⟨ancestor, List.mem_of_find?_eq_some h_find_c',
       ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
         h_chain_rec⟩
-    change (populate_down sl (extractorChildren log_c)
+    change (populateDown sl (extractorChildren log_c)
         (extractorChildren log_c (some root)).1).get idxLeft.toNodeIndex = none
     rw [show (extractorChildren log_c (some root)).1 = some ancestor by
           rw [extractorChildren_some, h_find_c']]
@@ -686,7 +686,7 @@ private theorem chainInLog_restrict
     refine ⟨ancestor, List.mem_of_find?_eq_some h_find_c',
       ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
         h_chain_rec⟩
-    change (populate_down sr (extractorChildren log_c)
+    change (populateDown sr (extractorChildren log_c)
         (extractorChildren log_c (some root)).2).get idxRight.toNodeIndex = none
     rw [show (extractorChildren log_c (some root)).2 = some ancestor by
           rw [extractorChildren_some, h_find_c']]

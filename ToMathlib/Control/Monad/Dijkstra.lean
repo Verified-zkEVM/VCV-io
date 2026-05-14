@@ -9,7 +9,7 @@ public import Mathlib.Control.Monad.Basic
 public import Mathlib.Control.Monad.Cont
 public import Mathlib.CategoryTheory.Monad.Basic
 public import ToMathlib.Control.Monad.Ordered
-public import ToMathlib.Control.Monad.Free
+public import PolyFun.Control.Monad.Free
 
 /-!
 # Dijkstra monad

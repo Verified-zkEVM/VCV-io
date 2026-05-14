@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.ProbComp
 import VCVio.EvalDist.Defs.Semantics
-import ToMathlib.Control.Monad.Hom
+import PolyFun.Control.Monad.Hom
 
 /-!
 # Bundled Lifts from `ProbComp`

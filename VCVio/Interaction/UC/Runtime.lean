@@ -3,9 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.Basic.Sampler
-import VCVio.Interaction.Basic.SpecFintype
-import VCVio.Interaction.UC.OpenProcessModel
+import PolyFun.Interaction.Basic.Sampler
+import PolyFun.Interaction.Basic.SpecFintype
+import PolyFun.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Computational
 import VCVio.OracleComp.Constructions.SampleableType
 

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.OracleComp.OracleComp
-import ToMathlib.ITree.Basic
+import PolyFun.ITree.Basic
 
 /-! # Bridge between `OracleComp` and `ITree`
 

@@ -35,7 +35,7 @@ as defined in `ToMathlib.Data.IndexedBinaryTree`.
   - [x] `getPutativeRoot`
   - [x] `verifyProof`
 - [x] Completeness theorem
-- [ ] Collision Lemma (See SNARGs book 18.3)
+- [x] Collision Lemma (See SNARGs book 18.3)
   - (this is really not a lemma about oracles, so it could go with the binary tree API)
 - [ ] Extractibility (See SNARGs book 18.5)
 - [ ] Multi-leaf proofs
@@ -94,12 +94,12 @@ def buildMerkleTree {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
 /--
 A functional form of merkle tree construction, that doesn't depend on the monad.
 This receives an explicit hash function. Implemented as the bottom-up
-`populate_up` from `ToMathlib.Data.IndexedBinaryTree.Basic`.
+`populateUp` from `ToMathlib.Data.IndexedBinaryTree.Basic`.
 -/
 @[simp, grind]
 def buildMerkleTreeWithHash {s} (leaf_tree : LeafData α s) (hashFn : α → α → α) :
     (FullData α s) :=
-  populate_up leaf_tree hashFn
+  populateUp leaf_tree hashFn
 
 /--
 Running the monadic version of `buildMerkleTree` with an oracle function `f`

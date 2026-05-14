@@ -5,11 +5,11 @@ Authors: Devon Tuma
 -/
 import Mathlib.Algebra.Polynomial.Eval.Defs
 import ToMathlib.General
-import ToMathlib.PFunctor.Bound
+import PolyFun.PFunctor.Bound
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.SimSemantics.Append
-import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
 # Bounding Queries Made by a Computation
@@ -816,6 +816,147 @@ theorem IsTotalQueryBound.simulateQ_of_step {ι' : Type u} {spec' : OracleSpec �
         fun u => ih u (h.2 u)
       have hn : 1 + (n - 1) = n := by have := h.1; omega
       simpa [hn] using isTotalQueryBound_bind (hstep t) hrest
+
+/-- Generalisation of `IsTotalQueryBound.simulateQ_of_step` where each per-query handler
+makes at most `step` queries (rather than at most `1`). The bound on the simulation is
+`n * step`, where `n` is the bound on the source. -/
+theorem IsTotalQueryBound.simulateQ_of_step_le {ι' : Type u} {spec' : OracleSpec ι'}
+    {impl : QueryImpl spec (OracleComp spec')}
+    {oa : OracleComp spec α} {n step : ℕ}
+    (h : IsTotalQueryBound oa n)
+    (hstep : ∀ t : spec.Domain, IsTotalQueryBound (impl t) step) :
+    IsTotalQueryBound (simulateQ impl oa) (n * step) := by
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure x =>
+      simpa [simulateQ_pure] using
+        (show IsTotalQueryBound (pure x : OracleComp spec' α) (n * step) from trivial)
+  | query_bind t mx ih =>
+      rw [isTotalQueryBound_query_bind_iff] at h
+      simp only [simulateQ_query_bind, OracleQuery.input_query, monadLift_self]
+      have hrest : ∀ u, IsTotalQueryBound (simulateQ impl (mx u)) ((n - 1) * step) :=
+        fun u => ih u (h.2 u)
+      have hn : step + (n - 1) * step = n * step := by
+        have hpos : 0 < n := h.1
+        rcases n with _ | k
+        · omega
+        · simp [Nat.succ_mul]; ring
+      simpa [hn] using isTotalQueryBound_bind (hstep t) hrest
+
+/-! ### Forward query-bound transfer for `preInsert` / `postInsert`
+
+Unlike the trace-flavour transfers (which are biconditional because `tell` makes zero
+oracle queries), an arbitrary insertion `nx` may itself query the underlying oracle. So
+the transfer is forward-only: a per-step bound on the inserted computation translates to
+a multiplicative bound on the simulation.
+
+The shape is `n * (b_nx + b_so)` where:
+* `n`     bounds the source computation `oa`,
+* `b_so`  bounds each per-query handler `impl t`,
+* `b_nx`  bounds each inserted computation `nx t` (or `nx t u` for `postInsert`).
+
+When `b_nx = 0` (the trace case), the formula collapses to `n * b_so`, recovering the
+biconditional trace transfer in one direction. -/
+
+theorem isTotalQueryBound_simulateQ_preInsert
+    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {impl : QueryImpl spec (OracleComp spec')}
+    {nx : spec.Domain → OracleComp spec' β}
+    {oa : OracleComp spec α} {n b_so b_nx : ℕ}
+    (hoa : IsTotalQueryBound oa n)
+    (h_so : ∀ t, IsTotalQueryBound (impl t) b_so)
+    (h_nx : ∀ t, IsTotalQueryBound (nx t) b_nx) :
+    IsTotalQueryBound (simulateQ (impl.preInsert nx) oa) (n * (b_nx + b_so)) := by
+  refine IsTotalQueryBound.simulateQ_of_step_le hoa ?_
+  intro t
+  show IsTotalQueryBound ((impl.preInsert nx) t) (b_nx + b_so)
+  simp only [QueryImpl.preInsert_apply, monadLift_self]
+  exact isTotalQueryBound_bind (h_nx t) (fun _ => h_so t)
+
+theorem isTotalQueryBound_simulateQ_postInsert
+    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {impl : QueryImpl spec (OracleComp spec')}
+    {nx : (t : spec.Domain) → spec.Range t → OracleComp spec' β}
+    {oa : OracleComp spec α} {n b_so b_nx : ℕ}
+    (hoa : IsTotalQueryBound oa n)
+    (h_so : ∀ t, IsTotalQueryBound (impl t) b_so)
+    (h_nx : ∀ t u, IsTotalQueryBound (nx t u) b_nx) :
+    IsTotalQueryBound (simulateQ (impl.postInsert nx) oa) (n * (b_so + b_nx)) := by
+  refine IsTotalQueryBound.simulateQ_of_step_le hoa ?_
+  intro t
+  show IsTotalQueryBound ((impl.postInsert nx) t) (b_so + b_nx)
+  simp only [QueryImpl.postInsert_apply, monadLift_self]
+  refine isTotalQueryBound_bind (h_so t) (fun u => ?_)
+  exact isTotalQueryBound_bind (h_nx t u)
+    (fun _ => show IsTotalQueryBound (pure u : OracleComp spec' _) 0 from trivial)
+
+/-- Predicated version of `simulateQ_of_step_le`: a total bound on the source plus a
+predicated step bound transfers to a predicated bound on the simulation. -/
+theorem IsQueryBoundP.simulateQ_of_step_le_total
+    {ι' : Type u} {spec' : OracleSpec ι'}
+    {q : ι' → Prop} [DecidablePred q]
+    {impl : QueryImpl spec (OracleComp spec')}
+    {oa : OracleComp spec α} {n step : ℕ}
+    (h : IsTotalQueryBound oa n)
+    (hstep : ∀ t : spec.Domain, IsQueryBoundP (impl t) q step) :
+    IsQueryBoundP (simulateQ impl oa) q (n * step) := by
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure x => simp [simulateQ_pure]
+  | query_bind t mx ih =>
+      rw [isTotalQueryBound_query_bind_iff] at h
+      simp only [simulateQ_query_bind, OracleQuery.input_query, monadLift_self]
+      have hrest : ∀ u, IsQueryBoundP (simulateQ impl (mx u)) q ((n - 1) * step) :=
+        fun u => ih u (h.2 u)
+      have hbind := isQueryBoundP_bind (hstep t) (fun u _ => hrest u)
+      refine hbind.mono ?_
+      rcases n with _ | k
+      · exact absurd h.1 (lt_irrefl 0)
+      · simp [Nat.succ_mul]; ring_nf; rfl
+
+theorem isQueryBoundP_simulateQ_preInsert
+    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {q : ι' → Prop} [DecidablePred q]
+    {impl : QueryImpl spec (OracleComp spec')}
+    {nx : spec.Domain → OracleComp spec' β}
+    {oa : OracleComp spec α} {n b_so b_nx : ℕ}
+    (hoa : IsTotalQueryBound oa n)
+    (h_so : ∀ t, IsQueryBoundP (impl t) q b_so)
+    (h_nx : ∀ t, IsQueryBoundP (nx t) q b_nx) :
+    IsQueryBoundP (simulateQ (impl.preInsert nx) oa) q (n * (b_nx + b_so)) := by
+  refine IsQueryBoundP.simulateQ_of_step_le_total hoa ?_
+  intro t
+  show IsQueryBoundP ((impl.preInsert nx) t) q (b_nx + b_so)
+  simp only [QueryImpl.preInsert_apply, monadLift_self]
+  exact isQueryBoundP_bind (h_nx t) (fun _ _ => h_so t)
+
+theorem isQueryBoundP_simulateQ_postInsert
+    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {q : ι' → Prop} [DecidablePred q]
+    {impl : QueryImpl spec (OracleComp spec')}
+    {nx : (t : spec.Domain) → spec.Range t → OracleComp spec' β}
+    {oa : OracleComp spec α} {n b_so b_nx : ℕ}
+    (hoa : IsTotalQueryBound oa n)
+    (h_so : ∀ t, IsQueryBoundP (impl t) q b_so)
+    (h_nx : ∀ t u, IsQueryBoundP (nx t u) q b_nx) :
+    IsQueryBoundP (simulateQ (impl.postInsert nx) oa) q (n * (b_so + b_nx)) := by
+  refine IsQueryBoundP.simulateQ_of_step_le_total hoa ?_
+  intro t
+  show IsQueryBoundP ((impl.postInsert nx) t) q (b_so + b_nx)
+  simp only [QueryImpl.postInsert_apply, monadLift_self]
+  refine isQueryBoundP_bind (h_so t) (fun u _ => ?_)
+  exact isQueryBoundP_bind (h_nx t u)
+    (fun _ _ => show IsQueryBoundP (pure u : OracleComp spec' _) q 0 from trivial)
+
+/-- Sanity check: instrumenting an oracle with a side-querying "monitor" computation
+fired before each query gives a clean multiplicative bound. -/
+example {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
+    {impl : QueryImpl spec (OracleComp spec)} {monitor : OracleComp spec β}
+    {oa : OracleComp spec α} {n b_so b_mon : ℕ}
+    (hoa : IsTotalQueryBound oa n)
+    (h_so : ∀ t, IsTotalQueryBound (impl t) b_so)
+    (h_mon : IsTotalQueryBound monitor b_mon) :
+    IsTotalQueryBound (simulateQ (impl.preInsert (fun _ => monitor)) oa)
+      (n * (b_mon + b_so)) :=
+  isTotalQueryBound_simulateQ_preInsert hoa h_so (fun _ => h_mon)
 
 namespace countingOracle
 

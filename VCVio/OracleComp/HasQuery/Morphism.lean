@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 import VCVio.OracleComp.HasQuery.Basic
 import VCVio.OracleComp.ProbComp
-import ToMathlib.Control.Monad.Hom
+import PolyFun.Control.Monad.Hom
 
 /-!
 # Morphisms of `HasQuery` Monads

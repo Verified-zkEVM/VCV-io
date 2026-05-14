@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import Examples.OneTimePad.Basic
 import VCVio.Interaction.UC.Computational
-import VCVio.Interaction.UC.OpenProcessModel
+import PolyFun.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Runtime
 import VCVio.OracleComp.Constructions.BitVec
 
@@ -475,7 +475,7 @@ by the bundled `UC.Semantics` above). -/
 noncomputable def liftSamplerToOptionT {spec : Interaction.Spec.{0}}
     (s : Spec.Sampler ProbComp spec) :
     Spec.Sampler (OptionT ProbComp) spec :=
-  Spec.Decoration.map
+  PFunctor.FreeM.Displayed.Decoration.map
     (Γ := fun X => ProbComp X) (Δ := fun X => OptionT ProbComp X)
     (fun _ (x : ProbComp _) => (liftM x : OptionT ProbComp _)) spec s
 
@@ -526,7 +526,7 @@ def otpOpenNode (sp : ℕ)
 root and the trivial `PUnit` decoration at the terminal leaf. -/
 def otpDecoration (sp : ℕ)
     (emit : PFunctor.Trace (Δ_otp sp).Out (BitVec sp)) :
-    Spec.Decoration (UC.OpenNodeContext Party (Δ_otp sp)) (otpSpec sp) :=
+    PFunctor.FreeM.Displayed.Decoration (UC.OpenNodeContext Party (Δ_otp sp)) (otpSpec sp) :=
   ⟨otpOpenNode sp emit, fun _ => ⟨⟩⟩
 
 /-! ### Real and ideal open processes -/

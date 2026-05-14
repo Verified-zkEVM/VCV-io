@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 module
 
-public import ToMathlib.Control.Monad.Hom
+public import PolyFun.Control.Monad.Hom
 public import Mathlib
 
 /-!
