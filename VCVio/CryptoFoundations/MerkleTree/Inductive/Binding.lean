@@ -41,6 +41,9 @@ merely asserting its existence.
 - `InductiveMerkleTree.getPutativeRootWithHash_binding` — from any two
   distinct leaf values producing the same root at the same leaf index under
   (possibly different) sibling proofs, `findCollision` returns `some`.
+- `InductiveMerkleTree.getPutativeRootWithHash_binding_collision` — the
+  user-facing Collision Lemma: the tuple returned by `findCollision` is a
+  genuine hash collision.
 
 ## References
 
@@ -212,5 +215,27 @@ theorem getPutativeRootWithHash_binding
         unfold findCollision
         dsimp
         simp [hpair, hhash_eq]
+
+/-- Collision Lemma for Merkle trees: from two distinct leaf values that
+    produce the same putative root at the same leaf index under (possibly
+    different) sibling proofs, `findCollision` returns a tuple that is a
+    genuine hash collision.
+
+    Combines `getPutativeRootWithHash_binding` (the search succeeds) with
+    `findCollision_sound` (its output satisfies `Collision`) into a single
+    witness suitable for collision-resistance reductions. -/
+theorem getPutativeRootWithHash_binding_collision
+    (h : α → α → α) {s : Skeleton} (idx : SkeletonLeafIndex s)
+    (proof₁ proof₂ : List.Vector α idx.depth) (x y : α)
+    (hne : x ≠ y)
+    (heq : getPutativeRootWithHash idx x proof₁ h
+         = getPutativeRootWithHash idx y proof₂ h) :
+    ∃ l₁ r₁ l₂ r₂,
+      findCollision h idx proof₁ proof₂ x y = some (l₁, r₁, l₂, r₂)
+        ∧ Collision h l₁ r₁ l₂ r₂ := by
+  obtain ⟨l₁, r₁, l₂, r₂, hfind⟩ :=
+    getPutativeRootWithHash_binding h idx proof₁ proof₂ x y hne heq
+  exact ⟨l₁, r₁, l₂, r₂, hfind,
+    findCollision_sound h idx proof₁ proof₂ x y l₁ r₁ l₂ r₂ hfind⟩
 
 end InductiveMerkleTree
