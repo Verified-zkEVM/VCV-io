@@ -1135,12 +1135,7 @@ i.e. simultaneously
 * but the extracted (leaf value, proof) pair
   does not match the adversary's (leaf value, proof pair)
 
-Where κ is ≤ 1/2 * (qb - 1) * qb / (Fintype.card α)
-        + 2 * (s.depth + 1) * s.leafCount / (Fintype.card α)
-(For sufficiently large qb)
-
-Here, we loosen this a bit to attempt a proof by considering all collisions
-in the combined query logs of the committing and opening adversaries and the verification.
+Where κ is 1/|α| * ((qb + s.depth)^2 / 2 + 1).
 -/
 theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabited α]
     {s : Skeleton}
