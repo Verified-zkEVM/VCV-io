@@ -66,22 +66,25 @@ import VCVio.Interaction.UC.Computational
 
 Important definitions:
 
-- `Semantics T` bundles a surface monad, its `SPMFSemantics`, and a closed-system runner.
-- `Semantics.evalDist` evaluates a closed system to an `SPMF Unit`.
+- `Semantics T` bundles a result type, a surface monad, its `SPMFSemantics`, and a closed-system runner.
+- `Semantics.evalDist` evaluates a closed system to an `SPMF sem.Result`.
 - `Semantics.distAdvantage` computes total variation distance between two closed systems.
-- `CompEmulates sem ε real ideal` states fixed-advantage computational emulation.
-- `AsympCompEmulates` packages the negligible asymptotic variant.
-- `CompUCSecure` is the simulator-based security wrapper.
+- `ObservedCompEmulates sem ε real ideal` states fixed-advantage computational emulation.
+- `AsympObservedCompEmulates` packages the negligible asymptotic variant.
+- `ObservedCompUCSecure` is the simulator-based security wrapper.
+- `Execution T` is the distributional experiment consumed by paper-level `Standard.UCSecure`.
 
 The generic equivalence-style UC judgments live in PolyFun.
 The VCV-io layer gives them a crypto-facing distributional interpretation.
+Use the `Observed*` definitions when you intentionally work relative to a chosen observer.
+Use `Standard.UCSecure exec ε π F` when stating textbook UC security for a fixed execution experiment; `Execution.ofSemantics` is an explicit bridge from an observer to such an execution.
 
 ## Examples
 
 The main smoke test for the integration is `Examples/OneTimePad/UC.lean`.
-It builds real and ideal one-time-pad systems as PolyFun open-theory objects, runs them through VCV-io's runtime/computational layer, and proves `CompEmulates 0`.
+It builds real and ideal one-time-pad systems as PolyFun open-theory objects, checks the runtime boundary-trace extraction on those processes, and proves the observation-level statement `ObservedCompEmulates 0`.
 
-Use it as the first example when wiring a concrete protocol into the UC runtime.
+Use it as the first example when wiring a concrete protocol into the UC runtime and computational observation layer.
 For lower-level probabilistic and oracle examples, see `docs/agents/probability.md` and `docs/agents/oracle-comp.md`.
 
 ## Import Guide
@@ -100,6 +103,7 @@ import PolyFun.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Runtime
 import VCVio.Interaction.UC.AsyncRuntime
 import VCVio.Interaction.UC.Computational
+import VCVio.Interaction.UC.Standard
 ```
 
 When editing VCV-io, prefer importing the specific PolyFun module you need rather than re-exporting large generic surfaces through VCV-io.

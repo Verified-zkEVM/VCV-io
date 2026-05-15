@@ -14,7 +14,7 @@ import VCVio.OracleComp.Constructions.BitVec
 
 This file wires the one-time pad from `Examples.OneTimePad.Basic` into
 the `Interaction.UC.Semantics` observation framework, giving a
-`CompEmulates 0` statement at the observation level.
+`ObservedCompEmulates 0` statement at the observation level.
 
 ## Canonical UC story being modeled
 
@@ -74,7 +74,7 @@ Because the observation layer is the same for every closed system in
 privacy claim:
 `(realSmcSemantics sp readMsg P).evalDist W = (idealSmcSemantics sp P).evalDist W`
 for every `W : T.Closed`. The UC indistinguishability statement
-`compEmulates_realSmcSemantics` then falls out: under the real SMC
+`observedCompEmulates_realSmcSemantics` then falls out: under the real SMC
 semantics, any two closed systems are indistinguishable with
 advantage zero.
 
@@ -101,8 +101,8 @@ Both processes thread a uniform sampler by lifting `Sampler.uniformI`
 from `ProbComp` to `OptionT ProbComp` through `Decoration.map`. They
 are structurally distinct whenever `msg ≠ 0` (`realOtp_ne_idealOtp`):
 their single-step boundary emissions disagree on the zero key. The
-indistinguishability statement `compEmulates_realOtp` follows from
-`compEmulates_realSmcSemantics`, which closes over every pair of open
+indistinguishability statement `observedCompEmulates_realOtp` follows from
+`observedCompEmulates_realSmcSemantics`, which closes over every pair of open
 processes at every boundary.
 
 ## References
@@ -310,6 +310,7 @@ denotations into the plaintext-independent ideal one. -/
 noncomputable def realSmcSemantics (sp : ℕ)
     (readMsg : MsgReader sp) (P : BitVec sp → Bool) :
     Semantics T where
+  Result := Unit
   m := OptionT ProbComp
   instMonad := inferInstance
   sem := SPMFSemantics.ofHasEvalSPMF (OptionT ProbComp)
@@ -322,6 +323,7 @@ Models the environment's view under the canonical simulator wrapping
 ciphertext distribution. -/
 noncomputable def idealSmcSemantics (sp : ℕ) (P : BitVec sp → Bool) :
     Semantics T where
+  Result := Unit
   m := OptionT ProbComp
   instMonad := inferInstance
   sem := SPMFSemantics.ofHasEvalSPMF (OptionT ProbComp)
@@ -357,9 +359,9 @@ theorem realSmcSemantics_eq_idealSmcSemantics (sp : ℕ)
       𝒟[idealCipherObserve sp P]
   exact evalDist_realCipherObserve_eq sp (readMsg W) P
 
-/-! ## `CompEmulates 0` via observation-layer OTP privacy -/
+/-! ## `ObservedCompEmulates 0` via observation-layer OTP privacy -/
 
-/-- **OTP UC privacy as `CompEmulates`.** Under the real SMC semantics,
+/-- **OTP UC privacy as `ObservedCompEmulates`.** Under the real SMC semantics,
 any two closed systems at any boundary are indistinguishable with
 advantage zero, for every choice of plaintext reader and
 distinguisher predicate.
@@ -370,10 +372,10 @@ is the same as the ideal-semantics view, which depends only on `P`
 and is the same for `W_real` and `W_ideal`. Hence the two
 real-semantics views coincide and the total variation distance is
 zero. -/
-theorem compEmulates_realSmcSemantics (sp : ℕ)
+theorem observedCompEmulates_realSmcSemantics (sp : ℕ)
     (readMsg : MsgReader sp) (P : BitVec sp → Bool)
     {Δ : PortBoundary} (W_real W_ideal : T.Obj Δ) :
-    CompEmulates (realSmcSemantics sp readMsg P) 0 W_real W_ideal := by
+    ObservedCompEmulates (realSmcSemantics sp readMsg P) 0 W_real W_ideal := by
   intro K
   show Semantics.distAdvantage _ _ _ ≤ (0 : ℝ)
   unfold Semantics.distAdvantage
@@ -395,11 +397,11 @@ indistinguishable under the real SMC semantics. When `msg₀ ≠ msg₁`
 the two closed systems are themselves distinct (`msgClosed_ne`), so
 the indistinguishability comes from OTP privacy rather than from
 `W_real = W_ideal`. -/
-theorem compEmulates_msgClosed (sp : ℕ) (readMsg : MsgReader sp)
+theorem observedCompEmulates_msgClosed (sp : ℕ) (readMsg : MsgReader sp)
     (P : BitVec sp → Bool) (msg₀ msg₁ : BitVec sp) :
-    CompEmulates (realSmcSemantics sp readMsg P) 0
+    ObservedCompEmulates (realSmcSemantics sp readMsg P) 0
       (msgClosed sp msg₀) (msgClosed sp msg₁) :=
-  compEmulates_realSmcSemantics sp readMsg P
+  observedCompEmulates_realSmcSemantics sp readMsg P
     (msgClosed sp msg₀) (msgClosed sp msg₁)
 
 /-- There is a plaintext reader under which `realSmcSemantics.run`
@@ -529,6 +531,39 @@ def otpDecoration (sp : ℕ)
     PFunctor.FreeM.Displayed.Decoration (UC.OpenNodeContext Party (Δ_otp sp)) (otpSpec sp) :=
   ⟨otpOpenNode sp emit, fun _ => ⟨⟩⟩
 
+/-! ### Runtime boundary traces -/
+
+/--
+The trace-aware runtime bridge reads exactly the packets stored in the
+single OTP node's `BoundaryAction.emit` field.
+
+This is intentionally a structural runtime fact, not the privacy theorem:
+the real and ideal processes below emit visibly different packet functions
+before any probabilistic observation or simulator argument is applied.
+-/
+@[simp]
+theorem boundaryTrace_otpDecoration (sp : ℕ)
+    (emit : PFunctor.Trace (Δ_otp sp).Out (BitVec sp)) (x : BitVec sp) :
+    UC.boundaryTrace (otpSpec sp) (otpDecoration sp emit) ⟨x, ⟨⟩⟩ =
+      emit x := by
+  simp [UC.boundaryTrace, otpSpec, otpDecoration, otpOpenNode]
+
+/-- The real OTP boundary trace contains the XOR ciphertext packet. -/
+@[simp]
+theorem boundaryTrace_realOtp (sp : ℕ) (msg x : BitVec sp) :
+    UC.boundaryTrace (otpSpec sp) (otpDecoration sp (realEmit sp msg)) ⟨x, ⟨⟩⟩ =
+      [(⟨(), x ^^^ msg⟩ : Interface.Packet (Δ_otp sp).Out)] := by
+  rw [boundaryTrace_otpDecoration]
+  rfl
+
+/-- The ideal OTP boundary trace contains the sampled ciphertext packet. -/
+@[simp]
+theorem boundaryTrace_idealOtp (sp : ℕ) (x : BitVec sp) :
+    UC.boundaryTrace (otpSpec sp) (otpDecoration sp (idealEmit sp)) ⟨x, ⟨⟩⟩ =
+      [(⟨(), x⟩ : Interface.Packet (Δ_otp sp).Out)] := by
+  rw [boundaryTrace_otpDecoration]
+  rfl
+
 /-! ### Real and ideal open processes -/
 
 /-- **Real-world OTP open process** at `Δ_otp sp`.
@@ -605,19 +640,19 @@ theorem realOtp_ne_idealOtp (sp : ℕ) {msg : BitVec sp}
 
 For every plaintext reader and distinguisher predicate, the real and
 ideal OTP open processes at the three-port boundary `Δ_otp sp` are
-`CompEmulates 0`-indistinguishable under `realSmcSemantics`.
+`ObservedCompEmulates 0`-indistinguishable under `realSmcSemantics`.
 
-Since `compEmulates_realSmcSemantics` quantifies over every pair of
+Since `observedCompEmulates_realSmcSemantics` quantifies over every pair of
 open processes at every boundary, this follows directly. The content
 lives one level down: OTP privacy
 (`evalDist_realCipherObserve_eq`) collapses the real and ideal
 bundled observations into the same `SPMF Unit`, regardless of what
 open-world object is plugged into the closed system. -/
-theorem compEmulates_realOtp (sp : ℕ) (msg : BitVec sp)
+theorem observedCompEmulates_realOtp (sp : ℕ) (msg : BitVec sp)
     (readMsg : MsgReader sp) (P : BitVec sp → Bool) :
-    CompEmulates (realSmcSemantics sp readMsg P) 0
+    ObservedCompEmulates (realSmcSemantics sp readMsg P) 0
       (realOtp sp msg) (idealOtp sp) :=
-  compEmulates_realSmcSemantics sp readMsg P (realOtp sp msg) (idealOtp sp)
+  observedCompEmulates_realSmcSemantics sp readMsg P (realOtp sp msg) (idealOtp sp)
 
 end UC
 end oneTimePad

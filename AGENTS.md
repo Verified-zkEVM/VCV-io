@@ -130,7 +130,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Per-node samplers as data (`Spec.Sampler m spec` = `Decoration (fun X => m X) spec`): `PolyFun/Interaction/Basic/Sampler.lean`
 - `Spec.Fintype` ornament + canonical uniform sampler: `PolyFun/Interaction/Basic/SpecFintype.lean`, `VCVio/Interaction/UC/Runtime.lean`
 - Oracle-aware runtime semantics (monad-parametric process execution, `processSemanticsOracle`): `VCVio/Interaction/UC/Runtime.lean` (no `sampler` argument; pulled from `process.stepSampler`)
-- End-to-end UC `CompEmulates 0` at a three-port boundary: `Examples/OneTimePad/UC.lean`
+- End-to-end UC `ObservedCompEmulates 0` at a three-port boundary: `Examples/OneTimePad/UC.lean`
 - Interaction examples: `PolyFun/Interaction/TwoParty/Examples.lean`, `PolyFun/Interaction/Multiparty/Examples.lean`, `PolyFun/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 - Program logic tactic walkthroughs: `Examples/ProgramLogic/`
