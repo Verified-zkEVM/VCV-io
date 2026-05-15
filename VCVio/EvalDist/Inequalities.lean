@@ -32,7 +32,7 @@ universe u v
 
 namespace OracleComp.EvalDist
 
-variable {m : Type → Type v} [Monad m] [HasEvalSPMF m]
+variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF]
 
 /-- **Marginalized Jensen / Cauchy-Schwarz step for the forking lemma.**
 

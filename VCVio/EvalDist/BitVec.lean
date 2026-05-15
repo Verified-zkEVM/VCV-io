@@ -8,7 +8,7 @@ import VCVio.EvalDist.Monad.Map
 /-!
 # Evaluation Distributions of Computations with `BitVec`
 
-Lemmas about `probOutput` involving `BitVec`, generic over any monad `m` with `[HasEvalSPMF m]`.
+Lemmas about `probOutput` involving `BitVec`, generic over any monad `m` with `[MonadLiftT m SPMF]`.
 
 The `SampleableType (BitVec n)` instance is defined in
 `VCVio.OracleComp.Constructions.SampleableType`.
@@ -16,7 +16,7 @@ The `SampleableType (BitVec n)` instance is defined in
 
 open BitVec
 
-variable {α β γ : Type _} {m : Type _ → Type _} [Monad m] [LawfulMonad m] [HasEvalSPMF m]
+variable {α β γ : Type _} {m : Type _ → Type _} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
 
 @[simp, grind =]
 lemma probOutput_ofFin_map {n : ℕ} (mx : m (Fin (2 ^ n))) (x : BitVec n) :

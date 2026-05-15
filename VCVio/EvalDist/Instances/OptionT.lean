@@ -24,13 +24,13 @@ namespace OptionT
 
 section HasEvalSet
 
-/-- Standalone `HasEvalSet (OptionT m)` instance under the weaker `[HasEvalSet m]` assumption.
+/-- Standalone `HasEvalSet (OptionT m)` instance under the weaker `[MonadLiftT m SetM]` assumption.
 
 This is deliberately kept separate from the `HasEvalSPMF (OptionT m)` instance below, which
 re-exports the same `toSet` to make the resulting typeclass diamond definitionally equal.
 Keeping this standalone instance means `support` on `OptionT m` works without requiring a
 full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM`). -/
-noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
+noncomputable instance (m : Type u → Type v) [Monad m] [MonadLiftT m SetM] :
     HasEvalSet (OptionT m) where
   monadLift mx := some ⁻¹' (support (OptionT.run mx))
   monadLift_pure mx := Set.ext fun x => by simp
@@ -53,7 +53,7 @@ noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
       _ ↔ x ∈ ⋃ a ∈ some ⁻¹' support mx.run, some ⁻¹' support (my a).run := by
             simp only [Set.mem_iUnion, Set.mem_preimage, exists_prop]
 
-variable [HasEvalSet m]
+variable [MonadLiftT m SetM]
 
 @[aesop unsafe norm, grind =]
 lemma support_def (mx : OptionT m α) :
@@ -76,12 +76,12 @@ end HasEvalSet
 section HasEvalFinset
 
 /-- Lift a `HasEvalFinset` instance to `OptionT`. by just taking preimage under `some`. -/
-noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] [HasEvalFinset m] :
+noncomputable instance (m : Type u → Type v) [Monad m] [MonadLiftT m SetM] [HasEvalFinset m] :
     HasEvalFinset (OptionT m) where
   finSupport mx := (finSupport mx.run).preimage some (by simp)
   coe_finSupport := by aesop
 
-variable [HasEvalSet m] [HasEvalFinset m]
+variable [MonadLiftT m SetM] [HasEvalFinset m]
 
 @[aesop unsafe norm, grind =]
 lemma finSupport_def [DecidableEq α] (mx : OptionT m α) :
@@ -117,18 +117,18 @@ that failure comes solely from `OptionT`, but this general instance subsumes it.
 Lean 4 automatically synthesizes `toSet` from the standalone `HasEvalSet (OptionT m)` instance
 above, ensuring the diamond is definitionally equal (per Mathlib convention). The `support_eq`
 field then serves as the coherence proof between the set-path and distribution-path. -/
-noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
+noncomputable instance (m : Type u → Type v) [Monad m] [MonadLiftT m SPMF] :
     HasEvalSPMF (OptionT m) where
   monadLift x := OptionT.mapM' (MonadHom.ofLift m SPMF) x
   monadLift_pure := by simp
   monadLift_bind := by simp
 
-instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
+instance (m : Type u → Type v) [Monad m] [MonadLiftT m SPMF] :
     HasEvalSet.LawfulFailure (OptionT m) where
   support_failure' := by aesop
 
 
-variable [HasEvalSPMF m]
+variable [MonadLiftT m SPMF]
 
 lemma evalDist_eq (mx : OptionT m α) :
     𝒟[mx] = OptionT.mapM' (MonadHom.ofLift m SPMF) mx := rfl

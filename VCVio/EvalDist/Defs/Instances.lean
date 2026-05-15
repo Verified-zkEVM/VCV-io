@@ -45,7 +45,7 @@ protected lemma support_eq_support (p : SPMF α) : support p = SPMF.support p :=
 @[grind =]
 lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
 
-lemma evalDist_eq_iff {m} [Monad m] [HasEvalSPMF m] (mx : m α) (p : SPMF α) :
+lemma evalDist_eq_iff {m} [Monad m] [MonadLiftT m SPMF] (mx : m α) (p : SPMF α) :
     𝒟[mx] = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
 
 end SPMF

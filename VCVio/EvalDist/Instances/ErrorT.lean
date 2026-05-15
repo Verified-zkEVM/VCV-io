@@ -41,13 +41,13 @@ namespace ExceptT
 
 section HasEvalSet
 
-/-- Standalone `HasEvalSet (ExceptT ε m)` instance under the weaker `[HasEvalSet m]` assumption.
+/-- Standalone `HasEvalSet (ExceptT ε m)` instance under the weaker `[MonadLiftT m SetM]` assumption.
 
 This is deliberately kept separate from the `HasEvalSPMF (ExceptT ε m)` instance below, which
 re-exports the same `toSet` to make the resulting typeclass diamond definitionally equal.
 Keeping this standalone instance means `support` on `ExceptT ε m` works without requiring a
 full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM`). -/
-noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalSet m] :
+noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [MonadLiftT m SetM] :
     HasEvalSet (ExceptT ε m) where
   monadLift mx := Except.ok ⁻¹' (support mx.run)
   monadLift_pure x := Set.ext fun y => by
@@ -69,7 +69,7 @@ noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalS
       obtain ⟨a, ha, hx⟩ := Set.mem_iUnion₂.mp h
       exact ⟨.ok a, ha, hx⟩
 
-variable [HasEvalSet m]
+variable [MonadLiftT m SetM]
 
 @[aesop unsafe norm, grind =]
 lemma support_def (mx : ExceptT ε m α) :
@@ -79,7 +79,7 @@ lemma support_def (mx : ExceptT ε m α) :
 lemma mem_support_iff (mx : ExceptT ε m α) (x : α) :
     x ∈ support mx ↔ Except.ok x ∈ support mx.run := Iff.rfl
 
-omit [HasEvalSet m] in
+omit [MonadLiftT m SetM] in
 @[simp]
 lemma run_liftM_eq_map_ok (mx : m α) :
     (liftM mx : ExceptT ε m α).run = Except.ok <$> mx := rfl
@@ -107,14 +107,14 @@ private instance instDecidableEqExcept [DecidableEq ε] [DecidableEq α] :
   | .error _, .ok _ => isFalse (by intro h; cases h)
 
 noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m]
-    [DecidableEq ε] [HasEvalSet m] [HasEvalFinset m] :
+    [DecidableEq ε] [MonadLiftT m SetM] [HasEvalFinset m] :
     HasEvalFinset (ExceptT ε m) where
   finSupport mx := (finSupport mx.run).preimage Except.ok
     (by intro a b; simp [Except.ok.injEq])
   coe_finSupport mx := by
     ext x; simp
 
-variable [DecidableEq ε] [HasEvalSet m] [HasEvalFinset m]
+variable [DecidableEq ε] [MonadLiftT m SetM] [HasEvalFinset m]
 
 @[aesop unsafe norm, grind =]
 lemma finSupport_def [DecidableEq α] (mx : ExceptT ε m α) :

@@ -230,7 +230,7 @@ private lemma fischlinSearchAux_eq_withUnitCost
         QueryImpl.withUnitCost_apply, liftM, MonadLiftT.monadLift, ih]
 
 private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
-    [HasEvalSet m]
+    [MonadLiftT m SetM]
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
@@ -335,7 +335,7 @@ private lemma fischlinSearchAux_eq_withAddCost
 private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
     {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
     [CanonicallyOrderedAdd κ]
-    [HasEvalSet m]
+    [MonadLiftT m SetM]
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
@@ -420,7 +420,7 @@ section verifyCostAccounting
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [HasEvalSet m]
+  [DecidableEq M] [MonadLiftT m SetM]
 
 /-- Fischlin verification makes at most `ρ` random-oracle queries under unit-cost
 instrumentation. -/
@@ -529,7 +529,7 @@ section signCostAccounting
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [HasEvalSet m]
+  [DecidableEq M] [MonadLiftT m SetM]
 
 /-- Fischlin signing makes at most `ρ * |Ω|` random-oracle queries under unit-cost
 instrumentation. -/
@@ -761,7 +761,7 @@ section expectedWeightedQueryCost
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [HasEvalSPMF m]
+  [DecidableEq M] [MonadLiftT m SPMF]
 
 /-- Fischlin signing has expected weighted query cost at most `ρ • (|Ω| • w)` whenever every
 random-oracle query is weighted by at most `w`. -/
@@ -790,7 +790,7 @@ section expectedQueries
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [HasEvalSPMF m]
+  [DecidableEq M] [MonadLiftT m SPMF]
 
 /-- Fischlin signing has expected query count at most `ρ * |Ω|` in the unit-cost runtime model.
 

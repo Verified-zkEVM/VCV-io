@@ -200,7 +200,7 @@ variable [spec.DecidableEq]
 omit [spec.DecidableEq] in
 /-- Running `withCaching` at state `cache` produces a result whose cache is `≥ cache`.
 On a cache hit the state is unchanged; on a miss a single entry is added. -/
-lemma withCaching_cache_le [LawfulMonad m] [HasEvalSet m]
+lemma withCaching_cache_le [LawfulMonad m] [MonadLiftT m SetM]
     (so : QueryImpl spec m) (t : spec.Domain) (cache₀ : QueryCache spec)
     (z) (hz : z ∈ support ((so.withCaching t).run cache₀)) :
     cache₀ ≤ z.2 := by

@@ -61,7 +61,7 @@ end ReaderT
 
 This allows evaluating reader computations to sub-probability distributions
 when the base monad `m` has such an evaluation. -/
-noncomputable def HasEvalSPMF.readerAt (ρ0 : ρ) [HasEvalSPMF m] :
+noncomputable def HasEvalSPMF.readerAt (ρ0 : ρ) [MonadLiftT m SPMF] :
     ReaderT ρ m →ᵐ SPMF :=
   MonadHom.ofLift m SPMF ∘ₘ ReaderT.evalAt (m := m) ρ0
 
@@ -77,7 +77,7 @@ namespace ReaderT
 
 section evalDist_lemmas
 
-variable [HasEvalSPMF m] (ρ0 : ρ)
+variable [MonadLiftT m SPMF] (ρ0 : ρ)
 
 /-- Evaluating `pure x` at any environment gives the same result as `pure x` in the base monad. -/
 @[simp] lemma evalSPMF_pure (x : α) :
@@ -124,7 +124,7 @@ However, for most cryptographic use cases, it's better to keep the environment
 explicit and use the `readerAt` homomorphisms directly.
 
 ```lean
-noncomputable instance [HasEvalSPMF m] [Inhabited ρ] :
+noncomputable instance [MonadLiftT m SPMF] [Inhabited ρ] :
     HasEvalSPMF (ReaderT ρ m) where
   toSPMF := HasEvalSPMF.readerAt (m := m) default
 

@@ -12,7 +12,7 @@ import VCVio.EvalDist.Defs.NeverFails
 Specialization lemmas for `HasEvalSPMF` computations returning `Bool`.
 -/
 
-variable {m : Type _ → Type _} [Monad m] [HasEvalSPMF m] {α β : Type _}
+variable {m : Type _ → Type _} [Monad m] [MonadLiftT m SPMF] {α β : Type _}
 
 @[simp, grind =]
 lemma probOutput_true_add_false (mx : m Bool) :

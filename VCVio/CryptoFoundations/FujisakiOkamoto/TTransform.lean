@@ -259,7 +259,7 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
       (costFn := fun _ ↦ 1) hdec)
 
 /-- T-transform decryption makes at most one hash-oracle query under unit-cost instrumentation. -/
-theorem decrypt_usesAtMostOneQuery [HasEvalSet m]
+theorem decrypt_usesAtMostOneQuery [MonadLiftT m SetM]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) :

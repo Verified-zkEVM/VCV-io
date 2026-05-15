@@ -79,12 +79,12 @@ lemma fst_map_run_withCost [LawfulMonad m]
 
 /-- Cost-tracking preserves failure probability: for any base monad `m` with `HasEvalSPMF`,
 wrapping an oracle implementation with `withCost` does not change the probability of failure. -/
-lemma probFailure_run_simulateQ_withCost [LawfulMonad m] [HasEvalSPMF m]
+lemma probFailure_run_simulateQ_withCost [LawfulMonad m] [MonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withCost costFn) mx).run] = Pr[⊥ | simulateQ so mx] :=
   probFailure_run_simulateQ_withTraceBefore so costFn mx
 
-lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [HasEvalSPMF m]
+lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [MonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withCost costFn) mx).run ↔ NeverFail (simulateQ so mx) :=
   NeverFail_run_simulateQ_withTraceBefore_iff so costFn mx
@@ -104,19 +104,19 @@ These lemmas connect the result-marginal distribution of a `withCost`-instrument
 computation to the distribution of the uninstrumented computation, enabling direct
 probability-level reasoning about traced computations. -/
 
-lemma evalDist_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+lemma evalDist_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     𝒟[Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
       𝒟[simulateQ so mx] :=
   evalDist_fst_run_withTraceBefore so costFn mx
 
-lemma probOutput_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+lemma probOutput_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
       Pr[= x | simulateQ so mx] :=
   probOutput_fst_run_withTraceBefore so costFn mx x
 
-lemma support_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+lemma support_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
       support (simulateQ so mx) :=

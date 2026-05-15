@@ -41,7 +41,7 @@ def composeWithDEM [Monad m]
 
 section Correct
 
-variable [DecidableEq K] [DecidableEq M] [Monad m] [HasEvalSPMF m]
+variable [DecidableEq K] [DecidableEq M] [Monad m] [MonadLiftT m SPMF]
 
 /-- From KEM correctness at the monadic probability level, every reachable decapsulation of an
 honest ciphertext returns the encapsulated key. -/

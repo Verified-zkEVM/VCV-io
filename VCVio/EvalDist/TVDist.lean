@@ -65,7 +65,7 @@ end SPMF
 
 section monadic
 
-variable {m : Type u → Type v} [Monad m] [HasEvalSPMF m] {α : Type u}
+variable {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF] {α : Type u}
 
 /-- Total variation distance between two monadic computations,
 defined via their evaluation distributions. -/
@@ -400,7 +400,7 @@ lemma ofReal_tvDist_bind_event_right_le
 
 section bool_tvdist
 
-variable {m : Type → Type v} [Monad m] [HasEvalSPMF m]
+variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF]
 
 /-- For any `Bool` computation, the difference of `Pr[= true]` values is bounded by
 TV distance. -/

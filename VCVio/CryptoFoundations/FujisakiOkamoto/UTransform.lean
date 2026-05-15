@@ -221,7 +221,7 @@ theorem encaps_usesExactFamilyWeightedCost {ω : Type} [AddMonoid ω]
 /-- Under per-family upper bounds on the two U-transform oracle families, encapsulation incurs
 weighted query cost at most the sum of those bounds. -/
 theorem encaps_usesWeightedQueryCostAtMost {ω : Type}
-    [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [HasEvalSet m]
+    [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [MonadLiftT m SetM]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -369,7 +369,7 @@ theorem decaps_usesZeroQueryCost_of_decrypt_eq_none {ω : Type} [AddMonoid ω]
 weighted query cost at most the sum of those bounds. -/
 theorem decaps_usesWeightedQueryCostAtMost {ω : Type}
     [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [CanonicallyOrderedAdd ω]
-    [HasEvalSet m]
+    [MonadLiftT m SetM]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -477,7 +477,7 @@ theorem decaps_expectedQueryCost_le {ω : Type}
     hval
 
 /-- Unit-cost specialization: U-transform decapsulation makes at most two oracle queries. -/
-theorem decaps_usesAtMostTwoQueries [HasEvalSet m]
+theorem decaps_usesAtMostTwoQueries [MonadLiftT m SetM]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)

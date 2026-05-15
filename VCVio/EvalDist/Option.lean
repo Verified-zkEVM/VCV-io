@@ -14,7 +14,7 @@ File for lemmas about `evalDist` on involving `Option`.
 
 universe u v w
 
-variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalSPMF m] {α β γ : Type u}
+variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] {α β γ : Type u}
 
 @[simp, grind =]
 lemma probOutput_some_map_some (mx : m α) (x : α) :

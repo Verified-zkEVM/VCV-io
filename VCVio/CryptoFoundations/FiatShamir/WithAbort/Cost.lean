@@ -137,7 +137,7 @@ theorem signAttempt_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
 /-- The expected weighted query cost of one signing attempt is the expectation of the queried
 commitment cost over the attempt output distribution. -/
 theorem signAttempt_expectedQueryCost_eq_outputExpectation
-    {ω : Type} [AddMonoid ω] [HasEvalSPMF m]
+    {ω : Type} [AddMonoid ω] [MonadLiftT m SPMF]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) (val : ω → ENNReal) :
     ExpectedQueryCost[
@@ -177,7 +177,7 @@ theorem signAttempt_expectedQueryCost_eq_outputExpectation
 
 section queryBounds
 
-variable [HasEvalSet m]
+variable [MonadLiftT m SetM]
 
 private lemma signAttempt_usesWeightedQueryCostAtMost
     {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
@@ -324,7 +324,7 @@ end queryBounds
 
 section expectedCost
 
-variable [HasEvalSPMF m]
+variable [MonadLiftT m SPMF]
 
 section schemeCost
 

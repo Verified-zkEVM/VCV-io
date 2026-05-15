@@ -42,7 +42,7 @@ Remarks:
   on the support of the left-hand side.
 -/
 class NeverFail {α : Type u} {m : Type u → Type v} [Monad m]
-    [HasEvalSPMF m] (mx : m α) : Prop where
+    [MonadLiftT m SPMF] (mx : m α) : Prop where
   mk :: probFailure_eq_zero : Pr[⊥ | mx] = 0
 
 export NeverFail (probFailure_eq_zero)
@@ -51,7 +51,7 @@ attribute [simp] probFailure_eq_zero
 attribute [aesop safe apply] NeverFail.mk
 
 /-- Version of `probFailure_eq_zero` that avoids typeclass search. -/
-lemma probFailure_eq_zero' [HasEvalSPMF m]
+lemma probFailure_eq_zero' [MonadLiftT m SPMF]
     {mx : m α} (h : NeverFail mx) : Pr[⊥ | mx] = 0 :=
   NeverFail.probFailure_eq_zero
 
@@ -65,7 +65,7 @@ end HasEvalPMF
 
 namespace HasEvalSPMF
 
-variable [HasEvalSPMF m]
+variable [MonadLiftT m SPMF]
 
 @[grind =]
 lemma neverFail_iff (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
@@ -100,7 +100,7 @@ namespace HasEvalSet
 
 @[simp]
 lemma not_neverFail_failure {m : Type u → Type v} [AlternativeMonad m]
-    [HasEvalSPMF m] [HasEvalSet.LawfulFailure m] :
+    [MonadLiftT m SPMF] [HasEvalSet.LawfulFailure m] :
     ¬ NeverFail (failure : m α) := by
   simp [HasEvalSPMF.neverFail_iff]
 
@@ -108,7 +108,7 @@ end HasEvalSet
 
 namespace NeverFail
 
-variable [HasEvalSPMF m]
+variable [MonadLiftT m SPMF]
 
 lemma of_probFailure_eq_zero (mx : m α) (h : Pr[⊥ | mx] = 0) : NeverFail mx :=
   { probFailure_eq_zero := h }

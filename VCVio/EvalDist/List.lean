@@ -12,13 +12,13 @@ import ToMathlib.General
 This file contains lemmas for `probEvent` and `probOutput` of computations involving `List`.
 We also include `Vector` as a related case.
 
-All lemmas are generic over any monad `m` with `[HasEvalSPMF m]`.
+All lemmas are generic over any monad `m` with `[MonadLiftT m SPMF]`.
 -/
 
 universe u v w
 
 variable {α β γ : Type v}
-    {m : Type _ → Type _} [Monad m] [HasEvalSPMF m]
+    {m : Type _ → Type _} [Monad m] [MonadLiftT m SPMF]
 
 open List
 
@@ -326,7 +326,7 @@ end ListVectorMmap
 
 section NeverFail
 
-variable {α β : Type*} {m : Type _ → Type _} [Monad m] [LawfulMonad m] [HasEvalSPMF m]
+variable {α β : Type*} {m : Type _ → Type _} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
 
 @[simp]
 lemma neverFail_list_mapM {f : α → m β} {as : List α}

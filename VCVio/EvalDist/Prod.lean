@@ -8,14 +8,14 @@ import VCVio.EvalDist.Monad.Seq
 /-!
 # Evaluation Distributions of Computations with `Prod`
 
-Lemmas about `evalDist` and `support` involving `Prod`, ported to generic `[HasEvalSPMF m]`.
+Lemmas about `evalDist` and `support` involving `Prod`, ported to generic `[MonadLiftT m SPMF]`.
 -/
 
 open ENNReal Prod
 
 universe u v
 
-variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalSPMF m] {α β γ δ : Type u}
+variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] {α β γ δ : Type u}
 
 omit [LawfulMonad m] in
 lemma probOutput_prod_mk_eq_probEvent (mx : m (α × β)) (x : α) (y : β) :

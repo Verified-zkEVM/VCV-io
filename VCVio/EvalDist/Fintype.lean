@@ -21,24 +21,24 @@ open ENNReal
 
 namespace HasEvalSPMF
 
-lemma probOutput_bind_eq_sum_fintype [HasEvalSPMF m]
+lemma probOutput_bind_eq_sum_fintype [MonadLiftT m SPMF]
     (mx : m α) (my : α → m β) [Fintype α] (y : β) :
     Pr[= y | mx >>= my] = ∑ x : α, Pr[= x | mx] * Pr[= y | my x] :=
   (probOutput_bind_eq_tsum mx my y).trans (tsum_fintype _)
 
-lemma probFailure_bind_eq_sum_fintype [HasEvalSPMF m]
+lemma probFailure_bind_eq_sum_fintype [MonadLiftT m SPMF]
     (mx : m α) (my : α → m β) [Fintype α] :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑ x : α, Pr[= x | mx] * Pr[⊥ | my x] :=
   (probFailure_bind_eq_add_tsum mx my).trans (congr_arg (Pr[⊥ | mx] + ·) <| tsum_fintype _)
 
-lemma probEvent_bind_eq_sum_fintype [HasEvalSPMF m]
+lemma probEvent_bind_eq_sum_fintype [MonadLiftT m SPMF]
     (mx : m α) (my : α → m β) [Fintype α] (q : β → Prop) :
     Pr[ q | mx >>= my] = ∑ x : α, Pr[= x | mx] * Pr[ q | my x] :=
   (probEvent_bind_eq_tsum mx my q).trans (tsum_fintype _)
 
 /-- Union bound: the probability that *some* event `E i` holds is at most the sum of the
 individual probabilities, over a finite index set `s`. -/
-lemma probEvent_exists_finset_le_sum [HasEvalSPMF m]
+lemma probEvent_exists_finset_le_sum [MonadLiftT m SPMF]
     {ι : Type u} (s : Finset ι) (mx : m α) (E : ι → α → Prop) :
     Pr[ (fun x => ∃ i ∈ s, E i x) | mx] ≤ s.sum (fun i => Pr[ E i | mx]) := by
   classical

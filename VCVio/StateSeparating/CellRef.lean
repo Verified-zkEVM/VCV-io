@@ -122,24 +122,24 @@ theorem writeM_run [DecidableEq Ident] (r : CellRef Ident) (x : r.Value)
 support-reachable final heap has the same value at that reference as the
 initial heap. This is the right generalization of `Preserves` beyond `Id`:
 for probabilistic/oracle computations there may be many possible final states. -/
-def SupportPreserves {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+def SupportPreserves {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (c : StateT (Heap Ident) m α) (r : CellRef Ident) : Prop :=
   ∀ h z, z ∈ support (c.run h) → r.get z.2 = r.get h
 
 /-- An effectful heap program writes only a set of identifiers when every cell
 outside the set is support-preserved. -/
-def SupportWritesOnly {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+def SupportWritesOnly {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (c : StateT (Heap Ident) m α) (writes : Set Ident) : Prop :=
   ∀ r : CellRef Ident, r.id ∉ writes → SupportPreserves c r
 
-theorem supportWritesOnly_mono {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem supportWritesOnly_mono {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} {c : StateT (Heap Ident) m α} {writes₁ writes₂ : Set Ident}
     (hc : SupportWritesOnly c writes₁) (hsubset : writes₁ ⊆ writes₂) :
     SupportWritesOnly c writes₂ := by
   intro r hr
   exact hc r (fun hmem => hr (hsubset hmem))
 
-theorem supportPreserves_pure {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem supportPreserves_pure {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (x : α) (r : CellRef Ident) :
     SupportPreserves (pure x : StateT (Heap Ident) m α) r := by
   intro h z hz
@@ -147,13 +147,13 @@ theorem supportPreserves_pure {m : Type (max u v) → Type*} [Monad m] [HasEvalS
     simpa using (mem_support_pure_iff z (x, h)).1 hz
   simp [hz_eq]
 
-theorem supportWritesOnly_pure_empty {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem supportWritesOnly_pure_empty {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (x : α) :
     SupportWritesOnly (pure x : StateT (Heap Ident) m α) (∅ : Set Ident) := by
   intro r hr
   exact supportPreserves_pure x r
 
-theorem supportPreserves_readM {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem supportPreserves_readM {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     (r s : CellRef Ident) :
     SupportPreserves (r.readM : StateT (Heap Ident) m r.Value) s := by
   intro h z hz
@@ -161,13 +161,13 @@ theorem supportPreserves_readM {m : Type (max u v) → Type*} [Monad m] [HasEval
     simpa using (mem_support_pure_iff z (r.get h, h)).1 hz
   simp [hz_eq]
 
-theorem readM_supportWritesOnly_empty {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem readM_supportWritesOnly_empty {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     (r : CellRef Ident) :
     SupportWritesOnly (r.readM : StateT (Heap Ident) m r.Value) (∅ : Set Ident) := by
   intro s hs
   exact supportPreserves_readM r s
 
-theorem supportPreserves_bind {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem supportPreserves_bind {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α β : Type (max u v)} {c : StateT (Heap Ident) m α}
     {k : α → StateT (Heap Ident) m β} {r : CellRef Ident}
     (hc : SupportPreserves c r) (hk : ∀ a, SupportPreserves (k a) r) :
@@ -180,7 +180,7 @@ theorem supportPreserves_bind {m : Type (max u v) → Type*} [Monad m] [HasEvalS
   exact (hk us.1 us.2 z hzcont).trans (hc h us hus)
 
 theorem writeM_supportWritesOnly_single [DecidableEq Ident]
-    {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+    {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     (r : CellRef Ident) (x : r.Value) :
     SupportWritesOnly
       (r.writeM x : StateT (Heap Ident) m PUnit) ({r.id} : Set Ident) := by
@@ -193,7 +193,7 @@ theorem writeM_supportWritesOnly_single [DecidableEq Ident]
       change s.id = r.id
       exact heq))
 
-theorem supportWritesOnly_bind {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem supportWritesOnly_bind {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α β : Type (max u v)} {c : StateT (Heap Ident) m α}
     {k : α → StateT (Heap Ident) m β} {writes₁ writes₂ : Set Ident}
     (hc : SupportWritesOnly c writes₁) (hk : ∀ a, SupportWritesOnly (k a) writes₂) :
@@ -204,7 +204,7 @@ theorem supportWritesOnly_bind {m : Type (max u v) → Type*} [Monad m] [HasEval
 
 /-- Dependent effectful bind form: the continuation's write set may depend on
 the first result. -/
-theorem supportWritesOnly_bind_dep {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+theorem supportWritesOnly_bind_dep {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α β : Type (max u v)} {c : StateT (Heap Ident) m α}
     {k : α → StateT (Heap Ident) m β} {writes₁ : Set Ident}
     {writes₂ : α → Set Ident}
@@ -216,7 +216,7 @@ theorem supportWritesOnly_bind_dep {m : Type (max u v) → Type*} [Monad m] [Has
 
 /-- A support-based write footprint packages a program with the set of cells it
 may write and the proof that every other cell is preserved. -/
-structure SupportWriteFootprint {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+structure SupportWriteFootprint {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (c : StateT (Heap Ident) m α) where
   /-- Cells that the effectful program may write. -/
   writes : Set Ident
@@ -225,7 +225,7 @@ structure SupportWriteFootprint {m : Type (max u v) → Type*} [Monad m] [HasEva
 
 namespace SupportWriteFootprint
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
 variable {α β : Type (max u v)}
 
 theorem preserves {c : StateT (Heap Ident) m α} (footprint : SupportWriteFootprint c)
@@ -259,7 +259,7 @@ end SupportWriteFootprint
 
 namespace SupportPreserves
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSPMF m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 
 /-- A support-level frame implies that the cell-change event has probability
@@ -310,7 +310,7 @@ end SupportPreserves
 
 namespace SupportWritesOnly
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSPMF m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {writes : Set Ident}
 
 theorem prob_changed_eq_zero (hc : SupportWritesOnly c writes)
@@ -336,7 +336,7 @@ end SupportWritesOnly
 /-- A computation preserves a cell except on an event when every
 support-reachable outcome outside that event has the initial cell value. The
 event may depend on the initial heap. -/
-def SupportPreservesExcept {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+def SupportPreservesExcept {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (c : StateT (Heap Ident) m α) (r : CellRef Ident)
     (event : Heap Ident → α × Heap Ident → Prop) : Prop :=
   ∀ h z, z ∈ support (c.run h) → ¬ event h z → r.get z.2 = r.get h
@@ -345,7 +345,7 @@ namespace SupportPreservesExcept
 
 section support
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {event : Heap Ident → α × Heap Ident → Prop}
 
@@ -371,7 +371,7 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSPMF m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {event : Heap Ident → α × Heap Ident → Prop}
 
@@ -406,7 +406,7 @@ end SupportPreservesExcept
 /-- A support-level relation between the initial and final value of one cell.
 This is the general qualitative layer underneath preservation (`rel := Eq`) and
 monotonicity/growth assertions. -/
-def SupportCellRel {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+def SupportCellRel {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (c : StateT (Heap Ident) m α) (r : CellRef Ident)
     (rel : r.Value → r.Value → Prop) : Prop :=
   ∀ h z, z ∈ support (c.run h) → rel (r.get h) (r.get z.2)
@@ -415,7 +415,7 @@ namespace SupportCellRel
 
 section support
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
 variable {α β : Type (max u v)} {c : StateT (Heap Ident) m α}
 variable {k : α → StateT (Heap Ident) m β} {r : CellRef Ident}
 variable {rel : r.Value → r.Value → Prop}
@@ -446,7 +446,7 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSPMF m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {rel : r.Value → r.Value → Prop}
 
@@ -465,7 +465,7 @@ end SupportCellRel
 /-- A measured cell bound says a numeric measure of a cell can increase by at
 most `δ` on every support-reachable execution path. Binds compose by adding
 their deltas. -/
-def SupportMeasureBound {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+def SupportMeasureBound {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     {α : Type (max u v)} (c : StateT (Heap Ident) m α) (r : CellRef Ident)
     (measure : r.Value → Nat) (δ : Nat) : Prop :=
   ∀ h z, z ∈ support (c.run h) → measure (r.get z.2) ≤ measure (r.get h) + δ
@@ -474,7 +474,7 @@ namespace SupportMeasureBound
 
 section support
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSet m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
 variable {α β : Type (max u v)} {c : StateT (Heap Ident) m α}
 variable {k : α → StateT (Heap Ident) m β} {r : CellRef Ident}
 variable {measure : r.Value → Nat}
@@ -506,7 +506,7 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [HasEvalSPMF m]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {measure : r.Value → Nat} {δ : Nat}
 
@@ -741,7 +741,7 @@ namespace QueryImpl
 
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [HasEvalSet m]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [MonadLiftT m SetM]
 
 /-- A `QueryImpl` preserves a heap cell when each single query step leaves
 that cell unchanged on every support-reachable post-state. This is the
@@ -797,7 +797,7 @@ namespace OracleComp
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [HasEvalSet m]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SetM]
 
 /-- If every handler query preserves a cell, then interpreting any
 `OracleComp` through that handler preserves the cell. -/
@@ -842,7 +842,7 @@ section probability
 
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [HasEvalSPMF m]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [MonadLiftT m SPMF]
 
 theorem PreservesCell.prob_changed_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)} {r : CellRef Ident₀}
@@ -885,7 +885,7 @@ section probability
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [HasEvalSPMF m]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
 
 theorem simulateQ_run_cellChange_prob_eq_zero
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
@@ -941,7 +941,7 @@ namespace QueryImpl
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [HasEvalSet m]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SetM]
 
 /-- A query-implementation cell-write footprint lifts through interpretation: if a
 cell is outside every per-query footprint, the interpreted computation
@@ -959,7 +959,7 @@ section probability
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [HasEvalSPMF m]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
 
 theorem CellWriteFootprint.simulateQ_run_cellChange_prob_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}

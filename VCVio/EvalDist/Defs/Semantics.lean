@@ -133,7 +133,7 @@ lemma probFailure_le_one (sem : SPMFSemantics m) (mx : m α) :
 This is the bridge back to the old style where the surface monad itself already carries its
 subprobabilistic denotation. In that case the internal semantic monad is just `m` itself, the
 interpreter is the identity monad morphism, and observation is `HasEvalSPMF.toSPMF`. -/
-protected def ofHasEvalSPMF (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
+protected def ofHasEvalSPMF (m : Type u → Type v) [Monad m] [MonadLiftT m SPMF] :
     SPMFSemantics m where
   Sem := m
   instMonadSem := inferInstance
@@ -141,11 +141,11 @@ protected def ofHasEvalSPMF (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
   observe := fun mx => liftM mx
 
 @[simp]
-lemma ofHasEvalSPMF_evalDist (mx : m α) [HasEvalSPMF m] :
+lemma ofHasEvalSPMF_evalDist (mx : m α) [MonadLiftT m SPMF] :
     (SPMFSemantics.ofHasEvalSPMF m).evalDist mx = liftM mx := rfl
 
 @[simp]
-lemma ofHasEvalSPMF_probFailure (mx : m α) [HasEvalSPMF m] :
+lemma ofHasEvalSPMF_probFailure (mx : m α) [MonadLiftT m SPMF] :
     (SPMFSemantics.ofHasEvalSPMF m).probFailure mx = Pr[⊥ | mx] := rfl
 
 end SPMFSemantics
@@ -188,7 +188,7 @@ noncomputable def toSPMFSemantics (sem : PMFSemantics m) : SPMFSemantics m where
 
 As with `SPMFSemantics.ofHasEvalSPMF`, this recovers the familiar case where the surface monad
 already comes with a total probabilistic denotation. -/
-protected def ofHasEvalPMF (m : Type u → Type v) [Monad m] [HasEvalPMF m] :
+protected def ofHasEvalPMF (m : Type u → Type v) [Monad m] [MonadLiftT m PMF] :
     PMFSemantics m where
   Sem := m
   instMonadSem := inferInstance
@@ -196,7 +196,7 @@ protected def ofHasEvalPMF (m : Type u → Type v) [Monad m] [HasEvalPMF m] :
   observe := fun mx => liftM mx
 
 @[simp]
-lemma ofHasEvalPMF_evalDist (mx : m α) [HasEvalPMF m] :
+lemma ofHasEvalPMF_evalDist (mx : m α) [MonadLiftT m PMF] :
     (PMFSemantics.ofHasEvalPMF m).evalDist mx = liftM mx := rfl
 
 end PMFSemantics

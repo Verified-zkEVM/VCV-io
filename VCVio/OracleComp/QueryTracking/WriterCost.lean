@@ -68,7 +68,7 @@ variable {α β : Type}
 
 section pathwiseCost
 
-variable [HasEvalSet m]
+variable [MonadLiftT m SetM]
 
 /-- Pathwise upper bound for an `AddWriterT` computation: every reachable execution result carries
 additive cost at most `w`. -/
@@ -191,12 +191,12 @@ of its cost marginal.
 This expectation is computed over the base monad's subdistribution semantics on `oa.costs`. In
 particular, if the underlying computation can fail, the missing mass contributes `0`, exactly as
 for other `wp`-style expectations in VCV-io. -/
-noncomputable def expectedCost [HasEvalSPMF m]
+noncomputable def expectedCost [MonadLiftT m SPMF]
     (oa : AddWriterT ω m α) (val : ω → ENNReal) : ENNReal :=
   ∑' w : ω, Pr[= w | oa.costs] * val w
 
 /-- Convenience specialization of [`AddWriterT.expectedCost`] to natural-valued additive costs. -/
-noncomputable abbrev expectedCostNat [HasEvalSPMF m] (oa : AddWriterT ℕ m α) : ENNReal :=
+noncomputable abbrev expectedCostNat [MonadLiftT m SPMF] (oa : AddWriterT ℕ m α) : ENNReal :=
   expectedCost oa (fun n ↦ ↑n)
 
 /-- Tail-sum formula for the natural-valued expected cost of an `AddWriterT` computation:
@@ -204,7 +204,7 @@ noncomputable abbrev expectedCostNat [HasEvalSPMF m] (oa : AddWriterT ℕ m α) 
 `E[cost] = ∑ i, Pr[i < cost]`.
 
 This is the standard discrete expectation identity specialized to the writer-cost marginal. -/
-lemma expectedCostNat_eq_tsum_tail_probs [HasEvalSPMF m] (oa : AddWriterT ℕ m α) :
+lemma expectedCostNat_eq_tsum_tail_probs [MonadLiftT m SPMF] (oa : AddWriterT ℕ m α) :
     expectedCostNat oa = ∑' i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] := by
   unfold expectedCostNat expectedCost
   calc
@@ -221,7 +221,7 @@ lemma expectedCostNat_eq_tsum_tail_probs [HasEvalSPMF m] (oa : AddWriterT ℕ m 
 
 If the tail probability `Pr[i < cost]` is bounded by `a i` for every `i`, then
 `E[cost] ≤ ∑ i, a i`. -/
-lemma expectedCostNat_le_tsum_of_tail_probs_le [HasEvalSPMF m]
+lemma expectedCostNat_le_tsum_of_tail_probs_le [MonadLiftT m SPMF]
     (oa : AddWriterT ℕ m α) {a : ℕ → ENNReal}
     (h : ∀ i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] ≤ a i) :
     expectedCostNat oa ≤ ∑' i : ℕ, a i := by
@@ -233,7 +233,7 @@ lemma expectedCostNat_le_tsum_of_tail_probs_le [HasEvalSPMF m]
 If every execution path of `oa` incurs cost at most `n`, then the tail probabilities vanish above
 `n`, so the infinite tail sum truncates to `Finset.range n`. -/
 lemma expectedCostNat_eq_sum_tail_probs_of_pathwiseCostAtMost
-    [HasEvalSPMF m] [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ}
+    [MonadLiftT m SPMF] [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ}
     (h : PathwiseCostAtMost oa n) :
     expectedCostNat oa = ∑ i ∈ Finset.range n, Pr[ fun c ↦ i < c | oa.costs ] := by
   rw [expectedCostNat_eq_tsum_tail_probs]
@@ -246,7 +246,7 @@ lemma expectedCostNat_eq_sum_tail_probs_of_pathwiseCostAtMost
     rcases hc with ⟨z, hz, rfl⟩
     exact not_lt_of_ge (le_trans (h z hz) hnb)
 
-lemma expectedCost_le_of_support_bound [HasEvalSPMF m]
+lemma expectedCost_le_of_support_bound [MonadLiftT m SPMF]
     (oa : AddWriterT ω m α) (val : ω → ENNReal) (c : ENNReal)
     (h : ∀ w ∈ support oa.costs, val w ≤ c) :
     expectedCost oa val ≤ c := by
@@ -273,7 +273,7 @@ lemma expectedCost_le_of_support_bound [HasEvalSPMF m]
           simpa [mul_comm] using (mul_le_mul_right hmass c)
     _ = c := by simp
 
-lemma expectedCost_le_of_pathwiseCostAtMost [AddMonoid ω] [HasEvalSPMF m] [LawfulMonad m]
+lemma expectedCost_le_of_pathwiseCostAtMost [AddMonoid ω] [MonadLiftT m SPMF] [LawfulMonad m]
     [Preorder ω]
     {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
     (h : PathwiseCostAtMost oa w) (hval : Monotone val) :
@@ -313,7 +313,7 @@ lemma expectedCost_ge_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Pre
             rw [hp]
             simp
 
-lemma expectedCost_eq_tsum_outputs_of_costsAs [HasEvalSPMF m] [LawfulMonad m]
+lemma expectedCost_eq_tsum_outputs_of_costsAs [MonadLiftT m SPMF] [LawfulMonad m]
     {oa : AddWriterT ω m α} {f : α → ω} {val : ω → ENNReal}
     (h : oa.CostsAs f) :
     expectedCost oa val = ∑' a : α, Pr[= a | oa.outputs] * val (f a) := by
@@ -348,7 +348,7 @@ end expectedCost
 
 section weightedPathwiseBounds
 
-variable [HasEvalSet m]
+variable [MonadLiftT m SetM]
 variable {ω : Type} [AddCommMonoid ω] [PartialOrder ω]
 
 lemma pathwiseCostAtMost_pure [LawfulMonad m] (x : α) :
@@ -665,7 +665,7 @@ end weightedPathwiseBounds
 
 section unitCostBounds
 
-variable [HasEvalSet m]
+variable [MonadLiftT m SetM]
 
 /-- Pathwise upper bound for a unit-cost `AddWriterT` computation. -/
 def QueryBoundedAboveBy (oa : AddWriterT ℕ m α) (n : ℕ) : Prop :=
@@ -785,7 +785,7 @@ end unitCostBounds
 
 section expectedUnitCost
 
-variable [HasEvalSPMF m]
+variable [MonadLiftT m SPMF]
 
 lemma expectedCostNat_le_of_queryBoundedAboveBy [LawfulMonad m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
@@ -824,4 +824,3 @@ lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m]
 end expectedUnitCostPMF
 
 end AddWriterT
-
