@@ -25,20 +25,6 @@ variable {α : Type}
 
 /-! ### Total query bounds for Merkle-tree primitives -/
 
-/-- If `oa >>= ob` has a total query bound `n`, then `oa` alone has total query bound `n`
-(the continuation can only add queries, not remove them). -/
-lemma _root_.IsTotalQueryBound.of_bind_left
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α β : Type}
-    {oa : OracleComp spec α} {ob : α → OracleComp spec β} {n : ℕ}
-    (h : IsTotalQueryBound (oa >>= ob) n) :
-    IsTotalQueryBound oa n := by
-  induction oa using OracleComp.inductionOn generalizing n with
-  | pure _ => trivial
-  | query_bind t mx ih =>
-      rw [bind_assoc, isTotalQueryBound_query_bind_iff] at h
-      rw [isTotalQueryBound_query_bind_iff]
-      exact ⟨h.1, fun u => ih u (h.2 u)⟩
-
 /-- `singleHash` makes exactly one oracle query, hence has total query bound `1`. -/
 lemma singleHash_isTotalQueryBound (left right : α) :
     IsTotalQueryBound (singleHash (m := OracleComp (spec α)) left right) 1 := by
