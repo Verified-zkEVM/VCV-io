@@ -792,14 +792,10 @@ theorem authExp_le_prfAdvantage_add_authRF
   linarith
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- Existential form of the authentication reduction: some PRF adversary witnesses the bound.
-
-This is the discharge of issue #203. The issue's original statement bounded `authExp` by
-`prfAdvantage + authIdealExp`; since `authIdealExp = 0` (`authIdealExp_eq_zero`) that reduces to
-`authExp ≤ prfAdvantage`, which is *false* — replacing the PRF by a lazy random function lets
-the reader's queries on unseen `(tag, nonce)` pairs hit uniform digests that may coincide with
-the adversary's authenticator, a contribution `prfAdvantage` alone does not bound. The correct
-right-hand side is the random-function world `authRFExp`, hence this theorem's name. -/
+/-- Existential form of the authentication reduction: there is a PRF adversary whose
+distinguishing advantage, added to the random-function world's success probability
+`authRFExp`, bounds the authentication adversary's success probability. The witness is
+`authToPRFReduction adversary`. -/
 theorem exists_prfAdv_authExp_le_prfAdvantage_add_authRF
     (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag)
     (adversary : AuthAdversary TagId Nonce Digest) :
