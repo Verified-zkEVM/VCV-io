@@ -31,17 +31,17 @@ lemma SetM.bind_def (mx : SetM α) (my : α → SetM β) :
 /-- The monad `m` can be evaluated to get a set of possible outputs.
 Note that we don't implement this for `Set` with the monad type-class strangeness.
 Should not be implemented manually if a `HasEvalSPMF` instance already exists. -/
-class HasEvalSet (m : Type u → Type v) [Monad m] where
-  toSet : m →ᵐ SetM
+class HasEvalSet (m : Type u → Type v) [Monad m]
+    extends MonadLiftT m SetM, LawfulMonadLiftT m SetM
 
 /-- The set of possible outputs of running the monadic computation `mx`. -/
 def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
-  SetM.run (HasEvalSet.toSet mx)
+  SetM.run (liftM mx)
 
 -- dtumad: not sure if this should actually be in the ruleset?
 @[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
-    support mx = SetM.run (HasEvalSet.toSet mx) := rfl
+    support mx = SetM.run (liftM mx) := rfl
 
 /-- The monad `m` can be evaluated to get a finite set of possible outputs.
 We restrict to the case of decidable equality of the output type, so `Finset.biUnion` exists.

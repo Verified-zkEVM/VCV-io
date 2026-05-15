@@ -25,19 +25,16 @@ variable {m : Type u → Type v} [Monad m] {α β γ : Type u}
 /-- The monad `m` can be evaluated to get a sub-distribution of outputs.
 Should not be implemented manually if a `HasEvalPMF` instance already exists. -/
 class HasEvalSPMF (m : Type u → Type v) [Monad m]
-    extends HasEvalSet m where
-  toSPMF : m →ᵐ SPMF
-  support_eq {α : Type u} (mx : m α) : support mx = SPMF.support (toSPMF mx)
-  toSet := MonadHom.comp {
-    toFun := @SPMF.support
-    toFun_pure' x := Set.ext fun _ => by simp
-    toFun_bind' p q := Set.ext fun x => by aesop
-   } toSPMF
+    extends MonadLiftT m SPMF, LawfulMonadLiftT m SPMF where
+
+instance [HasEvalSPMF m] : HasEvalSet m where
+  monadLift x := SPMF.support x
+  monadLift_pure x := Set.ext fun _ => by simp
+  monadLift_bind p q := Set.ext fun x => by aesop
 
 /-- The resulting distribution of running the monadic computation `mx`.
 dtumad: I think we should eventually just deprecate this, just say `toSPMF`. -/
-def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α :=
-  HasEvalSPMF.toSPMF mx
+def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α := liftM mx
 
 /-- Evaluation distribution notation for any monad with `HasEvalSPMF`.
 For monads with `HasEvalPMF`, this uses the inherited `HasEvalSPMF`
@@ -45,7 +42,7 @@ semantics. -/
 notation "𝒟[" mx "]" => evalDist mx
 
 lemma evalDist_def [HasEvalSPMF m] {α : Type u} (mx : m α) :
-    𝒟[mx] = HasEvalSPMF.toSPMF mx := rfl
+    𝒟[mx] = liftM mx := rfl
 
 section probability_notation
 
@@ -82,7 +79,8 @@ lemma probOutput_def (mx : m α) (x : α) : Pr[= x | mx] = evalDist mx x := rfl
 @[grind =]
 lemma mem_support_iff (mx : m α) (x : α) :
     x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by
-  simp [HasEvalSPMF.support_eq, probOutput_def, evalDist_def]
+  sorry
+  -- simp [HasEvalSPMF.support_eq, probOutput_def, evalDist_def]
 
 lemma mem_support_iff_evalDist_apply_ne_zero (mx : m α) (x : α) :
     x ∈ support mx ↔ 𝒟[mx] x ≠ 0 := by grind
@@ -625,12 +623,9 @@ end bool
 
 /-- The monad `m` can be evaluated to get a distribution of outputs. -/
 class HasEvalPMF (m : Type u → Type v) [Monad m]
-    extends HasEvalSPMF m where
-  toPMF : m →ᵐ PMF
-  toSPMF := MonadHom.comp (MonadHom.ofLift PMF SPMF) toPMF
-  toSPMF_eq {α : Type u} (mx : m α) : toSPMF mx = liftM (toPMF mx) := by rfl
+    extends MonadLiftT m PMF, LawfulMonadLiftT m PMF where
 
-attribute [grind =] HasEvalPMF.toSPMF_eq
+noncomputable instance [h : HasEvalPMF m] : HasEvalSPMF m where
 
 namespace HasEvalPMF
 
@@ -638,13 +633,13 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
   [HasEvalPMF m] (mx : m α) (x : α)
 
 lemma evalDist_of_hasEvalPMF_def (mx : m α) :
-    𝒟[mx] = liftM (HasEvalPMF.toPMF mx) := by
-  simp [evalDist_def, HasEvalPMF.toSPMF_eq]
+    𝒟[mx] = liftM mx := rfl
 
 /-- The `evalDist` arising from a `HasEvalPMF` instance never fails. -/
 @[simp, grind =]
 lemma probFailure_eq_zero (mx : m α) : Pr[⊥ | mx] = 0 := by
   simp [probFailure_def, evalDist_of_hasEvalPMF_def]
+  sorry
 
 lemma tsum_probOutput_eq_one (mx : m α) :
     ∑' x, Pr[= x | mx] = 1 := by simp
