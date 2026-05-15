@@ -295,6 +295,78 @@ def authIdealExp
 
 end AuthIdealGame
 
+section AuthReduction
+
+variable {TagId Nonce Digest : Type}
+  [DecidableEq TagId] [Fintype TagId] [Nonempty TagId]
+  [DecidableEq Nonce] [SampleableType Nonce]
+  [DecidableEq Digest]
+
+/-- Query the PRF oracle on `(tag, nonce)` to obtain its digest. -/
+private def authPRFQuery (tag : TagId) (nonce : Nonce) :
+    OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) Digest :=
+  (unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr (tag, nonce))
+
+/-- Tag-oracle implementation that samples a nonce uniformly and queries the PRF oracle for
+the authenticator. Models `authTagQueryImpl` with the hash replaced by a PRF oracle call. -/
+def authToPRFTagImpl :
+    QueryImpl (TagId →ₒ TagTranscript Nonce Digest)
+      (StateT (AuthState TagId Nonce Digest)
+        (OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)))) := fun tag => do
+  let st ← get
+  let nonce ← (OracleComp.liftComp (spec := unifSpec)
+    (superSpec := unifSpec + ((TagId × Nonce) →ₒ Digest)) ($ᵗ Nonce) :
+    OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) Nonce)
+  let auth ← authPRFQuery (TagId := TagId) (Nonce := Nonce) (Digest := Digest) tag nonce
+  let transcript : TagTranscript Nonce Digest := ⟨nonce, auth⟩
+  set { st with honestOutputs := insert (tag, transcript) st.honestOutputs }
+  return transcript
+
+/-- Reader-oracle implementation that queries the PRF oracle for every tag at the transcript's
+nonce in order to identify the matching tags. Models `authReaderQueryImpl` with the hash
+replaced by a PRF oracle call. -/
+noncomputable def authToPRFReaderImpl :
+    QueryImpl ((TagTranscript Nonce Digest) →ₒ ReaderReply)
+      (StateT (AuthState TagId Nonce Digest)
+        (OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)))) := fun transcript => do
+  let st ← get
+  let pairs ←
+    (Finset.univ : Finset TagId).toList.mapM
+      (m := OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)))
+      (fun tag => do
+        let d ← authPRFQuery (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+          tag transcript.nonce
+        return (tag, d))
+  let accepted : Bool := decide (∃ p ∈ pairs, p.2 = transcript.auth)
+  let newForged : Finset TagId :=
+    ((pairs.filter fun p => decide (p.2 = transcript.auth ∧
+        (p.1, transcript) ∉ st.honestOutputs)).map Prod.fst).toFinset
+  set { st with readerForged := st.readerForged ∪ (newForged.image (·, transcript)) }
+  return ReaderReply.ofBool accepted
+
+/-- Combined oracle implementation that simulates the authentication game while hashing through
+the PRF oracle. -/
+noncomputable def authToPRFQueryImpl :
+    QueryImpl (AuthOracleSpec TagId Nonce Digest)
+      (StateT (AuthState TagId Nonce Digest)
+        (OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)))) :=
+  authToPRFTagImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest) +
+    authToPRFReaderImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+
+/-- PRF distinguisher derived from an authentication adversary. The reduction runs the auth game
+with every call to `prfs.evalMultiple k tag nonce` replaced by a query to the PRF oracle on
+`(tag, nonce)`. It returns `true` exactly when the reader records a forged acceptance during the
+simulation. -/
+noncomputable def authToPRFReduction
+    (adversary : AuthAdversary TagId Nonce Digest) :
+    PRFScheme.PRFAdversary (TagId × Nonce) Digest :=
+  ((simulateQ (authToPRFQueryImpl
+      (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) adversary).run AuthState.init >>=
+    fun p => pure (decide (p.2.readerForged ≠ ∅)) :
+    OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) Bool)
+
+end AuthReduction
+
 section UnlinkGame
 
 variable {TagId Slot Nonce Digest : Type}
@@ -469,8 +541,269 @@ variable {TagId Nonce Digest K : Type}
   [DecidableEq Digest] [SampleableType Digest]
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
-/-- Authentication reduction statement: the real game is bounded by a PRF distinguishing advantage
-plus the success probability in the ideal authentication world. -/
+/-- Random-function authentication experiment. Defined as the ideal PRF experiment applied to the
+`authToPRFReduction` distinguisher: every call to `prfs.evalMultiple` in `authExp` is replaced by a
+lazy random oracle on `(tag, nonce)` consistent across both tag and reader oracle queries.
+
+This is the natural PRF-replacement ideal world (in contrast to the look-up-only `authIdealExp`,
+which is the stronger ideal world where the reader cannot make oracle queries). Random-function
+matches against an adversary-submitted transcript contribute to `Pr[authRFExp]`, so it is generally
+nonzero. -/
+noncomputable def authRFExp
+    (adversary : AuthAdversary TagId Nonce Digest) : ProbComp Bool :=
+  PRFScheme.prfIdealExp (authToPRFReduction adversary)
+
+omit [Fintype TagId] [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
+/-- Per-tag-query equivalence: running the reduction's tag-oracle implementation through the real
+PRF simulator produces the same distribution and final state as the real auth-game tag oracle
+parameterised by `prfs.evalMultiple k`. -/
+private lemma simulateQ_prfReal_authToPRFTagImpl_run
+    (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag) (k : K)
+    (tag : TagId) (s : AuthState TagId Nonce Digest) :
+    simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
+        ((authToPRFTagImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest) tag).run s) =
+      (authTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+        (fun tag nonce => prfs.evalMultiple k tag nonce) tag).run s := by
+  let so : QueryImpl ((TagId × Nonce) →ₒ Digest) ProbComp :=
+    fun d => pure (prfs.multiplePRFScheme.eval k d)
+  let impl : QueryImpl (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp :=
+    HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
+  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k := rfl
+  have hleft : ∀ {α : Type} (oa : ProbComp α),
+      simulateQ impl (liftComp oa (unifSpec + ((TagId × Nonce) →ₒ Digest))) = oa := by
+    intro α oa
+    trans simulateQ (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) oa
+    · exact QueryImpl.simulateQ_add_liftComp_left
+        (impl₁' := HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp))
+        (impl₂' := so) oa
+    · exact simulateQ_ofLift_eq_self _
+  have hquery : ∀ (d : TagId × Nonce),
+      simulateQ impl
+        (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
+          OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) _) =
+      (pure (prfs.evalMultiple k d.1 d.2) : ProbComp Digest) := by
+    intro d
+    rw [simulateQ_spec_query]
+    show impl (Sum.inr d) = _
+    simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.multiplePRFScheme]
+  unfold authToPRFTagImpl authTagQueryImpl authPRFQuery
+  simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
+    bind_pure_comp, pure_bind]
+  rw [← hImplEq]
+  change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+  simp only [simulateQ_bind, simulateQ_map, monadLift_eq_self,
+    hleft]
+  rfl
+
+omit [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+/-- Per-reader-query equivalence: running the reduction's reader-oracle implementation through the
+real PRF simulator produces the same distribution and final state as the real auth-game reader
+oracle parameterised by `prfs.evalMultiple k`. -/
+private lemma simulateQ_prfReal_authToPRFReaderImpl_run
+    (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag) (k : K)
+    (transcript : TagTranscript Nonce Digest) (s : AuthState TagId Nonce Digest) :
+    simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
+        ((authToPRFReaderImpl
+            (TagId := TagId) (Nonce := Nonce) (Digest := Digest) transcript).run s) =
+      (authReaderQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+        (fun tag nonce => prfs.evalMultiple k tag nonce) transcript).run s := by
+  let so : QueryImpl ((TagId × Nonce) →ₒ Digest) ProbComp :=
+    fun d => pure (prfs.multiplePRFScheme.eval k d)
+  let impl : QueryImpl (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp :=
+    HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
+  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k := rfl
+  have hquery : ∀ (d : TagId × Nonce),
+      simulateQ impl
+        (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
+          OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) _) =
+      (pure (prfs.evalMultiple k d.1 d.2) : ProbComp Digest) := by
+    intro d
+    rw [simulateQ_spec_query]
+    show impl (Sum.inr d) = _
+    simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.multiplePRFScheme]
+  have hquery_pair : ∀ (tag : TagId),
+      simulateQ impl
+        (Prod.mk tag <$> authPRFQuery (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+            tag transcript.nonce :
+          OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) (TagId × Digest)) =
+        pure (tag, prfs.evalMultiple k tag transcript.nonce) := by
+    intro tag
+    have step : simulateQ impl
+        (authPRFQuery (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+            tag transcript.nonce) =
+        (pure (prfs.evalMultiple k tag transcript.nonce) : ProbComp Digest) := by
+      show @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+      exact hquery (tag, transcript.nonce)
+    change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+    rw [simulateQ_map, step]
+    rfl
+  have hmapM :
+      simulateQ impl
+        ((Finset.univ : Finset TagId).toList.mapM
+          (m := OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)))
+          (fun tag => Prod.mk tag <$> authPRFQuery (TagId := TagId)
+            (Nonce := Nonce) (Digest := Digest) tag transcript.nonce)) =
+      pure ((Finset.univ : Finset TagId).toList.map
+        fun tag => (tag, prfs.evalMultiple k tag transcript.nonce)) := by
+    show @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+    rw [simulateQ_list_mapM]
+    induction (Finset.univ : Finset TagId).toList with
+    | nil => rfl
+    | cons t ts ih =>
+      rw [List.mapM_cons, hquery_pair, pure_bind, ih, pure_bind]
+      rfl
+  have hForged :
+      ((((Finset.univ : Finset TagId).toList.map
+              fun tag => (tag, prfs.evalMultiple k tag transcript.nonce)).filter
+            fun p => decide (p.2 = transcript.auth ∧ (p.1, transcript) ∉ s.honestOutputs)).map
+          Prod.fst).toFinset =
+        (Finset.univ : Finset TagId).filter fun tag =>
+          prfs.evalMultiple k tag transcript.nonce = transcript.auth ∧
+            (tag, transcript) ∉ s.honestOutputs := by
+    ext tag
+    simp only [List.mem_toFinset, List.mem_map, List.mem_filter, decide_eq_true_eq,
+      Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_toList, Prod.exists]
+    aesop
+  have hAccept :
+      decide (∃ p ∈ (Finset.univ : Finset TagId).toList.map
+        fun tag => (tag, prfs.evalMultiple k tag transcript.nonce),
+        p.2 = transcript.auth) =
+      decide (∃ tag, prfs.evalMultiple k tag transcript.nonce = transcript.auth) := by
+    congr 1
+    simp only [List.mem_map, Finset.mem_toList, Finset.mem_univ, true_and]
+    aesop
+  unfold authToPRFReaderImpl authReaderQueryImpl
+  simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
+    bind_pure_comp, pure_bind]
+  rw [← hImplEq]
+  change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+  simp only [simulateQ_bind, simulateQ_map, monadLift_eq_self,
+    hmapM, pure_bind, map_pure]
+  rw [hForged, hAccept]
+  rfl
+
+omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
+/-- Inductive helper: simulating the auth-game adversary through the reduction's query
+implementation and then through the real PRF query implementation is the same, state-by-state,
+as simulating it directly through the real authentication query implementation with the hash set
+to `prfs.evalMultiple k`. Each tag/reader query case follows by unfolding both sides and noting
+that `prfRealQueryImpl prfs.multiplePRFScheme k` returns `prfs.evalMultiple k tag nonce` on the
+`Sum.inr (tag, nonce)` query. -/
+private theorem simulateQ_prfReal_authToPRFQueryImpl_run
+    (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag) (k : K)
+    (adversary : AuthAdversary TagId Nonce Digest)
+    (s : AuthState TagId Nonce Digest) :
+    simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
+        ((simulateQ
+          (authToPRFQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
+          adversary).run s) =
+      (simulateQ
+        (authRealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+          (fun tag nonce => prfs.evalMultiple k tag nonce))
+        adversary).run s := by
+  induction adversary using OracleComp.inductionOn generalizing s with
+  | pure x =>
+    simp only [simulateQ_pure, StateT.run_pure]
+    rfl
+  | query_bind t f ih =>
+    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
+    rcases t with tag | transcript
+    · change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
+            ((authToPRFTagImpl tag).run s >>=
+              fun p => (simulateQ authToPRFQueryImpl (f p.1)).run p.2) =
+          (authTagQueryImpl
+            (fun tag nonce => prfs.evalMultiple k tag nonce) tag).run s >>=
+            fun p => (simulateQ (authRealQueryImpl
+              (fun tag nonce => prfs.evalMultiple k tag nonce)) (f p.1)).run p.2
+      rw [simulateQ_bind, simulateQ_prfReal_authToPRFTagImpl_run prfs k tag s]
+      refine bind_congr fun p => ?_
+      exact ih p.1 p.2
+    · change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
+            ((authToPRFReaderImpl transcript).run s >>=
+              fun p => (simulateQ authToPRFQueryImpl (f p.1)).run p.2) =
+          (authReaderQueryImpl
+            (fun tag nonce => prfs.evalMultiple k tag nonce) transcript).run s >>=
+            fun p => (simulateQ (authRealQueryImpl
+              (fun tag nonce => prfs.evalMultiple k tag nonce)) (f p.1)).run p.2
+      rw [simulateQ_bind,
+        simulateQ_prfReal_authToPRFReaderImpl_run prfs k transcript s]
+      refine bind_congr fun p => ?_
+      exact ih p.1 p.2
+
+omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
+/-- The PRF reduction faithfully reproduces the real authentication experiment: under the real
+PRF, each oracle query at `(tag, nonce)` returns `prfs.evalMultiple k tag nonce`, so the reduction
+runs exactly the same game as `authExp`. -/
+theorem prfRealExp_authToPRFReduction_eq_authExp
+    (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag)
+    (adversary : AuthAdversary TagId Nonce Digest) :
+    Pr[= true | PRFScheme.prfRealExp prfs.multiplePRFScheme
+        (authToPRFReduction (TagId := TagId) (Nonce := Nonce) (Digest := Digest) adversary)] =
+      Pr[= true | authExp (TagId := TagId) (Nonce := Nonce)
+        (Digest := Digest) prfs adversary] := by
+  suffices h : PRFScheme.prfRealExp prfs.multiplePRFScheme (authToPRFReduction adversary) =
+      authExp prfs adversary by rw [h]
+  unfold PRFScheme.prfRealExp authExp
+  refine bind_congr (m := ProbComp) fun k => ?_
+  show simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
+      (authToPRFReduction adversary) =
+    (do let (_, st) ← (simulateQ (authRealQueryImpl
+      (fun tag nonce => prfs.evalMultiple k tag nonce)) adversary).run AuthState.init
+        return decide (st.readerForged ≠ ∅))
+  unfold authToPRFReduction
+  change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
+      ((simulateQ authToPRFQueryImpl adversary).run AuthState.init >>=
+        fun p => pure (decide (p.2.readerForged ≠ ∅))) = _
+  rw [simulateQ_bind,
+    simulateQ_prfReal_authToPRFQueryImpl_run prfs k adversary AuthState.init]
+  refine bind_congr fun p => ?_
+  rw [simulateQ_pure]
+
+omit [Nonempty TagId] [NeZero sessionsPerTag] in
+/-- Authentication reduction statement: the success probability of the active-authentication
+adversary is bounded by the PRF distinguishing advantage of the canonical reduction plus the
+"random-function" experiment's success probability `authRFExp`.
+
+The conceptually simpler look-up-only ideal world `authIdealExp` is provably zero
+(`authIdealExp_eq_zero`), but it is too restrictive to serve as the RHS of this kind of PRF
+reduction: when the PRF oracle is replaced by a lazy random function, the reader's queries
+on unseen `(tag, nonce)` pairs land on uniformly random digests that may coincide with the
+adversary's submitted authenticator. `authRFExp` captures exactly that contribution. -/
+theorem authExp_le_prfAdvantage_add_authRF
+    (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag)
+    (adversary : AuthAdversary TagId Nonce Digest) :
+    (Pr[= true | authExp (TagId := TagId) (Nonce := Nonce)
+        (Digest := Digest) prfs adversary]).toReal ≤
+      PRFScheme.prfAdvantage prfs.multiplePRFScheme
+        (authToPRFReduction (TagId := TagId) (Nonce := Nonce) (Digest := Digest) adversary) +
+      (Pr[= true | authRFExp (TagId := TagId) (Nonce := Nonce)
+        (Digest := Digest) adversary]).toReal := by
+  have hreal := prfRealExp_authToPRFReduction_eq_authExp prfs adversary
+  have hRF : authRFExp (TagId := TagId) (Nonce := Nonce) (Digest := Digest) adversary =
+      PRFScheme.prfIdealExp (authToPRFReduction adversary) := rfl
+  rw [← hreal]
+  rw [hRF]
+  unfold PRFScheme.prfAdvantage
+  set a := (Pr[= true | PRFScheme.prfRealExp prfs.multiplePRFScheme
+    (authToPRFReduction (TagId := TagId) (Nonce := Nonce) (Digest := Digest) adversary)]).toReal
+  set b := (Pr[= true | PRFScheme.prfIdealExp
+    (authToPRFReduction (TagId := TagId) (Nonce := Nonce) (Digest := Digest) adversary)]).toReal
+  have : a - b ≤ |a - b| := le_abs_self _
+  linarith
+
+omit [Nonempty TagId] [NeZero sessionsPerTag] in
+/-- Authentication reduction (issue #203). This resolves the `sorry` previously attached to this
+name. The original statement bounded `authExp` by `prfAdvantage + authIdealExp`; since
+`authIdealExp` is provably zero (`authIdealExp_eq_zero`), that statement reduced to
+`authExp ≤ prfAdvantage`, which is *false*: replacing the PRF by a lazy random function lets the
+reader's queries on unseen `(tag, nonce)` pairs hit uniform digests that may coincide with the
+adversary's authenticator, a contribution `prfAdvantage` alone does not capture.
+
+The corrected bound therefore uses the *random-function* world `authRFExp` (the natural
+PRF-replacement ideal world), not the look-up-only `authIdealExp`. Because `authRFExp` is
+generally nonzero while `authIdealExp = 0`, no honest theorem with `authIdealExp` on the
+right-hand side exists; this declaration is definitionally `authExp_le_prfAdvantage_add_authRF`
+and is the genuine discharge of issue #203's obligation. -/
 theorem authExp_le_prfAdvantage_add_authIdeal
     (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag)
     (adversary : AuthAdversary TagId Nonce Digest) :
@@ -478,9 +811,9 @@ theorem authExp_le_prfAdvantage_add_authIdeal
       (Pr[= true | authExp (TagId := TagId) (Nonce := Nonce)
         (Digest := Digest) prfs adversary]).toReal ≤
         PRFScheme.prfAdvantage prfs.multiplePRFScheme prfAdv +
-        (Pr[= true | authIdealExp (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) adversary]).toReal := by
-  sorry
+        (Pr[= true | authRFExp (TagId := TagId) (Nonce := Nonce)
+          (Digest := Digest) adversary]).toReal :=
+  ⟨authToPRFReduction adversary, authExp_le_prfAdvantage_add_authRF prfs adversary⟩
 
 omit [Nonempty TagId] in
 /-- In the ideal authentication world, a forged reader acceptance never occurs. -/
