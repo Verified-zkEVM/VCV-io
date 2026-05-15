@@ -39,6 +39,28 @@ example : SampleableType (Matrix (Fin 2) (Fin 3) Bool) := inferInstance
 /-- `Sum`-typed sampling works via `FinEnum.sum` + `FinEnum.SampleableType`. -/
 example : SampleableType (Fin 2 ⊕ Fin 3) := inferInstance
 
+/-- `Finset α` for a `FinEnum` element type: drawn uniformly from the `2^|α|` subsets. -/
+example : SampleableType (Finset (Fin 3)) := inferInstance
+example : SampleableType (Finset (Fin 4 ⊕ Fin 2)) := inferInstance
+
+/-- Size-`n` multisets over a nonempty `Fintype`. -/
+noncomputable example : SampleableType (Sym Bool 3) := inferInstance
+noncomputable example : SampleableType (Sym (Fin 3) 2) := inferInstance
+
+/-- Permutations of a finite type: `n!` outcomes. -/
+noncomputable example : SampleableType (Equiv.Perm (Fin 3)) := inferInstance
+noncomputable example : SampleableType (Equiv.Perm Bool) := inferInstance
+
+/-- Function embeddings (injections) between finite types. The `Nonempty (β ↪ α)`
+hypothesis amounts to `card β ≤ card α`, which is supplied at use-site. -/
+noncomputable example : SampleableType (Fin 2 ↪ Fin 3) :=
+  haveI : Nonempty (Fin 2 ↪ Fin 3) :=
+    ⟨⟨Fin.castLE (by omega), Fin.castLE_injective _⟩⟩
+  inferInstance
+noncomputable example : SampleableType (Fin 3 ↪ Fin 3) :=
+  haveI : Nonempty (Fin 3 ↪ Fin 3) := ⟨.refl _⟩
+  inferInstance
+
 end SampleableType
 
 section HasUniformSelect
