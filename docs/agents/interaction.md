@@ -10,7 +10,7 @@ Generic protocol theory lives in PolyFun:
 
 - Sequential specs, transcripts, decorations, strategies, append, replicate, and state chains: `PolyFun.Interaction.Basic.*`
 - Two-party, multiparty, and concurrent interaction layers: `PolyFun.Interaction.TwoParty.*`, `PolyFun.Interaction.Multiparty.*`, `PolyFun.Interaction.Concurrent.*`
-- Generic UC interfaces, open processes, open theory, notation, environment actions, and leakage scaffolding: `PolyFun.Interaction.UC.*`
+- Generic UC interfaces, open processes, structural boundary traces, open theory, notation, environment actions, and leakage scaffolding: `PolyFun.Interaction.UC.*`
 
 For conceptual background, read PolyFun's `docs/wiki/interaction.md` and the module docstrings in the PolyFun dependency.
 VCV-io should only document how those generic APIs are instantiated with probabilistic semantics, oracle computations, and crypto examples.
@@ -35,6 +35,7 @@ Generic interaction modules should not be reintroduced under `VCVio/Interaction`
 
 `OpenProcess m Party Δ` comes from PolyFun and carries its per-step `Spec.Sampler m` intrinsically.
 VCV-io's runtime layer interprets a closed process by running those samplers and then observing the resulting state in a probabilistic semantics.
+Use PolyFun's `OpenStep.boundaryTrace` when you need to read the emitted output packets from a completed open-step transcript; routing and probabilistic interpretation remain VCV-io runtime concerns.
 
 Use the synchronous entry points in `VCVio/Interaction/UC/Runtime.lean`:
 

@@ -123,7 +123,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Concurrent specs and frontiers: `PolyFun/Interaction/Concurrent/Spec.lean`, `PolyFun/Interaction/Concurrent/Frontier.lean`
 - Concurrent processes and execution: `PolyFun/Interaction/Concurrent/Process.lean`
 - Open systems (interfaces, composition): `PolyFun/Interaction/UC/OpenTheory.lean`
-- Open processes (boundary traffic, UC bridge): `PolyFun/Interaction/UC/OpenProcess.lean` (monad-parametric `OpenProcess m Party Δ` with intrinsic `stepSampler` field)
+- Open processes (boundary traffic, UC bridge): `PolyFun/Interaction/UC/OpenProcess.lean` (monad-parametric `OpenProcess m Party Δ` with intrinsic `stepSampler` field and `OpenStep.boundaryTrace`)
 - Concrete open-theory model: `PolyFun/Interaction/UC/OpenProcessModel.lean` (`openTheory m Party schedulerSampler` threads `Spec.Sampler` through `map` / `par` / `wire` / `plug`)
 - UC emulation and security: `PolyFun/Interaction/UC/Emulates.lean`
 - Computational UC observation layer: `VCVio/Interaction/UC/Computational.lean`

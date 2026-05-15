@@ -65,7 +65,7 @@ require "leanprover-community" / "mathlib" @ git "v4.29.0"
 
 require PolyFun from git
   "https://github.com/Verified-zkEVM/PolyFun.git" @
-  "cdce2864a2a1b34eb18a2f665caba04ac0d2426b"
+  "cf8b35c0caa10c7f484d207abe07f2d496b852af"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio

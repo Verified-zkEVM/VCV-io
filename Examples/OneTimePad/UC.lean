@@ -568,6 +568,24 @@ noncomputable def idealOtp (sp : ℕ) : T.Obj (Δ_otp sp) where
 
 /-! ### Structural distinctness -/
 
+/-- The generic PolyFun boundary-trace extractor reads the real OTP
+one-step transcript as the emitted ciphertext packet. -/
+@[simp]
+theorem realOtp_boundaryTrace (sp : ℕ) (msg k : BitVec sp) :
+    Interaction.UC.OpenStep.boundaryTrace ((realOtp sp msg).step ())
+      (⟨k, ⟨⟩⟩ : Spec.Transcript (otpSpec sp)) =
+      [(⟨(), k ^^^ msg⟩ : Σ _ : Unit, BitVec sp)] := by
+  rfl
+
+/-- The generic PolyFun boundary-trace extractor reads the ideal OTP
+one-step transcript as the emitted uniform ciphertext packet. -/
+@[simp]
+theorem idealOtp_boundaryTrace (sp : ℕ) (c : BitVec sp) :
+    Interaction.UC.OpenStep.boundaryTrace ((idealOtp sp).step ())
+      (⟨c, ⟨⟩⟩ : Spec.Transcript (otpSpec sp)) =
+      [(⟨(), c⟩ : Σ _ : Unit, BitVec sp)] := by
+  rfl
+
 /-- For any nonzero plaintext `msg`, the real and ideal OTP open
 processes at `Δ_otp sp` are not equal: they agree on `Proc`,
 `step.spec`, `step.next`, and `stepSampler`, but their
