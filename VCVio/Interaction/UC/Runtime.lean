@@ -80,37 +80,6 @@ open OracleComp
 
 namespace Interaction
 
-namespace UC
-
-/-! ## Boundary trace extraction -/
-
-/--
-Extract the finite boundary-output trace emitted by a decorated
-interaction transcript.
-
-This is the first runtime bridge from the structural open-process layer
-to observable traffic: `BoundaryAction.emit` is indexed by the move chosen
-at each node, and a transcript supplies exactly those moves. The result is
-the ordered concatenation of all emitted packets along the root-to-leaf
-path of the step.
-
-This deliberately records only packets that survive in the process's
-current boundary. Higher-level routing of packets across `wire` / `plug`
-is a separate execution layer; the existing `OpenProcess` structural
-operations already filter or relabel `BoundaryAction.emit` before this
-function reads it.
--/
-def boundaryTrace
-    {Party : Type u} {Δ : PortBoundary} :
-    (spec : Spec.{0}) →
-    PFunctor.FreeM.Displayed.Decoration (OpenNodeContext Party Δ) spec →
-    Spec.Transcript spec → PFunctor.TraceList Δ.Out
-  | .done, _, _ => 1
-  | .node _ rest, ⟨node, next⟩, ⟨x, tr⟩ =>
-      node.boundary.emit x * boundaryTrace (rest x) (next x) tr
-
-end UC
-
 namespace Spec
 
 /--
@@ -169,8 +138,6 @@ end Spec
 
 namespace Concurrent
 
-open UC
-
 /--
 Run one step of a `ProcessOver` by sampling a transcript from the step's
 spec and applying the continuation to get the next state.
@@ -180,23 +147,6 @@ noncomputable def StepOver.sample {m : Type → Type} [Monad m]
     (step : StepOver Γ P) (sampler : Spec.Sampler m step.spec) : m P := do
   let tr ← Spec.sampleTranscript step.spec sampler
   return step.next tr
-
-/--
-Run one open-process step and return both the next state and the
-boundary packets emitted by the sampled transcript.
-
-This is the trace-aware companion to `StepOver.sample`. It does not add
-new scheduling behavior; it reuses the same sampler and reads the
-already-decorated `BoundaryAction.emit` fields along the transcript.
--/
-noncomputable def StepOver.sampleWithBoundaryTrace
-    {m : Type → Type} [Monad m]
-    {Party : Type u} {Δ : PortBoundary} {P : Type}
-    (step : StepOver (UC.OpenNodeContext Party Δ) P)
-    (sampler : Spec.Sampler m step.spec) :
-    m (P × PFunctor.TraceList Δ.Out) := do
-  let tr ← Spec.sampleTranscript step.spec sampler
-  return (step.next tr, UC.boundaryTrace step.spec step.semantics tr)
 
 /--
 Run `fuel` steps of a process, starting from state `s`, using a
@@ -211,27 +161,6 @@ noncomputable def ProcessOver.runSteps {m : Type → Type} [Monad m]
   | n + 1, s => do
     let s' ← (process.step s).sample (sampler s)
     runSteps process sampler n s'
-
-/--
-Run `fuel` steps of an open-boundary process while accumulating the
-boundary packets emitted by each sampled step.
-
-The trace is ordered in execution order: packets from the first sampled
-step precede packets from later steps.
--/
-noncomputable def ProcessOver.runStepsWithBoundaryTrace
-    {m : Type → Type} [Monad m]
-    {Party : Type u} {Δ : PortBoundary}
-    (process : ProcessOver (UC.OpenNodeContext Party Δ))
-    (sampler : (p : process.Proc) → Spec.Sampler m (process.step p).spec) :
-    ℕ → process.Proc → m (process.Proc × PFunctor.TraceList Δ.Out)
-  | 0, s => pure (s, 1)
-  | n + 1, s => do
-    let (s', headTrace) ←
-      (process.step s).sampleWithBoundaryTrace (sampler s)
-    let (final, tailTrace) ←
-      runStepsWithBoundaryTrace process sampler n s'
-    pure (final, headTrace * tailTrace)
 
 end Concurrent
 

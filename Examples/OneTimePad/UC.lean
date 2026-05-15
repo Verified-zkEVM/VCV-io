@@ -531,39 +531,6 @@ def otpDecoration (sp : ℕ)
     PFunctor.FreeM.Displayed.Decoration (UC.OpenNodeContext Party (Δ_otp sp)) (otpSpec sp) :=
   ⟨otpOpenNode sp emit, fun _ => ⟨⟩⟩
 
-/-! ### Runtime boundary traces -/
-
-/--
-The trace-aware runtime bridge reads exactly the packets stored in the
-single OTP node's `BoundaryAction.emit` field.
-
-This is intentionally a structural runtime fact, not the privacy theorem:
-the real and ideal processes below emit visibly different packet functions
-before any probabilistic observation or simulator argument is applied.
--/
-@[simp]
-theorem boundaryTrace_otpDecoration (sp : ℕ)
-    (emit : PFunctor.Trace (Δ_otp sp).Out (BitVec sp)) (x : BitVec sp) :
-    UC.boundaryTrace (otpSpec sp) (otpDecoration sp emit) ⟨x, ⟨⟩⟩ =
-      emit x := by
-  simp [UC.boundaryTrace, otpSpec, otpDecoration, otpOpenNode]
-
-/-- The real OTP boundary trace contains the XOR ciphertext packet. -/
-@[simp]
-theorem boundaryTrace_realOtp (sp : ℕ) (msg x : BitVec sp) :
-    UC.boundaryTrace (otpSpec sp) (otpDecoration sp (realEmit sp msg)) ⟨x, ⟨⟩⟩ =
-      [(⟨(), x ^^^ msg⟩ : Interface.Packet (Δ_otp sp).Out)] := by
-  rw [boundaryTrace_otpDecoration]
-  rfl
-
-/-- The ideal OTP boundary trace contains the sampled ciphertext packet. -/
-@[simp]
-theorem boundaryTrace_idealOtp (sp : ℕ) (x : BitVec sp) :
-    UC.boundaryTrace (otpSpec sp) (otpDecoration sp (idealEmit sp)) ⟨x, ⟨⟩⟩ =
-      [(⟨(), x⟩ : Interface.Packet (Δ_otp sp).Out)] := by
-  rw [boundaryTrace_otpDecoration]
-  rfl
-
 /-! ### Real and ideal open processes -/
 
 /-- **Real-world OTP open process** at `Δ_otp sp`.

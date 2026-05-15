@@ -82,7 +82,7 @@ Use `Standard.UCSecure exec ε π F` when stating textbook UC security for a fix
 ## Examples
 
 The main smoke test for the integration is `Examples/OneTimePad/UC.lean`.
-It builds real and ideal one-time-pad systems as PolyFun open-theory objects, checks the runtime boundary-trace extraction on those processes, and proves the observation-level statement `ObservedCompEmulates 0`.
+It builds real and ideal one-time-pad systems as PolyFun open-theory objects and proves the observation-level statement `ObservedCompEmulates 0`.
 
 Use it as the first example when wiring a concrete protocol into the UC runtime and computational observation layer.
 For lower-level probabilistic and oracle examples, see `docs/agents/probability.md` and `docs/agents/oracle-comp.md`.

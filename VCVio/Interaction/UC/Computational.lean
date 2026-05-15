@@ -572,20 +572,6 @@ theorem AsympObservedCompEmulates.iff_secureAgainst
   Iff.rfl
 
 /--
-If real UC-emulates ideal, then the UC distinguishing game is secure against
-any adversary class. Uses the `SecurityGame.secureAgainst` vocabulary.
--/
-theorem observedDistGame_secureAgainst_of_asympObservedCompEmulates
-    {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
-    {Δ : PortBoundary}
-    {real ideal : ∀ n, (T n).Obj Δ}
-    {Adv : Type*} {isPPT : Adv → Prop}
-    {env : Adv → ∀ n, (T n).Plug Δ}
-    (h : AsympObservedCompEmulates T sem real ideal Adv isPPT env) :
-    (observedDistGame T sem real ideal env).secureAgainst isPPT :=
-  h
-
-/--
 UC security reduction: if security of `g₁` reduces to UC-emulation of
 `real` by `ideal`, then `g₁` is secure whenever UC-emulation holds.
 
