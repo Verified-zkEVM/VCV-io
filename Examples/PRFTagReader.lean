@@ -792,19 +792,15 @@ theorem authExp_le_prfAdvantage_add_authRF
   linarith
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- Authentication reduction (issue #203). This resolves the `sorry` previously attached to this
-name. The original statement bounded `authExp` by `prfAdvantage + authIdealExp`; since
-`authIdealExp` is provably zero (`authIdealExp_eq_zero`), that statement reduced to
-`authExp ≤ prfAdvantage`, which is *false*: replacing the PRF by a lazy random function lets the
-reader's queries on unseen `(tag, nonce)` pairs hit uniform digests that may coincide with the
-adversary's authenticator, a contribution `prfAdvantage` alone does not capture.
+/-- Existential form of the authentication reduction: some PRF adversary witnesses the bound.
 
-The corrected bound therefore uses the *random-function* world `authRFExp` (the natural
-PRF-replacement ideal world), not the look-up-only `authIdealExp`. Because `authRFExp` is
-generally nonzero while `authIdealExp = 0`, no honest theorem with `authIdealExp` on the
-right-hand side exists; this declaration is definitionally `authExp_le_prfAdvantage_add_authRF`
-and is the genuine discharge of issue #203's obligation. -/
-theorem authExp_le_prfAdvantage_add_authIdeal
+This is the discharge of issue #203. The issue's original statement bounded `authExp` by
+`prfAdvantage + authIdealExp`; since `authIdealExp = 0` (`authIdealExp_eq_zero`) that reduces to
+`authExp ≤ prfAdvantage`, which is *false* — replacing the PRF by a lazy random function lets
+the reader's queries on unseen `(tag, nonce)` pairs hit uniform digests that may coincide with
+the adversary's authenticator, a contribution `prfAdvantage` alone does not bound. The correct
+right-hand side is the random-function world `authRFExp`, hence this theorem's name. -/
+theorem exists_prfAdv_authExp_le_prfAdvantage_add_authRF
     (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag)
     (adversary : AuthAdversary TagId Nonce Digest) :
     ∃ prfAdv : PRFScheme.PRFAdversary (TagId × Nonce) Digest,
