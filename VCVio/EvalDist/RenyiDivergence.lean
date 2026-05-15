@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence
-import VCVio.EvalDist.Defs.Basic
+import VCVio.EvalDist.Monad.Map
 
 /-!
 # Rényi Divergence for SPMFs and Monadic Computations
@@ -95,13 +95,13 @@ theorem renyiDiv_self (a : ℝ) (mx : m α) : renyiDiv a mx mx = 1 :=
 theorem renyiDiv_map_le [LawfulMonad m] {β : Type u} (a : ℝ) (ha : 1 < a)
     (f : α → β) (mx my : m α) :
     renyiDiv a (f <$> mx) (f <$> my) ≤ renyiDiv a mx my := by
-  simp only [renyiDiv, evalDist_def, MonadHom.mmap_map]
+  simp only [renyiDiv, _root_.evalDist_map]
   exact SPMF.renyiDiv_map_le a ha f _ _
 
 theorem renyiDiv_bind_right_le [LawfulMonad m] {β : Type u} (a : ℝ) (ha : 1 < a)
     (f : α → m β) (mx my : m α) :
     renyiDiv a (mx >>= f) (my >>= f) ≤ renyiDiv a mx my := by
-  simp only [renyiDiv, evalDist_def, MonadHom.mmap_bind]
+  simp only [renyiDiv, _root_.evalDist_bind]
   exact SPMF.renyiDiv_bind_right_le a ha _ _ _
 
 /-! ### Rényi to Probability Bounds -/

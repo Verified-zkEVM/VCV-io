@@ -138,11 +138,11 @@ protected def ofHasEvalSPMF (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
   Sem := m
   instMonadSem := inferInstance
   interpret := MonadHom.id m
-  observe := fun mx => HasEvalSPMF.toSPMF mx
+  observe := fun mx => liftM mx
 
 @[simp]
 lemma ofHasEvalSPMF_evalDist (mx : m α) [HasEvalSPMF m] :
-    (SPMFSemantics.ofHasEvalSPMF m).evalDist mx = HasEvalSPMF.toSPMF mx := rfl
+    (SPMFSemantics.ofHasEvalSPMF m).evalDist mx = liftM mx := rfl
 
 @[simp]
 lemma ofHasEvalSPMF_probFailure (mx : m α) [HasEvalSPMF m] :
@@ -193,10 +193,10 @@ protected def ofHasEvalPMF (m : Type u → Type v) [Monad m] [HasEvalPMF m] :
   Sem := m
   instMonadSem := inferInstance
   interpret := MonadHom.id m
-  observe := fun mx => HasEvalPMF.toPMF mx
+  observe := fun mx => liftM mx
 
 @[simp]
 lemma ofHasEvalPMF_evalDist (mx : m α) [HasEvalPMF m] :
-    (PMFSemantics.ofHasEvalPMF m).evalDist mx = HasEvalPMF.toPMF mx := rfl
+    (PMFSemantics.ofHasEvalPMF m).evalDist mx = liftM mx := rfl
 
 end PMFSemantics

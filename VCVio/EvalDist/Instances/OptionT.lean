@@ -32,9 +32,9 @@ Keeping this standalone instance means `support` on `OptionT m` works without re
 full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM`). -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
     HasEvalSet (OptionT m) where
-  toSet.toFun α mx := some ⁻¹' (support (OptionT.run mx))
-  toSet.toFun_pure' mx := Set.ext fun x => by simp
-  toSet.toFun_bind' mx my := Set.ext fun x => by
+  monadLift mx := some ⁻¹' (support (OptionT.run mx))
+  monadLift_pure mx := Set.ext fun x => by simp
+  monadLift_bind mx my := Set.ext fun x => by
     rw [Set.mem_preimage]
     calc
       some x ∈ support (OptionT.run (mx >>= my)) ↔
@@ -119,17 +119,9 @@ above, ensuring the diamond is definitionally equal (per Mathlib convention). Th
 field then serves as the coherence proof between the set-path and distribution-path. -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSPMF (OptionT m) where
-  toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
-  support_eq mx := by
-    ext x
-    simp only [mem_support_iff, OptionT.mapM', SPMF.mem_support_iff, SPMF.bind_apply_eq_tsum, ne_eq,
-      ENNReal.tsum_eq_zero, mul_eq_zero, not_forall, not_or]
-    constructor
-    · simp only [mem_support_iff_evalDist_apply_ne_zero, ne_eq]
-      refine fun h => ⟨some x, by simpa using h⟩
-    · simp only [mem_support_iff_evalDist_apply_ne_zero, ne_eq, forall_exists_index, and_imp]
-      intro x
-      cases x <;> aesop
+  monadLift x := OptionT.mapM' (MonadHom.ofLift m SPMF) x
+  monadLift_pure := by simp
+  monadLift_bind := by simp
 
 instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSet.LawfulFailure (OptionT m) where
@@ -139,15 +131,15 @@ instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
 variable [HasEvalSPMF m]
 
 lemma evalDist_eq (mx : OptionT m α) :
-    𝒟[mx] = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
+    𝒟[mx] = OptionT.mapM' (MonadHom.ofLift m SPMF) mx := rfl
 
 @[grind =]
 lemma probOutput_eq (mx : OptionT m α) (x : α) :
     Pr[= x | mx] = Pr[= some x | mx.run] := by
   simp only [probOutput_def]
-  change (OptionT.mapM' HasEvalSPMF.toSPMF mx) x = HasEvalSPMF.toSPMF mx.run (some x)
-  rw [show (OptionT.mapM' HasEvalSPMF.toSPMF mx : SPMF α) =
-    HasEvalSPMF.toSPMF mx.run >>= fun y =>
+  change (OptionT.mapM' (MonadHom.ofLift m SPMF) mx) x = (MonadHom.ofLift m SPMF) mx.run (some x)
+  rw [show (OptionT.mapM' (MonadHom.ofLift m SPMF) mx : SPMF α) =
+    (MonadHom.ofLift m SPMF) mx.run >>= fun y =>
       match y with | some a => pure a | none => failure from rfl]
   rw [SPMF.bind_apply_eq_tsum]
   refine (tsum_eq_single (some x) fun y hy => ?_).trans (by simp)
@@ -170,7 +162,7 @@ lemma probEvent_eq (mx : OptionT m α) (p : α → Prop) [DecidablePred p] :
 lemma probFailure_eq (mx : OptionT m α) :
     Pr[⊥ | mx] = Pr[⊥ | mx.run] + Pr[= none | mx.run] := by
   simp only [probFailure_def, probOutput_def]
-  rw [show 𝒟[mx] = (HasEvalSPMF.toSPMF mx.run >>= fun y =>
+  rw [show 𝒟[mx] = ((MonadHom.ofLift m SPMF) mx.run >>= fun y =>
       match y with | some a => pure a | none => failure : SPMF α) from rfl]
   simp [SPMF.toPMF_bind, Option.elimM, PMF.bind_apply, tsum_option,
     SPMF.toPMF_failure, SPMF.toPMF_pure, SPMF.apply_eq_toPMF_some, evalDist_def]

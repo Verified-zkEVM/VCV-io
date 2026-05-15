@@ -79,8 +79,9 @@ lemma probOutput_def (mx : m α) (x : α) : Pr[= x | mx] = evalDist mx x := rfl
 @[grind =]
 lemma mem_support_iff (mx : m α) (x : α) :
     x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by
-  sorry
-  -- simp [HasEvalSPMF.support_eq, probOutput_def, evalDist_def]
+  change x ∈ SetM.run (liftM mx : SetM α) ↔ _
+  change x ∈ SPMF.support (liftM mx : SPMF α) ↔ _
+  rw [SPMF.mem_support_iff, probOutput_def, evalDist_def]
 
 lemma mem_support_iff_evalDist_apply_ne_zero (mx : m α) (x : α) :
     x ∈ support mx ↔ 𝒟[mx] x ≠ 0 := by grind
@@ -638,8 +639,9 @@ lemma evalDist_of_hasEvalPMF_def (mx : m α) :
 /-- The `evalDist` arising from a `HasEvalPMF` instance never fails. -/
 @[simp, grind =]
 lemma probFailure_eq_zero (mx : m α) : Pr[⊥ | mx] = 0 := by
-  simp [probFailure_def, evalDist_of_hasEvalPMF_def]
-  sorry
+  rw [probFailure_def, evalDist_of_hasEvalPMF_def, SPMF.run_eq_toPMF]
+  change (some <$> (liftM mx : PMF α)) none = 0
+  simp [PMF.monad_map_eq_map, PMF.map_apply]
 
 lemma tsum_probOutput_eq_one (mx : m α) :
     ∑' x, Pr[= x | mx] = 1 := by simp

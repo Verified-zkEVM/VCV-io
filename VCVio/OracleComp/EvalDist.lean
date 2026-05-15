@@ -74,7 +74,9 @@ lemma supportWhen_mono {o₁ o₂ : QueryImpl spec Set}
 
 /-- The `support` instance for `OracleComp`, defined as -/
 instance hasEvalSet : HasEvalSet (OracleComp spec) where
-  toSet := simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ
+  monadLift mx := simulateQ' (r := SetM) (fun _ : spec.Domain => Set.univ) mx
+  monadLift_pure := (simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ).toFun_pure'
+  monadLift_bind := (simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ).toFun_bind'
 
 lemma support_eq_simulateQ (mx : OracleComp spec α) :
     support mx = simulateQ (r := SetM) (fun _ : spec.Domain => Set.univ) mx := rfl
@@ -152,12 +154,9 @@ variable [spec.Fintype] [spec.Inhabited]
 
 /-- Embed `OracleComp` into `SPMF` by mapping queries to uniform distributions over their range. -/
 noncomputable instance : HasEvalPMF (OracleComp spec) where
-  toPMF := simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)
-  support_eq mx := by induction mx using OracleComp.inductionOn with
-    | pure x => simp
-    | query_bind t mx ht => simp [ht]
-  toSPMF_eq mx := rfl
-  __ := OracleComp.hasEvalSet (spec := spec)
+  monadLift mx := simulateQ' (fun t => PMF.uniformOfFintype (spec.Range t)) mx
+  monadLift_pure := (simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)).toFun_pure'
+  monadLift_bind := (simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)).toFun_bind'
 
 lemma evalDist_eq_simulateQ (mx : OracleComp spec α) :
     𝒟[mx] = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
@@ -214,13 +213,54 @@ section supportEvalDist
 
 variable [spec.Fintype] [spec.Inhabited] (oa : OracleComp spec α) (x : α)
 
+/-- Bridge: support computed via the manual `hasEvalSet` agrees with `SPMF.support` of the
+distribution semantics. -/
+private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
+    support oa = SPMF.support (𝒟[oa]) := by
+  induction oa using OracleComp.inductionOn with
+  | pure y => ext z; simp [support_pure, evalDist_pure]
+  | query_bind t mx ih =>
+      ext z
+      rw [support_bind, support_query]
+      simp only [Set.mem_univ, true_and, Set.mem_iUnion, exists_prop]
+      simp_rw [ih]
+      simp only [SPMF.mem_support_iff, ne_eq, SPMF.apply_eq_toPMF_some]
+      rw [evalDist_bind, evalDist_query]
+      change (∃ i, ¬ (𝒟[mx i]).toPMF (some z) = 0) ↔
+        ¬ ((liftM (PMF.uniformOfFintype (spec.Range t)) : SPMF _) >>= fun u =>
+            𝒟[mx u]).toPMF (some z) = 0
+      rw [SPMF.toPMF_bind, Option.elimM, PMF.monad_bind_eq_bind, PMF.bind_apply,
+        tsum_option _ ENNReal.summable]
+      have hzero : ((liftM (PMF.uniformOfFintype (spec.Range t))
+          : SPMF (spec.Range t))).toPMF none = 0 := by
+        simp [SPMF.toPMF_liftM]
+      rw [hzero, zero_mul, zero_add]
+      have hcontU : ∀ u : spec.Range t,
+          ((liftM (PMF.uniformOfFintype (spec.Range t)) : SPMF _)).toPMF (some u) ≠ 0 := by
+        intro u
+        simp [SPMF.toPMF_liftM, PMF.uniformOfFintype, PMF.uniformOfFinset_apply,
+          Finset.card_univ, Fintype.card_ne_zero]
+      constructor
+      · intro h habs
+        rw [ENNReal.tsum_eq_zero] at habs
+        obtain ⟨u, hu⟩ := h
+        have := habs u
+        rw [mul_eq_zero] at this
+        exact this.elim (hcontU u) hu
+      · intro h
+        by_contra hcontra
+        push_neg at hcontra
+        apply h
+        refine ENNReal.tsum_eq_zero.mpr fun u => ?_
+        have := hcontra u
+        rw [Option.elim_some, this, mul_zero]
+
 /-- An output has non-zero probability in `evalDist` iff it is in computation support. -/
 @[simp]
 lemma mem_support_evalDist_iff :
     some x ∈ (𝒟[oa]).run.support ↔ x ∈ support oa := by
-  rw [PMF.mem_support_iff]
-  simpa [probOutput_def, SPMF.apply_eq_toPMF_some] using
-    (mem_support_iff (mx := oa) (x := x)).symm
+  rw [support_eq_SPMF_support, PMF.mem_support_iff, SPMF.mem_support_iff,
+    SPMF.apply_eq_toPMF_some, SPMF.run_eq_toPMF]
 
 alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff
 
@@ -284,7 +324,10 @@ lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : Orac
     · rfl
   · unfold Set.indicator
     have : (𝒟[oa]) x = 0 := by
-      rwa [← probOutput_def, probOutput_eq_zero_iff]
+      by_contra hne
+      apply hx
+      rw [support_eq_SPMF_support]
+      exact (SPMF.mem_support_iff _ _).mpr hne
     rw [h2] at this
     split_ifs <;> simp [this]
 
@@ -309,14 +352,21 @@ variable [spec.Fintype] [spec.Inhabited]
   rw [OracleComp.guard_eq]
   split_ifs with h
   · exact probOutput_pure_self ()
-  · exact probOutput_failure ()
+  · -- `probOutput_failure ()` would suit, but `LawfulFailure (OptionT (OracleComp spec))` does
+    -- not resolve through `OptionT.instLawfulFailure` due to a universe-inference quirk in the
+    -- post-refactor diamond. Compute directly.
+    rw [OptionT.probOutput_eq, OptionT.run_failure]
+    rw [show (pure none : OracleComp spec (Option Unit)) = pure none from rfl, probOutput_pure]
+    aesop
 
 @[simp] lemma probFailure_guard {p : Prop} [Decidable p] :
     Pr[⊥ | (guard p : OptionT (OracleComp spec) Unit)] = if p then 0 else 1 := by
   rw [OracleComp.guard_eq]
   split_ifs with h
   · exact probFailure_pure ()
-  · exact probFailure_failure
+  · -- See note above.
+    rw [OptionT.probFailure_eq, OptionT.run_failure]
+    simp
 
 lemma probOutput_eq_sub_probFailure_of_unit {oa : OracleComp spec PUnit} :
     Pr[= () | oa] = 1 - Pr[⊥ | oa] := by

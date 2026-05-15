@@ -92,12 +92,12 @@ lemma tvDist_le_one (mx my : m α) : tvDist mx my ≤ 1 := SPMF.tvDist_le_one _ 
 
 lemma tvDist_map_le [LawfulMonad m] {β : Type u} (f : α → β) (mx my : m α) :
     tvDist (f <$> mx) (f <$> my) ≤ tvDist mx my := by
-  simp only [tvDist, evalDist_def, MonadHom.mmap_map]
+  simp only [tvDist, evalDist_map]
   exact SPMF.tvDist_map_le f _ _
 
 lemma tvDist_bind_right_le [LawfulMonad m] {β : Type u} (f : α → m β) (mx my : m α) :
     tvDist (mx >>= f) (my >>= f) ≤ tvDist mx my := by
-  simp only [tvDist, evalDist_def, MonadHom.mmap_bind]
+  simp only [tvDist, evalDist_bind]
   exact SPMF.tvDist_bind_right_le _ _ _
 
 /-! ### TV distance bounds -/
@@ -235,16 +235,25 @@ lemma tvDist_bind_left_le
   simp_rw [HasEvalPMF.evalDist_of_hasEvalPMF_def]
   calc
     SPMF.tvDist
-        ((liftM (HasEvalPMF.toPMF mx) : SPMF α) >>= fun a => liftM (HasEvalPMF.toPMF (f a)))
-        ((liftM (HasEvalPMF.toPMF mx) : SPMF α) >>= fun a => liftM (HasEvalPMF.toPMF (g a)))
-      ≤ ∑' a, (HasEvalPMF.toPMF mx a).toReal *
-          SPMF.tvDist (liftM (HasEvalPMF.toPMF (f a))) (liftM (HasEvalPMF.toPMF (g a))) := by
-            exact spmf_tvDist_bind_left_le_liftM (HasEvalPMF.toPMF mx)
-              (fun a => HasEvalPMF.toPMF (f a))
-              (fun a => HasEvalPMF.toPMF (g a))
+        ((liftM (liftM mx : PMF α) : SPMF α) >>= fun a => liftM (liftM (f a) : PMF β))
+        ((liftM (liftM mx : PMF α) : SPMF α) >>= fun a => liftM (liftM (g a) : PMF β))
+      ≤ ∑' a, ((liftM mx : PMF α) a).toReal *
+          SPMF.tvDist (liftM (liftM (f a) : PMF β)) (liftM (liftM (g a) : PMF β)) := by
+            exact spmf_tvDist_bind_left_le_liftM (liftM mx : PMF α)
+              (fun a => (liftM (f a) : PMF β))
+              (fun a => (liftM (g a) : PMF β))
     _ = ∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a) := by
           refine tsum_congr fun a => ?_
-          simp [probOutput_def, tvDist, HasEvalPMF.evalDist_of_hasEvalPMF_def]
+          have h1 : ((liftM mx : PMF α) a).toReal = Pr[= a | mx].toReal := by
+            congr 1
+            rw [probOutput_def, HasEvalPMF.evalDist_of_hasEvalPMF_def]
+            exact (SPMF.liftM_apply (liftM mx : PMF α) a).symm
+          have h2 : (liftM (liftM (f a) : PMF β) : SPMF β).tvDist
+              (liftM (liftM (g a) : PMF β) : SPMF β) = tvDist (f a) (g a) := by
+            rw [tvDist, HasEvalPMF.evalDist_of_hasEvalPMF_def,
+              HasEvalPMF.evalDist_of_hasEvalPMF_def]
+            rfl
+          rw [h1, h2]
 
 /-! ### TV distance for bind with a bad event -/
 

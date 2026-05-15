@@ -40,7 +40,7 @@ noncomputable def withStateOracle
   instMonadSem := inferInstance
   interpret := simulateQ'
     ((QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl)
-  observe := fun mx => HasEvalSPMF.toSPMF (StateT.run' mx s)
+  observe := fun mx => (liftM (StateT.run' mx s) : SPMF _)
 
 /-- `withStateOracle` commutes with `<$>`: mapping a function over the surface computation
 is the same as mapping it over the observed `SPMF`.

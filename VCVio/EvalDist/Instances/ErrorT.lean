@@ -49,11 +49,11 @@ Keeping this standalone instance means `support` on `ExceptT ε m` works without
 full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM`). -/
 noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalSet m] :
     HasEvalSet (ExceptT ε m) where
-  toSet.toFun α mx := Except.ok ⁻¹' (support mx.run)
-  toSet.toFun_pure' x := Set.ext fun y => by
+  monadLift mx := Except.ok ⁻¹' (support mx.run)
+  monadLift_pure x := Set.ext fun y => by
     change Except.ok y ∈ support (pure (Except.ok x) : m _) ↔ y = x
     simp
-  toSet.toFun_bind' mx f := Set.ext fun x => by
+  monadLift_bind mx f := Set.ext fun x => by
     simp only [Set.mem_preimage]
     change Except.ok x ∈ support (mx.run >>= ExceptT.bindCont f) ↔ _
     rw [mem_support_bind_iff]
@@ -140,26 +140,26 @@ Given `mx : ExceptT ε m α`, we evaluate the underlying `m (Except ε α)` to a
 then route `Except.ok x` to `pure x` and `Except.error _` to `failure`. -/
 noncomputable def toSPMF' [HasEvalPMF m] : ExceptT ε m →ᵐ SPMF where
   toFun {α} (mx : ExceptT ε m α) : SPMF α :=
-    HasEvalSPMF.toSPMF mx.run >>= fun r =>
+    (liftM mx.run : SPMF _) >>= fun r =>
       match r with
       | Except.ok x => pure x
       | Except.error _ => failure
   toFun_pure' x := by simp
   toFun_bind' mx f := by
-    change HasEvalSPMF.toSPMF (mx.run >>= ExceptT.bindCont f) >>= _ = _
-    simp only [MonadHom.toFun_bind', monad_norm]
+    change (liftM (mx.run >>= ExceptT.bindCont f) : SPMF _) >>= _ = _
+    simp only [liftM_bind, monad_norm]
     congr 1; funext r
     cases r with
     | ok a =>
-      change HasEvalSPMF.toSPMF (f a).run >>= _ =
-        pure a >>= fun b => HasEvalSPMF.toSPMF (f b).run >>= _
+      change (liftM (f a).run : SPMF _) >>= _ =
+        pure a >>= fun b => (liftM (f b).run : SPMF _) >>= _
       simp
     | error e => simp [ExceptT.bindCont]
 
 private lemma toSPMF'_apply_eq [HasEvalPMF m] (mx : ExceptT ε m α) (x : α) :
-    ExceptT.toSPMF' mx x = HasEvalSPMF.toSPMF mx.run (Except.ok x) := by
+    ExceptT.toSPMF' mx x = (liftM mx.run : SPMF _) (Except.ok x) := by
   rw [show (ExceptT.toSPMF' mx : SPMF α) =
-    HasEvalSPMF.toSPMF mx.run >>= fun r =>
+    (liftM mx.run : SPMF _) >>= fun r =>
       match r with | Except.ok a => pure a | Except.error _ => failure from rfl]
   rw [SPMF.bind_apply_eq_tsum]
   refine (tsum_eq_single (Except.ok x) fun y hy => ?_).trans ?_
@@ -174,12 +174,9 @@ private lemma toSPMF'_apply_eq [HasEvalPMF m] (mx : ExceptT ε m α) (x : α) :
 Errors contribute to failure mass. -/
 noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalPMF m] :
     HasEvalSPMF (ExceptT ε m) where
-  toSPMF := ExceptT.toSPMF'
-  support_eq mx := by
-    ext x
-    rw [ExceptT.mem_support_iff, SPMF.mem_support_iff, toSPMF'_apply_eq]
-    change Except.ok x ∈ support mx.run ↔ 𝒟[mx.run] (Except.ok x) ≠ 0
-    exact mem_support_iff_evalDist_apply_ne_zero mx.run (Except.ok x)
+  monadLift mx := ExceptT.toSPMF' mx
+  monadLift_pure := ExceptT.toSPMF'.toFun_pure'
+  monadLift_bind := ExceptT.toSPMF'.toFun_bind'
 
 variable [HasEvalPMF m]
 
@@ -197,7 +194,7 @@ lemma probFailure_eq (mx : ExceptT ε m α) :
     Pr[⊥ | mx] = Pr[⊥ | mx.run] +
       Pr[ (fun r => match r with | Except.error _ => True | Except.ok _ => False) | mx.run] := by
   simp only [probFailure_def, probEvent_eq_tsum_indicator, probOutput_def]
-  rw [show 𝒟[mx] = (HasEvalSPMF.toSPMF mx.run >>= fun r =>
+  rw [show 𝒟[mx] = ((liftM mx.run : SPMF _) >>= fun r =>
       match r with | Except.ok a => pure a | Except.error _ => failure : SPMF α) from rfl]
   simp only [SPMF.run_eq_toPMF, SPMF.toPMF_bind, Option.elimM, PMF.monad_bind_eq_bind,
     PMF.bind_apply, ENNReal.summable, tsum_option, Option.elim_none, PMF.pure_apply, ↓reduceIte,
