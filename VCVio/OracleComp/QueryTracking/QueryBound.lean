@@ -712,19 +712,6 @@ lemma isTotalQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp s
   · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
   · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
 
-/-- If `oa >>= ob` has a total query bound `n`, then `oa` alone has total query bound `n`
-(the continuation can only add queries, not remove them). -/
-lemma IsTotalQueryBound.of_bind_left
-    {oa : OracleComp spec α} {ob : α → OracleComp spec β} {n : ℕ}
-    (h : IsTotalQueryBound (oa >>= ob) n) :
-    IsTotalQueryBound oa n := by
-  induction oa using OracleComp.inductionOn generalizing n with
-  | pure _ => trivial
-  | query_bind t mx ih =>
-      rw [bind_assoc, isTotalQueryBound_query_bind_iff] at h
-      rw [isTotalQueryBound_query_bind_iff]
-      exact ⟨h.1, fun u => ih u (h.2 u)⟩
-
 /-- Forward-direction `seq` analogue of `isTotalQueryBound_bind`. Reduces to the bind case
 via `seq_eq_bind_map` plus the `IsTotalQueryBound`-flavoured `isQueryBound_map_iff` to
 discharge the constant continuation. -/
