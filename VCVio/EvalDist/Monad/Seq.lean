@@ -17,6 +17,8 @@ TODO: many lemmas should probably have mirrored versions for `bind_map`.
 universe u v w
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
+  [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 open ENNReal
 
@@ -26,8 +28,9 @@ section seq
     support (mf <*> mx) = ⋃ f ∈ support mf, f '' support mx := by
   simp [seq_eq_bind_map]
 
-lemma mem_support_seq_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonad m] (mf : m (α → β)) (mx : m α) (y : β) :
-    y ∈ support (mf <*> mx) ↔ ∃ f ∈ support mf, ∃ x ∈ support mx, f x = y := by simp
+lemma mem_support_seq_iff [LawfulMonad m] (mf : m (α → β)) (mx : m α) (y : β) :
+    y ∈ support (mf <*> mx) ↔ ∃ f ∈ support mf, ∃ x ∈ support mx, f x = y := by
+  rw [support_seq]; simp
 
 @[simp] lemma finSupport_seq [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [LawfulMonad m]
     [DecidableEq (α → β)] [DecidableEq α] [DecidableEq β]

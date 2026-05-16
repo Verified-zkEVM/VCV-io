@@ -18,6 +18,7 @@ open BitVec
 
 variable {α β γ : Type _} {m : Type _ → Type _} [Monad m] [LawfulMonad m]
   [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 @[simp, grind =]
 lemma probOutput_ofFin_map {n : ℕ} (mx : m (Fin (2 ^ n))) (x : BitVec n) :

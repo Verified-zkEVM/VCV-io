@@ -185,7 +185,8 @@ end const
 
 section inverse
 
-variable {f : α → β} {g : β → α} {y : β}
+variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+  {f : α → β} {g : β → α} {y : β}
 
 @[aesop unsafe norm]
 lemma probOutput_map_eq_probOutput_of_leftInvOn
@@ -213,6 +214,8 @@ lemma probOutput_map_equiv (e : α ≃ β) (mx : m α) (y : β) :
 end inverse
 
 section injective
+
+variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 @[aesop unsafe norm]
 lemma probOutput_map_eq_probOutput_invFunOn [Nonempty α]
