@@ -162,20 +162,20 @@ theorem extractability_game_IsTotalQueryBound
     IsTotalQueryBound
         ((extractability_game committingAdv openingAdv))
         (qb + s.depth) := by
-  -- TODO, all these .2.2.1 etc. are pretty unreadable; can we make this into a do notation block?
   rw [show extractability_game committingAdv openingAdv =
       (committingAdv.withQueryLog >>= fun p =>
         openingAdv p.1.2 >>= fun q => pure (p, q)) >>=
-      fun pq =>
-        verifyProof pq.2.1 pq.2.2.1 pq.1.1.1 pq.2.2.2 >>= fun verified =>
-          pure (pq.1.1.1, pq.1.1.2,
-                ⟨pq.2.1, pq.2.2.1, pq.2.2.2,
-                 extractor s pq.1.2 pq.1.1.1,
-                 generateProof (extractor s pq.1.2 pq.1.1.1) pq.2.1,
+      fun (⟨⟨root, aux⟩, queryLog⟩, ⟨idx, leaf, proof⟩) =>
+        verifyProof idx leaf root proof >>= fun verified =>
+          pure (root, aux,
+                ⟨idx, leaf, proof,
+                 extractor s queryLog root,
+                 generateProof (extractor s queryLog root) idx,
                  verified⟩) by unfold extractability_game; simp only [bind_assoc, pure_bind]]
-  refine isTotalQueryBound_bind (n₁ := qb) (n₂ := s.depth) ?_ fun ⟨p, q⟩ =>
-    isTotalQueryBound_bind (n₁ := s.depth) (n₂ := 0)
-      (verifyProof_isTotalQueryBound_skeleton_depth q.1 q.2.1 p.1.1 q.2.2) (fun _ => trivial)
+  refine isTotalQueryBound_bind (n₁ := qb) (n₂ := s.depth) ?_
+    fun (⟨⟨root, _aux⟩, _queryLog⟩, ⟨idx, leaf, proof⟩) =>
+      isTotalQueryBound_bind (n₁ := s.depth) (n₂ := 0)
+        (verifyProof_isTotalQueryBound_skeleton_depth idx leaf root proof) (fun _ => trivial)
   have hmap : (fun _ => ()) <$>
       (committingAdv.withQueryLog >>= fun p => openingAdv p.1.2 >>= fun q => pure (p, q)) =
       (do let (_root, aux) ← committingAdv
