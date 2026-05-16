@@ -458,19 +458,16 @@ theorem withQueryLog_self_log_eq
   | pure x =>
       change ((v, l₁), l₂) ∈ support
         ((pure x : OracleComp spec α).withQueryLog.withQueryLog) at hmem
-      rw [withQueryLog_pure, withQueryLog_pure,
-        mem_support_pure_iff] at hmem
+      rw [withQueryLog_pure, withQueryLog_pure, mem_support_pure_iff] at hmem
       obtain ⟨⟨_, rfl⟩, rfl⟩ := Prod.mk.inj hmem |>.imp_left Prod.mk.inj
-      rfl
+      grind
   | query_bind t mx ih =>
       change ((v, l₁), l₂) ∈ support
         (((liftM (OracleSpec.query t) : OracleComp spec _) >>=
           fun u => mx u).withQueryLog.withQueryLog) at hmem
-      rw [withQueryLog_bind, withQueryLog_bind,
-        mem_support_bind_iff] at hmem
+      rw [withQueryLog_bind, withQueryLog_bind, mem_support_bind_iff] at hmem
       obtain ⟨⟨⟨u₁, log_q1⟩, log_q2⟩, h₁, hmem⟩ := hmem
-      rw [withQueryLog_query, withQueryLog_bind,
-        mem_support_bind_iff] at h₁
+      rw [withQueryLog_query, withQueryLog_bind, mem_support_bind_iff] at h₁
       obtain ⟨⟨u₂, log_qa⟩, h₁a, h₁b⟩ := h₁
       simp only [withQueryLog_query, mem_support_bind_iff,
         mem_support_pure_iff, Prod.mk.injEq] at h₁a
@@ -500,6 +497,8 @@ theorem withQueryLog_self_log_eq
       obtain ⟨rfl, rfl⟩ := h_pX
       simp only [Prod.map_apply, id_eq, List.append_nil, Prod.mk.injEq] at h_eq_X
       obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_eq_X
+      -- This proof can be `grind`ed a bit,
+      -- but seems to take a long time to finish/crash if we do so.
       rw [ih u' h_inner]
 
 
