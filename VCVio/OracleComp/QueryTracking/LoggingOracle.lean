@@ -450,7 +450,6 @@ inner `withQueryLog` already recorded, since `withQueryLog` does not add new
 queries to the underlying `OracleComp`. -/
 theorem withQueryLog_self_log_eq
     {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
-    [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) {v : α} {l₁ l₂ : spec.QueryLog}
     (hmem : ((v, l₁), l₂) ∈ support oa.withQueryLog.withQueryLog) :
     l₁ = l₂ := by
