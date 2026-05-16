@@ -45,8 +45,6 @@ A future improvement might be to re-structure the proof to recover the tighter b
 
 -/
 
-open scoped NNReal
-
 section ToVCV
 
 /--
@@ -176,19 +174,6 @@ def adversary_wins_extractability_game_event {α : Type} [BEq α] {s : Skeleton}
     ∨ not (proof.toList.map Option.some == extractedProof.toList))
 
 /--
-The event that the adversary wins the extractability game with logging:
-verification passes but the extracted leaf or proof does not match.
-The query log is ignored for the win condition.
--/
-def adversary_wins_extractability_game_with_logging_event
-    {α : Type} [BEq α] {s : Skeleton} {AuxState : Type} :
-    (α × AuxState ×
-       ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
-        FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) ×
-    (spec α).QueryLog → Prop :=
-  adversary_wins_extractability_game_event ∘ Prod.fst
-
-/--
 If the combined adversary pair `(committingAdv, openingAdv)` has total query bound `qb`,
 then the full extractability game has total query bound `qb + s.depth`.
 
@@ -271,7 +256,6 @@ private lemma getPutativeRoot_step_withQueryLog_decompose
   obtain ⟨⟨_, _⟩, h_q, h_eq2⟩ := hmem
   rw [mem_support_bind_iff] at h_q
   obtain ⟨_, _, h_pure⟩ := h_q
-  rw [mem_support_pure_iff, Prod.mk.injEq] at h_pure
   obtain ⟨rfl, rfl⟩ := h_pure
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_eq2
   exact ⟨a, log_a, h_rec, rfl⟩
@@ -325,7 +309,6 @@ private lemma verifyProof_support_chain
   rw [support_map, Set.mem_image] at hmem
   obtain ⟨⟨b, log_x⟩, h_x, h_eq⟩ := hmem
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_eq
-  rw [OracleComp.withQueryLog_pure, mem_support_pure_iff] at h_x
   obtain ⟨h_b_eq, rfl⟩ := Prod.mk.inj h_x
   obtain rfl : r = root := by simpa using h_b_eq.symm
   simpa using getPutativeRoot_support_chain idx leaf proof r log_g h_g
@@ -379,12 +362,10 @@ private lemma extractability_game_support_decompose
   obtain ⟨h_eq_co1, h_eq_co2⟩ := h_eq_co
   obtain ⟨h_eq_v1, h_eq_v2⟩ := h_eq_v
   obtain ⟨h_eq_p1, h_eq_p2⟩ := h_eq_p
-  rw [← h_eq_p1, h_p1] at h_eq_v1
-  rw [← h_eq_v1] at h_eq_co1
+  rw [← h_eq_v1, ← h_eq_p1, h_p1] at h_eq_co1
   simp only [Prod.mk.injEq] at h_eq_co1
   obtain ⟨rfl, rfl, h_sigma_eq⟩ := h_eq_co1
-  obtain ⟨h_idx_eq, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
-  subst h_idx_eq
+  obtain ⟨rfl, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
   simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
   obtain ⟨rfl, rfl, h_tree_eq, h_proof_ext_eq, rfl⟩ := h_rest_eq
   rw [OracleComp.withQueryLog_self_log_eq committingAdv h_c] at h_tree_eq h_proof_ext_eq
@@ -501,10 +482,7 @@ theorem extractor_chainInLog
     refine ⟨extLeaf, y ::ᵥ extProof, h_extLeaf, ?_, x, h_log_mem, h_chain⟩
     have h_root_value : (extractor sr log y).getRootValue = some y :=
       optionPopulateDown_getRootValue _ _
-    change (extractor sr log y).getRootValue ::
-        (generateProof (extractor sl log x) idxLeft).toList =
-      (y ::ᵥ extProof).toList.map some
-    rw [h_root_value, h_extProof]; rfl
+    grind [Nat.succ_eq_add_one, Vector.toList_cons]
   | @ofRight sl sr idxRight ih =>
     intros log root h_ne_none
     rcases hf : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
@@ -518,10 +496,7 @@ theorem extractor_chainInLog
     refine ⟨extLeaf, x ::ᵥ extProof, h_extLeaf, ?_, y, h_log_mem, h_chain⟩
     have h_root_value : (extractor sl log x).getRootValue = some x :=
       optionPopulateDown_getRootValue _ _
-    change (extractor sl log x).getRootValue ::
-        (generateProof (extractor sr log y) idxRight).toList =
-      (x ::ᵥ extProof).toList.map some
-    rw [h_root_value, h_extProof]; rfl
+    grind [Nat.succ_eq_add_one, Vector.toList_cons]
 
 /--
 **Pure consistency lemma.** Under no-collision, if the extractor's path from
@@ -551,8 +526,7 @@ theorem extractor_chain_match
   · obtain ⟨h1, h2⟩ := Prod.mk.inj hpair
     subst h1; subst h2
     exact ⟨h_extLeaf_eq, h_extProof_eq⟩
-  · exact absurd (chainInLog_logCollision_of_ne idx log root extLeaf leaf
-      extProof proof hpair h_extChain h_chain) h_no_coll
+  · grind [chainInLog_logCollision_of_ne]
 
 private theorem extractability_game_no_coll_match
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -729,7 +703,6 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
         -- `s = Skeleton.leaf`, so `extractor` returns `FullData.leaf (some root)` and
         -- `.get .ofLeaf` is `some root`, contradicting `h_get`.
         exfalso
-        change (some root : Option α) = none at h_get
         exact Option.some_ne_none _ h_get
       | ofLeft _ => exact Nat.succ_pos _
       | ofRight _ => exact Nat.succ_pos _
@@ -748,14 +721,6 @@ private theorem extractability_game_noColl_caseB_le_inv_card_aux
     (openingAdv : AuxState →
         OracleComp (spec α)
           ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
-    (qb : ℕ)
-    (_h_IsQueryBound_qb :
-      IsTotalQueryBound
-        (do
-          let (_root, aux) ← committingAdv
-          let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
-          pure ())
-        qb)
     (_h_card : 1 < (Fintype.card α : ENNReal)) :
     Pr[(fun x : (α × AuxState ×
         ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
@@ -772,8 +737,8 @@ private theorem extractability_game_noColl_caseB_le_inv_card_aux
             let ⟨_, _, idx, _, _, extractedTree, _, verified⟩ := vals
             verified = true ∧ extractedTree.get idx.toNodeIndex = none) ∘ Prod.fst) |
         (extractability_game committingAdv openingAdv).withQueryLog] ≤ _
-  rw [probEvent_withQueryLog]
-  rw [show extractability_game committingAdv openingAdv =
+  rw [probEvent_withQueryLog,
+    show extractability_game committingAdv openingAdv =
         committingAdv.withQueryLog >>= fun rootAuxLog =>
           openingAdv rootAuxLog.1.2 >>= fun ilp =>
             verifyProof ilp.1 ilp.2.1 rootAuxLog.1.1 ilp.2.2 >>= fun verified =>
@@ -782,21 +747,10 @@ private theorem extractability_game_noColl_caseB_le_inv_card_aux
                  extractor s rootAuxLog.2 rootAuxLog.1.1,
                  generateProof (extractor s rootAuxLog.2 rootAuxLog.1.1) ilp.1,
                  verified⟩) by unfold extractability_game; rfl]
-  refine probEvent_bind_le_of_forall_le ?_
-  rintro ⟨⟨root, aux⟩, log_c⟩ _
-  refine probEvent_bind_le_of_forall_le ?_
-  rintro ⟨idx, leaf, proof⟩ _
-  rw [show (fun verified : Bool =>
-        (pure (root, aux,
-          ⟨idx, leaf, proof, extractor s log_c root,
-           generateProof (extractor s log_c root) idx, verified⟩) :
-          OracleComp (spec α) (α × AuxState ×
-            ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
-             FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)))) =
-        pure ∘ (fun verified : Bool => (root, aux,
-          ⟨idx, leaf, proof, extractor s log_c root,
-           generateProof (extractor s log_c root) idx, verified⟩)) from rfl,
-      probEvent_bind_pure_comp]
+  refine probEvent_bind_le_of_forall_le fun ⟨⟨root, aux⟩, log_c⟩ _ => ?_
+  refine probEvent_bind_le_of_forall_le fun ⟨idx, leaf, proof⟩ _ => ?_
+  rw [show (fun verified : Bool => pure (root, aux, _) :
+        Bool → OracleComp (spec α) _) = pure ∘ _ from rfl, probEvent_bind_pure_comp]
   exact probEvent_verifyProof_extractor_none_le_inv_card idx leaf root proof log_c
 
 private theorem extractability_game_noColl_caseB_le_inv_card
@@ -806,15 +760,7 @@ private theorem extractability_game_noColl_caseB_le_inv_card
     (committingAdv : OracleComp (spec α) (α × AuxState))
     (openingAdv : AuxState →
         OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
-    (qb : ℕ)
-    (h_IsQueryBound_qb :
-      IsTotalQueryBound
-        (do
-          let (_root, aux) ← committingAdv
-          let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
-          pure ())
-        qb) :
+          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
     Pr[noColl_caseB_event |
         (extractability_game committingAdv openingAdv).withQueryLog] ≤
       (1 : ENNReal) / (Fintype.card α : ENNReal) := by
@@ -825,10 +771,9 @@ private theorem extractability_game_noColl_caseB_le_inv_card
     exact ⟨h_v, h_extract_none⟩
   by_cases h_card : (Fintype.card α : ENNReal) ≤ 1
   · refine probEvent_le_one.trans ?_
-    rw [ENNReal.le_div_iff_mul_le (Or.inr one_ne_zero) (Or.inr ENNReal.one_ne_top)]
     simpa using h_card
   · exact extractability_game_noColl_caseB_le_inv_card_aux
-      committingAdv openingAdv qb h_IsQueryBound_qb (not_le.mp h_card)
+      committingAdv openingAdv (not_le.mp h_card)
 
 private theorem extractability_game_noCollision_wins_le_inv_card
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
@@ -852,52 +797,22 @@ private theorem extractability_game_noCollision_wins_le_inv_card
         (1 : ENNReal) / (Fintype.card α : ENNReal) := by
   by_cases h_card : (Fintype.card α : ENNReal) ≤ 1
   · refine probEvent_le_one.trans ?_
-    rw [ENNReal.le_div_iff_mul_le (Or.inr one_ne_zero) (Or.inr ENNReal.one_ne_top)]
     simpa using h_card
   calc Pr[fun (vals, log) =>
             ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
             (extractability_game committingAdv openingAdv).withQueryLog]
       = Pr[fun x => noColl_caseA_event x ∨ noColl_caseB_event x |
             (extractability_game committingAdv openingAdv).withQueryLog] := by
-        rw [funext fun x => propext (noColl_bad_iff_caseA_or_caseB x)]
+        simp_rw [noColl_bad_iff_caseA_or_caseB]
     _ ≤ Pr[noColl_caseA_event |
             (extractability_game committingAdv openingAdv).withQueryLog] +
         Pr[noColl_caseB_event |
             (extractability_game committingAdv openingAdv).withQueryLog] :=
         probEvent_or_le ..
-    _ ≤ 0 + (1 : ENNReal) / (Fintype.card α : ENNReal) := by
-        gcongr
-        exacts [(extractability_game_noColl_caseA_eq_zero committingAdv openingAdv
-            qb h_IsQueryBound_qb).le,
-          extractability_game_noColl_caseB_le_inv_card committingAdv openingAdv
-            qb h_IsQueryBound_qb]
-    _ = (1 : ENNReal) / (Fintype.card α : ENNReal) := zero_add _
-
-private theorem extractability_game_noCollision_wins_le
-    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
-    [(spec α).Fintype] [(spec α).Inhabited]
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
-    (qb : ℕ)
-    (h_IsQueryBound_qb :
-      IsTotalQueryBound
-        (do
-          let (_root, aux) ← committingAdv
-          let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
-          pure ())
-        qb) :
-    Pr[fun (vals, log) =>
-        ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
-      (extractability_game committingAdv openingAdv).withQueryLog] ≤
-        1 / (Fintype.card α : ENNReal) := by
-  refine le_trans
-    (extractability_game_noCollision_wins_le_inv_card committingAdv openingAdv
-      qb h_IsQueryBound_qb) ?_
-  apply ENNReal.div_le_div_right
-  grind
+    _ ≤ (1 : ENNReal) / (Fintype.card α : ENNReal) := by
+        rw [extractability_game_noColl_caseA_eq_zero committingAdv openingAdv
+          qb h_IsQueryBound_qb, zero_add]
+        exact extractability_game_noColl_caseB_le_inv_card committingAdv openingAdv
 
 /--
 The extractability theorem for Merkle trees.
@@ -941,17 +856,16 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     := by
   calc
     -- Rewrite the game to include the combined query log.
-    _ = Pr[adversary_wins_extractability_game_with_logging_event |
-          (extractability_game committingAdv openingAdv).withQueryLog] := by
-      simp only [adversary_wins_extractability_game_with_logging_event]
-      rw [probEvent_withQueryLog]
+    _ = Pr[adversary_wins_extractability_game_event ∘ Prod.fst |
+          (extractability_game committingAdv openingAdv).withQueryLog] :=
+      (probEvent_withQueryLog _ _).symm
     -- Split: bad event implies collision, or no-collision with bad event.
     _ ≤ Pr[fun (vals, log) =>
             LogHasCollision log ∨
             (¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals) |
           (extractability_game committingAdv openingAdv).withQueryLog] := by
       refine probEvent_mono'' fun ⟨vals, log⟩ => ?_
-      simp [adversary_wins_extractability_game_with_logging_event]; tauto
+      tauto
     -- Union bound.
     _ ≤ Pr[fun (vals, log) => LogHasCollision log |
             (extractability_game committingAdv openingAdv).withQueryLog] +
@@ -973,7 +887,7 @@ theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabi
     -- Bound the no-collision bad event probability.
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         1 / (Fintype.card α) := by
-      have h' := extractability_game_noCollision_wins_le committingAdv openingAdv
+      have h' := extractability_game_noCollision_wins_le_inv_card committingAdv openingAdv
         (s := s) (AuxState := AuxState) qb h_IsQueryBound_qb
       gcongr
       norm_cast
