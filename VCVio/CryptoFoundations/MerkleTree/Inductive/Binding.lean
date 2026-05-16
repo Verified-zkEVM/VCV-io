@@ -9,14 +9,14 @@ import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
 # Merkle Binding (Collision Lemma)
 
 The structural collision lemma for inductive Merkle trees, often called the
-"Collision Lemma": two distinct leaf values that
-verify against the same Merkle root — under possibly different sibling
-proofs — entail a collision in the underlying hash function.
+"Collision Lemma": two distinct openings of the same Merkle root —
+distinct in the committed leaf value, the sibling proof, or both — entail a
+collision in the underlying hash function.
 
-The hypothesis `x ≠ y` captures that the adversary equivocates on the
-*committed value*, which is what binding requires; the case `x = y` with
-different sibling proofs is not a binding break, since the committer is
-allowed to know multiple valid proofs of the same value.
+The hypothesis `(x, proof₁) ≠ (y, proof₂)` captures any equivocation by the
+committer at the same leaf index, which is what binding forbids: at a fixed
+position there should be a single opening to a given root. (The
+distinct-position case is not a binding break and is handled separately.)
 
 The hash function is taken in curried form `α → α → α`, matching the
 convention used by `getPutativeRootWithHash` and the rest of the Merkle tree
@@ -39,8 +39,8 @@ merely asserting its existence.
 - `InductiveMerkleTree.findCollision_sound` — if `findCollision` returns
   a tuple, that tuple satisfies `Collision`.
 - `InductiveMerkleTree.getPutativeRootWithHash_binding` — from any two
-  distinct leaf values producing the same root at the same leaf index under
-  (possibly different) sibling proofs, `findCollision` returns `some`.
+  distinct openings `(x, proof₁) ≠ (y, proof₂)` producing the same root at
+  the same leaf index, `findCollision` returns `some`.
 - `InductiveMerkleTree.getPutativeRootWithHash_binding_collision` — the
   user-facing Collision Lemma: the tuple returned by `findCollision` is a
   genuine hash collision.
@@ -152,40 +152,60 @@ theorem findCollision_sound (h : α → α → α) {s : Skeleton} (idx : Skeleto
           exact ⟨hpair, heqhash⟩
         · simp [heqhash] at hfind
 
-/-- Merkle binding: from two distinct leaf values `x ≠ y` that produce the
-    same putative root at the same leaf index under (possibly different)
-    sibling proofs, the constructive search `findCollision` returns `some`.
+/-- Merkle binding: from two distinct openings `(x, proof₁) ≠ (y, proof₂)`
+    that produce the same putative root at the same leaf index, the
+    constructive search `findCollision` returns `some`.
 
     Note that `idx` is shared — this is binding *at a fixed position*. The
     distinct-position case requires walking down both paths to the lowest
     common ancestor and is handled separately.
+
+    The hypothesis is on the *pair* `(value, proof)` rather than just on the
+    leaf value, so this also covers the case where two distinct sibling
+    proofs of the same leaf produce the same root: that, too, is a binding
+    break and the constructive search still produces a collision.
 
     Proof strategy: induction on `idx`. At each non-leaf step, the recursion
     of `getPutativeRootWithHash` exposes a top-level hash. Either the two
     pairs `(subL, proof₁.head)` and `(subR, proof₂.head)` it consumes already
     differ (top-level collision, so `findCollision` returns them) or they
     agree component-wise — in which case the inputs to the inner recursive
-    calls disagree, so we recurse. -/
+    calls disagree (the original inequality on `(x, proof)` propagates down
+    to `(x, proof.tail)`), so we recurse. -/
 theorem getPutativeRootWithHash_binding
     (h : α → α → α) {s : Skeleton} (idx : SkeletonLeafIndex s)
     (proof₁ proof₂ : List.Vector α idx.depth) (x y : α)
-    (hne : x ≠ y)
+    (hne : (x, proof₁) ≠ (y, proof₂))
     (heq : getPutativeRootWithHash idx x proof₁ h
          = getPutativeRootWithHash idx y proof₂ h) :
     ∃ l₁ r₁ l₂ r₂, findCollision h idx proof₁ proof₂ x y = some (l₁, r₁, l₂, r₂) := by
   induction idx generalizing x y with
   | ofLeaf =>
+      -- At depth 0, both proofs are empty vectors hence equal; the inequality
+      -- forces `x ≠ y`, contradicting `heq : x = y`.
       simp only [getPutativeRootWithHash] at heq
-      exact absurd heq hne
+      refine absurd ?_ hne
+      have hp : proof₁ = proof₂ := List.Vector.ext (fun i => i.elim0)
+      exact Prod.ext heq hp
   | ofLeft idxLeft ih =>
       simp only [getPutativeRootWithHash] at heq
       have hhash_eq : h (getPutativeRootWithHash idxLeft x proof₁.tail h) proof₁.head =
                      h (getPutativeRootWithHash idxLeft y proof₂.tail h) proof₂.head := heq
       by_cases hpair : (getPutativeRootWithHash idxLeft x proof₁.tail h, proof₁.head) =
                        (getPutativeRootWithHash idxLeft y proof₂.tail h, proof₂.head)
-      · -- Pairs agree: recurse on the smaller index.
-        obtain ⟨hsub, _⟩ := Prod.mk.inj hpair
-        obtain ⟨l₁, r₁, l₂, r₂, hfind⟩ := ih proof₁.tail proof₂.tail x y hne hsub
+      · -- Pairs agree: propagate `(x, proof₁) ≠ (y, proof₂)` to the tail and recurse.
+        obtain ⟨hsub, hhead⟩ := Prod.mk.inj hpair
+        have hne_tail : (x, proof₁.tail) ≠ (y, proof₂.tail) := by
+          intro h_eq_tail
+          obtain ⟨hxy, htail⟩ := Prod.mk.inj h_eq_tail
+          apply hne
+          refine Prod.ext hxy ?_
+          conv_lhs => rw [show proof₁ = proof₁.head ::ᵥ proof₁.tail
+            from (List.Vector.cons_head_tail proof₁).symm]
+          conv_rhs => rw [show proof₂ = proof₂.head ::ᵥ proof₂.tail
+            from (List.Vector.cons_head_tail proof₂).symm]
+          rw [hhead, htail]
+        obtain ⟨l₁, r₁, l₂, r₂, hfind⟩ := ih proof₁.tail proof₂.tail x y hne_tail hsub
         refine ⟨l₁, r₁, l₂, r₂, ?_⟩
         unfold findCollision
         dsimp
@@ -202,9 +222,19 @@ theorem getPutativeRootWithHash_binding
                      h proof₂.head (getPutativeRootWithHash idxRight y proof₂.tail h) := heq
       by_cases hpair : (proof₁.head, getPutativeRootWithHash idxRight x proof₁.tail h) =
                        (proof₂.head, getPutativeRootWithHash idxRight y proof₂.tail h)
-      · -- Pairs agree: recurse on the smaller index.
-        obtain ⟨_, hsub⟩ := Prod.mk.inj hpair
-        obtain ⟨l₁, r₁, l₂, r₂, hfind⟩ := ih proof₁.tail proof₂.tail x y hne hsub
+      · -- Pairs agree: propagate `(x, proof₁) ≠ (y, proof₂)` to the tail and recurse.
+        obtain ⟨hhead, hsub⟩ := Prod.mk.inj hpair
+        have hne_tail : (x, proof₁.tail) ≠ (y, proof₂.tail) := by
+          intro h_eq_tail
+          obtain ⟨hxy, htail⟩ := Prod.mk.inj h_eq_tail
+          apply hne
+          refine Prod.ext hxy ?_
+          conv_lhs => rw [show proof₁ = proof₁.head ::ᵥ proof₁.tail
+            from (List.Vector.cons_head_tail proof₁).symm]
+          conv_rhs => rw [show proof₂ = proof₂.head ::ᵥ proof₂.tail
+            from (List.Vector.cons_head_tail proof₂).symm]
+          rw [hhead, htail]
+        obtain ⟨l₁, r₁, l₂, r₂, hfind⟩ := ih proof₁.tail proof₂.tail x y hne_tail hsub
         refine ⟨l₁, r₁, l₂, r₂, ?_⟩
         unfold findCollision
         dsimp
@@ -216,10 +246,10 @@ theorem getPutativeRootWithHash_binding
         dsimp
         simp [hpair, hhash_eq]
 
-/-- Collision Lemma for Merkle trees: from two distinct leaf values that
-    produce the same putative root at the same leaf index under (possibly
-    different) sibling proofs, `findCollision` returns a tuple that is a
-    genuine hash collision.
+/-- Collision Lemma for Merkle trees: from two distinct openings
+    `(x, proof₁) ≠ (y, proof₂)` that produce the same putative root at the
+    same leaf index, `findCollision` returns a tuple that is a genuine hash
+    collision.
 
     Combines `getPutativeRootWithHash_binding` (the search succeeds) with
     `findCollision_sound` (its output satisfies `Collision`) into a single
@@ -227,7 +257,7 @@ theorem getPutativeRootWithHash_binding
 theorem getPutativeRootWithHash_binding_collision
     (h : α → α → α) {s : Skeleton} (idx : SkeletonLeafIndex s)
     (proof₁ proof₂ : List.Vector α idx.depth) (x y : α)
-    (hne : x ≠ y)
+    (hne : (x, proof₁) ≠ (y, proof₂))
     (heq : getPutativeRootWithHash idx x proof₁ h
          = getPutativeRootWithHash idx y proof₂ h) :
     ∃ l₁ r₁ l₂ r₂,

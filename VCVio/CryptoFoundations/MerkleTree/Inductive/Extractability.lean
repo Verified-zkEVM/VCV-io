@@ -96,24 +96,6 @@ def extractor {α : Type} [DecidableEq α] [SampleableType α]
     FullData (Option α) s :=
   optionPopulateDown s (extractorChildren cache) root
 
-private lemma find?_response_eq_some_of_no_collision_mem
-    [DecidableEq α] {log : (spec α).QueryLog} {q : (_i : (α × α)) × α}
-    (h_no_coll : ¬ LogHasCollision log) (h_mem : q ∈ log) :
-    log.find? (fun q' => q'.2 == q.2) = some q := by
-  -- `find?` returns the first matching entry; under no-collision, all matching
-  -- entries are equal as Sigma values, so the first one must be `q`.
-  obtain ⟨y, hy⟩ : ∃ y, log.find? (fun q' => q'.2 == q.2) = some y := by
-    cases hf : log.find? (fun q' => q'.2 == q.2) with
-    | none => exact (List.find?_eq_none.mp hf q h_mem (by simp)).elim
-    | some y => exact ⟨y, rfl⟩
-  rw [hy]
-  congr 1
-  have h_y_eq : y.2 = q.2 := by
-    simpa using (List.find?_eq_some_iff_getElem.mp hy).1
-  by_contra h_ne
-  exact h_no_coll (LogHasCollision.of_mem h_ne (List.mem_of_find?_eq_some hy) h_mem
-    (heq_of_eq h_y_eq))
-
 /--
 Predicate stating that `log` contains a hash chain from `root` (combined with the
 sibling values in `proof`) down to `leaf` along the path determined by `idx`.
@@ -151,101 +133,6 @@ private lemma extractor_internal_eq_of_find?_eq
   simp only [extractor]
   rw [optionPopulateDown_internal, h_children]
   rfl
-
-/--
-**Pure consistency lemma.** Under no-collision, if the extractor's path from
-`root` to the node at `idx` is intact (the value there is `≠ none`) and
-`chainInLog log root idx leaf proof` holds, then the extracted leaf value equals
-`some leaf` and the extracted proof matches `proof.toList.map some` pointwise.
-
-The argument is a structural induction on `idx`: at each level the unique log
-entry with response equal to the current ancestor must be both the one used by
-the extractor (to descend) and the one used by the verifier's chain (to ascend),
-so their input pairs agree. Specifically, for `idx = .ofLeft idxLeft` we use:
-
-* `chainInLog` produces an entry `⟨(ancestor, proof.head), root⟩ ∈ log`.
-* `_h_ne_none` plus `extractor`'s `populateDown` definition forces
-  `log.find? (·.2 == root)` to be `some _`.
-* No-collision then identifies that `find?` result with the chain entry above,
-  giving `extracted leftRoot = some ancestor` and `extracted rightRoot = some proof.head`.
-* The IH applied to the left subtree (with new root `ancestor`) closes the
-  recursion. The `.ofRight` case is symmetric.
-
-The `.ofLeaf` base case follows because the extractor at `Skeleton.leaf`
-returns `FullData.leaf (some root)` and `chainInLog … .ofLeaf` forces
-`leaf = root`.
--/
-theorem extractor_chain_match
-    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
-    {s : Skeleton} (idx : SkeletonLeafIndex s) :
-    ∀ (log : (spec α).QueryLog) (root : α) (leaf : α)
-      (proof : List.Vector α idx.depth),
-    ¬ LogHasCollision log →
-    (extractor s log root).get idx.toNodeIndex ≠ none →
-    chainInLog log root idx leaf proof →
-    (extractor s log root).get idx.toNodeIndex = some leaf ∧
-      (generateProof (extractor s log root) idx).toList = proof.toList.map some := by
-  induction idx with
-  | ofLeaf =>
-    intro log root leaf proof _ _ h_chain
-    simp only [chainInLog] at h_chain
-    refine ⟨?_, ?_⟩
-    · change (FullData.leaf (some root) : FullData (Option α) Skeleton.leaf).get
-            SkeletonNodeIndex.ofLeaf = some leaf
-      rw [FullData.get_leaf, h_chain]
-    · obtain ⟨_ | _, hl⟩ := proof
-      · rfl
-      · exact absurd hl (Nat.succ_ne_zero _)
-  | @ofLeft sl sr idxLeft ih =>
-    intro log root leaf proof h_no_coll h_ne_none h_chain
-    obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    have h_find :
-        log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
-          some ⟨(ancestor, proof.head), root⟩ := by
-      simpa using find?_response_eq_some_of_no_collision_mem
-        (q := (⟨(ancestor, proof.head), root⟩ : (_i : (α × α)) × α)) h_no_coll h_log_mem
-    have h_extractor_decomp :=
-      extractor_internal_eq_of_find?_eq sl sr log root ancestor proof.head h_find
-    rw [h_extractor_decomp]
-    have h_ne_none_inner : (extractor sl log ancestor).get idxLeft.toNodeIndex ≠ none :=
-      fun hne => h_ne_none (by rw [h_extractor_decomp]; exact hne)
-    obtain ⟨ih_get, ih_proof⟩ :=
-      ih log ancestor leaf proof.tail h_no_coll h_ne_none_inner h_chain_rec
-    refine ⟨ih_get, ?_⟩
-    change (extractor sr log proof.head).getRootValue ::
-          (generateProof (extractor sl log ancestor) idxLeft).toList =
-        proof.toList.map some
-    have h_root_value : (extractor sr log proof.head).getRootValue = some proof.head :=
-      optionPopulateDown_getRootValue _ _
-    rw [h_root_value, ih_proof]
-    obtain ⟨_ | _, hl⟩ := proof
-    · exact absurd hl.symm (Nat.succ_ne_zero _)
-    · rfl
-  | @ofRight sl sr idxRight ih =>
-    intro log root leaf proof h_no_coll h_ne_none h_chain
-    obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    have h_find :
-        log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
-          some ⟨(proof.head, ancestor), root⟩ := by
-      simpa using find?_response_eq_some_of_no_collision_mem
-        (q := (⟨(proof.head, ancestor), root⟩ : (_i : (α × α)) × α)) h_no_coll h_log_mem
-    have h_extractor_decomp :=
-      extractor_internal_eq_of_find?_eq sl sr log root proof.head ancestor h_find
-    rw [h_extractor_decomp]
-    have h_ne_none_inner : (extractor sr log ancestor).get idxRight.toNodeIndex ≠ none :=
-      fun hne => h_ne_none (by rw [h_extractor_decomp]; exact hne)
-    obtain ⟨ih_get, ih_proof⟩ :=
-      ih log ancestor leaf proof.tail h_no_coll h_ne_none_inner h_chain_rec
-    refine ⟨ih_get, ?_⟩
-    change (extractor sl log proof.head).getRootValue ::
-          (generateProof (extractor sr log ancestor) idxRight).toList =
-        proof.toList.map some
-    have h_root_value : (extractor sl log proof.head).getRootValue = some proof.head :=
-      optionPopulateDown_getRootValue _ _
-    rw [h_root_value, ih_proof]
-    obtain ⟨_ | _, hl⟩ := proof
-    · exact absurd hl.symm (Nat.succ_ne_zero _)
-    · rfl
 
 /--
 The game for extractability.
@@ -502,114 +389,6 @@ private lemma extractorChildren_eq_none_of_find?_eq_none [DecidableEq α]
   change (match log_c.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = none
   rw [hf]
 
-/-- Under no-collision, if a chain entry `⟨pair, root⟩` lies in `log` and the
-extractor on the subset `log_c` reaches at least the descendant index
-`idx.ofLeft.toNodeIndex` (or `.ofRight`), then `log_c.find?` returns *exactly*
-the chain entry. The proof case-splits on `find?`: the `none` case contradicts
-the "extractor reaches a descendant" hypothesis via
-`populateDown_none_get_eq_none`; the `some` case forces equality with the
-chain entry via no-collision. -/
-private lemma find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none
-    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
-    {sl sr : Skeleton} (idxLeft : SkeletonLeafIndex sl)
-    {log log_c : (spec α).QueryLog} {root x y : α}
-    (h_sub : ∀ q, q ∈ log_c → q ∈ log) (h_no_coll : ¬ LogHasCollision log)
-    (h_chain_mem : (⟨(x, y), root⟩ : (_i : (α × α)) × α) ∈ log)
-    (h_ne_none : (extractor (Skeleton.internal sl sr) log_c root).get
-        (SkeletonLeafIndex.ofLeft idxLeft).toNodeIndex ≠ none) :
-    log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
-      some ⟨(x, y), root⟩ := by
-  obtain ⟨q_c, h_find_c⟩ :
-      ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
-    rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
-    · refine absurd ?_ h_ne_none
-      simp only [extractor]
-      rw [optionPopulateDown_internal, extractorChildren_eq_none_of_find?_eq_none hf]
-      change (populateDown sl (Option.bindPair (extractorChildren log_c)) none).get
-          idxLeft.toNodeIndex = none
-      exact populateDown_none_get_eq_none (Option.bindPair (extractorChildren log_c)) rfl
-        idxLeft.toNodeIndex
-    · exact ⟨q, rfl⟩
-  have h_qc_resp : q_c.2 = root := by
-    simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
-  have h_qc_eq : q_c = ⟨(x, y), root⟩ := by
-    by_contra h_ne
-    exact h_no_coll (LogHasCollision.of_mem h_ne
-      (h_sub _ (List.mem_of_find?_eq_some h_find_c)) h_chain_mem (heq_of_eq h_qc_resp))
-  rw [h_find_c, h_qc_eq]
-
-/-- Mirror of `find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none`
-for the right subtree. -/
-private lemma find?_response_eq_chain_entry_of_extractor_get_ofRight_ne_none
-    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
-    {sl sr : Skeleton} (idxRight : SkeletonLeafIndex sr)
-    {log log_c : (spec α).QueryLog} {root x y : α}
-    (h_sub : ∀ q, q ∈ log_c → q ∈ log) (h_no_coll : ¬ LogHasCollision log)
-    (h_chain_mem : (⟨(x, y), root⟩ : (_i : (α × α)) × α) ∈ log)
-    (h_ne_none : (extractor (Skeleton.internal sl sr) log_c root).get
-        (SkeletonLeafIndex.ofRight idxRight).toNodeIndex ≠ none) :
-    log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
-      some ⟨(x, y), root⟩ := by
-  obtain ⟨q_c, h_find_c⟩ :
-      ∃ q, log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
-    rcases hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
-    · refine absurd ?_ h_ne_none
-      simp only [extractor]
-      rw [optionPopulateDown_internal, extractorChildren_eq_none_of_find?_eq_none hf]
-      change (populateDown sr (Option.bindPair (extractorChildren log_c)) none).get
-          idxRight.toNodeIndex = none
-      exact populateDown_none_get_eq_none (Option.bindPair (extractorChildren log_c)) rfl
-        idxRight.toNodeIndex
-    · exact ⟨q, rfl⟩
-  have h_qc_resp : q_c.2 = root := by
-    simpa [beq_iff_eq] using (List.find?_eq_some_iff_getElem.mp h_find_c).1
-  have h_qc_eq : q_c = ⟨(x, y), root⟩ := by
-    by_contra h_ne
-    exact h_no_coll (LogHasCollision.of_mem h_ne
-      (h_sub _ (List.mem_of_find?_eq_some h_find_c)) h_chain_mem (heq_of_eq h_qc_resp))
-  rw [h_find_c, h_qc_eq]
-
-private theorem chainInLog_restrict
-    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
-    {s : Skeleton} (idx : SkeletonLeafIndex s) :
-    ∀ (log log_c : (spec α).QueryLog) (root : α) (leaf : α)
-      (proof : List.Vector α idx.depth),
-    (∀ q, q ∈ log_c → q ∈ log) →
-    ¬ LogHasCollision log →
-    (extractor s log_c root).get idx.toNodeIndex ≠ none →
-    chainInLog log root idx leaf proof →
-    chainInLog log_c root idx leaf proof := by
-  induction idx with
-  | ofLeaf => intros _ _ _ _ _ _ _ _ h_chain; exact h_chain
-  | @ofLeft sl sr idxLeft ih =>
-    intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
-    obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    have h_find_c' := find?_response_eq_chain_entry_of_extractor_get_ofLeft_ne_none
-      idxLeft h_sub h_no_coll h_log_mem h_ne_none
-    refine ⟨ancestor, List.mem_of_find?_eq_some h_find_c',
-      ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
-        h_chain_rec⟩
-    have h_children : extractorChildren log_c root = some (ancestor, proof.head) := by
-      change (match log_c.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = _
-      rw [h_find_c']
-    simp only [extractor]
-    rw [optionPopulateDown_internal, h_children]
-    exact hne
-  | @ofRight sl sr idxRight ih =>
-    intros log log_c root leaf proof h_sub h_no_coll h_ne_none h_chain
-    obtain ⟨ancestor, h_log_mem, h_chain_rec⟩ := h_chain
-    have h_find_c' := find?_response_eq_chain_entry_of_extractor_get_ofRight_ne_none
-      idxRight h_sub h_no_coll h_log_mem h_ne_none
-    refine ⟨ancestor, List.mem_of_find?_eq_some h_find_c',
-      ih log log_c ancestor leaf proof.tail h_sub h_no_coll (fun hne => h_ne_none ?_)
-        h_chain_rec⟩
-    have h_children : extractorChildren log_c root = some (proof.head, ancestor) := by
-      change (match log_c.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = _
-      rw [h_find_c']
-    simp only [extractor]
-    rw [optionPopulateDown_internal, h_children]
-    exact hne
-
 /-- **Self-log fixed point.** The two log layers produced by
 `oa.withQueryLog.withQueryLog` agree on every support point: simulating the
 logging oracle over `oa.withQueryLog` records exactly the queries that the
@@ -732,6 +511,200 @@ private lemma extractability_game_support_decompose
     rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
     simpa using List.mem_append_left _ (List.mem_append_left _ hq)
 
+/-- **Log-level binding (Collision Lemma at the log level).** Log-formalized
+analog of `getPutativeRootWithHash_binding_collision`: two distinct openings
+`(x, proof₁) ≠ (y, proof₂)` of the same `root` at the same index, both
+witnessed by hash chains `chainInLog` in the same `log`, force `log` to
+contain a hash collision (two log entries with equal responses but distinct
+inputs).
+
+Proof: induction on `idx`, mirroring the constructive recursion of
+`findCollision` (cf. `Binding.lean`). At each non-leaf level both chains
+expose a top entry `⟨(_, _), root⟩ ∈ log`; either the two top inputs differ
+(immediate `LogHasCollision` since both produce response `root`) or they
+coincide and we recurse on the shared ancestor — the original inequality
+`(x, proof₁) ≠ (y, proof₂)` propagates to `(x, proof₁.tail) ≠ (y, proof₂.tail)`. -/
+theorem chainInLog_logCollision_of_ne
+    {s : Skeleton} (idx : SkeletonLeafIndex s) :
+    ∀ (log : (spec α).QueryLog) (root x y : α)
+      (proof₁ proof₂ : List.Vector α idx.depth),
+    (x, proof₁) ≠ (y, proof₂) →
+    chainInLog log root idx x proof₁ →
+    chainInLog log root idx y proof₂ →
+    LogHasCollision log := by
+  induction idx with
+  | ofLeaf =>
+    intros log root x y proof₁ proof₂ hne hc₁ hc₂
+    exfalso; apply hne
+    simp only [chainInLog] at hc₁ hc₂
+    have hp : proof₁ = proof₂ := List.Vector.ext (fun i => i.elim0)
+    exact Prod.ext (hc₁.trans hc₂.symm) hp
+  | @ofLeft sl sr idxLeft ih =>
+    rintro log root x y proof₁ proof₂ hne ⟨a₁, h₁_mem, hc₁⟩ ⟨a₂, h₂_mem, hc₂⟩
+    by_cases hpair : (a₁, proof₁.head) = (a₂, proof₂.head)
+    · obtain ⟨ha, hhead⟩ := Prod.mk.inj hpair
+      subst ha
+      refine ih _ _ _ _ _ _ ?_ hc₁ hc₂
+      intro heq
+      apply hne
+      obtain ⟨hxy, htail⟩ := Prod.mk.inj heq
+      refine Prod.ext hxy ?_
+      conv_lhs => rw [show proof₁ = proof₁.head ::ᵥ proof₁.tail
+        from (List.Vector.cons_head_tail proof₁).symm]
+      conv_rhs => rw [show proof₂ = proof₂.head ::ᵥ proof₂.tail
+        from (List.Vector.cons_head_tail proof₂).symm]
+      rw [hhead, htail]
+    · -- Different inputs, same response (root): immediate log collision.
+      refine LogHasCollision.of_mem ?_ h₁_mem h₂_mem (heq_of_eq rfl)
+      intro h_eq_sigma
+      exact hpair (congrArg Sigma.fst h_eq_sigma)
+  | @ofRight sl sr idxRight ih =>
+    rintro log root x y proof₁ proof₂ hne ⟨a₁, h₁_mem, hc₁⟩ ⟨a₂, h₂_mem, hc₂⟩
+    by_cases hpair : (proof₁.head, a₁) = (proof₂.head, a₂)
+    · obtain ⟨hhead, ha⟩ := Prod.mk.inj hpair
+      subst ha
+      refine ih _ _ _ _ _ _ ?_ hc₁ hc₂
+      intro heq
+      apply hne
+      obtain ⟨hxy, htail⟩ := Prod.mk.inj heq
+      refine Prod.ext hxy ?_
+      conv_lhs => rw [show proof₁ = proof₁.head ::ᵥ proof₁.tail
+        from (List.Vector.cons_head_tail proof₁).symm]
+      conv_rhs => rw [show proof₂ = proof₂.head ::ᵥ proof₂.tail
+        from (List.Vector.cons_head_tail proof₂).symm]
+      rw [hhead, htail]
+    · refine LogHasCollision.of_mem ?_ h₁_mem h₂_mem (heq_of_eq rfl)
+      intro h_eq_sigma
+      exact hpair (congrArg Sigma.fst h_eq_sigma)
+
+/-- **Extractor recovery to a log chain.** When the extractor's path at `idx`
+is intact (the value there is `≠ none`), the extracted leaf value and proof
+form a hash chain `chainInLog` in the log. The conclusion bundles three
+facts: the extracted leaf (`extLeaf`), the recovered authentication path
+(`extProof`), and a chain witness in `log` connecting them to `root`.
+
+Proof: induction on `idx`, mirroring the extractor's `populateDown` descent.
+At each non-leaf level the non-none hypothesis forces `log.find? (·.2 == root)`
+to return some entry `⟨(l, r), root⟩`, which becomes the chain entry at this
+level; the IH recurses into the appropriate subtree. -/
+theorem extractor_chainInLog
+    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
+    {s : Skeleton} (idx : SkeletonLeafIndex s) :
+    ∀ (log : (spec α).QueryLog) (root : α),
+    (extractor s log root).get idx.toNodeIndex ≠ none →
+    ∃ extLeaf : α, ∃ extProof : List.Vector α idx.depth,
+      (extractor s log root).get idx.toNodeIndex = some extLeaf ∧
+      (generateProof (extractor s log root) idx).toList = extProof.toList.map some ∧
+      chainInLog log root idx extLeaf extProof := by
+  induction idx with
+  | ofLeaf =>
+    intros log root _
+    exact ⟨root, ⟨[], rfl⟩, rfl, rfl, rfl⟩
+  | @ofLeft sl sr idxLeft ih =>
+    intros log root h_ne_none
+    -- `h_ne_none` forces `log.find? (·.2 == root) = some _`.
+    obtain ⟨q, h_find⟩ :
+        ∃ q : (_i : (α × α)) × α,
+          log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
+      rcases hf : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
+      · refine absurd ?_ h_ne_none
+        simp only [extractor]
+        rw [optionPopulateDown_internal, extractorChildren_eq_none_of_find?_eq_none hf]
+        change (populateDown sl (Option.bindPair (extractorChildren log)) none).get
+            idxLeft.toNodeIndex = none
+        exact populateDown_none_get_eq_none (Option.bindPair (extractorChildren log)) rfl
+          idxLeft.toNodeIndex
+      · exact ⟨q, rfl⟩
+    have hq2 : q.2 = root := by
+      simpa using (List.find?_eq_some_iff_getElem.mp h_find).1
+    have hq_eq : q = ⟨(q.1.1, q.1.2), root⟩ := by
+      rcases q with ⟨⟨_, _⟩, _⟩; subst hq2; rfl
+    have h_find' : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
+                   some ⟨(q.1.1, q.1.2), root⟩ := by rw [h_find, hq_eq]
+    have h_log_mem : (⟨(q.1.1, q.1.2), root⟩ : (_i : (α × α)) × α) ∈ log := by
+      rw [← hq_eq]; exact List.mem_of_find?_eq_some h_find
+    have h_decomp := extractor_internal_eq_of_find?_eq sl sr log root q.1.1 q.1.2 h_find'
+    rw [h_decomp]
+    have h_ne_none_l : (extractor sl log q.1.1).get idxLeft.toNodeIndex ≠ none := fun he =>
+      h_ne_none (by rw [h_decomp]; exact he)
+    obtain ⟨extLeafL, extProofL, h_extLeaf_eq_L, h_extProof_eq_L, h_chain_L⟩ :=
+      ih log q.1.1 h_ne_none_l
+    refine ⟨extLeafL, q.1.2 ::ᵥ extProofL, h_extLeaf_eq_L, ?_, q.1.1, h_log_mem, h_chain_L⟩
+    change (extractor sr log q.1.2).getRootValue ::
+          (generateProof (extractor sl log q.1.1) idxLeft).toList =
+        (q.1.2 ::ᵥ extProofL).toList.map some
+    have h_root_value : (extractor sr log q.1.2).getRootValue = some q.1.2 :=
+      optionPopulateDown_getRootValue _ _
+    rw [h_root_value, h_extProof_eq_L]
+    rfl
+  | @ofRight sl sr idxRight ih =>
+    intros log root h_ne_none
+    obtain ⟨q, h_find⟩ :
+        ∃ q : (_i : (α × α)) × α,
+          log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = some q := by
+      rcases hf : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | q
+      · refine absurd ?_ h_ne_none
+        simp only [extractor]
+        rw [optionPopulateDown_internal, extractorChildren_eq_none_of_find?_eq_none hf]
+        change (populateDown sr (Option.bindPair (extractorChildren log)) none).get
+            idxRight.toNodeIndex = none
+        exact populateDown_none_get_eq_none (Option.bindPair (extractorChildren log)) rfl
+          idxRight.toNodeIndex
+      · exact ⟨q, rfl⟩
+    have hq2 : q.2 = root := by
+      simpa using (List.find?_eq_some_iff_getElem.mp h_find).1
+    have hq_eq : q = ⟨(q.1.1, q.1.2), root⟩ := by
+      rcases q with ⟨⟨_, _⟩, _⟩; subst hq2; rfl
+    have h_find' : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
+                   some ⟨(q.1.1, q.1.2), root⟩ := by rw [h_find, hq_eq]
+    have h_log_mem : (⟨(q.1.1, q.1.2), root⟩ : (_i : (α × α)) × α) ∈ log := by
+      rw [← hq_eq]; exact List.mem_of_find?_eq_some h_find
+    have h_decomp := extractor_internal_eq_of_find?_eq sl sr log root q.1.1 q.1.2 h_find'
+    rw [h_decomp]
+    have h_ne_none_r : (extractor sr log q.1.2).get idxRight.toNodeIndex ≠ none := fun he =>
+      h_ne_none (by rw [h_decomp]; exact he)
+    obtain ⟨extLeafR, extProofR, h_extLeaf_eq_R, h_extProof_eq_R, h_chain_R⟩ :=
+      ih log q.1.2 h_ne_none_r
+    refine ⟨extLeafR, q.1.1 ::ᵥ extProofR, h_extLeaf_eq_R, ?_, q.1.2, h_log_mem, h_chain_R⟩
+    change (extractor sl log q.1.1).getRootValue ::
+          (generateProof (extractor sr log q.1.2) idxRight).toList =
+        (q.1.1 ::ᵥ extProofR).toList.map some
+    have h_root_value : (extractor sl log q.1.1).getRootValue = some q.1.1 :=
+      optionPopulateDown_getRootValue _ _
+    rw [h_root_value, h_extProof_eq_R]
+    rfl
+
+/--
+**Pure consistency lemma.** Under no-collision, if the extractor's path from
+`root` to the node at `idx` is intact (the value there is `≠ none`) and
+`chainInLog log root idx leaf proof` holds, then the extracted leaf value
+equals `some leaf` and the extracted proof matches `proof.toList.map some`
+pointwise.
+
+Proof: `extractor_chainInLog` recovers a chain witness `(extLeaf, extProof)`
+from the extractor's reconstruction. If `(extLeaf, extProof) = (leaf, proof)`
+we are done; otherwise the two distinct chains force a `LogHasCollision` via
+`chainInLog_logCollision_of_ne`, contradicting `¬LogHasCollision log`. -/
+theorem extractor_chain_match
+    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
+    {s : Skeleton} (idx : SkeletonLeafIndex s) :
+    ∀ (log : (spec α).QueryLog) (root : α) (leaf : α)
+      (proof : List.Vector α idx.depth),
+    ¬ LogHasCollision log →
+    (extractor s log root).get idx.toNodeIndex ≠ none →
+    chainInLog log root idx leaf proof →
+    (extractor s log root).get idx.toNodeIndex = some leaf ∧
+      (generateProof (extractor s log root) idx).toList = proof.toList.map some := by
+  intros log root leaf proof h_no_coll h_ne_none h_chain
+  obtain ⟨extLeaf, extProof, h_extLeaf_eq, h_extProof_eq, h_extChain⟩ :=
+    extractor_chainInLog idx log root h_ne_none
+  by_cases hpair : (extLeaf, extProof) = (leaf, proof)
+  · obtain ⟨h1, h2⟩ := Prod.mk.inj hpair
+    subst h1; subst h2
+    exact ⟨h_extLeaf_eq, h_extProof_eq⟩
+  · exact absurd (chainInLog_logCollision_of_ne idx log root extLeaf leaf
+      extProof proof hpair h_extChain h_chain) h_no_coll
+
 private theorem extractability_game_no_coll_match
     {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
     [(spec α).Fintype] [(spec α).Inhabited]
@@ -754,19 +727,25 @@ private theorem extractability_game_no_coll_match
       proof.toList.map some = extractedProof.toList := by
   obtain ⟨log_c, log_v, h_vp, h_sub_v, h_sub_c, h_tree_eq, h_proof_ext_eq⟩ :=
     extractability_game_support_decompose committingAdv openingAdv hsupport
-  -- chainInLog on log restricts to log_c via the no-collision argument.
+  -- Verifier's chain in `log` (via `log_v ⊆ log`).
   have h_chain_log : chainInLog log root idx leaf proof :=
     chainInLog_mono idx h_sub_v (verifyProof_support_chain idx leaf root proof log_v h_vp)
+  -- Extractor's reconstruction non-none on `log_c`.
   have h_ne_none_lc : (extractor s log_c root).get idx.toNodeIndex ≠ none := by
     rw [← h_tree_eq]; exact h_ne_none
-  have h_chain_lc : chainInLog log_c root idx leaf proof :=
-    chainInLog_restrict idx log log_c root leaf proof
-      h_sub_c h_no_coll h_ne_none_lc h_chain_log
-  have h_no_coll_lc : ¬ LogHasCollision log_c := fun h => h_no_coll (LogHasCollision.mono h_sub_c h)
-  obtain ⟨h_get, h_proof_match⟩ :=
-    extractor_chain_match idx log_c root leaf proof
-      h_no_coll_lc h_ne_none_lc h_chain_lc
-  exact ⟨h_tree_eq.symm ▸ h_get, h_proof_ext_eq.symm ▸ h_proof_match.symm⟩
+  -- Extractor's reconstruction produces a chain in `log_c`, hence in `log`.
+  obtain ⟨extLeaf, extProof, h_extLeaf_eq, h_extProof_eq, h_extChain_lc⟩ :=
+    extractor_chainInLog idx log_c root h_ne_none_lc
+  have h_extChain_log : chainInLog log root idx extLeaf extProof :=
+    chainInLog_mono idx h_sub_c h_extChain_lc
+  -- Either openings match (we are done) or log has a collision (contradiction).
+  by_cases hpair : (extLeaf, extProof) = (leaf, proof)
+  · obtain ⟨hl, hp⟩ := Prod.mk.inj hpair
+    subst hl; subst hp
+    refine ⟨h_tree_eq.symm ▸ h_extLeaf_eq, ?_⟩
+    rw [h_proof_ext_eq, h_extProof_eq]
+  · exact absurd (chainInLog_logCollision_of_ne idx log root extLeaf leaf
+      extProof proof hpair h_extChain_log h_chain_log) h_no_coll
 
 private def noColl_caseA_event {α : Type} [BEq α] [DecidableEq α]
     {s : Skeleton} {AuxState : Type} :
