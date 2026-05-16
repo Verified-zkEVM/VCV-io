@@ -88,8 +88,7 @@ and uses its input pair as the children's values; in every other case (no matchi
 or the parent is already `none`) both children are `none`. Implemented as
 `optionPopulateDown` driven by `extractorChildren`.
 -/
-def extractor {α : Type} [DecidableEq α] [SampleableType α]
-    [OracleSpec.Fintype (spec α)]
+def extractor {α : Type} [DecidableEq α]
     (s : Skeleton) (cache : (spec α).QueryLog) (root : α) :
     FullData (Option α) s :=
   optionPopulateDown s (extractorChildren cache) root
@@ -102,7 +101,7 @@ that runs the committing adversary, extractor, opening adversary, and verifier i
 returns the transcript of the execution.
 -/
 def extractability_game
-    [DecidableEq α] [SampleableType α] [Fintype α] [OracleSpec.Fintype (spec α)]
+    [DecidableEq α]
     {s : Skeleton}
     {AuxState : Type}
     (committingAdv : OracleComp (spec α)
@@ -140,7 +139,7 @@ def adversary_wins_extractability_game_event {α : Type} [BEq α] {s : Skeleton}
 then the extractor at an internal skeleton unfolds to that node's two children using
 `x` and `y` as the new "ancestor" values for the left and right subtrees. -/
 private lemma extractor_internal_eq_of_find?_eq
-    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
+    [DecidableEq α]
     (sl sr : Skeleton) (log : (spec α).QueryLog) (root x y : α)
     (h_find : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
                 some ⟨(x, y), root⟩) :
@@ -161,7 +160,7 @@ The extra `s.depth` accounts for the `verifyProof` step, which traverses the pat
 queried leaf to the root, making at most `s.depth` oracle queries.
 -/
 theorem extractability_game_IsTotalQueryBound
-    [DecidableEq α] [SampleableType α] [Fintype α] [OracleSpec.Fintype (spec α)]
+    [DecidableEq α]
     {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
     (openingAdv : AuxState →
@@ -226,7 +225,6 @@ private lemma chainInLog_mono {α : Type} {s : Skeleton} (idx : SkeletonLeafInde
     exact ⟨ancestor, h_sub _ h_mem, ih h_rec⟩
 
 private lemma singleHash_withQueryLog
-    [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
     (a b : α) :
     (singleHash (m := OracleComp (spec α)) a b).withQueryLog =
       (liftM ((spec α).query (a, b)) : OracleComp (spec α) α) >>=
@@ -238,7 +236,6 @@ private lemma singleHash_withQueryLog
   rw [h, OracleComp.withQueryLog_query]
 
 private lemma getPutativeRoot_step_withQueryLog_decompose
-    [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
     (prog : OracleComp (spec α) α) (mkPair : α → α × α)
     (r : α) (log_v : (spec α).QueryLog)
     (hmem : (r, log_v) ∈ support
@@ -256,7 +253,6 @@ private lemma getPutativeRoot_step_withQueryLog_decompose
   exact ⟨a, log_a, h_rec, rfl⟩
 
 private lemma chainInLog_of_mem_support_getPutativeRoot
-    [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
     {s : Skeleton} (idx : SkeletonLeafIndex s)
     (leaf : α) (proof : List.Vector α idx.depth) (r : α)
     (log_v : (spec α).QueryLog)
@@ -291,7 +287,7 @@ with the query log,
 then that log contains a hash chain from `root` down to `leaf`.
 -/
 private lemma chainInLog_of_mem_support_verifyProof
-    {α : Type} [DecidableEq α] [SampleableType α] [(spec α).Fintype] [(spec α).Inhabited]
+    {α : Type} [DecidableEq α]
     {s : Skeleton} (idx : SkeletonLeafIndex s)
     (leaf root : α) (proof : List.Vector α idx.depth)
     (log_v : (spec α).QueryLog)
@@ -326,8 +322,7 @@ and the extractor and proof generation steps `log_c`
 yield the same extracted tree and proof as the transcript.
 -/
 private lemma extractability_game_support_decompose
-    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
-    [(spec α).Fintype] [(spec α).Inhabited]
+    {α : Type} [DecidableEq α] [Finite α] [Inhabited α]
     {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
     (openingAdv : AuxState →
@@ -348,6 +343,7 @@ private lemma extractability_game_support_decompose
       (∀ q, q ∈ log_c → q ∈ log) ∧
       extractedTree = extractor s log_c root ∧
       extractedProof = generateProof (extractor s log_c root) idx := by
+  letI := Fintype.ofFinite α
   unfold extractability_game at hsup
   simp only [OracleComp.withQueryLog_bind, mem_support_bind_iff, support_map,
     Set.mem_image] at hsup
@@ -425,7 +421,7 @@ If `root` is not the response of any query in `log`,
 then the extractor at an internal skeleton is `none`.
 -/
 private lemma extractor_internal_get_eq_none_of_find?_eq_none
-    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
+    [DecidableEq α]
     (sl sr : Skeleton) (log : (spec α).QueryLog) (root : α)
     (idx : SkeletonNodeIndex sl ⊕ SkeletonNodeIndex sr)
     (hf : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = none) :
@@ -447,7 +443,7 @@ At each non-leaf level the non-none hypothesis forces `log.find? (·.2 == root)`
 to return some entry `⟨(l, r), root⟩`, which becomes the chain entry at this
 level; the IH recurses into the appropriate subtree. -/
 theorem chainInLog_of_extractor_get_ne_none
-    [DecidableEq α] [SampleableType α] [(spec α).Fintype]
+    [DecidableEq α]
     {s : Skeleton} (idx : SkeletonLeafIndex s)
     (log : (spec α).QueryLog) (root : α)
     (h_ne_none : (extractor s log root).get idx.toNodeIndex ≠ none) :
@@ -487,8 +483,7 @@ theorem chainInLog_of_extractor_get_ne_none
     grind [Nat.succ_eq_add_one, Vector.toList_cons]
 
 private theorem extractability_game_not_logHasCollision_match
-    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
-    [(spec α).Fintype] [(spec α).Inhabited]
+    {α : Type} [DecidableEq α] [Finite α] [Inhabited α]
     {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
     (openingAdv : AuxState →
@@ -521,7 +516,7 @@ private theorem extractability_game_not_logHasCollision_match
       h_not_logHasCollision
 
 private lemma probOutput_singleHash_eq_inv_card
-    [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
+    [Fintype α] [Inhabited α]
     (a b root : α) :
     Pr[= root | (singleHash (m := OracleComp (spec α)) a b
                   : OracleComp (spec α) α)] =
@@ -531,10 +526,9 @@ private lemma probOutput_singleHash_eq_inv_card
     change (liftM ((spec α).query (a, b)) : OracleComp (spec α) α) >>= pure = _
     rw [bind_pure]
   rw [h, probOutput_query (spec := spec α) (a, b) root]
-  congr!
 
 private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
-    [SampleableType α] [Fintype α] [(spec α).Fintype] [(spec α).Inhabited]
+    [Fintype α] [Inhabited α]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
     (leaf : α) (proof : List.Vector α idx.depth) (root : α) :
     Pr[= root | (getPutativeRoot (m := OracleComp (spec α)) idx leaf proof
@@ -562,8 +556,7 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
       ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
 private lemma probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth
-    [DecidableEq α] [SampleableType α] [Fintype α]
-    [(spec α).Fintype] [(spec α).Inhabited]
+    [DecidableEq α] [Fintype α] [Inhabited α]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
     (leaf root : α) (proof : List.Vector α idx.depth) :
     Pr[(· = true) | (verifyProof (m := OracleComp (spec α)) idx leaf root proof
@@ -584,8 +577,7 @@ private lemma probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth
   exact probOutput_getPutativeRoot_eq_inv_card_of_pos_depth h_pos leaf proof root
 
 private lemma probEvent_verifyProof_extractor_none_le_inv_card
-    [DecidableEq α] [SampleableType α] [Fintype α]
-    [(spec α).Fintype] [(spec α).Inhabited]
+    [DecidableEq α] [Fintype α] [Inhabited α]
     {s : Skeleton} (idx : SkeletonLeafIndex s) (leaf root : α)
     (proof : List.Vector α idx.depth) (log_c : (spec α).QueryLog) :
     Pr[fun verified : Bool => verified = true ∧
@@ -612,8 +604,7 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     rintro _ _ ⟨_, h⟩; exact h_get h
 
 private theorem extractability_game_verified_extractor_none_le_inv_card
-    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
-    [(spec α).Fintype] [(spec α).Inhabited]
+    {α : Type} [DecidableEq α] [Fintype α] [Inhabited α]
     {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
     (openingAdv : AuxState →
@@ -651,8 +642,7 @@ private theorem extractability_game_verified_extractor_none_le_inv_card
   exact probEvent_verifyProof_extractor_none_le_inv_card idx leaf root proof log_c
 
 private theorem extractability_game_not_logHasCollision_wins_le_inv_card
-    {α : Type} [DecidableEq α] [SampleableType α] [Fintype α]
-    [(spec α).Fintype] [(spec α).Inhabited]
+    {α : Type} [DecidableEq α] [Fintype α] [Inhabited α]
     {s : Skeleton} {AuxState : Type}
     (committingAdv : OracleComp (spec α) (α × AuxState))
     (openingAdv : AuxState →
@@ -693,7 +683,7 @@ i.e. simultaneously
 
 Where κ is 1/|α| * ((qb + s.depth)^2 / 2 + 1).
 -/
-theorem extractability [DecidableEq α] [SampleableType α] [Fintype α] [Inhabited α]
+theorem extractability [DecidableEq α] [Fintype α] [Inhabited α]
     {s : Skeleton}
     {AuxState : Type}
     (committingAdv : OracleComp (spec α)
