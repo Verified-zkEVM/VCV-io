@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao, Bolton Bailey
 -/
 
-import VCVio.CryptoFoundations.MerkleTree.Inductive.Lemmas
+import VCVio.CryptoFoundations.MerkleTree.Inductive.QueryBound
 import VCVio.OracleComp.QueryTracking.Birthday
 import ToMathlib.Data.IndexedBinaryTree.Lemmas
 

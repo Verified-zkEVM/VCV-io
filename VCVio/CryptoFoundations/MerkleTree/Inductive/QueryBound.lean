@@ -9,12 +9,20 @@ import VCVio.OracleComp.QueryTracking.QueryBound
 import ToMathlib.Data.IndexedBinaryTree.Lemmas
 
 /-!
-# Inductive Merkle Tree Lemmas
+# Total query bounds for inductive Merkle tree primitives
 
-This file collects reusable structural lemmas about the inductive Merkle tree
-operations defined in `Defs.lean`. In particular, it provides total-query-bound
-lemmas for `singleHash`, `getPutativeRoot`, and `verifyProof`, plus a generic
-bind-extraction utility on `IsTotalQueryBound` used to combine them.
+This file establishes `IsTotalQueryBound` lemmas for the oracle computations
+defined in `Defs.lean`:
+
+* `singleHash_isTotalQueryBound` — `singleHash` makes one oracle query.
+* `getPutativeRoot_isTotalQueryBound` — `getPutativeRoot` makes `idx.depth`
+  queries, one per level walked from the leaf to the root.
+* `verifyProof_isTotalQueryBound` — `verifyProof` inherits the same bound.
+* `verifyProof_isTotalQueryBound_skeleton_depth` — coarsening to the uniform
+  `s.depth` bound, useful when the bound must not depend on `idx`.
+
+These bounds are consumed downstream by the extractability argument, which
+needs to know the total number of queries any honest Merkle operation issues.
 -/
 
 namespace InductiveMerkleTree
