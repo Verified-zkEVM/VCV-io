@@ -7,10 +7,13 @@ import VCVio.Prelude
 import ToMathlib.ProbabilityTheory.SPMF
 
 /-!
-# Typeclasses for Denotational Monad Support
+# Support of a Monadic Computation
 
-This file defines typeclasses `HasEvalSet m` and `HasEvalFinset m` for asigning a
-set of possible outputs to computations in a monad `m`.
+This file defines `support mx` — the set of possible outputs of a monadic computation `mx`
+— as well as `HasEvalFinset`, a typeclass for assigning a finite version of the support.
+
+The support is built directly on `MonadLiftT m SetM`: any monad with a lift into `SetM`
+(possibly via the canonical `PMF → SPMF → SetM` chain) automatically has `support`.
 -/
 
 open ENNReal
@@ -27,12 +30,6 @@ lemma SetM.pure_def (x : α) : (pure x : SetM α) = ({x} : Set α) := rfl
 @[simp]
 lemma SetM.bind_def (mx : SetM α) (my : α → SetM β) :
     mx >>= my = ⋃ x ∈ mx.run, my x := rfl
-
--- /-- The monad `m` can be evaluated to get a set of possible outputs.
--- Note that we don't implement this for `Set` with the monad type-class strangeness.
--- Should not be implemented manually if a `HasEvalSPMF` instance already exists. -/
--- class HasEvalSet (m : Type u → Type v) [Monad m]
---     extends MonadLiftT m SetM, LawfulMonadLiftT m SetM
 
 /-- The set of possible outputs of running the monadic computation `mx`. -/
 def support [MonadLiftT m SetM] {α : Type u} (mx : m α) : Set α :=
@@ -89,7 +86,7 @@ variable {m : Type u → Type v} [MonadLiftT m SetM] {α : Type u}
 
 /-- A predicate holds on every output reachable from a monadic computation `mx`,
 i.e. `∀ x ∈ support mx, p x`. This is the "almost-sure" assertion at the qualitative
-denotational level provided by `HasEvalSet`.
+denotational level provided by `MonadLiftT m SetM`.
 
 For `OracleComp`, see also the structural-recursion variant
 `OracleComp.allOutputsSatisfyWhen` in `VCVio/OracleComp/Traversal.lean`, which is

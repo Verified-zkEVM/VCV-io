@@ -65,7 +65,6 @@ lemma cache_lookup_eq_of_noCollision
 
 /-! ## Log entries are cached after logging inside caching -/
 
-omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
 /-- When running `loggingOracle` inside `cachingOracle`, every log entry ends up in the cache.
 
 We prove two properties simultaneously by induction:
@@ -175,7 +174,6 @@ theorem log_entry_in_cache_and_mono {α : Type}
       | tail _ hentry' => exact ih_entries entry hentry',
       le_trans hcache₀_le_mid ih_mono⟩
 
-omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
 /-- **Converse of `log_entry_in_cache_and_mono`**: when running `loggingOracle` inside
 `cachingOracle`, every cache entry that was not in the initial cache has a corresponding
 log entry. Combined with `log_entry_in_cache_and_mono`, this shows that (starting from `∅`)

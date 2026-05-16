@@ -29,7 +29,7 @@ universe u
 
 namespace OracleComp.ProgramLogic.PropLogic
 
-variable {ι : Type u} {spec : OracleSpec ι}
+variable {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
 variable {α β : Type}
 
 /-- The qualitative `Prop`-valued unary monad algebra for `OracleComp`.

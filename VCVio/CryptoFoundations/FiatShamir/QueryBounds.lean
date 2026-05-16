@@ -25,7 +25,8 @@ open OracleComp OracleSpec
 
 namespace FiatShamir
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type} [Inhabited Chal] [Fintype Chal]
+    {rel : Stmt → Wit → Bool}
 
 section bounds
 

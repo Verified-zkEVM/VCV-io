@@ -137,7 +137,7 @@ lemma probOutput_bind_ge_of_forall_support
     _ = (1 - δ) * ∑' x, Pr[= x | gen] := by
         simp_rw [mul_comm]; exact ENNReal.tsum_mul_left
     _ = 1 - δ := by
-        rw [HasEvalPMF.tsum_probOutput_eq_one, mul_one]
+        rw [tsum_probOutput_of_liftM_PMF, mul_one]
 
 end correctness
 

@@ -77,14 +77,14 @@ lemma fst_map_run_withCost [LawfulMonad m]
     Prod.fst <$> (simulateQ (so.withCost costFn) mx).run = simulateQ so mx :=
   fst_map_run_withTraceBefore so costFn mx
 
-/-- Cost-tracking preserves failure probability: for any base monad `m` with `HasEvalSPMF`,
+/-- Cost-tracking preserves failure probability: for any base monad `m` with `MonadLiftT m SPMF`,
 wrapping an oracle implementation with `withCost` does not change the probability of failure. -/
-lemma probFailure_run_simulateQ_withCost [LawfulMonad m] [MonadLiftT m SPMF]
+lemma probFailure_run_simulateQ_withCost [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withCost costFn) mx).run] = Pr[⊥ | simulateQ so mx] :=
   probFailure_run_simulateQ_withTraceBefore so costFn mx
 
-lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [MonadLiftT m SPMF]
+lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withCost costFn) mx).run ↔ NeverFail (simulateQ so mx) :=
   NeverFail_run_simulateQ_withTraceBefore_iff so costFn mx
@@ -104,19 +104,19 @@ These lemmas connect the result-marginal distribution of a `withCost`-instrument
 computation to the distribution of the uninstrumented computation, enabling direct
 probability-level reasoning about traced computations. -/
 
-lemma evalDist_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF]
+lemma evalDist_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     𝒟[Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
       𝒟[simulateQ so mx] :=
   evalDist_fst_run_withTraceBefore so costFn mx
 
-lemma probOutput_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF]
+lemma probOutput_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
       Pr[= x | simulateQ so mx] :=
   probOutput_fst_run_withTraceBefore so costFn mx x
 
-lemma support_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF]
+lemma support_fst_run_withCost [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
       support (simulateQ so mx) :=
@@ -237,6 +237,8 @@ lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 
   rw [fst_map_run_simulateQ]
 
 section support
+
+variable [spec.Fintype] [spec.Inhabited]
 
 /-- Compatibility helper matching old state-style counting semantics:
 simulate with zero initial count, then offset by `qc`. -/

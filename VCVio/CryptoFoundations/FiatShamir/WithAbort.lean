@@ -213,7 +213,8 @@ lemma fsAbortSignLoop_cache_invariant
           simp only [hs, StateT.run_bind] at h_query
           obtain ⟨⟨_, _⟩, _, h_cache⟩ :=
             (mem_support_bind_iff _ _ _).mp h_query
-          dsimp at h_cache
+          simp only [StateT.run_modifyGet, support_pure, Set.mem_singleton_iff,
+            Prod.mk.injEq] at h_cache
           obtain ⟨rfl, rfl⟩ := h_cache
           exact QueryCache.cacheQuery_self _ (msg, w_c) c_q
       · apply ids.verify_of_complete hc hrel
@@ -309,7 +310,7 @@ theorem correct
     have habort := h_abort pk sk hrel msg
     have habort' : Pr[= none | 𝒟[signOnly pk sk]] ≤ δ := by
       convert habort using 2
-    have hnoFail : Pr[⊥ | signVerify pk sk] = 0 := HasEvalPMF.probFailure_eq_zero _
+    have hnoFail : Pr[⊥ | signVerify pk sk] = 0 := probFailure_of_liftM_PMF _
     rw [show (1 : ENNReal) - δ = 1 - δ from rfl]
     calc
       Pr[= true | signVerify pk sk]

@@ -26,7 +26,10 @@ open OracleSpec OracleComp ProbComp
 
 namespace FiatShamir.Stateful
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+    [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
+    {rel : Stmt → Wit → Bool}
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)

@@ -698,7 +698,7 @@ lemma wp_choose_sumCounts_le_queryBound
             · rw [probOutput_eq_zero_of_not_mem_support hqchoose]
               simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- Every support point of `simulateQ hidingImplCountAll` is dominated by some
@@ -1099,7 +1099,7 @@ lemma wp_countPred_le_queryBound_of_run_hidingImplCountAll
           · rw [probOutput_eq_zero_of_not_mem_support hz]
             simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 /-- For a fixed computation under the shared counted implementation, the sum of
@@ -1170,7 +1170,7 @@ lemma sum_wp_countIncrements_le_queryBound_of_run_hidingImplCountAll
           · rw [probOutput_eq_zero_of_not_mem_support hz]
             simp
     _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 /-- For a fixed computation under the shared counted implementation, the sum of
@@ -1267,7 +1267,7 @@ lemma sum_wp_countIncrementIndicators_le_queryBound_of_run_hidingImplCountAll
           · rw [probOutput_eq_zero_of_not_mem_support hz]
             simp
     _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 /-- A selected final count decomposes into the initial selected count plus the

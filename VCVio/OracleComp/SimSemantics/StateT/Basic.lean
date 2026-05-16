@@ -327,14 +327,15 @@ end simulateQ_evalDist
 
 section support_simulateQ_StateT
 
-variable {α : Type w}
+variable {α : Type w} [spec.Fintype] [spec.Inhabited]
 
 /-- Simulating an `OracleComp` through a stateful implementation in monad `m` can only shrink the
 support: any output reachable after simulation was already reachable in the original computation
 (where oracle queries may return any value). This is the support-level analogue of
 `evalDist_simulateQ_run'_eq_evalDist`. -/
 theorem support_simulateQ_run'_subset
-    {n : Type w → Type _} [Monad n] [LawfulMonad n] [HasEvalSet n] {σ : Type w}
+    {n : Type w → Type _} [Monad n] [LawfulMonad n] [MonadLiftT n SetM] [LawfulMonadLiftT n SetM]
+    {σ : Type w}
     (impl : QueryImpl spec (StateT σ n))
     (oa : OracleComp spec α) (s : σ) :
     support ((simulateQ impl oa).run' s) ⊆ support oa := by

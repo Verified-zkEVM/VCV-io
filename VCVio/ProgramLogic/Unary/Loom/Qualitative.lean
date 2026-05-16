@@ -62,7 +62,7 @@ open Std.Do'
 
 namespace OracleComp.Qualitative
 
-variable {ι : Type u} {spec : OracleSpec ι}
+variable {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
 variable {α β : Type}
 
 /-- Qualitative `Std.Do'.WP` interpretation of `OracleComp spec` valued in `Prop`.

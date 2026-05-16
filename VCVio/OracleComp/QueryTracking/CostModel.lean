@@ -168,7 +168,7 @@ theorem expectedCost_le_of_support_bound (oa : OracleComp spec α) (cm : CostMod
         · exact mul_le_mul_of_nonneg_left (h z hz) (zero_le _)
         · simp [probOutput_eq_zero_of_not_mem_support hz]
     _ = c := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 end ExpectedCost
 
@@ -177,12 +177,13 @@ end ExpectedCost
 /-- Every execution path of `oa` under `cm` has total cost at most `bound`.
 
 Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
-def WorstCaseCostBound [AddCommMonoid ω] [Preorder ω]
+def WorstCaseCostBound [AddCommMonoid ω] [Preorder ω] [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) (cm : CostModel spec ω) (bound : ω) : Prop :=
   AddWriterT.PathwiseCostAtMost (instrumentedRun oa cm) bound
 
 /-- `WorstCaseCostBound` is equivalently a support bound over the old `costDist` view. -/
 theorem worstCaseCostBound_iff_support_bound [AddCommMonoid ω] [Preorder ω]
+    [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) (cm : CostModel spec ω) (bound : ω) :
     WorstCaseCostBound oa cm bound ↔
       ∀ z ∈ support (costDist oa cm), z.2 ≤ bound := by
@@ -267,7 +268,7 @@ private lemma addCostOracle_unit_run_apply (t : spec.Domain) :
 
 section UnitCostBridge
 
-private lemma exists_mem_support [spec.Inhabited] (oa : OracleComp spec α) :
+private lemma exists_mem_support [spec.Fintype] [spec.Inhabited] (oa : OracleComp spec α) :
     ∃ x, x ∈ support oa := by
   induction oa using OracleComp.inductionOn with
   | pure x =>
@@ -279,7 +280,8 @@ private lemma exists_mem_support [spec.Inhabited] (oa : OracleComp spec α) :
       exact ⟨u, mem_support_query t u, hx⟩
 
 private lemma exists_mem_support_costDist_of_mem_support
-    [AddCommMonoid ω] (oa : OracleComp spec α) (cm : CostModel spec ω) {x : α}
+    [AddCommMonoid ω] [spec.Fintype] [spec.Inhabited]
+    (oa : OracleComp spec α) (cm : CostModel spec ω) {x : α}
     (hx : x ∈ support oa) :
     ∃ c, (x, c) ∈ support (costDist oa cm) := by
   have hx' : x ∈ support (Prod.fst <$> costDist oa cm) := by
@@ -291,6 +293,7 @@ private lemma exists_mem_support_costDist_of_mem_support
   exact ⟨c, hz⟩
 
 private lemma mem_support_costDist_unit_query_bind_of_mem_support
+    [spec.Fintype] [spec.Inhabited]
     (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (u : spec.Range t)
     {z : α × Multiplicative ℕ} (hz : z ∈ support (costDist (mx u) CostModel.unit)) :
     (z.1, Multiplicative.ofAdd (Multiplicative.toAdd z.2 + 1)) ∈ support
@@ -307,7 +310,7 @@ private lemma mem_support_costDist_unit_query_bind_of_mem_support
     exact ⟨z, hz, by ext <;> simp [Nat.add_comm]⟩
 
 private theorem isPerIndexQueryBound_of_unit_support_bound
-    [DecidableEq ι] [spec.Inhabited]
+    [DecidableEq ι] [spec.Fintype] [spec.Inhabited]
     {oa : OracleComp spec α} {bound : ℕ}
     (hSupport : ∀ z ∈ support (costDist oa CostModel.unit), z.2 ≤ bound) :
     IsPerIndexQueryBound oa (fun _ => bound) := by
@@ -345,7 +348,7 @@ private theorem isPerIndexQueryBound_of_unit_support_bound
 if every execution uses at most `bound` total unit-cost steps, then each oracle index
 is queried at most `bound` times. -/
 theorem WorstCaseCostBound.toIsPerIndexQueryBound_unit
-    [DecidableEq ι] [spec.Inhabited]
+    [DecidableEq ι] [spec.Fintype] [spec.Inhabited]
     {oa : OracleComp spec α} {bound : ℕ}
     (h : WorstCaseCostBound oa CostModel.unit bound) :
     IsPerIndexQueryBound oa (fun _ => bound) := by
@@ -380,7 +383,7 @@ private lemma sum_update_pred_eq
 /-- If `main` makes at most `qb i` queries to each oracle `i`, then its total query count
 (under the unit cost model) is at most `∑ i, qb i` on every execution path. -/
 theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
-    [DecidableEq ι] [Fintype ι] [spec.Inhabited]
+    [DecidableEq ι] [Fintype ι] [spec.Fintype] [spec.Inhabited]
     {oa : OracleComp spec α} {qb : ι → ℕ}
     (h : IsPerIndexQueryBound oa qb) :
     WorstCaseCostBound oa CostModel.unit (∑ i, qb i) := by

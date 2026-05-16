@@ -22,7 +22,10 @@ namespace FiatShamir
 open OracleComp OracleSpec
 open scoped OracleSpec.PrimitiveQuery
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+    [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
+    {rel : Stmt → Wit → Bool}
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -41,7 +44,7 @@ indexes `Fin (qH + 1)`, which is exactly the right number of forkable slots
 (the framework's structural `+1` in `Fin (qH + 1)` is precisely the wrapper's
 verifier slot). The replay-forking denominator is therefore `qH + 1`. -/
 theorem cma_to_nma_advantage_bound
-    [DecidableEq M] [DecidableEq Commit]
+    [DecidableEq M] [DecidableEq Commit] [SampleableType Stmt] [SampleableType Wit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
@@ -172,7 +175,7 @@ private noncomputable def nmaReduction
   simulateQ (QueryImpl.ofLift unifSpec ProbComp +
     (uniformSampleImpl (spec := (Unit →ₒ Chal)))) (nmaForkExtract σ hr M nmaAdv qH pk)
 
-omit [SampleableType Wit] [Inhabited Chal] [Fintype Chal] in
+omit [SampleableType Wit] in
 /-- Every `(x, log)` in the support of `replayFirstRun (Fork.runTrace σ hr M nmaAdv pk)`
 satisfies the per-run invariant `forkSupportInvariant`. -/
 private theorem forkSupportInvariant_of_mem_replayFirstRun

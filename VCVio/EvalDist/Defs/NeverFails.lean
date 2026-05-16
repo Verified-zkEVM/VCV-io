@@ -14,14 +14,14 @@ This file defines a predicate-as-typeclass stating that a probabilistic computat
 produces failure mass, together with lemmas for how the property behaves under common
 monadic combinators.
 
-Given a `HasEvalSPMF m` instance and a computation `mx : m α` in that monad, `NeverFail mx` means
+Given a `MonadLiftT m SPMF` instance and a computation `mx : m α` in that monad, `NeverFail mx` means
 that `Pr[⊥ | mx] = 0`, i.e. that the computation never fails.
 
 Defined as a typeclass to allow it to be synthesized automatically in certain cases.
 However we don't include any instances for `bind` as this blows up the search space.
 Instances involving `bind` should be added manually as needed.
 
-The existence of a `HasEvalPMF m` instance implies that `NeverFail mx` holds for any computaiton
+The existence of a `MonadLiftT m PMF` instance implies that `NeverFail mx` holds for any computaiton
 in the monad, since the `PMF` doesn't allow any probability of failing.
 -/
 
@@ -55,17 +55,13 @@ lemma probFailure_eq_zero' [MonadLiftT m SPMF]
     {mx : m α} (h : NeverFail mx) : Pr[⊥ | mx] = 0 :=
   NeverFail.probFailure_eq_zero
 
-namespace HasEvalPMF
+/-- A computation in a monad with a total `PMF` lift can't fail. -/
+instance [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] (mx : m α) : NeverFail mx where
+  probFailure_eq_zero := probFailure_of_liftM_PMF mx
 
-/-- A computation in a monad with `HasEvalPMF` can't fail as outputs sum to probability `1`. -/
-instance [HasEvalPMF m] (mx : m α) : NeverFail mx where
-  probFailure_eq_zero := probFailure_eq_zero mx
+section neverFail_lemmas
 
-end HasEvalPMF
-
-namespace HasEvalSPMF
-
-variable [MonadLiftT m SPMF]
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
 @[grind =]
 lemma neverFail_iff (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
@@ -94,21 +90,17 @@ lemma neverFail_seq_iff [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
     exact h _ hne.choose_spec
   · exact fun ⟨hf, hx⟩ => ⟨hf, fun _ _ => hx⟩
 
-end HasEvalSPMF
-
-namespace HasEvalSet
-
 @[simp]
 lemma not_neverFail_failure {m : Type u → Type v} [AlternativeMonad m]
-    [MonadLiftT m SPMF] [HasEvalSet.LawfulFailure m] :
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [HasEvalSet.LawfulFailure m] :
     ¬ NeverFail (failure : m α) := by
-  simp [HasEvalSPMF.neverFail_iff]
+  simp [neverFail_iff]
 
-end HasEvalSet
+end neverFail_lemmas
 
 namespace NeverFail
 
-variable [MonadLiftT m SPMF]
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
 lemma of_probFailure_eq_zero (mx : m α) (h : Pr[⊥ | mx] = 0) : NeverFail mx :=
   { probFailure_eq_zero := h }
@@ -138,7 +130,7 @@ lemma bind_of_mem_support {mx : m α} {my : α → m β}
     NeverFail (mx >>= my) where
   probFailure_eq_zero := by
     simp [probFailure_bind_eq_add_tsum]
-    simp [HasEvalSPMF.neverFail_iff] at hy
+    simp [neverFail_iff] at hy
     tauto
 
 /--

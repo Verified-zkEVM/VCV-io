@@ -222,7 +222,7 @@ theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
 
 @[simp] theorem wp_const (oa : OracleComp spec α) (c : ℝ≥0∞) :
     wp oa (fun _ => c) = c := by
-  rw [wp_eq_tsum, ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+  rw [wp_eq_tsum, ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 @[game_rule] theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
     wp oa (fun x => f x + g x) =

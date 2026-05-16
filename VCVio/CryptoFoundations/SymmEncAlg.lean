@@ -36,7 +36,7 @@ def CompleteExp (encAlg : SymmEncAlg m M K C) (msg : M) : m (Option M) := do
   let σ ← encAlg.encrypt k msg
   encAlg.decrypt k σ
 
-def Complete [HasEvalPMF m] (encAlg : SymmEncAlg m M K C) : Prop :=
+def Complete [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] (encAlg : SymmEncAlg m M K C) : Prop :=
   ∀ msg : M, Pr[= msg | encAlg.CompleteExp msg] = 1
 
 section perfectSecrecy
@@ -82,7 +82,7 @@ lemma PerfectSecrecyCipherExp_eq_bind [LawfulMonad m] (encAlg : SymmEncAlg m M K
         encAlg.PerfectSecrecyCipherGivenMsgExp msg := by
   simp [PerfectSecrecyCipherExp, PerfectSecrecyExp_eq_bind, monad_norm]
 
-variable [HasEvalPMF m]
+variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
 
 lemma probOutput_PerfectSecrecyExp_eq_mul_cipherGivenMsg [LawfulMonad m]
     (encAlg : SymmEncAlg m M K C) (mgen : m M) (msg : M) (σ : C) :
@@ -250,7 +250,7 @@ theorem cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
     have hsuppσ : support (encExp k0) = ({σ} : Set C) := by
       simpa [encExp, hσ_eq_c0] using hc0
     rw [probOutput_eq_one_iff]
-    exact ⟨HasEvalPMF.probFailure_eq_zero _, hsuppσ⟩
+    exact ⟨probFailure_of_liftM_PMF _, hsuppσ⟩
   simp only [PerfectSecrecyCipherGivenMsgExp, probOutput_bind_eq_tsum]
   calc
     ∑' k : K, Pr[= k | keyExp] * Pr[= σ | encExp k] =
@@ -318,7 +318,7 @@ theorem perfectSecrecyAt_of_uniformKey_of_uniqueKey [LawfulMonad m]
       _ = (∑' msg : M, Pr[= msg | mgen]) * invK := by
             rw [ENNReal.tsum_mul_right]
       _ = invK := by
-            rw [HasEvalPMF.tsum_probOutput_eq_one mgen, one_mul]
+            rw [tsum_probOutput_of_liftM_PMF mgen, one_mul]
   intro mgen msg σ
   calc
     Pr[= (msg, σ) | encAlg.PerfectSecrecyExp mgen] =

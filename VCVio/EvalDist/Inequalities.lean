@@ -11,7 +11,7 @@ import ToMathlib.Data.ENNReal.SumSquares
 
 Inequalities relating per-element bounds and their probabilistic averages, for use in
 forking-lemma-style game-hopping arguments where the outermost step marginalizes over a
-random key (or, more generally, an arbitrary `HasEvalSPMF` monad output).
+random key (or, more generally, an arbitrary `MonadLiftT m SPMF` monad output).
 
 The headline lemma is `marginalized_jensen_forking_bound`: given a per-element bound
 `acc x · (acc x / q − hinv) ≤ B x` and weights `Pr[= x | mx]` for some monadic computation

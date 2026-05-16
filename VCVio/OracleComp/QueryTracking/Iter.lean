@@ -31,7 +31,7 @@ universe u v
 
 namespace OracleComp
 
-variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
+variable {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited] {α β : Type u}
 
 /-! ### Forward `replicate` bounds -/
 

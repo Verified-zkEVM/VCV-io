@@ -185,6 +185,7 @@ structure CmaH3RunFacts
 `simulateQ`. -/
 theorem simulateQ_bad_preserved_of_step
     {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    [spec'.Fintype] [spec'.Inhabited]
     {σ : Type} {α : Type}
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (hstep : ∀ (t : spec.Domain) (p : σ × Bool) (z),
@@ -864,7 +865,7 @@ private lemma cmaSimSignPublicBad_prob_le_roCacheCount_mul
         _ = (∑' key : Stmt × Wit, Pr[= key | hr.gen]) * (QueryCache.enncard cache * β) := by
               rw [ENNReal.tsum_mul_right]
         _ = QueryCache.enncard cache * β := by
-              rw [HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+              rw [tsum_probOutput_of_liftM_PMF, one_mul]
 
 private lemma cmaRealSignStep_evalDist_eq_ghost
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)

@@ -16,7 +16,8 @@ The `SampleableType (BitVec n)` instance is defined in
 
 open BitVec
 
-variable {α β γ : Type _} {m : Type _ → Type _} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
+variable {α β γ : Type _} {m : Type _ → Type _} [Monad m] [LawfulMonad m]
+  [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
 @[simp, grind =]
 lemma probOutput_ofFin_map {n : ℕ} (mx : m (Fin (2 ^ n))) (x : BitVec n) :

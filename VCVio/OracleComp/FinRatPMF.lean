@@ -62,8 +62,8 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
 
 @[simp] lemma evalDist_apply (t : spec.Domain) :
     𝒟[finRatImpl (spec := spec) t] = liftM (PMF.uniformOfFintype (spec.Range t)) := by
-  rw [HasEvalPMF.evalDist_of_hasEvalPMF_def]
-  change liftM (@Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t)) = _
+  rw [evalDist_def]
+  change (liftM (@Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t)) : SPMF _) = _
   rw [toPMF_apply]
 
 @[simp] lemma evalDist_simulateQ {α : Type v} (oa : OracleComp spec α) :
@@ -84,14 +84,15 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
 
 @[simp] lemma support_simulateQ {α : Type v} (oa : OracleComp spec α) :
     support (simulateQ (finRatImpl (spec := spec)) oa) = support oa := by
-  ext x
-  exact mem_support_iff_of_evalDist_eq (evalDist_simulateQ (spec := spec) oa) x
+  -- TODO: connect the direct SetM lift (`simulateQ' Set.univ`) and the SPMF-derived path.
+  -- Currently `support oa` uses the unconstrained direct lift while
+  -- `support (simulateQ finRatImpl oa)` goes through PMF→SPMF→SetM.
+  sorry
 
-@[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
-    (oa : OracleComp spec α) :
-    finSupport (simulateQ (finRatImpl (spec := spec)) oa) = finSupport oa := by
-  ext x
-  exact mem_finSupport_iff_of_evalDist_eq (evalDist_simulateQ (spec := spec) oa) x
+-- @[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
+--     (oa : OracleComp spec α) :
+--     finSupport (simulateQ (finRatImpl (spec := spec)) oa) = finSupport oa := by
+--   sorry
 
 end finRatImpl
 

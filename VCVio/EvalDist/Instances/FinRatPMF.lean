@@ -19,8 +19,10 @@ namespace Raw
 
 variable {α : Type u}
 
-noncomputable instance : HasEvalPMF Raw where
+noncomputable instance : MonadLift Raw PMF where
   monadLift := Raw.toPMFHom.toFun _
+
+noncomputable instance : LawfulMonadLift Raw PMF where
   monadLift_pure := Raw.toPMFHom.toFun_pure'
   monadLift_bind := Raw.toPMFHom.toFun_bind'
 
@@ -29,7 +31,7 @@ instance : HasEvalFinset Raw where
   coe_finSupport mx := by
     ext x
     rw [Finset.mem_coe, _root_.mem_support_iff, Raw.mem_support_iff]
-    rw [probOutput_def, HasEvalPMF.evalDist_of_hasEvalPMF_def]
+    rw [probOutput_def, evalDist_def]
     change mx.prob x ≠ 0 ↔ (liftM (liftM mx : PMF _) : SPMF _) x ≠ 0
     rw [SPMF.liftM_apply]
     change mx.prob x ≠ 0 ↔ ((@Raw.toPMF _ (Classical.decEq _) mx) x) ≠ 0

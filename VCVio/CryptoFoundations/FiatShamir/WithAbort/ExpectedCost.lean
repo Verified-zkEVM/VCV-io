@@ -106,7 +106,7 @@ private lemma signLoop_queryCountDist_succ
 
 end
 
-variable [HasEvalPMF m]
+variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
 
 /-- The probability that a single Fiat-Shamir-with-aborts signing attempt aborts. -/
 noncomputable abbrev signAttemptAbortProbability
@@ -588,8 +588,6 @@ theorem sign_queryTailProbability_le_signAttemptAbortProbability_pow
           (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
         runtime] ≤
       (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
-  letI : HasEvalSPMF m := HasEvalPMF.toHasEvalSPMF
-  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   by_cases hi : i < maxAttempts
   · rw [sign_queryTailProbability_eq_signAttemptAbortProbability_pow
       (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
@@ -630,8 +628,6 @@ theorem sign_expectedQueries_le_tsum_signAttemptAbortProbability_powers
       (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
     ] ≤
       ∑' i : ℕ, (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
-  letI : HasEvalSPMF m := HasEvalPMF.toHasEvalSPMF
-  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   exact HasQuery.expectedQueries_le_tsum_of_tail_probs_le
     (oa := fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ℕ m)] =>
       (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)

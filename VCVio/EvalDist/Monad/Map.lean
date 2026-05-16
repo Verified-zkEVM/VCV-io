@@ -25,35 +25,35 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 open ENNReal
 
 @[simp, grind =]
-lemma support_map [MonadLiftT m SetM] [LawfulMonad m] (f : α → β) (mx : m α) :
+lemma support_map [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonad m] (f : α → β) (mx : m α) :
     support (f <$> mx) = f '' support mx := by
   simp [monad_norm]
   aesop
 
 @[simp, grind =]
-lemma finSupport_map [MonadLiftT m SetM] [HasEvalFinset m] [LawfulMonad m]
+lemma finSupport_map [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [LawfulMonad m]
     [DecidableEq α] [DecidableEq β]
     (f : α → β) (mx : m α) : finSupport (f <$> mx) = (finSupport mx).image f := by
   grind [map_eq_bind_pure_comp]
 
 @[simp, grind =]
-lemma evalDist_map [MonadLiftT m SPMF] [LawfulMonad m] (mx : m α) (f : α → β) :
+lemma evalDist_map [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m] (mx : m α) (f : α → β) :
     𝒟[f <$> mx] = f <$> (𝒟[mx]) := by simp [monad_norm]
 
-lemma evalDist_map_eq_of_evalDist_eq [MonadLiftT m SPMF] [LawfulMonad m]
+lemma evalDist_map_eq_of_evalDist_eq [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m]
     {mx my : m α} (h : 𝒟[mx] = 𝒟[my]) (f : α → β) :
     𝒟[f <$> mx] = 𝒟[f <$> my] := by
   simpa [evalDist_map] using congrArg (fun p => f <$> p) h
 
-lemma probOutput_map_eq_of_evalDist_eq [MonadLiftT m SPMF] [LawfulMonad m]
+lemma probOutput_map_eq_of_evalDist_eq [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m]
     {mx my : m α} (h : 𝒟[mx] = 𝒟[my]) (f : α → β) (y : β) :
     Pr[= y | f <$> mx] = Pr[= y | f <$> my] := by
   exact (evalDist_ext_iff.mp (evalDist_map_eq_of_evalDist_eq h f)) y
 
-@[simp] lemma evalDist_comp_map [MonadLiftT m SPMF] [LawfulMonad m] (mx : m α) :
+@[simp] lemma evalDist_comp_map [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m] (mx : m α) :
     evalDist ∘ (fun f => f <$> mx) = fun f : (α → β) => f <$> 𝒟[mx] := by aesop
 
-variable [MonadLiftT m SPMF] (mx : m α) (f : α → β)
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (f : α → β)
 
 @[simp, grind =]
 lemma probEvent_bind_pure_comp (q : β → Prop) :

@@ -252,7 +252,7 @@ theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι}
     Triple (1 : ℝ≥0∞) oa (fun x => 𝟙⟦p x⟧) := by
   rw [show (1 : ℝ≥0∞) = 𝟙⟦True⟧ from propInd_true.symm]
   exact (triple_propInd_iff_probEvent_eq_one oa p).mpr
-    (probEvent_eq_one ⟨HasEvalPMF.probFailure_eq_zero oa, h⟩)
+    (probEvent_eq_one ⟨probFailure_of_liftM_PMF oa, h⟩)
 
 /-! ## Bridge lemmas: game equivalence and advantage -/
 

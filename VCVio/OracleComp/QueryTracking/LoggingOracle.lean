@@ -94,17 +94,17 @@ lemma fst_map_run_withLogging [LawfulMonad m] (so : QueryImpl spec m) (mx : Orac
     simulateQ so mx :=
   fst_map_run_withTraceAppend so (fun (t : spec.Domain) u => ([⟨t, u⟩] : QueryLog spec)) mx
 
-/-- Logging preserves failure probability: for any base monad `m` with `HasEvalSPMF`,
+/-- Logging preserves failure probability: for any base monad `m` with `MonadLiftT m SPMF`,
 wrapping an oracle implementation with `withLogging` does not change the probability of failure.
 When `m = OracleComp spec`, both sides are `0` (trivially true). When `m` can genuinely fail
 (e.g. `OptionT (OracleComp spec)`), this is a non-trivial faithfulness property. -/
-lemma probFailure_run_simulateQ_withLogging [LawfulMonad m] [MonadLiftT m SPMF]
+lemma probFailure_run_simulateQ_withLogging [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withLogging) mx).run] = Pr[⊥ | simulateQ so mx] :=
   probFailure_run_simulateQ_withTraceAppend so
     (fun (t : spec.Domain) u => ([⟨t, u⟩] : QueryLog spec)) mx
 
-lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [MonadLiftT m SPMF]
+lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withLogging) mx).run ↔ NeverFail (simulateQ so mx) :=
   NeverFail_run_simulateQ_withTraceAppend_iff so
@@ -298,7 +298,7 @@ theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
   isQueryBound_iff_of_map_eq (loggingOracle.fst_map_run_simulateQ oa) _ _
 
 theorem isQueryBoundP_run_simulateQ_loggingOracle_iff
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : ι → Prop) [DecidablePred p] (n : ℕ) :
     IsQueryBoundP ((simulateQ loggingOracle oa).run) p n ↔
     IsQueryBoundP oa p n :=
@@ -315,7 +315,7 @@ theorem isTotalQueryBound_run_simulateQ_withLogging_iff
 
 theorem isQueryBoundP_run_simulateQ_withLogging_iff
     {ι : Type} {spec : OracleSpec.{0, 0} ι}
-    {ι' : Type} {spec' : OracleSpec.{0, 0} ι'}
+    {ι' : Type} {spec' : OracleSpec.{0, 0} ι'} [spec'.Fintype] [spec'.Inhabited]
     (so : QueryImpl spec (OracleComp spec'))
     {α : Type} (mx : OracleComp spec α)
     (q : ι' → Prop) [DecidablePred q] (n : ℕ) :
@@ -324,7 +324,8 @@ theorem isQueryBoundP_run_simulateQ_withLogging_iff
   isQueryBoundP_iff_of_map_eq (p := q) (QueryImpl.fst_map_run_withLogging so mx)
 
 theorem isPerIndexQueryBound_run_simulateQ_loggingOracle_iff
-    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι} {α : Type}
+    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
+    [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (qb : ι → ℕ) :
     IsPerIndexQueryBound ((simulateQ loggingOracle oa).run) qb ↔
     IsPerIndexQueryBound oa qb :=
@@ -333,6 +334,7 @@ theorem isPerIndexQueryBound_run_simulateQ_loggingOracle_iff
 theorem isPerIndexQueryBound_run_simulateQ_withLogging_iff
     {ι : Type} {spec : OracleSpec.{0, 0} ι}
     {ι' : Type} [DecidableEq ι'] {spec' : OracleSpec.{0, 0} ι'}
+    [spec'.Fintype] [spec'.Inhabited]
     (so : QueryImpl spec (OracleComp spec'))
     {α : Type} (mx : OracleComp spec α) (qb : ι' → ℕ) :
     IsPerIndexQueryBound ((simulateQ (so.withLogging) mx).run) qb ↔
@@ -359,6 +361,8 @@ theorem log_length_le_of_mem_support_run_simulateQ
   | pure x =>
       intro z hz
       simp only [simulateQ_pure] at hz
+      change z ∈ support (pure (x, ([] : QueryLog spec)) : OracleComp spec _) at hz
+      rw [support_pure] at hz
       subst hz
       simp
   | query_bind t mx ih =>

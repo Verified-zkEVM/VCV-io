@@ -215,7 +215,7 @@ noncomputable def processSemanticsProbComp (Party : Type u)
     (observe : ∀ (p : Closed Party ProbComp schedulerSampler),
       p.Proc → ProbComp Unit) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
-  processSemantics Party schedulerSampler (SPMFSemantics.ofHasEvalSPMF ProbComp)
+  processSemantics Party schedulerSampler (SPMFSemantics.ofMonadLift ProbComp)
     init fuel observe
 
 /--
@@ -250,7 +250,7 @@ noncomputable def processSemanticsOracle (Party : Type u)
     { Sem := StateT σ ProbComp
       instMonadSem := inferInstance
       interpret := simulateQ' impl
-      observe := fun {_} mx => HasEvalSPMF.toSPMF (mx.run' initOracle) }
+      observe := fun {_} mx => liftM (mx.run' initOracle) }
   processSemantics Party (m := OracleComp superSpec) schedulerSampler oracleSem
     init fuel observe
 

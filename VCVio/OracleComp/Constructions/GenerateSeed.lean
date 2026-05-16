@@ -201,8 +201,8 @@ lemma probOutput_pop_some_eq_probOutput_prepend
           (pure (seed'.pop i) : ProbComp (Option (spec.Range i × QuerySeed spec))) →
         seed' = rest.prependValues [u] := by
     intro seed' _ hs
-    have hpop : seed'.pop i = some (u, rest) := by
-      simpa [support_pure, Set.mem_singleton_iff] using hs.symm
+    have hpop : seed'.pop i = some (u, rest) :=
+      (mem_support_pure_iff' (m := ProbComp) _ _).mp hs
     have hcons : u :: rest i = seed' i :=
       QuerySeed.cons_of_pop_eq_some seed' i u rest hpop
     have hrest : rest = Function.update seed' i ((seed' i).tail) :=
@@ -308,8 +308,8 @@ lemma probOutput_generateSeed [spec.Fintype] (seed : QuerySeed spec)
       intro xs' hxs' hseed'
       rw [mem_support_bind_iff] at hseed'
       obtain ⟨rest', _, hpure⟩ := hseed'
-      have hEq : rest'.prependValues xs' = seed := by
-        simpa [support_pure, Set.mem_singleton_iff] using hpure.symm
+      have hEq : rest'.prependValues xs' = seed :=
+        (mem_support_pure_iff' (m := ProbComp) _ _).mp hpure
       have hlen_xs' : xs'.length = qc j := by
         rw [support_replicate] at hxs'; exact hxs'.1
       exact (QuerySeed.eq_of_prependValues_eq seed rest' xs' hlen_xs' hEq).1 ▸ rfl
@@ -318,8 +318,8 @@ lemma probOutput_generateSeed [spec.Fintype] (seed : QuerySeed spec)
           seed ∈ support (return rest'.prependValues xs : ProbComp (QuerySeed spec)) →
             rest' = rest := by
       intro rest' _ hseed'
-      have hEq : rest'.prependValues xs = seed := by
-        simpa [support_pure, Set.mem_singleton_iff] using hseed'.symm
+      have hEq : rest'.prependValues xs = seed :=
+        (mem_support_pure_iff' (m := ProbComp) _ _).mp hseed'
       exact (QuerySeed.eq_of_prependValues_eq seed rest' xs hxs_len hEq).2
     -- Factor probability via probOutput_bind_eq_mul
     have houter :
@@ -370,7 +370,7 @@ lemma probOutput_generateSeed' [spec.Fintype]
       1 / (finSupport (generateSeed spec qc js)).card := by
   classical
   rw [probOutput_generateSeed spec qc js seed h]
-  exact HasEvalPMF.probOutput_eq_inv_finSupport_card fun s hs =>
+  exact probOutput_eq_inv_finSupport_card_of_liftM_PMF fun s hs =>
     probOutput_generateSeed spec qc js s hs
 
 lemma evalDist_generateSeed_eq_of_countEq [spec.Fintype] [spec.Inhabited]
@@ -586,17 +586,24 @@ theorem generateSeed_queryCostExactly
       simpa [probCompUnitQueryRun] using
         (AddWriterT.queryCostExactly_pure (∅ : QuerySeed spec))
   | cons j js ih =>
-      simpa [probCompUnitQueryRun, OracleComp.generateSeed_cons, simulateQ_bind, simulateQ_pure,
-        simulateQ_map, List.sum_cons, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
-        (AddWriterT.queryCostExactly_bind
-          (n₁ := qc j * sampleCost j)
-          (n₂ := (js.map fun j => qc j * sampleCost j).sum)
-          (oa := probCompUnitQueryRun (replicate (qc j) ($ᵗ spec.Range j)))
-          (f := fun xs =>
-            (fun rest : QuerySeed spec => rest.prependValues xs) <$>
+      have hmap : ∀ xs : List (spec.Range j),
+          AddWriterT.QueryCostExactly
+            ((fun rest : QuerySeed spec => rest.prependValues xs) <$>
               probCompUnitQueryRun (generateSeed spec qc js))
-          (queryCostExactly_replicate_probComp ($ᵗ spec.Range j) (hSample j) (qc j))
-          (fun xs => AddWriterT.queryCostExactly_map (fun rest => rest.prependValues xs) ih))
+            ((js.map fun j => qc j * sampleCost j).sum) := fun xs =>
+        AddWriterT.queryCostExactly_map (m := ProbComp)
+          (fun rest : QuerySeed spec => rest.prependValues xs) ih
+      have hbind := AddWriterT.queryCostExactly_bind (m := ProbComp)
+        (n₁ := qc j * sampleCost j)
+        (n₂ := (js.map fun j => qc j * sampleCost j).sum)
+        (oa := probCompUnitQueryRun (replicate (qc j) ($ᵗ spec.Range j)))
+        (f := fun xs =>
+          (fun rest : QuerySeed spec => rest.prependValues xs) <$>
+            probCompUnitQueryRun (generateSeed spec qc js))
+        (queryCostExactly_replicate_probComp ($ᵗ spec.Range j) (hSample j) (qc j))
+        hmap
+      simpa [probCompUnitQueryRun, OracleComp.generateSeed_cons, simulateQ_bind, simulateQ_pure,
+        simulateQ_map, List.sum_cons, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using hbind
 
 open ENNReal in
 /-- The expected number of uniform-oracle calls made by `generateSeed spec qc js` equals

@@ -22,19 +22,28 @@ variable {m : Type u → Type v} [Monad m] {α β γ : Type u}
 
 namespace OptionT
 
-section HasEvalSet
+section EvalSet
 
-/-- Standalone `HasEvalSet (OptionT m)` instance under the weaker `[MonadLiftT m SetM]` assumption.
+/-- Standalone `MonadLiftT (OptionT m) SetM` instance under the weaker `[MonadLiftT m SetM]`
+assumption. Keeping this standalone means `support` on `OptionT m` works without requiring a
+full `MonadLiftT m SPMF` lift — only `MonadLiftT m SetM` is needed.
 
-This is deliberately kept separate from the `HasEvalSPMF (OptionT m)` instance below, which
-re-exports the same `toSet` to make the resulting typeclass diamond definitionally equal.
-Keeping this standalone instance means `support` on `OptionT m` works without requiring a
-full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM`). -/
-noncomputable instance (m : Type u → Type v) [Monad m] [MonadLiftT m SetM] :
-    HasEvalSet (OptionT m) where
+We declare a `MonadLiftT` (rather than `MonadLift`) so the instance has no `semiOutParam`
+arguments to synthesize — `OptionT m`'s `m` cannot be recovered from the `SetM` codomain. -/
+noncomputable instance instMonadLiftTSetM {m : Type u → Type v} [Monad m]
+    [MonadLiftT m SetM] : MonadLiftT (OptionT m) SetM where
   monadLift mx := some ⁻¹' (support (OptionT.run mx))
-  monadLift_pure mx := Set.ext fun x => by simp
-  monadLift_bind mx my := Set.ext fun x => by
+
+noncomputable instance instLawfulMonadLiftTSetM {m : Type u → Type v} [Monad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
+    LawfulMonadLiftT (OptionT m) SetM where
+  monadLift_pure mx := by
+    show some ⁻¹' (support (OptionT.run (pure mx : OptionT m _))) = pure mx
+    ext x; simp
+  monadLift_bind mx my := by
+    show (some ⁻¹' (support (OptionT.run (mx >>= my))) : SetM _) =
+      ((some ⁻¹' (support mx.run)) >>= fun a => some ⁻¹' (support (my a).run) : SetM _)
+    ext x
     rw [Set.mem_preimage]
     calc
       some x ∈ support (OptionT.run (mx >>= my)) ↔
@@ -53,7 +62,7 @@ noncomputable instance (m : Type u → Type v) [Monad m] [MonadLiftT m SetM] :
       _ ↔ x ∈ ⋃ a ∈ some ⁻¹' support mx.run, some ⁻¹' support (my a).run := by
             simp only [Set.mem_iUnion, Set.mem_preimage, exists_prop]
 
-variable [MonadLiftT m SetM]
+variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
 @[aesop unsafe norm, grind =]
 lemma support_def (mx : OptionT m α) :
@@ -71,7 +80,7 @@ lemma support_liftM (mx : m α) :
 lemma support_lift (mx : m α) :
     support (OptionT.lift mx) = support mx := by grind
 
-end HasEvalSet
+end EvalSet
 
 section HasEvalFinset
 
@@ -93,42 +102,45 @@ lemma mem_finSupport_iff [DecidableEq α] (mx : OptionT m α) (x : α) :
   simp [finSupport_def, Finset.mem_preimage]
 
 @[simp]
-lemma finSupport_liftM [DecidableEq α] (mx : m α) :
+lemma finSupport_liftM [LawfulMonadLiftT m SetM] [LawfulMonad m] [DecidableEq α] (mx : m α) :
     finSupport (liftM mx : OptionT m α) = finSupport mx := by
-  grind only [= finSupport_def, = liftM_def, = coe_finSupport, = run_lift,
-    = mem_finSupport_iff_mem_support, = support_def, = Set.mem_preimage, = mem_support_bind_iff,
-    = support_pure, = Set.mem_singleton_iff]
+  ext x; simp [mem_finSupport_iff, mem_finSupport_iff_mem_support, support_liftM]
 
 @[simp]
-lemma finSupport_lift [DecidableEq α] (mx : m α) :
+lemma finSupport_lift [LawfulMonadLiftT m SetM] [LawfulMonad m] [DecidableEq α] (mx : m α) :
     finSupport (OptionT.lift mx) = finSupport mx := by
-  grind only [= finSupport_def, = run_lift, = coe_finSupport, = mem_finSupport_iff_mem_support,
-    = support_def, = Set.mem_preimage, = mem_support_bind_iff, = support_pure,
-    = Set.mem_singleton_iff]
+  ext x; simp [mem_finSupport_iff, mem_finSupport_iff_mem_support, support_lift]
 
 end HasEvalFinset
 
-section HasEvalSPMF
+section EvalSPMF
 
-/-- Lift a `HasEvalSPMF m` instance to `HasEvalSPMF (OptionT m)`.
-Note: a more specific `HasEvalPMF m → HasEvalSPMF (OptionT m)` path would make explicit
-that failure comes solely from `OptionT`, but this general instance subsumes it.
-
-Lean 4 automatically synthesizes `toSet` from the standalone `HasEvalSet (OptionT m)` instance
-above, ensuring the diamond is definitionally equal (per Mathlib convention). The `support_eq`
-field then serves as the coherence proof between the set-path and distribution-path. -/
-noncomputable instance (m : Type u → Type v) [Monad m] [MonadLiftT m SPMF] :
-    HasEvalSPMF (OptionT m) where
+/-- Lift a `MonadLiftT m SPMF` instance to `MonadLift (OptionT m) SPMF`. Failure in `OptionT`
+contributes to the failure mass of the resulting `SPMF`. -/
+noncomputable instance instMonadLiftTSPMF (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] :
+    MonadLiftT (OptionT m) SPMF where
   monadLift x := OptionT.mapM' (MonadHom.ofLift m SPMF) x
-  monadLift_pure := by simp
-  monadLift_bind := by simp
 
-instance (m : Type u → Type v) [Monad m] [MonadLiftT m SPMF] :
+noncomputable instance instLawfulMonadLiftTSPMF (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] :
+    LawfulMonadLiftT (OptionT m) SPMF where
+  monadLift_pure x := by
+    show OptionT.mapM' (MonadHom.ofLift m SPMF) (pure x : OptionT m _) = pure x
+    simp
+  monadLift_bind mx my := by
+    show OptionT.mapM' (MonadHom.ofLift m SPMF) (mx >>= my) =
+      OptionT.mapM' (MonadHom.ofLift m SPMF) mx >>=
+        fun a => OptionT.mapM' (MonadHom.ofLift m SPMF) (my a)
+    simp
+
+instance instLawfulFailure (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] :
     HasEvalSet.LawfulFailure (OptionT m) where
   support_failure' := by aesop
 
 
-variable [MonadLiftT m SPMF]
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
 lemma evalDist_eq (mx : OptionT m α) :
     𝒟[mx] = OptionT.mapM' (MonadHom.ofLift m SPMF) mx := rfl
@@ -169,11 +181,17 @@ lemma probFailure_eq (mx : OptionT m α) :
 
 @[simp, grind =]
 lemma probOutput_liftM [LawfulMonad m] (mx : m α) (x : α) :
-    Pr[= x | liftM (n := OptionT m) mx] = Pr[= x | mx] := by simp [probOutput_eq]
+    Pr[= x | liftM (n := OptionT m) mx] = Pr[= x | mx] := by
+  rw [probOutput_eq]
+  show Pr[= some x | (liftM mx : OptionT m _).run] = Pr[= x | mx]
+  rw [show (liftM mx : OptionT m _).run = some <$> mx from by
+    simp [monad_norm]]
+  exact probOutput_map_injective (f := (some : α → Option α)) mx (Option.some_injective _) x
 
 @[simp, grind =]
 lemma probOutput_lift [LawfulMonad m] (mx : m α) (x : α) :
-    Pr[= x | OptionT.lift mx] = Pr[= x | mx] := by simp [probOutput_eq]
+    Pr[= x | OptionT.lift mx] = Pr[= x | mx] :=
+  probOutput_liftM mx x
 
 @[simp, grind =]
 lemma probEvent_liftM [LawfulMonad m] (mx : m α) (p : α → Prop) :
@@ -195,6 +213,6 @@ lemma probFailure_lift [LawfulMonad m] (mx : m α) :
     Pr[⊥ | OptionT.lift mx] = Pr[⊥ | mx] := by
   simp [probFailure_eq]
 
-end HasEvalSPMF
+end EvalSPMF
 
 end OptionT

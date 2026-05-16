@@ -137,7 +137,7 @@ theorem encrypt_usesExactQueryCost {ω : Type} [AddMonoid ω]
 /-- T-transform encryption has expected weighted query cost equal to the weight of querying
 `msg`. -/
 theorem encrypt_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω]
-    [HasEvalPMF m]
+    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (msg : M) (costFn : M → ω) (val : ω → ENNReal) (hval : Monotone val) :
@@ -181,7 +181,7 @@ theorem decrypt_usesZeroQueryCost_of_decrypt_eq_none {ω : Type} [AddMonoid ω]
 /-- If deterministic decryption fails immediately, the T-transform has expected weighted query
 cost `0`. -/
 theorem decrypt_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
-    [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
+    [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) (costFn : M → ω)
@@ -217,7 +217,7 @@ theorem decrypt_usesExactQueryCost_of_decrypt_eq_some {ω : Type} [AddMonoid ω]
 /-- If deterministic decryption returns a message, the T-transform has expected weighted query
 cost equal to the weight of querying that message. -/
 theorem decrypt_expectedQueryCost_eq_of_decrypt_eq_some {ω : Type}
-    [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
+    [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) (costFn : M → ω)
@@ -259,7 +259,7 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
       (costFn := fun _ ↦ 1) hdec)
 
 /-- T-transform decryption makes at most one hash-oracle query under unit-cost instrumentation. -/
-theorem decrypt_usesAtMostOneQuery [MonadLiftT m SetM]
+theorem decrypt_usesAtMostOneQuery [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) :

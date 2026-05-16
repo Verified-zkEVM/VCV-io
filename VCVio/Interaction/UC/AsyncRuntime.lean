@@ -346,7 +346,7 @@ noncomputable def processSemanticsAsyncProbComp
       p.Proc → State → RuntimeTrace Event → ProbComp Unit) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
   processSemanticsAsync Party schedulerSampler
-    (SPMFSemantics.ofHasEvalSPMF ProbComp)
+    (SPMFSemantics.ofMonadLift ProbComp)
     envAction initEnvState
     init envScheduler fuel observe
 

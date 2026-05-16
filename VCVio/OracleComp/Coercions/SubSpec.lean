@@ -317,10 +317,11 @@ section liftComp_support
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α : Type w}
   [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
+  [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited]
 
 /-- Support is preserved by `liftComp`: lifting a computation to a larger oracle spec
 does not change which outputs are reachable. This is the support analogue of
-`evalDist_liftComp` and does not require `Fintype`/`Inhabited` instances. -/
+`evalDist_liftComp`. -/
 @[simp] lemma support_liftComp (mx : OracleComp spec α) :
     support (liftComp mx superSpec) = support mx := by
   simp only [liftComp]

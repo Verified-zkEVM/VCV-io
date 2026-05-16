@@ -94,19 +94,21 @@ lemma fst_map_run_withTraceBefore [LawfulMonad m]
     (fun t => by simp [WriterT.run_tell]) mx
 
 /-- A "before"-style trace preserves failure probability for any base monad with
-`HasEvalSPMF`: instrumenting with `withTraceBefore` does not change the
+`MonadLiftT m SPMF`: instrumenting with `withTraceBefore` does not change the
 probability of failure. -/
-lemma probFailure_run_simulateQ_withTraceBefore [LawfulMonad m] [MonadLiftT m SPMF]
+lemma probFailure_run_simulateQ_withTraceBefore [LawfulMonad m]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withTraceBefore traceFn) mx).run] = Pr[⊥ | simulateQ so mx] := by
   rw [show Pr[⊥ | (simulateQ (so.withTraceBefore traceFn) mx).run] =
     Pr[⊥ | Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run] from
     (probFailure_map _ _).symm, fst_map_run_withTraceBefore]
 
-lemma NeverFail_run_simulateQ_withTraceBefore_iff [LawfulMonad m] [MonadLiftT m SPMF]
+lemma NeverFail_run_simulateQ_withTraceBefore_iff [LawfulMonad m]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withTraceBefore traceFn) mx).run ↔ NeverFail (simulateQ so mx) := by
-  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withTraceBefore]
+  simp only [neverFail_iff, probFailure_run_simulateQ_withTraceBefore]
 
 /-- When every query traces to the monoid identity `1`, `withTraceBefore` is a
 no-op up to pairing with `1`. -/
@@ -121,19 +123,19 @@ lemma run_simulateQ_withTraceBefore_const_one [LawfulMonad m]
 
 /-! #### `evalDist` / `probOutput` / `support` bridges for `withTraceBefore` -/
 
-lemma evalDist_fst_run_withTraceBefore [LawfulMonad m] [MonadLiftT m SPMF]
+lemma evalDist_fst_run_withTraceBefore [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     𝒟[Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run] =
       𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTraceBefore so traceFn mx)
 
-lemma probOutput_fst_run_withTraceBefore [LawfulMonad m] [MonadLiftT m SPMF]
+lemma probOutput_fst_run_withTraceBefore [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run] =
       Pr[= x | simulateQ so mx] := by
   rw [fst_map_run_withTraceBefore]
 
-lemma support_fst_run_withTraceBefore [LawfulMonad m] [MonadLiftT m SPMF]
+lemma support_fst_run_withTraceBefore [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (so.withTraceBefore traceFn) mx).run) =
       support (simulateQ so mx) := by
@@ -170,11 +172,11 @@ lemma fst_map_run_withTrace [LawfulMonad m]
     (fun t => by simp [WriterT.run_tell]) mx
 
 /-- An "after"-style trace preserves failure probability for any base monad with
-`HasEvalSPMF`: instrumenting with `withTrace` does not change the probability
+`MonadLiftT m SPMF`: instrumenting with `withTrace` does not change the probability
 of failure. When `m = OracleComp spec`, both sides are `0` (trivially true);
 when `m` can genuinely fail (e.g. `OptionT (OracleComp spec)`), this is a
 non-trivial faithfulness property. -/
-lemma probFailure_run_simulateQ_withTrace [LawfulMonad m] [MonadLiftT m SPMF]
+lemma probFailure_run_simulateQ_withTrace [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withTrace traceFn) mx).run] = Pr[⊥ | simulateQ so mx] := by
@@ -182,11 +184,11 @@ lemma probFailure_run_simulateQ_withTrace [LawfulMonad m] [MonadLiftT m SPMF]
     Pr[⊥ | Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run] from
     (probFailure_map _ _).symm, fst_map_run_withTrace]
 
-lemma NeverFail_run_simulateQ_withTrace_iff [LawfulMonad m] [MonadLiftT m SPMF]
+lemma NeverFail_run_simulateQ_withTrace_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withTrace traceFn) mx).run ↔ NeverFail (simulateQ so mx) := by
-  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withTrace]
+  simp only [neverFail_iff, probFailure_run_simulateQ_withTrace]
 
 /-- When every query/response pair traces to the monoid identity `1`,
 `withTrace` is a no-op up to pairing with `1`. -/
@@ -201,21 +203,21 @@ lemma run_simulateQ_withTrace_const_one [LawfulMonad m]
 
 /-! #### `evalDist` / `probOutput` / `support` bridges for `withTrace` -/
 
-lemma evalDist_fst_run_withTrace [LawfulMonad m] [MonadLiftT m SPMF]
+lemma evalDist_fst_run_withTrace [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     𝒟[Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run] =
       𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTrace so traceFn mx)
 
-lemma probOutput_fst_run_withTrace [LawfulMonad m] [MonadLiftT m SPMF]
+lemma probOutput_fst_run_withTrace [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run] =
       Pr[= x | simulateQ so mx] := by
   rw [fst_map_run_withTrace]
 
-lemma support_fst_run_withTrace [LawfulMonad m] [MonadLiftT m SPMF]
+lemma support_fst_run_withTrace [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (so.withTrace traceFn) mx).run) =
@@ -254,7 +256,7 @@ lemma fst_map_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω]
     (fun t => by simp [WriterT.run_tell]) mx
 
 lemma probFailure_run_simulateQ_withTraceAppendBefore [LawfulMonad m]
-    [LawfulAppend ω] [MonadLiftT m SPMF]
+    [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withTraceAppendBefore traceFn) mx).run] =
       Pr[⊥ | simulateQ so mx] := by
@@ -263,27 +265,27 @@ lemma probFailure_run_simulateQ_withTraceAppendBefore [LawfulMonad m]
     (probFailure_map _ _).symm, fst_map_run_withTraceAppendBefore]
 
 lemma NeverFail_run_simulateQ_withTraceAppendBefore_iff [LawfulMonad m]
-    [LawfulAppend ω] [MonadLiftT m SPMF]
+    [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withTraceAppendBefore traceFn) mx).run ↔
       NeverFail (simulateQ so mx) := by
-  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withTraceAppendBefore]
+  simp only [neverFail_iff, probFailure_run_simulateQ_withTraceAppendBefore]
 
 /-! #### `evalDist` / `probOutput` / `support` bridges for `withTraceAppendBefore` -/
 
-lemma evalDist_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF]
+lemma evalDist_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     𝒟[Prod.fst <$> (simulateQ (so.withTraceAppendBefore traceFn) mx).run] =
       𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTraceAppendBefore so traceFn mx)
 
-lemma probOutput_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF]
+lemma probOutput_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (so.withTraceAppendBefore traceFn) mx).run] =
       Pr[= x | simulateQ so mx] := by
   rw [fst_map_run_withTraceAppendBefore]
 
-lemma support_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF]
+lemma support_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (mx : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (so.withTraceAppendBefore traceFn) mx).run) =
       support (simulateQ so mx) := by
@@ -322,7 +324,7 @@ lemma fst_map_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω]
     (fun t => by simp [WriterT.run_tell]) mx
 
 lemma probFailure_run_simulateQ_withTraceAppend [LawfulMonad m]
-    [LawfulAppend ω] [MonadLiftT m SPMF]
+    [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withTraceAppend traceFn) mx).run] = Pr[⊥ | simulateQ so mx] := by
@@ -331,30 +333,30 @@ lemma probFailure_run_simulateQ_withTraceAppend [LawfulMonad m]
     (probFailure_map _ _).symm, fst_map_run_withTraceAppend]
 
 lemma NeverFail_run_simulateQ_withTraceAppend_iff [LawfulMonad m]
-    [LawfulAppend ω] [MonadLiftT m SPMF]
+    [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withTraceAppend traceFn) mx).run ↔
       NeverFail (simulateQ so mx) := by
-  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withTraceAppend]
+  simp only [neverFail_iff, probFailure_run_simulateQ_withTraceAppend]
 
 /-! #### `evalDist` / `probOutput` / `support` bridges for `withTraceAppend` -/
 
-lemma evalDist_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF]
+lemma evalDist_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     𝒟[Prod.fst <$> (simulateQ (so.withTraceAppend traceFn) mx).run] =
       𝒟[simulateQ so mx] :=
   congrArg evalDist (fst_map_run_withTraceAppend so traceFn mx)
 
-lemma probOutput_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF]
+lemma probOutput_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (so.withTraceAppend traceFn) mx).run] =
       Pr[= x | simulateQ so mx] := by
   rw [fst_map_run_withTraceAppend]
 
-lemma support_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF]
+lemma support_fst_run_withTraceAppend [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (mx : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (so.withTraceAppend traceFn) mx).run) =

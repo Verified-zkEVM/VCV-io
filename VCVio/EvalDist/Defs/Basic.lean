@@ -9,7 +9,7 @@ import ToMathlib.ProbabilityTheory.SPMF
 /-!
 # Typeclasses for Denotational Monad Semantics
 
-This file defines typeclasses `HasEvalSPMF` and `HasEvalPMF` for assigning denotational
+This file builds atop `MonadLiftT m SPMF` / `MonadLiftT m PMF` for assigning denotational
 probability semantics to monadic computations. We also introduce functions
 `probOutput`, `probEvent`, and `probFailure` with associated notation.
 
@@ -22,26 +22,18 @@ universe u v w
 
 variable {m : Type u → Type v} {α β γ : Type u}
 
--- /-- The monad `m` can be evaluated to get a sub-distribution of outputs.
--- Should not be implemented manually if a `HasEvalPMF` instance already exists. -/
--- class HasEvalSPMF (m : Type u → Type v) [Monad m]
---     extends MonadLiftT m SPMF, LawfulMonadLiftT m SPMF where
-
 instance : MonadLift SPMF SetM where
   monadLift := SPMF.support
 
 instance : LawfulMonadLift SPMF SetM where
   monadLift_pure := SPMF.support_pure
-  monadLift_bind := sorry
+  monadLift_bind := SPMF.support_bind
 
-/-- The resulting distribution of running the monadic computation `mx`.
-The fixed return type often allows this (and `𝒟[mx]` notation) to unify more generally. -/
+/-- The resulting distribution of running the monadic computation `mx`. -/
 @[reducible, inline]
 def evalDist [MonadLiftT m SPMF] {α : Type u} (mx : m α) : SPMF α := liftM mx
 
-/-- Evaluation distribution notation for any monad with `HasEvalSPMF`.
-For monads with `HasEvalPMF`, this uses the inherited `HasEvalSPMF`
-semantics. -/
+/-- Evaluation distribution notation for any monad lifting into `SPMF`. -/
 notation "𝒟[" mx "]" => evalDist mx
 
 lemma evalDist_def [MonadLiftT m SPMF] {α : Type u} (mx : m α) :
@@ -626,60 +618,58 @@ lemma probEvent_const (mx : m α) (p : Prop) [Decidable p] :
 
 end bool
 
--- /-- The monad `m` can be evaluated to get a distribution of outputs. -/
--- class HasEvalPMF (m : Type u → Type v) [Monad m]
---     extends MonadLiftT m PMF, LawfulMonadLiftT m PMF where
+/-! ### Lemmas for monads with a total `PMF` denotation
 
--- noncomputable instance [h : HasEvalPMF m] : HasEvalSPMF m where
+These lemmas hold when `m` lifts into `PMF` (so computations never fail). They expose the
+absence of failure mass and total normalization of the resulting distribution. -/
 
-namespace HasEvalPMF
+section pmf_denotation
 
-variable {α β γ : Type u} {m : Type u → Type v}
-  [MonadLiftT m PMF] (mx : m α) (x : α)
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
+  [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
 
-lemma evalDist_of_hasEvalPMF_def (mx : m α) :
-    𝒟[mx] = liftM mx := rfl
-
-/-- The `evalDist` arising from a `HasEvalPMF` instance never fails. -/
+/-- A computation interpreted via a `PMF` lift has zero failure probability. -/
 @[simp, grind =]
-lemma probFailure_eq_zero (mx : m α) : Pr[⊥ | mx] = 0 := by
-  rw [probFailure_def, evalDist_of_hasEvalPMF_def, SPMF.run_eq_toPMF]
+lemma probFailure_of_liftM_PMF (mx : m α) : Pr[⊥ | mx] = 0 := by
+  rw [probFailure_def, show 𝒟[mx] = (liftM (liftM mx : PMF α) : SPMF α) from rfl,
+    SPMF.run_eq_toPMF]
   change (some <$> (liftM mx : PMF α)) none = 0
   simp [PMF.monad_map_eq_map, PMF.map_apply]
 
-lemma tsum_probOutput_eq_one (mx : m α) :
+lemma tsum_probOutput_of_liftM_PMF (mx : m α) :
     ∑' x, Pr[= x | mx] = 1 := by simp
 
-lemma tsum_support_probOutput_eq_one (mx : m α) :
+lemma tsum_support_probOutput_of_liftM_PMF (mx : m α) :
     ∑' x : support mx, Pr[= x | mx] = 1 := by simp
 
-lemma sum_probOutput_eq_one [Fintype α] (mx : m α) : ∑ x : α, Pr[= x | mx] = 1 := by simp
+lemma sum_probOutput_of_liftM_PMF [Fintype α] (mx : m α) :
+    ∑ x : α, Pr[= x | mx] = 1 := by simp
 
-lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α] (mx : m α) :
+lemma sum_finSupport_probOutput_of_liftM_PMF [HasEvalFinset m] [DecidableEq α] (mx : m α) :
     ∑ x ∈ finSupport mx, Pr[= x | mx] = 1 := by simp
 
-lemma finSupport_nonempty [HasEvalFinset m] [DecidableEq α] (mx : m α) :
+lemma finSupport_nonempty_of_liftM_PMF [HasEvalFinset m] [DecidableEq α] (mx : m α) :
     (finSupport mx).Nonempty := by
   by_contra h
-  have hsum := sum_finSupport_probOutput_eq_one mx
+  have hsum := sum_finSupport_probOutput_of_liftM_PMF (m := m) mx
   rw [Finset.not_nonempty_iff_eq_empty.mp h, Finset.sum_empty] at hsum
   exact zero_ne_one hsum
 
-lemma probOutput_eq_inv_finSupport_card [HasEvalFinset m] [DecidableEq α]
+lemma probOutput_eq_inv_finSupport_card_of_liftM_PMF [HasEvalFinset m] [DecidableEq α]
     {mx : m α} {c : ENNReal}
     (hconst : ∀ x ∈ support mx, Pr[= x | mx] = c) :
     c = 1 / (finSupport mx).card := by
   have hconst' : ∀ x ∈ finSupport mx, Pr[= x | mx] = c :=
     fun x hx => hconst x (mem_support_of_mem_finSupport hx)
   have hcard_mul : ((finSupport mx).card : ENNReal) * c = 1 := by
-    have h := sum_finSupport_probOutput_eq_one mx
+    have h := sum_finSupport_probOutput_of_liftM_PMF (m := m) mx
     rwa [show ∑ x ∈ finSupport mx, Pr[= x | mx] = ∑ x ∈ finSupport mx, c from
       Finset.sum_congr rfl fun x hx => hconst' x hx, Finset.sum_const, nsmul_eq_mul] at h
   have : c * ((finSupport mx).card : ENNReal) = 1 := by rwa [mul_comm] at hcard_mul
   calc c = ((finSupport mx).card : ENNReal)⁻¹ := ENNReal.eq_inv_of_mul_eq_one_left this
     _ = 1 / (finSupport mx).card := by rw [one_div]
 
-end HasEvalPMF
+end pmf_denotation
 
 section probEvent_mono_compl
 

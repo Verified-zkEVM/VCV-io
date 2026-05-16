@@ -44,7 +44,7 @@ def OracleSpec.enforceOracle [DecidableEq ι] [spec.Inhabited] :
 
 namespace enforceOracle
 
-variable [DecidableEq ι] [spec.Inhabited]
+variable [DecidableEq ι] [spec.Fintype] [spec.Inhabited]
 
 @[simp]
 lemma run_apply (t : ι) (budget : ι → ℕ) :

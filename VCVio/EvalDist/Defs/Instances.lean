@@ -17,24 +17,12 @@ variable {α β γ : Type u}
 
 namespace SetM
 
-/-- Enable `support` notation for `SetM` (note the need for the monadic instance and not `Set`). -/
-instance : HasEvalSet SetM where
-  monadLift x := x
-  monadLift_pure _ := rfl
-  monadLift_bind _ _ := rfl
-
 @[simp, grind =]
 lemma support_eq_run (s : SetM α) : support s = s.run := rfl
 
 end SetM
 
 namespace SPMF
-
-/-- Enable probability notation for `SPMF`, using identity as the `SPMF` embedding. -/
-instance : HasEvalSPMF SPMF where
-  monadLift x := x
-  monadLift_pure _ := rfl
-  monadLift_bind _ _ := rfl
 
 @[simp, grind =]
 protected lemma evalDist_def (p : SPMF α) : evalDist p = p := rfl
@@ -51,12 +39,6 @@ lemma evalDist_eq_iff {m} [Monad m] [MonadLiftT m SPMF] (mx : m α) (p : SPMF α
 end SPMF
 
 namespace PMF
-
-/-- Enable probability notation for `PMF`, using `liftM` as the `SPMF` embedding. -/
-noncomputable instance : HasEvalPMF PMF where
-  monadLift x := x
-  monadLift_pure _ := rfl
-  monadLift_bind _ _ := rfl
 
 @[simp] lemma evalDist_eq (p : PMF α) : evalDist p = liftM p := rfl
 
@@ -79,19 +61,14 @@ end PMF
 
 namespace Id
 
-/-- The support of a computation in `Id` is the result being returned. -/
-instance : HasEvalSet Id where
+/-- Lift `Id` into `PMF` (a `pure` of the result), giving `Id` the canonical total denotation. -/
+noncomputable instance : MonadLift Id PMF where
   monadLift x := pure x.run
-  monadLift_pure _ := rfl
-  monadLift_bind _ _ := by
-    show ({_} : Set _) = ⋃ _ ∈ ({_} : Set _), {_}
-    simp
 
-noncomputable instance : HasEvalPMF Id where
-  monadLift x := pure x.run
+noncomputable instance : LawfulMonadLift Id PMF where
   monadLift_pure _ := rfl
   monadLift_bind _ _ := by
-    show (pure _ : PMF _) = _ >>= _
+    show (PMF.pure _ : PMF _) = (pure _ : PMF _).bind fun x => pure _
     simp [PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind]
 
 instance : HasEvalFinset Id where
@@ -123,6 +100,7 @@ lemma probEvent_eq_ite (x : Id α) (p : α → Prop) [DecidablePred p] :
   rw [show x = pure x.run from rfl, probEvent_pure]
   rfl
 
-lemma probFailure_eq_zero (x : Id α) : Pr[⊥ | x] = 0 := by aesop
+lemma probFailure_eq_zero (x : Id α) : Pr[⊥ | x] = 0 := by
+  rw [show x = pure x.run from rfl, probFailure_pure]
 
 end Id

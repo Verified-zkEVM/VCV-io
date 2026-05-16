@@ -257,7 +257,7 @@ the `Hax.RustM` level has no oracle to sample at all. -/
 theorem tossedAdd_panic_prob :
     Pr[= some (Except.error Interop.Rust.Error.integerOverflow) |
         tossedAdd.run.run] = 2⁻¹ := by
-  rw [tossedAdd_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype]
+  rw [tossedAdd_run_run, probOutput_bind_eq_sum_fintype]
   -- ∑ x : Fin 2, Pr[= x | $[0..1]] * (if ... then 1 else 0).
   -- Both `Pr[= · | $[0..1]]` factors collapse to `(1 + 1 : ℝ≥0∞)⁻¹`, then the
   -- `x = 0` branch contributes `0` and the `x = 1` branch contributes the

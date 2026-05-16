@@ -40,7 +40,7 @@ theorem buildLayer_neverFails [DecidableEq α]
     (leaves : List.Vector α (2 ^ (n + 1))) : NeverFail
       ((simulateQ (spec α).randomOracle
         (buildLayer α n leaves)).run preexisting_cache) := by
-  grind only [buildLayer, = HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
+  grind only [buildLayer, = neverFail_iff, = probFailure_of_liftM_PMF]
 
 /--
 Building a Merkle tree never results in failure
@@ -53,7 +53,7 @@ theorem buildMerkleTree_neverFails [DecidableEq α]
     NeverFail
       ((simulateQ (spec α).randomOracle
         (buildMerkleTree α n leaves)).run preexisting_cache) := by
-  grind only [= HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
+  grind only [= neverFail_iff, = probFailure_of_liftM_PMF]
 
 /-- A functional completeness theorem for Merkle proofs built from `buildMerkleTree_with_hash`. -/
 theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i : Fin (2 ^ n))

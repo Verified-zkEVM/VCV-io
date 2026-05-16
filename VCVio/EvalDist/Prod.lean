@@ -15,7 +15,8 @@ open ENNReal Prod
 
 universe u v
 
-variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] {α β γ δ : Type u}
+variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
+  [LawfulMonadLiftT m SPMF] {α β γ δ : Type u}
 
 omit [LawfulMonad m] in
 lemma probOutput_prod_mk_eq_probEvent (mx : m (α × β)) (x : α) (y : β) :

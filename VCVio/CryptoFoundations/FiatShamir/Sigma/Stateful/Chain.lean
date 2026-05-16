@@ -36,7 +36,10 @@ attribute [fs_simp]
   simulatedNmaSigSim
   simulatedNmaImpl
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+    [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp]
+    {rel : Stmt → Wit → Bool}
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
@@ -687,7 +690,7 @@ private lemma forkInitialState_inv :
   · intro mc ch hcache
     simp [forkInitialState] at hcache
 
-omit [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
+omit [SampleableType Chal] [Finite Chal] in
 private lemma simulatedNmaUnifFork_flatten_preserves_state
     {α : Type} (A : ProbComp α)
     (advCache : (fsRoSpec M Commit Chal).QueryCache)
@@ -713,7 +716,7 @@ private lemma simulatedNmaUnifFork_flatten_preserves_state
       rfl)
     A (advCache, liveSt) rfl z hz
 
-omit [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
+omit [SampleableType Chal] [Finite Chal] in
 private lemma simulatedNmaUnifFork_nested_preserves_state
     {α : Type} (A : ProbComp α)
     (advCache : (fsRoSpec M Commit Chal).QueryCache)
@@ -2103,7 +2106,7 @@ private lemma verifyFreshComp_expectedQuerySlack_eq_zero
     · simp [IsCostlyQuery]
   · simp [verifyFreshComp, expectedQuerySlack_bad_eq_zero]
 
-omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] [Inhabited Chal] in
+omit [Finite Chal] in
 /-- Tight native H3 bound for the freshness-preserving adversary, using the
 candidate/verifier split so the final verifier hash query is not charged to H3
 signing replacement. -/
@@ -2255,7 +2258,6 @@ theorem cmaSim_signedFreshAdv_le_fork
       (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
       (Stmt := Stmt) (Wit := Wit) adv simT qS qH hQ)
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Native stateful top-level chain, assuming the H5 replay-forking boundary.
 
 This theorem carries the H1/H2/H3/H4 arithmetic directly in the stateful chain.
@@ -2340,7 +2342,6 @@ theorem cma_advantage_le_fork_bound_of_h5
         rw [ENNReal.ofReal_natCast]
         ring_nf
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Native stateful chain with H5 discharged by the replay-forking boundary,
 leaving only the public-to-stateful H1/H2 compatibility premise. -/
 theorem cma_advantage_le_fork_bound_of_h1h2

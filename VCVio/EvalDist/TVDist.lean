@@ -15,7 +15,7 @@ This file extends the TV distance from `PMF` (defined in
 `ToMathlib.ProbabilityTheory.TotalVariation`) to:
 
 1. `SPMF.tvDist` — on sub-probability mass functions (via `toPMF`)
-2. `tvDist` — on any monad with `HasEvalSPMF` (via `evalDist`)
+2. `tvDist` — on any monad with `MonadLiftT m SPMF` (via `evalDist`)
 -/
 
 noncomputable section
@@ -65,7 +65,7 @@ end SPMF
 
 section monadic
 
-variable {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF] {α : Type u}
+variable {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α : Type u}
 
 /-- Total variation distance between two monadic computations,
 defined via their evaluation distributions. -/
@@ -227,12 +227,12 @@ private lemma spmf_tvDist_bind_left_le_liftM
       (fun a => PMF.map Option.some (g a))
 
 lemma tvDist_bind_left_le
-    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx : m α) (f g : α → m β) :
     tvDist (mx >>= f) (mx >>= g) ≤ ∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a) := by
   rw [tvDist, evalDist_bind, evalDist_bind]
-  simp_rw [HasEvalPMF.evalDist_of_hasEvalPMF_def]
+  simp_rw [evalDist_def]
   calc
     SPMF.tvDist
         ((liftM (liftM mx : PMF α) : SPMF α) >>= fun a => liftM (liftM (f a) : PMF β))
@@ -246,12 +246,12 @@ lemma tvDist_bind_left_le
           refine tsum_congr fun a => ?_
           have h1 : ((liftM mx : PMF α) a).toReal = Pr[= a | mx].toReal := by
             congr 1
-            rw [probOutput_def, HasEvalPMF.evalDist_of_hasEvalPMF_def]
+            rw [probOutput_def, evalDist_def]
             exact (SPMF.liftM_apply (liftM mx : PMF α) a).symm
           have h2 : (liftM (liftM (f a) : PMF β) : SPMF β).tvDist
               (liftM (liftM (g a) : PMF β) : SPMF β) = tvDist (f a) (g a) := by
-            rw [tvDist, HasEvalPMF.evalDist_of_hasEvalPMF_def,
-              HasEvalPMF.evalDist_of_hasEvalPMF_def]
+            rw [tvDist, evalDist_def,
+              evalDist_def]
             rfl
           rw [h1, h2]
 
@@ -260,7 +260,7 @@ lemma tvDist_bind_left_le
 /-- Bound the weighted TV sum from `tvDist_bind_left_le` by the probability of a bad event
 when the two continuations are distributionally equal off that event. -/
 lemma tsum_probOutput_toReal_mul_tvDist_le_probEvent
-    {m : Type u → Type v} [Monad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
@@ -319,7 +319,7 @@ lemma tsum_probOutput_toReal_mul_tvDist_le_probEvent
 /-- If two continuations are equal off a bad event, binding them over the same base
 computation changes TV distance by at most the probability of that bad event. -/
 lemma tvDist_bind_left_event_le
-    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
@@ -330,7 +330,7 @@ lemma tvDist_bind_left_event_le
 /-- `ENNReal` form of `tvDist_bind_left_event_le`, matching the quantitative
 identical-until-bad APIs. -/
 lemma ofReal_tvDist_bind_left_event_le
-    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
@@ -342,7 +342,7 @@ lemma ofReal_tvDist_bind_left_event_le
 /-- Bind/event TV bound with different base computations: the base TV distance plus the
 bad-event probability controls the whole bind. -/
 lemma tvDist_bind_event_le
-    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx my : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
@@ -357,7 +357,7 @@ lemma tvDist_bind_event_le
 
 /-- `ENNReal` form of `tvDist_bind_event_le`. -/
 lemma ofReal_tvDist_bind_event_le
-    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx my : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
@@ -372,7 +372,7 @@ lemma ofReal_tvDist_bind_event_le
 probability under the right base computation. This is the symmetric orientation of
 `tvDist_bind_event_le`, useful when the bad event is introduced by the simulated side. -/
 lemma tvDist_bind_event_right_le
-    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx my : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
@@ -387,7 +387,7 @@ lemma tvDist_bind_event_right_le
 
 /-- `ENNReal` form of `tvDist_bind_event_right_le`. -/
 lemma ofReal_tvDist_bind_event_right_le
-    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
     {α : Type u} {β : Type u}
     (mx my : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
@@ -400,7 +400,7 @@ lemma ofReal_tvDist_bind_event_right_le
 
 section bool_tvdist
 
-variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF]
+variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
 /-- For any `Bool` computation, the difference of `Pr[= true]` values is bounded by
 TV distance. -/

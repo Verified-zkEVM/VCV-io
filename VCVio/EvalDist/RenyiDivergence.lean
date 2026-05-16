@@ -13,7 +13,7 @@ This file extends the Rényi divergence from `PMF` (defined in
 `ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence`) to:
 
 1. `SPMF.renyiDiv` — on sub-probability mass functions (via `toPMF`)
-2. `renyiDiv` — on any monad with `HasEvalSPMF` (via `evalDist`)
+2. `renyiDiv` — on any monad with `MonadLiftT m SPMF` (via `evalDist`)
 
 This mirrors the structure of `VCVio.EvalDist.TVDist`, which performs the same lift for
 total variation distance.
@@ -81,7 +81,7 @@ end SPMF
 
 section monadic
 
-variable {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF] {α : Type u}
+variable {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α : Type u}
 
 /-- Rényi divergence between two monadic computations,
 defined via their evaluation distributions. -/

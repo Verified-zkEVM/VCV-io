@@ -187,7 +187,7 @@ private lemma romCRInner_totalBound [DecidableEq X] [DecidableEq Y]
 /-- A win in the ROM-CR experiment implies a collision in the final cache:
 the verification queries cache `x ↦ y` and `x' ↦ y'` with `x ≠ x'` and
 `y = y'`, which is exactly `CacheHasCollision`. -/
-private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y]
+private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y] [Fintype Y] [Inhabited Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     ∀ z ∈ support ((simulateQ cachingOracle (romCRInner A)).run ∅),
       z.1 = true → CacheHasCollision z.2 := by

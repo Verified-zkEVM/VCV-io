@@ -276,7 +276,7 @@ lemma sum_wp_querySaltIndicators_le_queryBound_of_run_cached_logging
             · rw [probOutput_eq_zero_of_not_mem_support hz]
               simp
     _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype M] [Inhabited M] in
 lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_support_with_state
@@ -379,7 +379,7 @@ lemma sum_wp_querySaltIndicators_le_queryBound_of_run_logging
           · rw [probOutput_eq_zero_of_not_mem_support hz]
             simp
     _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
   [Inhabited C] in
@@ -1134,4 +1134,4 @@ theorem sum_probEvent_hidingBad_le [Finite M] {AUX : Type} {t : ℕ}
                 · rw [probOutput_eq_zero_of_not_mem_support hqchoose]
                   simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]

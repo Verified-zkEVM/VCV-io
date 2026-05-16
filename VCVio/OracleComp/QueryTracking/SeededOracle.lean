@@ -70,7 +70,8 @@ bound on `so t` transfers to `(so.withPregen t).run seed`. -/
 
 section QueryBound
 
-variable {ι' : Type u} {spec' : OracleSpec ι'}
+variable {ι' : Type u} {spec' : OracleSpec ι'} [spec.Fintype] [spec.Inhabited]
+  [spec'.Fintype] [spec'.Inhabited]
 
 lemma isQueryBoundP_run_withPregen
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain)
@@ -118,6 +119,7 @@ end QueryImpl
 namespace OracleComp
 
 variable {ι' : Type u} {spec' : OracleSpec ι'} {α : Type u}
+  [spec.Fintype] [spec.Inhabited] [spec'.Fintype] [spec'.Inhabited]
 
 theorem IsQueryBoundP.simulateQ_run_withPregen
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
@@ -421,7 +423,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
     apply evalDist_ext; intro a
     simp_rw [hrun']
     rw [probOutput_bind_const]
-    simp [HasEvalPMF.probFailure_eq_zero]
+    simp [probFailure_of_liftM_PMF]
   | query_bind t mx ih =>
     intro σ
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
@@ -1010,7 +1012,7 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
 
 section queryBounds
 
-variable {α : Type u}
+variable {α : Type u} [spec.Fintype] [spec.Inhabited]
 
 /-- If a pre-generated seed already supplies all but `residual t` of the answers allowed by the
 structural per-index query bound `qb`, then running `oa` against `seededOracle` can make at most
@@ -1172,6 +1174,7 @@ end queryBounds
 Forward only — the reverse fails because pregenerated values strictly reduce the count. -/
 
 theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    [spec₀.Fintype] [spec₀.Inhabited]
     {α : Type} {oa : OracleComp spec₀ α} {n : ℕ}
     (h : OracleComp.IsTotalQueryBound oa n) (seed : QuerySeed spec₀) :
     OracleComp.IsTotalQueryBound ((simulateQ spec₀.seededOracle oa).run seed) n := by
@@ -1180,6 +1183,7 @@ theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec
     (fun t => (OracleComp.isQueryBound_query_iff t 1 _ _).mpr Nat.one_pos) seed
 
 theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    [spec₀.Fintype] [spec₀.Inhabited]
     {α : Type} {oa : OracleComp spec₀ α}
     {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
     (h : OracleComp.IsQueryBoundP oa p n) (seed : QuerySeed spec₀) :
@@ -1191,6 +1195,7 @@ theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ 
     seed
 
 theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    [spec₀.Fintype] [spec₀.Inhabited]
     {α : Type} {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ}
     (h : OracleComp.IsPerIndexQueryBound oa qb) (seed : QuerySeed spec₀) :
     OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.seededOracle oa).run seed) qb := by
@@ -1204,7 +1209,8 @@ theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {s
 /-- State-preserving variant of `isPerIndexQueryBound_run'_zero`: when the seed covers `qb`
 at every index, the simulation makes zero further queries even with the seed in scope. -/
 theorem isPerIndexQueryBound_run_simulateQ_zero
-    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} {α : Type}
+    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} [spec₀.Fintype] [spec₀.Inhabited]
+    {α : Type}
     {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ} {seed : QuerySeed spec₀}
     (hqb : OracleComp.IsPerIndexQueryBound oa qb)
     (hseed : ∀ t, qb t ≤ (seed t).length) :
@@ -1216,7 +1222,8 @@ theorem isPerIndexQueryBound_run_simulateQ_zero
 /-- State-preserving variant of `isPerIndexQueryBound_run'_of_seedCoverage`: any uncovered
 suffix of the seed becomes the residual budget in the result spec. -/
 theorem isPerIndexQueryBound_run_simulateQ_of_seedCoverage
-    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} {α : Type}
+    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} [spec₀.Fintype] [spec₀.Inhabited]
+    {α : Type}
     {oa : OracleComp spec₀ α} {qb residual : ι₀ → ℕ} {seed : QuerySeed spec₀}
     (hqb : OracleComp.IsPerIndexQueryBound oa qb)
     (hcover : ∀ t, qb t - residual t ≤ (seed t).length) :

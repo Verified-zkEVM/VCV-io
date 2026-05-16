@@ -87,7 +87,7 @@ theorem correct :
   intro msg
   simp [AsymmEncAlg.CorrectExp, ProbCompRuntime.probComp, ProbCompRuntime.evalDist,
     hashedElGamal, hcomm,
-    HasEvalPMF.toSPMF_eq, SPMF.probFailure_liftM, HasEvalPMF.probFailure_eq_zero]
+    HasEvalPMF.toSPMF_eq, SPMF.probFailure_liftM, probFailure_of_liftM_PMF]
 
 /-! ## DDH Reduction -/
 
@@ -430,7 +430,7 @@ theorem esIdeal_eq_half
         simp [probOutput_uniformSample]
       simp_rw [hbool]
       have hsum : ∑' x : HK, Pr[= x | ($ᵗ HK)] = 1 :=
-        HasEvalPMF.tsum_probOutput_eq_one ($ᵗ HK)
+        tsum_probOutput_of_liftM_PMF ($ᵗ HK)
       rw [ENNReal.tsum_mul_right, hsum, one_mul]
 
 /-! ## Main theorem -/

@@ -230,7 +230,7 @@ private lemma fischlinSearchAux_eq_withUnitCost
         QueryImpl.withUnitCost_apply, liftM, MonadLiftT.monadLift, ih]
 
 private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
-    [MonadLiftT m SetM]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
@@ -335,7 +335,7 @@ private lemma fischlinSearchAux_eq_withAddCost
 private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
     {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
     [CanonicallyOrderedAdd κ]
-    [MonadLiftT m SetM]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
@@ -420,7 +420,7 @@ section verifyCostAccounting
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m SetM]
+  [DecidableEq M] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
 /-- Fischlin verification makes at most `ρ` random-oracle queries under unit-cost
 instrumentation. -/
@@ -529,7 +529,7 @@ section signCostAccounting
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m SetM]
+  [DecidableEq M] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
 /-- Fischlin signing makes at most `ρ * |Ω|` random-oracle queries under unit-cost
 instrumentation. -/
@@ -761,7 +761,7 @@ section expectedWeightedQueryCost
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m SPMF]
+  [DecidableEq M] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
 /-- Fischlin signing has expected weighted query cost at most `ρ • (|Ω| • w)` whenever every
 random-oracle query is weighted by at most `w`. -/
@@ -775,7 +775,6 @@ theorem sign_expectedQueryCost_le
     ExpectedQueryCost[
       (Fischlin σ hr ρ b S M).sign pk sk msg in runtime by costFn via val
     ] ≤ val (ρ • (FinEnum.card Chal • w)) := by
-  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   exact HasQuery.expectedQueryCost_le_of_usesCostAtMost
     (sign_usesWeightedQueryCostAtMost
       (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)
@@ -790,7 +789,7 @@ section expectedQueries
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m SPMF]
+  [DecidableEq M] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
 /-- Fischlin signing has expected query count at most `ρ * |Ω|` in the unit-cost runtime model.
 
@@ -801,7 +800,6 @@ theorem sign_expectedQueries_le_rhoCardOmega
     (pk : Stmt) (sk : Wit) (msg : M) :
     ExpectedQueries[ (Fischlin σ hr ρ b S M).sign pk sk msg in runtime ]
       ≤ ρ * FinEnum.card Chal := by
-  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   simpa [Nat.cast_mul] using HasQuery.expectedQueries_le_of_usesAtMostQueries
     (sign_usesAtMostRhoCardOmegaQueries
       (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)
@@ -814,15 +812,13 @@ section expectedQueriesPMF
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [HasEvalPMF m]
+  [DecidableEq M] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
 
 /-- Fischlin verification has expected query count exactly `ρ` in the unit-cost runtime model. -/
 theorem verify_expectedQueries_eq_rho
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (msg : M) (π : FischlinProof Commit Chal Resp ρ) :
     ExpectedQueries[ (Fischlin σ hr ρ b S M).verify pk msg π in runtime ] = ρ := by
-  letI : HasEvalSPMF m := HasEvalPMF.toHasEvalSPMF
-  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   apply HasQuery.expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
   · exact verify_usesAtMostRhoQueries
       (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)

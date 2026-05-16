@@ -81,7 +81,7 @@ theorem correct [DecidableEq G] :
     rw [this, add_sub_cancel_right]
   simp [AsymmEncAlg.PerfectlyCorrect, ProbCompRuntime.probComp, ProbCompRuntime.evalDist,
     AsymmEncAlg.CorrectExp, elGamalAsymmEnc, hcancel,
-    HasEvalPMF.toSPMF_eq, SPMF.probFailure_liftM, HasEvalPMF.probFailure_eq_zero]
+    HasEvalPMF.toSPMF_eq, SPMF.probFailure_liftM, probFailure_of_liftM_PMF]
 
 section IND_CPA
 
@@ -280,7 +280,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
         simp [probOutput_uniformSample]
       simp_rw [hbool]
       have hsum : ∑' x : G, Pr[= x | ($ᵗ G)] = 1 :=
-        HasEvalPMF.tsum_probOutput_eq_one ($ᵗ G)
+        tsum_probOutput_of_liftM_PMF ($ᵗ G)
       rw [ENNReal.tsum_mul_right, hsum, one_mul]
 
 omit [DecidableEq G] in

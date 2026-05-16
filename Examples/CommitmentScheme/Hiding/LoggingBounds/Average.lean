@@ -658,7 +658,7 @@ lemma wp_challenge_countPred_le_initialCount
             · rw [probOutput_eq_zero_of_not_mem_support hqch]
               simp
     _ = st.2 s := by
-        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma sum_wp_challenge_countPred_le_initialCount
@@ -997,7 +997,7 @@ lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support
                           OracleComp.ProgramLogic.propInd (qch.2.2 s < z.2.2 s) := by
                             simp_rw [mul_add]
                             rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
-                              HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+                              tsum_probOutput_of_liftM_PMF, one_mul]
               exact mul_le_mul' le_rfl hinner
             · rw [probOutput_eq_zero_of_not_mem_support hqch]
               simp
@@ -1013,7 +1013,7 @@ lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support
         rw [OracleComp.ProgramLogic.wp_eq_tsum]
         simp_rw [mul_add]
         rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
-          HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+          tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_support
@@ -1113,7 +1113,7 @@ lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_suppo
                             (qchoose.2.2 s = 0 ∧ qch.2.2 s < z.2.2 s) := by
                             simp_rw [mul_add]
                             rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
-                              HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+                              tsum_probOutput_of_liftM_PMF, one_mul]
               exact mul_le_mul' le_rfl hinner
             · rw [probOutput_eq_zero_of_not_mem_support hqch]
               simp
@@ -1130,7 +1130,7 @@ lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_suppo
         rw [OracleComp.ProgramLogic.wp_eq_tsum]
         simp_rw [mul_add]
         rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
-          HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+          tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [DecidableEq S] [Inhabited S] in
 lemma sum_chooseHitIndicators_le_sumCounts

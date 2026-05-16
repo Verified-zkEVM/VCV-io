@@ -494,7 +494,7 @@ lemma probOutput_decide_eq_uniformBool_half
       Pr[= false | f false] := by
     rw [probOutput_bind_eq_tsum]; simp
   have hsum : Pr[= true | f false] + Pr[= false | f false] = 1 := by
-    have := HasEvalPMF.sum_probOutput_eq_one (f false)
+    have := sum_probOutput_of_liftM_PMF (f false)
     rwa [Fintype.sum_bool] at this
   rw [htrue, hfalse, h true, ← mul_add, hsum, mul_one]
   simp [one_div]

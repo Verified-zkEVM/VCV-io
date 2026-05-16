@@ -25,7 +25,10 @@ open OracleSpec OracleComp ProbComp
 
 namespace FiatShamir.Stateful
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+    [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
+    {rel : Stmt → Wit → Bool}
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
@@ -366,7 +369,6 @@ private lemma cmaSignHashQueryBound_query_bind_iff {α : Type}
       · intro h
         exact ⟨fun u => (h u).1, fun u => (h u).2⟩
 
-omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- A bind is joint-bounded by the sum of the budgets for its prefix and
 continuations. -/
 private lemma cmaSignHashQueryBound_bind {α β : Type}
@@ -492,8 +494,6 @@ theorem signedCandidateAdv_cmaSignHashQueryBound
           (Chal := Chal) (Resp := Resp) (Stmt := Stmt)
           (oa := adv.main pk) qS qH (hQ pk))
 
-omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal]
-  [DecidableEq Commit] in
 /-- The final freshness-preserving Boolean adversary is bounded by the source
 adversary budget plus one verifier hash query. -/
 theorem signedFreshAdv_cmaSignHashQueryBound
@@ -522,8 +522,6 @@ theorem signedFreshAdv_cmaSignHashQueryBound
             (Commit := Commit) (Chal := Chal) (Resp := Resp) pk msg sig 0 1
             (Nat.succ_pos 0))
 
-omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal]
-  [DecidableEq Commit] in
 /-- Predicate-targeted signing-query bound for the final freshness-preserving
 CMA adversary. -/
 theorem signedFreshAdv_isQueryBoundP_costly
@@ -570,8 +568,6 @@ theorem signedCandidateAdv_isQueryBoundP_hash
       (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
       adv qS qH hQ).2
 
-omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal]
-  [DecidableEq Commit] in
 /-- Predicate-targeted hash-query bound for the final freshness-preserving CMA
 adversary. The extra query is the final Fiat-Shamir verification. -/
 theorem signedFreshAdv_isQueryBoundP_hash

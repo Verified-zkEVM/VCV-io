@@ -54,7 +54,7 @@ theorem wpProp_iff_forall_support (oa : OracleComp spec α) (p : α → Prop) :
     exact (probEvent_eq_one_iff (mx := oa) (p := p)).1 h |>.2
   · intro h
     exact probEvent_eq_one (mx := oa) (p := p)
-      ⟨HasEvalPMF.probFailure_eq_zero oa, h⟩
+      ⟨probFailure_of_liftM_PMF oa, h⟩
 
 /-- `wpProp` rule for `pure`. -/
 theorem wpProp_pure (x : α) (p : α → Prop) :

@@ -906,7 +906,6 @@ variable {ι : Type} {spec : OracleSpec ι}
 variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
 variable {α : Type} {σ : Type}
 
-omit [spec'.Fintype] [spec'.Inhabited] in
 /-- "Bad propagation": starting from a bad state, every output of the simulation has the
 bad flag set. This generalizes the per-step `h_mono` hypothesis to the full simulation. -/
 private lemma mem_support_simulateQ_run_of_bad
@@ -1019,7 +1018,7 @@ private theorem tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
         (ENNReal.tsum_toReal_eq fun z => by
           have h := probOutput_le_one (mx := mx) (x := z)
           exact ne_top_of_le_ne_top one_ne_top h).symm]
-      rw [HasEvalPMF.tsum_probOutput_eq_one]
+      rw [tsum_probOutput_of_liftM_PMF]
       simp
     rw [h_one, one_mul]
   have h_second_sum :

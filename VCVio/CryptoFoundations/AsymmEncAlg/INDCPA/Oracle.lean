@@ -33,7 +33,7 @@ variable [DecidableEq M]
 
 /-- Oracle-based multi-query IND-CPA game. The adversary gets oracle access to an encryption
 oracle that encrypts one of two challenge messages depending on a hidden bit. -/
-def IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
+abbrev IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
   unifSpec + (M × M →ₒ C)
 
 /-- An oracle IND-CPA adversary chooses challenge messages by querying the LR oracle and returns
@@ -203,9 +203,10 @@ lemma IND_CPA_queryImpl'_counted_counter_le_succ
       · simp only [IND_CPA_challengeOracle'_counted, IND_CPA_countedChallengeOracle, hcache,
           StateT.run_bind, StateT.run_get, pure_bind,
           StateT.run_pure] at hp
-        have := congrArg (fun x => x.2.2) hp
-        simp at this
-        omega
+        change p ∈ support (pure _ : OracleComp _ _) at hp
+        rw [support_pure, Set.mem_singleton_iff] at hp
+        subst hp
+        simp
 
 private lemma IND_CPA_countedChallengeOracle_proj_eq_cached
     (pk : PK)
@@ -286,7 +287,7 @@ lemma IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false
 /-- If a counted IND-CPA hybrid implementation agrees with the counted real implementation
 through the first `q` fresh LR queries, then any adversary making at most `q` LR queries sees
 the same output distribution as in the real IND-CPA game. -/
-theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
+theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq [Fintype C] [Inhabited C]
     (implCounted : PK → Bool → ℕ →
       QueryImpl encAlg'.IND_CPA_oracleSpec (StateT encAlg'.IND_CPA_CountedState ProbComp))
     (hsame : ∀ (pk : PK) (b : Bool) (realUntil : ℕ)
@@ -371,7 +372,7 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
 /-- A counted IND-CPA hybrid game agrees with the real IND-CPA experiment whenever the hybrid
 implementation matches the real counted implementation on all states that stay below the query
 budget. -/
-theorem IND_CPA_countedGame_eq_game_of_MakesAtMostQueries
+theorem IND_CPA_countedGame_eq_game_of_MakesAtMostQueries [Fintype C] [Inhabited C]
     (implCounted : PK → Bool → ℕ →
       QueryImpl encAlg'.IND_CPA_oracleSpec (StateT encAlg'.IND_CPA_CountedState ProbComp))
     (hsame : ∀ (pk : PK) (b : Bool) (realUntil : ℕ)
@@ -433,7 +434,7 @@ theorem IND_CPA_LR_hybridGame_zero_evalDist_eq_right
 
 /-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid is the
 all-left endpoint game. -/
-theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
+theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries [Fintype C] [Inhabited C]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     𝒟[encAlg'.IND_CPA_LR_hybridGame adversary q] =
@@ -483,6 +484,7 @@ theorem IND_CPA_LR_hybridGame_zero_probOutput_eq_right
 /-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid has
 the same success probability as the all-left endpoint. -/
 theorem IND_CPA_LR_hybridGame_q_probOutput_eq_left_of_MakesAtMostQueries
+    [Fintype C] [Inhabited C]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary q] =
@@ -657,9 +659,10 @@ lemma IND_CPA_hybridLR_counted_counter_le
         omega
       · simp only [hcache, StateT.run_bind, StateT.run_get, pure_bind,
           StateT.run_pure] at hp
-        have := congrArg (fun x => x.2.2) hp
-        simp at this
-        omega
+        change p ∈ support (pure _ : OracleComp _ _) at hp
+        rw [support_pure, Set.mem_singleton_iff] at hp
+        subst hp
+        simp
 
 /-- Behavior of the hybrid challenge oracle on a cache miss. -/
 lemma IND_CPA_hybridChallengeOracleLR_counted_run_none

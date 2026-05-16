@@ -9,10 +9,10 @@ import VCVio.EvalDist.Defs.NeverFails
 /-!
 # Evaluation Distributions on Boolean-Valued Computations
 
-Specialization lemmas for `HasEvalSPMF` computations returning `Bool`.
+Specialization lemmas for `MonadLiftT m SPMF` computations returning `Bool`.
 -/
 
-variable {m : Type _ → Type _} [Monad m] [MonadLiftT m SPMF] {α β : Type _}
+variable {m : Type _ → Type _} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α β : Type _}
 
 @[simp, grind =]
 lemma probOutput_true_add_false (mx : m Bool) :
