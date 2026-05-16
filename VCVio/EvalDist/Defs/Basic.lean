@@ -675,8 +675,8 @@ absence of failure mass and total normalization of the resulting distribution. -
 
 section pmf_denotation
 
-variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
-  [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+variable {α β γ : Type u} {m : Type u → Type v}
+  [MonadLiftT m PMF]
 
 /-- A computation interpreted via a `PMF` lift has zero failure probability. -/
 @[simp, grind =]
@@ -746,6 +746,7 @@ lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
     (h : ∀ x ∈ finSupport mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
   probEvent_mono (fun x hx hpx => h x (mem_finSupport_of_mem_support hx) hpx)
 
+omit [MonadLiftT m SetM] [EvalDistCompatible m] in
 lemma probEvent_compl (mx : m α) (p : α → Prop) :
     Pr[ p | mx] + Pr[ fun x => ¬p x | mx] = 1 - Pr[⊥ | mx] := by
   have := Classical.decPred p
@@ -754,6 +755,7 @@ lemma probEvent_compl (mx : m α) (p : α → Prop) :
   refine tsum_congr fun x => ?_
   split_ifs <;> simp_all
 
+omit [MonadLiftT m SetM] [EvalDistCompatible m] in
 /-- Union bound: the probability of `p ∨ q` is at most the sum of probabilities. -/
 lemma probEvent_or_le (mx : m α) (p q : α → Prop) :
     Pr[ fun x => p x ∨ q x | mx] ≤ Pr[ p | mx] + Pr[ q | mx] := by
@@ -845,6 +847,7 @@ lemma mem_finSupport_iff_of_evalDist_eq {m n} [Monad m] [MonadLiftT m SPMF]
   simp only [mem_finSupport_iff_mem_support, mem_support_iff_of_evalDist_eq h]
 
 open Classical in
+omit [MonadLiftT m SetM] [EvalDistCompatible m] in
 lemma indicator_objective_eq_probEvent (mx : m (α × β)) (R : α → β → Prop) :
     (∑' z, Pr[= z | mx] * (if R z.1 z.2 then 1 else 0)) = Pr[ fun z => R z.1 z.2 | mx] := by
   rw [probEvent_eq_tsum_ite]

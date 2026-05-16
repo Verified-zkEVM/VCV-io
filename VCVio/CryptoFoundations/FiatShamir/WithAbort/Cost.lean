@@ -138,6 +138,7 @@ theorem signAttempt_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
 commitment cost over the attempt output distribution. -/
 theorem signAttempt_expectedQueryCost_eq_outputExpectation
     {ω : Type} [AddMonoid ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) (val : ω → ENNReal) :
     ExpectedQueryCost[
@@ -325,6 +326,7 @@ end queryBounds
 section expectedCost
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 section schemeCost
 

@@ -107,6 +107,7 @@ private lemma signLoop_queryCountDist_succ
 end
 
 variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 /-- The probability that a single Fiat-Shamir-with-aborts signing attempt aborts. -/
 noncomputable abbrev signAttemptAbortProbability

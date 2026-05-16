@@ -68,7 +68,8 @@ lemma neverFail_iff (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
   ⟨by aesop, NeverFail.mk⟩
 
 @[simp, grind =]
-lemma neverFail_bind_iff (mx : m α) (my : α → m β) :
+lemma neverFail_bind_iff [MonadLiftT m SetM] [EvalDistCompatible m]
+    (mx : m α) (my : α → m β) :
     NeverFail (mx >>= my) ↔ NeverFail mx ∧ ∀ x ∈ support mx, NeverFail (my x) := by
   simp [neverFail_iff, probFailure_bind_eq_add_tsum, add_eq_zero]
   grind
@@ -79,7 +80,9 @@ lemma neverFail_map_iff [LawfulMonad m] (mx : m α) (f : α → β) :
   grind [= map_eq_bind_pure_comp]
 
 @[simp]
-lemma neverFail_seq_iff [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
+lemma neverFail_seq_iff [LawfulMonad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    (mf : m (α → β)) (mx : m α) :
     NeverFail (mf <*> mx) ↔ NeverFail mf ∧ NeverFail mx := by
   simp only [seq_eq_bind_map, neverFail_bind_iff, neverFail_map_iff]
   constructor
@@ -92,7 +95,8 @@ lemma neverFail_seq_iff [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
 
 @[simp]
 lemma not_neverFail_failure {m : Type u → Type v} [AlternativeMonad m]
-    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [HasEvalSet.LawfulFailure m] :
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] [HasEvalSet.LawfulFailure m] :
     ¬ NeverFail (failure : m α) := by
   simp [neverFail_iff]
 
@@ -125,7 +129,8 @@ the first term vanishes by `NeverFail mx`, while for `x ∉ support mx` the coef
 `Pr[= x | mx]` is `0`, and for `x ∈ support mx` the second factor vanishes by hypothesis.
 Hence the sum is `0`.
 -/
-lemma bind_of_mem_support {mx : m α} {my : α → m β}
+lemma bind_of_mem_support [MonadLiftT m SetM] [EvalDistCompatible m]
+    {mx : m α} {my : α → m β}
     [hx : NeverFail mx] (hy : ∀ x ∈ support mx, NeverFail (my x)) :
     NeverFail (mx >>= my) where
   probFailure_eq_zero := by
@@ -140,7 +145,8 @@ then the bind never fails.
 This is a convenience corollary of `bind_of_mem_support`; it is often easy to apply when
 `my` is uniform in its input (e.g. ignores it) or is known to be never-failing globally.
 -/
-lemma bind_of_forall {mx : m α} {my : α → m β}
+lemma bind_of_forall [MonadLiftT m SetM] [EvalDistCompatible m]
+    {mx : m α} {my : α → m β}
     [hx : NeverFail mx] [hy : ∀ x, NeverFail (my x)] :
     NeverFail (mx >>= my) := bind_of_mem_support (hx := hx) (fun x _ => hy x)
 
@@ -148,7 +154,8 @@ lemma bind_of_forall {mx : m α} {my : α → m β}
 Mapping a value through a total function preserves `NeverFail`.
 -/
 @[simp, grind .]
-instance instMap [LawfulMonad m] {mx : m α} [h : NeverFail mx] (f : α → β) :
+instance instMap [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
+    {mx : m α} [h : NeverFail mx] (f : α → β) :
     NeverFail (f <$> mx) := by
   simp only [monad_norm, bind_of_forall, Function.comp_def]
 
@@ -157,7 +164,8 @@ instance instMap [LawfulMonad m] {mx : m α} [h : NeverFail mx] (f : α → β) 
 /-- If both the function computation and the argument computation never fail,
 then their applicative sequencing also never fails. -/
 @[simp, grind .]
-instance instSeq [LawfulMonad m] {mf : m (α → β)} {mx : m α}
+instance instSeq [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
+    {mf : m (α → β)} {mx : m α}
     [hf : NeverFail mf] [hx : NeverFail mx] :
     NeverFail (mf <*> mx) := by
   -- `mf <*> mx = mf >>= fun f => f <$> mx`, and mapping preserves `NeverFail` given `hx`.
@@ -167,15 +175,20 @@ instance instSeq [LawfulMonad m] {mf : m (α → β)} {mx : m α}
 
 /-- If `mx` and `my` never fail, then `mx <* my` never fails. -/
 @[simp, grind .]
-instance instSeqLeft [LawfulMonad m] {mx : m α} {my : m β}
+instance instSeqLeft [LawfulMonad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx <* my) := by aesop
 
 /-- If `mx` and `my` never fail, then `mx *> my` never fails. -/
 @[simp, grind .]
-instance instSeqRight [LawfulMonad m] {mx : m α} {my : m β}
+instance instSeqRight [LawfulMonad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx *> my) := by aesop
 
-example [LawfulMonad m] (mx : m α) [h : NeverFail mx] : NeverFail (do
+example [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
+    (mx : m α) [h : NeverFail mx] : NeverFail (do
     let x ← mx
     let y ← mx
     return (x, y)) := by

@@ -248,8 +248,9 @@ section supportEvalDist
 
 variable [spec.Fintype] [spec.Inhabited] (oa : OracleComp spec α) (x : α)
 
-/-- Bridge: support computed via the manual `hasEvalSet` agrees with `SPMF.support` of the
-distribution semantics. -/
+/-- Bridge: support computed via the direct `MonadLiftT SetM` agrees with `SPMF.support` of the
+distribution semantics. This is the field body for the `EvalDistCompatible (OracleComp spec)`
+instance below. -/
 private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
     support oa = SPMF.support (𝒟[oa]) := by
   induction oa using OracleComp.inductionOn with
@@ -289,6 +290,11 @@ private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
         refine ENNReal.tsum_eq_zero.mpr fun u => ?_
         have := hcontra u
         rw [Option.elim_some, this, mul_zero]
+
+/-- `OracleComp spec` admits the bridge between its direct `support` semantics and the
+`SPMF.support` of its `evalDist`. -/
+instance instEvalDistCompatible : EvalDistCompatible (OracleComp spec) where
+  support_eq_SPMF_support oa := support_eq_SPMF_support oa
 
 /-- An output has non-zero probability in `evalDist` iff it is in computation support. -/
 @[simp]

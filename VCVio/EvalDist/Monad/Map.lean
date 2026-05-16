@@ -215,6 +215,23 @@ end inverse
 
 section injective
 
+@[grind .]
+lemma probOutput_map_injective (mx : m α) {f : α → β} (hf : f.Injective) (x : α) :
+    Pr[= f x | f <$> mx] = Pr[= x | mx] := by
+  classical
+  rw [map_eq_bind_pure_comp, probOutput_bind_eq_tsum]
+  refine (tsum_eq_single x fun y hy => ?_).trans (by
+    simp only [Function.comp_apply, probOutput_pure_self, mul_one])
+  simp only [Function.comp_apply, probOutput_pure, mul_ite, mul_one, mul_zero]
+  exact if_neg fun h => hy (hf h.symm)
+
+lemma probOutput_map_eq_probOutput (mx : m α)
+    {f : α → β} (hf : ∀ x x', f x = f x' → x = x') (x : α) :
+    Pr[= f x | f <$> mx] = Pr[= x | mx] :=
+  probOutput_map_injective mx hf x
+
+section support
+
 variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 @[aesop unsafe norm]
@@ -232,14 +249,6 @@ lemma probOutput_map_eq_probOutput_invFunOn [Nonempty α]
   rw [dif_pos hy]
   rw [(Classical.choose_spec hy).2]
 
-@[grind .]
-lemma probOutput_map_injective (mx : m α) {f : α → β} (hf : f.Injective) (x : α) :
-    Pr[= f x | f <$> mx] = Pr[= x | mx] := by
-  aesop
-
-lemma probOutput_map_eq_probOutput (mx : m α)
-    {f : α → β} (hf : ∀ x x', f x = f x' → x = x') (x : α) :
-    Pr[= f x | f <$> mx] = Pr[= x | mx] := by
-  aesop
+end support
 
 end injective

@@ -224,6 +224,7 @@ end genericCost
 section expectedCost
 
 variable [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 /-- The expected weighted query cost of `oa`, instantiated in `runtime` and instrumented by
 `costFn`.
@@ -330,6 +331,7 @@ end expectedCost
 section expectedCostPMF
 
 variable [Monad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 lemma expectedQueryCost_ge_of_usesCostAtLeast
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]

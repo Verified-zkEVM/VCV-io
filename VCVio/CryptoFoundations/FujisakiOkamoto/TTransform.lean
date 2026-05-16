@@ -138,6 +138,7 @@ theorem encrypt_usesExactQueryCost {ω : Type} [AddMonoid ω]
 `msg`. -/
 theorem encrypt_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω]
     [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (msg : M) (costFn : M → ω) (val : ω → ENNReal) (hval : Monotone val) :
@@ -182,6 +183,7 @@ theorem decrypt_usesZeroQueryCost_of_decrypt_eq_none {ω : Type} [AddMonoid ω]
 cost `0`. -/
 theorem decrypt_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
     [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) (costFn : M → ω)
@@ -218,6 +220,7 @@ theorem decrypt_usesExactQueryCost_of_decrypt_eq_some {ω : Type} [AddMonoid ω]
 cost equal to the weight of querying that message. -/
 theorem decrypt_expectedQueryCost_eq_of_decrypt_eq_some {ω : Type}
     [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) (costFn : M → ω)

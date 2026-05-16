@@ -89,10 +89,12 @@ lemma probOutput_seq_map_prod_mk_eq_mul (z : α × β) :
   probOutput_seq_map_eq_mul_of_injective2 mx my Prod.mk Prod.mk.injective2 z.1 z.2
 
 @[simp high]
-lemma support_seq_map_prod_mk : support (Prod.mk <$> mx <*> my) = support mx ×ˢ support my := by
+lemma support_seq_map_prod_mk [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
+    support (Prod.mk <$> mx <*> my) = support mx ×ˢ support my := by
   simp [Set.ext_iff]
 
-lemma finSupport_seq_map_prod_mk [HasEvalFinset m] [DecidableEq α] [DecidableEq β] :
+lemma finSupport_seq_map_prod_mk [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [HasEvalFinset m] [DecidableEq α] [DecidableEq β] :
     finSupport (Prod.mk <$> mx <*> my) = Finset.product (finSupport mx) (finSupport my) := by
   simp
 
@@ -123,11 +125,12 @@ lemma probOutput_bind_map_prod_mk_eq_mul'
     probOutput_seq_map_prod_mk_map_eq_mul' mx my f g z
 
 @[simp high]
-lemma support_seq_map_prod_mk_eq_sprod :
+lemma support_seq_map_prod_mk_eq_sprod [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
     support ((f ·, g ·) <$> mx <*> my) = (f '' support mx) ×ˢ (g '' support my) := by
   simp [Set.ext_iff]; grind
 
-lemma finSupport_seq_map_prod_mk_eq_product [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
+lemma finSupport_seq_map_prod_mk_eq_product [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
     [DecidableEq γ] [DecidableEq δ] : finSupport ((f ·, g ·) <$> mx <*> my) =
       ((finSupport mx).image f).product ((finSupport my).image g) := by
   simp [Finset.ext_iff]; grind

@@ -19,6 +19,7 @@ universe u v w
 
 variable {α β γ : Type v}
     {m : Type _ → Type _} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 open List
 
@@ -328,6 +329,7 @@ section NeverFail
 
 variable {α β : Type*} {m : Type _ → Type _} [Monad m] [LawfulMonad m]
   [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 @[simp]
 lemma neverFail_list_mapM {f : α → m β} {as : List α}

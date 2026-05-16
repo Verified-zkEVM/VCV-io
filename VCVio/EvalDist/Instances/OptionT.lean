@@ -135,6 +135,7 @@ noncomputable instance instLawfulMonadLiftTSPMF (m : Type u → Type v) [Monad m
     simp
 
 instance instLawfulFailure (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
     [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] :
     HasEvalSet.LawfulFailure (OptionT m) where
   support_failure' := by aesop

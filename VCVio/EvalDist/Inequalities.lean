@@ -34,6 +34,7 @@ namespace OracleComp.EvalDist
 
 variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF]
 
+omit [Monad m] in
 /-- **Marginalized Jensen / Cauchy-Schwarz step for the forking lemma.**
 
 If a per-element bound `acc x · (acc x / q − hinv) ≤ B x` holds for every `x` (with

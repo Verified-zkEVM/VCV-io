@@ -259,7 +259,7 @@ end SupportWriteFootprint
 
 namespace SupportPreserves
 
-variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 
 /-- A support-level frame implies that the cell-change event has probability
@@ -291,7 +291,9 @@ theorem prob_unchanged_eq_one_of_probFailure_eq_zero (hc : SupportPreserves c r)
 
 /-- If the ambient monad has total probability semantics, support preservation
 gives probability-one preservation directly. -/
-theorem prob_unchanged_eq_one {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+theorem prob_unchanged_eq_one {m : Type (max u v) → Type*} [Monad m]
+    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
     (hc : SupportPreserves c r) (h : Heap Ident) :
     Pr[ fun z => r.get z.2 = r.get h | c.run h] = 1 :=
@@ -310,7 +312,7 @@ end SupportPreserves
 
 namespace SupportWritesOnly
 
-variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {writes : Set Ident}
 
 theorem prob_changed_eq_zero (hc : SupportWritesOnly c writes)
@@ -371,7 +373,7 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {event : Heap Ident → α × Heap Ident → Prop}
 
@@ -446,7 +448,7 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {rel : r.Value → r.Value → Prop}
 
@@ -506,7 +508,7 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {measure : r.Value → Nat} {δ : Nat}
 
@@ -842,7 +844,7 @@ section probability
 
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 theorem PreservesCell.prob_changed_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)} {r : CellRef Ident₀}
@@ -885,7 +887,7 @@ section probability
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 theorem simulateQ_run_cellChange_prob_eq_zero
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
@@ -922,7 +924,7 @@ section probability_total
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 theorem simulateQ_run_cellUnchanged_prob_eq_one
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
@@ -959,7 +961,7 @@ section probability
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 theorem CellWriteFootprint.simulateQ_run_cellChange_prob_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
@@ -997,7 +999,7 @@ section probability_total
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 theorem CellWriteFootprint.simulateQ_run_cellUnchanged_prob_eq_one
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}

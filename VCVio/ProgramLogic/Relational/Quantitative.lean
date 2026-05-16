@@ -356,6 +356,7 @@ theorem ofReal_tvDist_map_private_right_bad_le
 
 theorem ofReal_tvDist_bind_left_le_const
     {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
     {α β : Type u}
     (mx : m α) (f g : α → m β) (ε : ℝ≥0∞)
     (hfg : ∀ a, a ∈ support mx → ENNReal.ofReal (tvDist (f a) (g a)) ≤ ε) :
@@ -408,6 +409,7 @@ theorem ofReal_tvDist_bind_left_le_const
 
 theorem ofReal_tvDist_bind_left_le_const'
     {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
     {α β : Type u}
     (mx : m α) (f g : α → m β) (ε : ℝ≥0∞)
     (hfg : ∀ a, ENNReal.ofReal (tvDist (f a) (g a)) ≤ ε) :

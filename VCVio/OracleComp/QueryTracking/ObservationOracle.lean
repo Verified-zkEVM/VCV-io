@@ -187,7 +187,7 @@ lemma probOutput_fst_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLift
       Pr[= x | eraseObs base oa] := by
   rw [fst_map_runObs]
 
-lemma support_fst_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+lemma support_fst_runObs [LawfulMonad m] [MonadLiftT m SetM]
     (base : QueryImpl spec m) (encode : Ev → ω)
     (oa : OracleComp (spec + ObsSpec Ev) α) :
     support ((fun z : α × ω => z.1) <$> runObs base encode oa) =

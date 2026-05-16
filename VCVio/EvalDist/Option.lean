@@ -22,8 +22,12 @@ lemma probOutput_some_map_some (mx : m α) (x : α) :
     Pr[= some x | some <$> mx] = Pr[= x | mx] :=
   probOutput_map_injective mx (Option.some_injective α) x
 
+@[simp, grind =]
 lemma probOutput_some_map_none (mx : m α) :
-    Pr[= none | some <$> mx] = 0 := by simp
+    Pr[= none | some <$> mx] = 0 := by
+  classical
+  rw [probOutput_map_eq_tsum_ite]
+  simp
 
 section double_option
 

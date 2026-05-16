@@ -20,24 +20,24 @@ open ENNReal
 
 section pure
 
-@[simp, grind =] lemma support_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x : α) :
+@[simp, grind =] lemma support_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x : α) :
     support (pure x : m α) = {x} := monadLift_pure x
 
-lemma mem_support_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : α) :
+lemma mem_support_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : α) :
     x ∈ support (pure y : m α) ↔ x = y := by grind
-lemma mem_support_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : α) :
+lemma mem_support_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : α) :
     x ∈ support (pure y : m α) ↔ y = x := by aesop
 
-@[simp, grind =] lemma finSupport_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
+@[simp, grind =] lemma finSupport_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
     (x : α) : finSupport (pure x : m α) = {x} := by aesop
 
-lemma mem_finSupport_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
+lemma mem_finSupport_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
     (x y : α) : x ∈ finSupport (pure y : m α) ↔ x = y := by grind
-lemma mem_finSupport_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
+lemma mem_finSupport_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
     (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
 @[simp, grind =, game_rule]
-lemma evalDist_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α : Type u} (x : α) :
+lemma evalDist_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α : Type u} (x : α) :
     𝒟[(pure x : m α)] = pure x := by simp [evalDist]
 
 @[simp]
@@ -202,16 +202,17 @@ lemma probEvent_bind_eq_sum_finSupport [MonadLiftT m SPMF] [LawfulMonadLiftT m S
 
 section const
 
-variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
-  [MonadLiftT m SetM] [EvalDistCompatible m]
+section support
+
+variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
 @[simp]
-lemma support_bind_const [LawfulMonadLiftT m SetM] (mx : m α) (my : m β) :
+lemma support_bind_const (mx : m α) (my : m β) :
     support (mx >>= fun _ => my) = {y ∈ support my | (support mx).Nonempty} := by
   grind [= Set.Nonempty]
 
 @[simp]
-lemma finSupport_bind_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
+lemma finSupport_bind_const [HasEvalFinset m]
     [DecidableEq β] [DecidableEq α] (mx : m α) (my : m β) :
     finSupport (mx >>= fun _ => my) = if (finSupport mx).Nonempty then finSupport my else ∅ := by
   split_ifs with h
@@ -219,8 +220,12 @@ lemma finSupport_bind_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEv
     aesop
   · aesop
 
-lemma probOutput_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
-    [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α)
+end support
+
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [EvalDistCompatible m]
+
+lemma probOutput_bind_of_const (mx : m α)
     {my : α → m β} {y : β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[= y | my x] = r) :
     Pr[= y | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
   rw [probOutput_bind_eq_tsum, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
@@ -590,11 +595,10 @@ end congr_mono
 
 section swap_compl
 
-variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
-  [MonadLiftT m SetM] [EvalDistCompatible m]
+variable [MonadLiftT m SPMF]
 
 /-- Swapping two independent random draws preserves probability of any event. -/
-lemma probEvent_bind_bind_swap [LawfulMonad m]
+lemma probEvent_bind_bind_swap [LawfulMonadLiftT m SPMF] [LawfulMonad m]
     (mx : m α) (my : m β) (f : α → β → m γ) (q : γ → Prop) :
     Pr[ q | mx >>= fun a => my >>= fun b => f a b] =
       Pr[ q | my >>= fun b => mx >>= fun a => f a b] := by
@@ -623,7 +627,7 @@ lemma probEvent_bind_bind_swap [LawfulMonad m]
           simp [probEvent_bind_eq_tsum]
 
 /-- Swapping two independent random draws preserves the probability of any fixed output. -/
-lemma probOutput_bind_bind_swap [LawfulMonad m]
+lemma probOutput_bind_bind_swap [LawfulMonadLiftT m SPMF] [LawfulMonad m]
     (mx : m α) (my : m β) (f : α → β → m γ) (z : γ) :
     Pr[= z | mx >>= fun a => my >>= fun b => f a b] =
       Pr[= z | my >>= fun b => mx >>= fun a => f a b] := by
