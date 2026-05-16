@@ -39,6 +39,12 @@ This is because we have simplified the proof at the expense of tightness
 by analyzing collisions for the full game at once.
 A future improvement might be to re-structure the proof to recover the tighter bound.
 
+## TODO
+
+- Instead of `(m := OracleComp (spec α))` perhaps it's better to make the lemmas generic
+  over any `m` with the right instances, so that they can be applied to things like `SimulateQ`
+  without having to re-prove them for those monads.
+
 ## References
 
 * [Building Cryptographic Proofs from Hash Functions by Chiesa and Yogev](https://snargsbook.org/), Lemma 18.5.1.
@@ -156,6 +162,7 @@ theorem extractability_game_IsTotalQueryBound
     IsTotalQueryBound
         ((extractability_game committingAdv openingAdv))
         (qb + s.depth) := by
+  -- TODO, all these .2.2.1 etc. are pretty unreadable; can we make this into a do notation block?
   rw [show extractability_game committingAdv openingAdv =
       (committingAdv.withQueryLog >>= fun p =>
         openingAdv p.1.2 >>= fun q => pure (p, q)) >>=
