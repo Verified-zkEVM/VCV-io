@@ -10,25 +10,26 @@ import PolyFun.Interaction.UC.Notation
 # Textbook UC vocabulary over the abstract open-system theory
 
 This file gives a thin, presentation-layer reading of the abstract
-`OpenTheory` / `Semantics` infrastructure in the standard Canetti-style
-UC vocabulary: `Protocol`, `Functionality`, `Adversary`, `Environment`,
+`OpenTheory` / execution infrastructure in the standard Canetti-style UC
+vocabulary: `Protocol`, `Functionality`, `Adversary`, `Environment`,
 `Simulator`, and an explicit execution experiment `EXEC`.
 
 The point of this file is *faithfulness*. The contextual-equivalence
-form `CompEmulates ε π F` quantifies uniformly over arbitrary plugs
-`K : T.Plug Δ`, which is mathematically clean but does not visibly look
-like the textbook definition of UC security. The textbook form
-`UCSecure ε π F` fixes that with explicit `∀ A. ∃ S. ∀ Z`-quantification
-over real-world adversaries `A`, simulators `S`, and environments `Z`.
+form `ObservedCompEmulates sem ε π F` quantifies uniformly over arbitrary plugs
+`K : T.Plug Δ` under a user-chosen observation semantics. That is
+mathematically useful, but it is not by itself the textbook execution
+experiment. The paper-level form `UCSecure exec ε π F` fixes that by taking
+an explicit `Execution T` and using `∀ A. ∃ S. ∀ Z`-quantification over
+real-world adversaries `A`, simulators `S`, and environments `Z`.
 
-The bridge `compEmulates_toUCSecure_id` (this file) shows that
+The bridge `observedCompEmulates_toUCSecure_id` (this file) shows that
 semantic emulation implies textbook UC security with the *identity*
 simulator `S := A`, exposing a single plug
 `K(A, Z) : T.Plug Δ.toPort` via `OpenTheory.plug_wire_left` and then
-applying `CompEmulates` at that plug.
+applying `ObservedCompEmulates` at that plug.
 
 The converse direction (textbook UC implies plug-level
-`CompUCSecure`) goes through Canetti's *dummy-adversary theorem* and is
+`ObservedCompUCSecure`) goes through Canetti's *dummy-adversary theorem* and is
 packaged as the reusable capability `HasDummyAdversaryFactor`.
 
 ## Main definitions
@@ -49,13 +50,15 @@ packaged as the reusable capability `HasDummyAdversaryFactor`.
 * `dummyAdversary`: the canonical bidirectional relay
   `idWire Δ.adv : Adversary T Δ Δ.adv` from `HasIdWire`.
 * `EXEC π A Z`: the closed system `T.close (T.wire π A) Z`.
-* `UCSecure sem ε π F`: textbook computational UC security
-  `∀ back A. ∃ S. ∀ Z. distAdvantage (EXEC π A Z) (EXEC F S Z) ≤ ε`.
+* `Execution T`: a concrete distributional interpretation of closed
+  systems as UC execution outputs.
+* `UCSecure exec ε π F`: textbook computational UC security
+  `∀ back A. ∃ S. ∀ Z. exec.distAdvantage (EXEC π A Z) (EXEC F S Z) ≤ ε`.
 
 ## Main results
 
-* `compEmulates_toUCSecure_id`: `CompEmulates sem ε π F` implies
-  `UCSecure sem ε π F` with the identity simulator `S := A`.
+* `observedCompEmulates_toUCSecure_id`: `ObservedCompEmulates sem ε π F` implies
+  `UCSecure (Execution.ofSemantics sem) ε π F` with the identity simulator `S := A`.
 -/
 
 universe u
@@ -159,7 +162,7 @@ def EXEC (π : Protocol T Δ) (A : Adversary T Δ back)
 /-! ## Textbook UC security -/
 
 /--
-`UCSecure sem ε π F` is the textbook computational UC security
+`UCSecure exec ε π F` is the textbook computational UC security
 statement: for every adversary `A`, there exists a simulator `S` such
 that no environment `Z` can distinguish the real-world execution
 `EXEC π A Z` from the ideal-world execution `EXEC F S Z` with
@@ -171,33 +174,33 @@ but not on the environment. The back-channel `back` is universally
 quantified to allow the environment-adversary side-channel to be
 arbitrary.
 -/
-def UCSecure (sem : Semantics T) (ε : ℝ)
+def UCSecure (exec : Execution T) (ε : ℝ)
     {Δ : ProtocolBoundary}
     (π F : Protocol T Δ) : Prop :=
   ∀ (back : PortBoundary) (A : Adversary T Δ back),
   ∃ S : Adversary T Δ back,
   ∀ Z : Environment T Δ back,
-    sem.distAdvantage (EXEC π A Z) (EXEC F S Z) ≤ ε
+    exec.distAdvantage (EXEC π A Z) (EXEC F S Z) ≤ ε
 
-/-! ## Bridge to abstract computational emulation -/
+/-! ## Bridge from observed emulation -/
 
 /--
-Computational emulation `CompEmulates ε π F` implies textbook UC
-security `UCSecure ε π F` with the **identity simulator** `S := A`:
-the existential simulator is witnessed by the real-world adversary
-itself.
+Computational emulation `ObservedCompEmulates sem ε π F` implies textbook UC
+security for the observation-induced execution
+`Execution.ofSemantics sem`, with the **identity simulator** `S := A`.
+The existential simulator is witnessed by the real-world adversary itself.
 
 The proof rewrites both `EXEC π A Z` and `EXEC F A Z` via
 `OpenTheory.plug_wire_left`, exposing the *same* plug
 `K(A, Z) : T.Plug Δ.toPort` on both sides, and then applies the
-`CompEmulates` hypothesis at that single plug.
+`ObservedCompEmulates` hypothesis at that single plug.
 -/
-theorem compEmulates_toUCSecure_id
+theorem observedCompEmulates_toUCSecure_id
     [OpenTheory.HasPlugWireFactor T]
     {sem : Semantics T} {ε : ℝ}
     {Δ : ProtocolBoundary} {π F : Protocol T Δ}
-    (h : CompEmulates sem ε π F) :
-    UCSecure sem ε π F :=
+    (h : ObservedCompEmulates sem ε π F) :
+    UCSecure (Execution.ofSemantics sem) ε π F :=
   fun _ A => ⟨A, fun Z => by
     change sem.distAdvantage (T.plug (T.wire π A) Z)
                               (T.plug (T.wire F A) Z) ≤ ε
@@ -213,19 +216,19 @@ adversary/environment pair. The concrete syntax models can provide that
 principle as an instance of this class.
 -/
 class HasDummyAdversaryFactor (T : OpenTheory.{u}) extends OpenTheory.IsCompactClosed T where
-  toCompUCSecure_dummy :
+  toObservedCompUCSecure_dummy :
     {sem : Semantics T} → {ε : ℝ} →
     {Δ : ProtocolBoundary} → {π F : Protocol T Δ} →
-    UCSecure sem ε π F →
+    UCSecure (Execution.ofSemantics sem) ε π F →
     ∃ (SimSpace : Type u) (simulate : SimSpace → T.Plug Δ.toPort →
         T.Plug Δ.toPort),
-      CompUCSecure sem ε π F SimSpace simulate
+      ObservedCompUCSecure sem ε π F SimSpace simulate
 
 /--
 **Dummy-adversary direction.**
 
-Textbook UC security `UCSecure ε π F` implies the plug-level
-simulator-based form `CompUCSecure`: given the existential simulator
+Textbook UC security `UCSecure exec ε π F` implies the plug-level
+simulator-based form `ObservedCompUCSecure`: given the existential simulator
 from `UCSecure` instantiated at the *dummy adversary*, one constructs
 a `T.Plug Δ.toPort`-level simulator by repackaging the
 adversary-environment pair through the zig-zag identity
@@ -236,15 +239,15 @@ This is the content of Canetti's dummy-adversary theorem (cf. Canetti
 explicit reusable assumption, `HasDummyAdversaryFactor`, rather than a
 local proof hole.
 -/
-theorem ucSecure_toCompUCSecure_dummy
+theorem ucSecure_toObservedCompUCSecure_dummy
     [HasDummyAdversaryFactor T]
     {sem : Semantics T} {ε : ℝ}
     {Δ : ProtocolBoundary} {π F : Protocol T Δ}
-    (h : UCSecure sem ε π F) :
+    (h : UCSecure (Execution.ofSemantics sem) ε π F) :
     ∃ (SimSpace : Type u) (simulate : SimSpace → T.Plug Δ.toPort →
         T.Plug Δ.toPort),
-      CompUCSecure sem ε π F SimSpace simulate :=
-  HasDummyAdversaryFactor.toCompUCSecure_dummy h
+      ObservedCompUCSecure sem ε π F SimSpace simulate :=
+  HasDummyAdversaryFactor.toObservedCompUCSecure_dummy h
 
 end Standard
 end UC

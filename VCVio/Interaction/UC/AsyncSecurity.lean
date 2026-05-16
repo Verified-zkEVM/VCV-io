@@ -370,7 +370,7 @@ def secureAgainstFair
     Prop :=
   ∀ scheds : SchedulerPair Party m schedulerSampler State Event,
     isPPT scheds → isFair scheds →
-      CompEmulates (mkSem scheds) ε real ideal
+      ObservedCompEmulates (mkSem scheds) ε real ideal
 
 namespace secureAgainstFair
 
@@ -383,12 +383,12 @@ variable {real ideal :
   (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ}
 variable {ε : ℝ}
 
-/-- Uniform `CompEmulates` against every scheduler pair implies
+/-- Uniform `ObservedCompEmulates` against every scheduler pair implies
 fair-PPT security against any choice of `isPPT` and `isFair`. -/
-theorem of_compEmulates
+theorem of_observedCompEmulates
     {isPPT : SchedulerPair Party m schedulerSampler State Event → Prop}
     {isFair : SchedulerPair Party m schedulerSampler State Event → Prop}
-    (h : ∀ scheds, CompEmulates (mkSem scheds) ε real ideal) :
+    (h : ∀ scheds, ObservedCompEmulates (mkSem scheds) ε real ideal) :
     secureAgainstFair mkSem real ideal ε isPPT isFair :=
   fun scheds _ _ => h scheds
 
@@ -399,7 +399,7 @@ theorem refl
     (isFair : SchedulerPair Party m schedulerSampler State Event → Prop)
     (W : (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ) :
     secureAgainstFair mkSem W W 0 isPPT isFair :=
-  fun _ _ _ => CompEmulates.refl _ W
+  fun _ _ _ => ObservedCompEmulates.refl _ W
 
 /-- Weakening on the advantage bound. -/
 theorem mono {ε₁ ε₂ : ℝ} (hε : ε₁ ≤ ε₂)
@@ -407,7 +407,7 @@ theorem mono {ε₁ ε₂ : ℝ} (hε : ε₁ ≤ ε₂)
     {isFair : SchedulerPair Party m schedulerSampler State Event → Prop}
     (h : secureAgainstFair mkSem real ideal ε₁ isPPT isFair) :
     secureAgainstFair mkSem real ideal ε₂ isPPT isFair :=
-  fun scheds hppt hfair => CompEmulates.mono hε (h scheds hppt hfair)
+  fun scheds hppt hfair => ObservedCompEmulates.mono hε (h scheds hppt hfair)
 
 /-- Weakening on the PPT class: a smaller PPT class quantifies over
 fewer schedulers, so security against the larger class implies
@@ -440,7 +440,7 @@ indexed family of `mkSem` constructors and `(real, ideal)` pairs
 is *fair-secure* when every PPT, fair adversary has negligible
 distinguishing advantage in the security parameter.
 
-The shape mirrors `AsympCompEmulates` from `Computational.lean`:
+The shape mirrors `AsympObservedCompEmulates` from `Computational.lean`:
 the adversary type `Adv` is opaque, equipped with PPT and
 fairness predicates, plus an `extract` function producing the
 scheduler pair and the closing plug at each security parameter.
@@ -508,7 +508,7 @@ theorem of_secureAgainstFair
   intro A hppt hfair
   refine negligible_of_le ?_ hε
   intro n
-  have hcomp : CompEmulates (mkSem n (extract A n).1) (ε n) (real n) (ideal n) :=
+  have hcomp : ObservedCompEmulates (mkSem n (extract A n).1) (ε n) (real n) (ideal n) :=
     h n (extract A n).1
       ⟨A, hppt, rfl⟩ ⟨A, hfair, rfl⟩
   have := hcomp (extract A n).2
