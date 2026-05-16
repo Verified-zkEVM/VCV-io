@@ -128,7 +128,8 @@ lemma evalDist_bind [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (m
     𝒟[mx >>= my] = 𝒟[mx] >>= fun x => 𝒟[my x] :=
   monadLift_bind mx my
 
-lemma evalDist_bind_of_support_eq_empty [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β)
+lemma evalDist_bind_of_support_eq_empty [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β)
     (h : support mx = ∅) : 𝒟[mx >>= my] = failure := by
   simp [SPMF.ext_iff, ← probOutput_def, h]
 
@@ -152,7 +153,8 @@ lemma probFailure_bind_eq_add_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     SPMF.apply_eq_toPMF_some]
 
 @[grind =]
-lemma probFailure_bind_eq_add_tsum_support [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) :
+lemma probFailure_bind_eq_add_tsum_support [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : support mx, Pr[= x | mx] * Pr[⊥ | my x] := by
   rw [probFailure_bind_eq_add_tsum]
   congr 1
@@ -162,7 +164,8 @@ lemma probFailure_bind_eq_add_tsum_support [MonadLiftT m SPMF] [LawfulMonadLiftT
   aesop
 
 @[simp, grind =]
-lemma probFailure_bind_eq_zero_iff [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) :
+lemma probFailure_bind_eq_zero_iff [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = 0 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, Pr[⊥ | my x] = 0 := by
   simp [probFailure_bind_eq_add_tsum]
   grind
@@ -171,32 +174,39 @@ lemma probFailure_bind_eq_zero_iff [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 of the first computation. This can be useful to avoid looking at edge cases that can't actually
 happen in practice after the first computation. A common example is if the first computation
 does some error handling to avoids returning malformed outputs. -/
-lemma probOutput_bind_eq_tsum_subtype [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) (y : β) :
+lemma probOutput_bind_eq_tsum_subtype [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β) (y : β) :
     Pr[= y | mx >>= my] = ∑' x : support mx, Pr[= x | mx] * Pr[= y | my x] := by
   rw [tsum_subtype _ (fun x => Pr[= x | mx] * Pr[= y | my x]), probOutput_bind_eq_tsum]
   refine tsum_congr (fun x => ?_)
   by_cases hx : x ∈ support mx <;> aesop
 
-lemma probEvent_bind_eq_tsum_subtype [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) (q : β → Prop) :
+lemma probEvent_bind_eq_tsum_subtype [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β) (q : β → Prop) :
     Pr[ q | mx >>= my] = ∑' x : support mx, Pr[= x | mx] * Pr[ q | my x] := by
   rw [tsum_subtype _ (fun x ↦ Pr[= x | mx] * Pr[ q | my x]), probEvent_bind_eq_tsum]
   refine tsum_congr (fun x ↦ ?_)
   by_cases hx : x ∈ support mx <;> aesop
 
-lemma probOutput_bind_eq_sum_finSupport [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [HasEvalFinset m]
+lemma probOutput_bind_eq_sum_finSupport [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] [HasEvalFinset m]
     (mx : m α) (my : α → m β) [DecidableEq α] (y : β) :
     Pr[= y | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[= y | my x] :=
   (probOutput_bind_eq_tsum mx my y).trans (tsum_eq_sum' <| by simp)
 
-lemma probEvent_bind_eq_sum_finSupport [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [HasEvalFinset m]
+lemma probEvent_bind_eq_sum_finSupport [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] [HasEvalFinset m]
     (mx : m α) (my : α → m β) [DecidableEq α] (q : β → Prop) :
     Pr[ q | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[ q | my x] :=
   (probEvent_bind_eq_tsum mx my q).trans (tsum_eq_sum' <| by simp)
 
 section const
 
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [EvalDistCompatible m]
+
 @[simp]
-lemma support_bind_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my : m β) :
+lemma support_bind_const [LawfulMonadLiftT m SetM] (mx : m α) (my : m β) :
     support (mx >>= fun _ => my) = {y ∈ support my | (support mx).Nonempty} := by
   grind [= Set.Nonempty]
 
@@ -209,7 +219,8 @@ lemma finSupport_bind_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEv
     aesop
   · aesop
 
-lemma probOutput_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α)
+lemma probOutput_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α)
     {my : α → m β} {y : β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[= y | my x] = r) :
     Pr[= y | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
   rw [probOutput_bind_eq_tsum, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
@@ -219,11 +230,11 @@ lemma probOutput_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx
   · aesop
 
 @[simp, grind =_]
-lemma probOutput_bind_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : m β) (y : β) :
+lemma probOutput_bind_const (mx : m α) (my : m β) (y : β) :
     Pr[= y | mx >>= fun _ => my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by
   rw [probOutput_bind_of_const mx fun _ _ => rfl]
 
-lemma probEvent_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α)
+lemma probEvent_bind_of_const (mx : m α)
     {my : α → m β} {p : β → Prop} {r : ℝ≥0∞}
     (h : ∀ x ∈ support mx, Pr[ p | my x] = r) :
     Pr[ p | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
@@ -234,13 +245,13 @@ lemma probEvent_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx 
   · aesop
 
 @[simp, grind =_]
-lemma probEvent_bind_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : m β) (p : β → Prop) :
+lemma probEvent_bind_const (mx : m α) (my : m β) (p : β → Prop) :
     Pr[ p | mx >>= fun _ => my] = (1 - Pr[⊥ | mx]) * Pr[ p | my] := by
   rw [probEvent_bind_of_const mx fun _ _ => rfl]
 
 /-- Write the probability of `mx >>= my` failing given that `my` has constant failure chance over
 the possible outputs in `support mx` as a fixed expression without any sums. -/
-lemma probFailure_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+lemma probFailure_bind_of_const
     {mx : m α} {my : α → m β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + r * (1 - Pr[⊥ | mx]) := by
   calc Pr[⊥ | mx >>= my]
@@ -249,18 +260,18 @@ lemma probFailure_bind_of_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     _ = Pr[⊥ | mx] + r * (1 - Pr[⊥ | mx]) := by
       rw [ENNReal.tsum_mul_right, mul_comm, tsum_support_probOutput_eq_sub]
 
-lemma probFailure_bind_of_const' [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+lemma probFailure_bind_of_const'
     {mx : m α} {my : α → m β} {r : ℝ≥0∞} (hr : r ≠ ⊤) (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + r - Pr[⊥ | mx] * r := by
   rw [probFailure_bind_of_const h, ENNReal.mul_sub, AddLECancellable.add_tsub_assoc_of_le,
     mul_comm Pr[⊥ | mx] r, mul_one] <;> simp [hr, ENNReal.mul_eq_top]
 
 @[simp, grind =_]
-lemma probFailure_bind_const [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : m β) :
+lemma probFailure_bind_const (mx : m α) (my : m β) :
     Pr[⊥ | mx >>= fun _ => my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
   rw [probFailure_bind_of_const' (by simp) fun _ _ => rfl]
 
-lemma probFailure_bind_eq_sub_mul [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+lemma probFailure_bind_eq_sub_mul
     (mx : m α) (my : α → m β) (r : ℝ≥0∞) (hr : r ≠ ⊤) (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
     Pr[⊥ | mx >>= my] = 1 - (1 - Pr[⊥ | mx]) * (1 - r) := by
   by_cases h' : (support mx).Nonempty
@@ -279,7 +290,10 @@ end const
 
 section mono
 
-lemma probFailure_bind_le_add_of_forall [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {mx : m α}
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [EvalDistCompatible m]
+
+lemma probFailure_bind_le_add_of_forall {mx : m α}
     {my : α → m β} {r : ℝ≥0∞}
     (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) :
     Pr[⊥ | mx >>= my] ≤ Pr[⊥ | mx] + (1 - Pr[⊥ | mx]) * r := by
@@ -292,7 +306,7 @@ lemma probFailure_bind_le_add_of_forall [MonadLiftT m SPMF] [LawfulMonadLiftT m 
     _ ≤ Pr[⊥ | mx] + (1 - Pr[⊥ | mx]) * r := by simp [ENNReal.tsum_mul_right]
 
 /-- Version of `probFailure_bind_le_of_forall` with that allows a manual `Pr[⊥ | mx]` value. -/
-lemma probFailure_bind_le_of_forall' [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {mx : m α}
+lemma probFailure_bind_le_of_forall' {mx : m α}
     {s : ℝ≥0∞} (h' : Pr[⊥ | mx] = s) (my : α → m β) {r : ℝ≥0∞}
     (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) : Pr[⊥ | mx >>= my] ≤ s + r := by
   rw [probFailure_bind_eq_add_tsum_support]
@@ -306,7 +320,7 @@ lemma probFailure_bind_le_of_forall' [MonadLiftT m SPMF] [LawfulMonadLiftT m SPM
     _ = r := one_mul r
 
 /-- Version of `probFailure_bind_le_of_forall` when `mx` never fails. -/
-lemma probFailure_bind_le_of_forall [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {mx : m α}
+lemma probFailure_bind_le_of_forall {mx : m α}
     (h' : Pr[⊥ | mx] = 0) {my : α → m β} {r : ℝ≥0∞}
     (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) : Pr[⊥ | mx >>= my] ≤ r := by
   refine (probFailure_bind_le_add_of_forall hr).trans (by simp [h'])
@@ -357,6 +371,7 @@ end forall_support
 section congr_mono
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [EvalDistCompatible m]
 
 lemma mul_le_probEvent_bind {mx : m α} {my : α → m β}
     {p : α → Prop} {q : β → Prop} {r r' : ℝ≥0∞}
@@ -576,6 +591,7 @@ end congr_mono
 section swap_compl
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [EvalDistCompatible m]
 
 /-- Swapping two independent random draws preserves probability of any event. -/
 lemma probEvent_bind_bind_swap [LawfulMonad m]
