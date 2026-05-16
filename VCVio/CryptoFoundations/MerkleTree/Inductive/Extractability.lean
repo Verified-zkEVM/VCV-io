@@ -45,24 +45,6 @@ A future improvement might be to re-structure the proof to recover the tighter b
 
 -/
 
-section ToVCV
-
-/--
-For any computation `oa` and predicate `p`, the probability of `p` holding on the output
-equals the probability of `p ∘ Prod.fst` holding on the output of `oa.withQueryLog`.
-This follows from the fact that `withQueryLog` only appends a log without changing the
-output value. The lemma exists as a phrasing in terms of `oa.withQueryLog` (which is
-`@[reducible]`) so that `rw` can match it; the underlying fact is
-`loggingOracle.probEvent_fst_run_simulateQ`.
--/
-lemma probEvent_withQueryLog {ι : Type} {oSpec : OracleSpec ι}
-    [oSpec.Fintype] [oSpec.Inhabited] {α : Type}
-    (oa : OracleComp oSpec α) (p : α → Prop) :
-    Pr[p ∘ Prod.fst | oa.withQueryLog] = Pr[p | oa] :=
-  loggingOracle.probEvent_fst_run_simulateQ oa p
-
-end ToVCV
-
 namespace InductiveMerkleTree
 
 open List OracleSpec OracleComp BinaryTree
@@ -374,14 +356,7 @@ analog of `getPutativeRootWithHash_binding_collision`: two distinct openings
 `(x, proof₁) ≠ (y, proof₂)` of the same `root` at the same index, both
 witnessed by hash chains `chainInLog` in the same `log`, force `log` to
 contain a hash collision (two log entries with equal responses but distinct
-inputs).
-
-Proof: induction on `idx`, mirroring the constructive recursion of
-`findCollision` (cf. `Binding.lean`). At each non-leaf level both chains
-expose a top entry `⟨(_, _), root⟩ ∈ log`; either the two top inputs differ
-(immediate `LogHasCollision` since both produce response `root`) or they
-coincide and we recurse on the shared ancestor — the original inequality
-`(x, proof₁) ≠ (y, proof₂)` propagates to `(x, proof₁.tail) ≠ (y, proof₂.tail)`. -/
+inputs). -/
 theorem logHasCollision_of_chainInLog_of_ne
     {s : Skeleton} (idx : SkeletonLeafIndex s)
     (log : (spec α).QueryLog) (root x y : α)
@@ -436,12 +411,7 @@ private lemma extractor_internal_get_eq_none_of_find?_eq_none
 is intact (the value there is `≠ none`), the extracted leaf value and proof
 form a hash chain `chainInLog` in the log. The conclusion bundles three
 facts: the extracted leaf (`extLeaf`), the recovered authentication path
-(`extProof`), and a chain witness in `log` connecting them to `root`.
-
-Proof: induction on `idx`, mirroring the extractor's `populateDown` descent.
-At each non-leaf level the non-none hypothesis forces `log.find? (·.2 == root)`
-to return some entry `⟨(l, r), root⟩`, which becomes the chain entry at this
-level; the IH recurses into the appropriate subtree. -/
+(`extProof`), and a chain witness in `log` connecting them to `root`. -/
 theorem chainInLog_of_extractor_get_ne_none
     [DecidableEq α]
     {s : Skeleton} (idx : SkeletonLeafIndex s)
@@ -515,6 +485,11 @@ private theorem extractability_game_not_logHasCollision_match
       extProof proof hpair (chainInLog_mono idx h_sub_c h_extChain_lc) h_chain_log)
       h_not_logHasCollision
 
+/--
+The probability that a single hash evaluates to a specific root value
+(without any prior queries)
+is the reciprocal of the range size.
+-/
 private lemma probOutput_singleHash_eq_inv_card
     [Fintype α] [Inhabited α]
     (a b root : α) :
@@ -527,6 +502,10 @@ private lemma probOutput_singleHash_eq_inv_card
     rw [bind_pure]
   rw [h, probOutput_query (spec := spec α) (a, b) root]
 
+/--
+The probability that `getPutativeRoot` evaluates to a specific root value at a positive-depth index
+(without any prior queries) is the reciprocal of the range size.
+-/
 private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
     [Fintype α] [Inhabited α]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
@@ -555,6 +534,10 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
     simp_rw [fun a => probOutput_singleHash_eq_inv_card proof.head a root,
       ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
+/--
+The probability that `verifyProof` evaluates to `true` at a positive-depth index
+(without any prior queries) is the reciprocal of the range size.
+-/
 private lemma probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth
     [DecidableEq α] [Fintype α] [Inhabited α]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
@@ -586,12 +569,9 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
          : OracleComp (spec α) Bool)] ≤
       (Fintype.card α : ENNReal)⁻¹ := by
   by_cases h_get : (extractor s log_c root).get idx.toNodeIndex = none
-  · -- Extractor's path is broken: derive `0 < idx.depth` and apply verifyProof bound.
-    have h_pos : 0 < idx.depth := by
+  · have h_pos : 0 < idx.depth := by
       cases idx with
       | ofLeaf =>
-        -- `s = Skeleton.leaf`, so `extractor` returns `FullData.leaf (some root)` and
-        -- `.get .ofLeaf` is `some root`, contradicting `h_get`.
         exfalso
         exact Option.some_ne_none _ h_get
       | ofLeft _ => exact Nat.succ_pos _
@@ -599,8 +579,7 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     refine (probEvent_mono'' (q := fun b : Bool => b = true) ?_).trans
       (probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth h_pos leaf root proof).le
     rintro _ ⟨h_v, _⟩; exact h_v
-  · -- Extractor's path is intact: the bad event is impossible.
-    refine probEvent_eq_zero ?_ |>.le.trans (zero_le _) |>.trans le_rfl
+  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le _) |>.trans le_rfl
     rintro _ _ ⟨_, h⟩; exact h_get h
 
 private theorem extractability_game_verified_extractor_none_le_inv_card
@@ -626,17 +605,18 @@ private theorem extractability_game_verified_extractor_none_le_inv_card
             verified = true ∧ extractedTree.get idx.toNodeIndex = none) ∘ Prod.fst) |
         (extractability_game committingAdv openingAdv).withQueryLog] ≤ _
   rw [probEvent_withQueryLog,
-    show extractability_game committingAdv openingAdv =
-        committingAdv.withQueryLog >>= fun rootAuxLog =>
-          openingAdv rootAuxLog.1.2 >>= fun ilp =>
-            verifyProof ilp.1 ilp.2.1 rootAuxLog.1.1 ilp.2.2 >>= fun verified =>
-              pure (rootAuxLog.1.1, rootAuxLog.1.2,
-                ⟨ilp.1, ilp.2.1, ilp.2.2,
-                 extractor s rootAuxLog.2 rootAuxLog.1.1,
-                 generateProof (extractor s rootAuxLog.2 rootAuxLog.1.1) ilp.1,
-                 verified⟩) by unfold extractability_game; rfl]
+    show extractability_game committingAdv openingAdv = (do
+        let ((root, aux), queryLog) ← committingAdv.withQueryLog
+        let ⟨idx, leaf, proof⟩ ← openingAdv aux
+        let verified ← verifyProof idx leaf root proof
+        pure (root, aux,
+          ⟨idx, leaf, proof,
+           extractor s queryLog root,
+           generateProof (extractor s queryLog root) idx,
+           verified⟩)) by unfold extractability_game; rfl]
   refine probEvent_bind_le_of_forall_le fun ⟨⟨root, aux⟩, log_c⟩ _ => ?_
   refine probEvent_bind_le_of_forall_le fun ⟨idx, leaf, proof⟩ _ => ?_
+  dsimp only
   rw [show (fun verified : Bool => pure (root, aux, _) :
         Bool → OracleComp (spec α) _) = pure ∘ _ from rfl, probEvent_bind_pure_comp]
   exact probEvent_verifyProof_extractor_none_le_inv_card idx leaf root proof log_c
