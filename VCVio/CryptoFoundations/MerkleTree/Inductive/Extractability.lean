@@ -83,8 +83,7 @@ structure Adversary (α : Type) (s : Skeleton) where
       OracleComp (spec α)
         ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)
 
-/-- The combined two-phase execution `commit ; open ; pure ()` of `𝒜` has total
-query bound `qb`. -/
+/-- The combined two-phase execution of `𝒜` has total query bound `qb`. -/
 def Adversary.IsTwoPhaseTotalQueryBound {s : Skeleton}
     (𝒜 : Adversary α s) (qb : ℕ) : Prop :=
   IsTotalQueryBound
@@ -200,7 +199,7 @@ omit [DecidableEq α] in
 /--
 Project the logged-prefix of `extractability_game` onto `Unit`: discarding both the
 committed root/aux and the query log of the committing adversary recovers the plain
-`(committingAdv ; openingAdv ; pure ())` skeleton used to express the combined query bound.
+measurement used to express the combined query bound.
 -/
 private lemma extractability_game_logged_prefix_map_unit_eq
     {s : Skeleton} (𝒜 : Adversary α s) :
