@@ -677,13 +677,10 @@ i.e. simultaneously
 Where κ is 1/|α| * ((qb + s.depth)^2 / 2 + 1).
 -/
 theorem extractability [DecidableEq α] [Fintype α] [Inhabited α]
-    {s : Skeleton}
-    {AuxState : Type}
-    (committingAdv : OracleComp (spec α)
-        (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
+    {s : Skeleton} {AuxState : Type}
+    (committingAdv : OracleComp (spec α) (α × AuxState))
+    (openingAdv : AuxState → OracleComp (spec α)
+        ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
     (qb : ℕ)
     (h_IsQueryBound_qb :
       IsTotalQueryBound
@@ -706,9 +703,8 @@ theorem extractability [DecidableEq α] [Fintype α] [Inhabited α]
     _ ≤ Pr[fun (vals, log) =>
             LogHasCollision log ∨
             (¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals) |
-          (extractability_game committingAdv openingAdv).withQueryLog] := by
-      refine probEvent_mono'' fun ⟨vals, log⟩ => ?_
-      tauto
+          (extractability_game committingAdv openingAdv).withQueryLog] :=
+      probEvent_mono'' fun ⟨_, _⟩ => by tauto
     -- Union bound.
     _ ≤ Pr[fun (vals, log) => LogHasCollision log |
             (extractability_game committingAdv openingAdv).withQueryLog] +
@@ -731,7 +727,6 @@ theorem extractability [DecidableEq α] [Fintype α] [Inhabited α]
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         1 / (Fintype.card α) := by
       have h' := extractability_game_not_logHasCollision_wins_le_inv_card committingAdv openingAdv
-        (s := s) (AuxState := AuxState)
       gcongr
       norm_cast
 
