@@ -73,7 +73,7 @@ def extractorChildren
     (cache : (spec α).QueryLog) (a : α) : Option (α × α) :=
   match cache.find? (fun ⟨_, r⟩ => r == a) with
   | none => none
-  | some q => some (q.1.1, q.1.2)
+  | some ⟨(x, y), _⟩ => some (x, y)
 
 /--
 The extraction algorithm for Merkle trees: from a query log `cache`, a `root`, and a
@@ -128,18 +128,17 @@ def adversary_wins_extractability_game_event {s : Skeleton} {AuxState : Type} :
     (not (leaf = extractedTree.get idx.toNodeIndex)
     ∨ not (proof.toList.map Option.some = extractedProof.toList))
 
-
 /-- If the query log's first entry with response `root` is the pair `⟨(x, y), root⟩`,
 then the extractor at an internal skeleton unfolds to that node's two children using
 `x` and `y` as the new "ancestor" values for the left and right subtrees. -/
 private lemma extractor_internal_eq_of_find?_eq
     (sl sr : Skeleton) (log : (spec α).QueryLog) (root x y : α)
-    (h_find : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) =
+    (h_find : log.find? (fun ⟨_, r⟩ => r == root) =
                 some ⟨(x, y), root⟩) :
     extractor (Skeleton.internal sl sr) log root =
       FullData.internal (some root) (extractor sl log x) (extractor sr log y) := by
   have h_children : extractorChildren log root = some (x, y) := by
-    change (match log.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = _
+    change (match log.find? _ with | none => none | some ⟨(x, y), _⟩ => some (x, y)) = _
     rw [h_find]
   simp only [extractor]
   rw [optionPopulateDown_internal, h_children]
@@ -167,8 +166,8 @@ theorem extractability_game_IsTotalQueryBound
         ((extractability_game committingAdv openingAdv))
         (qb + s.depth) := by
   rw [show extractability_game committingAdv openingAdv =
-      (committingAdv.withQueryLog >>= fun p =>
-        openingAdv p.1.2 >>= fun q => pure (p, q)) >>=
+      (committingAdv.withQueryLog >>= fun ((root, aux), queryLog) =>
+        openingAdv aux >>= fun q => pure (((root, aux), queryLog), q)) >>=
       fun (⟨⟨root, aux⟩, queryLog⟩, ⟨idx, leaf, proof⟩) =>
         verifyProof idx leaf root proof >>= fun verified =>
           pure (root, aux,
@@ -181,19 +180,20 @@ theorem extractability_game_IsTotalQueryBound
       isTotalQueryBound_bind (n₁ := s.depth) (n₂ := 0)
         (verifyProof_isTotalQueryBound_skeleton_depth idx leaf root proof) (fun _ => trivial)
   have hmap : (fun _ => ()) <$>
-      (committingAdv.withQueryLog >>= fun p => openingAdv p.1.2 >>= fun q => pure (p, q)) =
+      (committingAdv.withQueryLog >>= fun ((root, aux), queryLog) =>
+        openingAdv aux >>= fun q => pure (((root, aux), queryLog), q)) =
       (do let (_root, aux) ← committingAdv
           let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
           pure ()) := by
     simpa [map_bind, map_pure] using loggingOracle.run_simulateQ_bind_fst committingAdv
-      (fun r => openingAdv r.2 >>= fun _ => pure ())
+      (fun (_, aux) => openingAdv aux >>= fun _ => pure ())
   exact (isQueryBound_iff_of_map_eq hmap (fun _ b => 0 < b) (fun _ b => b - 1)).mpr h
 
 private lemma extractorChildren_eq_none_of_find?_eq_none
     {log_c : (spec α).QueryLog} {a : α}
-    (hf : log_c.find? (fun q' : (_i : (α × α)) × α => q'.2 == a) = none) :
+    (hf : log_c.find? (fun ⟨_, r⟩ => r == a) = none) :
     extractorChildren log_c a = none := by
-  change (match log_c.find? _ with | none => none | some q => some (q.1.1, q.1.2)) = none
+  change (match log_c.find? _ with | none => none | some ⟨(x, y), _⟩ => some (x, y)) = none
   rw [hf]
 
 /--
@@ -247,8 +247,8 @@ private lemma extractability_game_support_decompose
   refine ⟨log_c, log_v, h_vp, fun q hq => ?_, fun q hq => ?_,
     h_tree_eq.symm, h_proof_ext_eq.symm⟩ <;>
     rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
-  · simpa using List.mem_append_right _ (List.mem_append_right _ hq)
-  · simpa using List.mem_append_left _ (List.mem_append_left _ hq)
+  · grind [List.mem_append_right, List.mem_append_left]
+  · grind [List.mem_append_left]
 
 /--
 If `root` is not the response of any query in `log`,
@@ -257,7 +257,7 @@ then the extractor at an internal skeleton is `none`.
 private lemma extractor_internal_get_eq_none_of_find?_eq_none
     (sl sr : Skeleton) (log : (spec α).QueryLog) (root : α)
     (idx : SkeletonNodeIndex sl ⊕ SkeletonNodeIndex sr)
-    (hf : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) = none) :
+    (hf : log.find? (fun ⟨_, r⟩ => r == root) = none) :
     (extractor (Skeleton.internal sl sr) log root).get
         (idx.elim SkeletonNodeIndex.ofLeft SkeletonNodeIndex.ofRight) = none := by
   simp only [extractor]
@@ -282,7 +282,7 @@ private lemma getPutativeRoot_step_withQueryLog_decompose
     (prog : OracleComp (spec α) α) (mkPair : α → α × α)
     (r : α) (log_v : (spec α).QueryLog)
     (hmem : (r, log_v) ∈ support
-      (prog >>= fun a => singleHash (mkPair a).1 (mkPair a).2).withQueryLog) :
+      (prog >>= fun a => let (l, r') := mkPair a; singleHash l r').withQueryLog) :
     ∃ a log_a, (a, log_a) ∈ support prog.withQueryLog
       ∧ log_v = log_a ++ [⟨mkPair a, r⟩] := by
   rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
@@ -374,9 +374,9 @@ private lemma chainInLog_of_mem_support_verifyProof
   obtain ⟨⟨b, log_x⟩, h_x, h_eq⟩ := hmem
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_eq
   obtain ⟨h_b_eq, rfl⟩ := Prod.mk.inj h_x
-  obtain rfl : r = root := by simpa using h_b_eq.symm
-  simpa using chainInLog_of_mem_support_getPutativeRoot idx leaf proof r log_g h_g
-
+  obtain rfl : r = root := by grind
+  have := chainInLog_of_mem_support_getPutativeRoot idx leaf proof r log_g h_g
+  grind
 
 /-- **Log-level binding (Collision Lemma at the log level).** Log-formalized
 analog of `getPutativeRootWithHash_binding_collision`: two distinct openings
@@ -435,10 +435,11 @@ theorem chainInLog_of_extractor_get_ne_none
   induction idx generalizing root with
   | ofLeaf => exact ⟨root, ⟨[], rfl⟩, rfl, rfl, rfl⟩
   | @ofLeft sl sr idxLeft ih =>
-    rcases hf : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | ⟨⟨x, y⟩, r⟩
+    rcases hf : log.find? (fun ⟨_, r⟩ => r == root) with _ | ⟨⟨x, y⟩, r⟩
     · exact absurd (extractor_internal_get_eq_none_of_find?_eq_none
         sl sr log root (Sum.inl idxLeft.toNodeIndex) hf) h_ne_none
-    have hr : r = root := by simpa using (List.find?_eq_some_iff_getElem.mp hf).1
+    have hr : r = root := by
+      grind [find?_eq_some_iff_getElem]
     rw [hr] at hf
     have h_decomp := extractor_internal_eq_of_find?_eq sl sr log root x y hf
     rw [h_decomp]
@@ -449,10 +450,11 @@ theorem chainInLog_of_extractor_get_ne_none
       optionPopulateDown_getRootValue _ _
     grind [Nat.succ_eq_add_one, Vector.toList_cons]
   | @ofRight sl sr idxRight ih =>
-    rcases hf : log.find? (fun q' : (_i : (α × α)) × α => q'.2 == root) with _ | ⟨⟨x, y⟩, r⟩
+    rcases hf : log.find? (fun ⟨_, r⟩ => r == root) with _ | ⟨⟨x, y⟩, r⟩
     · exact absurd (extractor_internal_get_eq_none_of_find?_eq_none
         sl sr log root (Sum.inr idxRight.toNodeIndex) hf) h_ne_none
-    have hr : r = root := by simpa using (List.find?_eq_some_iff_getElem.mp hf).1
+    have hr : r = root := by
+      grind [find?_eq_some_iff_getElem]
     rw [hr] at hf
     have h_decomp := extractor_internal_eq_of_find?_eq sl sr log root x y hf
     rw [h_decomp]
@@ -590,7 +592,7 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     refine (probEvent_mono'' (q := fun b : Bool => b = true) ?_).trans
       (probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth h_pos leaf root proof).le
     rintro _ ⟨h_v, _⟩; exact h_v
-  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le _) |>.trans le_rfl
+  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le _)
     rintro _ _ ⟨_, h⟩; exact h_get h
 
 private theorem extractability_game_verified_extractor_none_le_inv_card
@@ -604,7 +606,7 @@ private theorem extractability_game_verified_extractor_none_le_inv_card
         ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
          FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) ×
       (spec α).QueryLog =>
-        let ⟨_, _, idx, _, _, extractedTree, _, verified⟩ := x.1
+        let ⟨⟨_, _, idx, _, _, extractedTree, _, verified⟩, _⟩ := x
         verified = true ∧ extractedTree.get idx.toNodeIndex = none) |
       (extractability_game committingAdv openingAdv).withQueryLog] ≤
         (1 : ENNReal) / (Fintype.card α : ENNReal) := by
