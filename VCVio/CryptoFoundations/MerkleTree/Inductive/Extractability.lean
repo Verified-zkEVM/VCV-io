@@ -18,11 +18,14 @@ that disagrees with the extracted tree.
 
 ## Main definitions
 
+* `Adversary`: a two-phase Merkle tree adversary, bundling an auxiliary state type, a
+  committing phase producing a claimed root and state, and an opening phase producing a
+  (leaf index, leaf value, authentication path) triple from that state.
 * `extractor`: builds a `FullData (Option α) s` from a query log, root, and skeleton by
   walking down from the root and pulling each node's children from the unique log entry
   whose response matches.
-* `extractability_game`: the bundled game pairing a committing adversary with an opening
-  adversary and recording the verifier's outcome along with the extracted tree and proof.
+* `extractability_game`: the bundled game running a `Adversary` against the extractor
+  and verifier, recording the verifier's outcome along with the extracted tree and proof.
 * `chainInLog`: structural predicate witnessing that a query log contains the hash chain
   from `root` down to `leaf` along the path determined by `idx`.
 
@@ -59,6 +62,36 @@ namespace InductiveMerkleTree
 open List OracleSpec OracleComp BinaryTree
 
 variable {α : Type}
+
+section Adversary
+
+/-- An adversary in the Merkle tree extractability game, packaged as a single
+two-phase object: a committing phase that produces a claimed root together with
+auxiliary state, and an opening phase that consumes the auxiliary state to
+produce a (leaf index, leaf value, authentication path) triple. -/
+structure Adversary (α : Type) (s : Skeleton) where
+  /-- Auxiliary state carried from the committing phase to the opening phase. -/
+  AuxState : Type
+  /-- Committing phase: produce a claimed root and auxiliary state. -/
+  commit : OracleComp (spec α) (α × AuxState)
+  /-- Opening phase: given the auxiliary state, produce a leaf index, claimed
+  leaf value, and authentication path. -/
+  opening : AuxState →
+      OracleComp (spec α)
+        ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)
+
+/-- The combined two-phase execution `commit ; open ; pure ()` of `𝒜` has total
+query bound `qb`. -/
+def Adversary.IsTwoPhaseTotalQueryBound {s : Skeleton}
+    (𝒜 : Adversary α s) (qb : ℕ) : Prop :=
+  IsTotalQueryBound
+    (do
+      let (_root, aux) ← 𝒜.commit
+      let ⟨_idx, _leaf, _proof⟩ ← 𝒜.opening aux
+      pure ())
+    qb
+
+end Adversary
 
 section ExtractabilityGame
 
@@ -97,20 +130,15 @@ returns the transcript of the execution.
 -/
 def extractability_game
     {s : Skeleton}
-    {AuxState : Type}
-    (committingAdv : OracleComp (spec α)
-        (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
+    (𝒜 : Adversary α s) :
     OracleComp (spec α)
-      (α × AuxState ×
+      (α × 𝒜.AuxState ×
         ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
          FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) :=
   do
-    let ((root, aux), queryLog) ← committingAdv.withQueryLog
+    let ((root, aux), queryLog) ← 𝒜.commit.withQueryLog
     let extractedTree := extractor s queryLog root
-    let ⟨idx, leaf, proof⟩ ← openingAdv aux
+    let ⟨idx, leaf, proof⟩ ← 𝒜.opening aux
     let extractedProof := generateProof extractedTree idx
     let verified ← verifyProof idx leaf root proof
     return (root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, verified⟩)
@@ -151,14 +179,10 @@ adversary's queries alongside the opening adversary's output, and whose continua
 expose the prefix as a target for query-bound reasoning.
 -/
 private lemma extractability_game_eq_bind_verifyProof
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
-    extractability_game committingAdv openingAdv =
-      (committingAdv.withQueryLog >>= fun ((root, aux), queryLog) =>
-        openingAdv aux >>= fun q => pure (((root, aux), queryLog), q)) >>=
+    {s : Skeleton} (𝒜 : Adversary α s) :
+    extractability_game 𝒜 =
+      (𝒜.commit.withQueryLog >>= fun ((root, aux), queryLog) =>
+        𝒜.opening aux >>= fun q => pure (((root, aux), queryLog), q)) >>=
       fun (⟨⟨root, aux⟩, queryLog⟩, ⟨idx, leaf, proof⟩) =>
         verifyProof idx leaf root proof >>= fun verified =>
           pure (root, aux,
@@ -176,48 +200,34 @@ committed root/aux and the query log of the committing adversary recovers the pl
 `(committingAdv ; openingAdv ; pure ())` skeleton used to express the combined query bound.
 -/
 private lemma extractability_game_logged_prefix_map_unit_eq
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
+    {s : Skeleton} (𝒜 : Adversary α s) :
     (fun _ => ()) <$>
-        (committingAdv.withQueryLog >>= fun ((root, aux), queryLog) =>
-          openingAdv aux >>= fun q => pure (((root, aux), queryLog), q)) =
-      (do let (_root, aux) ← committingAdv
-          let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
+        (𝒜.commit.withQueryLog >>= fun ((root, aux), queryLog) =>
+          𝒜.opening aux >>= fun q => pure (((root, aux), queryLog), q)) =
+      (do let (_root, aux) ← 𝒜.commit
+          let ⟨_idx, _leaf, _proof⟩ ← 𝒜.opening aux
           pure ()) := by
-  simpa [map_bind, map_pure] using loggingOracle.run_simulateQ_bind_fst committingAdv
-    (fun (_, aux) => openingAdv aux >>= fun _ => pure ())
+  simpa [map_bind, map_pure] using loggingOracle.run_simulateQ_bind_fst 𝒜.commit
+    (fun (_, aux) => 𝒜.opening aux >>= fun _ => pure ())
 
 /--
-If the combined adversary pair `(committingAdv, openingAdv)` has total query bound `qb`,
-then the full extractability game has total query bound `qb + s.depth`.
+If the adversary `𝒜` has two-phase total query bound `qb`, then the full extractability
+game has total query bound `qb + s.depth`.
 
 The extra `s.depth` accounts for the `verifyProof` step, which traverses the path from the
 queried leaf to the root, making at most `s.depth` oracle queries.
 -/
 theorem extractability_game_IsTotalQueryBound
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
-    (qb : ℕ)
-    (h : IsTotalQueryBound
-        (do let (_root, aux) ← committingAdv;
-            let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux; pure ())
-        qb) :
-    IsTotalQueryBound
-        ((extractability_game committingAdv openingAdv))
-        (qb + s.depth) := by
+    {s : Skeleton} (𝒜 : Adversary α s) (qb : ℕ)
+    (h : 𝒜.IsTwoPhaseTotalQueryBound qb) :
+    IsTotalQueryBound (extractability_game 𝒜) (qb + s.depth) := by
   rw [extractability_game_eq_bind_verifyProof]
   refine isTotalQueryBound_bind (n₁ := qb) (n₂ := s.depth) ?_
     fun (⟨⟨root, _aux⟩, _queryLog⟩, ⟨idx, leaf, proof⟩) =>
       isTotalQueryBound_bind (n₁ := s.depth) (n₂ := 0)
         (verifyProof_isTotalQueryBound_skeleton_depth idx leaf root proof) (fun _ => trivial)
   exact (isQueryBound_iff_of_map_eq
-      (extractability_game_logged_prefix_map_unit_eq committingAdv openingAdv)
+      (extractability_game_logged_prefix_map_unit_eq 𝒜)
       (fun _ b => 0 < b) (fun _ b => b - 1)).mpr h
 
 private lemma extractorChildren_eq_none_of_find?_eq_none
@@ -236,19 +246,15 @@ and the extractor and proof generation steps `log_c`
 yield the same extracted tree and proof as the transcript.
 -/
 private lemma extractability_game_support_decompose
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
-    {root : α} {aux : AuxState} {idx : SkeletonLeafIndex s} {leaf : α}
+    {s : Skeleton} (𝒜 : Adversary α s)
+    {root : α} {aux : 𝒜.AuxState} {idx : SkeletonLeafIndex s} {leaf : α}
     {proof : List.Vector α idx.depth}
     {extractedTree : FullData (Option α) s}
     {extractedProof : List.Vector (Option α) idx.depth}
     {log : (spec α).QueryLog}
     (hsup : ((root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩),
                   log) ∈
-      support (extractability_game committingAdv openingAdv).withQueryLog) :
+      support (extractability_game 𝒜).withQueryLog) :
     ∃ log_c log_v : (spec α).QueryLog,
       (true, log_v) ∈ support
           (verifyProof (m := OracleComp (spec α)) idx leaf root proof).withQueryLog ∧
@@ -274,7 +280,7 @@ private lemma extractability_game_support_decompose
   obtain ⟨rfl, h_rest_eq⟩ := Sigma.mk.inj h_sigma_eq
   simp only [heq_eq_eq, Prod.mk.injEq] at h_rest_eq
   obtain ⟨rfl, rfl, h_tree_eq, h_proof_ext_eq, rfl⟩ := h_rest_eq
-  rw [OracleComp.withQueryLog_self_log_eq committingAdv h_c] at h_tree_eq h_proof_ext_eq
+  rw [OracleComp.withQueryLog_self_log_eq 𝒜.commit h_c] at h_tree_eq h_proof_ext_eq
   refine ⟨log_c, log_v, h_vp, fun q hq => ?_, fun q hq => ?_,
     h_tree_eq.symm, h_proof_ext_eq.symm⟩ <;>
     rw [← h_eq_co2, ← h_eq_v2, ← h_eq_p2]
@@ -542,12 +548,8 @@ theorem chainInLog_of_extractor_get_ne_none
 
 private theorem extractability_game_not_logHasCollision_match
     [DecidableEq α]
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
-    {root : α} {aux : AuxState} {idx : SkeletonLeafIndex s} {leaf : α}
+    {s : Skeleton} (𝒜 : Adversary α s)
+    {root : α} {aux : 𝒜.AuxState} {idx : SkeletonLeafIndex s} {leaf : α}
     {proof : List.Vector α idx.depth}
     {extractedTree : FullData (Option α) s}
     {extractedProof : List.Vector (Option α) idx.depth}
@@ -556,11 +558,11 @@ private theorem extractability_game_not_logHasCollision_match
     (h_ne_none : extractedTree.get idx.toNodeIndex ≠ none)
     (hsupport : ((root, aux, ⟨idx, leaf, proof, extractedTree, extractedProof, true⟩),
                   log) ∈
-      support (extractability_game committingAdv openingAdv).withQueryLog) :
+      support (extractability_game 𝒜).withQueryLog) :
     extractedTree.get idx.toNodeIndex = some leaf ∧
       proof.toList.map some = extractedProof.toList := by
   obtain ⟨log_c, log_v, h_vp, h_sub_v, h_sub_c, h_tree_eq, h_proof_ext_eq⟩ :=
-    extractability_game_support_decompose committingAdv openingAdv hsupport
+    extractability_game_support_decompose 𝒜 hsupport
   have h_chain_log : chainInLog log leaf root idx proof :=
     chainInLog_mono idx h_sub_v
       (chainInLog_of_mem_support_verifyProof idx leaf root proof log_v h_vp)
@@ -672,30 +674,26 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
 
 private theorem extractability_game_verified_extractor_none_le_inv_card
     [DecidableEq α] [Fintype α] [Inhabited α]
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
-    Pr[(fun x : (α × AuxState ×
+    {s : Skeleton} (𝒜 : Adversary α s) :
+    Pr[(fun x : (α × 𝒜.AuxState ×
         ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
          FullData (Option α) s × List.Vector (Option α) idx.depth × Bool)) ×
       (spec α).QueryLog =>
         let ⟨⟨_, _, idx, _, _, extractedTree, _, verified⟩, _⟩ := x
         verified = true ∧ extractedTree.get idx.toNodeIndex = none) |
-      (extractability_game committingAdv openingAdv).withQueryLog] ≤
+      (extractability_game 𝒜).withQueryLog] ≤
         (1 : ENNReal) / (Fintype.card α : ENNReal) := by
   rw [one_div]
-  change Pr[((fun vals : α × AuxState ×
+  change Pr[((fun vals : α × 𝒜.AuxState ×
             ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth ×
              FullData (Option α) s × List.Vector (Option α) idx.depth × Bool) =>
             let ⟨_, _, idx, _, _, extractedTree, _, verified⟩ := vals
             verified = true ∧ extractedTree.get idx.toNodeIndex = none) ∘ Prod.fst) |
-        (extractability_game committingAdv openingAdv).withQueryLog] ≤ _
+        (extractability_game 𝒜).withQueryLog] ≤ _
   rw [probEvent_withQueryLog,
-    show extractability_game committingAdv openingAdv = (do
-        let ((root, aux), queryLog) ← committingAdv.withQueryLog
-        let ⟨idx, leaf, proof⟩ ← openingAdv aux
+    show extractability_game 𝒜 = (do
+        let ((root, aux), queryLog) ← 𝒜.commit.withQueryLog
+        let ⟨idx, leaf, proof⟩ ← 𝒜.opening aux
         let verified ← verifyProof idx leaf root proof
         pure (root, aux,
           ⟨idx, leaf, proof,
@@ -711,24 +709,20 @@ private theorem extractability_game_verified_extractor_none_le_inv_card
 
 private theorem extractability_game_not_logHasCollision_wins_le_inv_card
     [DecidableEq α] [Fintype α] [Inhabited α]
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState →
-        OracleComp (spec α)
-          ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth)) :
+    {s : Skeleton} (𝒜 : Adversary α s) :
     Pr[fun (vals, log) =>
         ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
-      (extractability_game committingAdv openingAdv).withQueryLog] ≤
+      (extractability_game 𝒜).withQueryLog] ≤
         (1 : ENNReal) / (Fintype.card α : ENNReal) := by
   refine le_trans (probEvent_mono ?_)
-    (extractability_game_verified_extractor_none_le_inv_card committingAdv openingAdv)
+    (extractability_game_verified_extractor_none_le_inv_card 𝒜)
   rintro ⟨vals, log⟩ hsupport ⟨h_not_logHasCollision, h_adv_wins⟩
   obtain ⟨root, aux, idx, leaf, proof, extractedTree, extractedProof, verified⟩ := vals
   obtain ⟨rfl, h_disagree⟩ := h_adv_wins
   refine ⟨rfl, ?_⟩
   by_contra h_ne_none
   obtain ⟨h_eq_leaf, h_map⟩ :=
-    extractability_game_not_logHasCollision_match committingAdv openingAdv
+    extractability_game_not_logHasCollision_match 𝒜
       h_not_logHasCollision h_ne_none hsupport
   simp [h_map, h_eq_leaf] at h_disagree
 
@@ -737,71 +731,58 @@ The extractability theorem for Merkle trees.
 
 Adapting from the SNARGs book Lemma 18.5.1:
 
-For any adversary `committingAdv` that outputs a root and auxiliary data,
-and any `openingAdv` that takes the auxiliary data and outputs a leaf index, leaf value, and proof,
-such that committingAdv and openingAdv together obey the query bound `qb`.
-If the `committingAdv` and `openingAdv` are executed, and the `extractor` algorithm is run on the
-resulting cache and root from `committingAdv`,
-then with probability at most κ does the adversary "win the extractability game"
-i.e. simultaneously
+For any adversary `𝒜` whose committing and opening phases together obey the two-phase total
+query bound `qb`, if the game runs `𝒜.commit` and `𝒜.opening`, and the `extractor` algorithm
+is run on the resulting cache and root, then with probability at most κ does `𝒜` "win the
+extractability game", i.e. simultaneously
 
-* the merkle tree verification passes on the proof from `openingAdv`
+* the merkle tree verification passes on the proof from `𝒜.opening`
 * but the extracted (leaf value, proof) pair
-  does not match the adversary's (leaf value, proof pair)
+  does not match the adversary's (leaf value, proof) pair
 
 Where κ is 1/|α| * ((qb + s.depth)^2 / 2 + 1).
 -/
 theorem extractability [DecidableEq α] [Fintype α] [Inhabited α]
-    {s : Skeleton} {AuxState : Type}
-    (committingAdv : OracleComp (spec α) (α × AuxState))
-    (openingAdv : AuxState → OracleComp (spec α)
-        ((idx : SkeletonLeafIndex s) × α × List.Vector α idx.depth))
-    (qb : ℕ)
-    (h_IsQueryBound_qb :
-      IsTotalQueryBound
-        (do
-          let (_root, aux) ← committingAdv
-          let ⟨_idx, _leaf, _proof⟩ ← openingAdv aux
-          pure ())
-        qb) :
+    {s : Skeleton} (𝒜 : Adversary α s) (qb : ℕ)
+    (h_IsQueryBound_qb : 𝒜.IsTwoPhaseTotalQueryBound qb) :
     Pr[adversary_wins_extractability_game_event |
-        extractability_game committingAdv openingAdv] ≤
+        extractability_game 𝒜] ≤
         ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α)
         + 1 / (Fintype.card α)
     := by
   calc
     -- Rewrite the game to include the combined query log.
     _ = Pr[adversary_wins_extractability_game_event ∘ Prod.fst |
-          (extractability_game committingAdv openingAdv).withQueryLog] :=
+          (extractability_game 𝒜).withQueryLog] :=
       (probEvent_withQueryLog _ _).symm
     -- Split: bad event implies collision, or no-collision with bad event.
     _ ≤ Pr[fun (vals, log) =>
             LogHasCollision log ∨
             (¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals) |
-          (extractability_game committingAdv openingAdv).withQueryLog] :=
+          (extractability_game 𝒜).withQueryLog] :=
       probEvent_mono'' fun ⟨_, _⟩ => by tauto
     -- Union bound.
     _ ≤ Pr[fun (vals, log) => LogHasCollision log |
-            (extractability_game committingAdv openingAdv).withQueryLog] +
+            (extractability_game 𝒜).withQueryLog] +
         Pr[fun (vals, log) =>
             ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
-          (extractability_game committingAdv openingAdv).withQueryLog] :=
+          (extractability_game 𝒜).withQueryLog] :=
       probEvent_or_le ..
     -- Birthday bound on the collision probability.
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         Pr[fun (vals, log) =>
             ¬ LogHasCollision log ∧ adversary_wins_extractability_game_event vals |
-          (extractability_game committingAdv openingAdv).withQueryLog] := by
+          (extractability_game 𝒜).withQueryLog] := by
       gcongr
       convert OracleComp.probEvent_logCollision_le_birthday_total (spec := spec α)
-        (extractability_game committingAdv openingAdv) (qb + s.depth)
-        (extractability_game_IsTotalQueryBound committingAdv openingAdv qb h_IsQueryBound_qb)
+        (extractability_game 𝒜) (qb + s.depth)
+        (extractability_game_IsTotalQueryBound 𝒜 qb h_IsQueryBound_qb)
         (fun _ => le_rfl) using 2
       push_cast; rfl
     -- Bound the no-collision bad event probability.
     _ ≤ ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α) +
         1 / (Fintype.card α) := by
-      have h' := extractability_game_not_logHasCollision_wins_le_inv_card committingAdv openingAdv
+      have h' := extractability_game_not_logHasCollision_wins_le_inv_card 𝒜
       gcongr
       norm_cast
 
