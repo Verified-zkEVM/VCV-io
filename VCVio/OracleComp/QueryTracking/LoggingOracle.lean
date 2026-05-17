@@ -404,21 +404,18 @@ end isQueryBound
 
 /-- `withQueryLog` distributes over `bind`: the combined log is the
 concatenation of the prefix's log and the continuation's log. -/
-lemma withQueryLog_bind
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α β : Type}
+lemma withQueryLog_bind {ι : Type} {spec : OracleSpec.{0, 0} ι} {α β : Type}
     (mx : OracleComp spec α) (my : α → OracleComp spec β) :
     (mx >>= my).withQueryLog =
       mx.withQueryLog >>= fun p => Prod.map id (p.2 ++ ·) <$> (my p.1).withQueryLog := by
-  change (WriterT.run (simulateQ _ (mx >>= my)) :
-      OracleComp spec (β × spec.QueryLog)) = _
-  rw [simulateQ_bind, WriterT.run_bind']
+  simp only [withQueryLog, simulateQ_bind, WriterT.run_bind']
 
 /-- `withQueryLog` of `pure x` produces `(x, [])` — no oracle queries,
 empty log. -/
-lemma withQueryLog_pure
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
-    (x : α) :
-    (pure x : OracleComp spec α).withQueryLog = pure (x, []) := rfl
+@[simp, grind =]
+lemma withQueryLog_pure {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type} (x : α) :
+    (pure x : OracleComp spec α).withQueryLog = pure (x, []) :=
+  rfl
 
 /-- `withQueryLog` of a single `query t` produces `(u, [⟨t, u⟩])` where
 `u` is the oracle response: one query, one log entry. -/
@@ -426,13 +423,7 @@ lemma withQueryLog_query
     {ι : Type} {spec : OracleSpec.{0, 0} ι} (t : spec.Domain) :
     (liftM (OracleSpec.query t) : OracleComp spec _).withQueryLog =
       liftM (OracleSpec.query t) >>= fun u => pure (u, [⟨t, u⟩]) := by
-  conv_lhs =>
-    rw [show (liftM (OracleSpec.query t) : OracleComp spec _) =
-        liftM (OracleSpec.query t) >>= pure from (bind_pure _).symm]
-  change (simulateQ loggingOracle (liftM (OracleSpec.query t) >>= pure)).run = _
-  rw [run_simulateQ_loggingOracle_query_bind]
-  simp only [simulateQ_pure, WriterT.run_pure', map_pure]
-  rfl
+  simp [withQueryLog, simulateQ_query, QueryImpl.withLogging_apply, WriterT.run_tell]
 
 /-- For any computation `oa` and predicate `p`, the probability of `p` holding on the output
 equals the probability of `p ∘ Prod.fst` holding on the output of `oa.withQueryLog`. -/
@@ -455,15 +446,9 @@ theorem withQueryLog_self_log_eq
     l₁ = l₂ := by
   induction oa using OracleComp.inductionOn generalizing v l₁ l₂ with
   | pure x =>
-      change ((v, l₁), l₂) ∈ support
-        ((pure x : OracleComp spec α).withQueryLog.withQueryLog) at hmem
       rw [withQueryLog_pure, withQueryLog_pure, mem_support_pure_iff] at hmem
-      obtain ⟨⟨_, rfl⟩, rfl⟩ := Prod.mk.inj hmem |>.imp_left Prod.mk.inj
       grind
   | query_bind t mx ih =>
-      change ((v, l₁), l₂) ∈ support
-        (((liftM (OracleSpec.query t) : OracleComp spec _) >>=
-          fun u => mx u).withQueryLog.withQueryLog) at hmem
       rw [withQueryLog_bind, withQueryLog_bind, mem_support_bind_iff] at hmem
       obtain ⟨⟨⟨u₁, log_q1⟩, log_q2⟩, h₁, hmem⟩ := hmem
       rw [withQueryLog_query, withQueryLog_bind, mem_support_bind_iff] at h₁
@@ -473,8 +458,7 @@ theorem withQueryLog_self_log_eq
       obtain ⟨u, _, rfl, rfl⟩ := h₁a
       rw [support_map, Set.mem_image] at h₁b
       obtain ⟨⟨⟨u', l_inner⟩, l_outer⟩, h_pure, h_eq_b⟩ := h₁b
-      simp only [withQueryLog_pure, mem_support_pure_iff,
-        Prod.mk.injEq] at h_pure
+      simp only [withQueryLog_pure, mem_support_pure_iff, Prod.mk.injEq] at h_pure
       obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_pure
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq, List.append_nil] at h_eq_b
       obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_eq_b
@@ -482,13 +466,11 @@ theorem withQueryLog_self_log_eq
       obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner_outer, h_eq⟩ := hmem
       simp only [Prod.map_apply, id_eq, Prod.mk.injEq] at h_eq
       obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_eq
-      simp only at h_inner_outer
-      rw [show (Prod.map id (fun x => ([⟨t, u'⟩] ++ x : (spec).QueryLog)) <$>
-              (mx u').withQueryLog) =
-            ((mx u').withQueryLog >>=
-              fun p => pure (Prod.map id (fun x => [⟨t, u'⟩] ++ x) p))
-          by rw [map_eq_pure_bind],
-        withQueryLog_bind, mem_support_bind_iff] at h_inner_outer
+      rw [show (Prod.map id (fun x => ([⟨t, u'⟩] ++ x : spec.QueryLog)) <$>
+            (mx u').withQueryLog) =
+          ((mx u').withQueryLog >>=
+            fun p => pure (Prod.map id (fun x => [⟨t, u'⟩] ++ x) p))
+        from map_eq_pure_bind .., withQueryLog_bind, mem_support_bind_iff] at h_inner_outer
       obtain ⟨⟨⟨v', l₁'⟩, l₂'⟩, h_inner, h_rest⟩ := h_inner_outer
       rw [support_map, Set.mem_image] at h_rest
       obtain ⟨⟨pX, lX⟩, h_pX, h_eq_X⟩ := h_rest
@@ -499,6 +481,5 @@ theorem withQueryLog_self_log_eq
       -- This proof can be `grind`ed a bit,
       -- but seems to take a long time to finish/crash if we do so.
       rw [ih u' h_inner]
-
 
 end OracleComp
