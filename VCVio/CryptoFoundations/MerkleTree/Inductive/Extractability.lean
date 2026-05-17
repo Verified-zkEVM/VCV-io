@@ -18,6 +18,9 @@ that disagrees with the extracted tree.
 
 ## Main definitions
 
+We make several definitions to set up and analyze the extractability game
+under namespace `InductiveMerkleTree`:
+
 * `Adversary`: a two-phase Merkle tree adversary, bundling an auxiliary state type, a
   committing phase producing a claimed root and state, and an opening phase producing a
   (leaf index, leaf value, authentication path) triple from that state.
@@ -440,7 +443,8 @@ theorem logHasCollision_of_chainInLog_of_ne
       refine ih _ _ _ _ _ (fun heq => hne ?_) hc₁ hc₂
       obtain ⟨rfl, htail⟩ := Prod.mk.inj heq
       exact congrArg (Prod.mk _) <| by
-        rw [← proof₁.cons_head_tail, ← proof₂.cons_head_tail]; exact congr (congrArg _ hhead) htail
+        rw [← proof₁.cons_head_tail, ← proof₂.cons_head_tail]
+        exact congr (congrArg _ hhead) htail
     · exact LogHasCollision.of_mem (fun h => hpair (congrArg Sigma.fst h))
         h₁_mem h₂_mem (heq_of_eq rfl)
   | @ofRight sl sr idxRight ih =>
@@ -451,7 +455,8 @@ theorem logHasCollision_of_chainInLog_of_ne
       refine ih _ _ _ _ _ (fun heq => hne ?_) hc₁ hc₂
       obtain ⟨rfl, htail⟩ := Prod.mk.inj heq
       exact congrArg (Prod.mk _) <| by
-        rw [← proof₁.cons_head_tail, ← proof₂.cons_head_tail]; exact congr (congrArg _ hhead) htail
+        rw [← proof₁.cons_head_tail, ← proof₂.cons_head_tail]
+        exact congr (congrArg _ hhead) htail
     · exact LogHasCollision.of_mem (fun h => hpair (congrArg Sigma.fst h))
         h₁_mem h₂_mem (heq_of_eq rfl)
 
