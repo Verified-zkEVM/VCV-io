@@ -66,6 +66,8 @@ open List OracleSpec OracleComp BinaryTree
 
 variable {α : Type}
 
+/-! ## Adversary -/
+
 section Adversary
 
 /-- An adversary in the Merkle tree extractability game, packaged as a single
@@ -94,6 +96,8 @@ def Adversary.IsTwoPhaseTotalQueryBound {s : Skeleton}
     qb
 
 end Adversary
+
+/-! ## Extractability game -/
 
 section ExtractabilityGame
 
