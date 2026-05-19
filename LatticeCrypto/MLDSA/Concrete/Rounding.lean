@@ -888,6 +888,11 @@ private theorem useHintCoeff_correct_of_small_of_isApproved (p : Params)
         highBitsCoeff_of_neg_overflow p hp r1 v hr1lt (by omega) hvneg hbdry hsum
       rw [hhint, huse, hgoal]
 
+theorem concreteRounding_high_low_decomp_of_isApproved (p : Params)
+    (_hp : p.isApproved) (r : Rq) :
+    highBitsShift p (highBits p r) + lowBits p r = r :=
+  concreteRounding_high_low_decomp p r
+
 theorem concreteRounding_lowBits_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
     cInfNorm (lowBits p r) ≤ p.gamma2 :=
