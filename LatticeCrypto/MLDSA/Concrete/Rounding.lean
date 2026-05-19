@@ -143,7 +143,7 @@ def hintWeight (h : Hint) : ℕ :=
   h.toList.foldl (fun acc b => acc + cond b 1 0) 0
 
 @[simp] theorem Rq.get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 :=
-  Vector.getElem_zero i.1 i.2
+  NegacyclicRing.coeff_zero coeffRing i
 
 @[simp] theorem Rq.get_add (a b : Rq) (i : Fin ringDegree) :
     (a + b).get i = a.get i + b.get i :=
