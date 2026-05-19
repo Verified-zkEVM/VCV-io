@@ -134,6 +134,10 @@ def mapCoeffs {Coeff' : Type v}
     f (src.coeff p ⟨i.val, by
       exact Nat.lt_of_lt_of_eq i.isLt hdeg.symm⟩)
 
+@[ext] theorem ext_coeff {backend : PolyBackend Coeff} {p q : backend.Poly}
+    (h : ∀ i, backend.coeff p i = backend.coeff q i) : p = q :=
+  backend.build_coeff p ▸ backend.build_coeff q ▸ congr_arg backend.build (funext h)
+
 end PolyBackend
 
 
