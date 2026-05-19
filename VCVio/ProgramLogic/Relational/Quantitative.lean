@@ -350,7 +350,7 @@ theorem ofReal_tvDist_map_private_right_bad_le
       show (liftM ob : SPMF β) = liftM ((liftM ob : PMF β)) from rfl,
       hp_pub]
   have hbad : Pr[bad | ob] = Pr[bad | q] := by
-    show Pr[bad | ob] = Pr[bad | (liftM ob : PMF β)]
+    change Pr[bad | ob] = Pr[bad | (liftM ob : PMF β)]
     rfl
   simpa [hleft, hbase, hbad] using h
 

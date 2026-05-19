@@ -70,7 +70,7 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
     𝒟[simulateQ (finRatImpl (spec := spec)) oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
-  | query_bind t mx h => simp [evalDist_bind, evalDist_apply, OracleComp.evalDist_query, h]
+  | query_bind t mx h => simp [evalDist_apply, OracleComp.evalDist_query, h]
 
 @[simp] lemma probOutput_simulateQ {α : Type v}
     (oa : OracleComp spec α) (x : α) :

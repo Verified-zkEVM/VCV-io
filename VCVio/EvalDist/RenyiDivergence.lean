@@ -88,6 +88,7 @@ defined via their evaluation distributions. -/
 noncomputable def renyiDiv (a : ℝ) (mx my : m α) : ℝ≥0∞ :=
   SPMF.renyiDiv a (𝒟[mx]) (𝒟[my])
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp]
 theorem renyiDiv_self (a : ℝ) (mx : m α) : renyiDiv a mx mx = 1 :=
   SPMF.renyiDiv_self _ _
@@ -106,6 +107,7 @@ theorem renyiDiv_bind_right_le [LawfulMonad m] {β : Type u} (a : ℝ) (ha : 1 <
 
 /-! ### Rényi to Probability Bounds -/
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 /-- If the Rényi divergence between two computations is at most `R`, then for any
 output `x`, `Pr[= x | my] ≥ Pr[= x | mx]^{a/(a-1)} / R`. -/
 theorem probOutput_le_of_renyiDiv (a : ℝ) (ha : 1 < a) (mx my : m α)

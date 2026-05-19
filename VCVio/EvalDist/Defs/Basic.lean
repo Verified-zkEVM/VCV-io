@@ -727,8 +727,26 @@ end pmf_denotation
 
 section probEvent_mono_compl
 
-variable [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
+variable [MonadLiftT m SPMF]
   {mx : m α} {p q : α → Prop}
+
+lemma probEvent_compl (mx : m α) (p : α → Prop) :
+    Pr[ p | mx] + Pr[ fun x => ¬p x | mx] = 1 - Pr[⊥ | mx] := by
+  have := Classical.decPred p
+  rw [probEvent_eq_tsum_ite mx p, probEvent_eq_tsum_ite mx (fun x => ¬p x)]
+  rw [← ENNReal.tsum_add, ← tsum_probOutput_eq_sub]
+  refine tsum_congr fun x => ?_
+  split_ifs <;> simp_all
+
+/-- Union bound: the probability of `p ∨ q` is at most the sum of probabilities. -/
+lemma probEvent_or_le (mx : m α) (p q : α → Prop) :
+    Pr[ fun x => p x ∨ q x | mx] ≤ Pr[ p | mx] + Pr[ q | mx] := by
+  have := Classical.decPred p; have := Classical.decPred q
+  simp only [probEvent_eq_tsum_ite, ← ENNReal.tsum_add]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hp : p x <;> by_cases hq : q x <;> simp [hp, hq]
+
+variable [MonadLiftT m SetM] [EvalDistCompatible m]
 
 /-- If `p` implies `q` on the `support` of a computation then it is more likely to happen. -/
 lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] := by
@@ -745,24 +763,6 @@ lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[ p | mx] ≤ P
 lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
     (h : ∀ x ∈ finSupport mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
   probEvent_mono (fun x hx hpx => h x (mem_finSupport_of_mem_support hx) hpx)
-
-omit [MonadLiftT m SetM] [EvalDistCompatible m] in
-lemma probEvent_compl (mx : m α) (p : α → Prop) :
-    Pr[ p | mx] + Pr[ fun x => ¬p x | mx] = 1 - Pr[⊥ | mx] := by
-  have := Classical.decPred p
-  rw [probEvent_eq_tsum_ite mx p, probEvent_eq_tsum_ite mx (fun x => ¬p x)]
-  rw [← ENNReal.tsum_add, ← tsum_probOutput_eq_sub]
-  refine tsum_congr fun x => ?_
-  split_ifs <;> simp_all
-
-omit [MonadLiftT m SetM] [EvalDistCompatible m] in
-/-- Union bound: the probability of `p ∨ q` is at most the sum of probabilities. -/
-lemma probEvent_or_le (mx : m α) (p q : α → Prop) :
-    Pr[ fun x => p x ∨ q x | mx] ≤ Pr[ p | mx] + Pr[ q | mx] := by
-  have := Classical.decPred p; have := Classical.decPred q
-  simp only [probEvent_eq_tsum_ite, ← ENNReal.tsum_add]
-  refine ENNReal.tsum_le_tsum fun x => ?_
-  by_cases hp : p x <;> by_cases hq : q x <;> simp [hp, hq]
 
 @[simp low, grind =]
 lemma probEvent_eq_one_iff :

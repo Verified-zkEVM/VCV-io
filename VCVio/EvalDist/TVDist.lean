@@ -72,22 +72,28 @@ defined via their evaluation distributions. -/
 noncomputable def tvDist (mx my : m α) : ℝ :=
   SPMF.tvDist (𝒟[mx]) (𝒟[my])
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp] lemma tvDist_self (mx : m α) : tvDist mx mx = 0 := SPMF.tvDist_self _
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp] lemma tvDist_eq_zero_iff (mx my : m α) :
     tvDist mx my = 0 ↔ 𝒟[mx] = 𝒟[my] := by
   unfold tvDist
   rw [SPMF.tvDist_eq_zero_iff, SPMF.toPMF_inj]
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 lemma tvDist_comm (mx my : m α) : tvDist mx my = tvDist my mx :=
   SPMF.tvDist_comm _ _
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 lemma tvDist_nonneg (mx my : m α) : 0 ≤ tvDist mx my := SPMF.tvDist_nonneg _ _
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 lemma tvDist_triangle (mx my mz : m α) :
     tvDist mx mz ≤ tvDist mx my + tvDist my mz :=
   SPMF.tvDist_triangle _ _ _
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 lemma tvDist_le_one (mx my : m α) : tvDist mx my ≤ 1 := SPMF.tvDist_le_one _ _
 
 lemma tvDist_map_le [LawfulMonad m] {β : Type u} (f : α → β) (mx my : m α) :
@@ -101,6 +107,8 @@ lemma tvDist_bind_right_le [LawfulMonad m] {β : Type u} (f : α → m β) (mx m
   exact SPMF.tvDist_bind_right_le _ _ _
 
 /-! ### TV distance bounds -/
+
+omit [LawfulMonadLiftT m SPMF] in
 lemma tvDist_le_probEvent_of_probOutput_eq_of_not
     {mx my : m α} [NeverFail mx] [NeverFail my]
     (p : α → Prop) (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
@@ -402,6 +410,7 @@ section bool_tvdist
 
 variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 /-- For any `Bool` computation, the difference of `Pr[= true]` values is bounded by
 TV distance. -/
 lemma abs_probOutput_toReal_sub_le_tvDist

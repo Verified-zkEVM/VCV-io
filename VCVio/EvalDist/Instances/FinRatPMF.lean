@@ -34,12 +34,12 @@ noncomputable instance instMonadLiftTRawSetM : MonadLiftT Raw SetM where
 
 noncomputable instance instLawfulMonadLiftTRawSetM : LawfulMonadLiftT Raw SetM where
   monadLift_pure x := by
-    show ((liftM (pure x : Raw _) : PMF _).support : Set _) = {x}
+    change ((liftM (pure x : Raw _) : PMF _).support : Set _) = {x}
     have : (liftM (pure x : Raw _) : PMF _) = pure x :=
       LawfulMonadLift.monadLift_pure (m := Raw) (n := PMF) x
     rw [this]; exact PMF.support_pure x
   monadLift_bind mx my := by
-    show ((liftM (mx >>= my) : PMF _).support : Set _) =
+    change ((liftM (mx >>= my) : PMF _).support : Set _) =
       Bind.bind (m := SetM)
         ((liftM mx : PMF _).support : Set _)
         (fun x => ((liftM (my x) : PMF _).support : Set _))
@@ -51,7 +51,7 @@ noncomputable instance instLawfulMonadLiftTRawSetM : LawfulMonadLiftT Raw SetM w
 /-- Compatibility: `Raw`'s SetM support equals the SPMF support of its `evalDist`. -/
 noncomputable instance : EvalDistCompatible Raw where
   support_eq_SPMF_support mx := by
-    show ((liftM mx : PMF _).support : Set _) =
+    change ((liftM mx : PMF _).support : Set _) =
       SPMF.support (liftM (liftM mx : PMF _) : SPMF _)
     rw [SPMF.support_liftM]
 

@@ -68,20 +68,20 @@ noncomputable instance : MonadLift Id PMF where
 noncomputable instance : LawfulMonadLift Id PMF where
   monadLift_pure _ := rfl
   monadLift_bind _ _ := by
-    show (PMF.pure _ : PMF _) = (pure _ : PMF _).bind fun x => pure _
-    simp [PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind]
+    change (PMF.pure _ : PMF _) = (pure _ : PMF _).bind fun x => pure _
+    simp [PMF.monad_pure_eq_pure]
 
 instance : HasEvalFinset Id where
   finSupport x := {x}
   coe_finSupport x := by
     ext y
-    show y ∈ (↑({x.run} : Finset _) : Set _) ↔ y ∈ SetM.run (pure x.run : SetM _)
+    change y ∈ (↑({x.run} : Finset _) : Set _) ↔ y ∈ SetM.run (pure x.run : SetM _)
     rw [Finset.coe_singleton]
     rfl
 
 @[simp, grind =]
 lemma support_eq_singleton (x : Id α) : support x = {x.run} := by
-  show SetM.run (pure x.run : SetM α) = _
+  change SetM.run (pure x.run : SetM α) = _
   rfl
 
 @[simp, grind =]

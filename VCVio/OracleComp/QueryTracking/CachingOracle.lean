@@ -247,6 +247,7 @@ section QueryBound
 
 variable {ι' : Type u} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
 
+omit [spec'.Fintype] [spec'.Inhabited] in
 lemma isQueryBoundP_run_withCaching
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain)
     {p : ι' → Prop} [DecidablePred p] {n : ℕ}
@@ -260,6 +261,7 @@ lemma isQueryBoundP_run_withCaching
       rw [withCaching_run_some _ hcache]
       trivial
 
+omit [spec'.Fintype] [spec'.Inhabited] in
 lemma isTotalQueryBound_run_withCaching
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain) {n : ℕ}
     (h : OracleComp.IsTotalQueryBound (so t) n) (cache : spec.QueryCache) :
@@ -526,6 +528,7 @@ namespace OracleComp
 variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
 
 omit [spec.DecidableEq] in
+omit [spec.Fintype] [spec.Inhabited] in
 /-- `simulateQ cachingOracle` only grows the cache: for any `oa`, if
 `z ∈ support ((simulateQ cachingOracle oa).run cache₀)` then `cache₀ ≤ z.2`. -/
 theorem simulateQ_cachingOracle_cache_le {α : Type u}
@@ -553,6 +556,7 @@ theorem simulateQ_cachingOracle_cache_le {α : Type u}
       exact le_trans hle_mid (ih _ cache_mid z hrest)
 
 omit [spec.DecidableEq] in
+omit [spec.Fintype] [spec.Inhabited] in
 /-- After running `cachingOracle` on a single query at `t`, the resulting cache
 maps `t` to the returned value. -/
 theorem cachingOracle_query_caches (t : spec.Domain)

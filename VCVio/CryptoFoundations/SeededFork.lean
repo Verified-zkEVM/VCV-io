@@ -100,6 +100,7 @@ def seededForkWithSeedValue (main : OracleComp spec α)
 
 end forkDef
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- When the seed has at least `qb t` pre-generated answers for each oracle `t`, running `main`
 against the seed makes zero live oracle queries (every query is answered from the seed). -/
 theorem isPerIndexQueryBound_firstRun_seeded
@@ -111,6 +112,7 @@ theorem isPerIndexQueryBound_firstRun_seeded
   seededOracle.isPerIndexQueryBound_run'_zero
     (oa := main) (qb := qb) (seed := seed) hmain hseed
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- After truncating the seed at query index `s` for oracle `i` and inserting a fresh answer `u`,
 the replayed run can make at most `qb i - (s + 1)` live queries, all to oracle `i`.
 All other oracle families remain fully covered by the seed. -/
@@ -126,6 +128,7 @@ theorem isPerIndexQueryBound_replayAfterFork
   seededOracle.isPerIndexQueryBound_run'_takeAtIndex_addValue
     (oa := main) (qb := qb) (seed := seed) (i := i) hmain hseed s u
 
+omit [spec.Fintype] [spec.Inhabited] in
 private lemma isPerIndexQueryBound_if_pure
     {p : Prop} [Decidable p]
     {oa : OracleComp spec α} {qb : ι → ℕ} {x : α}
@@ -135,6 +138,7 @@ private lemma isPerIndexQueryBound_if_pure
   · simp [hp]
   · simpa [hp] using h
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- `seededForkWithSeedValue` makes at most `qb i` live queries, all to oracle `i`.
 
 The first seeded run is query-free (covered by the seed); the replay after the fork point uses
@@ -236,6 +240,7 @@ section generateSeedCoverage
 
 variable [∀ i, SampleableType (spec.Range i)]
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- The expected unit-cost query count of `seededForkWithSeedValue`, averaged over the randomly
 sampled seed and replacement value, is at most `qb i`. -/
 theorem expectedQueryCount_seededForkWithSeedValue_le

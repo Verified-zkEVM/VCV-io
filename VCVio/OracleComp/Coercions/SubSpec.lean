@@ -319,6 +319,7 @@ variable {ι : Type u} {τ : Type v}
   [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
   [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited]
 
+omit [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited] in
 /-- Support is preserved by `liftComp`: lifting a computation to a larger oracle spec
 does not change which outputs are reachable. This is the support analogue of
 `evalDist_liftComp`. -/
@@ -345,6 +346,7 @@ does not change which outputs are reachable. This is the support analogue of
     dsimp [OracleSpec.query, OracleQuery.cont, OracleQuery.input]
     rw [Set.range_id]; rfl
 
+omit [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited] in
 @[simp, grind =] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
     x ∈ support (liftComp mx superSpec) ↔ x ∈ support mx := by
   simp [support_liftComp]

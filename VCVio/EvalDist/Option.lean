@@ -33,12 +33,14 @@ section double_option
 
 variable (mx : m (Option α))
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 lemma probOutput_none_add_tsum_some :
     Pr[= none | mx] + ∑' x, Pr[= some x | mx] = 1 - Pr[⊥ | mx] := by
   rw [← tsum_probOutput_eq_sub mx]
   rw [← tsum_option _ ENNReal.summable]
 
+omit [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 lemma probEvent_isSome_eq_one_sub_probOutput_none [NeverFail mx] :
     Pr[ fun r => r.isSome | mx] = 1 - Pr[= none | mx] := by
@@ -53,6 +55,7 @@ lemma probEvent_isSome_eq_one_sub_probOutput_none [NeverFail mx] :
     simpa [add_comm] using htotal
   exact ENNReal.eq_sub_of_add_eq hnone_ne_top htotal'
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 lemma sum_probOutput_some_le_one [Fintype α] :
     ∑ x : α, Pr[= (some x : Option α) | mx] ≤ 1 := by

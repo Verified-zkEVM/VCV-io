@@ -79,7 +79,8 @@ variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (ρ0 : ρ)
 /-- Evaluating `pure x` at any environment gives the same result as `pure x` in the base monad. -/
 @[simp] lemma toSPMF_pure (x : α) :
     ReaderT.toSPMF ρ0 (pure x : ReaderT ρ m α) = (liftM (pure x : m α) : SPMF α) := by
-  show liftM ((ReaderT.evalAt ρ0).toFun α (pure x : ReaderT ρ m α)) = (liftM (pure x : m α) : SPMF α)
+  change liftM ((ReaderT.evalAt ρ0).toFun α (pure x : ReaderT ρ m α)) = (liftM (pure x : m α)
+      : SPMF α)
   rfl
 
 /-- Evaluating a bind distributes through the monad homomorphism. -/
@@ -96,7 +97,8 @@ variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] (ρ0 : ρ)
 
 @[simp] lemma toPMF_pure (x : α) :
     ReaderT.toPMF ρ0 (pure x : ReaderT ρ m α) = (liftM (pure x : m α) : PMF α) := by
-  show liftM ((ReaderT.evalAt ρ0).toFun α (pure x : ReaderT ρ m α)) = (liftM (pure x : m α) : PMF α)
+  change liftM ((ReaderT.evalAt ρ0).toFun α (pure x : ReaderT ρ m α)) = (liftM (pure x : m α)
+      : PMF α)
   rfl
 
 @[simp] lemma toPMF_bind (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :

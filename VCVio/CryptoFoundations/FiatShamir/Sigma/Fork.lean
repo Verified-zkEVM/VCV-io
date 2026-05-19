@@ -89,6 +89,7 @@ def forkPoint
   else
     exact none
 
+omit [Fintype Chal] [Inhabited Chal] in
 lemma forkPoint_some_imp_verified
     [DecidableEq M] [DecidableEq Commit]
     {qH : ℕ}
@@ -102,6 +103,7 @@ lemma forkPoint_some_imp_verified
   · exact hverified
   · simp [hverified] at hs
 
+omit [Fintype Chal] [Inhabited Chal] in
 lemma forkPoint_some_imp_mem
     [DecidableEq M] [DecidableEq Commit]
     {qH : ℕ}
@@ -121,6 +123,7 @@ lemma forkPoint_some_imp_mem
     exact hs'.1
   · simp [hverified] at hs
 
+omit [Fintype Chal] [Inhabited Chal] in
 lemma forkPoint_getElem?_eq_some_target
     [DecidableEq M] [DecidableEq Commit]
     {qH : ℕ}
@@ -186,6 +189,7 @@ noncomputable def roImpl (M Commit Chal : Type) [DecidableEq M] [DecidableEq Com
           log ++ [mc])
         pure v
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Running the inner `unifFwd + roImpl` simulator against a source computation with
 an `nmaHashQueryBound Q` can grow the internal `queryLog` by at most `Q`.
 
@@ -336,6 +340,7 @@ Two thin lemmas that describe the support of a single step of the layered simula
 one place. The `Sum.inl` step always issues a forwarded uniform query and logs it; the
 `Sum.inr` step branches on whether the cache already contains the asked hash point. -/
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Support of one `Sum.inl n` step: forward the uniform query, log it, leave the
 simulator state unchanged. -/
 private lemma support_step_inl
@@ -364,6 +369,7 @@ private lemma support_step_inl
   · rintro ⟨_, ⟨u, rfl⟩, hzeq⟩; exact ⟨u, hzeq⟩
   · rintro ⟨u, rfl⟩; exact ⟨_, ⟨u, rfl⟩, rfl⟩
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Support of one `Sum.inr mc` step: cache hit returns the cached value with no outer
 log entry; cache miss issues a `Sum.inr ()` query, logs it, caches the response, and
 appends `mc` to the trace's internal `queryLog`. -/
@@ -423,6 +429,7 @@ the per-step preservation in *three* concrete cases (Sum.inl, Sum.inr cache hit,
 cache miss) using the support characterizations above; the inductive bookkeeping is
 factored out once. -/
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Generic 1-state preservation for the "stateful inner simulation, then outer logging"
 pattern. Given a per-step preservation `hstep`, lift it to the whole layered simulation. -/
 private theorem preservesInv_layered
@@ -474,6 +481,7 @@ private theorem preservesInv_layered
       rw [← List.append_assoc]
       exact hih
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Coupling invariant for `runTrace`'s inner simulation: the trace's internal `queryLog`
 grows by exactly the number of `Sum.inr ()` queries issued to the outer wrapped spec.
 Each cache miss in `roImpl` simultaneously appends to the outer log and to the trace's
@@ -514,6 +522,7 @@ private theorem queryLog_length_eq_outer_inr_count
           rw [h1, hI]
           ring
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Lockstep value invariant for `runTrace`'s inner simulation. Three coupled invariants
 travel together along the simulation:
 
@@ -706,6 +715,7 @@ private theorem queryLog_cache_outer_lockstep
             rw [List.nil_append]
             exact hlogω
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Prefix monotonicity: running `(simulateQ (unifFwd + roImpl) Y).run (c₀, l₀)` produces a
 final simulator state whose `queryLog` component extends `l₀`. The resulting list always
 starts with the initial `l₀`: cache misses only append entries, and cache hits plus
@@ -821,6 +831,7 @@ private theorem queryLog_extends_l₀
             subst houter
             exact ih v c₀ l₀ hpw_split
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Outer-log **prefix**-determinism for `runTrace`'s inner simulation. If the two outer
 logs share a common prefix `p` (with `#{Sum.inr ()} = j` in `p`), then the first
 `l₀.length + j` positions of the final internal `queryLog`s coincide. This is the
@@ -1059,6 +1070,7 @@ private theorem inner_prefix_det
             subst houter₂
             exact ih v c₀ l₀ hpw₁_split hpw₂_split p suffix₁ suffix₂ houter₁_eq houter₂_eq
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- One-more-step extension of `inner_prefix_det`: if the outer logs of two runs share the
 prefix `p ++ [⟨Sum.inr (), v_i⟩]` (allowing the values `v₁, v₂` at position `|p|` to differ),
 then the internal `queryLog`s coincide for one more entry than `inner_prefix_det` guarantees,
@@ -1276,6 +1288,7 @@ private theorem inner_prefix_det_one_more_inr
             subst houter₂
             exact ih v c₀ l₀ hpw₁_split hpw₂_split p houter₁_eq houter₂_eq
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Specialization of `queryLog_length_eq_outer_inr_count` to `runTrace`'s initial state
 `(∅, [])`: the trace's `queryLog` has the same length as the count of `Sum.inr ()` outer
 queries in the recorded log. -/
@@ -1305,6 +1318,7 @@ lemma runTrace_queryLog_length_eq
     (nmaAdv.main pk) ∅ [] (z := a.1) (outerLog := a.2) ha_mem
   simpa using h
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Specialization of `queryLog_cache_outer_lockstep` to `runTrace`'s initial state
 `(∅, [])`: the trace's `queryLog[i]` is cached in `x.roCache`, and the cached value matches
 the outer log's `i`-th `Sum.inr ()` response. -/
@@ -1350,6 +1364,7 @@ lemma runTrace_cache_outer_lockstep
   · rw [← hlog_eq]
     simpa using hlog
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Decoding the `verified` flag of a trace produced by `runTrace`. If the trace's
 `verified` field is `true`, then there is a cached challenge `ω` for `x.target` and the
 corresponding `σ.verify` succeeds. Used by `forkSupportInvariant_of_mem_replayFirstRun`. -/
@@ -1391,6 +1406,7 @@ lemma runTrace_verified_imp_verify
       refine ⟨ω, rfl, ?_⟩
       simpa using hv
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- The `forkPoint`-based reachability invariant for `runTrace`: whenever
 `forkPoint qH x = some s`, the outer `QueryLog` of `replayFirstRun (runTrace ...)` has a
 `Sum.inr ()` query at position `↑s`. This holds because each cache miss in `runTrace`'s
@@ -1423,6 +1439,7 @@ theorem runTrace_forkPoint_CfReachable
     exact hslt
   exact QueryLog.getQueryValue?_isSome_of_lt log (Sum.inr ()) ↑s hslt'
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- **Determinism of `runTrace`'s inner `queryLog` from the outer-log prefix.** If the outer
 logs of two runs of `runTrace` share a prefix `p` followed by a `Sum.inr ()` query (whose
 response may differ across runs), then the traces' internal `queryLog`s coincide on the first
@@ -1659,6 +1676,7 @@ lemma runTrace_target_eq_of_mem_forkReplay
     rw [← htgt₁, ← htgt₂, ← hgetElem_take x₁.queryLog, ← hgetElem_take x₂.queryLog, htakeEq]
   exact Option.some.inj this
 
+omit [Fintype Chal] [Inhabited Chal] in
 /-- Managed-RO replay-fork convenience theorem at a fixed public key, stated at the
 `OracleComp (unifSpec + (Unit →ₒ Chal))` level.
 

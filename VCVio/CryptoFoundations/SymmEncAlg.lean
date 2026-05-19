@@ -85,6 +85,7 @@ lemma PerfectSecrecyCipherExp_eq_bind [LawfulMonad m] (encAlg : SymmEncAlg m M K
 variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 lemma probOutput_PerfectSecrecyExp_eq_mul_cipherGivenMsg [LawfulMonad m]
     (encAlg : SymmEncAlg m M K C) (mgen : m M) (msg : M) (σ : C) :
     Pr[= (msg, σ) | encAlg.PerfectSecrecyExp mgen] =
@@ -111,6 +112,7 @@ lemma probOutput_PerfectSecrecyExp_eq_mul_cipherGivenMsg [LawfulMonad m]
           simp [hneq]
         · simp
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 lemma probOutput_PerfectSecrecyCipherExp_eq_tsum [LawfulMonad m]
     (encAlg : SymmEncAlg m M K C) (mgen : m M) (σ : C) :
     Pr[= σ | encAlg.PerfectSecrecyCipherExp mgen] =
@@ -140,6 +142,8 @@ def ciphertextRowsEqualAt (encAlg : SymmEncAlg m M K C) : Prop :=
     Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp msg₀] =
       Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp msg₁]
 
+omit [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    in
 theorem perfectSecrecyAtAllPriors_iff_ciphertextRowsEqualAt
     (encAlg : SymmEncAlg m M K C) [Finite M] :
     encAlg.perfectSecrecyAtAllPriors ↔ encAlg.ciphertextRowsEqualAt := by
@@ -205,12 +209,16 @@ def perfectSecrecyJointFactorizationAt
     Pr[= (msg, σ) | encAlg.PerfectSecrecyExp mgen] =
       Pr[= msg | mgen] * Pr[= σ | encAlg.PerfectSecrecyCipherExp mgen]
 
+omit [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    in
 lemma perfectSecrecyAt_iff_posteriorEqPriorAt (encAlg : SymmEncAlg m M K C) :
     encAlg.perfectSecrecyAt ↔ encAlg.perfectSecrecyPosteriorEqPriorAt := by
   constructor <;> intro h <;> intro mgen msg σ
   · simpa [perfectSecrecyAt, perfectSecrecyPosteriorEqPriorAt, mul_comm] using h mgen msg σ
   · simpa [perfectSecrecyAt, perfectSecrecyPosteriorEqPriorAt, mul_comm] using h mgen msg σ
 
+omit [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    in
 lemma perfectSecrecyAt_iff_jointFactorizationAt (encAlg : SymmEncAlg m M K C) :
     encAlg.perfectSecrecyAt ↔ encAlg.perfectSecrecyJointFactorizationAt := by
   constructor
@@ -221,6 +229,7 @@ lemma perfectSecrecyAt_iff_jointFactorizationAt (encAlg : SymmEncAlg m M K C) :
     simpa [perfectSecrecyAt, perfectSecrecyJointFactorizationAt]
       using h
 
+omit [LawfulMonadLiftT m SetM] in
 /-- Core uniformity lemma: uniform keygen plus unique key per (message, ciphertext) pair
 implies every (message, ciphertext) conditional has probability `(card K)⁻¹`.
 Both Shannon theorems follow from this. -/
@@ -267,6 +276,7 @@ theorem cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
         have hk0_uniform : Pr[= k0 | keyExp] = invK := hKeyUniform k0
         simp [hk0_uniform, henc_one]
 
+omit [LawfulMonadLiftT m SetM] in
 theorem ciphertextRowsEqualAt_of_uniformKey_of_uniqueKey
     (encAlg : SymmEncAlg m M K C) [Fintype K]
     (deterministicEnc : ∀ (k : K) (msg : M),
@@ -283,6 +293,7 @@ theorem ciphertextRowsEqualAt_of_uniformKey_of_uniqueKey
       encAlg.cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
         deterministicEnc hKeyUniform hUniqueKey msg₁ σ]
 
+omit [LawfulMonadLiftT m SetM] in
 /-- Constructive Shannon direction: if keygen is uniform and each `(message, ciphertext)`
 pair is realized by a unique key in support, then perfect secrecy holds.
 
@@ -332,6 +343,7 @@ theorem perfectSecrecyAt_of_uniformKey_of_uniqueKey [LawfulMonad m]
         Pr[= σ | encAlg.PerfectSecrecyCipherExp mgen] := by
           rw [hCipher_uniform mgen σ]
 
+omit [LawfulMonadLiftT m SetM] in
 /-- Constructive Shannon direction for all priors: uniform keys plus uniqueness
 imply perfect secrecy for all prior distributions on messages. -/
 theorem perfectSecrecyAtAllPriors_of_uniformKey_of_uniqueKey

@@ -50,12 +50,12 @@ noncomputable instance instLawfulMonadLiftTSetM (ε : Type u) (m : Type u → Ty
     [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
     LawfulMonadLiftT (ExceptT ε m) SetM where
   monadLift_pure x := by
-    show Except.ok ⁻¹' (support (pure (Except.ok x) : m _)) = pure x
+    change Except.ok ⁻¹' (support (pure (Except.ok x) : m _)) = pure x
     ext y
     change Except.ok y ∈ support (pure (Except.ok x) : m _) ↔ y = x
     simp
   monadLift_bind mx f := by
-    show (Except.ok ⁻¹' (support (mx >>= f : ExceptT ε m _).run) : SetM _) =
+    change (Except.ok ⁻¹' (support (mx >>= f : ExceptT ε m _).run) : SetM _) =
       (Except.ok ⁻¹' (support mx.run) >>=
         fun a => Except.ok ⁻¹' support (f a).run : SetM _)
     ext x
@@ -74,7 +74,11 @@ noncomputable instance instLawfulMonadLiftTSetM (ε : Type u) (m : Type u → Ty
       obtain ⟨a, ha, hx⟩ := Set.mem_iUnion₂.mp h
       exact ⟨.ok a, ha, hx⟩
 
-variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+@[simp]
+lemma run_liftM_eq_map_ok (mx : m α) :
+    (liftM mx : ExceptT ε m α).run = Except.ok <$> mx := rfl
+
+variable [MonadLiftT m SetM]
 
 @[aesop unsafe norm, grind =]
 lemma support_def (mx : ExceptT ε m α) :
@@ -84,10 +88,7 @@ lemma support_def (mx : ExceptT ε m α) :
 lemma mem_support_iff (mx : ExceptT ε m α) (x : α) :
     x ∈ support mx ↔ Except.ok x ∈ support mx.run := Iff.rfl
 
-omit [MonadLiftT m SetM] in
-@[simp]
-lemma run_liftM_eq_map_ok (mx : m α) :
-    (liftM mx : ExceptT ε m α).run = Except.ok <$> mx := rfl
+variable [LawfulMonadLiftT m SetM]
 
 @[simp]
 lemma support_liftM [LawfulMonad m] (mx : m α) :
@@ -117,7 +118,7 @@ noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m]
   finSupport mx := (finSupport mx.run).preimage Except.ok
     (by intro a b; simp [Except.ok.injEq])
   coe_finSupport mx := by
-    ext x; show x ∈ ((finSupport mx.run).preimage Except.ok _ : Set _) ↔
+    ext x; change x ∈ ((finSupport mx.run).preimage Except.ok _ : Set _) ↔
       x ∈ Except.ok ⁻¹' support mx.run
     simp
 

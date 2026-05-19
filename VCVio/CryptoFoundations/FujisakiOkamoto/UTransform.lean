@@ -221,7 +221,8 @@ theorem encaps_usesExactFamilyWeightedCost {ω : Type} [AddMonoid ω]
 /-- Under per-family upper bounds on the two U-transform oracle families, encapsulation incurs
 weighted query cost at most the sum of those bounds. -/
 theorem encaps_usesWeightedQueryCostAtMost {ω : Type}
-    [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [MonadLiftT m SetM] [LawfulMonadLiftT
+        m SetM]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -286,7 +287,8 @@ theorem encaps_usesExactlyTwoQueries
 
 /-- Expected weighted query cost of U-transform encapsulation under constant per-family weights. -/
 theorem encaps_expectedQueryCost_eq_of_constantOracleWeights {ω : Type}
-    [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM]
+        [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -307,7 +309,8 @@ theorem encaps_expectedQueryCost_eq_of_constantOracleWeights {ω : Type}
 /-- Expected weighted query cost of U-transform encapsulation is bounded by the sum of the
 per-family bounds. -/
 theorem encaps_expectedQueryCost_le {ω : Type}
-    [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [MonadLiftT m PMF] [LawfulMonadLiftT
+        m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -326,7 +329,8 @@ theorem encaps_expectedQueryCost_le {ω : Type}
     hval
 
 /-- Expected query count of U-transform encapsulation is exactly `2`. -/
-theorem encaps_expectedQueries_eq_two [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+theorem encaps_expectedQueries_eq_two [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -434,7 +438,8 @@ theorem decaps_usesWeightedQueryCostAtMost {ω : Type}
 /-- If deterministic decryption fails immediately, decapsulation has expected weighted query cost
 `0`. -/
 theorem decaps_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
-    [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM]
+        [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -456,7 +461,8 @@ theorem decaps_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
 per-family bounds. -/
 theorem decaps_expectedQueryCost_le {ω : Type}
     [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [CanonicallyOrderedAdd ω]
-    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+        [EvalDistCompatible m]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
@@ -491,7 +497,8 @@ theorem decaps_usesAtMostTwoQueries [MonadLiftT m SetM] [LawfulMonadLiftT m SetM
       (hCoins := fun _ ↦ le_rfl) (hKeys := fun _ ↦ le_rfl))
 
 /-- Expected query count of U-transform decapsulation is at most `2`. -/
-theorem decaps_expectedQueries_le_two [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+theorem decaps_expectedQueries_le_two [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)

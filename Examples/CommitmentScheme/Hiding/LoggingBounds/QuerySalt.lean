@@ -18,11 +18,10 @@ open OracleSpec OracleComp ENNReal
 open scoped OracleSpec.PrimitiveQuery
 
 variable {M S C : Type}
-  [DecidableEq M] [DecidableEq S] [DecidableEq C]
-  [Fintype M] [Fintype S] [Fintype C]
-  [Inhabited M] [Inhabited S] [Inhabited C]
+  [DecidableEq M] [DecidableEq S]
+  [Fintype C] [Inhabited C]
 
-omit [DecidableEq C] [Fintype M] [Inhabited M] in
+variable [Fintype S] [Inhabited S] in
 lemma wp_choose_sumHitIndicators_le_queryBound
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
@@ -37,8 +36,7 @@ lemma wp_choose_sumHitIndicators_le_queryBound
         sum_chooseHitIndicators_le_sumCounts qchoose.2.2))
     (wp_choose_sumCounts_le_queryBound (M := M) (S := S) (C := C) A)
 
-omit [DecidableEq M] [DecidableEq S] [DecidableEq C] [Fintype M] [Fintype S] [Fintype C]
-  [Inhabited M] [Inhabited S] [Inhabited C] in
+omit [DecidableEq M] [DecidableEq S] [Fintype C] [Inhabited C] in
 lemma run_simulateQ_loggingOracle_query_bind {α : Type}
     (t : (CMOracle M S C).Domain) (mx : (CMOracle M S C).Range t → OracleComp (CMOracle M S C) α) :
     (simulateQ loggingOracle (liftM (query t) >>= mx)).run =
@@ -49,8 +47,8 @@ lemma run_simulateQ_loggingOracle_query_bind {α : Type}
   simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
     Function.id_def]
 
-omit [DecidableEq M] [DecidableEq C] [Fintype M] [Fintype C] [Inhabited M] [Inhabited S]
-  [Inhabited C] in
+variable [Fintype S] in
+omit [DecidableEq M] [Fintype C] [Inhabited C] in
 lemma sum_querySaltCounts_eq_length
     (log : QueryLog (CMOracle M S C)) :
     (∑ s : S,
@@ -93,8 +91,8 @@ lemma sum_querySaltCounts_eq_length
               rw [hsingle]
         _ = log.length + 1 := by rw [ih, Nat.add_comm]
 
-omit [DecidableEq M] [DecidableEq C] [Fintype M] [Fintype C] [Inhabited M] [Inhabited S]
-  [Inhabited C] in
+variable [Fintype S] in
+omit [DecidableEq M] [Fintype C] [Inhabited C] in
 lemma sum_querySaltIndicators_le_logLength
     (log : QueryLog (CMOracle M S C)) :
     (∑ s : S,
@@ -109,7 +107,7 @@ lemma sum_querySaltIndicators_le_logLength
       (counts := fun s => QueryLog.countQ log (fun t : (CMOracle M S C).Domain => t.2 = s))) ?_
   exact le_of_eq hcounts
 
-omit [DecidableEq C] [Inhabited M] [Inhabited S] in
+variable [Fintype M] [Fintype S] in
 lemma log_length_le_of_mem_support_counting_simulate_run_logging
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {z : (α × QueryLog (CMOracle M S C)) × QueryCount (M × S)}
@@ -181,7 +179,6 @@ lemma log_length_le_of_mem_support_counting_simulate_run_logging
         simpa using Nat.succ_le_of_lt hlt
       simpa [hzlog] using hcons
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma log_length_le_of_mem_support_run_cached_logging
     [Finite M] [Finite S] [Finite C]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
@@ -224,7 +221,7 @@ lemma log_length_le_of_mem_support_run_cached_logging
       hboundLog hqc
   exact le_trans hlen hqc_le
 
-omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
+variable [Fintype S] in
 lemma sum_wp_querySaltIndicators_le_queryBound_of_run_cached_logging
     [Finite M]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
@@ -276,7 +273,7 @@ lemma sum_wp_querySaltIndicators_le_queryBound_of_run_cached_logging
     _ = (n : ℝ≥0∞) := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
-omit [DecidableEq C] [Fintype M] [Inhabited M] in
+variable [Fintype S] [Inhabited S] in
 lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_support_with_state
     [Finite M]
     {AUX : Type} {t : ℕ}
@@ -334,7 +331,8 @@ lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_su
     · simp [OracleComp.ProgramLogic.propInd, hslt]
   exact le_trans hmono hres
 
-omit [DecidableEq M] [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
+variable [Fintype S] in
+omit [DecidableEq M] in
 lemma sum_wp_querySaltIndicators_le_queryBound_of_run_logging
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n) :
@@ -379,8 +377,7 @@ lemma sum_wp_querySaltIndicators_le_queryBound_of_run_logging
     _ = (n : ℝ≥0∞) := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
-  [Inhabited C] in
+omit [Fintype C] [Inhabited C] in
 theorem run_cached_logging_proj_eq_cachingOracle
     {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
@@ -410,8 +407,7 @@ theorem run_cached_logging_proj_eq_cachingOracle
           simpa [simulateQ_map, StateT.map, StateT.run, Function.comp_def] using
             ih u (cache₀.cacheQuery t u)
 
-omit [DecidableEq M] [DecidableEq S] [DecidableEq C] [Fintype M] [Fintype S] [Fintype C]
-  [Inhabited M] [Inhabited S] [Inhabited C] in
+omit [DecidableEq M] [DecidableEq S] [Fintype C] [Inhabited C] in
 lemma queryLog_countQ_pos_of_mem
     {entry : (t : (CMOracle M S C).Domain) × (CMOracle M S C).Range t}
     {log : QueryLog (CMOracle M S C)}
@@ -430,7 +426,6 @@ lemma queryLog_countQ_pos_of_mem
         · simp only [hhd, ↓reduceIte]
           exact ih hmem
 
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma fresh_incrementIndicator_le_querySaltIndicator_cached_logging
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -529,8 +524,7 @@ lemma fresh_incrementIndicator_le_querySaltIndicator_cached_logging
           (M := M) (S := S) (C := C) hmem (by simp [hsalt])
   exact le_trans hcount_to_cache hcache_to_log
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
-  [Inhabited C] in
+omit [Fintype C] [Inhabited C] in
 lemma cacheQuery_swap_of_ne
     (cache : QueryCache (CMOracle M S C))
     {t₀ t₁ : (CMOracle M S C).Domain}
@@ -547,7 +541,6 @@ lemma cacheQuery_swap_of_ne
       simp [QueryCache.cacheQuery_self, QueryCache.cacheQuery_of_ne, hne.symm]
     · simp [QueryCache.cacheQuery_of_ne, ht₀, ht₁]
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma wp_querySaltIndicator_prepend_eq_one
     {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
@@ -592,7 +585,6 @@ lemma wp_querySaltIndicator_prepend_eq_one
     simp [OracleComp.ProgramLogic.propInd, hpos]
   rw [hpost, OracleComp.ProgramLogic.wp_const]
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma wp_querySaltIndicator_prepend_eq_of_ne
     {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
@@ -643,7 +635,6 @@ lemma wp_querySaltIndicator_prepend_eq_of_ne
     simp [QueryLog.countQ, QueryLog.getQ_cons, hsalt, OracleComp.ProgramLogic.propInd]
   rw [hpost]
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entries
     {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
@@ -826,7 +817,6 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
               (cache := cache₀) (t₀ := (m, s)) (t₁ := t) cm u hmst_ne_t]
               using ih u (cache₀.cacheQuery t u) hself' hother'
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma wp_querySaltIndicator_cached_logging_freshCache_eq_common
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -859,7 +849,7 @@ lemma wp_querySaltIndicator_cached_logging_freshCache_eq_common
     exact cache_none_of_zero_count_of_mem_support_run_hidingChoose
       (M := M) (S := S) (C := C) A hqchoose m' s hzero
 
-omit [DecidableEq C] [Fintype M] [Inhabited M] in
+variable [Fintype S] [Inhabited S] in
 lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
     [Finite M]
     {AUX : Type} {t : ℕ}
@@ -993,7 +983,7 @@ lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
           have hcard_top : (Fintype.card C : ℝ≥0∞) ≠ ∞ := by simp
           rw [ENNReal.mul_inv_cancel hcard0 hcard_top, one_mul]
 
-omit [DecidableEq C] [Fintype M] [Inhabited M] in
+variable [Fintype S] [Inhabited S] in
 theorem sum_probEvent_hidingBad_le [Finite M] {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S, Pr[hidingBad ∘ Prod.snd |

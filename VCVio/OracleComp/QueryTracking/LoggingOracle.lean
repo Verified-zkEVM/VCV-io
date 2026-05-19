@@ -98,13 +98,15 @@ lemma fst_map_run_withLogging [LawfulMonad m] (so : QueryImpl spec m) (mx : Orac
 wrapping an oracle implementation with `withLogging` does not change the probability of failure.
 When `m = OracleComp spec`, both sides are `0` (trivially true). When `m` can genuinely fail
 (e.g. `OptionT (OracleComp spec)`), this is a non-trivial faithfulness property. -/
-lemma probFailure_run_simulateQ_withLogging [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+lemma probFailure_run_simulateQ_withLogging [LawfulMonad m] [MonadLiftT m SPMF]
+    [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
     Pr[⊥ | (simulateQ (so.withLogging) mx).run] = Pr[⊥ | simulateQ so mx] :=
   probFailure_run_simulateQ_withTraceAppend so
     (fun (t : spec.Domain) u => ([⟨t, u⟩] : QueryLog spec)) mx
 
-lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [MonadLiftT m SPMF]
+    [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withLogging) mx).run ↔ NeverFail (simulateQ so mx) :=
   NeverFail_run_simulateQ_withTraceAppend_iff so

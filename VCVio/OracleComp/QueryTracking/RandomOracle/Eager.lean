@@ -64,7 +64,7 @@ theorem evalDist_simulateQ_run'_empty [spec₀.Fintype] [spec₀.Inhabited]
     {α : Type} (oa : OracleComp spec₀ α) :
     𝒟[(simulateQ (eagerRandomOracle (spec := spec₀)) oa).run' ∅] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
-  | pure a => simp [simulateQ_pure, evalDist_pure]
+  | pure a => simp [simulateQ_pure]
   | query_bind t f ih =>
     rw [simulateQ_bind,
       show simulateQ eagerRandomOracle (liftM (query t)) = eagerRandomOracle t by

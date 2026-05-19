@@ -44,6 +44,7 @@ section Correct
 variable [DecidableEq K] [DecidableEq M] [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- From KEM correctness at the monadic probability level, every reachable decapsulation of an
 honest ciphertext returns the encapsulated key. -/
 private lemma kem_decaps_mem_support

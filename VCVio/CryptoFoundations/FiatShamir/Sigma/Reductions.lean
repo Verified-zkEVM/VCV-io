@@ -29,6 +29,8 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
+omit [Fintype Chal] in
+omit [Inhabited Chal] in
 /-- CMA-to-NMA reduction for Fiat-Shamir signatures built from a Sigma protocol.
 
 The reduction runs the CMA adversary with simulated signing transcripts and a

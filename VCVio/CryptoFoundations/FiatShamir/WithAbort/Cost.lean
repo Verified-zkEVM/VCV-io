@@ -358,6 +358,7 @@ theorem sign_expectedQueries_eq_sum_reachedAttemptProbabilities
       (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
       (msg := msg) (maxAttempts := maxAttempts))
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- Expected weighted query cost of signing is bounded by the worst-case `maxAttempts • w`
 budget whenever every query costs at most `w`. -/
 theorem sign_expectedQueryCost_le
@@ -375,6 +376,7 @@ theorem sign_expectedQueryCost_le
       (msg := msg) (costFn := costFn) (w := w) hcost (maxAttempts := maxAttempts))
     hval
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- Unit-cost specialization: the expected number of signing queries is at most `maxAttempts`. -/
 theorem sign_expectedQueries_le
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)

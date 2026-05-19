@@ -73,6 +73,8 @@ section QueryBound
 variable {ι' : Type u} {spec' : OracleSpec ι'} [spec.Fintype] [spec.Inhabited]
   [spec'.Fintype] [spec'.Inhabited]
 
+omit [spec'.Fintype] [spec'.Inhabited] in
+omit [spec.Fintype] [spec.Inhabited] in
 lemma isQueryBoundP_run_withPregen
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain)
     {p : ι' → Prop} [DecidablePred p] {n : ℕ}
@@ -86,6 +88,7 @@ lemma isQueryBoundP_run_withPregen
       rw [withPregen_run_cons _ hseed]
       trivial
 
+omit [spec.Fintype] [spec.Inhabited] [spec'.Fintype] [spec'.Inhabited] in
 lemma isTotalQueryBound_run_withPregen
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain) {n : ℕ}
     (h : OracleComp.IsTotalQueryBound (so t) n) (seed : QuerySeed spec) :
@@ -98,6 +101,7 @@ lemma isTotalQueryBound_run_withPregen
       rw [withPregen_run_cons _ hseed]
       trivial
 
+omit [spec.Fintype] [spec.Inhabited] in
 lemma isPerIndexQueryBound_run_withPregen
     (so : QueryImpl spec (OracleComp spec)) (t : spec.Domain) {qb : ι → ℕ}
     (h : OracleComp.IsPerIndexQueryBound (so t) qb) (seed : QuerySeed spec) :
@@ -121,6 +125,7 @@ namespace OracleComp
 variable {ι' : Type u} {spec' : OracleSpec ι'} {α : Type u}
   [spec.Fintype] [spec.Inhabited] [spec'.Fintype] [spec'.Inhabited]
 
+omit [spec.Fintype] [spec.Inhabited] in
 theorem IsQueryBoundP.simulateQ_run_withPregen
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
     (so : QueryImpl spec (OracleComp spec'))
@@ -146,6 +151,7 @@ theorem IsTotalQueryBound.simulateQ_run_withPregen
     (fun t s' => QueryImpl.isTotalQueryBound_run_withPregen so t (hstep t) s')
     seed
 
+omit [spec.Fintype] [spec.Inhabited] in
 theorem IsPerIndexQueryBound.simulateQ_run_withPregen
     (so : QueryImpl spec (OracleComp spec))
     {oa : OracleComp spec α} {qb : ι → ℕ}
@@ -1014,6 +1020,7 @@ section queryBounds
 
 variable {α : Type u} [spec.Fintype] [spec.Inhabited]
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- If a pre-generated seed already supplies all but `residual t` of the answers allowed by the
 structural per-index query bound `qb`, then running `oa` against `seededOracle` can make at most
 those residual live queries.
@@ -1106,6 +1113,7 @@ theorem isPerIndexQueryBound_run'_of_seedCoverage
                     simpa [Function.update_of_ne hj] using this
                   simpa [Function.update_of_ne hj, hseed'_j, hj] using hcov_j))
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- A seed that covers the full structural query bound eliminates all live oracle queries. -/
 theorem isPerIndexQueryBound_run'_zero
     {oa : OracleComp spec α} {qb : ι → ℕ} {seed : QuerySeed spec}
@@ -1117,6 +1125,7 @@ theorem isPerIndexQueryBound_run'_zero
   intro t
   simpa using hcover t
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- If the seed stores only the first `k` answers for oracle `i`, then the replay can make live
 queries only to `i`, and at most `qb i - k` of them remain.
 
@@ -1144,6 +1153,7 @@ theorem isPerIndexQueryBound_run'_takeAtIndex
     omega
   · simpa [Function.update_of_ne ht, QuerySeed.takeAtIndex_apply_of_ne _ _ _ _ ht] using hcover t
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- After rewinding to query index `s` and appending one fresh answer at oracle `i`, the replayed
 run can still make live queries only to `i`, with at most `qb i - (s + 1)` such queries left. -/
 theorem isPerIndexQueryBound_run'_takeAtIndex_addValue

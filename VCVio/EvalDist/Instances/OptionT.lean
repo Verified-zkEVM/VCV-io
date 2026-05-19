@@ -38,10 +38,10 @@ noncomputable instance instLawfulMonadLiftTSetM {m : Type u → Type v} [Monad m
     [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
     LawfulMonadLiftT (OptionT m) SetM where
   monadLift_pure mx := by
-    show some ⁻¹' (support (OptionT.run (pure mx : OptionT m _))) = pure mx
+    change some ⁻¹' (support (OptionT.run (pure mx : OptionT m _))) = pure mx
     ext x; simp
   monadLift_bind mx my := by
-    show (some ⁻¹' (support (OptionT.run (mx >>= my))) : SetM _) =
+    change (some ⁻¹' (support (OptionT.run (mx >>= my))) : SetM _) =
       ((some ⁻¹' (support mx.run)) >>= fun a => some ⁻¹' (support (my a).run) : SetM _)
     ext x
     rw [Set.mem_preimage]
@@ -64,10 +64,12 @@ noncomputable instance instLawfulMonadLiftTSetM {m : Type u → Type v} [Monad m
 
 variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
+omit [LawfulMonadLiftT m SetM] in
 @[aesop unsafe norm, grind =]
 lemma support_def (mx : OptionT m α) :
     support mx = some ⁻¹' (support mx.run) := rfl
 
+omit [LawfulMonadLiftT m SetM] in
 @[simp low]
 lemma mem_support_iff (mx : OptionT m α) (x : α) :
     x ∈ support mx ↔ some x ∈ support mx.run := by grind
@@ -104,12 +106,12 @@ lemma mem_finSupport_iff [DecidableEq α] (mx : OptionT m α) (x : α) :
 @[simp]
 lemma finSupport_liftM [LawfulMonadLiftT m SetM] [LawfulMonad m] [DecidableEq α] (mx : m α) :
     finSupport (liftM mx : OptionT m α) = finSupport mx := by
-  ext x; simp [mem_finSupport_iff, mem_finSupport_iff_mem_support, support_liftM]
+  ext x; simp [mem_finSupport_iff, mem_finSupport_iff_mem_support]
 
 @[simp]
 lemma finSupport_lift [LawfulMonadLiftT m SetM] [LawfulMonad m] [DecidableEq α] (mx : m α) :
     finSupport (OptionT.lift mx) = finSupport mx := by
-  ext x; simp [mem_finSupport_iff, mem_finSupport_iff_mem_support, support_lift]
+  ext x; simp [mem_finSupport_iff, mem_finSupport_iff_mem_support]
 
 end HasEvalFinset
 
@@ -126,10 +128,10 @@ noncomputable instance instLawfulMonadLiftTSPMF (m : Type u → Type v) [Monad m
     [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] :
     LawfulMonadLiftT (OptionT m) SPMF where
   monadLift_pure x := by
-    show OptionT.mapM' (MonadHom.ofLift m SPMF) (pure x : OptionT m _) = pure x
+    change OptionT.mapM' (MonadHom.ofLift m SPMF) (pure x : OptionT m _) = pure x
     simp
   monadLift_bind mx my := by
-    show OptionT.mapM' (MonadHom.ofLift m SPMF) (mx >>= my) =
+    change OptionT.mapM' (MonadHom.ofLift m SPMF) (mx >>= my) =
       OptionT.mapM' (MonadHom.ofLift m SPMF) mx >>=
         fun a => OptionT.mapM' (MonadHom.ofLift m SPMF) (my a)
     simp

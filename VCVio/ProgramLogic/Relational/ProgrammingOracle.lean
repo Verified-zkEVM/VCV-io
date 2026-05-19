@@ -107,6 +107,7 @@ private lemma probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad
 
 /-! ## Bad-input monotonicity wrappers (`σ × Bool` shape) -/
 
+omit [spec.Fintype] [spec.Inhabited] in
 private lemma withProgramming_mono_pair
     (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) (p : spec.QueryCache × Bool) (hp : p.2 = true)
@@ -115,6 +116,7 @@ private lemma withProgramming_mono_pair
   cases (show b = true from hp)
   exact QueryImpl.withProgramming_bad_monotone (so := so) (policy := policy) t cache z hz
 
+omit [spec.Fintype] [spec.Inhabited] in
 private lemma withCachingTrackingPolicy_mono_pair
     (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) (p : spec.QueryCache × Bool) (hp : p.2 = true)

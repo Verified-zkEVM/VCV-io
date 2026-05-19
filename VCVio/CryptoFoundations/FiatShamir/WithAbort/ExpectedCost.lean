@@ -186,6 +186,7 @@ section
 
 variable [LawfulMonad m]
 
+omit [LawfulMonadLiftT m SetM] in
 private lemma signLoop_queryTailProbability_zero
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) (n : ℕ) :
     Pr[ fun q ↦ 0 < q |
@@ -219,6 +220,7 @@ private lemma signLoop_queryTailProbability_zero
     | none =>
         simp [probEvent_map]
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 private lemma signLoop_queryTailProbability_succ
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) (i n : ℕ) :
     Pr[ fun q ↦ i + 1 < q |

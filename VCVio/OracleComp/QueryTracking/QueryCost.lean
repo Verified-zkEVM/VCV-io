@@ -148,14 +148,16 @@ def UsesCostExactly {ω : Type} [AddMonoid ω]
 /-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at most `w` on
 every execution path. This is a semantic support bound, not merely an output-indexed cost
 description. -/
-def UsesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+def UsesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω] [MonadLiftT m SetM]
+    [LawfulMonadLiftT m SetM]
     (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryImpl spec m)
     (costFn : spec.Domain → ω) (w : ω) : Prop :=
   AddWriterT.PathwiseCostAtMost (HasQuery.Program.withAddCost oa runtime costFn) w
 
 /-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at least `w` on
 every execution path. -/
-def UsesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+def UsesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω] [MonadLiftT m SetM]
+    [LawfulMonadLiftT m SetM]
     (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryImpl spec m)
     (costFn : spec.Domain → ω) (w : ω) : Prop :=
   AddWriterT.PathwiseCostAtLeast (HasQuery.Program.withAddCost oa runtime costFn) w
@@ -257,6 +259,8 @@ noncomputable abbrev expectedQueries
     (oa : Computation spec (AddWriterT ℕ m) α) (runtime : QueryImpl spec m) : ENNReal :=
   HasQuery.expectedQueryCost oa runtime (fun _ ↦ 1) (fun n ↦ (n : ENNReal))
 
+omit [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    in
 /-- Tail-sum formula for the expected number of oracle queries made by `oa` in `runtime`:
 
 `E[number of queries] = ∑ i, Pr[i < number of queries]`.
@@ -269,6 +273,8 @@ lemma expectedQueries_eq_tsum_tail_probs
   simpa [HasQuery.expectedQueries, HasQuery.expectedQueryCost] using
     AddWriterT.expectedCostNat_eq_tsum_tail_probs (oa := HasQuery.Program.withUnitCost oa runtime)
 
+omit [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    in
 /-- Tail domination bounds expected query count.
 
 If `Pr[i < number of queries] ≤ a i` for every `i`, then
@@ -295,6 +301,7 @@ lemma expectedQueries_eq_sum_tail_probs_of_usesAtMostQueries [LawfulMonad m]
     (AddWriterT.expectedCostNat_eq_sum_tail_probs_of_pathwiseCostAtMost
       (oa := HasQuery.Program.withUnitCost oa runtime) h)
 
+omit [LawfulMonadLiftT m SPMF] in
 lemma expectedQueryCost_le_of_usesCostAtMost
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
@@ -303,6 +310,7 @@ lemma expectedQueryCost_le_of_usesCostAtMost
     HasQuery.expectedQueryCost oa runtime costFn val ≤ val w :=
   AddWriterT.expectedCost_le_of_pathwiseCostAtMost h hval
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 lemma expectedQueryCost_eq_tsum_outputs_of_usesCostAs
     {ω : Type} [AddMonoid ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
@@ -316,6 +324,7 @@ lemma expectedQueryCost_eq_tsum_outputs_of_usesCostAs
     (AddWriterT.expectedCost_eq_tsum_outputs_of_costsAs
       (oa := HasQuery.Program.withAddCost oa runtime costFn) (f := f) (val := val) h)
 
+omit [LawfulMonadLiftT m SPMF] in
 lemma expectedQueries_le_of_usesAtMostQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
     (h : HasQuery.UsesAtMostQueries oa runtime n) :
@@ -333,6 +342,7 @@ section expectedCostPMF
 variable [Monad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueryCost_ge_of_usesCostAtLeast
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
@@ -345,6 +355,7 @@ lemma expectedQueryCost_ge_of_usesCostAtLeast
     (AddWriterT.expectedCost_ge_of_pathwiseCostAtLeast
       (oa := HasQuery.Program.withAddCost oa runtime costFn) (w := w) (val := val) h' hval)
 
+omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueryCost_eq_of_usesCostExactly
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
@@ -357,6 +368,7 @@ lemma expectedQueryCost_eq_of_usesCostExactly
     (expectedQueryCost_ge_of_usesCostAtLeast
       (usesCostAtLeast_of_usesCostExactly h le_rfl) hval)
 
+omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueries_ge_of_usesAtLeastQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
     (h : HasQuery.UsesAtLeastQueries oa runtime n) :
@@ -367,6 +379,7 @@ lemma expectedQueries_ge_of_usesAtLeastQueries [LawfulMonad m]
       (fun a b hle ↦ by
         simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
 
+omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
@@ -377,6 +390,7 @@ lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     (expectedQueries_le_of_usesAtMostQueries hUpper)
     (expectedQueries_ge_of_usesAtLeastQueries hLower)
 
+omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueries_eq_of_usesExactlyQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
     (h : HasQuery.UsesExactlyQueries oa runtime n) :

@@ -8,7 +8,8 @@ import VCVio.EvalDist.Defs.Basic
 /-!
 # Denotational Semantics Over `AlternativeMonad`.
 
-This file defines a type-class refining `MonadLiftT m SetM` when given an `AlternativeMonad` instance
+This file defines a type-class refining `MonadLiftT m SetM` when given an `AlternativeMonad`
+    instance
 on the base monad, enforcing that `failure` maps to the empty sub-distribution.
 
 Compatibility conditions then force the correct semantics for `evalDist`, see _.

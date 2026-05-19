@@ -28,6 +28,7 @@ lemma probOutput_ofFin_map {n : ℕ} (mx : m (Fin (2 ^ n))) (x : BitVec n) :
 lemma probOutput_bitVec_toFin_map {n : ℕ} (mx : m (BitVec n)) (x : Fin (2 ^ n)) :
     Pr[= x | toFin <$> mx] = Pr[= ofFin x | mx] := by aesop
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 @[simp]
 lemma probOutput_xor_map {n : ℕ} (mx : m (BitVec n)) (x y : BitVec n) :
     Pr[= y | (x ^^^ ·) <$> mx] = Pr[= x ^^^ y | mx] := by

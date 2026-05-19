@@ -329,6 +329,7 @@ section support_simulateQ_StateT
 
 variable {α : Type w} [spec.Fintype] [spec.Inhabited]
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- Simulating an `OracleComp` through a stateful implementation in monad `m` can only shrink the
 support: any output reachable after simulation was already reachable in the original computation
 (where oracle queries may return any value). This is the support-level analogue of

@@ -906,6 +906,7 @@ variable {ι : Type} {spec : OracleSpec ι}
 variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
 variable {α : Type} {σ : Type}
 
+omit [spec'.Fintype] [spec'.Inhabited] in
 /-- "Bad propagation": starting from a bad state, every output of the simulation has the
 bad flag set. This generalizes the per-step `h_mono` hypothesis to the full simulation. -/
 private lemma mem_support_simulateQ_run_of_bad

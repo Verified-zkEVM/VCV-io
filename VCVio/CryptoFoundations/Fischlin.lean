@@ -764,6 +764,7 @@ variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   [DecidableEq M] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- Fischlin signing has expected weighted query cost at most `ρ • (|Ω| • w)` whenever every
 random-oracle query is weighted by at most `w`. -/
 theorem sign_expectedQueryCost_le
@@ -793,6 +794,7 @@ variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   [DecidableEq M] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- Fischlin signing has expected query count at most `ρ * |Ω|` in the unit-cost runtime model.
 
 This is the expectation-level counterpart of
@@ -817,6 +819,7 @@ variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   [DecidableEq M] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [LawfulMonadLiftT m PMF] in
 /-- Fischlin verification has expected query count exactly `ρ` in the unit-cost runtime model. -/
 theorem verify_expectedQueries_eq_rho
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)

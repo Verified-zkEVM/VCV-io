@@ -50,7 +50,8 @@ lemma WriterPreservesInv.trivial {ι : Type} {spec : OracleSpec ι}
     WriterPreservesInv impl (fun _ => True) :=
   fun _ _ _ _ _ => True.intro
 
-lemma WriterPreservesInv.and {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited] {ω : Type} [Monoid ω]
+lemma WriterPreservesInv.and {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited] {ω
+    : Type} [Monoid ω]
     {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {P Q : ω → Prop}
     (hP : WriterPreservesInv impl P) (hQ : WriterPreservesInv impl Q) :
     WriterPreservesInv impl (fun s => P s ∧ Q s) :=
@@ -74,7 +75,8 @@ If `Inv` holds on every writer increment `w` produced by a single query
 preserved across the whole simulation. This is the canonical builder for
 writer invariants: pick a submonoid-like predicate, show every per-query
 increment lands in it, and you're done. -/
-lemma WriterPreservesInv.of_mul_closed {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited] {ω : Type} [Monoid ω]
+lemma WriterPreservesInv.of_mul_closed {ι : Type} {spec : OracleSpec ι} [spec.Fintype]
+    [spec.Inhabited] {ω : Type} [Monoid ω]
     {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {Inv : ω → Prop}
     (hClosed : ∀ a b, Inv a → Inv b → Inv (a * b))
     (hPerQuery : ∀ t z, z ∈ support (impl t).run → Inv z.2) :

@@ -14,7 +14,8 @@ This file defines a predicate-as-typeclass stating that a probabilistic computat
 produces failure mass, together with lemmas for how the property behaves under common
 monadic combinators.
 
-Given a `MonadLiftT m SPMF` instance and a computation `mx : m α` in that monad, `NeverFail mx` means
+Given a `MonadLiftT m SPMF` instance and a computation `mx
+    : m α` in that monad, `NeverFail mx` means
 that `Pr[⊥ | mx] = 0`, i.e. that the computation never fails.
 
 Defined as a typeclass to allow it to be synthesized automatically in certain cases.
@@ -63,6 +64,7 @@ section neverFail_lemmas
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
+omit [LawfulMonadLiftT m SPMF] in
 @[grind =]
 lemma neverFail_iff (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
   ⟨by aesop, NeverFail.mk⟩
@@ -106,6 +108,7 @@ namespace NeverFail
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
+omit [LawfulMonadLiftT m SPMF] in
 lemma of_probFailure_eq_zero (mx : m α) (h : Pr[⊥ | mx] = 0) : NeverFail mx :=
   { probFailure_eq_zero := h }
 

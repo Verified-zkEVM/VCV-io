@@ -25,7 +25,8 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 open ENNReal
 
 @[simp, grind =]
-lemma support_map [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonad m] (f : α → β) (mx : m α) :
+lemma support_map [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonad m] (f : α
+    → β) (mx : m α) :
     support (f <$> mx) = f '' support mx := by
   simp [monad_norm]
   aesop
@@ -37,7 +38,8 @@ lemma finSupport_map [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinse
   grind [map_eq_bind_pure_comp]
 
 @[simp, grind =]
-lemma evalDist_map [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m] (mx : m α) (f : α → β) :
+lemma evalDist_map [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m] (mx : m α) (f : α
+    → β) :
     𝒟[f <$> mx] = f <$> (𝒟[mx]) := by simp [monad_norm]
 
 lemma evalDist_map_eq_of_evalDist_eq [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m]
@@ -50,7 +52,8 @@ lemma probOutput_map_eq_of_evalDist_eq [MonadLiftT m SPMF] [LawfulMonadLiftT m S
     Pr[= y | f <$> mx] = Pr[= y | f <$> my] := by
   exact (evalDist_ext_iff.mp (evalDist_map_eq_of_evalDist_eq h f)) y
 
-@[simp] lemma evalDist_comp_map [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m] (mx : m α) :
+@[simp]
+lemma evalDist_comp_map [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m] (mx : m α) :
     evalDist ∘ (fun f => f <$> mx) = fun f : (α → β) => f <$> 𝒟[mx] := by aesop
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (f : α → β)
@@ -140,7 +143,7 @@ lemma probOutput_map_eq_single [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [Ev
   specialize h x'
   by_cases hx' : x' ∈ support mx
   · have := h hx'
-    simp only [mul_eq_zero, probOutput_pure, Set.mem_singleton_iff]
+    simp only [mul_eq_zero]
     right
     aesop
   · simp [probOutput_eq_zero_of_not_mem_support hx']
@@ -149,12 +152,14 @@ section const
 
 variable (mx : m α) (y : β)
 
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
 @[aesop safe norm, grind .]
 lemma support_map_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
     (hx : (support mx).Nonempty) :
     support ((fun _ => y) <$> mx) = {y} := by
   aesop
 
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
 @[simp, grind .]
 lemma finSupport_map_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
     [DecidableEq α] [DecidableEq β] [HasEvalFinset m]

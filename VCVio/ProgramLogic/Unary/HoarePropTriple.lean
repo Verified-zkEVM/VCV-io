@@ -45,6 +45,7 @@ instance instMAlgOrdered : MAlgOrdered (OracleComp spec) Prop where
     rw [allOutputsSatisfy_bind, allOutputsSatisfy_bind]
     exact allOutputsSatisfy_mono hfg x
 
+omit [spec.Fintype] [spec.Inhabited] in
 /-- Support-based characterization of the `Prop`-valued WP for `OracleComp`. -/
 theorem wp_iff_forall_support (oa : OracleComp spec α) (post : α → Prop) :
     MAlgOrdered.wp (m := OracleComp spec) (l := Prop) oa post ↔

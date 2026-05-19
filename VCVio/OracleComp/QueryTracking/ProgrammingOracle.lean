@@ -406,6 +406,7 @@ section WithProgrammingBounds
 variable {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
   [spec'.Fintype] [spec'.Inhabited]
 
+omit [spec'.Fintype] [spec'.Inhabited] in
 private lemma isTotalQueryBound_run_withProgramming
     (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) {n : ℕ}
@@ -423,6 +424,7 @@ private lemma isTotalQueryBound_run_withProgramming
           exact (OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr
             ((OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr h)
 
+omit [spec'.Fintype] [spec'.Inhabited] in
 private lemma isQueryBoundP_run_withProgramming
     (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) {q : ι' → Prop} [DecidablePred q] {n : ℕ}

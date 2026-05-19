@@ -28,12 +28,15 @@ lemma mem_support_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : 
 lemma mem_support_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : α) :
     x ∈ support (pure y : m α) ↔ y = x := by aesop
 
-@[simp, grind =] lemma finSupport_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
-    (x : α) : finSupport (pure x : m α) = {x} := by aesop
+@[simp, grind =]
+lemma finSupport_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
+    [DecidableEq α] (x : α) : finSupport (pure x : m α) = {x} := by aesop
 
-lemma mem_finSupport_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
+lemma mem_finSupport_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
+    [DecidableEq α]
     (x y : α) : x ∈ finSupport (pure y : m α) ↔ x = y := by grind
-lemma mem_finSupport_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
+lemma mem_finSupport_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
+    [DecidableEq α]
     (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
 @[simp, grind =, game_rule]
@@ -65,13 +68,15 @@ lemma probOutput_pure_eq_indicator [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   aesop (rule_sets := [UnfoldEvalDist])
 
 @[simp, grind =]
-lemma probEvent_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : α) (p : α → Prop) [DecidablePred p] :
+lemma probEvent_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : α) (p : α → Prop)
+    [DecidablePred p] :
     Pr[ p | (pure x : m α)] = if p x then 1 else 0 := by
   aesop (rule_sets := [UnfoldEvalDist])
 
 /-- Fallback when we don't have decidable equality. -/
 @[grind =]
-lemma probEvent_pure_eq_indicator [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : α) (p : α → Prop) :
+lemma probEvent_pure_eq_indicator [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : α) (p : α
+    → Prop) :
     Pr[ p | (pure x : m α)] = Set.indicator {x | p x} (Function.const α 1) x := by
   aesop (rule_sets := [UnfoldEvalDist])
 
@@ -109,17 +114,20 @@ lemma support_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my
   monadLift_bind mx my
 
 @[grind =]
-lemma mem_support_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my : α → m β) (y : β) :
+lemma mem_support_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my : α
+    → m β) (y : β) :
     y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
 
 -- dt: do we need global assumptions about `decidable_eq` for the `finSupport` definition?
 @[simp, grind =]
-lemma finSupport_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
+lemma finSupport_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
+    [DecidableEq α]
     [DecidableEq β] (mx : m α) (my : α → m β) : finSupport (mx >>= my) =
       Finset.biUnion (finSupport mx) fun x => finSupport (my x) := by aesop
 
 @[grind =]
-lemma mem_finSupport_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] [DecidableEq α]
+lemma mem_finSupport_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
+    [DecidableEq α]
     [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
 
@@ -134,12 +142,14 @@ lemma evalDist_bind_of_support_eq_empty [MonadLiftT m SPMF] [LawfulMonadLiftT m 
   simp [SPMF.ext_iff, ← probOutput_def, h]
 
 @[grind =, game_rule]
-lemma probOutput_bind_eq_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) (y : β) :
+lemma probOutput_bind_eq_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α
+    → m β) (y : β) :
     Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
   simp [probOutput_def]
 
 @[grind =]
-lemma probEvent_bind_eq_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) (q : β → Prop) :
+lemma probEvent_bind_eq_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α
+    → m β) (q : β → Prop) :
     Pr[ q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[ q | my x] := by
   simp only [probEvent_eq_tsum_indicator, Set.indicator, Set.mem_setOf_eq, probOutput_bind_eq_tsum,
     ← ENNReal.tsum_mul_left, mul_ite, mul_zero]
@@ -147,7 +157,8 @@ lemma probEvent_bind_eq_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx :
   refine tsum_congr fun x => by split_ifs <;> simp
 
 @[grind =]
-lemma probFailure_bind_eq_add_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) :
+lemma probFailure_bind_eq_add_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my
+    : α → m β) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
   simp [probFailure_def, Option.elimM, tsum_option, probOutput_def,
     SPMF.apply_eq_toPMF_some]
@@ -332,7 +343,8 @@ lemma probFailure_bind_le_of_forall {mx : m α}
 
 end mono
 
-lemma probFailure_bind_of_probFailure_eq_zero [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {mx : m α}
+lemma probFailure_bind_of_probFailure_eq_zero [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {mx
+    : m α}
     (h' : Pr[⊥ | mx] = 0) {my : α → m β} :
     Pr[⊥ | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
   rw [probFailure_bind_eq_add_tsum, h', zero_add]
@@ -634,6 +646,7 @@ lemma probOutput_bind_bind_swap [LawfulMonadLiftT m SPMF] [LawfulMonad m]
   simpa [probEvent_eq_eq_probOutput] using
     probEvent_bind_bind_swap mx my f (· = z)
 
+omit [Monad m] in
 /-- If `Pr[ p | mx] ≥ 1 - ε` and `mx` never fails, then `Pr[ ¬p | mx] ≤ ε`. -/
 lemma probEvent_compl_le_of_ge
     {mx : m α} {p : α → Prop} {ε : ℝ≥0∞}
@@ -656,6 +669,7 @@ lemma probEvent_compl_le_of_ge
     exact le_trans (tsub_le_tsub_left h _)
       (by simp [ENNReal.sub_sub_cancel ENNReal.one_ne_top hε'])
 
+omit [Monad m] in
 /-- If `Pr[ ¬p | mx] ≤ ε` and `mx` never fails, then `Pr[ p | mx] ≥ 1 - ε`. -/
 lemma probEvent_ge_of_compl_le
     {mx : m α} {p : α → Prop} {ε : ℝ≥0∞}
@@ -678,6 +692,7 @@ section union_bound
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 /-- Union bound for finset-indexed events: the probability that *some* event in `s` holds
 is at most the sum of the individual event probabilities. -/
 lemma probEvent_exists_finset_le_sum

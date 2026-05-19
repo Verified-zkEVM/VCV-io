@@ -134,6 +134,7 @@ noncomputable def simulatedNmaAdv
       (Resp := Resp) simTranscript pk)
     (adv.main pk)).run ∅⟩
 
+omit [Fintype Chal] [Inhabited Chal] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Hash-query bound for `simulatedNmaAdv`: if the CMA adversary makes at most
 `qS` signing-oracle queries and `qH` random-oracle queries, the NMA reduction

@@ -63,6 +63,7 @@ def nmaHashQueryBound {α : Type}
     (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (Q : ℕ) : Prop :=
   OracleComp.IsQueryBoundP oa (· matches .inr _) Q
 
+omit [Inhabited Chal] [Fintype Chal] in
 @[simp]
 lemma nmaHashQueryBound_query_bind_iff {α : Type}
     (t : (unifSpec + (M × Commit →ₒ Chal)).Domain)
@@ -82,6 +83,7 @@ lemma nmaHashQueryBound_query_bind_iff {α : Type}
   simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_bind_iff]
   cases t <;> simp
 
+omit [Inhabited Chal] [Fintype Chal] in
 @[simp]
 lemma nmaHashQueryBound_query_iff
     (t : (unifSpec + (M × Commit →ₒ Chal)).Domain) (Q : ℕ) :
@@ -93,6 +95,7 @@ lemma nmaHashQueryBound_query_iff
   simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_iff]
   cases t <;> simp
 
+omit [Inhabited Chal] [Fintype Chal] in
 lemma nmaHashQueryBound_mono {α : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α} {Q₁ Q₂ : ℕ}
     (h : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
@@ -100,6 +103,7 @@ lemma nmaHashQueryBound_mono {α : Type}
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₂ :=
   OracleComp.IsQueryBoundP.mono h hQ
 
+omit [Inhabited Chal] [Fintype Chal] in
 lemma nmaHashQueryBound_bind {α β : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α}
     {ob : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β}

@@ -76,69 +76,48 @@ end support
 
 section evalDist_main
 
-variable [spec.Fintype] [spec.Inhabited]
-
 /-- Embed `OracleComp` into `PMF` by mapping queries to uniform distributions over their range. -/
-noncomputable instance instMonadLiftTPMF : MonadLiftT (OracleComp spec) PMF where
+noncomputable instance instMonadLiftTPMF [spec.Fintype] [spec.Inhabited] :
+    MonadLiftT (OracleComp spec) PMF where
   monadLift mx := simulateQ' (fun t => PMF.uniformOfFintype (spec.Range t)) mx
 
-noncomputable instance instLawfulMonadLiftTPMF : LawfulMonadLiftT (OracleComp spec) PMF where
+noncomputable instance instLawfulMonadLiftTPMF [spec.Fintype] [spec.Inhabited] :
+    LawfulMonadLiftT (OracleComp spec) PMF where
   monadLift_pure := (simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)).toFun_pure'
   monadLift_bind := (simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)).toFun_bind'
 
-/-- Canonical `MonadLiftT (OracleComp spec) SPMF` derived from the PMF lift.
-
-Declared explicitly (rather than relying on Lean's built-in transitivity) so that downstream
-synthesis always picks this specific path. -/
-noncomputable instance instMonadLiftTSPMF : MonadLiftT (OracleComp spec) SPMF where
-  monadLift mx := liftM (monadLift mx : PMF _)
-
-noncomputable instance instLawfulMonadLiftTSPMF : LawfulMonadLiftT (OracleComp spec) SPMF where
-  monadLift_pure x := by
-    show (liftM (monadLift (pure x : OracleComp spec _) : PMF _) : SPMF _) = pure x
-    rw [monadLift_pure]; simp
-  monadLift_bind mx my := by
-    show (liftM (monadLift (mx >>= my) : PMF _) : SPMF _) =
-      (liftM (monadLift mx : PMF _) : SPMF _) >>= fun x => (liftM (monadLift (my x) : PMF _) : SPMF _)
-    rw [monadLift_bind (m := OracleComp spec) (n := PMF)]
-    exact monadLift_bind (m := PMF) (n := SPMF) _ _
-
 /-- Canonical `MonadLiftT (OracleComp spec) SetM` derived from the SPMF lift. -/
 instance instMonadLiftTSetM : MonadLiftT (OracleComp spec) SetM where
-  monadLift mx := SPMF.support (monadLift mx)
+  monadLift mx := mx.supportWhen fun _ => Set.univ
 
 instance instLawfulMonadLiftTSetM : LawfulMonadLiftT (OracleComp spec) SetM where
   monadLift_pure x := by
-    show SPMF.support (monadLift (pure x : OracleComp spec _) : SPMF _) = pure x
-    rw [monadLift_pure (m := OracleComp spec) (n := SPMF)]
-    exact SPMF.support_pure x
+    simp [monadLift]
   monadLift_bind mx my := by
-    show (SPMF.support (monadLift (mx >>= my) : SPMF _) : SetM _) =
-      Bind.bind (m := SetM) (SPMF.support (monadLift mx : SPMF _))
-        (fun x => SPMF.support (monadLift (my x) : SPMF _))
-    rw [monadLift_bind (m := OracleComp spec) (n := SPMF)]
-    exact SPMF.support_bind _ _
+    simp [monadLift]; rfl
 
-lemma evalDist_eq_simulateQ (mx : OracleComp spec α) :
+lemma evalDist_eq_simulateQ [spec.Fintype] [spec.Inhabited] (mx : OracleComp spec α) :
     𝒟[mx] = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
+
+
 
 @[simp, grind =] lemma support_liftM (q : OracleQuery spec α) :
     support (liftM q : OracleComp spec α) = Set.range q.cont := by
-  ext x
-  show x ∈ SPMF.support (𝒟[(liftM q : OracleComp spec α)] : SPMF α) ↔ _
-  rw [SPMF.support_eq_preimage_some]
-  have hne : ∀ t, PMF.uniformOfFintype (spec.Range q.input) t ≠ 0 := fun t => by
-    simp [PMF.uniformOfFintype_apply, ENNReal.inv_ne_zero, Fintype.card_ne_zero]
-  simp [evalDist_eq_simulateQ, SPMF.liftM_eq_map, PMF.monad_map_eq_map, hne]
+  change SetM.run (simulateQ (r := SetM) (fun _ => Set.univ) (liftM q)) = Set.range q.cont
+  rw [simulateQ_query]
+  exact Set.image_univ
 
 @[grind =] lemma support_query (t : spec.Domain) :
-    support (liftM (query t) : OracleComp spec _) = Set.univ := by simp
+    support (liftM (query t) : OracleComp spec _) = Set.univ := by
+  rw [support_liftM]; exact Set.range_id
 
 lemma mem_support_liftM_iff (q : OracleQuery spec α) (u : α) :
-    u ∈ support (liftM q : OracleComp spec α) ↔ ∃ t, q.cont t = u := by grind
+    u ∈ support (liftM q : OracleComp spec α) ↔ ∃ t, q.cont t = u := by
+  rw [support_liftM]; exact Set.mem_range
 
 lemma mem_support_query (t : spec.Domain) (u : spec.Range t) :
-    u ∈ support (liftM (query t) : OracleComp spec _) := by grind
+    u ∈ support (liftM (query t) : OracleComp spec _) := by
+  rw [support_query]; trivial
 
 alias support_liftM_query := support_query
 
@@ -160,7 +139,7 @@ end evalDist_main
 
 section finSupport
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [spec.Fintype]
 
 /-- Finite version of support for when oracles have a finite set of possible outputs.
 NOTE: we can't use `simulateQ` because `Finset` lacks a `Monad` instance. -/
@@ -254,7 +233,7 @@ instance below. -/
 private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
     support oa = SPMF.support (𝒟[oa]) := by
   induction oa using OracleComp.inductionOn with
-  | pure y => ext z; simp [support_pure, evalDist_pure]
+  | pure y => ext z; simp [support_pure]
   | query_bind t mx ih =>
       ext z
       rw [support_bind, support_query]
@@ -275,7 +254,7 @@ private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
           ((liftM (PMF.uniformOfFintype (spec.Range t)) : SPMF _)).toPMF (some u) ≠ 0 := by
         intro u
         simp [SPMF.toPMF_liftM, PMF.uniformOfFintype, PMF.uniformOfFinset_apply,
-          Finset.card_univ, Fintype.card_ne_zero]
+          Finset.card_univ]
       constructor
       · intro h habs
         rw [ENNReal.tsum_eq_zero] at habs
@@ -285,7 +264,7 @@ private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
         exact this.elim (hcontU u) hu
       · intro h
         by_contra hcontra
-        push_neg at hcontra
+        push Not at hcontra
         apply h
         refine ENNReal.tsum_eq_zero.mpr fun u => ?_
         have := hcontra u

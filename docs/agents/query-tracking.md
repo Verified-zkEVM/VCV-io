@@ -341,8 +341,10 @@ The query-tracking files now try to keep theorem signatures narrow.
 Preferred pattern:
 
 - put only genuinely shared assumptions in section variable blocks
-- localize `HasEvalSet`, `HasEvalSPMF`, `HasEvalPMF`, and `LawfulMonad` to the smallest section or
-  theorem that needs them
+- localize the EvalDist lift triple (`MonadLiftT m SPMF`, `MonadLiftT m SetM`,
+  `EvalDistCompatible m`) and `LawfulMonad` to the smallest section or theorem that needs
+  them; for `OracleComp spec`, the corresponding section vars are `[spec.Fintype]`
+  `[spec.Inhabited]`
 - if a proof needs extra decidability or classical choice, install it locally with `classical` or
   a local instance
 
