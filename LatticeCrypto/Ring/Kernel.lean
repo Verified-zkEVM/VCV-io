@@ -20,6 +20,10 @@ Executable layer for the generic lattice ring architecture. Defines:
   `R[X] / (X^n + 1)` via a homomorphism `quotientOf`.
 - `schoolbookNegacyclicMul`: a backend-generic `O(n²)` reference multiplier
   implementing negacyclic convolution.
+- `coeff_add/sub/zero/neg`: `@[simp]` API projecting the four kernel axioms to
+  the `backend.coeff` accessor, used for coefficient-wise proof automation.
+- `AddCommGroup ring.Poly`: global instance derived from the coefficient axioms
+  via `ext_coeff`, so downstream code never needs local arithmetic instances.
 
 The executable / proof boundary is enforced structurally: `NegacyclicRing` is
 computable and carries no quotient types, while `NegacyclicRingSemantics` is
@@ -129,22 +133,27 @@ instance (ring : NegacyclicRing Coeff) : Sub ring.Poly :=
 instance (ring : NegacyclicRing Coeff) : Neg ring.Poly :=
   ⟨ring.neg⟩
 
+/-- Two `ring.Poly` values are equal iff they agree on every coefficient. -/
 theorem poly_ext {ring : NegacyclicRing Coeff} {p q : ring.Poly}
     (h : ∀ i, ring.backend.coeff p i = ring.backend.coeff q i) : p = q :=
   PolyBackend.ext_coeff h
 
+/-- The `i`-th coefficient of `f + g` equals the sum of the individual coefficients. -/
 @[simp] theorem coeff_add (ring : NegacyclicRing Coeff) (f g : ring.Poly) (i : Fin ring.degree) :
     ring.backend.coeff (f + g) i = ring.backend.coeff f i + ring.backend.coeff g i :=
   ring.add_coeff f g i
 
+/-- The `i`-th coefficient of `f - g` equals the difference of the individual coefficients. -/
 @[simp] theorem coeff_sub (ring : NegacyclicRing Coeff) (f g : ring.Poly) (i : Fin ring.degree) :
     ring.backend.coeff (f - g) i = ring.backend.coeff f i - ring.backend.coeff g i :=
   ring.sub_coeff f g i
 
+/-- Every coefficient of the zero polynomial is zero. -/
 @[simp] theorem coeff_zero (ring : NegacyclicRing Coeff) (i : Fin ring.degree) :
     ring.backend.coeff (0 : ring.Poly) i = 0 :=
   ring.zero_coeff i
 
+/-- The `i`-th coefficient of `-f` is the negation of the `i`-th coefficient of `f`. -/
 @[simp] theorem coeff_neg (ring : NegacyclicRing Coeff) (f : ring.Poly) (i : Fin ring.degree) :
     ring.backend.coeff (-f) i = -ring.backend.coeff f i :=
   ring.neg_coeff f i
