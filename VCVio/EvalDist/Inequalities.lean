@@ -39,7 +39,7 @@ omit [Monad m] in
 
 If a per-element bound `acc x · (acc x / q − hinv) ≤ B x` holds for every `x` (with
 `acc x ≤ 1`), and we marginalize over the output distribution of any `mx : m X` with
-`HasEvalSPMF`, then the marginalized expectation `μ := ∑' x, Pr[= x | mx] · acc x`
+`[MonadLiftT m SPMF]`, then the marginalized expectation `μ := ∑' x, Pr[= x | mx] · acc x`
 satisfies the same forking-bound shape:
 
   `μ · (μ / q − hinv) ≤ ∑' x, Pr[= x | mx] · B x`.

@@ -321,7 +321,7 @@ end ListVectorMmap
 
 -- TODO: mem_support_vector_mapM and neverFail_vector_mapM for Std.Vector —
 -- Vector.mapM (Std/Batteries) uses MonadSatisfying internally and doesn't
--- reduce cleanly for generic HasEvalSPMF monads.
+-- reduce cleanly for generic `[MonadLiftT m SPMF]` monads.
 
 /-! ## NeverFail lemmas for list monadic operations -/
 

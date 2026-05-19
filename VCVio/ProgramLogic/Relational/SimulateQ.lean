@@ -930,7 +930,8 @@ private lemma mem_support_simulateQ_run_of_bad
       exact ih u p' hp' z h_z
 
 /-- Under bad-monotonicity, a simulation started from a bad state has bad output probability
-exactly `1` (using `OracleComp.HasEvalPMF` to ensure no failure mass). -/
+exactly `1` (using the canonical `MonadLiftT (OracleComp spec) PMF` to ensure no failure
+mass). -/
 private lemma probEvent_simulateQ_run_bad_eq_one_of_bad
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (h_mono : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →

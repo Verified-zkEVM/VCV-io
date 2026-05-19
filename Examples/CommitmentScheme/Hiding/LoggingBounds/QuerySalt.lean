@@ -109,7 +109,7 @@ lemma sum_querySaltIndicators_le_logLength
       (counts := fun s => QueryLog.countQ log (fun t : (CMOracle M S C).Domain => t.2 = s))) ?_
   exact le_of_eq hcounts
 
-omit [DecidableEq C] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
+omit [DecidableEq C] [Inhabited M] [Inhabited S] in
 lemma log_length_le_of_mem_support_counting_simulate_run_logging
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {z : (α × QueryLog (CMOracle M S C)) × QueryCount (M × S)}
@@ -181,8 +181,7 @@ lemma log_length_le_of_mem_support_counting_simulate_run_logging
         simpa using Nat.succ_le_of_lt hlt
       simpa [hzlog] using hcons
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited C]
-  [Inhabited M] [Inhabited S] in
+omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma log_length_le_of_mem_support_run_cached_logging
     [Finite M] [Finite S] [Finite C]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
@@ -194,7 +193,6 @@ lemma log_length_le_of_mem_support_run_cached_logging
     z.1.2.length ≤ n := by
   haveI : Fintype M := Fintype.ofFinite M
   haveI : Fintype S := Fintype.ofFinite S
-  haveI : Fintype C := Fintype.ofFinite C
   classical
   let cost : QueryCache (CMOracle M S C) → ℕ := fun _ => 0
   have hstep :
@@ -432,7 +430,7 @@ lemma queryLog_countQ_pos_of_mem
         · simp only [hhd, ↓reduceIte]
           exact ih hmem
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma fresh_incrementIndicator_le_querySaltIndicator_cached_logging
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)

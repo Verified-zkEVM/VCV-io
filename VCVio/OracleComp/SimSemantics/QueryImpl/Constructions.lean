@@ -155,7 +155,8 @@ lemma proj_simulateQ_preInsert [Monad m] [LawfulMonad m] [LawfulMonad n]
       exact bind_congr ih
 
 /-- A `preInsert` instrumentation preserves failure probability for any base monad with
-`HasEvalSPMF`, given the projection bundle and its compatibility with failure probabilities. -/
+`[MonadLiftT m SPMF]`, given the projection bundle and its compatibility with failure
+probabilities. -/
 lemma probFailure_proj_simulateQ_preInsert [Monad m]
     [LawfulMonad m] [LawfulMonad n] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (nx : spec.Domain → n α)
@@ -325,7 +326,8 @@ lemma proj_simulateQ_postInsert [LawfulMonad m] [LawfulMonad n]
       exact bind_congr ih
 
 /-- A `postInsert` instrumentation preserves failure probability for any base monad with
-`HasEvalSPMF`, given the projection bundle and its compatibility with failure probabilities. -/
+`[MonadLiftT m SPMF]`, given the projection bundle and its compatibility with failure
+probabilities. -/
 lemma probFailure_proj_simulateQ_postInsert
     [LawfulMonad m] [LawfulMonad n] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (nx : (t : spec.Domain) → spec.Range t → n α)

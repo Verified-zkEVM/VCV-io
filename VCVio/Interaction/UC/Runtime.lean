@@ -26,7 +26,7 @@ externally visible `SPMF Unit`.
 
 Common instantiations:
 
-* `m = ProbComp` with `sem := SPMFSemantics.ofHasEvalSPMF ProbComp` for
+* `m = ProbComp` with `sem := SPMFSemantics.ofMonadLift ProbComp` for
   coin-flip-only protocols. Use `processSemanticsProbComp`.
 
 * `m = OracleComp (unifSpec + roSpec)` with a hand-rolled
@@ -37,7 +37,7 @@ Common instantiations:
 
 * Observation-style semantics that deliberately carry failure mass,
   for example `m = OptionT ProbComp` with
-  `SPMFSemantics.ofHasEvalSPMF (OptionT ProbComp)`. This is what
+  `SPMFSemantics.ofMonadLift (OptionT ProbComp)`. This is what
   cryptographic smoke tests (OTP-style privacy, guess games) use so
   that the `guard` branch contributes a real failure mass to the
   resulting `SPMF Unit`.
@@ -204,7 +204,7 @@ noncomputable def processSemantics (Party : Type u)
 /--
 `processSemanticsProbComp` is the specialization of `processSemantics`
 for `m = ProbComp` with its canonical `SPMFSemantics`
-(`SPMFSemantics.ofHasEvalSPMF`).
+(`SPMFSemantics.ofMonadLift`).
 This is the right entry point for coin-flip-only protocols with no
 shared oracles and no deliberate failure mass.
 -/

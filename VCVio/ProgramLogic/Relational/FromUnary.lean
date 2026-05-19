@@ -12,7 +12,8 @@ import VCVio.ProgramLogic.Relational.Basic
 
 Two `OracleComp` computations that are independently correct (each satisfying a unary
 `Std.Do.Triple`) can always be paired via the product coupling, since every
-`OracleComp` distribution sums to probability `1` (`HasEvalPMF`).
+`OracleComp` distribution sums to probability `1` (the canonical
+`MonadLiftT (OracleComp spec) PMF` lift).
 
 This file provides the "unary → relational" bridge:
 
@@ -41,7 +42,8 @@ variable {α β : Type}
 
 /-- Core lift: two `support`-style unary postconditions combine into a relational
 coupling. The product coupling `evalDist oa ⊗ evalDist ob` witnesses the conjunction,
-using `HasEvalPMF` to ensure neither side has failure mass. -/
+using the canonical `MonadLiftT (OracleComp spec) PMF` to ensure neither side has
+failure mass. -/
 theorem relTriple_prod
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     {P : α → Prop} {Q : β → Prop}

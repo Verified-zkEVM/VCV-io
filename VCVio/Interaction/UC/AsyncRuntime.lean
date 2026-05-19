@@ -329,7 +329,7 @@ noncomputable def processSemanticsAsync
 
 /--
 Coin-flip-only specialization of `processSemanticsAsync` (`m = ProbComp`,
-`sem := SPMFSemantics.ofHasEvalSPMF ProbComp`). Companion of
+`sem := SPMFSemantics.ofMonadLift ProbComp`). Companion of
 `processSemanticsProbComp`.
 -/
 noncomputable def processSemanticsAsyncProbComp

@@ -29,7 +29,6 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
     [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
     [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
     {rel : Stmt → Wit → Bool}
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -242,7 +241,6 @@ computation. -/
     (cmaInit M Commit Chal Stmt Wit) (signedAdv σ hr M adv)
   pure (p.1.1, p.1.2, p.2.1.1)
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- The initial public-key query in `signedAdv` factors `cmaRealRun` through
 the key generator and a fixed-key post-keygen run. -/
 lemma cmaRealRun_eq_keygen_bind
@@ -267,7 +265,6 @@ lemma cmaRealRun_eq_keygen_bind
     simp [cmaReal, cmaInit, StateT.run, StateT.mk]]
   simp only [monad_norm]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-! ## Joint signing/hash query bounds -/
 
 /-- A named CMA query is costly for H3 exactly when it targets the signing
@@ -309,7 +306,7 @@ def cmaSignHashQueryBound {α : Type}
       (IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt)) qH
 
-omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
+omit [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- Query-bind form of the joint signing/hash query bound. -/
 @[simp]
 private lemma cmaSignHashQueryBound_query_bind_iff {α : Type}
@@ -384,7 +381,7 @@ private lemma cmaSignHashQueryBound_bind {α β : Type}
   exact ⟨isQueryBoundP_bind h₁.1 (fun x _ => (h₂ x).1),
     isQueryBoundP_bind h₁.2 (fun x _ => (h₂ x).2)⟩
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
+omit [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] in
 /-- Fiat-Shamir verification consumes exactly one random-oracle query and no
 signing queries in the named CMA interface. -/
@@ -408,7 +405,7 @@ private lemma fiatShamir_verify_cmaSignHashQueryBound
       ⟨⟨by simp [IsCostlyQuery], by simpa [IsHashQuery] using hQ⟩,
         by simp [cmaSignHashQueryBound]⟩
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
+omit [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] in
 /-- Lifting a source post-keygen CMA computation into the named CMA interface
 preserves its joint signing/hash query bound. -/
@@ -442,7 +439,7 @@ private theorem liftAdv_cmaSignHashQueryBound
           rcases t with (n | mc) | m <;> simp [IsHashQuery])
         hQ.2
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
+omit [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] in
 /-- Logging signing inputs while forwarding all queries preserves the joint
 signing/hash query bound. -/
@@ -470,7 +467,7 @@ theorem cmaSignLogImpl_cmaSignHashQueryBound
             StateT.run_get, StateT.run_set, monadLift_self, bind_pure_comp])
       signed
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [SampleableType Chal]
+omit [DecidableEq M] [SampleableType Chal]
   [DecidableEq Commit] in
 /-- Candidate production, with signing queries logged before final verification,
 preserves the source adversary signing/hash query budget. -/
@@ -536,7 +533,7 @@ theorem signedFreshAdv_isQueryBoundP_costly
       (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
       adv qS qH hQ).1
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [SampleableType Chal]
+omit [DecidableEq M] [SampleableType Chal]
   [DecidableEq Commit] in
 /-- Predicate-targeted signing-query bound for candidate production before the
 final verification suffix. -/
@@ -552,7 +549,7 @@ theorem signedCandidateAdv_isQueryBoundP_costly
       (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
       adv qS qH hQ).1
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [SampleableType Chal]
+omit [DecidableEq M] [SampleableType Chal]
   [DecidableEq Commit] in
 /-- Predicate-targeted hash-query bound for candidate production before the
 final verification suffix. -/

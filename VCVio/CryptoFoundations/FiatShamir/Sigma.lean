@@ -35,7 +35,7 @@ universe u v
 open OracleComp OracleSpec
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type}
-    {rel : Stmt → Wit → Bool} [SampleableType Stmt] [SampleableType Wit]
+    {rel : Stmt → Wit → Bool}
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
@@ -180,7 +180,6 @@ variable {m : Type → Type u} [Monad m]
   [MonadLiftT ProbComp m] [MonadLiftT ProbComp n]
   [HasQuery (M × Commit →ₒ Chal) m] [HasQuery (M × Commit →ₒ Chal) n]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir is natural in any oracle semantics morphism that preserves both random-oracle
 queries and public-randomness lifting.
 
@@ -225,7 +224,6 @@ variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
@@ -259,7 +257,6 @@ private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
           AddWriterT ω m Resp)) = _
   simp [bind_map_left]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
@@ -297,7 +294,6 @@ private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
           AddWriterT ω m Resp)) = _
   simp [bind_map_left]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing has query cost determined by its output: the signature `(c, s)` records
 the unique queried commitment `c`, so the total weighted query cost is exactly
 `costFn (msg, c)`. -/
@@ -316,7 +312,6 @@ theorem sign_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
     (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
     (msg := msg) (costFn := costFn)
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing has expected weighted query cost equal to the expectation of the queried
 commitment cost over the output signature distribution. -/
 theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
@@ -357,7 +352,6 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
             (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
             (msg := msg) (costFn := costFn)]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
 theorem sign_usesExactlyOneQuery
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) :
@@ -366,7 +360,6 @@ theorem sign_usesExactlyOneQuery
     sign_usesCostAsQueryCost (σ := σ) (hr := hr) (M := M) (runtime := runtime)
       (pk := pk) (sk := sk) (msg := msg) (costFn := fun _ ↦ (1 : ℕ))
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification incurs exactly the weighted cost assigned to the single
 random-oracle query on `(msg, sig.1)`. -/
 theorem verify_usesExactQueryCost {ω : Type} [AddMonoid ω]
@@ -385,7 +378,6 @@ theorem verify_usesExactQueryCost {ω : Type} [AddMonoid ω]
   simp [HasQuery.Program.withAddCost, FiatShamir, QueryImpl.withAddCost_apply,
     AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification has expected weighted query cost equal to the weight of its single
 random-oracle query. -/
 theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
@@ -400,7 +392,6 @@ theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [Mo
       (sig := sig) (costFn := costFn))
     hval
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification makes exactly one random-oracle query under unit-cost
 instrumentation. -/
 theorem verify_usesExactlyOneQuery
@@ -423,7 +414,6 @@ variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 open scoped Classical in
-omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect [SampleableType Chal]

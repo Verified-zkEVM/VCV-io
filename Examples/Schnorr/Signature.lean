@@ -184,7 +184,7 @@ Three Schnorr-specific facts feed in:
 
 The result is delivered in the textbook DLog form `dlogExp g reduction` via
 the conversion `hardRelationExp_dlogGenerable_eq_dlogExp`. -/
-theorem signature_euf_cma (g : G)
+theorem signature_euf_cma [Fintype G] [Inhabited G] (g : G)
     (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (signature F G g M))

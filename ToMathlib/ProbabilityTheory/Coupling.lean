@@ -164,7 +164,7 @@ theorem bind_const_of_toPMF_none_eq_zero {p : SPMF α} (hp : p.toPMF none = 0) (
 product forms a coupling.
 
 This is the core coupling result for reasoning about pairs of computations that never
-fail individually (e.g., `OracleComp spec α` via `HasEvalPMF`): the product distribution
+fail individually (e.g., `OracleComp spec α` via `MonadLiftT _ PMF` + `EvalDistCompatible`): the product distribution
 `do let a ← p; let b ← q; pure (a, b)` witnesses that the pair has marginals `(p, q)`. -/
 theorem IsCoupling.prod {α β : Type u} {p : SPMF α} {q : SPMF β}
     (hp : p.toPMF none = 0) (hq : q.toPMF none = 0) :

@@ -262,6 +262,7 @@ namespace SupportPreserves
 variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- A support-level frame implies that the cell-change event has probability
 zero. This is the probability-facing corollary most proofs want after a
 generic frame theorem has done the support-level work. -/
@@ -271,6 +272,7 @@ theorem prob_changed_eq_zero (hc : SupportPreserves c r) (h : Heap Ident) :
   intro z hz hchange
   exact hchange (hc h z hz)
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- If a cell is support-preserved, then the probability of reading the
 initial value at the end is exactly one minus the failure probability. -/
 theorem prob_unchanged_eq_sub_probFailure (hc : SupportPreserves c r) (h : Heap Ident) :
@@ -299,6 +301,7 @@ theorem prob_unchanged_eq_one {m : Type (max u v) → Type*} [Monad m]
     Pr[ fun z => r.get z.2 = r.get h | c.run h] = 1 :=
   prob_unchanged_eq_one_of_probFailure_eq_zero hc h (probFailure_of_liftM_PMF (c.run h))
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- If the initial cell value is not `x`, then a support-preserved cell has
 final value `x` with probability zero. -/
 theorem prob_final_eq_eq_zero_of_ne (hc : SupportPreserves c r) (h : Heap Ident)
@@ -377,6 +380,7 @@ variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMon
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {event : Heap Ident → α × Heap Ident → Prop}
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- If a cell can change only when `event` occurs, then the change probability
 is bounded by the event probability. -/
 theorem prob_changed_le_prob_event (hc : SupportPreservesExcept c r event)
@@ -452,6 +456,7 @@ variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMon
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {rel : r.Value → r.Value → Prop}
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- A support-level cell relation makes violations of the relation a
 probability-zero event. -/
 theorem prob_violate_eq_zero (hc : SupportCellRel c r rel) (h : Heap Ident) :
@@ -512,6 +517,7 @@ variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMon
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {measure : r.Value → Nat} {δ : Nat}
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- A measured support bound gives probability zero to exceeding the bound. -/
 theorem prob_exceeds_eq_zero (hc : SupportMeasureBound c r measure δ)
     (h : Heap Ident) :
@@ -889,6 +895,7 @@ variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
 variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [LawfulMonadLiftT m SPMF] in
 theorem simulateQ_run_cellChange_prob_eq_zero
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
     (r : CellRef Ident₀) (himpl : QueryImpl.PreservesCell impl r)

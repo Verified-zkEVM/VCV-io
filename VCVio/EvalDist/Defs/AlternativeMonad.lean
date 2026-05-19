@@ -20,9 +20,9 @@ universe u v w
 
 variable {m : Type u → Type v} [AlternativeMonad m] {α β γ : Type u}
 
-/-- Type-class for `HasEvalSet` when given an `AlternativeMonad` instance on the base monad,
-enforcing that `failure` maps to the empty sub-distribution.
-Compatibility conditions then force the correct semantics for `evalDist`, see below. -/
+/-- Refinement of `MonadLiftT m SetM` when given an `AlternativeMonad` instance on the
+base monad, enforcing that `failure` maps to the empty sub-distribution. Compatibility
+conditions then force the correct semantics for `evalDist`, see below. -/
 protected class HasEvalSet.LawfulFailure (m : Type u → Type v)
     [AlternativeMonad m] [MonadLiftT m SetM] : Prop where
   support_failure' {α : Type u} : support (failure : m α) = ∅

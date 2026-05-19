@@ -338,7 +338,6 @@ lemma hiding_choose_totalBound {AUX : Type} {t : ℕ}
       (n := t)
       (A.totalBound default))
 
-omit [DecidableEq C] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 lemma hiding_distinguish_totalBound_of_choose_support
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S)
@@ -368,8 +367,7 @@ lemma hiding_distinguish_totalBound_of_choose_support
     omega
   simpa [hbudget] using hcm
 
-omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
-  [Inhabited C] in
+omit [DecidableEq C] in
 lemma hidingImpl₁_run_totalBound_current {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     IsTotalQueryBound

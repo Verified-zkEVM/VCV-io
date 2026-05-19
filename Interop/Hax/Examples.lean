@@ -193,7 +193,7 @@ end OracleTripleSpec
 Everything so far was a `Triple`: universal over oracle outcomes, with
 no probabilistic content. The point of dropping `Hax.RustM` into
 `RustOracleComp spec` is that the `OracleComp spec` layer also carries
-`HasEvalSPMF` (via the `ExceptT` / `OptionT` instances in
+`MonadLiftT _ SPMF` (via the `ExceptT` / `OptionT` instances in
 `VCVio.EvalDist.Instances.{ErrorT,OptionT}`), so quantitative claims
 like `Pr[= some (.error e) | tossedAdd.run.run] = 1/2` are well-defined
 and provable.

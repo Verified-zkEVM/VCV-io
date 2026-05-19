@@ -86,8 +86,9 @@ theorem correct :
     intro a b; rw [← mul_smul, mul_comm, mul_smul]
   intro msg
   simp [AsymmEncAlg.CorrectExp, ProbCompRuntime.probComp, ProbCompRuntime.evalDist,
-    hashedElGamal, hcomm,
-    HasEvalPMF.toSPMF_eq, SPMF.probFailure_liftM, probFailure_of_liftM_PMF]
+    hashedElGamal, hcomm, SPMF.probFailure_liftM]
+  show 1 - Pr[⊥ | ($ᵗ HK : ProbComp HK)] = 1
+  simp [probFailure_uniformSample]
 
 /-! ## DDH Reduction -/
 

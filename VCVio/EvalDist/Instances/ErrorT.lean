@@ -138,7 +138,7 @@ lemma finSupport_liftM [LawfulMonad m] [DecidableEq α] (mx : m α) :
     finSupport (liftM mx : ExceptT ε m α) = finSupport mx := by
   ext x
   rw [mem_finSupport_iff', mem_finSupport_iff_mem_support, mem_finSupport_iff_mem_support]
-  show Except.ok x ∈ support (Except.ok <$> mx) ↔ x ∈ support mx
+  change Except.ok x ∈ support (Except.ok <$> mx) ↔ x ∈ support mx
   simp
 
 end EvalFinset
