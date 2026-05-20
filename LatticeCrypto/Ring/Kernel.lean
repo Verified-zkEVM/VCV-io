@@ -20,6 +20,10 @@ Executable layer for the generic lattice ring architecture. Defines:
   `R[X] / (X^n + 1)` via a homomorphism `quotientOf`.
 - `schoolbookNegacyclicMul`: a backend-generic `O(n²)` reference multiplier
   implementing negacyclic convolution.
+- `coeff_add/sub/zero/neg`: `@[simp]` API projecting the four kernel axioms to
+  the `backend.coeff` accessor, used for coefficient-wise proof automation.
+- `AddCommGroup ring.Poly`: global instance derived from the coefficient axioms
+  via `ext_coeff`, so downstream code never needs local arithmetic instances.
 
 The executable / proof boundary is enforced structurally: `NegacyclicRing` is
 computable and carries no quotient types, while `NegacyclicRingSemantics` is
@@ -75,6 +79,10 @@ structure NegacyclicRing (Coeff : Type u) [CommRing Coeff] where
   sub : backend.Poly → backend.Poly → backend.Poly
   neg : backend.Poly → backend.Poly
   mul : backend.Poly → backend.Poly → backend.Poly
+  add_coeff : ∀ f g i, backend.coeff (add f g) i = backend.coeff f i + backend.coeff g i
+  sub_coeff : ∀ f g i, backend.coeff (sub f g) i = backend.coeff f i - backend.coeff g i
+  zero_coeff : ∀ i, backend.coeff zero i = 0
+  neg_coeff : ∀ f i, backend.coeff (neg f) i = -backend.coeff f i
 
 /-- Proof-facing soundness certificate for a `NegacyclicRing`.
 
@@ -124,6 +132,41 @@ instance (ring : NegacyclicRing Coeff) : Sub ring.Poly :=
 
 instance (ring : NegacyclicRing Coeff) : Neg ring.Poly :=
   ⟨ring.neg⟩
+
+/-- Two `ring.Poly` values are equal iff they agree on every coefficient. -/
+theorem poly_ext {ring : NegacyclicRing Coeff} {p q : ring.Poly}
+    (h : ∀ i, ring.backend.coeff p i = ring.backend.coeff q i) : p = q :=
+  PolyBackend.ext_coeff h
+
+/-- The `i`-th coefficient of `f + g` equals the sum of the individual coefficients. -/
+@[simp] theorem coeff_add (ring : NegacyclicRing Coeff) (f g : ring.Poly) (i : Fin ring.degree) :
+    ring.backend.coeff (f + g) i = ring.backend.coeff f i + ring.backend.coeff g i :=
+  ring.add_coeff f g i
+
+/-- The `i`-th coefficient of `f - g` equals the difference of the individual coefficients. -/
+@[simp] theorem coeff_sub (ring : NegacyclicRing Coeff) (f g : ring.Poly) (i : Fin ring.degree) :
+    ring.backend.coeff (f - g) i = ring.backend.coeff f i - ring.backend.coeff g i :=
+  ring.sub_coeff f g i
+
+/-- Every coefficient of the zero polynomial is zero. -/
+@[simp] theorem coeff_zero (ring : NegacyclicRing Coeff) (i : Fin ring.degree) :
+    ring.backend.coeff (0 : ring.Poly) i = 0 :=
+  ring.zero_coeff i
+
+/-- The `i`-th coefficient of `-f` is the negation of the `i`-th coefficient of `f`. -/
+@[simp] theorem coeff_neg (ring : NegacyclicRing Coeff) (f : ring.Poly) (i : Fin ring.degree) :
+    ring.backend.coeff (-f) i = -ring.backend.coeff f i :=
+  ring.neg_coeff f i
+
+instance (ring : NegacyclicRing Coeff) : AddCommGroup ring.Poly where
+  add_assoc a b c     := by ext i; simp only [coeff_add, add_assoc]
+  zero_add a          := by ext i; simp only [coeff_add, coeff_zero, zero_add]
+  add_zero a          := by ext i; simp only [coeff_add, coeff_zero, add_zero]
+  neg_add_cancel a    := by ext i; simp only [coeff_add, coeff_neg, neg_add_cancel, coeff_zero]
+  add_comm a b        := by ext i; simp only [coeff_add, add_comm]
+  sub_eq_add_neg a b  := by ext i; simp only [coeff_sub, coeff_add, coeff_neg, sub_eq_add_neg]
+  nsmul               := nsmulRec
+  zsmul               := zsmulRec
 
 /-- Indexed access into a polynomial carrier by coefficient position. -/
 instance (ring : NegacyclicRing Coeff) :

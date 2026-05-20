@@ -68,6 +68,10 @@ def piRing (Coeff : Type*) [CommRing Coeff] (n : Nat) :
   sub := fun f g i => f i - g i
   neg := fun f i => -f i
   mul := negacyclicMulPure (piKernel Coeff n)
+  add_coeff  _ _ _ := rfl
+  sub_coeff  _ _ _ := rfl
+  zero_coeff _     := rfl
+  neg_coeff  _ _   := rfl
 
 /-- Quotient semantics for the function-backed negacyclic ring. -/
 noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
