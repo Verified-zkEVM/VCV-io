@@ -10,7 +10,7 @@ Generic protocol theory lives in PolyFun:
 
 - Sequential specs, transcripts, decorations, strategies, append, replicate, and state chains: `PolyFun.Interaction.Basic.*`
 - Two-party, multiparty, and concurrent interaction layers: `PolyFun.Interaction.TwoParty.*`, `PolyFun.Interaction.Multiparty.*`, `PolyFun.Interaction.Concurrent.*`
-- Generic UC interfaces, open processes, open theory, notation, environment actions, and leakage scaffolding: `PolyFun.Interaction.UC.*`
+- Generic UC interfaces, open processes, structural boundary traces, open theory, notation, environment actions, and leakage scaffolding: `PolyFun.Interaction.UC.*`
 
 For conceptual background, read PolyFun's `docs/wiki/interaction.md` and the module docstrings in the PolyFun dependency.
 VCV-io should only document how those generic APIs are instantiated with probabilistic semantics, oracle computations, and crypto examples.
@@ -35,6 +35,7 @@ Generic interaction modules should not be reintroduced under `VCVio/Interaction`
 
 `OpenProcess m Party Δ` comes from PolyFun and carries its per-step `Spec.Sampler m` intrinsically.
 VCV-io's runtime layer interprets a closed process by running those samplers and then observing the resulting state in a probabilistic semantics.
+Use PolyFun's `OpenStep.boundaryTrace` when you need to read the emitted output packets from a completed open-step transcript; routing and probabilistic interpretation remain VCV-io runtime concerns.
 
 Use the synchronous entry points in `VCVio/Interaction/UC/Runtime.lean`:
 
@@ -66,22 +67,25 @@ import VCVio.Interaction.UC.Computational
 
 Important definitions:
 
-- `Semantics T` bundles a surface monad, its `SPMFSemantics`, and a closed-system runner.
-- `Semantics.evalDist` evaluates a closed system to an `SPMF Unit`.
+- `Semantics T` bundles a result type, a surface monad, its `SPMFSemantics`, and a closed-system runner.
+- `Semantics.evalDist` evaluates a closed system to an `SPMF sem.Result`.
 - `Semantics.distAdvantage` computes total variation distance between two closed systems.
-- `CompEmulates sem ε real ideal` states fixed-advantage computational emulation.
-- `AsympCompEmulates` packages the negligible asymptotic variant.
-- `CompUCSecure` is the simulator-based security wrapper.
+- `ObservedCompEmulates sem ε real ideal` states fixed-advantage computational emulation.
+- `AsympObservedCompEmulates` packages the negligible asymptotic variant.
+- `ObservedCompUCSecure` is the simulator-based security wrapper.
+- `Execution T` is the distributional experiment consumed by paper-level `Standard.UCSecure`.
 
 The generic equivalence-style UC judgments live in PolyFun.
 The VCV-io layer gives them a crypto-facing distributional interpretation.
+Use the `Observed*` definitions when you intentionally work relative to a chosen observer.
+Use `Standard.UCSecure exec ε π F` when stating textbook UC security for a fixed execution experiment; `Execution.ofSemantics` is an explicit bridge from an observer to such an execution.
 
 ## Examples
 
 The main smoke test for the integration is `Examples/OneTimePad/UC.lean`.
-It builds real and ideal one-time-pad systems as PolyFun open-theory objects, runs them through VCV-io's runtime/computational layer, and proves `CompEmulates 0`.
+It builds real and ideal one-time-pad systems as PolyFun open-theory objects and proves the observation-level statement `ObservedCompEmulates 0`.
 
-Use it as the first example when wiring a concrete protocol into the UC runtime.
+Use it as the first example when wiring a concrete protocol into the UC runtime and computational observation layer.
 For lower-level probabilistic and oracle examples, see `docs/agents/probability.md` and `docs/agents/oracle-comp.md`.
 
 ## Import Guide
@@ -100,6 +104,7 @@ import PolyFun.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Runtime
 import VCVio.Interaction.UC.AsyncRuntime
 import VCVio.Interaction.UC.Computational
+import VCVio.Interaction.UC.Standard
 ```
 
 When editing VCV-io, prefer importing the specific PolyFun module you need rather than re-exporting large generic surfaces through VCV-io.

@@ -32,13 +32,6 @@ variable [Inhabited K] [Fintype K] [SampleableType K]
 variable [Inhabited S] [Fintype S] [DecidableEq S] [SampleableType S]
 variable [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O]
 
-instance instSampleableTypeListVector (n : ℕ) : SampleableType (List.Vector O n) :=
-  SampleableType.ofEquiv
-    { toFun := List.Vector.ofFn
-      invFun := fun xs i => xs.get i
-      left_inv := fun f => funext fun i => by simp
-      right_inv := fun xs => List.Vector.ext fun i => by simp }
-
 /-- Deterministically unroll `n` rounds of a state transition/output function. -/
 def streamOutputs (step : S → S × O) : (n : ℕ) → S → List.Vector O n
   | 0, _ => .nil
