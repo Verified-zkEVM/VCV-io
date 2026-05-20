@@ -27,6 +27,13 @@ import Examples.PRFTagReader.Auth
 import Examples.PRFTagReader.BadEvent
 import Examples.PRFTagReader.Collision
 import Examples.PRFTagReader.Defs
+import Examples.PRFTagReader.HopAEager
+import Examples.PRFTagReader.HopASetup
+import Examples.PRFTagReader.HopB
+import Examples.PRFTagReader.Hybrid
+import Examples.PRFTagReader.MultipleBadCollision
+import Examples.PRFTagReader.PRFReductions
+import Examples.PRFTagReader.Table
 import Examples.PRFTagReaderUnlinkReduction
 import Examples.PRGfromPRF
 import Examples.Pedersen
