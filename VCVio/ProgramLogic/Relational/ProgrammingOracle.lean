@@ -48,7 +48,7 @@ universe u
 
 namespace OracleComp.ProgramLogic.Relational
 
-variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} [IsUniformSpec spec]
 variable {α : Type}
 
 /-! ## Per-step distributional agreement on non-bad outputs -/
@@ -107,7 +107,7 @@ private lemma probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad
 
 /-! ## Bad-input monotonicity wrappers (`σ × Bool` shape) -/
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 private lemma withProgramming_mono_pair
     (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) (p : spec.QueryCache × Bool) (hp : p.2 = true)
@@ -116,7 +116,7 @@ private lemma withProgramming_mono_pair
   cases (show b = true from hp)
   exact QueryImpl.withProgramming_bad_monotone (so := so) (policy := policy) t cache z hz
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 private lemma withCachingTrackingPolicy_mono_pair
     (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) (p : spec.QueryCache × Bool) (hp : p.2 = true)

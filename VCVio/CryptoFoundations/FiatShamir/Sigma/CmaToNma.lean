@@ -156,6 +156,8 @@ theorem simulatedNmaAdv_hashQueryBound
         (simTranscript := simTranscript) (adv := adv)).main pk) qH := by
   classical
   letI : Fintype Chal := Fintype.ofFinite Chal
+  letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _

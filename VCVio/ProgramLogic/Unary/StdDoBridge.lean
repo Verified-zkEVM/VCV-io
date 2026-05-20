@@ -24,7 +24,7 @@ universe u
 namespace OracleComp.ProgramLogic.StdDo
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 /-- Proposition-level bridge from quantitative WP (`= 1` threshold). -/
@@ -117,7 +117,7 @@ handler proof needs to leave `mvcgen` (e.g. to perform a structural induction on
 
 section StatefulBridges
 
-variable {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+variable {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
 
 /-- Support characterization of `Std.Do.Triple` on `StateT σ (OracleComp spec)`.
 

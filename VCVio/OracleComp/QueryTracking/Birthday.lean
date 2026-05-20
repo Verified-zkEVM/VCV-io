@@ -21,7 +21,7 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-  [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+  [spec.DecidableEq] [IsUniformSpec spec]
 
 /-! ## Per-Pair Collision Bound (Textbook Step 3)
 

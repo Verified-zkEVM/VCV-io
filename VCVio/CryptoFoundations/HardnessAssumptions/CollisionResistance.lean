@@ -127,6 +127,9 @@ Closes one of the layers requested in
 a distinct oracle index returning a value in `Y`. -/
 abbrev ROMHashSpec (X Y : Type) : OracleSpec X := fun _ => Y
 
+noncomputable instance {X Y : Type} [Fintype Y] [Inhabited Y] :
+    IsUniformSpec (ROMHashSpec X Y) := IsUniformSpec.ofFintypeInhabited _
+
 /-- A ROM-CR adversary is an oracle computation outputting a candidate
 collision pair under the random oracle. -/
 def ROMCRAdversary (X Y : Type) : Type := OracleComp (ROMHashSpec X Y) (X × X)

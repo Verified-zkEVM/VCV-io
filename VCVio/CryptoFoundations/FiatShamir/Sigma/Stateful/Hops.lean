@@ -185,7 +185,7 @@ structure CmaH3RunFacts
 `simulateQ`. -/
 theorem simulateQ_bad_preserved_of_step
     {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {σ : Type} {α : Type}
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (hstep : ∀ (t : spec.Domain) (p : σ × Bool) (z),

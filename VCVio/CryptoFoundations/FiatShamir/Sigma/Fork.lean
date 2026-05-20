@@ -1518,6 +1518,8 @@ lemma runTrace_target_eq_of_mem_forkReplay
       qH x₂ = some s) :
     x₁.target = x₂.target := by
   letI : Fintype Chal := Fintype.ofFinite Chal
+  letI : IsUniformSpec ((Unit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
   classical
   let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
   obtain ⟨log₁, log₂, s', hx₁, hx₂, hcf₁, _hcf₂, _hneq, replacement, st, hz, hlog₂,
@@ -1735,6 +1737,8 @@ theorem replayForkingBound
     (hreach : CfReachable (runTrace σ hr M nmaAdv pk)
       (fun j : ℕ ⊕ Unit => match j with | .inl _ => 0 | .inr () => qH) (Sum.inr ())
       (forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH)) :
+    letI : IsUniformSpec ((Unit →ₒ Chal) : OracleSpec _) :=
+      IsUniformSpec.ofFintypeInhabited _
     let wrappedMain := runTrace σ hr M nmaAdv pk
     let cf := forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
     let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
@@ -1755,6 +1759,8 @@ theorem replayForkingBound
             P_out x₁ log₁ ∧
             P_out x₂ log₂
         | forkReplay wrappedMain qb (Sum.inr ()) cf] := by
+  letI : IsUniformSpec ((Unit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
   intro wrappedMain cf qb acc
   -- Step 1: Rewrite `acc` as `∑ s, Pr[= some s | cf <$> wrappedMain]`, matching the LHS of
   -- `le_probEvent_isSome_forkReplay`.

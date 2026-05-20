@@ -35,7 +35,7 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-  [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+  [spec.DecidableEq] [IsUniformSpec spec]
 
 /-! ## Collision Predicates -/
 
@@ -50,7 +50,7 @@ def CacheHasCollision (cache : QueryCache spec) : Prop :=
   ∃ (t₁ t₂ : spec.Domain) (u₁ : spec.Range t₁) (u₂ : spec.Range t₂),
     t₁ ≠ t₂ ∧ cache t₁ = some u₁ ∧ cache t₂ = some u₂ ∧ HEq u₁ u₂
 
-omit [DecidableEq ι] [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
+omit [DecidableEq ι] [spec.DecidableEq] [IsUniformSpec spec] in
 /-- In a collision-free cache, a value determines at most one query input. -/
 lemma cache_lookup_eq_of_noCollision
     {cache : QueryCache spec}
@@ -66,7 +66,7 @@ lemma cache_lookup_eq_of_noCollision
 /-! ## Log entries are cached after logging inside caching -/
 
 omit [spec.DecidableEq] in
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- When running `loggingOracle` inside `cachingOracle`, every log entry ends up in the cache.
 
 We prove two properties simultaneously by induction:
@@ -177,7 +177,7 @@ theorem log_entry_in_cache_and_mono {α : Type}
       le_trans hcache₀_le_mid ih_mono⟩
 
 omit [spec.DecidableEq] in
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- **Converse of `log_entry_in_cache_and_mono`**: when running `loggingOracle` inside
 `cachingOracle`, every cache entry that was not in the initial cache has a corresponding
 log entry. Combined with `log_entry_in_cache_and_mono`, this shows that (starting from `∅`)

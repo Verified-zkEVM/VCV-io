@@ -155,7 +155,7 @@ canonical `MonadLiftT … PMF` — a true probability monad). -/
 namespace OracleComp.Probabilistic
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 /-- The underlying `ℝ≥0∞`-valued WP, packaged for use inside the `Prob`

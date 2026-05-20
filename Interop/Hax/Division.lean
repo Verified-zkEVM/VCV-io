@@ -87,7 +87,7 @@ precondition preserved. The `errorOfHax` rebrand inside
 `triple_liftRustM` is again invisible at the Triple level because the
 precondition rules out the panic branch; the equality-level lemma
 below is the one that actually witnesses the rebrand. -/
-theorem checkedDivLifted_triple [spec.Fintype] [spec.Inhabited]
+theorem checkedDivLifted_triple [IsUniformSpec spec]
     (x y : u32) (h : y ≠ 0) :
     ⦃⌜True⌝⦄
     (checkedDivLifted (spec := spec) x y)

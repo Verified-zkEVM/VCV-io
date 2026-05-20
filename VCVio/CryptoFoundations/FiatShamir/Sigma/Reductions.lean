@@ -29,6 +29,14 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
+noncomputable local instance instIsUniformSpecChalSingleton :
+    IsUniformSpec ((Unit →ₒ Chal) : OracleSpec _) :=
+  IsUniformSpec.ofFintypeInhabited _
+
+noncomputable local instance instIsUniformSpecChalFn (M Commit : Type) :
+    IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+  IsUniformSpec.ofFintypeInhabited _
+
 omit [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
   [Inhabited Stmt] [Inhabited Chal] in
 /-- CMA-to-NMA reduction for Fiat-Shamir signatures built from a Sigma protocol.

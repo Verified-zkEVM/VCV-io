@@ -77,7 +77,7 @@ lemma replicate_pure (x : α) :
   | zero => rfl
   | succ n hn => simp [hn, List.replicate]
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 lemma probFailure_replicate :
     Pr[⊥ | oa.replicate n] = 1 - (1 - Pr[⊥ | oa]) ^ n := by
@@ -149,7 +149,7 @@ section SimulateQ
 variable {ι'} {spec' : OracleSpec ι'} {r : Type v → Type*}
   [Monad r] [LawfulMonad r] (impl : QueryImpl spec r)
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- `simulateQ` distributes over `replicate`: simulating a replicated computation
 equals running the simulated body `n` times via monadic recursion. -/
 lemma simulateQ_replicate :

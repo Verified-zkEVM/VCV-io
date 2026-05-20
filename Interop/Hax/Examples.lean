@@ -116,7 +116,7 @@ section TripleSpec
 
 set_option mvcgen.warning false
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 /-- `addOrPanicLifted` total-correctness spec. Under the no-overflow
 precondition, the lifted hax computation never panics, never diverges,
@@ -166,7 +166,7 @@ section OracleTripleSpec
 
 set_option mvcgen.warning false
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 /-- If the oracle's response can never push `x + coe y` above `2^32`,
 then `oracleThenAdd` always returns a value `≥ x`. The interesting part

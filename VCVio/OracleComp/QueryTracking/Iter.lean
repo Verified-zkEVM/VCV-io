@@ -31,11 +31,11 @@ universe u v
 
 namespace OracleComp
 
-variable {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited] {α β : Type u}
+variable {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α β : Type u}
 
 /-! ### Forward `replicate` bounds -/
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isTotalQueryBound_replicate {oa : OracleComp spec α} {k : ℕ}
     (h : IsTotalQueryBound oa k) (n : ℕ) :
     IsTotalQueryBound (oa.replicate n) (n * k) := by
@@ -49,7 +49,7 @@ lemma isTotalQueryBound_replicate {oa : OracleComp spec α} {k : ℕ}
         isTotalQueryBound_bind ih fun _ => trivial
       simpa using hrest
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isQueryBoundP_replicate {oa : OracleComp spec α} {p : ι → Prop}
     [DecidablePred p] {k : ℕ}
     (h : IsQueryBoundP oa p k) (n : ℕ) :
@@ -64,7 +64,7 @@ lemma isQueryBoundP_replicate {oa : OracleComp spec α} {p : ι → Prop}
         isQueryBoundP_bind ih fun _ _ => trivial
       simpa using hrest
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isPerIndexQueryBound_replicate [DecidableEq ι]
     {oa : OracleComp spec α} {qb : ι → ℕ}
     (h : IsPerIndexQueryBound oa qb) (n : ℕ) :
@@ -85,7 +85,7 @@ When the body `oa` is fixed, the loop bound `n * k` is exactly characterized by 
 bound `k`: forward by `isTotalQueryBound_replicate`, reverse by lifting any
 counting-oracle support point of `oa` to an `n`-fold copy in `replicate n oa`. -/
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- Compositional support characterization for `countingOracle.simulate (oa >>= ob) 0`:
 the support decomposes as the sum of a path through `oa` and a path through `ob x`. -/
 private lemma countingOracle.mem_support_simulate_bind_iff [DecidableEq ι]
@@ -123,7 +123,7 @@ private lemma countingOracle.mem_support_simulate_bind_iff [DecidableEq ι]
     simp only [QueryCount.monoid_mul_def]
     exact hsum.symm
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- Every counting-oracle support point of the body `oa` lifts to a counting-oracle
 support point of `replicate n oa` whose query count is `n` times the body's. -/
 private lemma countingOracle.support_simulate_replicate_const [DecidableEq ι]
@@ -155,8 +155,7 @@ private lemma countingOracle.support_simulate_replicate_const [DecidableEq ι]
         · funext i; simp
       · funext i; simp [Pi.add_apply]; ring
 
-omit [spec.Inhabited] in
-theorem isTotalQueryBound_replicate_iff [Finite ι] [spec.Inhabited]
+theorem isTotalQueryBound_replicate_iff [Finite ι]
     {oa : OracleComp spec α} {n k : ℕ} (hn : 0 < n) :
     IsTotalQueryBound (oa.replicate n) (n * k) ↔ IsTotalQueryBound oa k := by
   letI : DecidableEq ι := Classical.decEq ι
@@ -171,8 +170,7 @@ theorem isTotalQueryBound_replicate_iff [Finite ι] [spec.Inhabited]
   rw [hsum] at this
   exact Nat.le_of_mul_le_mul_left this hn
 
-omit [spec.Inhabited] in
-theorem isQueryBoundP_replicate_iff [Finite ι] [spec.Inhabited]
+theorem isQueryBoundP_replicate_iff [Finite ι]
     {oa : OracleComp spec α} {p : ι → Prop} [DecidablePred p] {n k : ℕ} (hn : 0 < n) :
     IsQueryBoundP (oa.replicate n) p (n * k) ↔ IsQueryBoundP oa p k := by
   letI : DecidableEq ι := Classical.decEq ι
@@ -190,41 +188,39 @@ theorem isQueryBoundP_replicate_iff [Finite ι] [spec.Inhabited]
 
 /-! ### `replicateTR` corollaries -/
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isTotalQueryBound_replicateTR {oa : OracleComp spec α} {k : ℕ}
     (h : IsTotalQueryBound oa k) (n : ℕ) :
     IsTotalQueryBound (oa.replicateTR n) (n * k) := by
   rw [replicateTR_eq_replicate]; exact isTotalQueryBound_replicate h n
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isQueryBoundP_replicateTR {oa : OracleComp spec α} {p : ι → Prop}
     [DecidablePred p] {k : ℕ}
     (h : IsQueryBoundP oa p k) (n : ℕ) :
     IsQueryBoundP (oa.replicateTR n) p (n * k) := by
   rw [replicateTR_eq_replicate]; exact isQueryBoundP_replicate h n
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isPerIndexQueryBound_replicateTR [DecidableEq ι]
     {oa : OracleComp spec α} {qb : ι → ℕ}
     (h : IsPerIndexQueryBound oa qb) (n : ℕ) :
     IsPerIndexQueryBound (oa.replicateTR n) (n • qb) := by
   rw [replicateTR_eq_replicate]; exact isPerIndexQueryBound_replicate h n
 
-omit [spec.Inhabited] in
-theorem isTotalQueryBound_replicateTR_iff [Finite ι] [spec.Inhabited]
+theorem isTotalQueryBound_replicateTR_iff [Finite ι]
     {oa : OracleComp spec α} {n k : ℕ} (hn : 0 < n) :
     IsTotalQueryBound (oa.replicateTR n) (n * k) ↔ IsTotalQueryBound oa k := by
   rw [replicateTR_eq_replicate]; exact isTotalQueryBound_replicate_iff hn
 
-omit [spec.Inhabited] in
-theorem isQueryBoundP_replicateTR_iff [Finite ι] [spec.Inhabited]
+theorem isQueryBoundP_replicateTR_iff [Finite ι]
     {oa : OracleComp spec α} {p : ι → Prop} [DecidablePred p] {n k : ℕ} (hn : 0 < n) :
     IsQueryBoundP (oa.replicateTR n) p (n * k) ↔ IsQueryBoundP oa p k := by
   rw [replicateTR_eq_replicate]; exact isQueryBoundP_replicate_iff hn
 
 /-! ### `List.mapM` and `List.foldlM` (forward only) -/
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isTotalQueryBound_listMapM
     {f : α → OracleComp spec β} {k : α → ℕ}
     (h : ∀ x, IsTotalQueryBound (f x) (k x)) (xs : List α) :
@@ -240,7 +236,7 @@ lemma isTotalQueryBound_listMapM
         isTotalQueryBound_bind ih fun _ => trivial
       simpa using hrest
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isTotalQueryBound_listMapM_const
     {f : α → OracleComp spec β} {k : ℕ}
     (h : ∀ x, IsTotalQueryBound (f x) k) (xs : List α) :
@@ -249,7 +245,7 @@ lemma isTotalQueryBound_listMapM_const
   rwa [show (xs.map fun _ => k).sum = xs.length * k by
     rw [List.map_const', List.sum_replicate, smul_eq_mul]] at this
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isTotalQueryBound_listFoldlM
     {f : β → α → OracleComp spec β} {k : α → ℕ}
     (h : ∀ b x, IsTotalQueryBound (f b x) (k x)) (b₀ : β) (xs : List α) :
@@ -262,7 +258,7 @@ lemma isTotalQueryBound_listFoldlM
       refine isTotalQueryBound_bind (h b₀ a) fun b' => ?_
       exact ih b'
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isQueryBoundP_listMapM
     {f : α → OracleComp spec β} {p : ι → Prop} [DecidablePred p] {k : α → ℕ}
     (h : ∀ x, IsQueryBoundP (f x) p (k x)) (xs : List α) :
@@ -277,7 +273,7 @@ lemma isQueryBoundP_listMapM
         isQueryBoundP_bind ih fun _ _ => trivial
       simpa using hrest
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isQueryBoundP_listMapM_const
     {f : α → OracleComp spec β} {p : ι → Prop} [DecidablePred p] {k : ℕ}
     (h : ∀ x, IsQueryBoundP (f x) p k) (xs : List α) :
@@ -286,7 +282,7 @@ lemma isQueryBoundP_listMapM_const
   rwa [show (xs.map fun _ => k).sum = xs.length * k by
     rw [List.map_const', List.sum_replicate, smul_eq_mul]] at this
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isQueryBoundP_listFoldlM
     {f : β → α → OracleComp spec β} {p : ι → Prop} [DecidablePred p] {k : α → ℕ}
     (h : ∀ b x, IsQueryBoundP (f b x) p (k x)) (b₀ : β) (xs : List α) :
@@ -298,7 +294,7 @@ lemma isQueryBoundP_listFoldlM
       refine isQueryBoundP_bind (h b₀ a) fun b' _ => ?_
       exact ih b'
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isPerIndexQueryBound_listMapM [DecidableEq ι]
     {f : α → OracleComp spec β} {qb : α → ι → ℕ}
     (h : ∀ x, IsPerIndexQueryBound (f x) (qb x)) (xs : List α) :
@@ -313,7 +309,7 @@ lemma isPerIndexQueryBound_listMapM [DecidableEq ι]
         isPerIndexQueryBound_bind ih fun _ => trivial
       simpa using hrest
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isPerIndexQueryBound_listMapM_const [DecidableEq ι]
     {f : α → OracleComp spec β} {qb : ι → ℕ}
     (h : ∀ x, IsPerIndexQueryBound (f x) qb) (xs : List α) :
@@ -322,7 +318,7 @@ lemma isPerIndexQueryBound_listMapM_const [DecidableEq ι]
   rwa [show (xs.map fun _ => qb).sum = xs.length • qb by
     rw [List.map_const', List.sum_replicate]] at this
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma isPerIndexQueryBound_listFoldlM [DecidableEq ι]
     {f : β → α → OracleComp spec β} {qb : α → ι → ℕ}
     (h : ∀ b x, IsPerIndexQueryBound (f b x) (qb x)) (b₀ : β) (xs : List α) :

@@ -245,9 +245,9 @@ A wrapped step makes ≤ 1 underlying query (zero on a hit, one on a miss), so a
 
 section QueryBound
 
-variable {ι' : Type u} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
+variable {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
 
-omit [spec'.Fintype] [spec'.Inhabited] in
+omit [IsUniformSpec spec'] in
 lemma isQueryBoundP_run_withCaching
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain)
     {p : ι' → Prop} [DecidablePred p] {n : ℕ}
@@ -261,7 +261,7 @@ lemma isQueryBoundP_run_withCaching
       rw [withCaching_run_some _ hcache]
       trivial
 
-omit [spec'.Fintype] [spec'.Inhabited] in
+omit [IsUniformSpec spec'] in
 lemma isTotalQueryBound_run_withCaching
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain) {n : ℕ}
     (h : OracleComp.IsTotalQueryBound (so t) n) (cache : spec.QueryCache) :
@@ -274,7 +274,7 @@ lemma isTotalQueryBound_run_withCaching
       rw [withCaching_run_some _ hcache]
       trivial
 
-lemma isPerIndexQueryBound_run_withCaching [spec.Fintype] [spec.Inhabited]
+lemma isPerIndexQueryBound_run_withCaching [IsUniformSpec spec]
     (so : QueryImpl spec (OracleComp spec)) (t : spec.Domain) {qb : ι → ℕ}
     (h : OracleComp.IsPerIndexQueryBound (so t) qb) (cache : spec.QueryCache) :
     OracleComp.IsPerIndexQueryBound ((so.withCaching t).run cache) qb := by
@@ -295,7 +295,7 @@ end QueryImpl
 namespace OracleComp
 
 variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
-  {ι' : Type u} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited] {α : Type u}
+  {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec'] {α : Type u}
 
 theorem IsQueryBoundP.simulateQ_run_withCaching
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
@@ -322,7 +322,7 @@ theorem IsTotalQueryBound.simulateQ_run_withCaching
     (fun t s' => QueryImpl.isTotalQueryBound_run_withCaching so t (hstep t) s')
     cache
 
-theorem IsPerIndexQueryBound.simulateQ_run_withCaching [spec.Fintype] [spec.Inhabited]
+theorem IsPerIndexQueryBound.simulateQ_run_withCaching [IsUniformSpec spec]
     (so : QueryImpl spec (OracleComp spec))
     {oa : OracleComp spec α} {qb : ι → ℕ}
     (h : IsPerIndexQueryBound oa qb)
@@ -370,7 +370,7 @@ A generic `withCaching` version for arbitrary base monads would require a separa
 because caching changes the oracle semantics (cache hits skip the underlying oracle call). -/
 @[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
-    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    [IsUniformSpec spec₀] {α : Type}
     (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
     Pr[⊥ | (simulateQ spec₀.cachingOracle oa).run cache] = Pr[⊥ | oa] := by
   simp only [probFailure_of_liftM_PMF]
@@ -378,7 +378,7 @@ lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι�
 /-- Trivially true via `probFailure_eq_zero`; see `probFailure_run_simulateQ`. -/
 @[simp]
 lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
-    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    [IsUniformSpec spec₀] {α : Type}
     (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
     NeverFail ((simulateQ spec₀.cachingOracle oa).run cache) ↔ NeverFail oa := by
   rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
@@ -394,7 +394,7 @@ lemma simulateQ_query (t : spec.Domain) :
 Forward only — the reverse fails because cache hits strictly reduce the simulated count. -/
 
 theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
-    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    {spec₀ : OracleSpec.{0, 0} ι₀} [IsUniformSpec spec₀] {α : Type}
     {oa : OracleComp spec₀ α} {n : ℕ}
     (h : OracleComp.IsTotalQueryBound oa n) (cache : spec₀.QueryCache) :
     OracleComp.IsTotalQueryBound ((simulateQ spec₀.cachingOracle oa).run cache) n := by
@@ -403,7 +403,7 @@ theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
     (fun t => (OracleComp.isQueryBound_query_iff t 1 _ _).mpr Nat.one_pos) cache
 
 theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
-    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    {spec₀ : OracleSpec.{0, 0} ι₀} [IsUniformSpec spec₀] {α : Type}
     {oa : OracleComp spec₀ α} {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
     (h : OracleComp.IsQueryBoundP oa p n) (cache : spec₀.QueryCache) :
     OracleComp.IsQueryBoundP ((simulateQ spec₀.cachingOracle oa).run cache) p n := by
@@ -414,7 +414,7 @@ theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
     cache
 
 theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
-    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    {spec₀ : OracleSpec.{0, 0} ι₀} [IsUniformSpec spec₀] {α : Type}
     {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ}
     (h : OracleComp.IsPerIndexQueryBound oa qb) (cache : spec₀.QueryCache) :
     OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.cachingOracle oa).run cache) qb := by
@@ -525,10 +525,10 @@ end withCacheOverlay
 
 namespace OracleComp
 
-variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+variable [spec.DecidableEq] [IsUniformSpec spec]
 
 omit [spec.DecidableEq] in
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- `simulateQ cachingOracle` only grows the cache: for any `oa`, if
 `z ∈ support ((simulateQ cachingOracle oa).run cache₀)` then `cache₀ ≤ z.2`. -/
 theorem simulateQ_cachingOracle_cache_le {α : Type u}
@@ -556,7 +556,7 @@ theorem simulateQ_cachingOracle_cache_le {α : Type u}
       exact le_trans hle_mid (ih _ cache_mid z hrest)
 
 omit [spec.DecidableEq] in
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- After running `cachingOracle` on a single query at `t`, the resulting cache
 maps `t` to the returned value. -/
 theorem cachingOracle_query_caches (t : spec.Domain)

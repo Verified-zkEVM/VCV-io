@@ -47,6 +47,10 @@ variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
   [Finite Chal] [Inhabited Chal]
 
+noncomputable local instance instIsUniformSpecChalSingleton [Fintype Chal] :
+    IsUniformSpec ((Unit →ₒ Chal) : OracleSpec _) :=
+  IsUniformSpec.ofFintypeInhabited _
+
 /-! ## CMA-to-NMA adversary -/
 
 /-- The CMA-to-NMA reduction at the managed random-oracle interface. -/

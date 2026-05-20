@@ -76,15 +76,74 @@ end support
 
 section evalDist_main
 
-/-- Embed `OracleComp` into `PMF` by mapping queries to uniform distributions over their range. -/
-noncomputable instance instMonadLiftTPMF [spec.Fintype] [spec.Inhabited] :
-    MonadLiftT (OracleComp spec) PMF where
-  monadLift mx := simulateQ' (fun t => PMF.uniformOfFintype (spec.Range t)) mx
+/-- A per-query distribution on an `OracleSpec`. Each query index `t : ι` is
+assigned a `PMF (spec t)` for its responses. This is the abstract data needed
+to lift `OracleComp spec` into `PMF`; uniformity is **not** assumed — see
+`IsUniformSpec` for the uniform-sampling specialization.
 
-noncomputable instance instLawfulMonadLiftTPMF [spec.Fintype] [spec.Inhabited] :
+Specs that should opt into uniform sampling are best registered via
+`IsUniformSpec`, which extends this class and additionally carries
+`Fintype` / `Inhabited` on each range plus a propositional witness that
+`toPMF` is the canonical uniform distribution. -/
+class IsProbabilitySpec (spec : OracleSpec ι) where
+  /-- The distribution of responses to query `t`. -/
+  toPMF (t : ι) : PMF (spec t)
+
+/-- An `OracleSpec` whose responses are uniformly sampled from finite, inhabited
+ranges. Bundles `spec.Fintype`, `spec.Inhabited`, and `IsProbabilitySpec spec`
+together with a `Prop` witness that the per-query distribution agrees with
+`PMF.uniformOfFintype`. Use this as the canonical input to lemmas that
+mention `Fintype.card (spec.Range _)` or `PMF.uniformOfFintype` in their
+statements. -/
+class IsUniformSpec (spec : OracleSpec ι) extends IsProbabilitySpec spec where
+  /-- Every response set is finite. -/
+  fintype : spec.Fintype
+  /-- Every response set is inhabited. -/
+  inhabited : spec.Inhabited
+  /-- The per-query distribution is the uniform distribution on the response set. -/
+  toPMF_eq_uniform : ∀ t, toPMF t = PMF.uniformOfFintype (spec.Range t)
+
+attribute [reducible, instance] IsUniformSpec.fintype IsUniformSpec.inhabited
+
+/-- Bridge from `[spec.Fintype] [spec.Inhabited]` to `IsUniformSpec spec`.
+Deliberately **not** an instance — `IsUniformSpec` must be opted into per
+spec so that uniform-sampling semantics never attach silently to a spec
+whose author didn't intend a probabilistic interpretation. Use this
+helper when declaring `IsUniformSpec` for a concrete spec. -/
+@[reducible] noncomputable def IsUniformSpec.ofFintypeInhabited
+    {ι : Type u} (spec : OracleSpec ι)
+    [hF : spec.Fintype] [hI : spec.Inhabited] : IsUniformSpec spec where
+  toPMF t := PMF.uniformOfFintype (spec.Range t)
+  fintype := hF
+  inhabited := hI
+  toPMF_eq_uniform _ := rfl
+
+noncomputable instance : IsUniformSpec unifSpec := IsUniformSpec.ofFintypeInhabited _
+noncomputable instance : IsUniformSpec coinSpec := IsUniformSpec.ofFintypeInhabited _
+
+/-- Propagate `IsUniformSpec` through `+`: each summand's uniformity is
+preserved on its branch. `IsProbabilitySpec (spec + spec')` is derived via
+the `extends` chain. -/
+noncomputable instance instIsUniformSpecAdd {ι ι'} (spec : OracleSpec ι)
+    (spec' : OracleSpec ι') [IsUniformSpec spec] [IsUniformSpec spec'] :
+    IsUniformSpec (spec + spec') := IsUniformSpec.ofFintypeInhabited _
+
+/-- Successor to the legacy empty marker `OracleSpec.IsProbSpec`. The replacement
+`IsUniformSpec` bundles `Fintype`, `Inhabited`, `IsProbabilitySpec`, and a uniformity
+witness. -/
+@[deprecated IsUniformSpec (since := "2026-05-20")]
+alias _root_.OracleSpec.IsProbSpec := IsUniformSpec
+
+/-- Embed `OracleComp` into `PMF` by interpreting each query via the per-query
+distribution provided by `IsProbabilitySpec`. -/
+noncomputable instance instMonadLiftTPMF [IsProbabilitySpec spec] :
+    MonadLiftT (OracleComp spec) PMF where
+  monadLift mx := simulateQ IsProbabilitySpec.toPMF mx
+
+noncomputable instance instLawfulMonadLiftTPMF [IsProbabilitySpec spec] :
     LawfulMonadLiftT (OracleComp spec) PMF where
-  monadLift_pure := (simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)).toFun_pure'
-  monadLift_bind := (simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)).toFun_bind'
+  monadLift_pure := simulateQ_pure _
+  monadLift_bind := simulateQ_bind _
 
 /-- Canonical `MonadLiftT (OracleComp spec) SetM` derived from the SPMF lift. -/
 instance instMonadLiftTSetM : MonadLiftT (OracleComp spec) SetM where
@@ -96,8 +155,23 @@ instance instLawfulMonadLiftTSetM : LawfulMonadLiftT (OracleComp spec) SetM wher
   monadLift_bind mx my := by
     simp [monadLift]; rfl
 
-lemma evalDist_eq_simulateQ [spec.Fintype] [spec.Inhabited] (mx : OracleComp spec α) :
-    𝒟[mx] = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
+lemma evalDist_eq_simulateQ [IsProbabilitySpec spec] (mx : OracleComp spec α) :
+    𝒟[mx] = simulateQ IsProbabilitySpec.toPMF mx := rfl
+
+/-- Abstract distribution of a single lifted query under `IsProbabilitySpec`:
+the per-query distribution `toPMF` is pushed forward through the query's
+continuation. Uniform-content sibling: `evalDist_liftM`. -/
+lemma evalDist_liftM_toPMF [IsProbabilitySpec spec] (q : OracleQuery spec α) :
+    𝒟[(liftM q : OracleComp spec α)] =
+      (IsProbabilitySpec.toPMF q.input).map q.cont := by
+  simp [evalDist_eq_simulateQ, SPMF.liftM_eq_map, PMF.map_comp, PMF.monad_map_eq_map]
+
+/-- `liftM (query t) : OracleComp spec _` evaluates to the per-query distribution
+`IsProbabilitySpec.toPMF t`, lifted to `SPMF`. -/
+lemma evalDist_query_toPMF [IsProbabilitySpec spec] (t : spec.Domain) :
+    𝒟[(liftM (query t) : OracleComp spec _)] =
+      (IsProbabilitySpec.toPMF t : SPMF (spec.Range t)) := by
+  rw [evalDist_liftM_toPMF]; simp [PMF.map_id]
 
 @[simp, grind =] lemma support_liftM (q : OracleQuery spec α) :
     support (liftM q : OracleComp spec α) = Set.range q.cont := by
@@ -171,18 +245,18 @@ noncomputable def evalDistWhen (d : QueryImpl spec SPMF)
     (mx : OracleComp spec α) : SPMF α :=
   simulateQ (r := SPMF) d mx
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 @[simp low, grind =]
 lemma evalDist_liftM (q : OracleQuery spec α) :
     𝒟[(liftM q : OracleComp spec α)] =
       (PMF.uniformOfFintype (spec.Range q.input)).map q.cont := by
-  simp [evalDist_eq_simulateQ, SPMF.liftM_eq_map, PMF.map_comp, PMF.monad_map_eq_map]
+  rw [evalDist_liftM_toPMF, IsUniformSpec.toPMF_eq_uniform]
 
 @[simp, grind =]
 lemma evalDist_query (t : spec.Domain) :
     𝒟[(liftM (query t) : OracleComp spec _)] = PMF.uniformOfFintype (spec.Range t) := by
-  simp [PMF.map_id]
+  rw [evalDist_liftM]; simp [PMF.map_id]
 
 @[simp low, grind =]
 lemma probOutput_liftM_eq_div (q : OracleQuery spec α) (x : α) :
@@ -223,11 +297,12 @@ end evalDist
 
 section supportEvalDist
 
-variable [spec.Fintype] [spec.Inhabited] (oa : OracleComp spec α) (x : α)
+variable [IsUniformSpec spec] (oa : OracleComp spec α) (x : α)
 
 /-- Bridge: support computed via the direct `MonadLiftT SetM` agrees with `SPMF.support` of the
 distribution semantics. This is the field body for the `EvalDistCompatible (OracleComp spec)`
-instance below. -/
+instance below. The equality is uniform-content: it relies on every response having nonzero
+probability, which requires `IsUniformSpec`. -/
 private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
     support oa = SPMF.support (𝒟[oa]) := by
   induction oa using OracleComp.inductionOn with
@@ -294,7 +369,7 @@ end supportEvalDist
 
 section NeverFail
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsProbabilitySpec spec]
 
 @[simp]
 lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : probFailure oa = 0 ↔ NeverFail oa := by
@@ -314,7 +389,7 @@ end NeverFail
 
 section evalDistConvenience
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec] [IsProbabilitySpec spec']
 
 lemma evalDist_query_bind
     (t : spec.Domain) (ou : spec.Range t → OracleComp spec α) :
@@ -323,12 +398,10 @@ lemma evalDist_query_bind
   rw [evalDist_bind, evalDist_query]; rfl
 
 lemma probOutput_congr {x y : α} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
-    [spec'.Fintype] [spec'.Inhabited]
     (h1 : x = y) (h2 : 𝒟[oa] = 𝒟[oa']) : Pr[= x | oa] = Pr[= y | oa'] := by
   simp_rw [probOutput_def, h1, h2]
 
 lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
-    [spec'.Fintype] [spec'.Inhabited]
     (h1 : ∀ x, x ∈ support oa → (p x ↔ q x))
     (h2 : 𝒟[oa] = 𝒟[oa']) : Pr[ p | oa] = Pr[ q | oa'] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_def, h2]
@@ -350,7 +423,6 @@ lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : Orac
     split_ifs <;> simp [this]
 
 lemma evalDist_ext_probEvent {oa : OracleComp spec α} {oa' : OracleComp spec' α}
-    [spec'.Fintype] [spec'.Inhabited]
     (h : ∀ x, Pr[= x | oa] = Pr[= x | oa']) : (𝒟[oa]).run = (𝒟[oa']).run := by
   have heval : 𝒟[oa] = 𝒟[oa'] := evalDist_ext h
   simp [heval]
@@ -363,7 +435,7 @@ end evalDistConvenience
 
 section guard
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsProbabilitySpec spec]
 
 @[simp] lemma probOutput_guard {p : Prop} [Decidable p] :
     Pr[= () | (guard p : OptionT (OracleComp spec) Unit)] = if p then 1 else 0 := by
@@ -416,12 +488,11 @@ end guard
 
 section simulateQ_evalDist
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsProbabilitySpec spec] [IsProbabilitySpec spec']
 
 /-- If an oracle implementation preserves the distribution of each source query, then
 `simulateQ` preserves the distribution of every source computation. -/
 lemma evalDist_simulateQ_eq_evalDist
-    [spec'.Fintype] [spec'.Inhabited]
     (so : QueryImpl spec' (OracleComp spec))
     (h : ∀ t : spec'.Domain, 𝒟[so t] =
       𝒟[(liftM (query t) : OracleComp spec' (spec'.Range t))])
@@ -438,3 +509,5 @@ lemma evalDist_simulateQ_eq_evalDist
 end simulateQ_evalDist
 
 end OracleComp
+
+export OracleComp (IsProbabilitySpec IsUniformSpec)

@@ -180,7 +180,7 @@ lemma tail_length_of_mem_support_generateSeed
       seed i hseed hlenPos with ⟨u, us, hus⟩
   rw [hus] at hlen ⊢; simp at hlen ⊢; omega
 
-lemma probOutput_pop_none_eq_zero_of_count_pos [spec.Fintype] [spec.Inhabited]
+lemma probOutput_pop_none_eq_zero_of_count_pos [IsUniformSpec spec]
     (i : ι) (hpos : 0 < qc i * js.count i) :
     Pr[= none | (fun seed => seed.pop i) <$> generateSeed spec qc js] = 0 := by
   rw [probOutput_eq_zero_iff]
@@ -373,7 +373,7 @@ lemma probOutput_generateSeed' [spec.Fintype]
   exact probOutput_eq_inv_finSupport_card_of_liftM_PMF fun s hs =>
     probOutput_generateSeed spec qc js s hs
 
-lemma evalDist_generateSeed_eq_of_countEq [spec.Fintype] [spec.Inhabited]
+lemma evalDist_generateSeed_eq_of_countEq [IsUniformSpec spec]
     (qc' : ι → ℕ) (js' : List ι)
     (hcount : ∀ i, qc i * js.count i = qc' i * js'.count i) :
     𝒟[generateSeed spec qc js] = 𝒟[generateSeed spec qc' js'] := by
@@ -427,7 +427,7 @@ lemma evalDist_generateSeed_eq_of_countEq [spec.Fintype] [spec.Inhabited]
       (probOutput_eq_zero_iff (generateSeed spec qc' js') seed).2 hsupp
     rw [hzero, hzero']
 
-lemma probOutput_generateSeed_prependValues [spec.Fintype] [spec.Inhabited]
+lemma probOutput_generateSeed_prependValues [IsUniformSpec spec]
     {t : ι} (u : spec.Range t) (s' : QuerySeed spec)
     (hpos : 0 < qc t * js.count t) :
     Pr[= s'.prependValues [u] | generateSeed spec qc js] =

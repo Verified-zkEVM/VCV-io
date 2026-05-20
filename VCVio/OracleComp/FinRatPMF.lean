@@ -33,6 +33,9 @@ variable [spec.Inhabited] [∀ t : spec.Domain, FinEnum (spec.Range t)]
 local instance instSpecFintypeOfFinEnum : spec.Fintype where
   fintype_B _ := inferInstance
 
+noncomputable local instance instIsUniformSpec : IsUniformSpec spec :=
+  IsUniformSpec.ofFintypeInhabited _
+
 @[simp] lemma toPMF_apply (t : spec.Domain) :
     @Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t) =
       PMF.uniformOfFintype (spec.Range t) := by

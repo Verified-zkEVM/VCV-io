@@ -51,7 +51,7 @@ set_option mvcgen.warning false
 namespace OracleComp.ProgramLogic.StdDo
 
 variable {ι : Type}
-variable {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited] [spec.DecidableEq]
+variable {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec] [spec.DecidableEq]
 
 section replayOracle
 

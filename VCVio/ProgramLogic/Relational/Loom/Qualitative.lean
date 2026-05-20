@@ -67,7 +67,7 @@ namespace OracleComp.Rel.Qualitative
 
 variable {ι₁ ι₂ : Type u}
 variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable [IsUniformSpec spec₁] [IsUniformSpec spec₂]
 variable {α β : Type}
 
 /-- Qualitative `Std.Do'.RelWP` interpretation of pairs of `OracleComp`

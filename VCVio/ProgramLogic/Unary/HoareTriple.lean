@@ -44,7 +44,7 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp.ProgramLogic
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β σ : Type}
 
 /-! ## API contract
@@ -568,10 +568,10 @@ lemma wp_congr_evalDist {oa ob : OracleComp spec α}
   exact μ_congr_evalDist (by simp [h])
 
 lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {oa : OracleComp spec' ℝ≥0∞} {ob : OracleComp spec ℝ≥0∞}
     (h : 𝒟[oa] = 𝒟[ob]) :
-    @μ _ spec' _ _ oa = μ ob := by
+    @μ _ spec' _ oa = μ ob := by
   simp only [μ]
   exact tsum_congr fun x => by
     change 𝒟[oa] x * x = 𝒟[ob] x * x

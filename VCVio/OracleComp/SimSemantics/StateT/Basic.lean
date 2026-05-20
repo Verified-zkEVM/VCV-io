@@ -240,7 +240,7 @@ open scoped OracleSpec.PrimitiveQuery
 
 section simulateQ_evalDist
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 /-- If a `StateT` oracle implementation preserves distributions (each oracle query produces a
 uniform distribution after discarding state), then `simulateQ` followed by `run'` preserves
@@ -327,9 +327,9 @@ end simulateQ_evalDist
 
 section support_simulateQ_StateT
 
-variable {α : Type w} [spec.Fintype] [spec.Inhabited]
+variable {α : Type w} [IsUniformSpec spec]
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- Simulating an `OracleComp` through a stateful implementation in monad `m` can only shrink the
 support: any output reachable after simulation was already reachable in the original computation
 (where oracle queries may return any value). This is the support-level analogue of

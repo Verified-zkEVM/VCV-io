@@ -172,19 +172,19 @@ lemma fst_map_run_simulateQ (costFn : spec.Domain → ω) (oa : OracleComp spec 
   rw [costOracle, QueryImpl.fst_map_run_withCost, simulateQ_ofLift_eq_self]
 
 @[simp]
-lemma evalDist_fst_run_simulateQ [spec.Fintype] [spec.Inhabited]
+lemma evalDist_fst_run_simulateQ [IsUniformSpec spec]
     (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
     𝒟[Prod.fst <$> (simulateQ (costOracle costFn) oa).run] = 𝒟[oa] := by
   rw [fst_map_run_simulateQ]
 
 @[simp]
-lemma probOutput_fst_run_simulateQ [spec.Fintype] [spec.Inhabited]
+lemma probOutput_fst_run_simulateQ [IsUniformSpec spec]
     (costFn : spec.Domain → ω) (oa : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (costOracle costFn) oa).run] = Pr[= x | oa] := by
   rw [fst_map_run_simulateQ]
 
 @[simp]
-lemma support_run_simulateQ [spec.Fintype] [spec.Inhabited]
+lemma support_run_simulateQ [IsUniformSpec spec]
     (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (costOracle costFn) oa).run) = support oa := by
   rw [fst_map_run_simulateQ]
@@ -208,7 +208,7 @@ lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp s
 /-- Specialization of `QueryImpl.probFailure_run_simulateQ_withCost` to `countingOracle`. -/
 @[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
-    [spec₀.Fintype] [spec₀.Inhabited] {α : Type} (oa : OracleComp spec₀ α) :
+    [IsUniformSpec spec₀] {α : Type} (oa : OracleComp spec₀ α) :
     Pr[⊥ | (simulateQ (spec₀.countingOracle) oa).run] = Pr[⊥ | oa] := by
   simp only [countingOracle, QueryImpl.withCounting_eq_withCost,
     QueryImpl.probFailure_run_simulateQ_withCost, simulateQ_ofLift_eq_self]
@@ -216,7 +216,7 @@ lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι�
 /-- Specialization of `QueryImpl.NeverFail_run_simulateQ_withCost_iff` to `countingOracle`. -/
 @[simp]
 lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
-    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    [IsUniformSpec spec₀] {α : Type}
     (oa : OracleComp spec₀ α) :
     NeverFail (simulateQ (spec₀.countingOracle) oa).run ↔ NeverFail oa := by
   simp only [countingOracle, QueryImpl.withCounting_eq_withCost,
@@ -224,7 +224,7 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
 
 @[simp]
 lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
-    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    [IsUniformSpec spec₀] {α : Type}
     (oa : OracleComp spec₀ α) (p : α → Prop) :
     Pr[ fun z => p z.1 | (simulateQ (spec₀.countingOracle) oa).run] = Pr[ p | oa] := by
   rw [show (fun z : α × QueryCount ι₀ => p z.1) = p ∘ Prod.fst from rfl,
@@ -232,7 +232,7 @@ lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
 
 @[simp]
 lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
-    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    [IsUniformSpec spec₀] {α : Type}
     (oa : OracleComp spec₀ α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (spec₀.countingOracle) oa).run] =
       Pr[= x | oa] := by
@@ -240,7 +240,7 @@ lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 
 
 section support
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 /-- Compatibility helper matching old state-style counting semantics:
 simulate with zero initial count, then offset by `qc`. -/
@@ -248,7 +248,7 @@ def simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
     OracleComp spec (α × QueryCount ι) :=
   Prod.map id (qc + ·) <$> (simulateQ countingOracle oa).run
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : QueryCount ι) :
     simulate oa qc = Prod.map id (qc + ·) <$> simulate oa 0 := by
   unfold simulate
@@ -258,7 +258,7 @@ lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : QueryC
   rcases a with ⟨x, q⟩
   simp
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- We can always reduce simulation with counting to start with `0`,
 and add the initial count back at the end. -/
 lemma support_simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
@@ -266,7 +266,7 @@ lemma support_simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
   rw [run_simulateT_eq_run_simulateT_zero]
   simp [support_map]
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- Reduce membership in support of simulation with counting to simulation starting from `0`. -/
 lemma mem_support_simulate_iff (oa : OracleComp spec α) (qc : QueryCount ι)
     (z : α × QueryCount ι) :
@@ -288,7 +288,7 @@ lemma mem_support_simulate_iff (oa : OracleComp spec α) (qc : QueryCount ι)
       · simp
       · simpa using hq
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma mem_support_simulate_iff_of_le (oa : OracleComp spec α) (qc : QueryCount ι)
     (z : α × QueryCount ι) (hz : qc ≤ z.2) :
     z ∈ support (simulate oa qc) ↔ (z.1, z.2 - qc) ∈ support (simulate oa 0) := by
@@ -304,7 +304,7 @@ lemma mem_support_simulate_iff_of_le (oa : OracleComp spec α) (qc : QueryCount 
     funext i
     simp [Pi.add_apply, Pi.sub_apply, Nat.add_sub_of_le (hz i)]
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma le_of_mem_support_simulate {oa : OracleComp spec α} {qc : QueryCount ι}
     {z : α × QueryCount ι} (h : z ∈ support (simulate oa qc)) : qc ≤ z.2 := by
   rcases (mem_support_simulate_iff oa qc z).1 h with ⟨qc', _, hq⟩
@@ -313,7 +313,7 @@ lemma le_of_mem_support_simulate {oa : OracleComp spec α} {qc : QueryCount ι}
 
 section snd_map
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma mem_support_snd_map_simulate_iff (oa : OracleComp spec α)
     (qc qc' : QueryCount ι) :
     qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
@@ -328,7 +328,7 @@ lemma mem_support_snd_map_simulate_iff (oa : OracleComp spec α)
     refine ⟨x, (mem_support_simulate_iff oa qc (x, qc')).2 ?_⟩
     exact ⟨qc'', hmem, hq⟩
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma mem_support_snd_map_simulate_iff_of_le (oa : OracleComp spec α)
     {qc qc' : QueryCount ι} (hqc : qc ≤ qc') :
     qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
@@ -349,7 +349,7 @@ lemma mem_support_snd_map_simulate_iff_of_le (oa : OracleComp spec α)
     funext i
     simp [Pi.add_apply, Pi.sub_apply, Nat.add_sub_of_le (hqc i)]
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma le_of_mem_support_snd_map_simulate {oa : OracleComp spec α}
     {qc qc' : QueryCount ι}
     (h : qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
@@ -358,7 +358,7 @@ lemma le_of_mem_support_snd_map_simulate {oa : OracleComp spec α}
   intro i
   exact le_of_le_of_eq (Nat.le_add_right _ _) (congrFun hq i)
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma sub_mem_support_snd_map_simulate {oa : OracleComp spec α}
     {qc qc' : QueryCount ι}
     (h : qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
@@ -370,7 +370,7 @@ lemma sub_mem_support_snd_map_simulate {oa : OracleComp spec α}
 
 end snd_map
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma add_mem_support_simulate {oa : OracleComp spec α} {qc : QueryCount ι}
     {z : α × QueryCount ι} (hz : z ∈ support (simulate oa qc)) (qc' : QueryCount ι) :
     (z.1, z.2 + qc') ∈ support (simulate oa (qc + qc')) := by
@@ -385,7 +385,7 @@ lemma add_mem_support_simulate {oa : OracleComp spec α} {qc : QueryCount ι}
     _ = z.2 i + qc' i := by simp [hi]
     _ = (z.2 + qc') i := by simp [Pi.add_apply]
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 @[simp]
 lemma add_right_mem_support_simulate_iff (oa : OracleComp spec α)
     (qc qc' : QueryCount ι) (x : α) :
@@ -399,7 +399,7 @@ lemma add_right_mem_support_simulate_iff (oa : OracleComp spec α)
   · intro hmem
     exact ⟨qc', hmem, by rfl⟩
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 @[simp]
 lemma add_left_mem_support_simulate_iff (oa : OracleComp spec α)
     (qc qc' : QueryCount ι) (x : α) :
@@ -407,13 +407,13 @@ lemma add_left_mem_support_simulate_iff (oa : OracleComp spec α)
   rw [add_comm qc' qc]
   exact add_right_mem_support_simulate_iff oa qc qc' x
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma mem_support_simulate_pure_iff (x : α) (qc : QueryCount ι)
     (z : α × QueryCount ι) :
     z ∈ support (simulate (pure x : OracleComp spec α) qc) ↔ z = (x, qc) := by
   simp [simulate]
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma apply_ne_zero_of_mem_support_simulate_queryBind {t : spec.Domain}
     {oa : spec.Range t → OracleComp spec α} {qc : QueryCount ι} {z : α × QueryCount ι}
     (hz : z ∈ support (simulate ((query t : OracleComp spec _) >>= oa) qc)) :
@@ -433,7 +433,7 @@ lemma apply_ne_zero_of_mem_support_simulate_queryBind {t : spec.Domain}
     exact lt_of_lt_of_le hsingle (Nat.le_add_left _ _)
   exact Nat.ne_of_gt hpos
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma exists_mem_support_of_mem_support_simulate_queryBind {t : spec.Domain}
     {oa : spec.Range t → OracleComp spec α} {qc : QueryCount ι} {z : α × QueryCount ι}
     (hz : z ∈ support (simulate ((query t : OracleComp spec _) >>= oa) qc)) :
@@ -470,7 +470,7 @@ lemma exists_mem_support_of_mem_support_simulate_queryBind {t : spec.Domain}
       simpa [zero_add] using hqj
     simp [Function.update, hj, hcalc]
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma mem_support_simulate_queryBind_iff (t : spec.Domain)
     (oa : spec.Range t → OracleComp spec α) (qc : QueryCount ι) (z : α × QueryCount ι) :
     z ∈ support (simulate ((query t : OracleComp spec _) >>= oa) qc) ↔
@@ -525,7 +525,7 @@ lemma mem_support_simulate_queryBind_iff (t : spec.Domain)
     exact (mem_support_simulate_iff (oa := ((query t : OracleComp spec _) >>= oa))
       qc z).2 ⟨q0, hq0mem, hqsum⟩
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 lemma exists_mem_support_of_mem_support {oa : OracleComp spec α} {x : α} (hx : x ∈ support oa)
     (qc : QueryCount ι) : ∃ qc', (x, qc') ∈ support (simulate oa qc) := by
   have hx' : x ∈ support (Prod.fst <$> (simulateQ countingOracle oa).run) := by

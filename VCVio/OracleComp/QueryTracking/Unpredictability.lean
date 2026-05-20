@@ -37,13 +37,13 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-  [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+  [spec.DecidableEq] [IsUniformSpec spec]
 
 /-! ## Unpredictability -/
 
 section Unpredictability
 
-variable {spec' : OracleSpec.{0, 0} ι} [spec'.DecidableEq] [spec'.Fintype] [spec'.Inhabited]
+variable {spec' : OracleSpec.{0, 0} ι} [spec'.DecidableEq] [IsUniformSpec spec']
 
 omit [spec'.DecidableEq] in
 /-- **Fresh query uniformity**: querying `cachingOracle` at an uncached point

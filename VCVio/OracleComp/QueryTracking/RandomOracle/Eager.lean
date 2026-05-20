@@ -60,7 +60,7 @@ lemma apply_eq (t : spec₀.Domain) :
 /-- With an empty seed, the eager random oracle reduces to `uniformSampleImpl`:
 every query falls through to fresh uniform sampling with no state change.
 This is a faithful simulation (preserves `evalDist`). -/
-theorem evalDist_simulateQ_run'_empty [spec₀.Fintype] [spec₀.Inhabited]
+theorem evalDist_simulateQ_run'_empty [IsUniformSpec spec₀]
     {α : Type} (oa : OracleComp spec₀ α) :
     𝒟[(simulateQ (eagerRandomOracle (spec := spec₀)) oa).run' ∅] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
@@ -133,7 +133,7 @@ but for `eagerRandomOracle` (which falls back to `ProbComp` rather than `OracleC
 theorem eagerRandomOracle_evalDist_generateSeed_bind {ι₀ : Type} [DecidableEq ι₀]
     {spec₀ : OracleSpec.{0, 0} ι₀}
     [∀ t : spec₀.Domain, SampleableType (spec₀.Range t)]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     {α : Type} (oa : OracleComp spec₀ α)
     (qc : ι₀ → ℕ) (js : List ι₀) :
     𝒟[do

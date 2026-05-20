@@ -44,9 +44,8 @@ def OracleSpec.enforceOracle [DecidableEq ι] [spec.Inhabited] :
 
 namespace enforceOracle
 
-variable [DecidableEq ι] [spec.Fintype] [spec.Inhabited]
+variable [DecidableEq ι] [IsUniformSpec spec]
 
-omit [spec.Fintype] in
 @[simp]
 lemma run_apply (t : ι) (budget : ι → ℕ) :
     (spec.enforceOracle t).run budget =
@@ -55,7 +54,6 @@ lemma run_apply (t : ι) (budget : ι → ℕ) :
       else
         pure (default, budget) := rfl
 
-omit [spec.Fintype] in
 /-- When the computation is within its query bound, enforcement is transparent:
 the output distribution is identical to running without enforcement. -/
 theorem fst_map_run_simulateQ

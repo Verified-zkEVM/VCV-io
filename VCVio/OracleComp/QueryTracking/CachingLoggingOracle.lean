@@ -93,7 +93,7 @@ private lemma _root_.QueryImpl.withCachingTraceAppend_run_proj_eq
 
 omit [Monad m] [spec.DecidableEq] in
 theorem isTotalQueryBound_run_simulateQ_withCachingTraceAppend
-    [spec.Fintype] [spec.Inhabited] [LawfulAppend ω]
+    [IsUniformSpec spec] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
     {oa : OracleComp spec α} {n : ℕ}
@@ -108,7 +108,7 @@ theorem isTotalQueryBound_run_simulateQ_withCachingTraceAppend
 
 omit [Monad m] [spec.DecidableEq] in
 theorem isQueryBoundP_run_simulateQ_withCachingTraceAppend
-    [spec'.Fintype] [spec'.Inhabited] [LawfulAppend ω]
+    [IsUniformSpec spec'] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
     {oa : OracleComp spec α}
@@ -186,7 +186,7 @@ The log overlay does not change the underlying query count, so the `cachingOracl
 transfer through `fst_map_run_simulateQ` via `isQueryBound_iff_of_map_eq`. -/
 
 theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
-    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] [spec₀.Fintype] [spec₀.Inhabited]
+    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α} {n : ℕ}
     (h : OracleComp.IsTotalQueryBound oa n)
     (s : QueryCache spec₀ × QueryLog spec₀) :
@@ -195,7 +195,7 @@ theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
     (cachingOracle.isTotalQueryBound_run_simulateQ h s.1)
 
 theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
-    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] [spec₀.Fintype] [spec₀.Inhabited]
+    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α} {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
     (h : OracleComp.IsQueryBoundP oa p n)
     (s : QueryCache spec₀ × QueryLog spec₀) :
@@ -204,7 +204,7 @@ theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
     (cachingOracle.isQueryBoundP_run_simulateQ h s.1)
 
 theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
-    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] [spec₀.Fintype] [spec₀.Inhabited]
+    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ}
     (h : OracleComp.IsPerIndexQueryBound oa qb)
     (s : QueryCache spec₀ × QueryLog spec₀) :

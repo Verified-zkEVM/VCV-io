@@ -515,7 +515,7 @@ namespace uniformSampleImpl
 variable [∀ i, SampleableType (spec.Range i)]
 
 @[simp]
-lemma evalDist_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma evalDist_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) :
     𝒟[simulateQ uniformSampleImpl oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
@@ -523,19 +523,19 @@ lemma evalDist_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma probOutput_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma probOutput_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (x : α) :
     Pr[= x | simulateQ uniformSampleImpl oa] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ oa)) x
 
 @[simp]
-lemma probEvent_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma probEvent_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Pr[ p | simulateQ uniformSampleImpl oa] = Pr[ p | oa] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
 
 @[simp]
-lemma support_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma support_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) :
     support (simulateQ uniformSampleImpl oa) = support oa := by
   induction oa using OracleComp.inductionOn with
@@ -543,7 +543,7 @@ lemma support_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma finSupport_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma finSupport_simulateQ [IsUniformSpec spec] {α : Type}
     [DecidableEq α] (oa : OracleComp spec α) :
     finSupport (simulateQ uniformSampleImpl oa) = finSupport oa := by
   simp [finSupport_eq_iff_support_eq_coe]

@@ -113,7 +113,7 @@ is the natural strengthening of `map_run_simulateQ_eq_of_query_map_eq` for
 projections that only agree on a reachable subset of states. -/
 theorem map_run_simulateQ_eq_of_query_map_eq_inv'
     {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {σ₁ σ₂ : Type _}
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec')))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec')))
@@ -164,7 +164,7 @@ support-preservation half of `map_run_simulateQ_eq_of_query_map_eq_inv'`,
 exposed separately for projected continuations after a simulated prefix. -/
 theorem simulateQ_run_preserves_inv_of_query
     {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {σ : Type _}
     (impl : QueryImpl spec (StateT σ (OracleComp spec')))
     (inv : σ → Prop)
@@ -188,7 +188,7 @@ theorem simulateQ_run_preserves_inv_of_query
 a stateful continuation. -/
 theorem map_run_simulateQ_bind_eq_of_query_map_eq_inv'
     {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {σ₁ σ₂ : Type _} {β : Type u}
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec')))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec')))
@@ -239,7 +239,7 @@ theorem map_run_simulateQ_bind_eq_of_query_map_eq_inv'
 /-- `run'` projection corollary of `map_run_simulateQ_eq_of_query_map_eq_inv'`. -/
 theorem run'_simulateQ_eq_of_query_map_eq_inv'
     {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {σ₁ σ₂ : Type _}
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec')))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec')))
@@ -267,7 +267,7 @@ only needs to commute with each query on states satisfying `inv`, and `inv` must
 be preserved by each query step. -/
 structure StateOrnament
     {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {σ τ : Type _}
     (decorated : QueryImpl spec (StateT σ (OracleComp spec')))
     (base : QueryImpl spec (StateT τ (OracleComp spec'))) where
@@ -283,7 +283,7 @@ structure StateOrnament
 namespace StateOrnament
 
 variable {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-variable [spec'.Fintype] [spec'.Inhabited]
+variable [IsUniformSpec spec']
 variable {σ τ : Type _}
 variable {decorated : QueryImpl spec (StateT σ (OracleComp spec'))}
 variable {base : QueryImpl spec (StateT τ (OracleComp spec'))}

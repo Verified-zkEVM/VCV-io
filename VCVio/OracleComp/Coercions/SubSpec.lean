@@ -278,7 +278,7 @@ section liftComp_evalDist
 
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α : Type w}
-variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited]
+variable [OracleComp.IsUniformSpec spec] [OracleComp.IsUniformSpec superSpec]
     [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
 @[simp, grind =] lemma evalDist_liftComp (mx : OracleComp spec α) :
@@ -290,10 +290,17 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
       OracleQuery.input_query]
     rw [evalDist_bind, evalDist_bind]; simp_rw [ih]
     congr 1
-    simp only [evalDist_eq_simulateQ (spec := superSpec), evalDist_eq_simulateQ (spec := spec),
-      simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query, id_map]
+    have hsuper : (𝒟[(liftM (query t) : OracleComp superSpec _)] : SPMF (spec.Range t)) =
+        liftM ((PMF.uniformOfFintype (superSpec.Range
+          ((liftM (n := OracleQuery superSpec) (spec.query t)).input))).map
+          ((liftM (n := OracleQuery superSpec) (spec.query t)).cont)) := by
+      rw [show (liftM (query t) : OracleComp superSpec (spec.Range t)) =
+            liftM (liftM (spec.query t) : OracleQuery superSpec _) from rfl, evalDist_liftM]
+    have hspec : (𝒟[(liftM (query t) : OracleComp spec _)] : SPMF _) =
+        liftM (PMF.uniformOfFintype (spec.Range t)) := by rw [evalDist_query]
+    rw [hsuper, hspec]
     congr 1
-    exact LawfulSubSpec.evalDist_liftM_query t
+    exact LawfulSubSpec.evalDist_liftM_query (spec := spec) (superSpec := superSpec) t
 
 @[simp, grind =] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
     Pr[= x | liftComp mx superSpec] = Pr[= x | mx] :=
@@ -317,9 +324,7 @@ section liftComp_support
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α : Type w}
   [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
-  [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited]
 
-omit [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited] in
 /-- Support is preserved by `liftComp`: lifting a computation to a larger oracle spec
 does not change which outputs are reachable. This is the support analogue of
 `evalDist_liftComp`. -/
@@ -346,7 +351,6 @@ does not change which outputs are reachable. This is the support analogue of
     dsimp [OracleSpec.query, OracleQuery.cont, OracleQuery.input]
     rw [Set.range_id]; rfl
 
-omit [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited] in
 @[simp, grind =] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
     x ∈ support (liftComp mx superSpec) ↔ x ∈ support mx := by
   simp [support_liftComp]

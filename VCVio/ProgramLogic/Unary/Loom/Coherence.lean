@@ -56,7 +56,7 @@ open ENNReal OracleComp.ProgramLogic OracleComp.ProgramLogic.PropLogic
 namespace OracleComp.Loom.Coherence
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α : Type}
 
 /-! ## Probabilistic ↔ Quantitative

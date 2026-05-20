@@ -29,7 +29,7 @@ universe u
 
 namespace OracleComp.ProgramLogic.PropLogic
 
-variable {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
 variable {α β : Type}
 
 /-- The qualitative `Prop`-valued unary monad algebra for `OracleComp`.
@@ -45,7 +45,7 @@ instance instMAlgOrdered : MAlgOrdered (OracleComp spec) Prop where
     rw [allOutputsSatisfy_bind, allOutputsSatisfy_bind]
     exact allOutputsSatisfy_mono hfg x
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [IsUniformSpec spec] in
 /-- Support-based characterization of the `Prop`-valued WP for `OracleComp`. -/
 theorem wp_iff_forall_support (oa : OracleComp spec α) (post : α → Prop) :
     MAlgOrdered.wp (m := OracleComp spec) (l := Prop) oa post ↔

@@ -56,7 +56,7 @@ variable (p : Params) (prims : Primitives p) (nttOps : NTTRingOps)
 section Properties
 
 variable [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
+  [IsUniformSpec unifSpec]
 
 -- The algebraic core of completeness: whenever `respond` produces `some (z, h)`, the
 -- `verify` function accepts. This follows from the key generation relationship
@@ -133,7 +133,7 @@ theorem idsWithAbort_hvzk :
   classical
   sorry
 
-omit [SampleableType (CommitHashBytes p)] [unifSpec.Fintype] [unifSpec.Inhabited]
+omit [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec]
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
 from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
 enabling the CMA-to-NMA reduction in the security proof.
@@ -159,7 +159,7 @@ section NMASecurity
 
 variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
+  [IsUniformSpec unifSpec]
 
 open scoped Classical in
 /-- **NMA Security (Lemma 7, CRYPTO 2023).**
@@ -234,7 +234,7 @@ section MainTheorem
 
 variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
+  [IsUniformSpec unifSpec]
 
 open scoped Classical in
 /-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**

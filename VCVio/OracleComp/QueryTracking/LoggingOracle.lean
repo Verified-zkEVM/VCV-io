@@ -233,7 +233,7 @@ namespace loggingOracle
 /-- Specialization of `QueryImpl.probFailure_run_simulateQ_withLogging` to `loggingOracle`. -/
 @[simp]
 lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     (oa : OracleComp spec α) :
     Pr[⊥ | (WriterT.run
         (simulateQ spec.loggingOracle oa) :
@@ -255,14 +255,14 @@ lemma run_simulateQ_bind_fst {spec : OracleSpec.{0, 0} ι} {α β : Type}
 /-- Specialization of `QueryImpl.NeverFail_run_simulateQ_withLogging_iff` to `loggingOracle`. -/
 @[simp]
 lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0, 0} ι} {α : Type}
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     (oa : OracleComp spec α) :
     NeverFail (simulateQ spec.loggingOracle oa).run ↔ NeverFail oa := by
   rw [loggingOracle, QueryImpl.NeverFail_run_simulateQ_withLogging_iff, simulateQ_ofLift_eq_self]
 
 @[simp]
 lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     (oa : OracleComp spec α) (p : α → Prop) :
     Pr[ fun z => p z.1 | (simulateQ spec.loggingOracle oa).run] = Pr[ p | oa] := by
   rw [show (fun z : α × spec.QueryLog => p z.1) = p ∘ Prod.fst from rfl,
@@ -270,7 +270,7 @@ lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
 
 @[simp]
 lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     (oa : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ spec.loggingOracle oa).run] =
       Pr[= x | oa] := by
@@ -300,7 +300,7 @@ theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
   isQueryBound_iff_of_map_eq (loggingOracle.fst_map_run_simulateQ oa) _ _
 
 theorem isQueryBoundP_run_simulateQ_loggingOracle_iff
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited] {α : Type}
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : ι → Prop) [DecidablePred p] (n : ℕ) :
     IsQueryBoundP ((simulateQ loggingOracle oa).run) p n ↔
     IsQueryBoundP oa p n :=
@@ -317,7 +317,7 @@ theorem isTotalQueryBound_run_simulateQ_withLogging_iff
 
 theorem isQueryBoundP_run_simulateQ_withLogging_iff
     {ι : Type} {spec : OracleSpec.{0, 0} ι}
-    {ι' : Type} {spec' : OracleSpec.{0, 0} ι'} [spec'.Fintype] [spec'.Inhabited]
+    {ι' : Type} {spec' : OracleSpec.{0, 0} ι'} [IsUniformSpec spec']
     (so : QueryImpl spec (OracleComp spec'))
     {α : Type} (mx : OracleComp spec α)
     (q : ι' → Prop) [DecidablePred q] (n : ℕ) :
@@ -327,7 +327,7 @@ theorem isQueryBoundP_run_simulateQ_withLogging_iff
 
 theorem isPerIndexQueryBound_run_simulateQ_loggingOracle_iff
     {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (qb : ι → ℕ) :
     IsPerIndexQueryBound ((simulateQ loggingOracle oa).run) qb ↔
     IsPerIndexQueryBound oa qb :=
@@ -336,7 +336,7 @@ theorem isPerIndexQueryBound_run_simulateQ_loggingOracle_iff
 theorem isPerIndexQueryBound_run_simulateQ_withLogging_iff
     {ι : Type} {spec : OracleSpec.{0, 0} ι}
     {ι' : Type} [DecidableEq ι'] {spec' : OracleSpec.{0, 0} ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     (so : QueryImpl spec (OracleComp spec'))
     {α : Type} (mx : OracleComp spec α) (qb : ι' → ℕ) :
     IsPerIndexQueryBound ((simulateQ (so.withLogging) mx).run) qb ↔
@@ -348,7 +348,7 @@ if `oa` makes at most `n` queries, then every support point of
 `(simulateQ loggingOracle oa).run` has log length at most `n`. -/
 theorem log_length_le_of_mem_support_run_simulateQ
     {ι : Type} {spec : OracleSpec.{0, 0} ι}
-    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
+    [spec.DecidableEq] [IsUniformSpec spec] {α : Type}
     {oa : OracleComp spec α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
     {z : α × QueryLog spec}
