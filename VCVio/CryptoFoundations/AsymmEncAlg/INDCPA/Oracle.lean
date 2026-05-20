@@ -287,7 +287,7 @@ lemma IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false
 /-- If a counted IND-CPA hybrid implementation agrees with the counted real implementation
 through the first `q` fresh LR queries, then any adversary making at most `q` LR queries sees
 the same output distribution as in the real IND-CPA game. -/
-theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq [Fintype C] [Inhabited C]
+theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq [Finite C] [Inhabited C]
     (implCounted : PK → Bool → ℕ →
       QueryImpl encAlg'.IND_CPA_oracleSpec (StateT encAlg'.IND_CPA_CountedState ProbComp))
     (hsame : ∀ (pk : PK) (b : Bool) (realUntil : ℕ)
@@ -372,7 +372,7 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq [Fintype C] [Inhabited
 /-- A counted IND-CPA hybrid game agrees with the real IND-CPA experiment whenever the hybrid
 implementation matches the real counted implementation on all states that stay below the query
 budget. -/
-theorem IND_CPA_countedGame_eq_game_of_MakesAtMostQueries [Fintype C] [Inhabited C]
+theorem IND_CPA_countedGame_eq_game_of_MakesAtMostQueries [Finite C] [Inhabited C]
     (implCounted : PK → Bool → ℕ →
       QueryImpl encAlg'.IND_CPA_oracleSpec (StateT encAlg'.IND_CPA_CountedState ProbComp))
     (hsame : ∀ (pk : PK) (b : Bool) (realUntil : ℕ)
@@ -434,7 +434,7 @@ theorem IND_CPA_LR_hybridGame_zero_evalDist_eq_right
 
 /-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid is the
 all-left endpoint game. -/
-theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries [Fintype C] [Inhabited C]
+theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries [Finite C] [Inhabited C]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     𝒟[encAlg'.IND_CPA_LR_hybridGame adversary q] =
@@ -484,7 +484,7 @@ theorem IND_CPA_LR_hybridGame_zero_probOutput_eq_right
 /-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid has
 the same success probability as the all-left endpoint. -/
 theorem IND_CPA_LR_hybridGame_q_probOutput_eq_left_of_MakesAtMostQueries
-    [Fintype C] [Inhabited C]
+    [Finite C] [Inhabited C]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary q] =

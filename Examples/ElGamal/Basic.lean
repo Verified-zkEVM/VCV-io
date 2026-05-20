@@ -320,7 +320,7 @@ theorem elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage
 /-- **Main theorem.** If an adversary makes at most `q` LR queries and every extracted one-time
 ElGamal DDH reduction has guess advantage at most `ε`, then ElGamal has IND-CPA advantage at most
 `q * (2 * ε)`. -/
-theorem elGamal_IND_CPA_le_q_mul_ddh [Fintype G]
+theorem elGamal_IND_CPA_le_q_mul_ddh [Finite G]
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elGamalAsymmEnc F G gen).IND_CPA_adversary)
     (q : ℕ) (ε : ℝ)

@@ -96,7 +96,7 @@ private def bindingInner {t : ℕ} (A : BindingAdversary M S C t) :
 private lemma bindingGame_eq {t : ℕ} (A : BindingAdversary M S C t) :
     bindingGame A = (simulateQ cachingOracle (bindingInner A)).run ∅ := rfl
 
-private lemma binding_win_implies_collision {t : ℕ} [Fintype C] [Inhabited C]
+private lemma binding_win_implies_collision {t : ℕ} [Finite C] [Inhabited C]
     (A : BindingAdversary M S C t) :
     ∀ z ∈ support ((simulateQ cachingOracle (bindingInner A)).run ∅),
       z.1 = true → CacheHasCollision z.2 := by

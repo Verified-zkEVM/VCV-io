@@ -10,7 +10,9 @@ open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S]
-  [Fintype C] [Inhabited C]
+  [Finite C] [Inhabited C]
+
+attribute [local instance] Fintype.ofFinite
 
 section experiments
 
@@ -52,6 +54,7 @@ def hidingMixedSim {AUX : Type} {t : ℕ}
 
 end experiments
 
+omit [Finite C] [Inhabited C] in
 lemma run_simulateQ_hidingAvgRightImpl_eq_liftComp {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
     (st : HidingCountState M S C) :
@@ -80,6 +83,7 @@ lemma run_simulateQ_hidingAvgRightImpl_eq_liftComp {α : Type}
       exact OracleComp.bind_congr' hstep (fun p => by
         simpa using ih p.1 p.2)
 
+omit [Finite C] [Inhabited C] in
 variable [Inhabited M] [Inhabited S] in
 lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
@@ -183,6 +187,7 @@ theorem sum_probEvent_hidingBad_eq_avg_bad_mass {AUX : Type} {t : ℕ}
           rw [hprob]
 
 variable [Fintype S] [Inhabited M] [Inhabited S] in
+omit [Inhabited M] in
 lemma probEvent_hidingAvg_bad_le_wp_selectedCountPred
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
@@ -302,12 +307,14 @@ theorem sum_probEvent_hidingBad_le_sum_wp_countPred {AUX : Type} {t : ℕ}
                 card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
                   (M := M) (S := S) (C := C) A
 
+omit [Finite C] [Inhabited C] in
 /-- The real hiding game is `simulateQ cachingOracle` applied to the shared computation. -/
 theorem hidingReal_eq {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     hidingReal A s = (simulateQ cachingOracle (hidingOa A s)).run' ∅ := by
   simp only [hidingReal, hidingOa]
 
+omit [Finite C] [Inhabited C] in
 /-- The real hiding game equals `simulateQ hidingImpl₁` projected to discard the counter.
 This lifts cachingOracle's state by pairing it with the salt counter. -/
 theorem hidingReal_eq_impl₁ {AUX : Type} {t : ℕ}
@@ -329,6 +336,7 @@ theorem hidingReal_eq_impl₁ {AUX : Type} {t : ℕ}
     ) (hidingOa A s) (∅, 0)).symm
 
 variable [Inhabited M] [Inhabited S] in
+omit [Finite C] [Inhabited C] in
 /-- The implementations agree when `¬bad`: when the counter is less than 2,
 `hidingImpl₁` and `hidingImpl₂` produce the same monadic computation.
 The redirect condition `cnt ≥ 2 && salt = s` is `false` since `cnt < 2`. -/
@@ -349,13 +357,14 @@ theorem hidingImpl_agree (s : S) (ms : M × S)
       simp [this]
     rw [hcnt]
 
-omit [DecidableEq M] [DecidableEq S] [Fintype C] [Inhabited C] in
+omit [DecidableEq M] [DecidableEq S] [Finite C] [Inhabited C] in
 /-- `hidingBad` is upward-closed in the counter component. -/
 private lemma hidingBad_of_counter_le
     {st₁ st₂ : QueryCache (CMOracle M S C) × ℕ}
     (h : hidingBad st₁) (hle : st₁.2 ≤ st₂.2) : hidingBad st₂ := by
   simp only [hidingBad] at h ⊢; omega
 
+omit [Finite C] [Inhabited C] in
 /-- One-step counter growth bound for `hidingImpl₁`:
 the salt counter is monotone and increases by at most one. -/
 theorem hidingImpl₁_counter_le_succ (s : S) (ms : M × S)
@@ -380,6 +389,7 @@ theorem hidingImpl₁_counter_le_succ (s : S) (ms : M × S)
     simp
     split <;> omega
 
+omit [Finite C] [Inhabited C] in
 /-- Bad is monotone for `hidingImpl₁`: once the counter reaches 2, it stays ≥ 2. -/
 theorem hidingImpl₁_bad_mono (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
@@ -401,6 +411,7 @@ The proof uses `hidingImplSim`, which redirects all salt-`s` cache misses to
 
 The `Pr[bad] ≤ t/|S|` bound requires `s` to be uniformly random (see below). -/
 
+omit [Finite C] [Inhabited C] in
 variable [Inhabited M] [Inhabited S] in
 /-- One-step counter growth bound for `hidingImplSim`:
 the salt counter is monotone and increases by at most one. -/
@@ -426,6 +437,7 @@ theorem hidingImplSim_counter_le_succ (s : S) (ms : M × S)
     simp
     split <;> omega
 
+omit [Finite C] [Inhabited C] in
 variable [Inhabited M] [Inhabited S] in
 /-- Bad is monotone for `hidingImplSim`: once cnt ≥ 2, it stays ≥ 2. -/
 theorem hidingImplSim_bad_mono (s : S) (ms : M × S)
@@ -468,6 +480,7 @@ theorem hidingImpl_agree_dist (s : S) (ms : M × S)
     refine tsum_congr fun x => ?_
     congr 1
 
+omit [Finite C] [Inhabited C] in
 variable [Inhabited M] [Inhabited S] in
 /-- The sim game equals `hidingImplSim` applied to `hidingOa`, projected to output.
 

@@ -19,7 +19,9 @@ open scoped OracleSpec.PrimitiveQuery
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S]
-  [Fintype C] [Inhabited C]
+  [Finite C] [Inhabited C]
+
+attribute [local instance] Fintype.ofFinite
 
 variable [Fintype S] [Inhabited S] in
 lemma wp_choose_sumHitIndicators_le_queryBound
@@ -36,7 +38,7 @@ lemma wp_choose_sumHitIndicators_le_queryBound
         sum_chooseHitIndicators_le_sumCounts qchoose.2.2))
     (wp_choose_sumCounts_le_queryBound (M := M) (S := S) (C := C) A)
 
-omit [DecidableEq M] [DecidableEq S] [Fintype C] [Inhabited C] in
+omit [DecidableEq M] [DecidableEq S] [Finite C] [Inhabited C] in
 lemma run_simulateQ_loggingOracle_query_bind {α : Type}
     (t : (CMOracle M S C).Domain) (mx : (CMOracle M S C).Range t → OracleComp (CMOracle M S C) α) :
     (simulateQ loggingOracle (liftM (query t) >>= mx)).run =
@@ -48,7 +50,7 @@ lemma run_simulateQ_loggingOracle_query_bind {α : Type}
     Function.id_def]
 
 variable [Fintype S] in
-omit [DecidableEq M] [Fintype C] [Inhabited C] in
+omit [DecidableEq M] [Finite C] [Inhabited C] in
 lemma sum_querySaltCounts_eq_length
     (log : QueryLog (CMOracle M S C)) :
     (∑ s : S,
@@ -92,7 +94,7 @@ lemma sum_querySaltCounts_eq_length
         _ = log.length + 1 := by rw [ih, Nat.add_comm]
 
 variable [Fintype S] in
-omit [DecidableEq M] [Fintype C] [Inhabited C] in
+omit [DecidableEq M] [Finite C] [Inhabited C] in
 lemma sum_querySaltIndicators_le_logLength
     (log : QueryLog (CMOracle M S C)) :
     (∑ s : S,
@@ -107,6 +109,7 @@ lemma sum_querySaltIndicators_le_logLength
       (counts := fun s => QueryLog.countQ log (fun t : (CMOracle M S C).Domain => t.2 = s))) ?_
   exact le_of_eq hcounts
 
+omit [Finite C] [Inhabited C] in
 variable [Fintype M] [Fintype S] in
 lemma log_length_le_of_mem_support_counting_simulate_run_logging
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
@@ -179,6 +182,7 @@ lemma log_length_le_of_mem_support_counting_simulate_run_logging
         simpa using Nat.succ_le_of_lt hlt
       simpa [hzlog] using hcons
 
+omit [Finite C] in
 lemma log_length_le_of_mem_support_run_cached_logging
     [Finite M] [Finite S] [Finite C]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
@@ -377,7 +381,7 @@ lemma sum_wp_querySaltIndicators_le_queryBound_of_run_logging
     _ = (n : ℝ≥0∞) := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
-omit [Fintype C] [Inhabited C] in
+omit [Finite C] [Inhabited C] in
 theorem run_cached_logging_proj_eq_cachingOracle
     {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
@@ -407,7 +411,7 @@ theorem run_cached_logging_proj_eq_cachingOracle
           simpa [simulateQ_map, StateT.map, StateT.run, Function.comp_def] using
             ih u (cache₀.cacheQuery t u)
 
-omit [DecidableEq M] [DecidableEq S] [Fintype C] [Inhabited C] in
+omit [DecidableEq M] [DecidableEq S] [Finite C] [Inhabited C] in
 lemma queryLog_countQ_pos_of_mem
     {entry : (t : (CMOracle M S C).Domain) × (CMOracle M S C).Range t}
     {log : QueryLog (CMOracle M S C)}
@@ -524,7 +528,7 @@ lemma fresh_incrementIndicator_le_querySaltIndicator_cached_logging
           (M := M) (S := S) (C := C) hmem (by simp [hsalt])
   exact le_trans hcount_to_cache hcache_to_log
 
-omit [Fintype C] [Inhabited C] in
+omit [Finite C] [Inhabited C] in
 lemma cacheQuery_swap_of_ne
     (cache : QueryCache (CMOracle M S C))
     {t₀ t₁ : (CMOracle M S C).Domain}

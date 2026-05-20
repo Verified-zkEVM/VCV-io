@@ -639,7 +639,7 @@ theorem IND_CPA_stepAdversary_signedAdvantageReal_eq_hybridDiff_half
 /-- Planned generic one-time-to-many-time lift: bounded multi-query IND-CPA advantage is at most
 the sum of the extracted one-time signed advantages over the first `q` fresh LR queries. -/
 theorem IND_CPA_advantage_toReal_le_sum_step_signedAdvantageReal_abs
-    [Inhabited M] [Fintype C] [Inhabited C]
+    [Inhabited M] [Finite C] [Inhabited C]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     (IND_CPA_advantage (encAlg := encAlg') adversary).toReal ≤
@@ -725,7 +725,7 @@ theorem IND_CPA_advantage_toReal_le_sum_step_signedAdvantageReal_abs
 signed real advantage at most `ε`, then any `q`-query oracle adversary has IND-CPA advantage at
 most `q * ε`. -/
 theorem IND_CPA_advantage_toReal_le_q_mul_of_oneTime_signedAdvantageReal_bound
-    [Inhabited M] [Fintype C] [Inhabited C]
+    [Inhabited M] [Finite C] [Inhabited C]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ) (ε : ℝ)
     (hq : adversary.MakesAtMostQueries q)
     (hstep : ∀ adv : IND_CPA_Adv encAlg',

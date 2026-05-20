@@ -87,8 +87,8 @@ theorem correct :
   intro msg
   simp [AsymmEncAlg.CorrectExp, ProbCompRuntime.probComp, ProbCompRuntime.evalDist,
     hashedElGamal, hcomm, SPMF.probFailure_liftM]
-  show 1 - Pr[⊥ | ($ᵗ HK : ProbComp HK)] = 1
-  simp [probFailure_uniformSample]
+  change 1 - Pr[⊥ | ($ᵗ HK : ProbComp HK)] = 1
+  simp
 
 /-! ## DDH Reduction -/
 

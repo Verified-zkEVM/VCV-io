@@ -34,9 +34,11 @@ open OracleComp OracleSpec
 namespace FiatShamir
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type}
-    [Fintype Chal] [Fintype Commit] [Fintype Resp]
+    [Fintype Chal] [Finite Commit] [Finite Resp]
     [Inhabited Chal] [Inhabited Commit] [Inhabited Resp]
     {rel : Stmt → Wit → Bool}
+
+attribute [local instance] Fintype.ofFinite
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
