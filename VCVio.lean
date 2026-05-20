@@ -46,6 +46,8 @@ import VCVio.CryptoFoundations.MacAlg
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Binding
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Completeness
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
+import VCVio.CryptoFoundations.MerkleTree.Inductive.Extractability
+import VCVio.CryptoFoundations.MerkleTree.Inductive.QueryBound
 import VCVio.CryptoFoundations.MerkleTree.Inductive.Uniqueness
 import VCVio.CryptoFoundations.MerkleTree.Vector.Completeness
 import VCVio.CryptoFoundations.MerkleTree.Vector.Defs

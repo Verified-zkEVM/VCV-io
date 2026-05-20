@@ -93,7 +93,8 @@ def buildMerkleTree {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
 
 /--
 A functional form of merkle tree construction, that doesn't depend on the monad.
-This receives an explicit hash function
+This receives an explicit hash function. Implemented as the bottom-up
+`populateUp` from `ToMathlib.Data.IndexedBinaryTree.Basic`.
 -/
 @[simp, grind]
 def buildMerkleTreeWithHash {s} (leaf_tree : LeafData α s) (hashFn : α → α → α) :
