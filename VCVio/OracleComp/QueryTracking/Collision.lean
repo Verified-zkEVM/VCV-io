@@ -45,6 +45,42 @@ def LogHasCollision (log : QueryLog spec) : Prop :=
   ∃ (i j : Fin log.length), i ≠ j ∧
     log[i].1 ≠ log[j].1 ∧ HEq log[i].2 log[j].2
 
+omit [DecidableEq ι] [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
+/-- Value-form constructor for `LogHasCollision`: any two distinct log entries with
+`HEq`-equal outputs (note: distinctness forces distinct inputs when outputs match) witness
+a collision. -/
+lemma LogHasCollision.of_mem {log : QueryLog spec}
+    {q1 q2 : (i : ι) × spec.Range i}
+    (hne : q1 ≠ q2) (hm1 : q1 ∈ log) (hm2 : q2 ∈ log) (hresp : HEq q1.2 q2.2) :
+    LogHasCollision log := by
+  rcases List.mem_iff_getElem.mp hm1 with ⟨i, hi, hgi⟩
+  rcases List.mem_iff_getElem.mp hm2 with ⟨j, hj, hgj⟩
+  have hgi' : log[(⟨i, hi⟩ : Fin log.length)] = q1 := hgi
+  have hgj' : log[(⟨j, hj⟩ : Fin log.length)] = q2 := hgj
+  refine ⟨⟨i, hi⟩, ⟨j, hj⟩, ?_, ?_, ?_⟩
+  · intro heq_idx
+    apply hne
+    rw [← hgi', ← hgj']
+    exact congrArg (log[·]) heq_idx
+  · rw [hgi', hgj']
+    intro h_inputs_eq
+    apply hne
+    rcases q1 with ⟨i1, v1⟩; rcases q2 with ⟨i2, v2⟩
+    cases h_inputs_eq
+    exact congrArg _ (eq_of_heq hresp)
+  · rw [hgi', hgj']; exact hresp
+
+omit [DecidableEq ι] [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
+/-- `LogHasCollision` is monotone under log inclusion (member-wise). -/
+lemma LogHasCollision.mono {log₁ log₂ : QueryLog spec}
+    (h_sub : ∀ q, q ∈ log₁ → q ∈ log₂) :
+    LogHasCollision log₁ → LogHasCollision log₂ := by
+  rintro ⟨i, j, hij, h_inp, h_out⟩
+  refine LogHasCollision.of_mem ?_
+    (h_sub _ (List.getElem_mem _)) (h_sub _ (List.getElem_mem _)) h_out
+  intro h_eq_sigma
+  exact h_inp (congrArg Sigma.fst h_eq_sigma)
+
 /-- A cache has a collision: two distinct inputs map to the same output. -/
 def CacheHasCollision (cache : QueryCache spec) : Prop :=
   ∃ (t₁ t₂ : spec.Domain) (u₁ : spec.Range t₁) (u₂ : spec.Range t₂),
