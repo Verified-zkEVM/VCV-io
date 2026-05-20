@@ -99,8 +99,6 @@ instance instLawfulMonadLiftTSetM : LawfulMonadLiftT (OracleComp spec) SetM wher
 lemma evalDist_eq_simulateQ [spec.Fintype] [spec.Inhabited] (mx : OracleComp spec α) :
     𝒟[mx] = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
 
-
-
 @[simp, grind =] lemma support_liftM (q : OracleQuery spec α) :
     support (liftM q : OracleComp spec α) = Set.range q.cont := by
   change SetM.run (simulateQ (r := SetM) (fun _ => Set.univ) (liftM q)) = Set.range q.cont

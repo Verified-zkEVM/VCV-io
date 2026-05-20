@@ -318,10 +318,6 @@ theorem IsQueryBoundP.mono {oa : OracleComp spec α} {n m : ℕ}
       · simp only [if_neg hpt] at hu ⊢
         exact ih u hu hnm
 
-section needs_fintype_inhabited
-
--- variable [spec.Fintype] [spec.Inhabited]
-
 /-- `oa >>= ob` is `p`-bounded by `n + m` when `oa` is `p`-bounded by `n` and every reachable
 continuation `ob x` is `p`-bounded by `m`. -/
 lemma isQueryBoundP_bind
@@ -445,8 +441,6 @@ theorem IsQueryBoundP.and_isQueryBound_pair
       rw [isQueryBound_query_bind_iff]
       refine ⟨⟨h₁.1, h₂.1⟩, fun u => ?_⟩
       exact ih u (h₁.2 u) (h₂.2 u)
-
-end needs_fintype_inhabited
 
 end IsQueryBoundP
 

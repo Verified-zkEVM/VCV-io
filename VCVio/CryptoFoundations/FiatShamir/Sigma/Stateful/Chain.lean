@@ -1596,7 +1596,7 @@ private lemma forkLogged_base_support
   simpa [forkLoggedImpl, forkInitialState, forkInitialBaseState] using
     (by rw [hproj] at hmem; exact hmem)
 
-omit [Fintype Stmt] [Inhabited Stmt] in
+omit [Fintype Stmt] [Fintype Chal] [Inhabited Stmt] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma forkLogged_queryLog_length_le
     (adv : SignatureAlg.unforgeableAdv
@@ -2168,7 +2168,8 @@ private lemma verifyFreshComp_expectedQuerySlack_eq_zero
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 omit [Finite Chal] in
-omit [Fintype Chal] [Inhabited Chal] in
+omit [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+  [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- Tight native H3 bound for the freshness-preserving adversary, using the
 candidate/verifier split so the final verifier hash query is not charged to H3
 signing replacement. -/
@@ -2329,6 +2330,8 @@ theorem cmaSim_signedFreshAdv_le_fork
       (Stmt := Stmt) (Wit := Wit) adv simT qS qH hQ)
 
 omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+  [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] in
 /-- Native stateful top-level chain, assuming the H5 replay-forking boundary.
 
 This theorem carries the H1/H2/H3/H4 arithmetic directly in the stateful chain.
@@ -2414,7 +2417,7 @@ theorem cma_advantage_le_fork_bound_of_h5
         ring_nf
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-omit [Fintype Chal] in
+omit [Fintype Stmt] [Fintype Chal] [Inhabited Stmt] in
 /-- Native stateful chain with H5 discharged by the replay-forking boundary,
 leaving only the public-to-stateful H1/H2 compatibility premise. -/
 theorem cma_advantage_le_fork_bound_of_h1h2

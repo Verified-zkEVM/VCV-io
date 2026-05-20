@@ -57,17 +57,15 @@ structure FischlinROInput (Stmt Commit Chal Resp : Type) (ρ : ℕ) (M : Type) w
   resp : Resp
   deriving DecidableEq
 
-variable (Stmt Commit Chal Resp : Type) (ρ b : ℕ) (M : Type) in
 /-- The random oracle specification for the Fischlin transform.
 Domain: `FischlinROInput` (statement, message, commitment list, index, challenge, response).
 Range: `Fin (2^b)` (b-bit hash values). -/
-abbrev fischlinROSpec :=
+abbrev fischlinROSpec (Stmt Commit Chal Resp : Type) (ρ b : ℕ) (M : Type) :=
   FischlinROInput Stmt Commit Chal Resp ρ M →ₒ Fin (2 ^ b)
 
-variable (Commit Chal Resp : Type) (ρ : ℕ) in
 /-- A Fischlin proof consists of one `(commitment, challenge, response)` triple
 per parallel repetition. -/
-abbrev FischlinProof := Fin ρ → Commit × Chal × Resp
+abbrev FischlinProof (Commit Chal Resp : Type) (ρ : ℕ) := Fin ρ → Commit × Chal × Resp
 
 /-! ## Prover Search -/
 
@@ -761,10 +759,9 @@ section expectedWeightedQueryCost
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [DecidableEq M] [MonadLiftT m SPMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m SPMF] in
 /-- Fischlin signing has expected weighted query cost at most `ρ • (|Ω| • w)` whenever every
 random-oracle query is weighted by at most `w`. -/
 theorem sign_expectedQueryCost_le
@@ -791,10 +788,9 @@ section expectedQueries
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [DecidableEq M] [MonadLiftT m SPMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m SPMF] in
 /-- Fischlin signing has expected query count at most `ρ * |Ω|` in the unit-cost runtime model.
 
 This is the expectation-level counterpart of
@@ -816,10 +812,9 @@ section expectedQueriesPMF
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+  [DecidableEq M] [MonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m PMF] in
 /-- Fischlin verification has expected query count exactly `ρ` in the unit-cost runtime model. -/
 theorem verify_expectedQueries_eq_rho
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)

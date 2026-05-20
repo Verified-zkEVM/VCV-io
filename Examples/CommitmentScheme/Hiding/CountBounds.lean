@@ -61,10 +61,9 @@ theorem probEvent_hidingBad_eq_countAll {AUX : Type} {t : ℕ}
   rfl
 
 omit [Finite C] [Inhabited C] in
-variable [Fintype S] in
 /-- One-step growth bound for the shared counted hiding implementation:
 the total count increases by at most one. -/
-lemma sum_counts_step_le_succ_hidingImplCountAll (ms : M × S)
+lemma sum_counts_step_le_succ_hidingImplCountAll [Fintype S] (ms : M × S)
     (st : QueryCache (CMOracle M S C) × (S → ℕ))
     (x : C × (QueryCache (CMOracle M S C) × (S → ℕ)))
     (hx : x ∈ support ((hidingImplCountAll (M := M) (S := S) (C := C) ms).run st)) :
@@ -86,9 +85,8 @@ lemma sum_counts_step_le_succ_hidingImplCountAll (ms : M × S)
       simp [sum_update_succ_count]
 
 omit [Finite C] in
-variable [Fintype S] [Inhabited S] in
 lemma hiding_distinguish_totalBound_of_choose_count_support
-    [Finite M] [Finite C]
+    [Fintype S] [Inhabited S] [Finite M] [Finite C]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {x : (M × AUX) × (QueryCache (CMOracle M S C) × (S → ℕ))}
@@ -503,10 +501,9 @@ lemma wp_freshDistinguishIncrement_eq
     simp [hzero]
 
 omit [Finite C] [Inhabited C] in
-variable [Fintype S] in
 /-- On the support of the counted hiding run, the total count is at most `n`
 plus the initial total count. -/
-lemma sum_counts_le_of_mem_support_run_hidingImplCountAll
+lemma sum_counts_le_of_mem_support_run_hidingImplCountAll [Fintype S]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
     {st₀ : QueryCache (CMOracle M S C) × (S → ℕ)}
@@ -644,10 +641,9 @@ lemma exists_new_salt_cacheEntry_of_count_gt_one
               hcount' hself' hunique' hz' hgt
 
 omit [Finite C] in
-variable [Fintype S] [Inhabited S] in
 /-- Along the counted choose run, the total per-salt miss count is bounded by the
 adversary query budget `t`. -/
-lemma sum_counts_le_queryBound_of_mem_support_run_hidingChoose
+lemma sum_counts_le_queryBound_of_mem_support_run_hidingChoose [Fintype S] [Inhabited S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × (QueryCache (CMOracle M S C) × (S → ℕ))}
@@ -662,8 +658,7 @@ lemma sum_counts_le_queryBound_of_mem_support_run_hidingChoose
       (z := qchoose)
       hqchoose)
 
-variable [Fintype S] [Inhabited S] in
-lemma wp_choose_sumCounts_le_queryBound
+lemma wp_choose_sumCounts_le_queryBound [Fintype S] [Inhabited S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     OracleComp.ProgramLogic.wp
@@ -693,11 +688,11 @@ lemma wp_choose_sumCounts_le_queryBound
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 omit [Finite C] [Inhabited C] in
-variable [Fintype M] [Fintype S] in
 /-- Every support point of `simulateQ hidingImplCountAll` is dominated by some
 `countingOracle.simulate` support point: the total count across all salts is
 bounded by the initial counts plus the counting oracle's total query cost. -/
 lemma exists_counting_support_of_mem_support_run_hidingImplCountAll
+    [Fintype M] [Fintype S]
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {st₀ : QueryCache (CMOracle M S C) × (S → ℕ)}
     {z : α × (QueryCache (CMOracle M S C) × (S → ℕ))}
@@ -747,11 +742,10 @@ lemma exists_counting_support_of_mem_support_run_hidingImplCountAll
       omega
 
 omit [Finite C] [Inhabited C] in
-variable [Fintype M] in
 /-- Per-coordinate variant of `exists_counting_support_of_mem_support_run_hidingImplCountAll`:
 for each salt `t`, the per-salt count `z.2.2 t` is bounded by the initial count
 plus the counting oracle's per-index query count at `t`. -/
-lemma exists_counting_support_of_mem_support_run_hidingImplCountAll_coord
+lemma exists_counting_support_of_mem_support_run_hidingImplCountAll_coord [Fintype M]
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {st₀ : QueryCache (CMOracle M S C) × (S → ℕ)}
     {z : α × (QueryCache (CMOracle M S C) × (S → ℕ))}
@@ -1089,10 +1083,9 @@ lemma wp_countPred_le_queryBound_of_run_hidingImplCountAll
     _ = t := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
-variable [Fintype S] in
 /-- For a fixed computation under the shared counted implementation, the sum of
 expected per-salt count increments is bounded by the total query bound. -/
-lemma sum_wp_countIncrements_le_queryBound_of_run_hidingImplCountAll
+lemma sum_wp_countIncrements_le_queryBound_of_run_hidingImplCountAll [Fintype S]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
     (st₀ : QueryCache (CMOracle M S C) × (S → ℕ)) :
@@ -1160,12 +1153,11 @@ lemma sum_wp_countIncrements_le_queryBound_of_run_hidingImplCountAll
     _ = (n : ℝ≥0∞) := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
-variable [Fintype S] in
 /-- For a fixed computation under the shared counted implementation, the sum of
 expected indicators of whether each salt counter ever increases is bounded by the
 total query bound. -/
 lemma sum_wp_countIncrementIndicators_le_queryBound_of_run_hidingImplCountAll
-    [Finite M]
+    [Fintype S] [Finite M]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
     (st₀ : QueryCache (CMOracle M S C) × (S → ℕ)) :
@@ -1300,8 +1292,7 @@ lemma wp_countPred_le_initialPred_add_wp_countIncrement
           (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - st₀.2 s : ℝ≥0∞)) := by
             rw [OracleComp.ProgramLogic.wp_add, OracleComp.ProgramLogic.wp_const]
 
-variable [Fintype S] in
-lemma sum_wp_countPred_le_sum_initialPred_add_sum_wp_countIncrements
+lemma sum_wp_countPred_le_sum_initialPred_add_sum_wp_countIncrements [Fintype S]
     {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
     (st₀ : QueryCache (CMOracle M S C) × (S → ℕ)) :

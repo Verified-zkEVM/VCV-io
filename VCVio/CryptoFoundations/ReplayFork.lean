@@ -1556,7 +1556,7 @@ end support
 
 section quantitative
 
-variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+variable [spec.DecidableEq]
 variable [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec]
 variable [unifSpec ˡ⊂ₒ spec]
 
@@ -1628,7 +1628,7 @@ private theorem isTotalQueryBound_replayRunWithTraceValue
   exact IsTotalQueryBound.simulateQ_run_of_step (impl := replayOracle i) hmain
     (fun t s => replayOracle_step_isTotalQueryBound i t s) _
 
-omit [unifSpec ˡ⊂ₒ spec] in
+omit [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec] in
 /-- If `forkReplay` succeeds, both runs agree on the selected fork index. -/
 private theorem cf_eq_of_mem_support_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)

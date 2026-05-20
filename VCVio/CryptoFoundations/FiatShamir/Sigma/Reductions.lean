@@ -29,8 +29,8 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
-omit [Fintype Chal] in
-omit [Inhabited Chal] in
+omit [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+  [Inhabited Stmt] [Inhabited Chal] in
 /-- CMA-to-NMA reduction for Fiat-Shamir signatures built from a Sigma protocol.
 
 The reduction runs the CMA adversary with simulated signing transcripts and a
@@ -47,6 +47,7 @@ indexes `Fin (qH + 1)`, which is exactly the right number of forkable slots
 verifier slot). The replay-forking denominator is therefore `qH + 1`. -/
 theorem cma_to_nma_advantage_bound
     [DecidableEq M] [DecidableEq Commit] [SampleableType Stmt] [SampleableType Wit]
+    [Finite Stmt] [Finite Commit] [Finite Resp]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
@@ -63,6 +64,9 @@ theorem cma_to_nma_advantage_bound
       adv.advantage (runtime M) ≤
         Fork.advantage σ hr M nmaAdv qH +
           ENNReal.ofReal ((qS : ℝ) * ζ_zk) + (qS : ENNReal) * (qS + qH) * β := by
+  letI : Fintype Stmt := Fintype.ofFinite Stmt
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   refine ⟨Stateful.nmaAdvFromCmaWithFinalQuery σ hr M adv simTranscript, ?_⟩
   exact Stateful.cma_advantage_le_fork_bound_of_h1h2 σ hr M
     simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
@@ -80,7 +84,7 @@ theorem cma_to_nma_advantage_bound
 
 section evalDistBridge
 
-variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
+variable [SampleableType Chal]
 
 /-- The `ofLift + uniformSampleImpl` simulation on `unifSpec + (Unit →ₒ Chal)` preserves
 `evalDist`. Both oracle components sample uniformly from their range. -/
@@ -142,7 +146,7 @@ private def forkSupportInvariant
       x.roCache x.target = some ω ∧
       σ.verify pk x.target.2 ω x.forgery.2.2 = true
 
-variable [SampleableType Wit] [SampleableType Chal] [Fintype Chal] [Inhabited Chal]
+variable [SampleableType Wit] [SampleableType Chal]
 
 /-- Witness-extraction computation used by the NMA reduction. -/
 private noncomputable def nmaForkExtract
@@ -177,7 +181,9 @@ private noncomputable def nmaReduction
   simulateQ (QueryImpl.ofLift unifSpec ProbComp +
     (uniformSampleImpl (spec := (Unit →ₒ Chal)))) (nmaForkExtract σ hr M nmaAdv qH pk)
 
-omit [SampleableType Wit] in
+omit [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+  [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
+  [SampleableType Wit] in
 /-- Every `(x, log)` in the support of `replayFirstRun (Fork.runTrace σ hr M nmaAdv pk)`
 satisfies the per-run invariant `forkSupportInvariant`. -/
 private theorem forkSupportInvariant_of_mem_replayFirstRun
@@ -219,6 +225,8 @@ private theorem forkSupportInvariant_of_mem_replayFirstRun
   rw [hωeq]
   exact hverify
 
+omit [Fintype Stmt] [Fintype Commit] [Fintype Resp]
+  [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] in
 /-- Given the structural forking event on `pk`, the NMA reduction recovers a valid witness
 with probability at least that of the fork event under `forkReplay`. -/
 private theorem perPk_extraction_bound
@@ -355,6 +363,8 @@ private theorem perPk_extraction_bound
 
 end nmaToExtraction
 
+omit [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
+  [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- NMA-to-extraction via the forking lemma and special soundness.
 
 The parameter `qH` is the *fork slot parameter* passed to `Fork.forkPoint qH`,

@@ -78,8 +78,6 @@ theorem fst_map_run_simulateQ
 
 section Probability
 
-variable [spec.Fintype]
-
 /-- For a computation that is structurally within budget, the budget check in the
 counting semantics is redundant on the support. -/
 theorem probEvent_counting_budget_eq

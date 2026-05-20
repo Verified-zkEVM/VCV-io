@@ -1499,9 +1499,11 @@ The replay transcript gives a common outer-log prefix up to the consumed fork qu
 `runTrace_queryLog_take_eq` transfers that prefix equality to the internal logical
 `queryLog`, and `forkPoint_getElem?_eq_some_target` identifies each target with
 the selected logical query. -/
+omit [Fintype Chal] in
 open scoped Classical in
 lemma runTrace_target_eq_of_mem_forkReplay
     [DecidableEq M] [DecidableEq Commit] [DecidableEq Chal] [SampleableType Chal]
+    [Finite Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ) (pk : Stmt)
@@ -1515,6 +1517,7 @@ lemma runTrace_target_eq_of_mem_forkReplay
     (h₂ : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH x₂ = some s) :
     x₁.target = x₂.target := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
   classical
   let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
   obtain ⟨log₁, log₂, s', hx₁, hx₂, hcf₁, _hcf₂, _hneq, replacement, st, hz, hlog₂,

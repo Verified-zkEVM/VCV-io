@@ -84,8 +84,8 @@ lemma run_simulateQ_hidingAvgRightImpl_eq_liftComp {α : Type}
         simpa using ih p.1 p.2)
 
 omit [Finite C] [Inhabited C] in
-variable [Inhabited M] [Inhabited S] in
-lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
+lemma run_simulateQ_hidingAvgComp_eq_bind [Inhabited M] [Inhabited S]
+    {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0) =
       (liftM ((Unit →ₒ S).query ()) >>= fun s =>
@@ -126,13 +126,13 @@ lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
         (HidingAvgSpec M S C)))
   rfl
 
-variable [Fintype S] [Inhabited M] [Inhabited S] in
 /-- Averaged-mass bridge for hiding.
 
 This packages the per-salt bad probabilities into the shared `hidingAvgComp`
 run, where the salt is sampled once up front and then the shared count-all
 simulation is reused for the rest of the game. -/
-theorem sum_probEvent_hidingBad_eq_avg_bad_mass {AUX : Type} {t : ℕ}
+theorem sum_probEvent_hidingBad_eq_avg_bad_mass [Fintype S] [Inhabited M] [Inhabited S]
+    {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S, Pr[hidingBad ∘ Prod.snd |
       (simulateQ (hidingImpl₁ s) (hidingOa A s)).run (∅, 0)]) =
@@ -186,9 +186,7 @@ theorem sum_probEvent_hidingBad_eq_avg_bad_mass {AUX : Type} {t : ℕ}
             (simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0)] := by
           rw [hprob]
 
-variable [Fintype S] [Inhabited M] [Inhabited S] in
-omit [Inhabited M] in
-lemma probEvent_hidingAvg_bad_le_wp_selectedCountPred
+lemma probEvent_hidingAvg_bad_le_wp_selectedCountPred [Fintype S] [Inhabited S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     Pr[fun z : ((S × Bool) × HidingCountState M S C) => 2 ≤ z.2.2 z.1.1 |
@@ -211,8 +209,8 @@ lemma probEvent_hidingAvg_bad_le_wp_selectedCountPred
         simpa using hcast)
   simpa [oa] using h
 
-variable [Fintype S] [Inhabited M] [Inhabited S] in
 lemma card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
+    [Fintype S] [Inhabited M] [Inhabited S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (Fintype.card S : ℝ≥0∞) *
@@ -272,10 +270,10 @@ lemma card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
             (fun z : Bool × HidingCountState M S C => (z.2.2 s - 1 : ℝ≥0∞)) := by
           simp [Q]
 
-variable [Fintype S] [Inhabited M] [Inhabited S] in
 /-- Textbook outer bridge: the bad-mass sum is bounded by the per-salt
 count-pred expectations from the shared counted implementation. -/
-theorem sum_probEvent_hidingBad_le_sum_wp_countPred {AUX : Type} {t : ℕ}
+theorem sum_probEvent_hidingBad_le_sum_wp_countPred [Fintype S] [Inhabited M] [Inhabited S]
+    {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S, Pr[hidingBad ∘ Prod.snd |
       (simulateQ (hidingImpl₁ s) (hidingOa A s)).run (∅, 0)]) ≤
@@ -335,12 +333,11 @@ theorem hidingReal_eq_impl₁ {AUX : Type} {t : ℕ}
         simp [StateT.run_set, StateT.run_pure, Prod.map, StateT.run_modifyGet]
     ) (hidingOa A s) (∅, 0)).symm
 
-variable [Inhabited M] [Inhabited S] in
 omit [Finite C] [Inhabited C] in
 /-- The implementations agree when `¬bad`: when the counter is less than 2,
 `hidingImpl₁` and `hidingImpl₂` produce the same monadic computation.
 The redirect condition `cnt ≥ 2 && salt = s` is `false` since `cnt < 2`. -/
-theorem hidingImpl_agree (s : S) (ms : M × S)
+theorem hidingImpl_agree [Inhabited M] [Inhabited S] (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) (h : ¬hidingBad st) :
     (hidingImpl₁ s ms).run st = (hidingImpl₂ s ms).run st := by
   simp only [hidingBad, ge_iff_le, not_le] at h
@@ -412,10 +409,9 @@ The proof uses `hidingImplSim`, which redirects all salt-`s` cache misses to
 The `Pr[bad] ≤ t/|S|` bound requires `s` to be uniformly random (see below). -/
 
 omit [Finite C] [Inhabited C] in
-variable [Inhabited M] [Inhabited S] in
 /-- One-step counter growth bound for `hidingImplSim`:
 the salt counter is monotone and increases by at most one. -/
-theorem hidingImplSim_counter_le_succ (s : S) (ms : M × S)
+theorem hidingImplSim_counter_le_succ [Inhabited M] [Inhabited S] (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ)
     (x : C × (QueryCache (CMOracle M S C) × ℕ))
     (hx : x ∈ support ((hidingImplSim s ms).run st)) :
@@ -438,16 +434,14 @@ theorem hidingImplSim_counter_le_succ (s : S) (ms : M × S)
     split <;> omega
 
 omit [Finite C] [Inhabited C] in
-variable [Inhabited M] [Inhabited S] in
 /-- Bad is monotone for `hidingImplSim`: once cnt ≥ 2, it stays ≥ 2. -/
-theorem hidingImplSim_bad_mono (s : S) (ms : M × S)
+theorem hidingImplSim_bad_mono [Inhabited M] [Inhabited S] (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
     (x : C × (QueryCache (CMOracle M S C) × ℕ))
     (hx : x ∈ support ((hidingImplSim s ms).run st)) :
     hidingBad x.2 :=
   hidingBad_of_counter_le h (hidingImplSim_counter_le_succ s ms st x hx).1
 
-variable [Inhabited M] [Inhabited S] in
 /-- `hidingImpl₁` and `hidingImplSim` agree **distributionally** when `¬bad`.
 
 When `cnt < 2`, the two implementations differ only in the query point for
@@ -457,7 +451,7 @@ queries at `(default, default)`. Since the underlying oracle is memoryless
 are `C`), the returned value has the same distribution. The cache update and
 counter increment are identical (both cache at `ms`, both increment when
 `ms.2 = s`). Therefore every `(output, state)` pair has the same probability. -/
-theorem hidingImpl_agree_dist (s : S) (ms : M × S)
+theorem hidingImpl_agree_dist [Inhabited M] [Inhabited S] (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) (h : ¬hidingBad st)
     (p : C × (QueryCache (CMOracle M S C) × ℕ)) :
     Pr[= p | (hidingImpl₁ s ms).run st] =
@@ -481,18 +475,16 @@ theorem hidingImpl_agree_dist (s : S) (ms : M × S)
     congr 1
 
 omit [Finite C] [Inhabited C] in
-variable [Inhabited M] [Inhabited S] in
 /-- The sim game equals `hidingImplSim` applied to `hidingOa`, projected to output.
 
 This lifts `cachingOracle`'s state by pairing it with the salt counter and
 shows that `hidingImplSim` acts as a state-projection of `cachingOracle` where
 all salt-s queries are redirected. -/
-theorem hidingSim_eq_implSim {AUX : Type} {t : ℕ}
+theorem hidingSim_eq_implSim [Inhabited M] [Inhabited S] {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     hidingSim A s = (simulateQ (hidingImplSim s) (hidingOa A s)).run' (∅, 0) := by
   rfl
 
-variable [Inhabited M] [Inhabited S] in
 /-- For fixed `s`, the TV distance between real and sim games is bounded by
 the probability of the bad event under `hidingImpl₁`.
 
@@ -500,7 +492,8 @@ The proof uses the distributional identical-until-bad lemma
 (`tvDist_simulateQ_le_probEvent_bad_dist`): `hidingImpl₁` (real with counter) and
 `hidingImplSim` (sim with counter) agree distributionally when `¬bad` because the
 underlying oracle is memoryless. -/
-theorem tvDist_hidingReal_hidingSim_le_probBad {AUX : Type} {t : ℕ}
+theorem tvDist_hidingReal_hidingSim_le_probBad [Inhabited M] [Inhabited S]
+    {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     tvDist (hidingReal A s) (hidingSim A s) ≤
     Pr[hidingBad ∘ Prod.snd |
@@ -551,8 +544,7 @@ lemma wp_finset_sum {α : Type}
   · intro s ss hs ih
     simp [Finset.sum_insert, hs, ih, OracleComp.ProgramLogic.wp_add]
 
-variable [Fintype S] in
-lemma sum_wp_hidingOa_eq_wp_choose
+lemma sum_wp_hidingOa_eq_wp_choose [Fintype S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     (post : S → Bool × HidingCountState M S C → ℝ≥0∞) :
@@ -613,8 +605,7 @@ lemma sum_wp_hidingOa_eq_wp_choose
                     ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2)
                     (post s))))
 
-variable [Fintype S] in
-lemma sum_wp_countPred_eq_wp_choose
+lemma sum_wp_countPred_eq_wp_choose [Fintype S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S,
@@ -665,8 +656,7 @@ lemma wp_challenge_countPred_le_initialCount
     _ = st.2 s := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
-variable [Fintype S] in
-lemma sum_wp_challenge_countPred_le_initialCount
+lemma sum_wp_challenge_countPred_le_initialCount [Fintype S]
     (m : M) (st : HidingCountState M S C) :
     (∑ s : S,
       OracleComp.ProgramLogic.wp
@@ -677,8 +667,8 @@ lemma sum_wp_challenge_countPred_le_initialCount
   intro s hs
   exact wp_challenge_countPred_le_initialCount (M := M) (S := S) (C := C) m s st
 
-variable [Fintype S] [Inhabited S] in
 lemma sum_wp_distinguish_countPred_le_sum_initialPred_add_residual
+    [Fintype S] [Inhabited S]
     {AUX : Type} {t : ℕ} [Finite M]
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
@@ -715,8 +705,8 @@ lemma sum_wp_distinguish_countPred_le_sum_initialPred_add_residual
     simpa [add_assoc, add_left_comm, add_comm] using
       add_le_add_left hincr (∑ s : S, (qchoose.2.2 s - 1 : ℝ≥0∞)))
 
-variable [Fintype S] in
 lemma sum_wp_countPred_le_sum_initialPred_add_queryBound_of_run_hidingImplCountAll
+    [Fintype S]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
     (st₀ : HidingCountState M S C) :
@@ -740,8 +730,8 @@ lemma sum_wp_countPred_le_sum_initialPred_add_queryBound_of_run_hidingImplCountA
     simpa [add_assoc, add_left_comm, add_comm] using
       add_le_add_left hincr (∑ s : S, (st₀.2 s - 1 : ℝ≥0∞)))
 
-variable [Fintype S] [Inhabited S] in
 lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
+    [Fintype S] [Inhabited S]
     {AUX : Type} {t : ℕ} [Finite M]
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
@@ -810,8 +800,8 @@ lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
         rw [Nat.cast_sum]
         exact tsub_add_cancel_of_le hcast
 
-variable [Fintype S] [Inhabited S] in
 lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_support
+    [Fintype S] [Inhabited S]
     {AUX : Type} {t : ℕ} [Finite M]
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
@@ -861,8 +851,7 @@ lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_su
     · simp [OracleComp.ProgramLogic.propInd, hslt]
   exact le_trans hmono hres
 
-variable [Fintype S] in
-lemma sum_wp_badIndicator_eq_wp_choose
+lemma sum_wp_badIndicator_eq_wp_choose [Fintype S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S, Pr[hidingBad ∘ Prod.snd |
@@ -909,8 +898,7 @@ lemma sum_wp_badIndicator_eq_wp_choose
             (M := M) (S := S) (C := C) A
             (fun s z => OracleComp.ProgramLogic.propInd (2 ≤ z.2.2 s))
 
-variable [Fintype S] in
-lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support
+lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support [Fintype S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
@@ -1020,8 +1008,7 @@ lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support
         rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
           tsum_probOutput_of_liftM_PMF, one_mul]
 
-variable [Fintype S] in
-lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_support
+lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_support [Fintype S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
@@ -1149,8 +1136,7 @@ lemma sum_chooseHitIndicators_le_sumCounts [Fintype S]
     exact_mod_cast hpos
   · simp [OracleComp.ProgramLogic.propInd, hpos]
 
-variable [Fintype S] in
-lemma sum_wp_freshDistinguishIncrement_eq_query
+lemma sum_wp_freshDistinguishIncrement_eq_query [Fintype S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}

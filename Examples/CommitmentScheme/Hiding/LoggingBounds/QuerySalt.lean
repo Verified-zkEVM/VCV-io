@@ -23,8 +23,7 @@ variable {M S C : Type}
 
 attribute [local instance] Fintype.ofFinite
 
-variable [Fintype S] [Inhabited S] in
-lemma wp_choose_sumHitIndicators_le_queryBound
+lemma wp_choose_sumHitIndicators_le_queryBound [Fintype S] [Inhabited S]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     OracleComp.ProgramLogic.wp
@@ -49,9 +48,8 @@ lemma run_simulateQ_loggingOracle_query_bind {α : Type}
   simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
     Function.id_def]
 
-variable [Fintype S] in
 omit [DecidableEq M] [Finite C] [Inhabited C] in
-lemma sum_querySaltCounts_eq_length
+lemma sum_querySaltCounts_eq_length [Fintype S]
     (log : QueryLog (CMOracle M S C)) :
     (∑ s : S,
       QueryLog.countQ log (fun t : (CMOracle M S C).Domain => t.2 = s)) = log.length := by
@@ -93,9 +91,8 @@ lemma sum_querySaltCounts_eq_length
               rw [hsingle]
         _ = log.length + 1 := by rw [ih, Nat.add_comm]
 
-variable [Fintype S] in
 omit [DecidableEq M] [Finite C] [Inhabited C] in
-lemma sum_querySaltIndicators_le_logLength
+lemma sum_querySaltIndicators_le_logLength [Fintype S]
     (log : QueryLog (CMOracle M S C)) :
     (∑ s : S,
       OracleComp.ProgramLogic.propInd
@@ -110,8 +107,7 @@ lemma sum_querySaltIndicators_le_logLength
   exact le_of_eq hcounts
 
 omit [Finite C] [Inhabited C] in
-variable [Fintype M] [Fintype S] in
-lemma log_length_le_of_mem_support_counting_simulate_run_logging
+lemma log_length_le_of_mem_support_counting_simulate_run_logging [Fintype M] [Fintype S]
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {z : (α × QueryLog (CMOracle M S C)) × QueryCount (M × S)}
     (hz : z ∈ support (countingOracle.simulate ((simulateQ loggingOracle oa).run) 0)) :
@@ -225,9 +221,8 @@ lemma log_length_le_of_mem_support_run_cached_logging
       hboundLog hqc
   exact le_trans hlen hqc_le
 
-variable [Fintype S] in
 lemma sum_wp_querySaltIndicators_le_queryBound_of_run_cached_logging
-    [Finite M]
+    [Fintype S] [Finite M]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (cache₀ : QueryCache (CMOracle M S C))
     (hbound : IsTotalQueryBound oa n) :
@@ -277,8 +272,8 @@ lemma sum_wp_querySaltIndicators_le_queryBound_of_run_cached_logging
     _ = (n : ℝ≥0∞) := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
-variable [Fintype S] [Inhabited S] in
 lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_support_with_state
+    [Fintype S] [Inhabited S]
     [Finite M]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -335,9 +330,8 @@ lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_su
     · simp [OracleComp.ProgramLogic.propInd, hslt]
   exact le_trans hmono hres
 
-variable [Fintype S] in
 omit [DecidableEq M] in
-lemma sum_wp_querySaltIndicators_le_queryBound_of_run_logging
+lemma sum_wp_querySaltIndicators_le_queryBound_of_run_logging [Fintype S]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n) :
     (∑ s : S,
@@ -853,8 +847,7 @@ lemma wp_querySaltIndicator_cached_logging_freshCache_eq_common
     exact cache_none_of_zero_count_of_mem_support_run_hidingChoose
       (M := M) (S := S) (C := C) A hqchoose m' s hzero
 
-variable [Fintype S] [Inhabited S] in
-lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
+lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support [Fintype S] [Inhabited S]
     [Finite M]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -987,8 +980,7 @@ lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
           have hcard_top : (Fintype.card C : ℝ≥0∞) ≠ ∞ := by simp
           rw [ENNReal.mul_inv_cancel hcard0 hcard_top, one_mul]
 
-variable [Fintype S] [Inhabited S] in
-theorem sum_probEvent_hidingBad_le [Finite M] {AUX : Type} {t : ℕ}
+theorem sum_probEvent_hidingBad_le [Fintype S] [Inhabited S] [Finite M] {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S, Pr[hidingBad ∘ Prod.snd |
       (simulateQ (hidingImpl₁ s) (hidingOa A s)).run (∅, 0)]) ≤ t := by

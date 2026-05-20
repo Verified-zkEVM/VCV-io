@@ -304,7 +304,7 @@ theorem expectedQueryCount_seededForkWithSeedValue_le
 section forkRuntime
 
 variable [spec.DecidableEq]
-variable [Finite ι] [spec.Fintype] [spec.Inhabited]
+variable [Finite ι]
 
 /-- Total expected query work of one fork attempt. The LHS decomposes as three terms:
 
@@ -350,9 +350,9 @@ end generateSeedCoverage
 variable (main : OracleComp spec α) (qb : ι → ℕ)
     (js : List ι) (i : ι) (cf : α → Option (Fin (qb i + 1)))
     [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
-    [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec]
+    [unifSpec ˡ⊂ₒ spec]
 
-omit [unifSpec ˡ⊂ₒ spec] in
+omit [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec] in
 /-- If `seededFork` succeeds (returns `some`), both runs agree on the fork index. -/
 theorem cf_eq_of_mem_support_seededFork (x₁ x₂ : α)
     (h : some (x₁, x₂) ∈ support (seededFork main qb js i cf)) :

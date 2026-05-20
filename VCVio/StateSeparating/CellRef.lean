@@ -1172,18 +1172,21 @@ theorem demoClient_supportPreserves_flag :
   intro h z hz
   exact demoClient_preserves_flag h z hz
 
-/-- From the empty heap, the framed flag is never `true`. -/
+/-- From the empty heap, the framed flag is never `true`. The cell's
+`CellSpec.default` value is `false`, so support preservation collapses the event
+to one with no reachable witness. -/
 theorem demoClient_prob_flag_true_eq_zero :
     Pr[ fun z => flagRef.get z.2 = true |
-      (simulateQ demoImpl demoClient).run (Heap.empty : Heap DemoCell)] = 0 := by
-  -- TODO: this depends on `CellRef.SupportPreserves` whose `MonadLiftT m SetM` instance
-  -- disagrees between the direct OracleComp lift and the transitive PMF→SPMF→SetM lift.
-  sorry
+      (simulateQ demoImpl demoClient).run (Heap.empty : Heap DemoCell)] = 0 :=
+  CellRef.SupportPreserves.prob_final_eq_eq_zero_of_ne
+    demoClient_supportPreserves_flag (Heap.empty : Heap DemoCell) (by decide)
 
-/-- Probability-one preservation for the framed flag. -/
+/-- Probability-one preservation for the framed flag: under the uniform-sampling
+semantics of `ProbComp`, the handler never changes the flag and never aborts. -/
 theorem demoClient_prob_flag_unchanged_eq_one (h : Heap DemoCell) :
     Pr[ fun z => flagRef.get z.2 = flagRef.get h |
-      (simulateQ demoImpl demoClient).run h] = 1 := by sorry
+      (simulateQ demoImpl demoClient).run h] = 1 :=
+  CellRef.SupportPreserves.prob_unchanged_eq_one demoClient_supportPreserves_flag h
 
 /-- Increment the cache counter and append one log entry. The program never
 writes `flagRef`. -/

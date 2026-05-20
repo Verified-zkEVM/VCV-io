@@ -128,9 +128,9 @@ section correctness
 
 variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
+  [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
 
 omit hr in
-variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- When the simulated signing loop produces `some (w, z)`, the random-oracle cache
 contains a challenge `c` at `(msg, w)` satisfying `ids.verify pk w c z = true`.
 
@@ -227,7 +227,6 @@ lemma fsAbortSignLoop_cache_invariant
           support_pure, Set.mem_singleton_iff]
         exact ⟨some z, h_rsp_mem, by simp [Option.map]⟩
 
-variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- When the random-oracle cache already contains the challenge for `(msg, w)`,
 verification of signature `(w, z)` deterministically returns `true`. -/
 lemma verify_eq_true_of_cached
@@ -270,7 +269,6 @@ Unlike the CRYPTO 2023 paper and EasyCrypt formalization (which use an unbounded
 and do not state a correctness theorem), this formulation uses a bounded loop with
 `maxAttempts` iterations, matching FIPS 204 Algorithm 7 (ML-DSA.Sign_internal). -/
 theorem correct
-    [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
     (hc : ids.Complete) (maxAttempts : ℕ) (δ : ENNReal)
     (h_abort : ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
       ∀ msg : M,
