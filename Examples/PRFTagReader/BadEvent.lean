@@ -27,19 +27,19 @@ variable {TagId Nonce Digest K : Type}
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
 /-- The number of still-available successful tag sessions in a bad-event state. -/
-private def unlinkBadRemaining (st : UnlinkBadState TagId Nonce Digest) : ℕ :=
+def unlinkBadRemaining (st : UnlinkBadState TagId Nonce Digest) : ℕ :=
   (Finset.univ : Finset TagId).sum fun tag => sessionsPerTag - st.sessionsUsed tag
 
 /-- Reachable bad-event states only cache nonces that came from successful tag sessions. For each
 tag, we retain a finite witness set of cached nonces whose size is bounded by that tag's session
 counter. -/
-private def unlinkBadCacheBounded (st : UnlinkBadState TagId Nonce Digest) : Prop :=
+def unlinkBadCacheBounded (st : UnlinkBadState TagId Nonce Digest) : Prop :=
   ∀ tag : TagId, ∃ nonces : Finset Nonce,
     nonces.card ≤ st.sessionsUsed tag ∧
       ∀ nonce : Nonce, (st.responses (tag, nonce)).isSome = true → nonce ∈ nonces
 
 /-- State produced by a successful `RF_bad` tag query after sampling `nonce` and `auth`. -/
-private def unlinkBadTagNext
+def unlinkBadTagNext
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (nonce : Nonce) (auth : Digest) : UnlinkBadState TagId Nonce Digest :=
   { sessionsUsed := Function.update st.sessionsUsed tag (st.sessionsUsed tag + 1)
@@ -51,7 +51,7 @@ omit [Fintype TagId] [Nonempty TagId] [DecidableEq TagId] [DecidableEq Nonce]
     [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- The initial state satisfies `unlinkBadCacheBounded`: the response cache is empty, so the empty
 witness set trivially bounds each tag's nonce count. -/
-private lemma unlinkBadCacheBounded_init :
+lemma unlinkBadCacheBounded_init :
     unlinkBadCacheBounded
       (UnlinkBadState.init (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) := by
   intro tag
@@ -120,7 +120,7 @@ omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
     [DecidableEq Digest] [SampleableType Digest] in
 /-- `unlinkBadCacheBounded` is preserved by a successful tag step: the new nonce is added to the
 witness set, keeping its cardinality within the incremented session counter. -/
-private lemma unlinkBadTagNext_cacheBounded
+lemma unlinkBadTagNext_cacheBounded
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (nonce : Nonce) (auth : Digest)
     (hbounded : unlinkBadCacheBounded st) :
@@ -155,7 +155,7 @@ omit [Fintype TagId] [Nonempty TagId]
     [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- A successful tag step does not push any tag's session counter above `sessionsPerTag`,
 preserving the `sessionsUsed ≤ sessionsPerTag` invariant needed by the induction. -/
-private lemma unlinkBadTagNext_sessionsUsed_le
+lemma unlinkBadTagNext_sessionsUsed_le
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (nonce : Nonce) (auth : Digest)
     (hslot : st.sessionsUsed tag < sessionsPerTag)
@@ -172,7 +172,7 @@ omit [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
     [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- A successful tag step decrements `unlinkBadRemaining` by exactly 1, which is the key
 step in the union-bound induction. -/
-private lemma unlinkBadRemaining_tagNext
+lemma unlinkBadRemaining_tagNext
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (nonce : Nonce) (auth : Digest)
     (hslot : st.sessionsUsed tag < sessionsPerTag) :
@@ -205,7 +205,7 @@ omit [DecidableEq TagId] [DecidableEq Nonce] [DecidableEq Digest]
     [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- If any tag still has a free slot, the total remaining budget is positive. Used to justify
 the `- 1` arithmetic in `unlinkBadRemaining_tagNext`. -/
-private lemma unlinkBadRemaining_pos_of_slot
+lemma unlinkBadRemaining_pos_of_slot
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (hslot : st.sessionsUsed tag < sessionsPerTag) :
     0 < unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st := by
