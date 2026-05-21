@@ -61,11 +61,12 @@ noncomputable def nmaAdvFromCma
       (SourceSigAlg (σ := σ) (hr := hr) (M := M)) :=
   FiatShamir.simulatedNmaAdv σ hr M simT adv
 
-omit [Fintype Chal] in
+omit [Fintype Chal] [Fintype Commit] [Fintype Resp] in
 omit [Fintype Stmt] [Inhabited Stmt] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Hash-query bound for `nmaAdvFromCma`. -/
 theorem nmaAdvFromCma_nmaHashQueryBound
+    [Finite Commit] [Finite Resp]
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (qS qH : ℕ)
@@ -73,6 +74,8 @@ theorem nmaAdvFromCma_nmaHashQueryBound
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := (nmaAdvFromCma σ hr M adv simT).main pk) qH := by
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   intro pk
   have hbase :=
     FiatShamir.simulatedNmaAdv_hashQueryBound σ hr M simT adv qS qH hQ pk
@@ -712,8 +715,8 @@ private lemma forkInitialState_inv :
   · intro mc ch hcache
     simp [forkInitialState] at hcache
 
-omit [Fintype Commit] [Inhabited Commit] in
-omit [SampleableType Chal] [Finite Chal] in
+omit [Fintype Commit] [Fintype Chal] [Inhabited Commit] in
+omit [SampleableType Chal] in
 private lemma simulatedNmaUnifFork_flatten_preserves_state
     {α : Type} (A : ProbComp α)
     (advCache : (fsRoSpec M Commit Chal).QueryCache)
@@ -725,6 +728,7 @@ private lemma simulatedNmaUnifFork_flatten_preserves_state
           (simulatedNmaUnifSim (M := M) (Commit := Commit) (Chal := Chal))).flattenStateT
         A).run (advCache, liveSt))) :
     z.2 = (advCache, liveSt) := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
   exact OracleComp.simulateQ_run_preserves_inv_of_query
     (impl := ((Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal).mapStateTBase
       (simulatedNmaUnifSim (M := M) (Commit := Commit) (Chal := Chal))).flattenStateT)
@@ -739,8 +743,8 @@ private lemma simulatedNmaUnifFork_flatten_preserves_state
       rfl)
     A (advCache, liveSt) rfl z hz
 
-omit [Fintype Commit] [Inhabited Commit] in
-omit [SampleableType Chal] [Finite Chal] in
+omit [Fintype Commit] [Fintype Chal] [Inhabited Commit] in
+omit [SampleableType Chal] in
 private lemma simulatedNmaUnifFork_nested_preserves_state
     {α : Type} (A : ProbComp α)
     (advCache : (fsRoSpec M Commit Chal).QueryCache)
@@ -751,6 +755,7 @@ private lemma simulatedNmaUnifFork_nested_preserves_state
         ((simulateQ (simulatedNmaUnifSim (M := M) (Commit := Commit)
           (Chal := Chal)) A).run advCache)).run liveSt)) :
     z.1.2 = advCache ∧ z.2 = liveSt := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
   rw [OracleComp.simulateQ_mapStateTBase_run_eq_map_flattenStateT
     (outer := Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal)
     (inner := simulatedNmaUnifSim (M := M) (Commit := Commit) (Chal := Chal))
@@ -764,7 +769,7 @@ private lemma simulatedNmaUnifFork_nested_preserves_state
   subst st
   simp
 
-omit [Fintype Commit] [Inhabited Commit] in
+omit [Fintype Commit] [Fintype Chal] [Inhabited Commit] in
 omit [Fintype Stmt] [Fintype Resp] [Inhabited Stmt] [Inhabited Resp] in
 omit [SampleableType Stmt] in
 private lemma forkLoggedImpl_preserves_inv_step
@@ -775,6 +780,7 @@ private lemma forkLoggedImpl_preserves_inv_step
       ∀ z ∈ support ((forkLoggedImpl (M := M) (Commit := Commit)
         (Chal := Chal) (Resp := Resp) simT pk t).run s),
         forkAwareInv (M := M) (Commit := Commit) (Chal := Chal) z.2 := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
   intro t s hs z hz
   rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
   rcases hs with ⟨hfreshInv, hlogInv⟩
@@ -870,7 +876,7 @@ private lemma forkLoggedImpl_preserves_inv_step
       change mc ∈ x.2.2
       simpa [hxlive] using hlogInv mc ch hcache_old
 
-omit [Fintype Commit] [Inhabited Commit] in
+omit [Fintype Commit] [Fintype Chal] [Inhabited Commit] in
 omit [Fintype Stmt] [Fintype Resp] [Inhabited Stmt] [Inhabited Resp] in
 omit [SampleableType Stmt] in
 private lemma forkLoggedImpl_preserves_inv
@@ -881,6 +887,7 @@ private lemma forkLoggedImpl_preserves_inv
       (Commit := Commit) (Chal := Chal) (Resp := Resp) simT pk) A).run
       (forkInitialState M Commit Chal))) :
     forkAwareInv (M := M) (Commit := Commit) (Chal := Chal) z.2 := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
   exact OracleComp.simulateQ_run_preserves_inv_of_query
     (impl := forkLoggedImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) simT pk)
@@ -890,7 +897,7 @@ private lemma forkLoggedImpl_preserves_inv
     A (forkInitialState M Commit Chal)
     (forkInitialState_inv (M := M) (Commit := Commit) (Chal := Chal)) z hz
 
-omit [Fintype Commit] [Inhabited Commit] in
+omit [Fintype Commit] [Fintype Chal] [Inhabited Commit] in
 omit [Fintype Stmt] [Fintype Resp] [Inhabited Stmt] [Inhabited Resp] in
 omit [SampleableType Stmt] in
 private lemma forkLoggedImpl_preserves_live_adv_inv_step
@@ -901,6 +908,7 @@ private lemma forkLoggedImpl_preserves_live_adv_inv_step
       ∀ z ∈ support ((forkLoggedImpl (M := M) (Commit := Commit)
         (Chal := Chal) (Resp := Resp) simT pk t).run s),
         forkLiveCacheAdvCacheInv (M := M) (Commit := Commit) (Chal := Chal) z.2 := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
   intro t s hs z hz
   rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
   rcases t with ((n | mc) | m)
@@ -968,7 +976,7 @@ private lemma forkLoggedImpl_preserves_live_adv_inv_step
       | some old =>
           simpa [hxadv, htarget] using hadv_old'
 
-omit [Fintype Commit] [Inhabited Commit] in
+omit [Fintype Commit] [Fintype Chal] [Inhabited Commit] in
 omit [Fintype Stmt] [Fintype Resp] [Inhabited Stmt] [Inhabited Resp] in
 omit [SampleableType Stmt] in
 private lemma forkLoggedImpl_preserves_live_adv_inv
@@ -979,6 +987,7 @@ private lemma forkLoggedImpl_preserves_live_adv_inv
       (Commit := Commit) (Chal := Chal) (Resp := Resp) simT pk) A).run
       (forkInitialState M Commit Chal))) :
     forkLiveCacheAdvCacheInv (M := M) (Commit := Commit) (Chal := Chal) z.2 := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
   exact OracleComp.simulateQ_run_preserves_inv_of_query
     (impl := forkLoggedImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) simT pk)
@@ -1600,9 +1609,10 @@ private lemma forkLogged_base_support
   simpa [forkLoggedImpl, forkInitialState, forkInitialBaseState] using
     (by rw [hproj] at hmem; exact hmem)
 
-omit [Fintype Stmt] [Fintype Chal] [Inhabited Stmt] in
+omit [Fintype Stmt] [Fintype Chal] [Fintype Commit] [Fintype Resp] [Inhabited Stmt] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma forkLogged_queryLog_length_le
+    [Finite Commit] [Finite Resp]
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
@@ -1615,6 +1625,8 @@ private lemma forkLogged_queryLog_length_le
         (Chal := Chal) (Resp := Resp) simT pk) (adv.main pk)).run
         (forkInitialState M Commit Chal))) :
     z.2.1.2.2.length ≤ qH := by
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   have hbase := forkLogged_base_support (M := M) (Commit := Commit)
     (Chal := Chal) (Resp := Resp) σ hr adv simT pk hz
   have hnested :
@@ -1671,14 +1683,14 @@ private lemma forkLogged_queryLog_length_le
   simpa [nmaAdvFromCma, FiatShamir.simulatedNmaAdv] using hlen
 
 omit [Fintype Stmt] [Inhabited Stmt] in
-omit [Fintype Chal] in
+omit [Fintype Chal] [Fintype Commit] [Fintype Resp] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- The H5 verify body's success probability is bounded by the live `forkPoint`
 event for the verify-wrapped adversary. The fork slot parameter is `qH`:
 `Fork.forkPoint qH` indexes `Fin (qH + 1)`, accommodating the wrapped
 adversary's source-`qH` plus verifier-point query. -/
 private lemma forkLogged_verify_prob_true_le_forkPoint_run
-    [Fintype Chal]
+    [Fintype Chal] [Finite Commit] [Finite Resp]
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt)
@@ -1694,6 +1706,8 @@ private lemma forkLogged_verify_prob_true_le_forkPoint_run
           >>= fun trace =>
             pure ((Fork.forkPoint (M := M) (Commit := Commit)
               (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   let loggedRun :=
     ((simulateQ (forkLoggedImpl (M := M) (Commit := Commit)
       (Chal := Chal) (Resp := Resp) simT pk) (adv.main pk)).run
@@ -1798,14 +1812,14 @@ private lemma forkLogged_verify_prob_true_le_forkPoint_run
               (Resp := Resp) (Chal := Chal) qH trace).isSome)] := hpoint
 
 omit [Fintype Stmt] [Inhabited Stmt] in
-omit [Fintype Chal] in
+omit [Fintype Chal] [Fintype Commit] [Fintype Resp] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- The H5 body's success probability is bounded by the wrapped adversary's
 fork advantage at slot parameter `qH`. The framework's `Fin (qH + 1)` indexing
 provides exactly enough slots for the wrapped adversary's source-`qH` plus
 verifier-point query. -/
 private lemma forkH5Body_prob_true_le_fork_advantage
-    [Fintype Chal]
+    [Fintype Chal] [Finite Commit] [Finite Resp]
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
@@ -1817,6 +1831,8 @@ private lemma forkH5Body_prob_true_le_fork_advantage
           (Resp := Resp) σ hr adv simT]
       ≤
     Fork.advantage σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT) qH := by
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   have hbind := probEvent_bind_congr_le_add
     (mx := (OracleComp.liftComp hr.gen (Fork.wrappedSpec Chal) :
       OracleComp (Fork.wrappedSpec Chal) (Stmt × Wit)))
@@ -2078,7 +2094,7 @@ private lemma nma_runProb_shiftLeft_signedFreshAdv_eq_forkH5Body
         rfl
 
 omit [Fintype Stmt] [Inhabited Stmt] in
-omit [Fintype Chal] in
+omit [Fintype Chal] [Fintype Commit] [Fintype Resp] in
 omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] in
 /-- H5 boundary in shifted-NMA form. This is the fork-side statement after the
 native H4 normalization has moved `cmaSim` to `nma ∘ cmaToNma`. The bound is in
@@ -2086,7 +2102,7 @@ terms of the verify-wrapped adversary `nmaAdvFromCmaWithFinalQuery` at fork
 slot parameter `qH` (the framework's `Fin (qH + 1)` indexing accommodates the
 wrapper's verifier-point query). -/
 theorem nma_runProb_shiftLeft_signedFreshAdv_le_fork
-    [Finite Chal]
+    [Finite Chal] [Finite Commit] [Finite Resp]
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (qS qH : ℕ)
@@ -2100,6 +2116,8 @@ theorem nma_runProb_shiftLeft_signedFreshAdv_le_fork
       ≤ Fork.advantage σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT)
           qH := by
   letI : Fintype Chal := Fintype.ofFinite Chal
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   have hbridge :
       Pr[= true |
           (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
@@ -2308,12 +2326,12 @@ theorem cmaSim_signedFreshAdv_le_fork_of_shifted_h5
   exact hH5
 
 omit [Fintype Stmt] [Inhabited Stmt] in
-omit [Fintype Chal] in
+omit [Fintype Chal] [Fintype Commit] [Fintype Resp] in
 omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] in
 /-- Native H5 boundary in the linked simulated-CMA form used by the top-level
 chain. -/
 theorem cmaSim_signedFreshAdv_le_fork
-    [Finite Chal]
+    [Finite Chal] [Finite Commit] [Finite Resp]
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (qS qH : ℕ)
@@ -2326,6 +2344,8 @@ theorem cmaSim_signedFreshAdv_le_fork
       Fork.advantage σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT)
         qH := by
   letI : Fintype Chal := Fintype.ofFinite Chal
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   exact cmaSim_signedFreshAdv_le_fork_of_shifted_h5 (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     (Stmt := Stmt) (Wit := Wit) adv simT qH
@@ -2421,10 +2441,11 @@ theorem cma_advantage_le_fork_bound_of_h5
         ring_nf
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-omit [Fintype Stmt] [Fintype Chal] [Inhabited Stmt] in
+omit [Fintype Stmt] [Fintype Chal] [Fintype Commit] [Fintype Resp] [Inhabited Stmt] in
 /-- Native stateful chain with H5 discharged by the replay-forking boundary,
 leaving only the public-to-stateful H1/H2 compatibility premise. -/
 theorem cma_advantage_le_fork_bound_of_h1h2
+    [Finite Commit] [Finite Resp]
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hHVZK : σ.HVZK simT ζ_zk)
@@ -2444,6 +2465,8 @@ theorem cma_advantage_le_fork_bound_of_h1h2
         ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
         (qS : ENNReal) * ((qS : ENNReal) + (qH : ENNReal)) * β := by
   letI : Fintype Chal := Fintype.ofFinite Chal
+  letI : Fintype Commit := Fintype.ofFinite Commit
+  letI : Fintype Resp := Fintype.ofFinite Resp
   exact cma_advantage_le_fork_bound_of_h5 (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     (Stmt := Stmt) (Wit := Wit) simT ζ_zk hζ_zk hHVZK β hPredSim

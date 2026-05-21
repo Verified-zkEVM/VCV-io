@@ -12,6 +12,11 @@ package VCVio where
     ⟨`weak.linter.modulesUpperCamelCase, true⟩,
     ⟨`weak.linter.style.whitespace, true⟩
   ]
+  -- The Mathlib `unusedTactic` linter walks each file's tactic syntax recursively;
+  -- the long `do`-blocks in `LatticeCryptoTest/*/Main.lean` overflow the default
+  -- 8 MB thread stack during elaboration. Bumping `--tstack` keeps the linter
+  -- intact rather than disabling it per file. Cheap; affects build only.
+  weakLeanArgs := #["--tstack=65536"]
 
 /-
 Interop backends — pinned to explicit git revisions so reproducible builds are
