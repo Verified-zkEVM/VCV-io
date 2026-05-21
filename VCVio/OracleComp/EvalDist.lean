@@ -102,7 +102,15 @@ noncomputable instance instLawfulMonadLiftTPMF [IsProbabilitySpec spec] :
   monadLift_pure := simulateQ_pure _
   monadLift_bind := simulateQ_bind _
 
-/-- Canonical `MonadLiftT (OracleComp spec) SetM` derived from the SPMF lift. -/
+/-- Direct `MonadLiftT (OracleComp spec) SetM`: the syntactic / operational
+support of `mx`, computed by folding queries to `Set.univ`. Independent of any
+probability structure on `spec` — works for arbitrary specs without `Fintype`
+or `Inhabited`. The bridge to the probability side is `EvalDistCompatible`
+below, supplied only when `[IsUniformSpec spec]`.
+
+Note: This is the *only* `MonadLiftT (OracleComp spec) SetM` instance Lean will
+find. The generic `MonadLiftT SPMF SetM` is declared as `MonadLiftT` (not
+`MonadLift`), so `monadLiftTrans` cannot chain `OracleComp → SPMF → SetM`. -/
 instance instMonadLiftTSetM : MonadLiftT (OracleComp spec) SetM where
   monadLift mx := simulateQ (r := SetM) (fun _ => Set.univ) mx
 

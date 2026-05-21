@@ -155,7 +155,6 @@ theorem simulatedNmaAdv_hashQueryBound
       (oa := (simulatedNmaAdv (σ := σ) (hr := hr) (M := M)
         (simTranscript := simTranscript) (adv := adv)).main pk) qH := by
   classical
-  letI : Fintype Chal := Fintype.ofFinite Chal
   letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
     IsUniformSpec.ofFintypeInhabited _
   let spec := unifSpec + (M × Commit →ₒ Chal)

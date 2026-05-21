@@ -72,9 +72,6 @@ theorem cma_to_nma_advantage_bound
       adv.advantage (runtime M) ≤
         Fork.advantage σ hr M nmaAdv qH +
           ENNReal.ofReal ((qS : ℝ) * ζ_zk) + (qS : ENNReal) * (qS + qH) * β := by
-  letI : Fintype Stmt := Fintype.ofFinite Stmt
-  letI : Fintype Commit := Fintype.ofFinite Commit
-  letI : Fintype Resp := Fintype.ofFinite Resp
   refine ⟨Stateful.nmaAdvFromCmaWithFinalQuery σ hr M adv simTranscript, ?_⟩
   exact Stateful.cma_advantage_le_fork_bound_of_h1h2 σ hr M
     simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ

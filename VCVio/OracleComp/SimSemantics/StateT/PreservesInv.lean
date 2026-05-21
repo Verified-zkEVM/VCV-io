@@ -207,20 +207,37 @@ lemma preservesInv_bind {σ α β : Type}
   rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hcont⟩
   exact h₂ us.1 us.2 (h₁ σ0 hσ0 us hus) z hcont
 
-/-- If `mx` is output-independent on `Inv`, and `my` preserves `Inv` and never fails, then the
-output distribution of `mx` is unchanged by running `my` first and then running `mx` on the
-resulting state. -/
+/-- If `mx` is output-independent on `Inv`, and `my` preserves `Inv` and never fails under `Inv`,
+then the output distribution of `mx` is unchanged by running `my` first and then running `mx`
+on the resulting state. -/
 lemma outputIndependent_after_preservesInv {σ α β : Type}
     (mx : StateT σ ProbComp α) (my : StateT σ ProbComp β) (Inv : σ → Prop)
     (hmx : OutputIndependent mx Inv)
-    (hmyInv : PreservesInv my Inv) :
+    (hmyInv : PreservesInv my Inv)
+    (hmyNoFail : NeverFailsUnder my Inv) :
     ∀ σ0, Inv σ0 →
       𝒟[(my.run σ0) >>= fun us => mx.run' us.2] = 𝒟[mx.run' σ0] := by
-  -- TODO: this proof previously bridged `support`-based sums and `tsum`-over-all-points using
-  -- `mem_support_iff` and `probOutput_eq_zero_of_not_mem_support`. With the dual
-  -- `MonadLiftT (OracleComp spec) SetM` paths (direct vs transitive via PMF→SPMF→SetM),
-  -- the two `support` instantiations on `my.run σ0` no longer match. Restore once the
-  -- canonical path is unified.
-  sorry
+  intro σ0 hσ0
+  refine SPMF.ext fun a => ?_
+  change Pr[= a | (my.run σ0) >>= fun us => mx.run' us.2] = Pr[= a | mx.run' σ0]
+  rw [probOutput_bind_eq_tsum]
+  have hbind_eq :
+      (∑' us : β × σ, Pr[= us | my.run σ0] * Pr[= a | mx.run' us.2]) =
+        (∑' us : β × σ, Pr[= us | my.run σ0]) * Pr[= a | mx.run' σ0] := by
+    rw [← ENNReal.tsum_mul_right]
+    refine tsum_congr fun us => ?_
+    rcases eq_or_ne (Pr[= us | my.run σ0]) 0 with hus | hus
+    · rw [hus, zero_mul, zero_mul]
+    · have hus' : us ∈ support (my.run σ0) := by
+        rw [mem_support_iff]; exact hus
+      have hInv : Inv us.2 := hmyInv σ0 hσ0 us hus'
+      simp only [probOutput_def, hmx us.2 σ0 hInv hσ0]
+  rw [hbind_eq]
+  have hsum : (∑' us : β × σ, Pr[= us | my.run σ0]) = 1 := by
+    have hnofail : Pr[⊥ | my.run σ0] = 0 := hmyNoFail σ0 hσ0
+    have htotal := tsum_probOutput_add_probFailure (my.run σ0)
+    rw [hnofail, add_zero] at htotal
+    exact htotal
+  rw [hsum, one_mul]
 
 end StateT

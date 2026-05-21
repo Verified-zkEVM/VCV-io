@@ -26,9 +26,10 @@ noncomputable instance : LawfulMonadLift Raw PMF where
   monadLift_pure := Raw.toPMFHom.toFun_pure'
   monadLift_bind := Raw.toPMFHom.toFun_bind'
 
-/-- Direct `MonadLiftT Raw SetM` defined via the underlying PMF lift. This *is* the
-chain `Raw → PMF → SetM`, but expressed directly so it does not get re-derived
-via `MonadLift SPMF SetM` (which would conflict with other monads' direct lifts). -/
+/-- Direct `MonadLiftT Raw SetM` defined via the underlying PMF support. The generic
+`MonadLiftT SPMF SetM` is non-transitive (declared as `MonadLiftT`, not `MonadLift`,
+so `monadLiftTrans` cannot chain through it), so every monad with probabilistic
+semantics declares its `SetM` lift directly. -/
 noncomputable instance instMonadLiftTRawSetM : MonadLiftT Raw SetM where
   monadLift mx := ((liftM mx : PMF _).support : Set _)
 

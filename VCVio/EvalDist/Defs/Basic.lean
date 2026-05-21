@@ -27,15 +27,15 @@ variable {m : Type u → Type v} {α β γ : Type u}
 Every lift exposed to users in this layer is declared as `MonadLiftT`, never
 `MonadLift`. There are two independent reasons.
 
-**Diamond at `SPMF → SetM`.** We deliberately do **not** declare a generic
-`MonadLift SPMF SetM` instance. That would cause Lean's built-in transitivity
-(`instMonadLiftTOfMonadLift`) to synthesize `MonadLiftT m SetM` whenever
-`MonadLiftT m SPMF` is present, which creates a diamond whenever `m` *also*
-has a direct `MonadLiftT m SetM` instance (e.g. `OracleComp`, which needs
-`support` without `[spec.Fintype]`). Every monad we care about declares its
-`MonadLiftT m SetM` directly; the `EvalDistCompatible` class below records the
-propositional coherence between `support` and `SPMF.support ∘ evalDist` when
-both are defined.
+**No transitive `SPMF → SetM` lift.** The `MonadLiftT SPMF SetM` instance below
+exists so `support` and friends work on raw `SPMF α`. Crucially it is declared
+as `MonadLiftT` rather than `MonadLift`, which means Lean's `monadLiftTrans`
+(which requires `MonadLift n o` for the outer hop) cannot chain it: a monad
+`m` with `MonadLiftT m SPMF` does **not** automatically gain `MonadLiftT m SetM`
+via transitivity. Each monad declares its `MonadLiftT m SetM` directly — e.g.
+`OracleComp` uses the syntactic `simulateQ` into `SetM` (which doesn't require
+`[spec.Fintype]`), and `EvalDistCompatible` records the propositional coherence
+between that syntactic support and `SPMF.support ∘ evalDist`.
 
 **Resolution fragility for parameterized + typeclass-gated lifts.** Lifts whose
 source is parameterized (`OracleComp spec`, `OptionT m`, `StateT σ m`, …) and

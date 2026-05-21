@@ -118,15 +118,33 @@ lemma probEvent_replicate_of_probEvent_cons
         (fun x _ xs _ => hq x xs),
       ih, pow_succ, mul_comm]
 
+omit [IsUniformSpec spec] in
 /-- Possible outputs of `replicate n oa` are lists of length `n` where
 each element in the list is a possible output of `oa`. -/
 @[simp]
 lemma support_replicate :
     support (oa.replicate n) = {xs | xs.length = n ∧ ∀ x ∈ xs, x ∈ support oa} := by
-  -- TODO: blocked on the `HasEvalFinset` / `MonadLiftT (OracleComp spec) SetM` synthesis
-  -- ambiguity (direct vs transitive paths) that hits inside `simp`/`rw` for these
-  -- composite lemmas. Restore once the synthesis path is unified.
-  sorry
+  induction n with
+  | zero =>
+    ext xs
+    simp only [replicate_zero, support_pure, Set.mem_singleton_iff, Set.mem_setOf_eq,
+      List.length_eq_zero_iff]
+    refine ⟨fun h => ⟨h, ?_⟩, fun h => h.1⟩
+    intro x hx; subst h; exact (List.not_mem_nil hx).elim
+  | succ n ih =>
+    rw [replicate_succ]
+    ext xs
+    cases xs with
+    | nil =>
+      rw [support_seq_map_eq_image2]
+      simp only [Set.mem_image2, Set.mem_setOf_eq, List.length_nil]
+      refine ⟨?_, fun ⟨h, _⟩ => absurd h (Nat.succ_ne_zero n).symm⟩
+      rintro ⟨_, _, _, _, ⟨⟩⟩
+    | cons x xs =>
+      rw [cons_mem_support_seq_map_cons_iff, ih]
+      simp only [Set.mem_setOf_eq, List.length_cons, Nat.add_right_cancel_iff, List.mem_cons,
+        forall_eq_or_imp]
+      tauto
 
 @[simp]
 lemma mem_finSupport_replicate [spec.DecidableEq] [DecidableEq α]

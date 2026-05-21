@@ -8,6 +8,7 @@ import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT.Basic
 import VCVio.EvalDist.Defs.Semantics
+import ToMathlib.Control.StateT
 
 /-!
 # Bundled Subprobability Semantics for Oracle Simulations
@@ -55,8 +56,11 @@ monad morphism: `<$>` does not thread state, so `Prod.fst <$> (f <$> mx).run s` 
     {α β : Type} (f : α → β) (mx : OracleComp (unifSpec + hashSpec) α) :
     (SPMFSemantics.withStateOracle hashImpl s).evalDist (f <$> mx) =
       f <$> (SPMFSemantics.withStateOracle hashImpl s).evalDist mx := by
-  -- TODO: post-MonadLift refactor the LHS unfolds with extra `liftM` wrappers.
-  sorry
+  set impl :=
+    (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl with himpl
+  change (liftM (StateT.run' (simulateQ impl (f <$> mx)) s) : SPMF _) =
+    f <$> (liftM (StateT.run' (simulateQ impl mx) s) : SPMF _)
+  rw [simulateQ_map, StateT.run'_map', liftM_map]
 
 /-- `withStateOracle` commutes with the specific `>>= pure ∘ f` pattern produced by
 a do-block returning a pure value at the end. A direct corollary of

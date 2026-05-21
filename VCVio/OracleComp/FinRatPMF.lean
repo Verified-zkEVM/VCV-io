@@ -87,15 +87,18 @@ noncomputable local instance instIsUniformSpec : IsUniformSpec spec :=
 
 @[simp] lemma support_simulateQ {α : Type v} (oa : OracleComp spec α) :
     support (simulateQ (finRatImpl (spec := spec)) oa) = support oa := by
-  -- TODO: connect the direct SetM lift (`simulateQ' Set.univ`) and the SPMF-derived path.
-  -- Currently `support oa` uses the unconstrained direct lift while
-  -- `support (simulateQ finRatImpl oa)` goes through PMF→SPMF→SetM.
-  sorry
+  have hLHS : support (simulateQ (finRatImpl (spec := spec)) oa) =
+      SPMF.support 𝒟[simulateQ (finRatImpl (spec := spec)) oa] :=
+    EvalDistCompatible.support_eq_SPMF_support _
+  have hRHS : support oa = SPMF.support 𝒟[oa] :=
+    EvalDistCompatible.support_eq_SPMF_support _
+  rw [hLHS, evalDist_simulateQ, ← hRHS]
 
--- @[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
---     (oa : OracleComp spec α) :
---     finSupport (simulateQ (finRatImpl (spec := spec)) oa) = finSupport oa := by
---   sorry
+@[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
+    (oa : OracleComp spec α) :
+    finSupport (simulateQ (finRatImpl (spec := spec)) oa) = finSupport oa := by
+  apply Finset.coe_injective
+  rw [coe_finSupport, coe_finSupport, support_simulateQ]
 
 end finRatImpl
 

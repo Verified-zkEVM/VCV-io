@@ -413,7 +413,6 @@ private def cmaSimLoggedLeftOrnament
   proj := cmaSimLoggedProj (M := M) (Commit := Commit)
     (Chal := Chal) (Stmt := Stmt) (Wit := Wit)
   preserves_inv := fun t s hs => by
-    letI : Fintype Chal := Fintype.ofFinite Chal
     rcases s with ⟨signed, ⟨⟨log, cache, keypair⟩, bad⟩⟩
     simp only [cmaSimFixedKeyInv] at hs ⊢
     rcases t with ((n | mc) | m)
@@ -481,7 +480,6 @@ private def cmaSimLoggedLeftOrnament
           subst a
           simp [hxinner]
   project_step := fun t s hs => by
-    letI : Fintype Chal := Fintype.ofFinite Chal
     rcases s with ⟨signed, ⟨⟨log, cache, keypair⟩, bad⟩⟩
     simp only [cmaSimFixedKeyInv] at hs
     rcases t with ((n | mc) | m)
@@ -1706,8 +1704,6 @@ private lemma forkLogged_verify_prob_true_le_forkPoint_run
           >>= fun trace =>
             pure ((Fork.forkPoint (M := M) (Commit := Commit)
               (Resp := Resp) (Chal := Chal) qH trace).isSome)] := by
-  letI : Fintype Commit := Fintype.ofFinite Commit
-  letI : Fintype Resp := Fintype.ofFinite Resp
   let loggedRun :=
     ((simulateQ (forkLoggedImpl (M := M) (Commit := Commit)
       (Chal := Chal) (Resp := Resp) simT pk) (adv.main pk)).run
@@ -1831,8 +1827,6 @@ private lemma forkH5Body_prob_true_le_fork_advantage
           (Resp := Resp) σ hr adv simT]
       ≤
     Fork.advantage σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT) qH := by
-  letI : Fintype Commit := Fintype.ofFinite Commit
-  letI : Fintype Resp := Fintype.ofFinite Resp
   have hbind := probEvent_bind_congr_le_add
     (mx := (OracleComp.liftComp hr.gen (Fork.wrappedSpec Chal) :
       OracleComp (Fork.wrappedSpec Chal) (Stmt × Wit)))
@@ -2116,8 +2110,6 @@ theorem nma_runProb_shiftLeft_signedFreshAdv_le_fork
       ≤ Fork.advantage σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT)
           qH := by
   letI : Fintype Chal := Fintype.ofFinite Chal
-  letI : Fintype Commit := Fintype.ofFinite Commit
-  letI : Fintype Resp := Fintype.ofFinite Resp
   have hbridge :
       Pr[= true |
           (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
@@ -2343,9 +2335,6 @@ theorem cmaSim_signedFreshAdv_le_fork
           (signedFreshAdv σ hr M adv)] ≤
       Fork.advantage σ hr M (nmaAdvFromCmaWithFinalQuery σ hr M adv simT)
         qH := by
-  letI : Fintype Chal := Fintype.ofFinite Chal
-  letI : Fintype Commit := Fintype.ofFinite Commit
-  letI : Fintype Resp := Fintype.ofFinite Resp
   exact cmaSim_signedFreshAdv_le_fork_of_shifted_h5 (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     (Stmt := Stmt) (Wit := Wit) adv simT qH
@@ -2464,9 +2453,6 @@ theorem cma_advantage_le_fork_bound_of_h1h2
           (nmaAdvFromCmaWithFinalQuery σ hr M adv simT) qH +
         ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
         (qS : ENNReal) * ((qS : ENNReal) + (qH : ENNReal)) * β := by
-  letI : Fintype Chal := Fintype.ofFinite Chal
-  letI : Fintype Commit := Fintype.ofFinite Commit
-  letI : Fintype Resp := Fintype.ofFinite Resp
   exact cma_advantage_le_fork_bound_of_h5 (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     (Stmt := Stmt) (Wit := Wit) simT ζ_zk hζ_zk hHVZK β hPredSim

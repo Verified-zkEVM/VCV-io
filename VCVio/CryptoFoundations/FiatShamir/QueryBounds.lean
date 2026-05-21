@@ -123,7 +123,6 @@ lemma nmaHashQueryBound_liftComp_zero {α : Type}
       (oa := OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) 0 := by
   -- The lifted handler routes every uniform query into the `.inl` arm, which never matches
   -- `(· matches .inr _)`, so the predicate-targeted bound is uniformly 0 per step.
-  letI : Fintype Chal := Fintype.ofFinite Chal
   letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
     IsUniformSpec.ofFintypeInhabited _
   rw [nmaHashQueryBound, OracleComp.liftComp_def]
