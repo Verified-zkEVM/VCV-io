@@ -25,7 +25,10 @@ open OracleComp OracleSpec
 
 namespace FiatShamir
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type} [Inhabited Chal] [Finite Chal]
+    {rel : Stmt → Wit → Bool}
+
+attribute [local instance] Fintype.ofFinite
 
 section bounds
 
@@ -62,6 +65,7 @@ def nmaHashQueryBound {α : Type}
     (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (Q : ℕ) : Prop :=
   OracleComp.IsQueryBoundP oa (· matches .inr _) Q
 
+omit [Inhabited Chal] [Finite Chal] in
 @[simp]
 lemma nmaHashQueryBound_query_bind_iff {α : Type}
     (t : (unifSpec + (M × Commit →ₒ Chal)).Domain)
@@ -81,6 +85,7 @@ lemma nmaHashQueryBound_query_bind_iff {α : Type}
   simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_bind_iff]
   cases t <;> simp
 
+omit [Inhabited Chal] [Finite Chal] in
 @[simp]
 lemma nmaHashQueryBound_query_iff
     (t : (unifSpec + (M × Commit →ₒ Chal)).Domain) (Q : ℕ) :
@@ -92,6 +97,7 @@ lemma nmaHashQueryBound_query_iff
   simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_iff]
   cases t <;> simp
 
+omit [Inhabited Chal] [Finite Chal] in
 lemma nmaHashQueryBound_mono {α : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α} {Q₁ Q₂ : ℕ}
     (h : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
@@ -99,6 +105,7 @@ lemma nmaHashQueryBound_mono {α : Type}
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₂ :=
   OracleComp.IsQueryBoundP.mono h hQ
 
+omit [Inhabited Chal] [Finite Chal] in
 lemma nmaHashQueryBound_bind {α β : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α}
     {ob : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β}
@@ -116,6 +123,9 @@ lemma nmaHashQueryBound_liftComp_zero {α : Type}
       (oa := OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) 0 := by
   -- The lifted handler routes every uniform query into the `.inl` arm, which never matches
   -- `(· matches .inr _)`, so the predicate-targeted bound is uniformly 0 per step.
+  letI : Fintype Chal := Fintype.ofFinite Chal
+  letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
   rw [nmaHashQueryBound, OracleComp.liftComp_def]
   refine OracleComp.IsQueryBoundP.simulateQ_of_step
     (p := fun _ : ℕ => False)

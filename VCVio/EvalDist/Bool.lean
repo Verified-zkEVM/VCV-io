@@ -9,27 +9,32 @@ import VCVio.EvalDist.Defs.NeverFails
 /-!
 # Evaluation Distributions on Boolean-Valued Computations
 
-Specialization lemmas for `HasEvalSPMF` computations returning `Bool`.
+Specialization lemmas for `MonadLiftT m SPMF` computations returning `Bool`.
 -/
 
-variable {m : Type _ → Type _} [Monad m] [HasEvalSPMF m] {α β : Type _}
+variable {m : Type _
+    → Type _} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α β : Type _}
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp, grind =]
 lemma probOutput_true_add_false (mx : m Bool) :
     Pr[= true | mx] + Pr[= false | mx] = 1 - Pr[⊥ | mx] := by
   have h := tsum_probOutput_eq_sub mx
   rwa [tsum_fintype (L := .unconditional _), Fintype.sum_bool] at h
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp, grind =]
 lemma probOutput_false_add_true (mx : m Bool) :
     Pr[= false | mx] + Pr[= true | mx] = 1 - Pr[⊥ | mx] := by
   rw [add_comm, probOutput_true_add_false]
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 lemma probOutput_true_eq_sub (mx : m Bool) :
     Pr[= true | mx] = 1 - Pr[⊥ | mx] - Pr[= false | mx] := by
   rw [← probOutput_true_add_false]
   exact (ENNReal.add_sub_cancel_right probOutput_ne_top).symm
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 lemma probOutput_false_eq_sub (mx : m Bool) :
     Pr[= false | mx] = 1 - Pr[⊥ | mx] - Pr[= true | mx] := by
   rw [← probOutput_false_add_true]
@@ -45,14 +50,17 @@ lemma probOutput_not_map' [LawfulMonad m] (mx : m Bool) :
     Pr[= false | (! ·) <$> mx] = Pr[= true | mx] :=
   probOutput_map_injective mx (fun a b h => by cases a <;> cases b <;> simp_all) true
 
+omit [LawfulMonadLiftT m SPMF] in
 @[grind =]
 lemma probOutput_true_add_false_of_neverFail {mx : m Bool} [NeverFail mx] :
     Pr[= true | mx] + Pr[= false | mx] = 1 := by simp
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp, grind =]
 lemma probEvent_true_eq_probOutput (mx : m Bool) :
     Pr[ (· = true) | mx] = Pr[= true | mx] := probEvent_eq_eq_probOutput mx true
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp, grind =]
 lemma probEvent_not_eq_probOutput (mx : m Bool) :
     Pr[ (· = false) | mx] = Pr[= false | mx] := probEvent_eq_eq_probOutput mx false

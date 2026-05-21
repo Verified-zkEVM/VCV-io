@@ -304,7 +304,7 @@ end QueryLog
 
 namespace OracleComp
 
-variable {ι : Type} {spec : OracleSpec ι} {α : Type}
+variable {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {α : Type}
 
 /-- Replay state for the second run of a replay-based fork.
 
@@ -416,20 +416,23 @@ def replayOracle [spec.DecidableEq] (i : ι) :
 def replayFirstRun (main : OracleComp spec α) : OracleComp spec (α × QueryLog spec) :=
   (simulateQ spec.loggingOracle main).run
 
+omit [IsUniformSpec spec] in
 @[simp]
 lemma fst_map_replayFirstRun (main : OracleComp spec α) :
     Prod.fst <$> replayFirstRun main = main := by
   simpa [replayFirstRun, OracleComp.withQueryLog, loggingOracle] using
     (loggingOracle.fst_map_run_simulateQ (spec := spec) main)
 
+omit [IsUniformSpec spec] in
 @[simp]
-lemma probEvent_fst_replayFirstRun [spec.Fintype] [spec.Inhabited]
+lemma probEvent_fst_replayFirstRun [IsUniformSpec spec]
     (main : OracleComp spec α) (p : α → Prop) :
     Pr[ fun z => p z.1 | replayFirstRun main] = Pr[ p | main] := by
   simp [replayFirstRun]
 
+omit [IsUniformSpec spec] in
 @[simp]
-lemma probOutput_fst_map_replayFirstRun [spec.Fintype] [spec.Inhabited]
+lemma probOutput_fst_map_replayFirstRun [IsUniformSpec spec]
     (main : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> replayFirstRun main] = Pr[= x | main] := by
   simp [replayFirstRun]
@@ -487,6 +490,7 @@ def forkReplay [spec.DecidableEq] (main : OracleComp spec α)
       let u ← liftComp ($ᵗ spec.Range i) spec
       forkReplayWithTraceValue main qb i cf first u
 
+omit [IsUniformSpec spec] in
 @[simp]
 lemma forkReplayWithTraceValue_eq_none_of_cf_none
     [spec.DecidableEq]
@@ -512,6 +516,7 @@ BeforeForkAt`): after the fork point on either side (full log vs. truncated log)
 computations enter live mode, and the α-marginal collapses to `evalDist main`.
 -/
 
+omit [IsUniformSpec spec] in
 /-- Live mode is preserved by `noteObserved`: neither `forkConsumed` nor `mismatch` is
 touched by recording an observation. -/
 lemma ReplayForkState.noteObserved_live_iff {i : ι}
@@ -520,6 +525,7 @@ lemma ReplayForkState.noteObserved_live_iff {i : ι}
       (st.noteObserved t u).mismatch = st.mismatch := by
   simp [ReplayForkState.noteObserved]
 
+omit [IsUniformSpec spec] in
 /-- **Live-mode α-marginal.** Starting from a replay state in live mode
 (`forkConsumed = true` or `mismatch = true`), the α-component of running the replay
 oracle on `main` equals `main` itself. The state only accumulates observations; it has
@@ -577,11 +583,12 @@ lemma fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
           exact ih u (st.noteObserved t u) (hst' u)
       _ = (liftM (query t) >>= fun u => oa u : OracleComp spec α) := rfl
 
+omit [IsUniformSpec spec] in
 /-- α-marginal form of `fst_map_simulateQ_replayOracle_of_live`, specialized to the
 `evalDist` level. Once in live mode, the α-output distribution of the replay run is
 `evalDist main`. -/
 lemma evalDist_fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     (i : ι) (main : OracleComp spec α) (st : ReplayForkState spec i)
     (hst : st.forkConsumed = true ∨ st.mismatch = true) :
     𝒟[(Prod.fst <$> (simulateQ (replayOracle i) main).run st :
@@ -623,6 +630,7 @@ namespace ReplayPrefixInvariant
 
 variable [spec.DecidableEq] {i : ι}
 
+omit [IsUniformSpec spec] in
 lemma init (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i) :
     ReplayPrefixInvariant i (ReplayForkState.init trace forkQuery replacement) := by
   refine ⟨by simp [ReplayForkState.init], by simp [ReplayForkState.init], ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -641,6 +649,7 @@ lemma init (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i
 
 end ReplayPrefixInvariant
 
+omit [IsUniformSpec spec] in
 /-- Per-query preservation of the replay prefix invariant: a single
 `replayOracle i t` step starting from any state satisfying
 `ReplayPrefixInvariant` produces a state still satisfying it.
@@ -1113,6 +1122,7 @@ lemma replayRunWithTraceValue_forkConsumed_imp_last_input [spec.DecidableEq]
     (main := main) (i := i) (trace := trace) (forkQuery := forkQuery)
     (replacement := replacement) hz (n := z.2.cursor - 1) (by omega)).trans htrace
 
+omit [IsUniformSpec spec] in
 /-- The replay oracle never mutates the immutable parameters `forkQuery`, `replacement`,
 or `trace`.
 
@@ -1257,6 +1267,7 @@ namespace ReplayReplacementInvariant
 
 variable [spec.DecidableEq] {i : ι}
 
+omit [IsUniformSpec spec] in
 lemma init (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i) :
     ReplayReplacementInvariant i
       (ReplayForkState.init trace forkQuery replacement) := by
@@ -1268,6 +1279,7 @@ lemma init (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i
 
 end ReplayReplacementInvariant
 
+omit [IsUniformSpec spec] in
 /-- Per-query preservation of the replay replacement invariant.
 
 Made `protected` (formerly `private`) so the `Std.Do.Triple` bridge in
@@ -1439,6 +1451,7 @@ lemma replayRunWithTraceValue_getQueryValue?_observed_eq_replacement [spec.Decid
   rw [hrep] at hPostApp
   exact QueryLog.getQueryValue?_eq_some_of_getQ_getElem? _ _ _ _ hPostApp
 
+omit [IsUniformSpec spec] in
 private lemma replayOracle_observed_eq_logQuery [spec.DecidableEq]
     (i : ι) (t : ι) {st : ReplayForkState spec i}
     {z : spec.Range t × ReplayForkState spec i}
@@ -1489,6 +1502,7 @@ private lemma replayOracle_observed_eq_logQuery [spec.DecidableEq]
           rcases hz with ⟨u, _, rfl⟩
           simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]
 
+omit [IsUniformSpec spec] in
 private theorem replayRun_mem_support_replayFirstRun_append [spec.DecidableEq]
     (main : OracleComp spec α) (i : ι) {st₀ : ReplayForkState spec i}
     {z : α × ReplayForkState spec i}
@@ -1522,6 +1536,7 @@ private theorem replayRun_mem_support_replayFirstRun_append [spec.DecidableEq]
           _ = st₀.observed ++ (⟨t, us.1⟩ :: log) := by
               simp [QueryLog.logQuery, QueryLog.singleton, List.append_assoc]
 
+omit [IsUniformSpec spec] in
 /-- Every replay run can be realized as a logged run with the same observed transcript. -/
 theorem replayRunWithTraceValue_mem_support_replayFirstRun [spec.DecidableEq]
     (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
@@ -1541,11 +1556,11 @@ end support
 
 section quantitative
 
-variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+variable [spec.DecidableEq]
 variable [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec]
 variable [unifSpec ˡ⊂ₒ spec]
 
-omit [spec.Fintype] [spec.Inhabited] [∀ i, SampleableType (spec.Range i)]
+omit [IsUniformSpec spec] [∀ i, SampleableType (spec.Range i)]
     [unifSpec ⊂ₒ spec] [unifSpec ˡ⊂ₒ spec] in
 /-- Each step of `replayOracle` makes at most one oracle query. Either the oracle returns
 pure (matched-consumption or fork substitution), or it invokes `liftM (query t)` exactly
@@ -1596,7 +1611,7 @@ private lemma replayOracle_step_isTotalQueryBound
             Functor.map_map]
           exact hquery (fun u => (st.markMismatch).noteObserved t u)
 
-omit [spec.Fintype] [spec.Inhabited] [∀ i, SampleableType (spec.Range i)]
+omit [∀ i, SampleableType (spec.Range i)]
     [unifSpec ⊂ₒ spec] [unifSpec ˡ⊂ₒ spec] in
 /-- Replay does not increase the total number of oracle queries. If `main` makes at most
 `n` queries, then `replayRunWithTraceValue main i trace forkQuery replacement` also makes
@@ -1613,7 +1628,7 @@ private theorem isTotalQueryBound_replayRunWithTraceValue
   exact IsTotalQueryBound.simulateQ_run_of_step (impl := replayOracle i) hmain
     (fun t s => replayOracle_step_isTotalQueryBound i t s) _
 
-omit [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec] in
+omit [IsUniformSpec spec] [unifSpec ˡ⊂ₒ spec] in
 /-- If `forkReplay` succeeds, both runs agree on the selected fork index. -/
 private theorem cf_eq_of_mem_support_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
@@ -1720,9 +1735,9 @@ the fork query without mismatching the prefix. The proof has three parts:
 3. `replayRunWithTraceValue_state_correct`: the user-facing corollary obtained by
    instantiating the auxiliary invariant at the initial replay state. -/
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] in
+omit [IsUniformSpec spec] in
 private lemma replayOracle_preservesConsumed
     (i t : ι) {st : ReplayForkState spec i}
     (h_consumed : st.forkConsumed = true) (h_mismatch : st.mismatch = false)
@@ -1741,9 +1756,9 @@ private lemma replayOracle_preservesConsumed
   · simpa [ReplayForkState.noteObserved] using h_consumed
   · simpa [ReplayForkState.noteObserved] using h_mismatch
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] in
+omit [IsUniformSpec spec] in
 private theorem replayRun_preservesConsumed
     (main : OracleComp spec α) (idx : ι) {st₀ : ReplayForkState spec idx}
     (h_consumed : st₀.forkConsumed = true) (h_mismatch : st₀.mismatch = false)
@@ -1768,9 +1783,9 @@ private theorem replayRun_preservesConsumed
         replayOracle_preservesConsumed (i := idx) (t := t) h_consumed h_mismatch hus'
       exact ih (u := us.1) (st₀ := us.2) h_consumed' h_mismatch' hzcont
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] in
+omit [IsUniformSpec spec] in
 /-- Coupled invariant for the replay simulation: starting from a state whose remaining
 trace coincides with a continuation produced by some first run of `main`, and which
 still has enough `idx`-queries left to reach the fork query, every reachable end state
@@ -1931,9 +1946,9 @@ private theorem replayRun_state_correct_aux
         exact ih u_first hp_first' h_st₁_mismatch h_st₁_obs_len
           h_st₁_trace_drop h_st₁_forkConsumed h_st₁_dlt h_can_reach' hzcont'
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] in
+omit [IsUniformSpec spec] in
 /-- Replay correctness invariant: starting from a logged first run of `main` whose
 log already records an `i`-query at position `↑s`, replaying `main` against that log
 with substitution at the fork query always reaches the fork (so `forkConsumed = true`
@@ -2146,7 +2161,7 @@ private lemma probOutput_collisionReplay_le_main_div
 
 /-! ### Per-step unfolding of `replayOracle` -/
 
-omit [spec.Fintype] [spec.Inhabited]
+omit [IsUniformSpec spec]
   [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
 /-- Non-`i` lockstep step. -/
@@ -2165,7 +2180,7 @@ private lemma replayOracle_run_lockstep_ne_i [spec.DecidableEq]
   rw [dif_neg h_ti]
   simp [StateT.run_map, StateT.run_set]
 
-omit [spec.Fintype] [spec.Inhabited]
+omit [IsUniformSpec spec]
   [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
 /-- Distinguished-query lockstep before the fork point. -/
@@ -2186,7 +2201,7 @@ private lemma replayOracle_run_lockstep_i_pre_fork [spec.DecidableEq]
   rw [if_neg h_fork]
   simp [StateT.run_map, StateT.run_set]
 
-omit [spec.Fintype] [spec.Inhabited]
+omit [IsUniformSpec spec]
   [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
 /-- Distinguished-query step at the fork point. -/
@@ -2209,7 +2224,7 @@ private lemma replayOracle_run_fork_fires [spec.DecidableEq]
   rw [if_pos h_fork]
   simp [StateT.run_map, StateT.run_set]
 
-omit [spec.Fintype] [spec.Inhabited]
+omit [IsUniformSpec spec]
   [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
 /-- Empty-trace step enters live mode. -/
@@ -2227,7 +2242,7 @@ private lemma replayOracle_run_nextEntry_none [spec.DecidableEq]
   simp [StateT.run_monadLift,
     StateT.run_map, StateT.run_set]
 
-omit [spec.Fintype] [spec.Inhabited]
+omit [IsUniformSpec spec]
   [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
 /-- Type-mismatch step enters live mode. -/
@@ -2633,9 +2648,9 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
                 simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]))
           simp_rw [hliveL, hliveR]
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
+omit [IsUniformSpec spec] in
 /-- State-irrelevance for replay runs with the same readable fields. -/
 private theorem fst_map_simulateQ_replayOracle_state_equiv [spec.DecidableEq]
     (i : ι) (oa : OracleComp spec α) :
@@ -2828,9 +2843,9 @@ private theorem fst_map_simulateQ_replayOracle_state_equiv [spec.DecidableEq]
               (stR.markMismatch.noteObserved t v) (Or.inr (by
                 simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]))]
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
+omit [IsUniformSpec spec] in
 /-- The α-marginal of replay with an empty trace is `main`. -/
 private theorem fst_map_replayRunWithTraceValue_nil [spec.DecidableEq]
     (main : OracleComp spec α) (i : ι) (s : ℕ) (u' : spec.Range i) :
@@ -2862,9 +2877,9 @@ private theorem fst_map_replayRunWithTraceValue_nil [spec.DecidableEq]
       (Or.inr (by
         simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]))
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
+omit [IsUniformSpec spec] in
 /-- Replay step-unfolding for a non-`i` query. -/
 private theorem fst_map_replayRunWithTraceValue_query_bind_cons_ne [spec.DecidableEq]
     (i t : ι) (h_ti : t ≠ i)
@@ -2903,9 +2918,9 @@ private theorem fst_map_replayRunWithTraceValue_query_bind_cons_ne [spec.Decidab
     · exact Nat.zero_le _
   exact h_eqv
 
-omit [spec.Fintype] [spec.Inhabited]
-  [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
+omit [∀ j, SampleableType (spec.Range j)] [unifSpec ⊂ₒ spec]
   [unifSpec ˡ⊂ₒ spec] [spec.DecidableEq] in
+omit [IsUniformSpec spec] in
 /-- Replay step-unfolding for an `i`-query before the fork point. -/
 private theorem fst_map_replayRunWithTraceValue_query_bind_cons_self_succ
     [spec.DecidableEq]
@@ -3225,11 +3240,11 @@ private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
                 (h ([] : QueryLog spec) *
                   Pr[= y | (f <$> main : OracleComp spec β)]) =
             h ([] : QueryLog spec) * Pr[= y | (f <$> main : OracleComp spec β)] := fun u => by
-          rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+          rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
         simp_rw [hLHS_inner, hRHS_inner]
         simp_rw [← mul_assoc, mul_comm _ (h ([] : QueryLog spec)), mul_assoc,
           ENNReal.tsum_mul_left]
-        rw [← hfmain, ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+        rw [← hfmain, ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
       | succ k =>
         have htrunc : ∀ (u : spec.Range t) (p' : α × QueryLog spec),
             QueryLog.takeBeforeForkAt
@@ -3732,7 +3747,7 @@ private theorem probOutput_none_forkReplay_le
     ne_top_of_le_ne_top one_ne_top
       (sum_probOutput_some_le_one (mx := cf <$> main) (α := Fin (qb i + 1)))
   have htotal := probOutput_none_add_tsum_some (mx := forkReplay main qb i cf)
-  rw [HasEvalPMF.probFailure_eq_zero, tsub_zero] at htotal
+  rw [probFailure_of_liftM_PMF, tsub_zero] at htotal
   have hne_top : (∑' p, Pr[= some p | forkReplay main qb i cf]) ≠ ⊤ :=
     ne_top_of_le_ne_top one_ne_top (htotal ▸ le_add_self)
   have hPr_eq : Pr[= none | forkReplay main qb i cf] =
@@ -3805,7 +3820,7 @@ theorem le_probEvent_isSome_forkReplay
   exact (ENNReal.le_sub_iff_add_le_right hnone_ne_top probOutput_le_one).2
     (by simpa [add_comm] using hfork)
 
-omit [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec] in
+omit [unifSpec ˡ⊂ₒ spec] in
 /-- Structural success facts for `forkReplay`. -/
 theorem forkReplay_success_log_props
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
@@ -3884,7 +3899,7 @@ theorem forkReplay_success_log_props
             exact this
         · simp at h
 
-omit [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec] in
+omit [unifSpec ˡ⊂ₒ spec] in
 /-- Transfer logged-run postconditions through a successful replay fork. -/
 theorem forkReplay_propertyTransfer
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)

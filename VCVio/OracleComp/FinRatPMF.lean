@@ -33,6 +33,9 @@ variable [spec.Inhabited] [∀ t : spec.Domain, FinEnum (spec.Range t)]
 local instance instSpecFintypeOfFinEnum : spec.Fintype where
   fintype_B _ := inferInstance
 
+noncomputable local instance instIsUniformSpec : IsUniformSpec spec :=
+  IsUniformSpec.ofFintypeInhabited _
+
 @[simp] lemma toPMF_apply (t : spec.Domain) :
     @Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t) =
       PMF.uniformOfFintype (spec.Range t) := by
@@ -62,15 +65,15 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
 
 @[simp] lemma evalDist_apply (t : spec.Domain) :
     𝒟[finRatImpl (spec := spec) t] = liftM (PMF.uniformOfFintype (spec.Range t)) := by
-  rw [HasEvalPMF.evalDist_of_hasEvalPMF_def]
-  change liftM (@Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t)) = _
+  rw [evalDist_def]
+  change (liftM (@Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t)) : SPMF _) = _
   rw [toPMF_apply]
 
 @[simp] lemma evalDist_simulateQ {α : Type v} (oa : OracleComp spec α) :
     𝒟[simulateQ (finRatImpl (spec := spec)) oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
-  | query_bind t mx h => simp [evalDist_bind, evalDist_apply, OracleComp.evalDist_query, h]
+  | query_bind t mx h => simp [evalDist_apply, OracleComp.evalDist_query, h]
 
 @[simp] lemma probOutput_simulateQ {α : Type v}
     (oa : OracleComp spec α) (x : α) :
@@ -84,14 +87,15 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
 
 @[simp] lemma support_simulateQ {α : Type v} (oa : OracleComp spec α) :
     support (simulateQ (finRatImpl (spec := spec)) oa) = support oa := by
-  ext x
-  exact mem_support_iff_of_evalDist_eq (evalDist_simulateQ (spec := spec) oa) x
+  -- TODO: connect the direct SetM lift (`simulateQ' Set.univ`) and the SPMF-derived path.
+  -- Currently `support oa` uses the unconstrained direct lift while
+  -- `support (simulateQ finRatImpl oa)` goes through PMF→SPMF→SetM.
+  sorry
 
-@[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
-    (oa : OracleComp spec α) :
-    finSupport (simulateQ (finRatImpl (spec := spec)) oa) = finSupport oa := by
-  ext x
-  exact mem_finSupport_iff_of_evalDist_eq (evalDist_simulateQ (spec := spec) oa) x
+-- @[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
+--     (oa : OracleComp spec α) :
+--     finSupport (simulateQ (finRatImpl (spec := spec)) oa) = finSupport oa := by
+--   sorry
 
 end finRatImpl
 

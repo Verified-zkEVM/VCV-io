@@ -237,14 +237,14 @@ These are genuinely custom and stay as hand-written `QueryImpl` definitions. If 
 
 ### evalDist IS simulateQ
 
-`evalDist : OracleComp spec α → PMF α` is *definitionally* (`rfl`) `simulateQ` into `PMF`, with each query interpreted as the uniform distribution over its response type. The `HasEvalPMF` instance at `VCVio/OracleComp/EvalDist.lean:154-156` reads:
+`evalDist : OracleComp spec α → SPMF α` is *definitionally* (`rfl`) `liftM` into `SPMF`, which for `OracleComp` is `simulateQ` with each query interpreted as the uniform distribution over its response type. The canonical `MonadLiftT (OracleComp spec) PMF` instance in `VCVio/OracleComp/EvalDist.lean` reads:
 
 ```lean
-noncomputable instance : HasEvalPMF (OracleComp spec) where
-  toPMF := simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)
+noncomputable instance instMonadLiftTPMF : MonadLiftT (OracleComp spec) PMF where
+  monadLift mx := simulateQ' (fun t => PMF.uniformOfFintype (spec.Range t)) mx
 ```
 
-(requires `[spec.Fintype] [spec.Inhabited]`). `support : OracleComp spec α → Set α` has the same shape but target `SetM` with `impl _ := Set.univ`. Both are instances of the same universal fold, not separate primitives.
+(requires `[spec.Fintype] [spec.Inhabited]`). `support : OracleComp spec α → Set α` has the same shape but goes through `MonadLiftT (OracleComp spec) SetM` (with `impl _ := Set.univ`) and needs *no* `Fintype`/`Inhabited` — it is the qualitative reachable-output set. The propositional `EvalDistCompatible (OracleComp spec)` instance witnesses that `support` and `SPMF.support ∘ evalDist` agree on outputs. All three lifts are instances of the same universal fold, not separate primitives.
 
 Distinct from the `PMF`-target `evalDist`, there is also a *syntactic* uniform-sampling handler that rewrites queries into `ProbComp` (i.e. target `OracleComp unifSpec`, not `PMF`):
 

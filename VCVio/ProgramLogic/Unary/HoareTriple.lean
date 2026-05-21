@@ -44,7 +44,7 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp.ProgramLogic
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β σ : Type}
 
 /-! ## API contract
@@ -222,7 +222,7 @@ theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
 
 @[simp] theorem wp_const (oa : OracleComp spec α) (c : ℝ≥0∞) :
     wp oa (fun _ => c) = c := by
-  rw [wp_eq_tsum, ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+  rw [wp_eq_tsum, ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 @[game_rule] theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
     wp oa (fun x => f x + g x) =
@@ -568,10 +568,10 @@ lemma wp_congr_evalDist {oa ob : OracleComp spec α}
   exact μ_congr_evalDist (by simp [h])
 
 lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
+    [IsUniformSpec spec']
     {oa : OracleComp spec' ℝ≥0∞} {ob : OracleComp spec ℝ≥0∞}
     (h : 𝒟[oa] = 𝒟[ob]) :
-    @μ _ spec' _ _ oa = μ ob := by
+    @μ _ spec' _ oa = μ ob := by
   simp only [μ]
   exact tsum_congr fun x => by
     change 𝒟[oa] x * x = 𝒟[ob] x * x

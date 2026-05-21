@@ -26,8 +26,12 @@ open OracleSpec OracleComp ProbComp
 
 namespace FiatShamir.Stateful
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
-variable [SampleableType Stmt] [SampleableType Wit]
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal]
+    [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
+    {rel : Stmt → Wit → Bool}
+
+attribute [local instance] Fintype.ofFinite
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -89,7 +93,8 @@ def PublicCompatible
   publicUnforgeableAdvantage σ hr M adv =
     statefulCmaFreshAdvantage σ hr M adv
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- Interpreting a lifted source-CMA computation through the named real-CMA
 handler is the same as interpreting it through the source-query full-state
 handler. -/
@@ -113,7 +118,8 @@ private lemma simulateQ_cmaReal_liftM_sourceCma_eq
     rw [simulateQ_spec_query]
     rfl
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- The Fiat-Shamir public random-oracle interface has the same real-CMA
 semantics whether it is embedded directly into the named CMA interface or first
 through the source-CMA interface. -/
@@ -135,7 +141,8 @@ private lemma simulateQ_cmaReal_liftM_fsRo_eq_sourceCma
       · simp only [add_apply_inr]
         exact bind_congr ih
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- Fixed-key `postKeygenAdv` over the named CMA interface is the source
 post-keygen computation interpreted by the full-state source handler. -/
 private lemma postKeygenAdv_runState_eq_postKeygenAdvBase_run
@@ -159,7 +166,9 @@ private lemma postKeygenAdv_runState_eq_postKeygenAdvBase_run
     (oa := (SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify pk a.1.1 a.1.2)]
   simp
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
+omit [Fintype Stmt] in
 /-- The direct `cmaRealRun` endpoint and the fixed-key post-keygen endpoint are
 the same full-state freshness experiment. -/
 theorem statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage
@@ -233,7 +242,8 @@ private def cmaPostKeygenInv
     (s : CmaState M Commit Chal Stmt Wit) : Prop :=
   s.1.2.2 = some (pk, sk) ∧ s.2 = false
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma cmaRealSourceFullSum_lift_ro_query_run
     (mc : M × Commit) (s : CmaState M Commit Chal Stmt Wit) :
     (simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
@@ -247,7 +257,8 @@ private lemma cmaRealSourceFullSum_lift_ro_query_run
         (Chal := Chal) (Resp := Resp)).query (.inl (.inr mc))))).run s = _
   rw [simulateQ_spec_query]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma cmaRealSourceFullSum_sign_run_some
     (pk : Stmt) (sk : Wit) (m : M)
     (signed : List M) (cache : RoCache M Commit Chal) :
@@ -274,7 +285,6 @@ private lemma cmaRealSourceFullSum_sign_run_some
   | none =>
       simp [monad_norm]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 private def cmaRealSourceFullSum_postKeygenOrnament
     (pk : Stmt) (sk : Wit) :
     QueryImpl.StateOrnament
@@ -357,7 +367,8 @@ private def cmaRealSourceFullSum_postKeygenOrnament
       | none =>
           simp [fs_simp, uniformSampleImpl, StateT.run_modifyGet, monad_norm]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma postKeygenAppendProdImpl_eq_flattenStateT
     (pk : Stmt) (sk : Wit) :
     postKeygenAppendProdImpl (σ := σ) (hr := hr) (M := M)
@@ -415,7 +426,8 @@ private noncomputable def postKeygenFreshAppendProb
             pk msg sig
         pure (!decide (msg ∈ signed) && verified)).run' (∅ : RoCache M Commit Chal)
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run
     {α : Type}
     (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal)
@@ -470,7 +482,8 @@ private lemma postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run
             hproj.symm
         simpa [impl, st, cmaPostKeygenProj, Functor.map_map] using hreassoc
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private theorem postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) (sk : Wit) :
@@ -528,7 +541,8 @@ private theorem postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb
     (cmaSignLogImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt))).flattenStateT
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
     (t : (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp)).Domain) :
@@ -581,7 +595,8 @@ private lemma cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
     simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase,
       QueryImpl.flattenStateT, StateT.run_bind, monad_norm]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
     (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) α)
@@ -608,7 +623,6 @@ private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
     List M × CmaState M Commit Chal Stmt Wit :=
   (st.1.1, st)
 
-omit [SampleableType Stmt] [SampleableType Wit] in
 private def cmaRealAppendOrnament :
     QueryImpl.StateOrnament
       (cmaRealSourceFullSum M Commit Chal σ hr)
@@ -651,7 +665,8 @@ private def cmaRealAppendOrnament :
           | none =>
               simp [fs_simp, monad_norm]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run
     {α : Type}
     (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal)
@@ -709,7 +724,8 @@ private lemma cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run
   rw [happend]
   simp [st, cmaRealAppendProj, Functor.map_map]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- The post-keygen freshness endpoint is the same Boolean experiment as running
 `signedFreshAdv` in the direct stateful CMA game. -/
 theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
@@ -882,7 +898,8 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
             pk msg sig
         pure (!decide (msg ∈ signed) && verified)).run' ∅
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private theorem postKeygenWriterLog_eq_inputLog
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) (sk : Wit) :
@@ -924,7 +941,8 @@ private theorem postKeygenWriterLog_eq_inputLog
       (m₀ := StateT (RoCache M Commit Chal) ProbComp)
       so (adv.main pk) ([] : List M))
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private theorem postKeygenFreshWriterProb_eq_postKeygenFreshProb
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) (sk : Wit) :
@@ -988,7 +1006,8 @@ private theorem postKeygenFreshWriterProb_eq_postKeygenFreshProb
   exact postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 private lemma fsBaseImpl_writerTMapBase_signingOracle_eq
     (pk : Stmt) (sk : Wit) :
     let baseW : QueryImpl (unifSpec + roSpec M Commit Chal)
@@ -1028,7 +1047,8 @@ private lemma fsBaseImpl_writerTMapBase_signingOracle_eq
       QueryImpl.withLogging_apply, cmaRealFixedSign, SourceSigAlg, FiatShamir,
       fsBaseImpl, randomOracle, StateT.run_bind, roSim.run_liftM]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Fintype Chal] [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp]
+    [Inhabited Chal] in
 private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) (sk : Wit) :
@@ -1079,7 +1099,8 @@ private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
   conv_rhs =>
     simp [implS, baseS, fsBaseImpl, cmaRealFixedSign, SourceSigAlg, FiatShamir,
       randomOracle, QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Fintype Chal] [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp]
+    [Inhabited Chal] in
 private theorem runtime_evalDist_postKeygenFreshWriterComp_eq
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) (sk : Wit) :
@@ -1097,7 +1118,9 @@ private theorem runtime_evalDist_postKeygenFreshWriterComp_eq
   rw [postKeygenFreshWriterProb_eq_postKeygenFreshProb (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk]
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
+omit [DecidableEq Commit] in
 /-- The public EUF-CMA experiment factors into keygen followed by the fixed-key
 WriterT post-keygen computation. -/
 private theorem unforgeableExp_eq_runtime_bind_postKeygenFreshWriterComp
@@ -1120,7 +1143,8 @@ private theorem unforgeableExp_eq_runtime_bind_postKeygenFreshWriterComp
   funext a
   congr
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Fintype Chal] [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp]
+    [Inhabited Chal] in
 /-- Public EUF-CMA advantage in the shared fixed-key post-keygen normal form. -/
 theorem publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) :
@@ -1151,7 +1175,9 @@ theorem publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage
   rw [runtime_evalDist_postKeygenFreshWriterComp_eq (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Chal] [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp]
+    [Inhabited Chal] in
+omit [Fintype Stmt] in
 /-- Public compatibility for the legacy `SignatureAlg` endpoint. -/
 theorem publicCompatible
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) :
@@ -1164,7 +1190,8 @@ theorem publicCompatible
     (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
     (Resp := Resp) adv]
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Stmt] [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Stmt]
+    [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- Public compatibility, in inequality form, against the direct stateful
 freshness experiment. -/
 theorem publicUnforgeableAdvantage_le_statefulCmaFresh

@@ -62,7 +62,7 @@ open Std.Do'
 
 namespace OracleComp.Qualitative
 
-variable {ι : Type u} {spec : OracleSpec ι}
+variable {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
 variable {α β : Type}
 
 /-- Qualitative `Std.Do'.WP` interpretation of `OracleComp spec` valued in `Prop`.
@@ -103,6 +103,7 @@ theorem in `HoarePropTriple.lean` (and the support-style lemma
 `wp_iff_forall_support`) transports for free when the user rewrites
 `Std.Do'.wp _ _ _ ↦ MAlgOrdered.wp (l := Prop) _ _`. -/
 
+omit [IsUniformSpec spec] in
 theorem wp_eq_mAlgOrdered_wp_prop
     (oa : OracleComp spec α) (post : α → Prop) :
     Std.Do'.wp oa post Lean.Order.bot =

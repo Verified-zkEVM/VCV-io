@@ -19,7 +19,7 @@ open ENNReal OracleSpec OracleComp
 open OracleComp.ProgramLogic
 open scoped OracleComp.ProgramLogic
 
-variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec]
 variable {α β γ δ ε ζ : Type}
 
 /-! ## Congruence -/

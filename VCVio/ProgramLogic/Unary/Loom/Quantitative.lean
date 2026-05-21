@@ -77,7 +77,7 @@ universe u v
 namespace OracleComp.ProgramLogic
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 /-! ## Expectation algebra and the `MAlgOrdered` instance -/
@@ -183,7 +183,7 @@ namespace OracleComp.ProgramLogic.Loom
 /-! ## `Std.Do'.WP` instance for `OracleComp` -/
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 /-- Quantitative `Std.Do'.WP` interpretation of `OracleComp spec` valued in `ℝ≥0∞`.
@@ -618,7 +618,7 @@ end Std.Do'
 namespace OracleComp.ProgramLogic.Loom
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 namespace WriterT

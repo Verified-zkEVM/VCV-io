@@ -81,14 +81,15 @@ or `VCVioTest/`. This contract is enforced by
 
 ## Critical Gotchas
 
-1. **`[spec.Fintype]` and `[spec.Inhabited]`** are required for probability reasoning (`evalDist`, `Pr[...]`).
-2. **`autoImplicit = false` is set globally in `lakefile.lean`**. Do not add `set_option autoImplicit false` in individual files. Every variable must be explicitly declared.
-3. **`evalDist` IS `simulateQ`** with uniform distributions. This is definitional (`rfl`).
-4. **`++ₒ` is dead** — use `+` for combining oracle specs.
-5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad/Basic.lean` as canonical reference.
-6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
-7. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off. Fix the root cause instead.
-8. **Interop TCB isolation is mandatory**. Core VCVio (`VCVio/`, `ToMathlib/`, `LatticeCrypto/`, `Examples/`, `LatticeCryptoTest/`, `FFI/`, `VCVioWidgets/`, `VCVioTest/`) must never `import Interop.…`, `import Hax.…`, or `import Aeneas.…`. CI fails the PR if it does. See `docs/agents/interop.md`.
+1. **`[spec.Fintype]` and `[spec.Inhabited]`** are required for probability reasoning (`evalDist`, `Pr[...]`) over `OracleComp spec`. They feed the canonical `MonadLiftT (OracleComp spec) PMF` instance (and through it `SPMF`, `SetM`).
+2. **For a generic monad `m`, probability reasoning needs the lift triple**: `[MonadLiftT m SPMF]` (for `Pr[...]`), `[MonadLiftT m SetM]` + `[LawfulMonadLiftT m SetM]` (for `support`), and `[EvalDistCompatible m]` (the propositional coherence between the two — that the SetM reachable outputs are exactly the SPMF nonzero-probability outputs). Add `[HasEvalFinset m]` only when you specifically need `finSupport`. The legacy `HasEvalSet`/`HasEvalPMF`/`HasEvalSPMF` *data* classes no longer exist; only `HasEvalFinset` and the `HasEvalSet.{Decidable,LawfulFailure}` sub-typeclasses survive as namespaces.
+3. **`autoImplicit = false` is set globally in `lakefile.lean`**. Do not add `set_option autoImplicit false` in individual files. Every variable must be explicitly declared.
+4. **`evalDist` IS `liftM` to `SPMF`**. The definition is `@[reducible, inline] def evalDist [MonadLiftT m SPMF] (mx : m α) : SPMF α := liftM mx`. For `m = OracleComp spec`, this is definitionally `simulateQ` with uniform-sampling queries (composed with the `PMF → SPMF` coercion).
+5. **`++ₒ` is dead** — use `+` for combining oracle specs.
+6. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad/Basic.lean` as canonical reference.
+7. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
+8. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off. Fix the root cause instead.
+9. **Interop TCB isolation is mandatory**. Core VCVio (`VCVio/`, `ToMathlib/`, `LatticeCrypto/`, `Examples/`, `LatticeCryptoTest/`, `FFI/`, `VCVioWidgets/`, `VCVioTest/`) must never `import Interop.…`, `import Hax.…`, or `import Aeneas.…`. CI fails the PR if it does. See `docs/agents/interop.md`.
 
 For the full list, see `docs/agents/gotchas.md`.
 

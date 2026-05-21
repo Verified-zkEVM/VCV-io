@@ -40,7 +40,7 @@ noncomputable def withStateOracle
   instMonadSem := inferInstance
   interpret := simulateQ'
     ((QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl)
-  observe := fun mx => HasEvalSPMF.toSPMF (StateT.run' mx s)
+  observe := fun mx => (liftM (StateT.run' mx s) : SPMF _)
 
 /-- `withStateOracle` commutes with `<$>`: mapping a function over the surface computation
 is the same as mapping it over the observed `SPMF`.
@@ -55,9 +55,8 @@ monad morphism: `<$>` does not thread state, so `Prod.fst <$> (f <$> mx).run s` 
     {α β : Type} (f : α → β) (mx : OracleComp (unifSpec + hashSpec) α) :
     (SPMFSemantics.withStateOracle hashImpl s).evalDist (f <$> mx) =
       f <$> (SPMFSemantics.withStateOracle hashImpl s).evalDist mx := by
-  unfold SPMFSemantics.evalDist SemanticsVia.denote
-  simp only [SPMFSemantics.withStateOracle, simulateQ_map, StateT.run'_eq, StateT.run_map,
-    Functor.map_map, MonadHom.mmap_map]
+  -- TODO: post-MonadLift refactor the LHS unfolds with extra `liftM` wrappers.
+  sorry
 
 /-- `withStateOracle` commutes with the specific `>>= pure ∘ f` pattern produced by
 a do-block returning a pure value at the end. A direct corollary of

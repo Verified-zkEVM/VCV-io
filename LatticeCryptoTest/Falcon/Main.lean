@@ -628,8 +628,8 @@ def main : IO Unit := do
         let msg : ByteArray := ⟨#[0x48, 0x65, 0x6C, 0x6C, 0x6F]⟩
         let signSeed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
           (0xFF - i.val).toUInt8⟩
-        let masterPRNG := PRNGState.init signSeed
-        let (salt, _) := prngNextSalt masterPRNG
+        let rndbuf := signLoopRandomBytes signSeed 0
+        let salt : Bytes 40 := Vector.ofFn fun i => rndbuf[i.1]!
         let hm := hashToPoint n salt pk msg.toList
         let hmArr := rqToUInt16Array hm
         IO.println s!"  hm[0..4] = {hmArr.toList.take 4}"

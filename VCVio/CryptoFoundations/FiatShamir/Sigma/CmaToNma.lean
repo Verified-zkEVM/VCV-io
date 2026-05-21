@@ -33,7 +33,12 @@ open OracleComp OracleSpec
 
 namespace FiatShamir
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Fintype Chal] [Finite Commit] [Finite Resp]
+    [Inhabited Chal] [Inhabited Commit] [Inhabited Resp]
+    {rel : Stmt → Wit → Bool}
+
+attribute [local instance] Fintype.ofFinite
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
@@ -131,6 +136,7 @@ noncomputable def simulatedNmaAdv
       (Resp := Resp) simTranscript pk)
     (adv.main pk)).run ∅⟩
 
+omit [Fintype Chal] [Inhabited Chal] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Hash-query bound for `simulatedNmaAdv`: if the CMA adversary makes at most
 `qS` signing-oracle queries and `qH` random-oracle queries, the NMA reduction
@@ -150,6 +156,8 @@ theorem simulatedNmaAdv_hashQueryBound
         (simTranscript := simTranscript) (adv := adv)).main pk) qH := by
   classical
   letI : Fintype Chal := Fintype.ofFinite Chal
+  letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _

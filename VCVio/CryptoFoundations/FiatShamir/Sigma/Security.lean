@@ -33,12 +33,18 @@ open scoped OracleSpec.PrimitiveQuery
 
 namespace FiatShamir
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Finite Stmt] [Finite Commit] [Finite Resp] [Fintype Chal]
+    [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
+    {rel : Stmt → Wit → Bool}
+
+attribute [local instance] Fintype.ofFinite
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [Fintype Chal] in
+omit [Inhabited Stmt] [Inhabited Chal] in
 /-- **CMA-to-NMA reduction via HVZK simulation and managed random-oracle programming.**
 
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
@@ -75,6 +81,8 @@ theorem euf_cma_to_nma
   cma_to_nma_advantage_bound (σ := σ) (hr := hr) (M := M)
     simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
 
+omit [Finite Stmt] [Finite Commit] [Finite Resp] [Inhabited Stmt] [Inhabited Commit]
+  [Inhabited Resp] [Fintype Chal] [Inhabited Chal] in
 omit [SampleableType Stmt] in
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
@@ -105,7 +113,7 @@ theorem euf_nma_bound
         Pr[= true | hardRelationExp hr reduction] :=
   nma_to_hard_relation_bound (σ := σ) (hr := hr) (M := M) hss hss_nf nmaAdv qH
 
-omit [SampleableType Stmt] in
+omit [Inhabited Stmt] [Fintype Chal] [Inhabited Chal] in
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK, β-parametric).**
 
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
