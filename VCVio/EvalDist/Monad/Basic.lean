@@ -199,6 +199,24 @@ lemma probEvent_bind_eq_tsum_subtype [MonadLiftT m SPMF] [LawfulMonadLiftT m SPM
   refine tsum_congr (fun x ↦ ?_)
   by_cases hx : x ∈ support mx <;> aesop
 
+/-- If `Pr[q | my x] ≤ ε` for every `x` in the support of `mx`, then the bound also
+holds for the bind. -/
+lemma probEvent_bind_le_of_forall_le [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
+    {mx : m α} {my : α → m β} {q : β → Prop} {ε : ENNReal}
+    (h : ∀ x ∈ support mx, Pr[ q | my x] ≤ ε) :
+    Pr[ q | mx >>= my] ≤ ε := by
+  rw [probEvent_bind_eq_tsum]
+  calc ∑' x : α, Pr[= x | mx] * Pr[ q | my x]
+      ≤ ∑' x : α, Pr[= x | mx] * ε := by
+        refine ENNReal.tsum_le_tsum fun x => ?_
+        by_cases hx : x ∈ support mx
+        · exact mul_le_mul' le_rfl (h x hx)
+        · simp [probOutput_eq_zero_of_not_mem_support hx]
+    _ = (∑' x : α, Pr[= x | mx]) * ε := ENNReal.tsum_mul_right
+    _ ≤ 1 * ε := mul_le_mul' tsum_probOutput_le_one le_rfl
+    _ = ε := one_mul _
+
 lemma probOutput_bind_eq_sum_finSupport [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [MonadLiftT m SetM] [EvalDistCompatible m] [HasEvalFinset m]
     (mx : m α) (my : α → m β) [DecidableEq α] (y : β) :

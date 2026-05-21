@@ -65,6 +65,8 @@ abbrev Quotient := LatticeCrypto.NegacyclicRingSemantics.Quotient coeffSemantics
 /-- Coefficient-domain polynomials in `R_q = Z_q[X] / (X^256 + 1)`. -/
 abbrev Rq := coeffRing.Poly
 
+instance : AddCommGroup Rq := inferInstance
+
 /-- Transform-domain polynomials for the ML-DSA bundled ring. -/
 abbrev Tq := LatticeCrypto.TransformPoly coeffRing
 

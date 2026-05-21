@@ -432,14 +432,136 @@ end uniformSelectFinset
 
 section uniformSelectArray
 
-instance {α : Type _} : HasUniformSelect (Array α) α where
+instance hasUniformSelectArray (α : Type _) : HasUniformSelect (Array α) α where
   uniformSelect xs := if h : xs.size = 0 then failure else do
     let u ← $[0..xs.size-1]
     return xs[u] -- Note the in-index bound here relies on `h`.
 
--- TODO: full API for this
+variable {α : Type} (xs : Array α)
+
+lemma uniformSelectArray_def :
+    ($ xs : OptionT ProbComp α) =
+      if h : xs.size = 0 then failure else do
+        let u ← $[0..xs.size-1]
+        return xs[u] := rfl
+
+@[simp, grind =]
+lemma uniformSelectArray_empty : ($ (#[] : Array α) : OptionT ProbComp α) = failure := rfl
+
+@[simp, grind =]
+lemma support_uniformSelectArray : support ($ xs) = {x | x ∈ xs} := by
+  by_cases h : xs.size = 0
+  · have hxs : xs = #[] := Array.size_eq_zero_iff.mp h
+    subst hxs; ext x; simp
+  · have hsucc : xs.size - 1 + 1 = xs.size := Nat.succ_pred_eq_of_pos (Nat.pos_of_ne_zero h)
+    rw [uniformSelectArray_def, dif_neg h]
+    ext x
+    simp only [support_bind, OptionT.support_liftM, support_uniformFin,
+      Set.mem_iUnion, Set.mem_setOf_eq, support_pure, Set.mem_singleton_iff]
+    constructor
+    · rintro ⟨i, _, hx⟩
+      have hi : i.val < xs.size := Nat.lt_of_lt_of_eq i.isLt hsucc
+      rw [hx]
+      exact Array.getElem_mem hi
+    · intro hmem
+      obtain ⟨i, hi, hxs⟩ := Array.mem_iff_getElem.mp hmem
+      exact ⟨⟨i, Nat.lt_of_lt_of_eq hi hsucc.symm⟩, Set.mem_univ _, hxs.symm⟩
+
+@[simp, grind =]
+lemma finSupport_uniformSelectArray [DecidableEq α] :
+    finSupport ($ xs) = xs.toList.toFinset := by
+  apply finSupport_eq_of_support_eq_coe
+  rw [support_uniformSelectArray]
+  ext x
+  simp only [List.coe_toFinset, Set.mem_setOf_eq]
+  constructor
+  · intro hmem
+    obtain ⟨i, hi, hxs⟩ := Array.mem_iff_getElem.mp hmem
+    rw [List.mem_iff_getElem]
+    refine ⟨i, by rwa [Array.length_toList], ?_⟩
+    rw [Array.getElem_toList]; exact hxs
+  · intro hmem
+    rw [List.mem_iff_getElem] at hmem
+    obtain ⟨i, hi, hxs⟩ := hmem
+    rw [Array.length_toList] at hi
+    rw [Array.mem_iff_getElem]
+    exact ⟨i, hi, by rw [← Array.getElem_toList (h := hi)]; exact hxs⟩
+
+@[simp, grind =]
+lemma probFailure_uniformSelectArray : Pr[⊥ | $ xs] = if xs.size = 0 then 1 else 0 := by
+  by_cases h : xs.size = 0
+  · have hxs : xs = #[] := Array.size_eq_zero_iff.mp h
+    subst hxs; simp
+  · rw [uniformSelectArray_def, dif_neg h]
+    simp [h]
+
+-- TODO: `probOutput_uniformSelectArray` and `probEvent_uniformSelectArray` analogous to the
+-- `List` API. These need a careful `Fin (xs.size - 1 + 1) ≃ Fin xs.size` reindexing that
+-- the present helpers don't cleanly factor. Bridging through `xs.toList` once a clean
+-- `($ xs : OptionT ProbComp α) = $ xs.toList` lemma lands is probably the right path.
 
 end uniformSelectArray
+
+section uniformSelectMultiset
+
+/-- Choose a random element from a multiset, by converting to a list and choosing from that.
+This is noncomputable as the underlying list is only canonical up to permutation; for any
+fixed `Multiset.toList` representative each element is sampled with weight equal to its
+multiplicity. -/
+noncomputable instance hasUniformSelectMultiset (α : Type) :
+    HasUniformSelect (Multiset α) α where
+  uniformSelect s := $ s.toList
+
+variable {α : Type} (s : Multiset α)
+
+lemma uniformSelectMultiset_def : ($ s : OptionT ProbComp α) = $ s.toList := rfl
+
+@[simp, grind =]
+lemma support_uniformSelectMultiset :
+    support ($ s) = {x | x ∈ s} := by
+  ext x; simp [uniformSelectMultiset_def, Multiset.mem_toList]
+
+@[simp, grind =]
+lemma finSupport_uniformSelectMultiset [DecidableEq α] :
+    finSupport ($ s) = s.toFinset := by
+  apply finSupport_eq_of_support_eq_coe
+  ext x
+  simp [Multiset.mem_toFinset]
+
+@[simp, grind =]
+lemma probOutput_uniformSelectMultiset [DecidableEq α] (x : α) :
+    Pr[= x | $ s] = (s.count x : ℝ≥0∞) / Multiset.card s := by
+  simp only [uniformSelectMultiset_def, probOutput_uniformSelectList,
+    Multiset.length_toList]
+  congr 2
+  exact (Multiset.coe_count x s.toList).symm.trans (by rw [Multiset.coe_toList])
+
+@[simp, grind =]
+lemma probEvent_uniformSelectMultiset (p : α → Prop) [DecidablePred p] :
+    Pr[ p | $ s] = (Multiset.countP p s : ℝ≥0∞) / Multiset.card s := by
+  classical
+  simp only [uniformSelectMultiset_def, probEvent_uniformSelectList,
+    Multiset.length_toList]
+  congr 2
+  exact (Multiset.coe_countP p s.toList).symm.trans (by rw [Multiset.coe_toList])
+
+@[simp, grind =]
+lemma probFailure_uniformSelectMultiset :
+    Pr[⊥ | $ s] = if 0 < Multiset.card s then 0 else 1 := by
+  rw [uniformSelectMultiset_def, probFailure_uniformSelectList]
+  by_cases h : Multiset.card s = 0
+  · have hs : s = 0 := Multiset.card_eq_zero.mp h
+    subst hs
+    simp
+  · have hne : s ≠ 0 := fun hs => h (by rw [hs]; rfl)
+    have hempty_false : s.toList.isEmpty = false := by
+      rw [Bool.eq_false_iff, ne_eq, List.isEmpty_iff, Multiset.toList_eq_nil]
+      exact hne
+    have hpos : 0 < Multiset.card s := Nat.pos_of_ne_zero h
+    rw [hempty_false, if_pos hpos]
+    rfl
+
+end uniformSelectMultiset
 
 end ProbComp
 

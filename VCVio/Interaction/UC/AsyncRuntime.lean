@@ -304,6 +304,7 @@ process `p : Closed Party`, matching the shape of the synchronous
 noncomputable def processSemanticsAsync
     (Party : Type u)
     {m : Type → Type} [Monad m]
+    {Result : Type}
     (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
     {Event : Type} {State : Type}
@@ -314,8 +315,9 @@ noncomputable def processSemanticsAsync
       EnvScheduler m p.Proc State Event)
     (fuel : ℕ)
     (observe : ∀ p : Closed Party m schedulerSampler,
-      p.Proc → State → RuntimeTrace Event → m Unit) :
+      p.Proc → State → RuntimeTrace Event → m Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler) where
+  Result := Result
   m := m
   instMonad := inferInstance
   sem := sem
@@ -334,6 +336,7 @@ Coin-flip-only specialization of `processSemanticsAsync` (`m = ProbComp`,
 -/
 noncomputable def processSemanticsAsyncProbComp
     (Party : Type u)
+    {Result : Type}
     (schedulerSampler : ProbComp (ULift Bool))
     {Event : Type} {State : Type}
     (envAction : EnvAction ProbComp Event State)
@@ -343,7 +346,7 @@ noncomputable def processSemanticsAsyncProbComp
       EnvScheduler ProbComp p.Proc State Event)
     (fuel : ℕ)
     (observe : ∀ p : Closed Party ProbComp schedulerSampler,
-      p.Proc → State → RuntimeTrace Event → ProbComp Unit) :
+      p.Proc → State → RuntimeTrace Event → ProbComp Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
   processSemanticsAsync Party schedulerSampler
     (SPMFSemantics.ofMonadLift ProbComp)
@@ -368,11 +371,12 @@ trace and the unit env state.
 theorem processSemantics_eq_processSemanticsAsync_trivial
     (Party : Type u)
     {m : Type → Type} [Monad m] [LawfulMonad m]
+    {Result : Type}
     (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
     (init : ∀ p : Closed Party m schedulerSampler, p.Proc)
     (fuel : ℕ)
-    (observe : ∀ p : Closed Party m schedulerSampler, p.Proc → m Unit) :
+    (observe : ∀ p : Closed Party m schedulerSampler, p.Proc → m Result) :
     processSemantics Party schedulerSampler sem init fuel observe =
       processSemanticsAsync Party schedulerSampler sem
         (EnvAction.empty Unit) ()
@@ -411,11 +415,12 @@ abstract, leaving only the protocol-specific data (`init`, `sampler`, `fuel`,
 -/
 theorem processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial
     (Party : Type u)
+    {Result : Type}
     (schedulerSampler : ProbComp (ULift Bool))
     (init : ∀ p : Closed Party ProbComp schedulerSampler, p.Proc)
     (fuel : ℕ)
     (observe : ∀ p : Closed Party ProbComp schedulerSampler,
-      p.Proc → ProbComp Unit) :
+      p.Proc → ProbComp Result) :
     processSemanticsProbComp Party schedulerSampler
         init fuel observe =
       processSemanticsAsyncProbComp Party schedulerSampler

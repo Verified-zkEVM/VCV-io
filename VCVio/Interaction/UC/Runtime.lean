@@ -22,7 +22,7 @@ arbitrary monad `m : Type → Type`. This generality lets the execution
 intermediate monad carry additional capabilities, such as shared oracle
 access (random oracles, CRS, …), while the bundled
 `SPMFSemantics m` fixes how those capabilities are collapsed into the
-externally visible `SPMF Unit`.
+externally visible `SPMF Result`.
 
 Common instantiations:
 
@@ -40,7 +40,7 @@ Common instantiations:
   `SPMFSemantics.ofMonadLift (OptionT ProbComp)`. This is what
   cryptographic smoke tests (OTP-style privacy, guess games) use so
   that the `guard` branch contributes a real failure mass to the
-  resulting `SPMF Unit`.
+  resulting visible `SPMF`.
 
 ## Main definitions
 
@@ -178,8 +178,8 @@ surface execution monad `m` together with a bundled `SPMFSemantics m`.
 
 The execution runs entirely in `m`: per-step samplers come from the
 `OpenProcess`'s `stepSampler` field, multi-step iteration threads them,
-and the observer extracts the final judgment as an `m Unit` value. The
-bundled `sem` then collapses the `m Unit` game into a `SPMF Unit` via
+and the observer extracts the final judgment as an `m Result` value. The
+bundled `sem` then collapses the `m Result` game into a visible `SPMF` via
 `Semantics.evalDist`.
 
 See `processSemanticsProbComp` for the coin-flip-only specialization
@@ -187,12 +187,14 @@ and `processSemanticsOracle` for the shared-oracle specialization.
 -/
 noncomputable def processSemantics (Party : Type u)
     {m : Type → Type} [Monad m]
+    {Result : Type}
     (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
     (init : ∀ (p : Closed Party m schedulerSampler), p.Proc)
     (fuel : ℕ)
-    (observe : ∀ (p : Closed Party m schedulerSampler), p.Proc → m Unit) :
+    (observe : ∀ (p : Closed Party m schedulerSampler), p.Proc → m Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler) where
+  Result := Result
   m := m
   instMonad := inferInstance
   sem := sem
@@ -209,11 +211,12 @@ This is the right entry point for coin-flip-only protocols with no
 shared oracles and no deliberate failure mass.
 -/
 noncomputable def processSemanticsProbComp (Party : Type u)
+    {Result : Type}
     (schedulerSampler : ProbComp (ULift Bool))
     (init : ∀ (p : Closed Party ProbComp schedulerSampler), p.Proc)
     (fuel : ℕ)
     (observe : ∀ (p : Closed Party ProbComp schedulerSampler),
-      p.Proc → ProbComp Unit) :
+      p.Proc → ProbComp Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
   processSemantics Party schedulerSampler (SPMFSemantics.ofMonadLift ProbComp)
     init fuel observe
@@ -226,7 +229,7 @@ The surface monad is `OracleComp superSpec`, where `superSpec` describes
 all oracles available during execution. The bundled `SPMFSemantics`
 interprets those oracle queries by `simulateQ' impl` into
 `StateT σ ProbComp`, initializing the oracle state to `initOracle` and
-projecting onto the output to obtain the final `SPMF Unit`.
+projecting onto the output to obtain the final visible `SPMF`.
 
 For a protocol in the random oracle model, a typical instantiation is:
 * `superSpec := unifSpec + (D →ₒ R)` (uniform sampling plus hash oracle)
@@ -236,6 +239,7 @@ For a protocol in the random oracle model, a typical instantiation is:
 -/
 noncomputable def processSemanticsOracle (Party : Type u)
     {ι : Type} {superSpec : OracleSpec.{0, 0} ι} {σ : Type}
+    {Result : Type}
     (schedulerSampler : OracleComp superSpec (ULift Bool))
     (impl : QueryImpl superSpec (StateT σ ProbComp))
     (initOracle : σ)
@@ -243,7 +247,7 @@ noncomputable def processSemanticsOracle (Party : Type u)
       p.Proc)
     (fuel : ℕ)
     (observe : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler),
-      p.Proc → OracleComp superSpec Unit) :
+      p.Proc → OracleComp superSpec Result) :
     Semantics
       (openTheory.{u, 0, 0, 0} Party (OracleComp superSpec) schedulerSampler) :=
   let oracleSem : SPMFSemantics.{0, 0, 0} (OracleComp superSpec) :=

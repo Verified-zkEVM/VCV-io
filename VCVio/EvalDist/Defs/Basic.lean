@@ -779,6 +779,11 @@ lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
     (h : ∀ x ∈ finSupport mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
   probEvent_mono (fun x hx hpx => h x (mem_finSupport_of_mem_support hx) hpx)
 
+/-- If `p` implies `q` everywhere then `p` is less likely than `q`. Convenience
+specialisation of `probEvent_mono` that drops the support hypothesis. -/
+lemma probEvent_mono'' (h : ∀ x, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
+  probEvent_mono (fun x _ => h x)
+
 @[simp low, grind =]
 lemma probEvent_eq_one_iff :
     Pr[ p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by

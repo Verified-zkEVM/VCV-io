@@ -10,6 +10,9 @@ import VCVio.EvalDist.Bool
 import VCVio.EvalDist.Prod
 import Init.Data.UInt.Lemmas
 import Mathlib.Data.FinEnum
+import Mathlib.Data.Fintype.Perm
+import Mathlib.Data.Fintype.Pi
+import Mathlib.Data.Fintype.Vector
 
 /-!
 # Uniform Selection Over a Type
@@ -304,6 +307,15 @@ instance FinEnum.SampleableType (α : Type)
   have : NeZero (FinEnum.card α) := NeZero.mk FinEnum.card_ne_zero
   exact SampleableType.ofEquiv h.equiv.symm
 
+/-- Noncomputable bridge from a nonempty `Fintype` with decidable equality to `SampleableType`,
+via `Fintype.equivFin`. Used by downstream instances (e.g. `Sym α n`, `Equiv.Perm α`, `β ↪ α`)
+whose Mathlib `Fintype` instances are not paired with a `FinEnum`. Provided as a `def` rather
+than an `instance` to avoid overlap with `FinEnum.SampleableType`. -/
+@[reducible] noncomputable def SampleableType.ofFintype (α : Type)
+    [Fintype α] [DecidableEq α] [Nonempty α] : SampleableType α :=
+  haveI : NeZero (Fintype.card α) := ⟨Fintype.card_ne_zero⟩
+  SampleableType.ofEquiv (Fintype.equivFin α).symm
+
 instance (n : ℕ) [NeZero n] : FinEnum (ZMod n) where
   card := n
   equiv := (ZMod.finEquiv n).symm.toEquiv
@@ -387,7 +399,8 @@ instance instFintypeVector (α : Type u) (n : ℕ) [Fintype α] : Fintype (Vecto
       left_inv := fun f => funext fun i => by simp [Vector.get, Vector.ofFn]
       right_inv := fun v => Vector.ext fun i hi => by simp [Vector.ofFn, Vector.get] }
 
-/-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
+/-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. This is the base
+case used by the general `FinEnum`-indexed `instSampleableTypeFunc` below. -/
 instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :
     SampleableType (Fin n → α) :=
   SampleableType.ofEquiv
@@ -396,9 +409,70 @@ instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :
       left_inv := fun v => Vector.ext fun i hi => by simp [Vector.ofFn, Vector.get]
       right_inv := fun f => funext fun i => by simp [Vector.get, Vector.ofFn] }
 
-/-- Select a uniform element from `Matrix α n` by selecting each row independently. -/
-instance (α : Type) (n m : ℕ) [SampleableType α] : SampleableType (Matrix (Fin n) (Fin m) α) :=
-  inferInstanceAs (SampleableType (Fin n → Fin m → α))
+/-- A function `β → α` for `β` finitely enumerable and `α` sampleable is itself sampleable.
+This generalizes the `Fin n → α` instance above: the `FinEnum.fin` instance recovers it. -/
+instance instSampleableTypeFunc {β α : Type} [FinEnum β] [SampleableType α] :
+    SampleableType (β → α) :=
+  SampleableType.ofEquiv (α := Fin (FinEnum.card β) → α)
+    (Equiv.arrowCongr FinEnum.equiv.symm (Equiv.refl α))
+
+/-- Select a uniform element from `List.Vector α n` by independently selecting `α` at each
+index. The construction goes through the equivalence with `Fin n → α`. -/
+instance instSampleableTypeListVector {α : Type} {n : ℕ} [SampleableType α] :
+    SampleableType (List.Vector α n) :=
+  SampleableType.ofEquiv
+    { toFun := List.Vector.ofFn
+      invFun := fun xs i => xs.get i
+      left_inv := fun f => funext fun i => by simp
+      right_inv := fun xs => List.Vector.ext fun i => by simp }
+
+/-- Select a uniform element from `Matrix ι κ α` by independently selecting an entry for each
+`(i, j)`. Both index types only need to be `FinEnum`; the previous `Fin n × Fin m`-indexed
+instance is recovered through `FinEnum.fin`. -/
+instance instSampleableTypeMatrix {α ι κ : Type} [FinEnum ι] [FinEnum κ] [SampleableType α] :
+    SampleableType (Matrix ι κ α) :=
+  inferInstanceAs (SampleableType (ι → κ → α))
+
+/-- Discoverability wrapper: `SampleableType (α ⊕ β)` follows from `FinEnum` on each side
+plus nonemptiness of the sum, via Mathlib's `FinEnum.sum` instance and
+`FinEnum.SampleableType`. Listed explicitly so users can see it in the instance set rather
+than relying on a multi-step search. -/
+instance instSampleableTypeSum {α β : Type} [FinEnum α] [FinEnum β]
+    [Nonempty (α ⊕ β)] : SampleableType (α ⊕ β) :=
+  inferInstance
+
+/-- Discoverability wrapper: `SampleableType (Finset α)` for `FinEnum α`. Uniform sampling
+draws every subset of `α` with the same probability (`2^|α|` outcomes). `Finset α` is always
+inhabited by `∅`, so no `Nonempty` hypothesis is needed. -/
+instance instSampleableTypeFinset {α : Type} [FinEnum α] : SampleableType (Finset α) :=
+  inferInstance
+
+/-- Uniform sampling of size-`n` multisets over `α`. `Sym α n` is the correct finite analogue
+of `Multiset α`: a plain `Multiset α` is unbounded in multiplicity and thus not `Fintype`,
+while `Sym α n` is a `Fintype` whenever `α` is. The `Mathlib` instance lives in
+`Mathlib.Data.Fintype.Vector`; we lift it through `SampleableType.ofFintype`. -/
+noncomputable instance instSampleableTypeSym {α : Type} {n : ℕ}
+    [Fintype α] [DecidableEq α] [Nonempty α] : SampleableType (Sym α n) :=
+  haveI : Nonempty (Sym α n) := ⟨.replicate n (Classical.arbitrary α)⟩
+  SampleableType.ofFintype _
+
+/-- Uniform sampling of permutations of a finite type. `Equiv.Perm α` has `n!` elements when
+`Fintype.card α = n`. Mathlib provides `Fintype (Equiv.Perm α)` via
+`Mathlib.Data.Fintype.Perm`; we lift through `SampleableType.ofFintype`. Useful for
+shuffle-based protocols and oblivious-permutation games. -/
+noncomputable instance instSampleableTypePerm {α : Type} [Fintype α] [DecidableEq α] :
+    SampleableType (Equiv.Perm α) :=
+  haveI : Nonempty (Equiv.Perm α) := ⟨Equiv.refl α⟩
+  SampleableType.ofFintype _
+
+/-- Uniform sampling of injections `β ↪ α` for finite types. The number of such embeddings is
+`α.card! / (α.card - β.card)!` when `β.card ≤ α.card`, else `0`; the `Nonempty (β ↪ α)`
+hypothesis rules out the latter case. Mathlib provides `Fintype (β ↪ α)` via
+`Mathlib.Data.Fintype.Pi`; we lift through `SampleableType.ofFintype`. -/
+noncomputable instance instSampleableTypeEmbedding {β α : Type}
+    [Fintype β] [Fintype α] [DecidableEq β] [DecidableEq α] [Nonempty (β ↪ α)] :
+    SampleableType (β ↪ α) :=
+  SampleableType.ofFintype _
 
 end instances
 
