@@ -17,64 +17,11 @@ open OracleSpec Option ENNReal BigOperators
 
 universe u v w
 
-open scoped OracleSpec.PrimitiveQuery
+-- open scoped OracleSpec.PrimitiveQuery
 
-namespace OracleComp
+namespace OracleSpec
 
-variable {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} {α β γ : Type w}
-
-section support
-
-/-- The possible outputs of `mx` when queries can output values in the specified sets.
-NOTE: currently proofs using this should reduce to `simulateQ`. A full API would be better -/
-def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
-  simulateQ (r := SetM) o mx
-
-@[simp]
-lemma supportWhen_pure (o : QueryImpl spec Set) (x : α) :
-    supportWhen o (pure x : OracleComp spec α) = {x} := by
-  simp [supportWhen]
-
-@[simp]
-lemma supportWhen_query_bind (o : QueryImpl spec Set) (q : spec.Domain)
-    (oa : spec.Range q → OracleComp spec α) :
-    supportWhen o ((query q : OracleComp spec _) >>= oa) =
-      ⋃ x ∈ o q, supportWhen o (oa x) := by
-  simp only [supportWhen, simulateQ_query_bind]
-  exact Set.bind_def
-
-/-- Reachable outputs of a bind are the reachable outputs of the continuation over reachable
-outputs of the first computation. -/
-@[simp]
-lemma supportWhen_bind (o : QueryImpl spec Set) (oa : OracleComp spec α)
-    (ob : α → OracleComp spec β) :
-    supportWhen o (oa >>= ob) = ⋃ x ∈ supportWhen o oa, supportWhen o (ob x) := by
-  simp only [supportWhen, simulateQ_bind]
-  exact Set.bind_def
-
-/-- Membership form of [`OracleComp.supportWhen_bind`]. -/
-lemma mem_supportWhen_bind_iff (o : QueryImpl spec Set) (oa : OracleComp spec α)
-    (ob : α → OracleComp spec β) (y : β) :
-    y ∈ supportWhen o (oa >>= ob) ↔
-      ∃ x ∈ supportWhen o oa, y ∈ supportWhen o (ob x) := by
-  simp [supportWhen_bind]
-
-/-- Enlarging the set of possible oracle outputs only enlarges the reachable output set. -/
-lemma supportWhen_mono {o₁ o₂ : QueryImpl spec Set}
-    (h : ∀ q, o₁ q ⊆ o₂ q) (oa : OracleComp spec α) :
-    supportWhen o₁ oa ⊆ supportWhen o₂ oa := by
-  intro y hy
-  induction oa using OracleComp.inductionOn generalizing y with
-  | pure x =>
-      simpa [supportWhen_pure] using hy
-  | query_bind q oa ih =>
-      simp only [supportWhen_query_bind, Set.mem_iUnion, exists_prop] at hy ⊢
-      rcases hy with ⟨u, hu, hy⟩
-      exact ⟨u, h q hu, ih u hy⟩
-
-end support
-
-section evalDist_main
+variable {ι} {spec : OracleSpec ι}
 
 /-- A per-query distribution on an `OracleSpec`. Each query index `t : ι` is
 assigned a `PMF (spec t)` for its responses. This is the abstract data needed
@@ -134,6 +81,16 @@ witness. -/
 @[deprecated IsUniformSpec (since := "2026-05-20")]
 alias _root_.OracleSpec.IsProbSpec := IsUniformSpec
 
+end OracleSpec
+
+export OracleSpec (IsProbabilitySpec IsUniformSpec)
+
+namespace OracleComp
+
+variable {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} {α β γ : Type w}
+
+section evalDist_main
+
 /-- Embed `OracleComp` into `PMF` by interpreting each query via the per-query
 distribution provided by `IsProbabilitySpec`. -/
 noncomputable instance instMonadLiftTPMF [IsProbabilitySpec spec] :
@@ -147,13 +104,11 @@ noncomputable instance instLawfulMonadLiftTPMF [IsProbabilitySpec spec] :
 
 /-- Canonical `MonadLiftT (OracleComp spec) SetM` derived from the SPMF lift. -/
 instance instMonadLiftTSetM : MonadLiftT (OracleComp spec) SetM where
-  monadLift mx := mx.supportWhen fun _ => Set.univ
+  monadLift mx := simulateQ (r := SetM) (fun _ => Set.univ) mx
 
 instance instLawfulMonadLiftTSetM : LawfulMonadLiftT (OracleComp spec) SetM where
-  monadLift_pure x := by
-    simp [monadLift]
-  monadLift_bind mx my := by
-    simp [monadLift]; rfl
+  monadLift_pure := simulateQ_pure _
+  monadLift_bind := simulateQ_bind _
 
 lemma evalDist_eq_simulateQ [IsProbabilitySpec spec] (mx : OracleComp spec α) :
     𝒟[mx] = simulateQ IsProbabilitySpec.toPMF mx := rfl
@@ -169,7 +124,7 @@ lemma evalDist_liftM_toPMF [IsProbabilitySpec spec] (q : OracleQuery spec α) :
 /-- `liftM (query t) : OracleComp spec _` evaluates to the per-query distribution
 `IsProbabilitySpec.toPMF t`, lifted to `SPMF`. -/
 lemma evalDist_query_toPMF [IsProbabilitySpec spec] (t : spec.Domain) :
-    𝒟[(liftM (query t) : OracleComp spec _)] =
+    𝒟[(liftM (OracleSpec.query t) : OracleComp spec _)] =
       (IsProbabilitySpec.toPMF t : SPMF (spec.Range t)) := by
   rw [evalDist_liftM_toPMF]; simp [PMF.map_id]
 
@@ -180,7 +135,7 @@ lemma evalDist_query_toPMF [IsProbabilitySpec spec] (t : spec.Domain) :
   exact Set.image_univ
 
 @[grind =] lemma support_query (t : spec.Domain) :
-    support (liftM (query t) : OracleComp spec _) = Set.univ := by
+    support (liftM (OracleSpec.query t) : OracleComp spec _) = Set.univ := by
   rw [support_liftM]; exact Set.range_id
 
 lemma mem_support_liftM_iff (q : OracleQuery spec α) (u : α) :
@@ -188,7 +143,7 @@ lemma mem_support_liftM_iff (q : OracleQuery spec α) (u : α) :
   rw [support_liftM]; exact Set.mem_range
 
 lemma mem_support_query (t : spec.Domain) (u : spec.Range t) :
-    u ∈ support (liftM (query t) : OracleComp spec _) := by
+    u ∈ support (liftM (OracleSpec.query t) : OracleComp spec _) := by
   rw [support_query]; trivial
 
 alias support_liftM_query := support_query
@@ -202,8 +157,8 @@ theorem bind_congr_of_forall_mem_support (mx : OracleComp spec α) {f g : α →
     simp only [monad_norm]
     exact h a (by simp [support_pure])
   | query_bind q k ih =>
-    change liftM (query q) >>= (fun u => k u >>= f) =
-      liftM (query q) >>= (fun u => k u >>= g)
+    change liftM (OracleSpec.query q) >>= (fun u => k u >>= f) =
+      liftM (OracleSpec.query q) >>= (fun u => k u >>= g)
     exact bind_congr fun u => ih u (fun x hx =>
       h x ((mem_support_bind_iff _ _ _).mpr ⟨u, by simp, hx⟩))
 
@@ -227,23 +182,17 @@ instance : HasEvalFinset (OracleComp spec) where
     finSupport (liftM q : OracleComp spec α) = Finset.univ.image q.cont := by grind
 
 lemma finSupport_query [spec.DecidableEq] (t : spec.Domain) :
-    finSupport (liftM (query t) : OracleComp spec _) = Finset.univ := by grind
+    finSupport (liftM (OracleSpec.query t) : OracleComp spec _) = Finset.univ := by grind
 
 lemma mem_finSupport_liftM_iff [DecidableEq α] (q : OracleQuery spec α) (x : α) :
     x ∈ finSupport (liftM q : OracleComp spec α) ↔ ∃ t, q.cont t = x := by simp
 
 lemma mem_finSupport_query [spec.DecidableEq] (t : spec.Domain) (u : spec.Range t) :
-    u ∈ finSupport (liftM (query t) : OracleComp spec _) := by grind
+    u ∈ finSupport (liftM (OracleSpec.query t) : OracleComp spec _) := by grind
 
 end finSupport
 
 section evalDist
-
-/-- The output distribution of `mx` when queries follow the specified distribution.
-NOTE: currently proofs using this should reduce to `simulateQ`. A full API would be better -/
-noncomputable def evalDistWhen (d : QueryImpl spec SPMF)
-    (mx : OracleComp spec α) : SPMF α :=
-  simulateQ (r := SPMF) d mx
 
 variable [IsUniformSpec spec]
 
@@ -255,7 +204,7 @@ lemma evalDist_liftM (q : OracleQuery spec α) :
 
 @[simp, grind =]
 lemma evalDist_query (t : spec.Domain) :
-    𝒟[(liftM (query t) : OracleComp spec _)] = PMF.uniformOfFintype (spec.Range t) := by
+    𝒟[(liftM (OracleSpec.query t) : OracleComp spec _)] = PMF.uniformOfFintype (spec.Range t) := by
   rw [evalDist_liftM]; simp [PMF.map_id]
 
 @[simp low, grind =]
@@ -268,7 +217,8 @@ lemma probOutput_liftM_eq_div (q : OracleQuery spec α) (x : α) :
 
 @[simp, grind =]
 lemma probOutput_query (t : spec.Domain) (u : spec.Range t) :
-    Pr[= u | (query t : OracleComp spec _)] = (Fintype.card (spec.Range t) : ℝ≥0∞)⁻¹ := by
+    Pr[= u | (OracleSpec.query t : OracleComp spec _)] =
+      (Fintype.card (spec.Range t) : ℝ≥0∞)⁻¹ := by
   simp; rfl
 
 @[grind =]
@@ -285,11 +235,12 @@ lemma probEvent_liftM_eq_div (q : OracleQuery spec α) (p : α → Prop) :
 
 @[grind =]
 lemma probOutput_query_eq_div (t : spec.Domain) (u : spec.Range t) :
-    Pr[= u | (query t : OracleComp spec _)] = 1 / Fintype.card (spec.Range t) := by simp
+    Pr[= u | (OracleSpec.query t : OracleComp spec _)] = 1 / Fintype.card (spec.Range t) := by
+  simp
 
 @[simp, grind =]
 lemma probEvent_query (t : spec.Domain) (p : spec.Range t → Prop) [DecidablePred p] :
-    Pr[ p | (query t : OracleComp spec _)] =
+    Pr[ p | (OracleSpec.query t : OracleComp spec _)] =
       Finset.card {x | p x} / Fintype.card (spec.Range t) := by
   simp [probEvent_liftM_eq_div]; rfl
 
@@ -393,7 +344,7 @@ variable [IsUniformSpec spec] [IsProbabilitySpec spec']
 
 lemma evalDist_query_bind
     (t : spec.Domain) (ou : spec.Range t → OracleComp spec α) :
-    𝒟[(query t : OracleComp spec _) >>= ou] =
+    𝒟[(OracleSpec.query t : OracleComp spec _) >>= ou] =
       (OptionT.lift (PMF.uniformOfFintype (spec.Range t))) >>= (evalDist ∘ ou) := by
   rw [evalDist_bind, evalDist_query]; rfl
 
@@ -495,7 +446,7 @@ variable [IsProbabilitySpec spec] [IsProbabilitySpec spec']
 lemma evalDist_simulateQ_eq_evalDist
     (so : QueryImpl spec' (OracleComp spec))
     (h : ∀ t : spec'.Domain, 𝒟[so t] =
-      𝒟[(liftM (query t) : OracleComp spec' (spec'.Range t))])
+      𝒟[(liftM (OracleSpec.query t) : OracleComp spec' (spec'.Range t))])
     (oa : OracleComp spec' α) :
     𝒟[simulateQ so oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
@@ -508,6 +459,64 @@ lemma evalDist_simulateQ_eq_evalDist
 
 end simulateQ_evalDist
 
-end OracleComp
+section supportWhen
 
-export OracleComp (IsProbabilitySpec IsUniformSpec)
+/-- The possible outputs of `mx` when queries can output values in the specified sets.
+NOTE: currently proofs using this should reduce to `simulateQ`. A full API would be better -/
+def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
+  simulateQ (r := SetM) o mx
+
+@[simp]
+lemma supportWhen_pure (o : QueryImpl spec Set) (x : α) :
+    supportWhen o (pure x : OracleComp spec α) = {x} := by
+  simp [supportWhen]
+
+@[simp]
+lemma supportWhen_query_bind (o : QueryImpl spec Set) (q : spec.Domain)
+    (oa : spec.Range q → OracleComp spec α) :
+    supportWhen o ((OracleSpec.query q : OracleComp spec _) >>= oa) =
+      ⋃ x ∈ o q, supportWhen o (oa x) := by
+  simp only [supportWhen, simulateQ_query_bind]
+  exact Set.bind_def
+
+/-- Reachable outputs of a bind are the reachable outputs of the continuation over reachable
+outputs of the first computation. -/
+@[simp]
+lemma supportWhen_bind (o : QueryImpl spec Set) (oa : OracleComp spec α)
+    (ob : α → OracleComp spec β) :
+    supportWhen o (oa >>= ob) = ⋃ x ∈ supportWhen o oa, supportWhen o (ob x) := by
+  simp only [supportWhen, simulateQ_bind]
+  exact Set.bind_def
+
+/-- Membership form of [`OracleComp.supportWhen_bind`]. -/
+lemma mem_supportWhen_bind_iff (o : QueryImpl spec Set) (oa : OracleComp spec α)
+    (ob : α → OracleComp spec β) (y : β) :
+    y ∈ supportWhen o (oa >>= ob) ↔
+      ∃ x ∈ supportWhen o oa, y ∈ supportWhen o (ob x) := by
+  simp [supportWhen_bind]
+
+/-- Enlarging the set of possible oracle outputs only enlarges the reachable output set. -/
+lemma supportWhen_mono {o₁ o₂ : QueryImpl spec Set}
+    (h : ∀ q, o₁ q ⊆ o₂ q) (oa : OracleComp spec α) :
+    supportWhen o₁ oa ⊆ supportWhen o₂ oa := by
+  intro y hy
+  induction oa using OracleComp.inductionOn generalizing y with
+  | pure x =>
+      simpa [supportWhen_pure] using hy
+  | query_bind q oa ih =>
+      simp only [supportWhen_query_bind, Set.mem_iUnion, exists_prop] at hy ⊢
+      rcases hy with ⟨u, hu, hy⟩
+      exact ⟨u, h q hu, ih u hy⟩
+
+end supportWhen
+
+section evalDistWhen
+
+/-- The output distribution of `mx` when queries follow the specified distribution. -/
+@[reducible, simp]
+noncomputable def evalDistWhen (d : QueryImpl spec SPMF) (mx : OracleComp spec α) : SPMF α :=
+  simulateQ (r := SPMF) d mx
+
+end evalDistWhen
+
+end OracleComp

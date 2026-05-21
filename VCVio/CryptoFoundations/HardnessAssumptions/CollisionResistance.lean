@@ -34,7 +34,13 @@ protocol parameter.
 - `KeyedCRAdversary K X` — an adversary for the keyed variant.
 - `keyedCRExp` — the keyed collision-resistance experiment.
 - `keyedCRAdvantage` — the advantage of a keyed CR adversary.
-- `ROMHashSpec X Y` — random-oracle spec with domain `X` and range `Y`.
+- `ROMHashSpec X Y` — adversary-facing random-oracle spec; carries no
+  probability instances.
+- `ROMHashSpec.cached X Y` — post-simulation companion; defeq to
+  `ROMHashSpec X Y` but with the `IsUniformSpec` instance attached.
+- `ROMHashSpec.cachingOracle` — `QueryImpl` bridge that consumes pre-spec
+  queries and dispatches them through the generic `cachingOracle` on the
+  cached spec. The spec transition happens only via `simulateQ`.
 - `ROMCRAdversary X Y` — an adversary for the ROM variant.
 - `romCRExp` — the ROM collision-resistance experiment.
 - `romCRAdvantage` — the advantage of a ROM-CR adversary.
@@ -111,9 +117,12 @@ noncomputable def keyedCRAdvantage [DecidableEq X] [DecidableEq Y]
 
 Companion section modelling collision resistance directly in the random-oracle
 model. A ROM-CR adversary is an oracle computation outputting a candidate
-collision pair `(x, x')`. The experiment runs the adversary inside
-`cachingOracle`, then queries the random oracle on both candidates sharing
-the same cache; it wins iff `x ≠ x'` and the queried outputs coincide.
+collision pair `(x, x')`, expressed in the adversary-facing `ROMHashSpec X Y`
+which carries no probability instances. The experiment lifts the adversary
+into the post-simulation companion `ROMHashSpec.cached X Y` (defeq, distinct
+head symbol) where `IsUniformSpec` is in scope, then runs it inside
+`cachingOracle` and queries the random oracle on both candidates sharing the
+same cache; it wins iff `x ≠ x'` and the queried outputs coincide.
 
 For any `t`-query ROM-CR adversary the advantage is bounded by the birthday
 term `(t+2) * (t+1) / (2 * |Y|)` — a `(t+2)`-query game once the two
@@ -123,12 +132,61 @@ Closes one of the layers requested in
 [Verified-zkEVM/VCV-io#284](https://github.com/Verified-zkEVM/VCV-io/issues/284).
 -/
 
-/-- The random-oracle spec with domain `X` and range `Y`: each input `x : X` is
-a distinct oracle index returning a value in `Y`. -/
-abbrev ROMHashSpec (X Y : Type) : OracleSpec X := fun _ => Y
+/-- The random-oracle spec with domain `X` and range `Y`, as seen by the
+adversary. Each input `x : X` is a distinct oracle index returning a value in
+`Y`. This pre-cache spec carries no probability instances: a ROM-CR adversary
+is a syntactic object, and probability semantics only attach to the
+post-simulation spec `ROMHashSpec.cached` (defeq, distinct head symbol). -/
+def ROMHashSpec (X Y : Type) : OracleSpec X := fun _ => Y
+
+instance {X Y : Type} [DecidableEq X] [DecidableEq Y] :
+    (ROMHashSpec X Y).DecidableEq where
+  decidableEq_A := (inferInstanceAs (DecidableEq X))
+  decidableEq_B := fun _ => (inferInstanceAs (DecidableEq Y))
+
+/-- The post-simulation companion to `ROMHashSpec`: definitionally the same
+`OracleSpec X`, but with a distinct head symbol so the `IsUniformSpec`
+instance below is opted into only where probability reasoning is intended.
+The adversary's pre-cache computation is converted into a post-cache
+computation only via `simulateQ ROMHashSpec.cachingOracle`. -/
+def ROMHashSpec.cached (X Y : Type) : OracleSpec X := fun _ => Y
+
+instance {X Y : Type} [Fintype Y] : (ROMHashSpec.cached X Y).Fintype where
+  fintype_B := fun _ => (inferInstanceAs (Fintype Y))
+
+instance {X Y : Type} [Inhabited Y] : (ROMHashSpec.cached X Y).Inhabited where
+  inhabited_B := fun _ => (inferInstanceAs (Inhabited Y))
+
+instance {X Y : Type} [DecidableEq X] [DecidableEq Y] :
+    (ROMHashSpec.cached X Y).DecidableEq where
+  decidableEq_A := (inferInstanceAs (DecidableEq X))
+  decidableEq_B := fun _ => (inferInstanceAs (DecidableEq Y))
 
 noncomputable instance {X Y : Type} [Fintype Y] [Inhabited Y] :
-    IsUniformSpec (ROMHashSpec X Y) := IsUniformSpec.ofFintypeInhabited _
+    IsUniformSpec (ROMHashSpec.cached X Y) := IsUniformSpec.ofFintypeInhabited _
+
+/-- Bridge caching oracle: a `QueryImpl` that takes adversary-facing
+`ROMHashSpec X Y` queries and dispatches them through the generic
+`cachingOracle` on the post-cache spec `ROMHashSpec.cached X Y`. The spec
+transition from pre to cached happens only here, via `simulateQ`. -/
+@[inline, reducible]
+def ROMHashSpec.cachingOracle {X Y : Type} [DecidableEq X] :
+    QueryImpl (ROMHashSpec X Y)
+      (StateT (QueryCache (ROMHashSpec.cached X Y))
+        (OracleComp (ROMHashSpec.cached X Y))) :=
+  OracleSpec.cachingOracle (spec := ROMHashSpec.cached X Y)
+
+/-- Specialised `simulateQ_query` lemma for the bridge: simulating a single
+pre-spec query through `ROMHashSpec.cachingOracle` is the generic
+`cachingOracle` action at the post-cache spec. True by `rfl` because the two
+specs are definitionally equal as `OracleSpec X`. -/
+@[simp]
+lemma ROMHashSpec.simulateQ_cachingOracle_query {X Y : Type} [DecidableEq X] (x : X) :
+    simulateQ ROMHashSpec.cachingOracle (liftM ((ROMHashSpec X Y).query x)) =
+      OracleSpec.cachingOracle (spec := ROMHashSpec.cached X Y) x := by
+  change simulateQ (OracleSpec.cachingOracle (spec := ROMHashSpec.cached X Y))
+      (liftM ((ROMHashSpec.cached X Y).query x)) = _
+  exact cachingOracle.simulateQ_query x
 
 /-- A ROM-CR adversary is an oracle computation outputting a candidate
 collision pair under the random oracle. -/
@@ -141,14 +199,18 @@ structure BoundedROMCRAdversary (X Y : Type) (t : ℕ) where
   /-- The adversary makes at most `t` total queries. -/
   queryBound : IsTotalQueryBound run t
 
-/-- ROM collision-resistance experiment: run the adversary inside
-`cachingOracle` from the empty cache, then query the random oracle on both
-candidate inputs (verification queries share the cache). Win iff the inputs
-are distinct and the queried outputs coincide. -/
+/-- ROM collision-resistance experiment: run the adversary inside the
+`ROMHashSpec.cachingOracle` bridge from the empty cache, then query the
+random oracle on both candidate inputs (verification queries share the
+cache). Win iff the inputs are distinct and the queried outputs coincide.
+The bridge takes the entire computation from `OracleComp (ROMHashSpec X Y)`
+into `OracleComp (ROMHashSpec.cached X Y)` in one step — no separate
+oracle-comp lift is needed. -/
 def romCRExp [DecidableEq X] [DecidableEq Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
-    OracleComp (ROMHashSpec X Y) (Bool × QueryCache (ROMHashSpec X Y)) :=
-  (simulateQ cachingOracle (do
+    OracleComp (ROMHashSpec.cached X Y)
+      (Bool × QueryCache (ROMHashSpec.cached X Y)) :=
+  (simulateQ ROMHashSpec.cachingOracle (do
     let (x, x') ← A.run
     let y ← (ROMHashSpec X Y).query x
     let y' ← (ROMHashSpec X Y).query x'
@@ -161,7 +223,9 @@ noncomputable def romCRAdvantage [DecidableEq X] [DecidableEq Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) : ℝ≥0∞ :=
   Pr[fun z => z.1 = true | romCRExp A]
 
-/-- The inner oracle computation of `romCRExp`, before `simulateQ`. -/
+/-- The inner oracle computation of `romCRExp`, before `simulateQ`. Lives
+entirely on the pre-cache spec — the spec transition happens at the
+`simulateQ ROMHashSpec.cachingOracle` step. -/
 private def romCRInner [DecidableEq X] [DecidableEq Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     OracleComp (ROMHashSpec X Y) Bool := do
@@ -172,7 +236,7 @@ private def romCRInner [DecidableEq X] [DecidableEq Y]
 
 private lemma romCRExp_eq [DecidableEq X] [DecidableEq Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
-    romCRExp A = (simulateQ cachingOracle (romCRInner A)).run ∅ := rfl
+    romCRExp A = (simulateQ ROMHashSpec.cachingOracle (romCRInner A)).run ∅ := rfl
 
 /-- The total query bound on `romCRInner` is `t + 2` — `t` from the adversary
 plus the two verification queries. -/
@@ -192,7 +256,7 @@ the verification queries cache `x ↦ y` and `x' ↦ y'` with `x ≠ x'` and
 `y = y'`, which is exactly `CacheHasCollision`. -/
 private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y] [Finite Y] [Inhabited Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
-    ∀ z ∈ support ((simulateQ cachingOracle (romCRInner A)).run ∅),
+    ∀ z ∈ support ((simulateQ ROMHashSpec.cachingOracle (romCRInner A)).run ∅),
       z.1 = true → CacheHasCollision z.2 := by
   intro z hz hwin
   simp only [romCRInner, simulateQ_bind, simulateQ_pure] at hz
@@ -209,18 +273,19 @@ private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y] [Finite
   rw [hz] at hwin ⊢
   simp only [decide_eq_true_eq] at hwin
   obtain ⟨hne, hyy⟩ := hwin
-  rw [cachingOracle.simulateQ_query] at hmem₂
+  rw [ROMHashSpec.simulateQ_cachingOracle_query] at hmem₂
   have hcache₂ : cache₂ x = some y :=
     cachingOracle_query_caches x cache₁ y cache₂ hmem₂
   have hcache_mono : cache₂ ≤ cache₃ := by
     have hmem₃_co : (y', cache₃) ∈ support
-        (((ROMHashSpec X Y).cachingOracle x').run cache₂) := by
-      simp only [cachingOracle.simulateQ_query] at hmem₃; exact hmem₃
-    unfold cachingOracle at hmem₃_co
+        (((ROMHashSpec.cached X Y).cachingOracle x').run cache₂) := by
+      rw [ROMHashSpec.simulateQ_cachingOracle_query] at hmem₃
+      exact hmem₃
+    unfold OracleSpec.cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le
-      (QueryImpl.ofLift (ROMHashSpec X Y) (OracleComp (ROMHashSpec X Y)))
+      (QueryImpl.ofLift (ROMHashSpec.cached X Y) (OracleComp (ROMHashSpec.cached X Y)))
       x' cache₂ (y', cache₃) hmem₃_co
-  rw [cachingOracle.simulateQ_query] at hmem₃
+  rw [ROMHashSpec.simulateQ_cachingOracle_query] at hmem₃
   have hcache₃ : cache₃ x' = some y' :=
     cachingOracle_query_caches x' cache₂ y' cache₃ hmem₃
   have hcache₃_x : cache₃ x = some y := hcache_mono hcache₂
@@ -237,16 +302,19 @@ theorem romCRAdvantage_le_birthday [DecidableEq X] [DecidableEq Y]
     romCRAdvantage A ≤ (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card Y) := by
   unfold romCRAdvantage
   rw [romCRExp_eq]
-  have hrange : ∀ s : (ROMHashSpec X Y).Domain,
-      Fintype.card ((ROMHashSpec X Y).Range default) ≤
-        Fintype.card ((ROMHashSpec X Y).Range s) := fun _ => le_rfl
-  calc Pr[fun z => z.1 = true | (simulateQ cachingOracle (romCRInner A)).run ∅]
+  have hrange : ∀ s : (ROMHashSpec.cached X Y).Domain,
+      Fintype.card ((ROMHashSpec.cached X Y).Range default) ≤
+        Fintype.card ((ROMHashSpec.cached X Y).Range s) := fun _ => le_rfl
+  have hY' : 0 < Fintype.card ((ROMHashSpec.cached X Y).Range default) := hY
+  calc Pr[fun z => z.1 = true |
+          (simulateQ ROMHashSpec.cachingOracle (romCRInner A)).run ∅]
       ≤ Pr[fun z => CacheHasCollision z.2 |
-          (simulateQ cachingOracle (romCRInner A)).run ∅] :=
+          (simulateQ ROMHashSpec.cachingOracle (romCRInner A)).run ∅] :=
         probEvent_mono (romCRWin_implies_collision A)
     _ ≤ (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card Y) :=
         probEvent_cacheCollision_le_birthday_total_tight
-          (spec := ROMHashSpec X Y) (romCRInner A) (t + 2)
-          (romCRInner_totalBound A) hY hrange
+          (spec := ROMHashSpec.cached X Y)
+          (romCRInner A : OracleComp (ROMHashSpec.cached X Y) Bool) (t + 2)
+          (romCRInner_totalBound A) hY' hrange
 
 end CollisionResistance

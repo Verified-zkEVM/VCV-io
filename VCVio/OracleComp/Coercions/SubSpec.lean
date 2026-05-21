@@ -278,7 +278,7 @@ section liftComp_evalDist
 
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α : Type w}
-variable [OracleComp.IsUniformSpec spec] [OracleComp.IsUniformSpec superSpec]
+variable [spec.IsUniformSpec] [superSpec.IsUniformSpec]
     [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
 @[simp, grind =] lemma evalDist_liftComp (mx : OracleComp spec α) :

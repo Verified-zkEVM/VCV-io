@@ -142,6 +142,30 @@ instance instLawfulFailure (m : Type u → Type v) [Monad m]
     HasEvalSet.LawfulFailure (OptionT m) where
   support_failure' := by aesop
 
+/-- The SetM-lift of `OptionT m` (preimage of `support mx.run` under `some`) agrees with the
+SPMF-lift (the `OptionT.mapM'` bind into `SPMF`) on outputs, given `EvalDistCompatible m`. -/
+instance instEvalDistCompatible (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [EvalDistCompatible m] :
+    EvalDistCompatible (OptionT m) where
+  support_eq_SPMF_support {α} mx := by
+    change some ⁻¹' (SetM.run (liftM mx.run : SetM (Option α))) =
+      SPMF.support ((MonadHom.ofLift m SPMF) mx.run >>=
+        fun y => match y with | some a => pure a | none => failure : SPMF α)
+    rw [SPMF.support_bind]
+    have hbridge : SetM.run (liftM mx.run : SetM (Option α)) =
+        SPMF.support ((MonadHom.ofLift m SPMF) mx.run) :=
+      EvalDistCompatible.support_eq_SPMF_support mx.run
+    rw [hbridge]
+    ext a
+    simp only [Set.mem_preimage, Set.mem_iUnion, exists_prop]
+    refine ⟨fun h => ⟨some a, h, by simp [SPMF.support_pure]⟩, ?_⟩
+    rintro ⟨y, hy, ha⟩
+    cases y with
+    | none => simp only [SPMF.mem_support_iff, SPMF.failure_apply, ne_eq, not_true_eq_false] at ha
+    | some b => rw [SPMF.support_pure, Set.mem_singleton_iff] at ha; exact ha ▸ hy
+
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
