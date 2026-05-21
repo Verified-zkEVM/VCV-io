@@ -1349,6 +1349,9 @@ def hidingSim [Inhabited M] [Inhabited S]
 abbrev HidingAvgSpec (M : Type) (S : Type) (C : Type) :=
   (Unit →ₒ S) + CMOracle M S C
 
+noncomputable instance unitArrowSpecIsUniformSpec (S : Type) [Fintype S] [Inhabited S] :
+    IsUniformSpec (Unit →ₒ S) := IsUniformSpec.ofFintypeInhabited _
+
 abbrev hidingAvgLeftImpl :
     QueryImpl (Unit →ₒ S)
       (StateT (HidingCountState M S C) (OracleComp (HidingAvgSpec M S C))) :=

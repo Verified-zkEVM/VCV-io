@@ -24,15 +24,30 @@ variable {m : Type u → Type v} {α β γ : Type u}
 
 /-! ## `MonadLiftT m SetM` and `MonadLiftT m SPMF`
 
-We deliberately do **not** declare a generic `MonadLift SPMF SetM` instance.
-That would cause Lean's built-in transitivity (`instMonadLiftTOfMonadLift`) to
-synthesize `MonadLiftT m SetM` whenever `MonadLiftT m SPMF` is present, which
-creates a diamond whenever `m` *also* has a direct `MonadLiftT m SetM` instance
-(e.g. `OracleComp`, which needs `support` without `[spec.Fintype]`).
+Every lift exposed to users in this layer is declared as `MonadLiftT`, never
+`MonadLift`. There are two independent reasons.
 
-Every monad we care about declares its `MonadLiftT m SetM` directly; the
-`EvalDistCompatible` class below records the propositional coherence between
-`support` and `SPMF.support ∘ evalDist` when both are defined. -/
+**Diamond at `SPMF → SetM`.** We deliberately do **not** declare a generic
+`MonadLift SPMF SetM` instance. That would cause Lean's built-in transitivity
+(`instMonadLiftTOfMonadLift`) to synthesize `MonadLiftT m SetM` whenever
+`MonadLiftT m SPMF` is present, which creates a diamond whenever `m` *also*
+has a direct `MonadLiftT m SetM` instance (e.g. `OracleComp`, which needs
+`support` without `[spec.Fintype]`). Every monad we care about declares its
+`MonadLiftT m SetM` directly; the `EvalDistCompatible` class below records the
+propositional coherence between `support` and `SPMF.support ∘ evalDist` when
+both are defined.
+
+**Resolution fragility for parameterized + typeclass-gated lifts.** Lifts whose
+source is parameterized (`OracleComp spec`, `OptionT m`, `StateT σ m`, …) and
+which are gated by a typeclass on the parameter (`[IsProbabilitySpec spec]`,
+`[MonadLiftT m SPMF]`, …) must also be `MonadLiftT`, not `MonadLift`. Demoting
+to `MonadLift` forces Lean to find the instance through its transitive
+instance, whose outer hop is `MonadLift n o` with `n` a `semiOutParam`. When
+the recursion lands on a parameterized head like `MonadLift (OracleComp ?spec) PMF`,
+Lean has to simultaneously unify `?spec` through the `semiOutParam`, discharge
+the typeclass premise on `?spec`, and pin down `?spec` from the inner reflexive
+premise — a combination Lean's instance search refuses to chase. The direct
+`MonadLiftT` declaration sidesteps this with a single-step head match. -/
 
 /-- Direct `MonadLiftT SPMF SetM` (only on `SPMF` itself — not the transitive
 `MonadLift` that would create a diamond). -/
