@@ -323,7 +323,7 @@ instance SampleableType.Finite (α : Type) [SampleableType α] : Finite α :=
 /-- We avoid making this an instance globally as many types already have a `Fintype` instance
 that would not be definitionally equal to this one. -/
 @[reducible]
-def SampleableType.FinEnum (α : Type) [h : SampleableType α] [DecidableEq α] : Fintype α where
+def SampleableType.Fintype (α : Type) [h : SampleableType α] [DecidableEq α] : Fintype α where
   elems := finSupport ($ᵗ α)
   complete := by grind
 
