@@ -110,6 +110,12 @@ theorem bind_congr_of_forall_mem_support (mx : OracleComp spec α) {f g : α →
     exact bind_congr fun u => ih u (fun x hx =>
       h x ((mem_support_bind_iff _ _ _).mpr ⟨u, by simp, hx⟩))
 
+@[simp, grind .]
+lemma support_finite [spec.Fintype] (mx : OracleComp spec α) : (support mx).Finite := by
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t f h => simpa using Set.finite_iUnion h
+
 end support
 
 section finSupport

@@ -312,9 +312,20 @@ via `Fintype.equivFin`. Used by downstream instances (e.g. `Sym α n`, `Equiv.Pe
 whose Mathlib `Fintype` instances are not paired with a `FinEnum`. Provided as a `def` rather
 than an `instance` to avoid overlap with `FinEnum.SampleableType`. -/
 @[reducible] noncomputable def SampleableType.ofFintype (α : Type)
-    [Fintype α] [DecidableEq α] [Nonempty α] : SampleableType α :=
+    [Fintype α] [Nonempty α] : SampleableType α :=
   haveI : NeZero (Fintype.card α) := ⟨Fintype.card_ne_zero⟩
   SampleableType.ofEquiv (Fintype.equivFin α).symm
+
+/-- This typeclass shouldn't cause diamonds since `Finite` is propositional. -/
+instance SampleableType.Finite (α : Type) [SampleableType α] : Finite α :=
+  Finite.of_finite_univ <| by simp only [← support_uniformSample, OracleComp.support_finite]
+
+/-- We avoid making this an instance globally as many types already have a `Fintype` instance
+that would not be definitionally equal to this one. -/
+@[reducible]
+def SampleableType.Fintype (α : Type) [h : SampleableType α] [DecidableEq α] : Fintype α where
+  elems := finSupport ($ᵗ α)
+  complete := by grind
 
 instance (n : ℕ) [NeZero n] : FinEnum (ZMod n) where
   card := n
