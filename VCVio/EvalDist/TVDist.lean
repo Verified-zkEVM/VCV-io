@@ -408,9 +408,8 @@ lemma ofReal_tvDist_bind_event_right_le
 
 section bool_tvdist
 
-variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type → Type v} [MonadLiftT m SPMF]
 
-omit [Monad m] [LawfulMonadLiftT m SPMF] in
 /-- For any `Bool` computation, the difference of `Pr[= true]` values is bounded by
 TV distance. -/
 lemma abs_probOutput_toReal_sub_le_tvDist

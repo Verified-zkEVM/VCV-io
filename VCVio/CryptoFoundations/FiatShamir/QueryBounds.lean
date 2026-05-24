@@ -25,7 +25,7 @@ open OracleComp OracleSpec
 
 namespace FiatShamir
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} [Inhabited Chal] [Finite Chal]
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
     {rel : Stmt → Wit → Bool}
 
 attribute [local instance] Fintype.ofFinite
@@ -65,7 +65,6 @@ def nmaHashQueryBound {α : Type}
     (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (Q : ℕ) : Prop :=
   OracleComp.IsQueryBoundP oa (· matches .inr _) Q
 
-omit [Inhabited Chal] [Finite Chal] in
 @[simp]
 lemma nmaHashQueryBound_query_bind_iff {α : Type}
     (t : (unifSpec + (M × Commit →ₒ Chal)).Domain)
@@ -85,7 +84,6 @@ lemma nmaHashQueryBound_query_bind_iff {α : Type}
   simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_bind_iff]
   cases t <;> simp
 
-omit [Inhabited Chal] [Finite Chal] in
 @[simp]
 lemma nmaHashQueryBound_query_iff
     (t : (unifSpec + (M × Commit →ₒ Chal)).Domain) (Q : ℕ) :
@@ -97,7 +95,6 @@ lemma nmaHashQueryBound_query_iff
   simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_iff]
   cases t <;> simp
 
-omit [Inhabited Chal] [Finite Chal] in
 lemma nmaHashQueryBound_mono {α : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α} {Q₁ Q₂ : ℕ}
     (h : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
@@ -105,7 +102,6 @@ lemma nmaHashQueryBound_mono {α : Type}
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₂ :=
   OracleComp.IsQueryBoundP.mono h hQ
 
-omit [Inhabited Chal] [Finite Chal] in
 lemma nmaHashQueryBound_bind {α β : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α}
     {ob : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β}
@@ -117,7 +113,7 @@ lemma nmaHashQueryBound_bind {α β : Type}
       (oa := oa >>= ob) (Q₁ + Q₂) :=
   OracleComp.isQueryBoundP_bind h1 (fun x _ => h2 x)
 
-lemma nmaHashQueryBound_liftComp_zero {α : Type}
+lemma nmaHashQueryBound_liftComp_zero [Inhabited Chal] [Finite Chal] {α : Type}
     (oa : ProbComp α) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) 0 := by

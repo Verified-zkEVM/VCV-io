@@ -245,9 +245,8 @@ A wrapped step makes ≤ 1 underlying query (zero on a hit, one on a miss), so a
 
 section QueryBound
 
-variable {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
+variable {ι' : Type u} {spec' : OracleSpec ι'}
 
-omit [IsUniformSpec spec'] in
 lemma isQueryBoundP_run_withCaching
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain)
     {p : ι' → Prop} [DecidablePred p] {n : ℕ}
@@ -261,7 +260,6 @@ lemma isQueryBoundP_run_withCaching
       rw [withCaching_run_some _ hcache]
       trivial
 
-omit [IsUniformSpec spec'] in
 lemma isTotalQueryBound_run_withCaching
     (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain) {n : ℕ}
     (h : OracleComp.IsTotalQueryBound (so t) n) (cache : spec.QueryCache) :
