@@ -85,8 +85,11 @@ theorem correct :
   have hcomm : ∀ (a b : F), a • (b • g) = b • (a • g) := by
     intro a b; rw [← mul_smul, mul_comm, mul_smul]
   intro msg
-  simp [AsymmEncAlg.CorrectExp, ProbCompRuntime.probComp, ProbCompRuntime.evalDist,
-    hashedElGamal, hcomm, SPMF.probFailure_liftM]
+  simp only [ProbCompRuntime.evalDist, ProbCompRuntime.probComp, AsymmEncAlg.CorrectExp,
+    hashedElGamal, bind_pure_comp, map_pure, Option.some.injEq, Functor.map_map, hcomm, bind_assoc,
+    bind_map_left, add_sub_cancel_left, decide_true, SPMFSemantics.ofMonadLift_evalDist, liftM_bind,
+    evalDist_uniformSample, liftM_map, probOutput_bind_const, SPMF.probFailure_liftM,
+    probFailure_of_liftM_PMF, tsub_zero, probOutput_map_const, probOutput_pure, ↓reduceIte, mul_one]
   change 1 - Pr[⊥ | ($ᵗ HK : ProbComp HK)] = 1
   simp
 
