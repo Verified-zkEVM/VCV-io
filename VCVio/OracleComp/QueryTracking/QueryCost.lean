@@ -339,10 +339,9 @@ end expectedCost
 
 section expectedCostPMF
 
-variable [Monad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+variable [Monad m] [MonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueryCost_ge_of_usesCostAtLeast
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
@@ -355,7 +354,6 @@ lemma expectedQueryCost_ge_of_usesCostAtLeast
     (AddWriterT.expectedCost_ge_of_pathwiseCostAtLeast
       (oa := HasQuery.Program.withAddCost oa runtime costFn) (w := w) (val := val) h' hval)
 
-omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueryCost_eq_of_usesCostExactly
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
@@ -368,7 +366,6 @@ lemma expectedQueryCost_eq_of_usesCostExactly
     (expectedQueryCost_ge_of_usesCostAtLeast
       (usesCostAtLeast_of_usesCostExactly h le_rfl) hval)
 
-omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueries_ge_of_usesAtLeastQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
     (h : HasQuery.UsesAtLeastQueries oa runtime n) :
@@ -379,7 +376,6 @@ lemma expectedQueries_ge_of_usesAtLeastQueries [LawfulMonad m]
       (fun a b hle ↦ by
         simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
 
-omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
@@ -390,7 +386,6 @@ lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     (expectedQueries_le_of_usesAtMostQueries hUpper)
     (expectedQueries_ge_of_usesAtLeastQueries hLower)
 
-omit [LawfulMonadLiftT m PMF] in
 lemma expectedQueries_eq_of_usesExactlyQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
     (h : HasQuery.UsesExactlyQueries oa runtime n) :

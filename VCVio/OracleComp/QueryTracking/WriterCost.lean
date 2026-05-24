@@ -817,10 +817,9 @@ end unitCostBounds
 
 section expectedUnitCost
 
-variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable [MonadLiftT m SPMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m SPMF] in
 lemma expectedCostNat_le_of_queryBoundedAboveBy [LawfulMonad m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
     (h : QueryBoundedAboveBy oa n) :
@@ -835,10 +834,9 @@ end expectedUnitCost
 
 section expectedUnitCostPMF
 
-variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+variable [MonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
-omit [LawfulMonadLiftT m PMF] in
 lemma expectedCostNat_ge_of_queryBoundedBelowBy [LawfulMonad m] [EvalDistCompatible m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
     (h : QueryBoundedBelowBy oa n) :
@@ -849,7 +847,6 @@ lemma expectedCostNat_ge_of_queryBoundedBelowBy [LawfulMonad m] [EvalDistCompati
       simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal)))
     (probFailure_of_liftM_PMF _)
 
-omit [LawfulMonadLiftT m PMF] in
 lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m] [EvalDistCompatible m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
     (h : QueryCostExactly oa n) :

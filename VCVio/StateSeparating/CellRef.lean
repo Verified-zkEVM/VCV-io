@@ -464,12 +464,11 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF]
     [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {rel : r.Value → r.Value → Prop}
 
-omit [LawfulMonadLiftT m SPMF] in
 /-- A support-level cell relation makes violations of the relation a
 probability-zero event. -/
 theorem prob_violate_eq_zero (hc : SupportCellRel c r rel) (h : Heap Ident) :
@@ -527,12 +526,11 @@ end support
 
 section probability
 
-variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SPMF]
     [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident}
 variable {measure : r.Value → Nat} {δ : Nat}
 
-omit [LawfulMonadLiftT m SPMF] in
 /-- A measured support bound gives probability zero to exceeding the bound. -/
 theorem prob_exceeds_eq_zero (hc : SupportMeasureBound c r measure δ)
     (h : Heap Ident) :
@@ -866,17 +864,15 @@ section probability
 
 variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
-variable {m : Type (max u₀ v) → Type*} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+variable {m : Type (max u₀ v) → Type*} [Monad m] [MonadLiftT m SPMF]
     [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem PreservesCell.prob_changed_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)} {r : CellRef Ident₀}
     (himpl : PreservesCell impl r) (t : spec.Domain) (h : Heap Ident₀) :
     Pr[ fun z => r.get z.2 ≠ r.get h | (impl t).run h] = 0 :=
   CellRef.SupportPreserves.prob_changed_eq_zero (himpl t) h
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem PreservesCell.prob_unchanged_eq_sub_probFailure
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)} {r : CellRef Ident₀}
     (himpl : PreservesCell impl r) (t : spec.Domain) (h : Heap Ident₀) :
@@ -884,7 +880,6 @@ theorem PreservesCell.prob_unchanged_eq_sub_probFailure
       1 - Pr[⊥ | (impl t).run h] :=
   CellRef.SupportPreserves.prob_unchanged_eq_sub_probFailure (himpl t) h
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem CellWriteFootprint.prob_changed_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
     (footprint : CellWriteFootprint impl) (r : CellRef Ident₀)
@@ -893,7 +888,6 @@ theorem CellWriteFootprint.prob_changed_eq_zero
     Pr[ fun z => r.get z.2 ≠ r.get h | (impl t).run h] = 0 :=
   (footprint.preservesCell r hr).prob_changed_eq_zero t h
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem CellWriteFootprint.prob_unchanged_eq_sub_probFailure
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
     (footprint : CellWriteFootprint impl) (r : CellRef Ident₀)
@@ -915,9 +909,8 @@ variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
 variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
-    [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem simulateQ_run_cellChange_prob_eq_zero
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
     (r : CellRef Ident₀) (himpl : QueryImpl.PreservesCell impl r)
@@ -927,7 +920,6 @@ theorem simulateQ_run_cellChange_prob_eq_zero
   intro z hz hchange
   exact hchange (simulateQ_run_cellPreserved impl r himpl A h z hz)
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem simulateQ_run_cellUnchanged_prob_eq_sub_probFailure
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
     (r : CellRef Ident₀) (himpl : QueryImpl.PreservesCell impl r)
@@ -939,7 +931,6 @@ theorem simulateQ_run_cellUnchanged_prob_eq_sub_probFailure
     exact simulateQ_run_cellPreserved impl r himpl A h' z hz
   exact CellRef.SupportPreserves.prob_unchanged_eq_sub_probFailure hpres h
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem simulateQ_run_cellUnchanged_prob_eq_one_of_probFailure_eq_zero
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
     (r : CellRef Ident₀) (himpl : QueryImpl.PreservesCell impl r)
@@ -956,9 +947,8 @@ variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
 variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m PMF]
-    [LawfulMonadLiftT m PMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m PMF] in
 theorem simulateQ_run_cellUnchanged_prob_eq_one
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
     (r : CellRef Ident₀) (himpl : QueryImpl.PreservesCell impl r)
@@ -996,9 +986,8 @@ variable {ι : Type uι} {spec : OracleSpec.{uι, max u₀ v} ι}
 variable {α : Type (max u₀ v)}
 variable {Ident₀ : Type u₀} [CellSpec.{u₀, max u₀ v} Ident₀]
 variable {m : Type (max u₀ v) → Type*} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
-    [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem CellWriteFootprint.simulateQ_run_cellChange_prob_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
     (footprint : CellWriteFootprint impl) (r : CellRef Ident₀)
@@ -1008,7 +997,6 @@ theorem CellWriteFootprint.simulateQ_run_cellChange_prob_eq_zero
   OracleComp.simulateQ_run_cellChange_prob_eq_zero impl r
     (footprint.preservesCell r hr) A h
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem CellWriteFootprint.simulateQ_run_cellUnchanged_prob_eq_sub_probFailure
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
     (footprint : CellWriteFootprint impl) (r : CellRef Ident₀)
@@ -1019,7 +1007,6 @@ theorem CellWriteFootprint.simulateQ_run_cellUnchanged_prob_eq_sub_probFailure
   OracleComp.simulateQ_run_cellUnchanged_prob_eq_sub_probFailure impl r
     (footprint.preservesCell r hr) A h
 
-omit [LawfulMonadLiftT m SPMF] in
 theorem CellWriteFootprint.simulateQ_run_cellUnchanged_prob_eq_one_of_probFailure_eq_zero
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
     (footprint : CellWriteFootprint impl) (r : CellRef Ident₀)

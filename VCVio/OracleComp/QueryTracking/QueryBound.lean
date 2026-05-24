@@ -446,14 +446,13 @@ end IsQueryBoundP
 
 section IsPerIndexQueryBound
 
-variable [DecidableEq ι] [IsUniformSpec spec]
+variable [DecidableEq ι]
 
 /-- Per-index query bound: `qb t` gives the maximum number of queries to oracle `t`.
 Each query to `t` decrements `qb t` by one. Recovers the classical notion. -/
 abbrev IsPerIndexQueryBound (oa : OracleComp spec α) (qb : ι → ℕ) : Prop :=
   IsQueryBound oa qb (fun t qb => 0 < qb t) (fun t qb => Function.update qb t (qb t - 1))
 
-omit [IsUniformSpec spec] in
 /-- `IsPerIndexQueryBound` is `IsRollBound` on the underlying `FreeM` with the
 per-index validity and cost. -/
 theorem isPerIndexQueryBound_iff_isRollBound (oa : OracleComp spec α) (qb : ι → ℕ) :
@@ -463,19 +462,16 @@ theorem isPerIndexQueryBound_iff_isRollBound (oa : OracleComp spec α) (qb : ι 
         (fun t qb => Function.update qb t (qb t - 1)) :=
   Iff.rfl
 
-omit [IsUniformSpec spec] in
 @[simp]
 lemma isPerIndexQueryBound_pure (x : α) (qb : ι → ℕ) :
     IsPerIndexQueryBound (pure x : OracleComp spec α) qb := trivial
 
-omit [IsUniformSpec spec] in
 lemma isPerIndexQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
     (qb : ι → ℕ) :
     IsPerIndexQueryBound (liftM (spec.query t) >>= mx) qb ↔
       0 < qb t ∧ ∀ u, IsPerIndexQueryBound (mx u) (Function.update qb t (qb t - 1)) :=
   Iff.rfl
 
-omit [IsUniformSpec spec] in
 @[simp]
 lemma isPerIndexQueryBound_query_iff (t : ι) (qb : ι → ℕ) :
     IsPerIndexQueryBound (liftM (spec.query t) : OracleComp spec _) qb ↔
@@ -491,7 +487,6 @@ private lemma update_le_update {qb qb' : ι → ℕ} {t : ι} (hle : qb ≤ qb')
   · rw [Function.update_of_ne hj, Function.update_of_ne hj]
     exact hle j
 
-omit [IsUniformSpec spec] in
 private lemma isPerIndexQueryBound_mono_aux (oa : OracleComp spec α) :
     ∀ {qb qb' : ι → ℕ}, qb ≤ qb' →
       oa.IsPerIndexQueryBound qb → oa.IsPerIndexQueryBound qb' := by
@@ -502,7 +497,6 @@ private lemma isPerIndexQueryBound_mono_aux (oa : OracleComp spec α) :
     rw [isPerIndexQueryBound_query_bind_iff] at h ⊢
     exact ⟨Nat.lt_of_lt_of_le h.1 (hle t), fun u => ih u (update_le_update hle) (h.2 u)⟩
 
-omit [IsUniformSpec spec] in
 lemma IsPerIndexQueryBound.mono {oa : OracleComp spec α} {qb qb' : ι → ℕ}
     (h : IsPerIndexQueryBound oa qb) (hle : qb ≤ qb') : IsPerIndexQueryBound oa qb' :=
   isPerIndexQueryBound_mono_aux oa hle h
@@ -515,7 +509,6 @@ private lemma update_add_eq_update_add {qb₁ qb₂ : ι → ℕ} {t : ι} (ht :
   · rw [hj, Pi.add_apply, Function.update_self, Pi.add_apply, Function.update_self]; omega
   · simp only [Pi.add_apply, Function.update_of_ne hj]
 
-omit [IsUniformSpec spec] in
 private lemma isPerIndexQueryBound_bind_aux (oa : OracleComp spec α)
     (ob : α → OracleComp spec β) (qb₂ : ι → ℕ)
     (h2 : ∀ x, IsPerIndexQueryBound (ob x) qb₂) :
@@ -534,20 +527,17 @@ private lemma isPerIndexQueryBound_bind_aux (oa : OracleComp spec α)
     rw [← update_add_eq_update_add h1.1]
     exact ih u (h1.2 u)
 
-omit [IsUniformSpec spec] in
 lemma isPerIndexQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     {qb₁ qb₂ : ι → ℕ}
     (h1 : IsPerIndexQueryBound oa qb₁) (h2 : ∀ x, IsPerIndexQueryBound (ob x) qb₂) :
     IsPerIndexQueryBound (oa >>= ob) (qb₁ + qb₂) :=
   isPerIndexQueryBound_bind_aux oa ob qb₂ h2 h1
 
-omit [IsUniformSpec spec] in
 @[simp]
 lemma isPerIndexQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb : ι → ℕ) :
     IsPerIndexQueryBound (f <$> oa) qb ↔ IsPerIndexQueryBound oa qb :=
   isQueryBound_map_aux oa f _ _
 
-omit [IsUniformSpec spec] in
 /-- Forward-direction `seq` analogue of `isPerIndexQueryBound_bind`. Reduces to the bind
 case via `seq_eq_bind_map` plus `isPerIndexQueryBound_map_iff` to discharge the constant
 continuation. -/
@@ -559,7 +549,6 @@ lemma isPerIndexQueryBound_seq {og : OracleComp spec (α → β)} {oa : OracleCo
   exact isPerIndexQueryBound_bind h1
     (fun g => (isPerIndexQueryBound_map_iff oa g qb₂).mpr h2)
 
-omit [IsUniformSpec spec] in
 /-- Per-index analogue of `isQueryBound_iff_of_map_eq`: if `f <$> oa = ob` for any `f`, then
 `IsPerIndexQueryBound` transfers between them. -/
 lemma isPerIndexQueryBound_iff_of_map_eq
@@ -570,7 +559,6 @@ lemma isPerIndexQueryBound_iff_of_map_eq
 
 /-! ### Soundness: structural bound implies dynamic count bound -/
 
-omit [IsUniformSpec spec] in
 /-- The structural query bound `IsPerIndexQueryBound` is sound with respect to the dynamic
 query count produced by `countingOracle`: if a computation satisfies a per-index query bound,
 then every execution path's query count is bounded.
@@ -615,7 +603,6 @@ If each step `impl t` makes at most one query of the matching index `t` (and non
 other), the source's per-index bound transfers across `simulateQ`. Captures the
 `cachingOracle` / `seededOracle` shape, where each step delegates to a single `query t`. -/
 
-omit [IsUniformSpec spec] in
 theorem IsPerIndexQueryBound.simulateQ_run_of_uniform_step
     {σ : Type u}
     {impl : QueryImpl spec (StateT σ (OracleComp spec))}
@@ -651,7 +638,6 @@ theorem IsPerIndexQueryBound.simulateQ_run_of_uniform_step
       rw [hadd]
       simpa [StateT.run_bind] using isPerIndexQueryBound_bind hstep' hrest
 
-omit [IsUniformSpec spec] in
 /-- Stateless analogue of `IsPerIndexQueryBound.simulateQ_run_of_uniform_step`: when the
 simulation target monad is `OracleComp spec` directly (no `StateT` layer), each step's
 single-`t`-query bound transfers without an external state argument. -/
@@ -1065,9 +1051,8 @@ end countingOracle
 
 section CountingResidual
 
-variable [DecidableEq ι] [Fintype ι] [IsUniformSpec spec]
+variable [DecidableEq ι] [Fintype ι]
 
-omit [IsUniformSpec spec] in
 /-- If `oa >>= ob` is totally query-bounded by `n`, then after any support point of the
 counting run of `oa`, the continuation `ob` is bounded by the residual budget. -/
 theorem IsTotalQueryBound.residual_of_mem_support_counting
@@ -1099,7 +1084,6 @@ theorem IsTotalQueryBound.residual_of_mem_support_counting
         omega
       simpa [hbudget] using hu
 
-omit [IsUniformSpec spec] in
 /-- Any support point of the counting simulation of a totally query-bounded
 computation has total query count at most the structural bound. -/
 theorem IsTotalQueryBound.counting_total_le
@@ -1132,7 +1116,7 @@ omit [Fintype ι] in
 /-- The counting-oracle simulation of any `OracleComp` has non-empty support whenever every
 oracle range is inhabited. Used by the converse direction of
 `isTotalQueryBound_iff_counting_total_le`. -/
-lemma countingOracle.support_simulate_nonempty
+lemma countingOracle.support_simulate_nonempty [IsUniformSpec spec]
     (oa : OracleComp spec α) :
     (support (countingOracle.simulate oa 0)).Nonempty := by
   induction oa using OracleComp.inductionOn with
@@ -1145,7 +1129,7 @@ lemma countingOracle.support_simulate_nonempty
 /-- Converse of `IsTotalQueryBound.counting_total_le`: a counting-oracle bound on every
 support path implies the structural total query bound. Together they characterize
 `IsTotalQueryBound` purely in terms of the counting-oracle support. -/
-theorem isTotalQueryBound_iff_counting_total_le
+theorem isTotalQueryBound_iff_counting_total_le [IsUniformSpec spec]
     {oa : OracleComp spec α} {n : ℕ} :
     IsTotalQueryBound oa n ↔
       ∀ z ∈ support (countingOracle.simulate oa 0), (∑ i, z.2 i) ≤ n := by
@@ -1179,7 +1163,6 @@ theorem isTotalQueryBound_iff_counting_total_le
       have hb : 1 + (∑ i, z.2 i) ≤ n := (hsplit z.2) ▸ h _ hbig'
       omega
 
-omit [IsUniformSpec spec] in
 omit [Fintype ι] [DecidableEq ι] in
 /-- If a stateful simulation has support cost at most one per query step, then any support
 point of the simulated prefix leaves the continuation bounded by the residual budget measured
@@ -1234,9 +1217,8 @@ theorem IsTotalQueryBound.of_perIndex [DecidableEq ι] [Fintype ι]
 
 section IsQueryBoundPRelations
 
-variable {p : ι → Prop} [DecidablePred p] [IsUniformSpec spec]
+variable {p : ι → Prop} [DecidablePred p]
 
-omit [IsUniformSpec spec] in
 /-- A total query bound implies a predicate-targeted bound for every predicate `p`. -/
 theorem IsTotalQueryBound.isQueryBoundP {oa : OracleComp spec α} {n : ℕ}
     (h : IsTotalQueryBound oa n) : IsQueryBoundP oa p n := by
@@ -1252,13 +1234,11 @@ theorem IsTotalQueryBound.isQueryBoundP {oa : OracleComp spec α} {n : ℕ}
       · simp only [if_neg hpt]
         exact (ih u (h.2 u)).mono (Nat.sub_le _ _)
 
-omit [IsUniformSpec spec] in
 /-- With the always-true predicate, `IsQueryBoundP` reduces to `IsTotalQueryBound`. -/
 lemma isQueryBoundP_true_iff (oa : OracleComp spec α) (n : ℕ) :
     IsQueryBoundP oa (fun _ => True) n ↔ IsTotalQueryBound oa n := by
   refine isQueryBound_congr (fun t b => ?_) (fun t b => ?_) <;> simp
 
-omit [IsUniformSpec spec] in
 /-- The always-false predicate places no constraint. -/
 @[simp]
 lemma isQueryBoundP_false (oa : OracleComp spec α) (n : ℕ) :
@@ -1271,7 +1251,6 @@ lemma isQueryBoundP_false (oa : OracleComp spec α) (n : ℕ) :
       simp only [if_neg (fun h : False => h)]
       exact ih u
 
-omit [IsUniformSpec spec] in
 /-- A per-index bound implies a predicate-targeted bound at the sum of the per-index budgets
 over the indices satisfying `p`. -/
 theorem IsPerIndexQueryBound.isQueryBoundP [DecidableEq ι] [Fintype ι]
@@ -1295,7 +1274,6 @@ theorem IsPerIndexQueryBound.isQueryBoundP [DecidableEq ι] [Fintype ι]
         · rw [if_neg hpt, ← sum_filter_update_of_not_pred hpt]
           exact ih u (h.2 u)
 
-omit [IsUniformSpec spec] in
 /-- Soundness: any path of the counting-oracle simulation of a `p`-bounded computation has
 sum of per-index counts over `p`-indices at most `n`. -/
 theorem IsQueryBoundP.counting_bounded [DecidableEq ι] [Fintype ι]
@@ -1333,7 +1311,6 @@ theorem IsQueryBoundP.counting_bounded [DecidableEq ι] [Fintype ι]
         rw [sum_filter_update_of_not_pred hpt] at hrec
         exact hrec
 
-omit [IsUniformSpec spec] in
 /-- Residual bound via the counting oracle: after any partial counting-simulation of `oa`, the
 continuation `ob` is `p`-bounded by `n` minus the filtered count so far. -/
 theorem IsQueryBoundP.residual_of_mem_support_counting [DecidableEq ι] [Fintype ι]
@@ -1373,7 +1350,7 @@ theorem IsQueryBoundP.residual_of_mem_support_counting [DecidableEq ι] [Fintype
 /-- Predicate-targeted analogue of `isTotalQueryBound_iff_counting_total_le`: a
 counting-oracle filtered-sum bound characterizes the structural `IsQueryBoundP` bound. -/
 theorem isQueryBoundP_iff_counting_filter_le
-    [DecidableEq ι] [Fintype ι]
+    [DecidableEq ι] [Fintype ι] [IsUniformSpec spec]
     {oa : OracleComp spec α} {n : ℕ} :
     IsQueryBoundP oa p n ↔
       ∀ z ∈ support (countingOracle.simulate oa 0),
