@@ -173,6 +173,21 @@ instance (ring : NegacyclicRing Coeff) :
     GetElem ring.Poly Nat Coeff (fun _ i => i < ring.degree) where
   getElem p i hi := ring.backend.coeff p ⟨i, hi⟩
 
+/-- The constant ring element with coefficient `c` in position zero. -/
+def scalarPoly (ring : NegacyclicRing Coeff) (c : Coeff) : ring.Poly :=
+  ring.backend.build fun i => if i.val = 0 then c else 0
+
+/-- Dot product over a bundled negacyclic ring, using the ring's explicit multiplication. -/
+def dot (ring : NegacyclicRing Coeff) {n : Nat}
+    (u v : PolyVec ring.Poly n) : ring.Poly :=
+  (Vector.zipWith ring.mul u v).foldl ring.add ring.zero
+
+/-- Matrix-vector multiplication over a bundled negacyclic ring. -/
+def matVecMul (ring : NegacyclicRing Coeff) {rows cols : Nat}
+    (A : PolyMatrix ring.Poly rows cols) (v : PolyVec ring.Poly cols) :
+    PolyVec ring.Poly rows :=
+  A.map fun row => ring.dot row v
+
 end NegacyclicRing
 
 namespace NegacyclicRingSemantics

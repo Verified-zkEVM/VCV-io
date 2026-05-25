@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import Init.Data.Vector.Algebra
 import Init.Data.Vector.Basic
 import Mathlib.LinearAlgebra.Matrix.Defs
 import Mathlib.RingTheory.Ideal.Operations
@@ -58,6 +59,24 @@ def ofPi (f : Fin k → P) : PolyVec P k :=
   apply Vector.ext
   intro i hi
   simp [toPi, ofPi, Vector.get]
+
+/-- Flatten equally sized vector blocks into one row-major vector. -/
+def flattenBlocks {blocks width : Nat}
+    (xs : PolyVec (PolyVec P width) blocks) : PolyVec P (blocks * width) :=
+  Vector.ofFn fun j =>
+    if hwidth : width = 0 then
+      False.elim (by
+        have hj := j.isLt
+        simp [hwidth] at hj)
+    else
+      let block : Fin blocks :=
+        ⟨j.val / width, by
+          have hj : j.val < width * blocks :=
+            Nat.lt_of_lt_of_eq j.isLt (Nat.mul_comm blocks width)
+          exact Nat.div_lt_of_lt_mul hj⟩
+      let offset : Fin width :=
+        ⟨j.val % width, Nat.mod_lt _ (Nat.pos_of_ne_zero hwidth)⟩
+      (xs.get block).get offset
 
 end PolyVec
 
