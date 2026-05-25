@@ -7,10 +7,10 @@ Authors: Quang Dao
 import Examples.PRFTagReader.Hybrid
 
 /-!
-# PRF Tag/Reader Protocol — Hop B
+# PRF Tag/Reader Protocol — Hybrid-to-single coupling with reader-slack
 
-Hop B of the unlinkability reduction: bounding the gap between the hybrid world and the
-single-session ideal world. Deliverables 2-4:
+Bounding the gap between the hybrid world and the single-session ideal world. Deliverables
+2-4:
 
 * **Deliverable 2**: the per-reader-query slack bound `probEvent_coupledReader_disagree_le`,
   which charges each reader-query column to `qReader * |TagId| * sessionsPerTag / |Digest|`
@@ -18,8 +18,8 @@ single-session ideal world. Deliverables 2-4:
 * **Deliverable 3**: the coupled reader step and the lazy-vs-coupled coupling theorem
   `evalDist_simulateQ_hybridCoupledHandler_run'_eq_lazy`.
 * **Deliverable 4**: the coupled hybrid-vs-single coupling theorem
-  `hybridCoupled_le_singleIdeal_add_readerSlack_aux` and the headline Hop B bound
-  `hybrid_le_singleIdeal_add_readerSlack`.
+  `hybridCoupled_le_singleIdeal_add_readerSlack_aux` and the headline hybrid-to-single
+  bound `hybrid_le_singleIdeal_add_readerSlack`.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -42,7 +42,7 @@ variable {TagId Nonce Digest : Type}
   [DecidableEq Digest] [SampleableType Digest]
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
-/-! #### Hop B, deliverable 2: the per-reader-query slack bound
+/-! #### Hybrid-to-single, deliverable 2: the per-reader-query slack bound
 
 A single reader query under the single-session ideal handler folds `idealCacheStep` over the
 column of cells `l`. The hybrid reader inspects only the *already cached* cells; a cell that is
@@ -120,7 +120,7 @@ lemma probEvent_idealCacheMapM_mem_le {D : Type} [DecidableEq D] [Fintype Digest
           · exact h
         · rw [hrcache d' hd']; exact hfresh d' (Or.inr hd')
 
-/-! #### Hop B, deliverable 3: the coupled reader step and the coupling theorem
+/-! #### Hybrid-to-single, deliverable 3: the coupled reader step and the coupling theorem
 
 `hybridCoupledHandler` is the hybrid world run *in lockstep* with the single-session ideal handler:
 its tag oracle is the lazy hybrid tag oracle and its reader oracle folds `idealCacheStep` over the
@@ -636,7 +636,7 @@ lemma probEvent_bind_le_add_bad_disagree {α β γ : Type} {mx : ProbComp α}
         · rw [ENNReal.tsum_mul_right]
           exact mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one
 
-/-! #### Hop B, deliverable 4: the coupled hybrid-vs-single coupling theorem
+/-! #### Hybrid-to-single, deliverable 4: the coupled hybrid-vs-single coupling theorem
 
 The coupled hybrid handler `hybridCoupledHandler` and the single-session ideal handler
 `singleIdealQueryImpl` evolve their random-oracle cache and session counters in lockstep — they
@@ -681,7 +681,7 @@ lemma hybridColFresh_init (oa : UnlinkAdversary TagId Nonce Digest)
   intro n tag sid hsome _
   simp at hsome
 
-/-- **Hop B, core coupling bound.** For any hybrid state `s` and single state `sS` with equal
+/-- **Hybrid-to-single, core coupling bound.** For any hybrid state `s` and single state `sS` with equal
 session counters, sharing a random-oracle cache `c`, the coupled hybrid handler's success
 probability is bounded by the single-session ideal handler's plus the reader-slack term
 `qR * |TagId| * sessionsPerTag / |Digest|`, provided the adversary has pairwise-distinct reader
@@ -1034,7 +1034,7 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
         exact ih (ReaderReply.ofBool hybBit) qR' s sS rs.2 hcounter (hqRf _)
           hdistcont hwo hfresh'
 
-/-- **Hop B.** Under `HasDistinctUnlinkReaderNonces` and a reader-query bound `qReader`, the hybrid
+/-- **Hybrid-to-single.** Under `HasDistinctUnlinkReaderNonces` and a reader-query bound `qReader`, the hybrid
 world `H` (run as the lazy hybrid handler from the initial state) succeeds with probability at most
 that of the single-session ideal world plus the reader-slack term
 `qReader * |TagId| * sessionsPerTag / |Digest|`.

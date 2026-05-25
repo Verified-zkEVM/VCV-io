@@ -17,7 +17,9 @@ with the composed ideal-world handlers (`multipleIdealQueryImpl`, `singleIdealQu
 pairwise-distinct-reader-nonce predicate `HasDistinctUnlinkReaderNonces`.
 
 This is the first module of the unlinkability reduction split; downstream modules
-(`Table`, `Hybrid`, `HopB`, `HopASetup`, `HopAEager`, `MultipleBadCollision`) extend this
+(`Table`, `Hybrid`, `HybridToSingle`, `MultipleToHybrid.Setup`,
+`MultipleToHybrid.EagerSetup`, `MultipleToHybrid.EagerReader`, `MultipleToHybrid.Eager`,
+`MultipleBadCollision`) extend this
 infrastructure to the eager-table coupling chain culminating in
 `unlinkabilityAdvantage_le_two_prf_plus_collision`.
 -/

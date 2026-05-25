@@ -4,16 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import Examples.PRFTagReader.HopAEagerSetup
+import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
 
 /-!
-# PRF Tag/Reader Protocol — Hop A Eager Coupling, Reader Step
+# PRF Tag/Reader Protocol — Multiple-to-hybrid eager coupling, reader step
 
 The reader-query branch of `multipleBadEager_le_hybridEager_aux`. Both table handlers reduce on a
 reader query to a deterministic `pure (bit, state)`. The two reader bits agree everywhere except
 on the disagreement set where the multi reader accepts but the hybrid reader rejects; the
 disagreement mass is bounded by `|TagId| / |Digest|` per query via
-`probEvent_multipleReader_disagree_le`, the `HopAColFresh` witness `hfresh` rules out rogue cached
+`probEvent_multipleReader_disagree_le`, the `MultipleHybridColFresh` witness `hfresh` rules out rogue cached
 cells at `transcript.nonce` so the `hcol` hypothesis of that lemma is satisfied, and `hdist` —
 the per-nonce reader-uniqueness budget — together with `hCacheBound` provides the bookkeeping that
 prevents double-counting in the inductive step.
@@ -39,7 +39,7 @@ variable {TagId Nonce Digest K : Type}
 head reader query to a deterministic `pure`; lazifying the multi-side table draw to
 `idealCacheMapM cells sM.2` exposes a disagreement set bounded by `|TagId| / |Digest|`
 (`probEvent_multipleReader_disagree_le`), and off the disagreement set the inductive hypothesis
-`ih` closes the per-list-rs pointwise bound via `HopACoupling_reader_step`. -/
+`ih` closes the per-list-rs pointwise bound via `MultipleHybridCoupling_reader_step`. -/
 lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
     (transcript : TagTranscript Nonce Digest)
     (f : (UnlinkOracleSpec TagId Nonce Digest).Range (Sum.inr transcript) →
@@ -52,11 +52,11 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (sB : UnlinkBadState TagId Nonce Digest)
-    (hInv : HopACoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
+    (hInv : MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
     (hqR : OracleComp.IsQueryBoundP oa (fun i => i.isRight) qR)
     (hqT : OracleComp.IsQueryBoundP oa (fun i => i.isLeft) qT)
     (hdist : ∀ n : Nonce, OracleComp.IsQueryBoundP oa (pReaderNonce n) 1)
-    (hfresh : HopAColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+    (hfresh : MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
       (sessionsPerTag := sessionsPerTag) oa sH sM.2)
     (hCacheBound : ∀ tag : TagId,
       (Finset.univ.filter (fun n : Nonce =>
@@ -70,11 +70,11 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
         (sH : HybridState TagId Nonce sessionsPerTag ×
           (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
         (sB : UnlinkBadState TagId Nonce Digest),
-        HopACoupling (sessionsPerTag := sessionsPerTag) sM sH sB →
+        MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) sM sH sB →
         OracleComp.IsQueryBoundP (f u) (fun i => i.isRight = true) qR →
         OracleComp.IsQueryBoundP (f u) (fun i => i.isLeft = true) qT →
         (∀ n : Nonce, OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 1) →
-        HopAColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+        MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) (f u) sH sM.2 →
         (∀ tag : TagId,
           (Finset.univ.filter (fun n : Nonce =>
@@ -490,9 +490,9 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       rw [hMψBAD_def]
       dsimp only
       rw [h]
-    have hInvNew : HopACoupling (sessionsPerTag := sessionsPerTag) (sM.1, rs.2) sH sB :=
-      HopACoupling_reader_step sM sH sB hInv cells rs hrs
-    have hfreshNew : HopAColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+    have hInvNew : MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) (sM.1, rs.2) sH sB :=
+      MultipleHybridCoupling_reader_step sM sH sB hInv cells rs hrs
+    have hfreshNew : MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
         (sessionsPerTag := sessionsPerTag) (f (ReaderReply.ofBool bHconst)) sH rs.2 := by
       intro n tag hsome hns
       by_cases hnn : n = n₀

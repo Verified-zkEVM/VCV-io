@@ -4,10 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import Examples.PRFTagReader.HopASetup
+import Examples.PRFTagReader.MultipleToHybrid.Setup
 
 /-!
-# PRF Tag/Reader Protocol — Hop A Eager Coupling, Shared Setup
+# PRF Tag/Reader Protocol — Multiple-to-hybrid eager coupling, shared setup
 
 Shared definitions and helpers for the eager-table multiple-vs-hybrid coupling proof. This
 module hosts:
@@ -24,7 +24,7 @@ module hosts:
   `evalDist_couplingProject_uniformSample`.
 
 The headline aux lemma `multipleBadEager_le_hybridEager_aux` and its two large sub-branches live
-in the sibling modules `HopAEager`, `HopAEagerReader`, and `HopAEagerTag`.
+in the sibling modules `MultipleToHybrid.Eager` and `MultipleToHybrid.EagerReader`.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -39,9 +39,9 @@ variable {TagId Nonce Digest K : Type}
   [DecidableEq Digest] [SampleableType Digest]
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
-/-! ### Hop A: the eager-table instrumented multiple handler
+/-! ### Multiple-to-hybrid: the eager-table instrumented multiple handler
 
-The `HopACoupling`-`inductionOn` route for the hop-A coupling bound is a proven dead end: a
+The `MultipleHybridCoupling`-`inductionOn` route for the coupling bound is a proven dead end: a
 `Prop`-valued state coupling cannot encode the run-determined session index that a later tag query
 reads back. The eager route fixes this by sampling the random-oracle table up front.
 

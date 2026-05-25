@@ -27,12 +27,13 @@ import Examples.PRFTagReader.Auth
 import Examples.PRFTagReader.BadEvent
 import Examples.PRFTagReader.Collision
 import Examples.PRFTagReader.Defs
-import Examples.PRFTagReader.HopAEager
-import Examples.PRFTagReader.HopAEagerSetup
-import Examples.PRFTagReader.HopASetup
-import Examples.PRFTagReader.HopB
 import Examples.PRFTagReader.Hybrid
+import Examples.PRFTagReader.HybridToSingle
 import Examples.PRFTagReader.MultipleBadCollision
+import Examples.PRFTagReader.MultipleToHybrid.Eager
+import Examples.PRFTagReader.MultipleToHybrid.EagerReader
+import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
+import Examples.PRFTagReader.MultipleToHybrid.Setup
 import Examples.PRFTagReader.PRFReductions
 import Examples.PRFTagReader.Table
 import Examples.PRFTagReaderUnlinkReduction

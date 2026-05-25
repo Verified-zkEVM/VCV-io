@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import Examples.PRFTagReader.HopAEager
+import Examples.PRFTagReader.MultipleToHybrid.Eager
 
 /-!
 # PRF Tag/Reader Protocol — Multiple-Bad Collision Bound
@@ -12,8 +12,9 @@ import Examples.PRFTagReader.HopAEager
 Composes the two hops into the multiple-vs-single ideal-world bound and discharges the
 multiple-bad collision term in closed form:
 
-* `multipleIdeal_le_hybrid_add_bad` (Hop A) and `hybrid_le_singleIdeal_add_readerSlack` (Hop B,
-  from `Hybrid`/`HopB`) combine to give `multipleIdeal_le_singleIdeal_add_bad`;
+* `multipleIdeal_le_hybrid_add_bad` (multiple → hybrid) and
+  `hybrid_le_singleIdeal_add_readerSlack` (hybrid → single, from
+  `Hybrid`/`HybridToSingle`) combine to give `multipleIdeal_le_singleIdeal_add_bad`;
 * `multipleBadStep_*` lemmas track the per-step bad-flag bound and the session counter;
 * `simulateQ_multipleBad_prob_le` unrolls those step lemmas to a union bound, yielding
   `multipleBad_bad_le_sessionCollisionBound`;
@@ -39,33 +40,34 @@ variable {TagId Nonce Digest K : Type}
 The multiple-vs-single bound `multipleIdeal_le_singleIdeal_add_bad` follows by chaining the two
 hops:
 
-* **Hop A** (`multipleIdeal_le_hybrid_add_bad`): the multiple-session ideal world is bounded by the
-  hybrid world plus the within-tag nonce-collision probability (the `bad` flag of the instrumented
-  `multipleBadQueryImpl`) plus the reader/tag slacks
+* **Multiple→Hybrid** (`multipleIdeal_le_hybrid_add_bad`): the multiple-session ideal world is
+  bounded by the hybrid world plus the within-tag nonce-collision probability (the `bad` flag of
+  the instrumented `multipleBadQueryImpl`) plus the reader/tag slacks
   `qReader * |TagId| / |Digest|` and `qReader * qTag / |Nonce|`.
-* **Hop B** (`hybrid_le_singleIdeal_add_readerSlack`): the hybrid world is bounded by the
+* **Hybrid→Single** (`hybrid_le_singleIdeal_add_readerSlack`): the hybrid world is bounded by the
   single-session ideal world plus the reader-slack term
   `qReader * |TagId| * sessionsPerTag / |Digest|`.
 
 Combining the two yields the headline bound below, with the nonce-collision term expressed in the
-`multipleBadQueryImpl` shape (this is the shape that Hop A actually produces; downstream consumers
-either match this shape or take the bridge as a hypothesis). -/
+`multipleBadQueryImpl` shape (this is the shape that the multiple→hybrid transition actually
+produces; downstream consumers either match this shape or take the bridge as a hypothesis). -/
 
-/-- Core coupling bound for the unlinkability reduction, proved by chaining Hop A
-(`multipleIdeal_le_hybrid_add_bad`) and Hop B (`hybrid_le_singleIdeal_add_readerSlack`).
+/-- Core coupling bound for the unlinkability reduction, proved by chaining the multiple→hybrid
+transition (`multipleIdeal_le_hybrid_add_bad`) and the hybrid→single transition
+(`hybrid_le_singleIdeal_add_readerSlack`).
 
 The multiple-session ideal world is bounded by the single-session ideal world plus the
 within-tag nonce-collision probability (carried by the instrumented `multipleBadQueryImpl`'s
 `bad` flag) plus three additive slack terms:
 
-* `qReader * Fintype.card TagId / Fintype.card Digest` (Hop A's reader-cell asymmetry between the
-  multiple and hybrid worlds);
-* `qReader * qTag / Fintype.card Nonce` (Hop A's Sub-B tag-cache aliasing slack);
-* `qReader * Fintype.card TagId * sessionsPerTag / Fintype.card Digest` (Hop B's hybrid-vs-single
+* `qReader * Fintype.card TagId / Fintype.card Digest` (multiple→hybrid reader-cell asymmetry
+  between the multiple and hybrid worlds);
+* `qReader * qTag / Fintype.card Nonce` (multiple→hybrid Sub-B tag-cache aliasing slack);
+* `qReader * Fintype.card TagId * sessionsPerTag / Fintype.card Digest` (hybrid→single
   reader-cell asymmetry).
 
 The bound assumes `HasDistinctUnlinkReaderNonces` (each nonce is carried by at most one reader
-query), which both hops require. -/
+query), which both transitions require. -/
 lemma multipleIdeal_le_singleIdeal_add_bad [Fintype Nonce] [Fintype Digest]
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (qReader qTag : ℕ)
@@ -90,13 +92,13 @@ lemma multipleIdeal_le_singleIdeal_add_bad [Fintype Nonce] [Fintype Digest]
     adversary qReader qTag hqReader hqTag hdist
   have hB := hybrid_le_singleIdeal_add_readerSlack (sessionsPerTag := sessionsPerTag)
     adversary qReader hdist hqReader
-  -- Chain Hop A and Hop B: hybrid ≤ single + Hop-B slack, applied inside hA's RHS.
+  -- Chain the two transitions: hybrid ≤ single + hybrid→single slack, applied inside hA's RHS.
   calc Pr[= true | (simulateQ (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
               (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adversary).run'
               (UnlinkState.init, ∅)]
       ≤ _ := hA
     _ ≤ _ := by
-        -- Reorder/widen via Hop B on the hybrid term.
+        -- Reorder/widen via Hybrid-to-single on the hybrid term.
         have := add_le_add_right
           (add_le_add_right
             (add_le_add_right
@@ -112,7 +114,7 @@ lemma multipleIdeal_le_singleIdeal_add_bad [Fintype Nonce] [Fintype Digest]
         -- The shape after `add_le_add_right` differs; we instead use a direct calc by
         -- rewriting the bound's RHS as a re-grouped sum.
         clear this
-        -- Apply Hop B by widening the hybrid term.
+        -- Apply Hybrid-to-single by widening the hybrid term.
         have hHybridLe :
             Pr[= true | (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
                 (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adversary).run'

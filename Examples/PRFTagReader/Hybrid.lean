@@ -223,7 +223,7 @@ lemma hybridReaderAccepts_imp_singleReaderAccepts
   obtain ⟨tag, sid, _, hcell⟩ := h
   exact ⟨tag, sid, hcell⟩
 
-/-! #### Hop B: the lazy hybrid handler and its eager-table equivalence
+/-! #### Hybrid-to-single: the lazy hybrid handler and its eager-table equivalence
 
 `hybridTableHandler` runs the hybrid world `H` against a *pre-sampled* single-session table `gS`.
 For the hop-B coupling we instead need `H` and `Single` to share a *lazily-sampled* random-oracle
@@ -420,7 +420,7 @@ lemma hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending
     rw [OracleComp.tableExtending, hv, Option.getD_some] at hcv
     rw [hcv]
 
-/-- **Hop B, Step 1.** Running the lazy hybrid handler from a session-nonce / cache consistent
+/-- **Hybrid-to-single, Step 1.** Running the lazy hybrid handler from a session-nonce / cache consistent
 state `(s, c)` has the same output distribution as sampling a full single-session random-oracle
 table `g`, overlaying the cache `c`, and running the deterministic table hybrid handler
 `hybridTableHandler (tableExtending c g)` from `s`. The hybrid analogue of
@@ -554,7 +554,7 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
       rw [hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending s c g hcons transcript]
       rfl
 
-/-- **Hop B, deliverable 1.** Eager form of the hybrid-world success probability: running the
+/-- **Hybrid-to-single, deliverable 1.** Eager form of the hybrid-world success probability: running the
 lazy hybrid handler from the initial state has the same success probability as sampling a full
 single-session random-oracle table `gS` up front and running the deterministic table hybrid
 handler. The hybrid analogue of `probOutput_singleIdeal_run'_eq_tableSample`. -/
@@ -571,7 +571,7 @@ lemma probOutput_hybrid_run'_eq_tableSample [Fintype Nonce] [Finite Digest]
       hybridCacheConsistent_init]
   simp only [OracleComp.tableExtending_empty]
 
-/-! #### Hop A: the spare-fed hybrid handler
+/-! #### Multiple-to-hybrid: the spare-fed hybrid handler
 
 The hop-A coupling pairs the multiple world against the hybrid world. The multiple world's reader
 queries *write* random-oracle cells keyed on `(TagId × Nonce)` that a later multiple tag query may

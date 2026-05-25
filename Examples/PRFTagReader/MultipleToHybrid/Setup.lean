@@ -4,24 +4,26 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import Examples.PRFTagReader.HopB
+import Examples.PRFTagReader.HybridToSingle
 
 /-!
-# PRF Tag/Reader Protocol — Hop A Setup
+# PRF Tag/Reader Protocol — Multiple-to-hybrid coupling setup
 
-Coupling infrastructure for Hop A of the unlinkability reduction. Includes:
+Coupling infrastructure for the multiple-session → hybrid transition of the unlinkability
+reduction. Includes:
 
 * the multiple-vs-hybrid cache coupling invariants `MHBInv`, `MHBRel`, and the reader-aware
-  refinement `HopACoupling`;
+  refinement `MultipleHybridCoupling`;
 * the instrumented multiple-session handler `multipleBadQueryImpl` with its bad-flag advance
   `multipleBadAdvance` and per-query reductions;
 * the spare-draw distribution-neutrality lemmas (`evalDist_bind_const_eq`,
   `evalDist_idealCacheMapM_bind_const_eq`);
-* the `HopAColFresh` predicate tracking collision-freshness across reader queries;
-* initial-state lemmas (`MHBInv_init`, `MHBRel_init`, `HopACoupling_init`, `hopAColFresh_init`).
+* the `MultipleHybridColFresh` predicate tracking collision-freshness across reader queries;
+* initial-state lemmas (`MHBInv_init`, `MHBRel_init`, `MultipleHybridCoupling_init`,
+  `multipleHybridColFresh_init`).
 
 The eager-table coupling proof itself (`multipleBadEager_le_hybridEager_aux`) lives in the
-sibling `HopAEager` module.
+sibling `MultipleToHybrid.Eager` module.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -44,9 +46,9 @@ variable {TagId Nonce Digest : Type}
   [DecidableEq Digest] [SampleableType Digest]
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
-/-! ### Hop A: the multiple-vs-hybrid cache coupling
+/-! ### Multiple-to-hybrid: the multiple-vs-hybrid cache coupling
 
-Hop A couples the multiple-session ideal handler `multipleIdealQueryImpl` (a lazy random oracle
+This couples the multiple-session ideal handler `multipleIdealQueryImpl` (a lazy random oracle
 over `TagId × Nonce`, whose tag oracle reuses the cell `(tag, nonce)` whenever two sessions of one
 tag draw the same nonce) against the per-session-fresh hybrid handler `hybridLazyHandler` (a lazy
 random oracle over `(TagId × Fin sessionsPerTag) × Nonce`, whose tag oracle always consults a fresh
@@ -58,7 +60,7 @@ probability `Pr[bad]` and the reader-cell asymmetry goes into the reader-slack
 The coupling is threaded by `MHBInv`, a state relation on the three handler states (the multiple
 cache, the hybrid cache + session-nonce map, and the bad-world `responses` cache). -/
 
-/-- **Hop A coupling invariant.** Relates a multiple-session ideal state `sM`, a hybrid-world state
+/-- **Multiple-to-hybrid coupling invariant.** Relates a multiple-session ideal state `sM`, a hybrid-world state
 `sH`, and a bad-event state `sB`. It records that:
 
 * the three worlds' session counters agree (reader-stable, untouched by reader queries);
@@ -184,7 +186,7 @@ lemma probEvent_multipleReader_disagree_le [Fintype Digest]
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- **Hop A, off-collision tag-step invariant preservation.** Given `MHBInv sM sH sB`, a free slot
+/-- **Multiple-to-hybrid, off-collision tag-step invariant preservation.** Given `MHBInv sM sH sB`, a free slot
 `hslot`, an off-collision nonce `n` (`sM.2 (tag, n) = none`) and a digest `u`, the three
 post-states produced by the off-collision tag step — the multiple, hybrid and bad worlds all
 caching the fresh digest `u` for tag `tag` at nonce `n` — again satisfy `MHBInv`. -/
@@ -324,7 +326,7 @@ lemma MHBInv_tag_step
       rw [QueryCache.cacheQuery_of_ne _ _ hhkey]
       exact hcons tag' sid' n' hsn'
 
-/-! ### Hop A: the instrumented multiple-session handler
+/-! ### Multiple-to-hybrid: the instrumented multiple-session handler
 
 `multipleIdealQueryImpl`'s state — a lazy random-oracle cache over `(TagId × Nonce)` — cannot
 express "a within-tag tag–tag nonce collision has occurred": the cache key does not record whether
@@ -399,7 +401,7 @@ lemma multipleBadQueryImpl_reader_run (transcript : TagTranscript Nonce Digest)
 
 open OracleComp.ProgramLogic.Relational in
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- **Hop A, output equivalence.** The instrumented handler `multipleBadQueryImpl` produces the
+/-- **Multiple-to-hybrid, output equivalence.** The instrumented handler `multipleBadQueryImpl` produces the
 same output distribution as `multipleIdealQueryImpl`: the bad-world component it threads beside the
 multiple-ideal state never feeds back into the output bit. Hence `Pr[= true]` is unchanged. -/
 lemma probOutput_multipleBad_run'_eq_multipleIdeal
@@ -503,7 +505,7 @@ lemma multipleBadQueryImpl_run_preserves_bad {α : Type}
     obtain ⟨p, hp, hz⟩ := hz
     exact ih p.1 p.2 (multipleBadQueryImpl_step_preserves_bad t s hbad p hp) z hz
 
-/-! ### Hop A: spare uniform draws are distribution-neutral
+/-! ### Multiple-to-hybrid: spare uniform draws are distribution-neutral
 
 The hop-A coupling pairs each multiple-cache cell written by a *reader* query with a reserved
 hybrid "spare" digest. Operationally the hybrid side draws those spares and discards them. The
@@ -535,7 +537,7 @@ lemma evalDist_idealCacheMapM_bind_const_eq {D β : Type} [DecidableEq D]
 
 end EagerComposed
 
-/-! ### Hop A: the multiple-vs-hybrid coupling relation
+/-! ### Multiple-to-hybrid: the multiple-vs-hybrid coupling relation
 
 The heterogeneous bad+slack `simulateQ` rule couples the instrumented multiple handler
 `multipleBadQueryImpl` (state `MultipleBadState`, the multiple-ideal state paired with the
@@ -562,7 +564,7 @@ lemma MHBRel_init :
       ((UnlinkState.init, ∅), UnlinkBadState.init) (HybridState.init, ∅) :=
   MHBInv_init
 
-/-! ### Hop A: the reader-aware coupling relation `HopACoupling`
+/-! ### Multiple-to-hybrid: the reader-aware coupling relation `MultipleHybridCoupling`
 
 `MHBInv`/`MHBRel` is *insufficient* for hop A: its clause
 `(sM.2 (tag, n)).isSome ↔ (sB.responses (tag, n)).isSome` couples the multiple-ideal cache
@@ -571,7 +573,7 @@ the multiple cache — `multipleIdealQueryImpl_reader_run` folds `idealCacheMapM
 `(tag, n)` cell it inspects — while leaving the bad-world `responses` untouched
 (`multipleBadQueryImpl_reader_run`). So after one reader query that biconditional is broken.
 
-`HopACoupling` is the reader-aware replacement. It distinguishes multiple-cache cells written by
+`MultipleHybridCoupling` is the reader-aware replacement. It distinguishes multiple-cache cells written by
 *tag* queries from those written by *reader* queries: a cell `(tag, n)` is *tag-written* exactly
 when some hybrid session recorded the draw, `∃ sid, sH.sessionNonce (tag, sid) = some n`. The
 bad-world `responses` cache then mirrors precisely the *tag-written* cells (clause `hbadcol`),
@@ -588,7 +590,7 @@ The clauses are those of `MHBInv` except that the multiple/bad cache bicondition
 tag-written cells — those `n` recorded by some session of `tag`. This makes the invariant stable
 under reader queries, which write the multiple cache but not the bad-world or session-nonce
 components. -/
-def HopACoupling
+def MultipleHybridCoupling
     (sM : UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
@@ -613,8 +615,8 @@ omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce]
   [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- The three initial states satisfy the reader-aware hop-A coupling: counters are all zero, the
 bad flag is unset, and all caches and the session-nonce map are empty. -/
-lemma HopACoupling_init :
-    HopACoupling (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+lemma MultipleHybridCoupling_init :
+    MultipleHybridCoupling (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
       (sessionsPerTag := sessionsPerTag)
       (UnlinkState.init, ∅) (HybridState.init, ∅) UnlinkBadState.init := by
   refine ⟨rfl, rfl, rfl, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -631,34 +633,34 @@ lemma HopACoupling_init :
 
 /-- Reader-aware hop-A coupling relation for the heterogeneous bad+slack `simulateQ` rule: relate a
 `MultipleBadState` (multiple-ideal state `s₁.1` together with a bad-world state `s₁.2`) and a
-lazy-hybrid state `s₂` exactly when the three underlying components satisfy `HopACoupling`. -/
-def HopARel
+lazy-hybrid state `s₂` exactly when the three underlying components satisfy `MultipleHybridCoupling`. -/
+def MultipleHybridRel
     (s₁ : MultipleBadState TagId Nonce Digest sessionsPerTag)
     (s₂ : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) : Prop :=
-  HopACoupling (sessionsPerTag := sessionsPerTag) s₁.1 s₂ s₁.2
+  MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) s₁.1 s₂ s₁.2
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce]
   [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- The initial `MultipleBadState` and lazy-hybrid state are `HopARel`-related. -/
-lemma HopARel_init :
-    HopARel (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+/-- The initial `MultipleBadState` and lazy-hybrid state are `MultipleHybridRel`-related. -/
+lemma MultipleHybridRel_init :
+    MultipleHybridRel (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
       (sessionsPerTag := sessionsPerTag)
       ((UnlinkState.init, ∅), UnlinkBadState.init) (HybridState.init, ∅) :=
-  HopACoupling_init
+  MultipleHybridCoupling_init
 
-/-- **Hop A freshness invariant** (the `HybridColFresh`-analogue for the multiple cache). A cached
+/-- **Multiple-to-hybrid freshness invariant** (the `HybridColFresh`-analogue for the multiple cache). A cached
 multiple-cache cell `(tag, n)` that was *not* produced by a tag draw — no session of `tag` recorded
 the nonce `n` in the hybrid session-nonce map `sH.1.sessionNonce` — can only have been written by
 an earlier *reader* query. Under `HasDistinctUnlinkReaderNonces` a second reader query at `n` is
 then impossible, which is recorded here as the residual reader budget at `n` being exhausted.
 
 The hybrid tag oracle records `sessionNonce (tag, sid) := some n` exactly when it draws nonce `n`
-for session `(tag, sid)`, and the hop-A cache correspondence `HopACoupling.hcorr` ties tag-drawn
+for session `(tag, sid)`, and the hop-A cache correspondence `MultipleHybridCoupling.hcorr` ties tag-drawn
 multiple cells to recorded sessions; so a cached multiple cell with no recorded session is genuinely
 reader-written. This predicate is the freshness witness that the reader-step coupling threads
 through the induction, exactly mirroring `HybridColFresh` in hop B. -/
-def HopAColFresh (oa : UnlinkAdversary TagId Nonce Digest)
+def MultipleHybridColFresh (oa : UnlinkAdversary TagId Nonce Digest)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (cM : ((TagId × Nonce) →ₒ Digest).QueryCache) : Prop :=
@@ -669,33 +671,33 @@ def HopAColFresh (oa : UnlinkAdversary TagId Nonce Digest)
 omit [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- The empty multiple cache satisfies the hop-A freshness invariant vacuously: no cell is cached,
 so the hypothesis `(cM (tag, n)).isSome` is never met. -/
-lemma hopAColFresh_init (oa : UnlinkAdversary TagId Nonce Digest)
+lemma multipleHybridColFresh_init (oa : UnlinkAdversary TagId Nonce Digest)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) :
-    HopAColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+    MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
       (sessionsPerTag := sessionsPerTag) oa sH ∅ := by
   intro n tag hsome _
   simp at hsome
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [NeZero sessionsPerTag] in
-/-- **Hop A, reader-step coupling stability.** A multiple-session reader query folds
+/-- **Multiple-to-hybrid, reader-step coupling stability.** A multiple-session reader query folds
 `idealCacheStep` over its cells, extending the multiple cache `sM.2` to some `r.2` while leaving
 the session counters, the hybrid state and the bad-world state untouched. Because `idealCacheStep`
 only fills `none` cells — never overwriting an already-cached cell — and every tag-written cell is
 already cached (clause `hcorr` together with the hybrid cache/session-nonce consistency), the
-reader-extended state still satisfies `HopACoupling`. This is the precise sense in which the
+reader-extended state still satisfies `MultipleHybridCoupling`. This is the precise sense in which the
 reader-aware invariant is stable across reader queries. -/
-lemma HopACoupling_reader_step
+lemma MultipleHybridCoupling_reader_step
     (sM : UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (sB : UnlinkBadState TagId Nonce Digest)
-    (hInv : HopACoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
+    (hInv : MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
     (cells : List (TagId × Nonce))
     (r : List Digest × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (hr : r ∈ support (idealCacheMapM (Digest := Digest) cells sM.2)) :
-    HopACoupling (sessionsPerTag := sessionsPerTag) (sM.1, r.2) sH sB := by
+    MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) (sM.1, r.2) sH sB := by
   obtain ⟨hcnt1, hcnt2, hbad, hbadcol, hcorr, hcolfree, hwo, hhyb1, hhyb2⟩ := hInv
   refine ⟨hcnt1, hcnt2, hbad, hbadcol, ?_, hcolfree, hwo, hhyb1, hhyb2⟩
   intro tag sid n hsn
@@ -707,25 +709,25 @@ lemma HopACoupling_reader_step
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- **Hop A, off-collision tag-step coupling stability.** Given `HopACoupling sM sH sB`, a free
+/-- **Multiple-to-hybrid, off-collision tag-step coupling stability.** Given `MultipleHybridCoupling sM sH sB`, a free
 slot `hslot`, an off-collision nonce `n` (`sM.2 (tag, n) = none`) and a digest `u`, the three
 post-states produced by the off-collision tag step — the multiple, hybrid and bad worlds all
-caching the fresh digest `u` for tag `tag` at nonce `n` — again satisfy `HopACoupling`.
+caching the fresh digest `u` for tag `tag` at nonce `n` — again satisfy `MultipleHybridCoupling`.
 
 Off-collision means no session of `tag` had drawn `n` before, so the new draw both extends the
 session-nonce map at the fresh slot `sid` and writes a fresh bad-world `responses` entry; the
 reader-aware clause `hbadcol` is preserved because both the new session record and the new
 bad-world entry sit at the same cell `(tag, n)`. -/
-lemma HopACoupling_tag_step
+lemma MultipleHybridCoupling_tag_step
     (tag : TagId) (n : Nonce) (u : Digest)
     (sM : UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (sB : UnlinkBadState TagId Nonce Digest)
-    (hInv : HopACoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
+    (hInv : MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
     (hslot : sM.1.sessionsUsed tag < sessionsPerTag)
     (hfresh : sM.2 (tag, n) = none) :
-    HopACoupling (sessionsPerTag := sessionsPerTag)
+    MultipleHybridCoupling (sessionsPerTag := sessionsPerTag)
       ({ sM.1 with sessionsUsed :=
           Function.update sM.1.sessionsUsed tag (sM.1.sessionsUsed tag + 1) },
         sM.2.cacheQuery (tag, n) u)
@@ -861,7 +863,7 @@ lemma HopACoupling_tag_step
       rw [QueryCache.cacheQuery_of_ne _ _ hhkey]
       exact hcons tag' sid' n' hsn'
 
-/-! ### Hop A: closing `multipleIdeal_le_hybrid_add_bad`
+/-! ### Multiple-to-hybrid: closing `multipleIdeal_le_hybrid_add_bad`
 
 The reader and tag per-query coupling steps are discharged below and assembled through the
 heterogeneous bad+slack `simulateQ` rule `probOutput_simulateQ_run'_le_add_bad_add_slack`. -/
@@ -885,7 +887,7 @@ lemma mem_drawn_of_cached_cell {D : Type} [DecidableEq D]
   simp [OracleComp.tableExtending, hr2, hcd]
 
 omit [Nonempty TagId] [SampleableType Nonce] [NeZero sessionsPerTag] in
-/-- **Hop A, reader-step output domination.** Under `HopACoupling sM sH sB`, whenever the lazy
+/-- **Multiple-to-hybrid, reader-step output domination.** Under `MultipleHybridCoupling sM sH sB`, whenever the lazy
 hybrid reader accepts a transcript (`hybridCacheAccepts` reads `true`), the multiple reader also
 accepts: the accepting hybrid session cell mirrors a cached multiple cell holding the
 authenticator, which the multiple reader fold reads back into its drawn list. Hence the two
@@ -895,7 +897,7 @@ lemma multipleReader_accepts_of_hybridCacheAccepts
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (sB : UnlinkBadState TagId Nonce Digest)
-    (hInv : HopACoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
+    (hInv : MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) sM sH sB)
     (transcript : TagTranscript Nonce Digest)
     (rs : List Digest × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (hrs : rs ∈ support (idealCacheMapM (multipleReaderCells (TagId := TagId) (Nonce := Nonce)
