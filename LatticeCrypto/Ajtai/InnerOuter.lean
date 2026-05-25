@@ -77,30 +77,6 @@ abbrev Message (ring : NegacyclicRing Coeff) (messageRows blocks : Nat) :=
 abbrev Commitment (ring : NegacyclicRing Coeff) (outerRows : Nat) :=
   Simple.Commitment ring outerRows
 
-/-- Compute all message decompositions for the honest committer. -/
-def messageDecomps (ring : NegacyclicRing Coeff)
-    {messageRows messageDigits innerRows innerDigits blocks : Nat}
-    (decomp : Decomposition ring messageRows messageDigits innerRows innerDigits)
-    (m : Message ring messageRows blocks) :
-    PolyVec (PolyVec ring.Poly (messageRows * messageDigits)) blocks :=
-  m.map decomp.message
-
-/-- Compute one inner commitment `A * s_i`. -/
-def innerCommit (ring : NegacyclicRing Coeff)
-    {innerRows messageRows messageDigits : Nat}
-    (A : Simple.PublicParams ring innerRows (messageRows * messageDigits))
-    (s : Simple.Message ring (messageRows * messageDigits)) : Simple.Commitment ring innerRows :=
-  Simple.commit ring A s
-
-/-- Compute all inner gadget decompositions for the honest committer. -/
-def innerDecomps (ring : NegacyclicRing Coeff)
-    {messageRows messageDigits innerRows innerDigits blocks : Nat}
-    (decomp : Decomposition ring messageRows messageDigits innerRows innerDigits)
-    (A : Simple.PublicParams ring innerRows (messageRows * messageDigits))
-    (ss : PolyVec (PolyVec ring.Poly (messageRows * messageDigits)) blocks) :
-    PolyVec (PolyVec ring.Poly (innerRows * innerDigits)) blocks :=
-  ss.map fun s => decomp.inner (innerCommit ring A s)
-
 /-- Compute the outer commitment from an opening. -/
 def commitWithOpening (ring : NegacyclicRing Coeff)
     {innerRows messageRows messageDigits outerRows blocks innerDigits : Nat}
@@ -116,46 +92,9 @@ def openMessage (ring : NegacyclicRing Coeff)
     (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
     (m : Message ring messageRows blocks) :
     Opening ring innerRows messageRows messageDigits blocks innerDigits :=
-  let ss := messageDecomps ring decomp m
+  let ss := m.map decomp.message
   { messageDecomp := ss
-    innerDecomp := innerDecomps ring decomp pp.innerMatrix ss }
-
-/-- Check that the opening's message decompositions map back to the claimed message. -/
-def messageChecks (ring : NegacyclicRing Coeff) (base : Coeff)
-    {innerRows messageRows messageDigits blocks innerDigits : Nat}
-    (m : Message ring messageRows blocks)
-    (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) : Prop :=
-  ∀ i : Fin blocks, gadgetMul ring base (opening.messageDecomp.get i) = m.get i
-
-/-- Boolean version of `messageChecks` used by executable verification. -/
-def messageChecksBool (ring : NegacyclicRing Coeff) (base : Coeff)
-    {innerRows messageRows messageDigits blocks innerDigits : Nat}
-    [DecidableEq (PolyVec ring.Poly messageRows)]
-  (m : Message ring messageRows blocks)
-  (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) : Bool :=
-  (List.finRange blocks).all fun i =>
-    Simple.verify ring (gadgetMatrix ring base messageRows messageDigits)
-      (opening.messageDecomp.get i) (m.get i) ()
-
-/-- Check that each inner decomposition opens the corresponding inner Ajtai commitment. -/
-def innerChecks (ring : NegacyclicRing Coeff) (base : Coeff)
-    {innerRows messageRows messageDigits outerRows blocks innerDigits : Nat}
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) : Prop :=
-  ∀ i : Fin blocks,
-    innerCommit ring pp.innerMatrix (opening.messageDecomp.get i) =
-      gadgetMul ring base (opening.innerDecomp.get i)
-
-/-- Boolean version of `innerChecks` used by executable verification. -/
-def innerChecksBool (ring : NegacyclicRing Coeff) (base : Coeff)
-    {innerRows messageRows messageDigits outerRows blocks innerDigits : Nat}
-    [DecidableEq (PolyVec ring.Poly innerRows)]
-  (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-  (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) : Bool :=
-  (List.finRange blocks).all fun i =>
-    Simple.verify ring (gadgetMatrix ring base innerRows innerDigits)
-      (opening.innerDecomp.get i)
-      (innerCommit ring pp.innerMatrix (opening.messageDecomp.get i)) ()
+    innerDecomp := ss.map fun s => decomp.inner (Simple.commit ring pp.innerMatrix s) }
 
 /-- Verify a Hachi-style inner-outer opening. -/
 def verify (ring : NegacyclicRing Coeff) (base : Coeff)
@@ -167,61 +106,14 @@ def verify (ring : NegacyclicRing Coeff) (base : Coeff)
     (m : Message ring messageRows blocks)
     (c : Commitment ring outerRows)
     (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) : Bool :=
-  messageChecksBool ring base m opening &&
-    innerChecksBool ring base pp opening &&
+  (List.finRange blocks).all (fun i =>
+    Simple.verify ring (gadgetMatrix ring base messageRows messageDigits)
+      (opening.messageDecomp.get i) (m.get i) ()) &&
+    (List.finRange blocks).all (fun i =>
+      Simple.verify ring (gadgetMatrix ring base innerRows innerDigits)
+        (opening.innerDecomp.get i)
+        (Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i)) ()) &&
     Simple.verify ring pp.outerMatrix (PolyVec.flattenBlocks opening.innerDecomp) c ()
-
-@[simp] theorem messageChecksBool_openMessage (ring : NegacyclicRing Coeff) (base : Coeff)
-    {innerRows messageRows messageDigits outerRows blocks innerDigits : Nat}
-    [DecidableEq (PolyVec ring.Poly messageRows)]
-    (decomp : Decomposition ring messageRows messageDigits innerRows innerDigits)
-    (hdecomp : decomp.IsLawful ring base)
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (m : Message ring messageRows blocks) :
-    messageChecksBool ring base m (openMessage ring decomp pp m) = true := by
-  simp only [messageChecksBool, openMessage, messageDecomps, Simple.verify,
-    Simple.commit, List.all_eq_true]
-  intro i _hi
-  have hmap :
-      (Vector.map decomp.message m).get i = decomp.message (m.get i) := by
-    change (Vector.map decomp.message m)[i.val] = decomp.message (m[i.val])
-    simp
-  have hprod :
-      ring.matVecMul (gadgetMatrix ring base messageRows messageDigits)
-        ((Vector.map decomp.message m).get i) = m.get i := by
-    rw [hmap]
-    simpa [gadgetMul] using hdecomp.1 (m.get i)
-  simp [hprod]
-
-@[simp] theorem innerChecksBool_openMessage (ring : NegacyclicRing Coeff) (base : Coeff)
-    {innerRows messageRows messageDigits outerRows blocks innerDigits : Nat}
-    [DecidableEq (PolyVec ring.Poly innerRows)]
-    (decomp : Decomposition ring messageRows messageDigits innerRows innerDigits)
-    (hdecomp : decomp.IsLawful ring base)
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (m : Message ring messageRows blocks) :
-    innerChecksBool ring base pp (openMessage ring decomp pp m) = true := by
-  simp only [innerChecksBool, openMessage, innerDecomps, innerCommit, Simple.verify,
-    Simple.commit, List.all_eq_true]
-  intro i _hi
-  have hmap :
-      (Vector.map (fun s => decomp.inner (ring.matVecMul pp.innerMatrix s))
-          (messageDecomps ring decomp m)).get i =
-        decomp.inner (ring.matVecMul pp.innerMatrix ((messageDecomps ring decomp m).get i)) := by
-    change
-      (Vector.map (fun s => decomp.inner (ring.matVecMul pp.innerMatrix s))
-          (messageDecomps ring decomp m))[i.val] =
-        decomp.inner (ring.matVecMul pp.innerMatrix ((messageDecomps ring decomp m)[i.val]))
-    simp
-  have hprod :
-      ring.matVecMul (gadgetMatrix ring base innerRows innerDigits)
-        ((Vector.map (fun s => decomp.inner (ring.matVecMul pp.innerMatrix s))
-          (messageDecomps ring decomp m)).get i) =
-        ring.matVecMul pp.innerMatrix ((messageDecomps ring decomp m).get i) := by
-    rw [hmap]
-    simpa [gadgetMul] using
-      hdecomp.2 (ring.matVecMul pp.innerMatrix ((messageDecomps ring decomp m).get i))
-  simp [hprod]
 
 /-- The inner-outer Ajtai commitment instantiated as `CommitmentScheme`. -/
 def commitmentScheme (ring : NegacyclicRing Coeff) (base : Coeff)
@@ -261,11 +153,58 @@ theorem perfectlyCorrect (ring : NegacyclicRing Coeff) (base : Coeff)
   intro pp _ m cd hmem
   simp only [commitmentScheme, support_pure, Set.mem_singleton_iff] at hmem
   rcases hmem with rfl
+  let opening := openMessage ring decomp pp m
+  have hMessage :
+      (List.finRange blocks).all (fun i =>
+        Simple.verify ring (gadgetMatrix ring base messageRows messageDigits)
+          (opening.messageDecomp.get i) (m.get i) ()) = true := by
+    simp only [List.all_eq_true]
+    intro i _hi
+    have hmap : opening.messageDecomp.get i = decomp.message (m.get i) := by
+      simp only [opening, openMessage]
+      change (Vector.map decomp.message m)[i.val] = decomp.message (m[i.val])
+      simp
+    have hprod :
+        Simple.commit ring (gadgetMatrix ring base messageRows messageDigits)
+          (opening.messageDecomp.get i) = m.get i := by
+      rw [hmap]
+      simpa [Simple.commit, gadgetMul] using hdecomp.1 (m.get i)
+    simp [Simple.verify, hprod]
+  have hInner :
+      (List.finRange blocks).all (fun i =>
+        Simple.verify ring (gadgetMatrix ring base innerRows innerDigits)
+          (opening.innerDecomp.get i)
+          (Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i)) ()) = true := by
+    simp only [List.all_eq_true]
+    intro i _hi
+    have hmap :
+        opening.innerDecomp.get i =
+          decomp.inner (Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i)) := by
+      simp only [opening, openMessage]
+      change
+        (Vector.map (fun s => decomp.inner (Simple.commit ring pp.innerMatrix s))
+          (Vector.map decomp.message m)).get i =
+          decomp.inner
+            (Simple.commit ring pp.innerMatrix ((Vector.map decomp.message m).get i))
+      change
+        (Vector.map (fun s => decomp.inner (Simple.commit ring pp.innerMatrix s))
+          (Vector.map decomp.message m))[i.val] =
+          decomp.inner
+            (Simple.commit ring pp.innerMatrix ((Vector.map decomp.message m)[i.val]))
+      simp
+    have hprod :
+        Simple.commit ring (gadgetMatrix ring base innerRows innerDigits)
+          (opening.innerDecomp.get i) =
+          Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i) := by
+      rw [hmap]
+      simpa [Simple.commit, gadgetMul] using
+        hdecomp.2 (Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i))
+    simp [Simple.verify, hprod]
   change
     verify ring base pp m
-      (commitWithOpening ring pp (openMessage ring decomp pp m))
-      (openMessage ring decomp pp m) = true
-  simp [verify, hdecomp, commitWithOpening]
+      (commitWithOpening ring pp opening)
+      opening = true
+  simp [verify, commitWithOpening, hMessage, hInner]
 
 end InnerOuter
 end Ajtai
