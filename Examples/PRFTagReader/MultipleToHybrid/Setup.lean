@@ -360,22 +360,50 @@ def multipleBadAdvance (tag : TagId)
           (tr.auth :: Option.getD (sB.responses (tag, tr.nonce)) [])
         bad := sB.bad || (sB.responses (tag, tr.nonce)).isSome }
 
-/-- Instrumented multiple-session handler: runs `multipleIdealQueryImpl` on the multiple-ideal
-component and, on a tag query, advances the bad-world component via `multipleBadAdvance`. Reader
-queries leave the bad-world component untouched. The first projection of the output equals
-`multipleIdealQueryImpl`'s output. -/
+/-- `multipleIdealQueryImpl` re-targeted to the larger `MultipleBadState` monad: runs the
+multiple-ideal handler on the inner state component and threads the extra `UnlinkBadState`
+component through unchanged. This is the "base" handler that `multipleBadQueryImpl` instruments
+via `QueryImpl.postInsert`. -/
+noncomputable def multipleIdealLiftedQueryImpl :
+    QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
+      (StateT (MultipleBadState TagId Nonce Digest sessionsPerTag) ProbComp) :=
+  fun q => fun p =>
+    (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+        (sessionsPerTag := sessionsPerTag) q) p.1 >>= fun r =>
+      pure (r.1, (r.2, p.2))
+
+/-- Instrumented multiple-session handler: defined via `QueryImpl.postInsert` on top of
+`multipleIdealLiftedQueryImpl`. The inserted side effect is a `modify` on the bad-world component
+that fires `multipleBadAdvance` on a tag query and is a no-op on a reader query. The output bit and
+inner-state evolution match `multipleIdealQueryImpl` exactly; only the extra `UnlinkBadState`
+component carries the bad-flag instrumentation.
+
+This shape validates the `postInsert` combinator for the "bad-flag" pattern: future reductions can
+use the same idiom (lift the base ideal handler to the larger state, then `postInsert` a
+`modify`-based bad-flag advance). -/
 noncomputable def multipleBadQueryImpl :
     QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
       (StateT (MultipleBadState TagId Nonce Digest sessionsPerTag) ProbComp) :=
-  fun q => fun p => match q with
-    | Sum.inl tag =>
-        (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) p.1 >>= fun r =>
-          pure (r.1, (r.2.1, r.2.2), multipleBadAdvance tag p.2 r.1)
-    | Sum.inr transcript =>
-        (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) p.1 >>= fun r =>
-          pure (r.1, (r.2.1, r.2.2), p.2)
+  (multipleIdealLiftedQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+      (sessionsPerTag := sessionsPerTag)).postInsert
+    (fun q (r : (UnlinkOracleSpec TagId Nonce Digest).Range q) =>
+      (modify (fun s : MultipleBadState TagId Nonce Digest sessionsPerTag =>
+        match q, r with
+        | Sum.inl tag, r => (s.1, multipleBadAdvance tag s.2 r)
+        | Sum.inr _, _ => s) :
+          StateT (MultipleBadState TagId Nonce Digest sessionsPerTag) ProbComp Unit))
+
+omit [Nonempty TagId] [NeZero sessionsPerTag] in
+/-- `multipleIdealLiftedQueryImpl` on a query: explicit form as an inner-state bind with the extra
+state component preserved. -/
+lemma multipleIdealLiftedQueryImpl_run
+    (q : (UnlinkOracleSpec TagId Nonce Digest).Domain)
+    (s : MultipleBadState TagId Nonce Digest sessionsPerTag) :
+    (multipleIdealLiftedQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+        (sessionsPerTag := sessionsPerTag) q) s =
+      (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+          (sessionsPerTag := sessionsPerTag) q) s.1 >>= fun r =>
+        pure (r.1, (r.2, s.2)) := rfl
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `multipleBadQueryImpl` on a tag query: the multiple-ideal tag step with the bad-world component
@@ -386,7 +414,12 @@ lemma multipleBadQueryImpl_tag_run (tag : TagId)
         (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) s =
       (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) s.1 >>= fun r =>
-        pure (r.1, (r.2.1, r.2.2), multipleBadAdvance tag s.2 r.1) := rfl
+        pure (r.1, (r.2.1, r.2.2), multipleBadAdvance tag s.2 r.1) := by
+  show (multipleIdealLiftedQueryImpl (Sum.inl tag) s) >>= _ = _
+  rw [multipleIdealLiftedQueryImpl_run, bind_assoc]
+  refine bind_congr fun r => ?_
+  rw [pure_bind]
+  rfl
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `multipleBadQueryImpl` on a reader query: the multiple-ideal reader step, bad-world component
@@ -397,7 +430,12 @@ lemma multipleBadQueryImpl_reader_run (transcript : TagTranscript Nonce Digest)
         (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) s =
       (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) s.1 >>= fun r =>
-        pure (r.1, (r.2.1, r.2.2), s.2) := rfl
+        pure (r.1, (r.2.1, r.2.2), s.2) := by
+  show (multipleIdealLiftedQueryImpl (Sum.inr transcript) s) >>= _ = _
+  rw [multipleIdealLiftedQueryImpl_run, bind_assoc]
+  refine bind_congr fun r => ?_
+  rw [pure_bind]
+  rfl
 
 open OracleComp.ProgramLogic.Relational in
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
@@ -429,12 +467,8 @@ lemma probOutput_multipleBad_run'_eq_multipleIdeal
     subst hs
     cases t with
     | inl tag =>
-      show RelTriple
-        ((multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) s₁.1 >>= fun r =>
-          pure (r.1, (r.2.1, r.2.2), multipleBadAdvance tag s₁.2 r.1))
-        ((multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) s₁.1) _
+      change RelTriple ((multipleBadQueryImpl (Sum.inl tag)) s₁) _ _
+      rw [multipleBadQueryImpl_tag_run]
       refine relTriple_of_evalDist_eq_right
         (congrArg evalDist (bind_pure ((multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
           (Digest := Digest) (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) s₁.1))) ?_
@@ -442,12 +476,8 @@ lemma probOutput_multipleBad_run'_eq_multipleIdeal
       rintro a b rfl
       exact relTriple_pure_pure ⟨rfl, rfl⟩
     | inr transcript =>
-      show RelTriple
-        ((multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) s₁.1 >>= fun r =>
-          pure (r.1, (r.2.1, r.2.2), s₁.2))
-        ((multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) s₁.1) _
+      change RelTriple ((multipleBadQueryImpl (Sum.inr transcript)) s₁) _ _
+      rw [multipleBadQueryImpl_reader_run]
       refine relTriple_of_evalDist_eq_right
         (congrArg evalDist (bind_pure ((multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
           (Digest := Digest) (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) s₁.1))) ?_
