@@ -363,7 +363,14 @@ def multipleBadAdvance (tag : TagId)
 /-- `multipleIdealQueryImpl` re-targeted to the larger `MultipleBadState` monad: runs the
 multiple-ideal handler on the inner state component and threads the extra `UnlinkBadState`
 component through unchanged. This is the "base" handler that `multipleBadQueryImpl` instruments
-via `QueryImpl.postInsert`. -/
+via `QueryImpl.postInsert`.
+
+Exists to bridge a framework gap: there is no standard `MonadLift` instance between
+`StateT σ₁ m` and `StateT (σ₁ × σ₂) m`, so `postInsert` cannot lift a handler in the
+smaller-state monad into the larger-state monad directly. The right fix is a general
+`StateT.liftWith : MonadLift (StateT σ₁ m) (StateT (σ₁ × σ₂) m)` instance under
+`VCVio/OracleComp/SimSemantics/StateT/`; until that lands, the manual lift here is the
+template for future bad-flag-style instrumentation. -/
 noncomputable def multipleIdealLiftedQueryImpl :
     QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
       (StateT (MultipleBadState TagId Nonce Digest sessionsPerTag) ProbComp) :=
