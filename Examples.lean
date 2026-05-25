@@ -28,6 +28,7 @@ import Examples.PRFTagReader.BadEvent
 import Examples.PRFTagReader.Collision
 import Examples.PRFTagReader.Defs
 import Examples.PRFTagReader.HopAEager
+import Examples.PRFTagReader.HopAEagerSetup
 import Examples.PRFTagReader.HopASetup
 import Examples.PRFTagReader.HopB
 import Examples.PRFTagReader.Hybrid
