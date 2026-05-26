@@ -54,8 +54,7 @@ witness set trivially bounds each tag's nonce count. -/
 lemma unlinkBadCacheBounded_init :
     unlinkBadCacheBounded
       (UnlinkBadState.init (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) := by
-  intro tag
-  refine ⟨∅, by simp [UnlinkBadState.init], ?_⟩
+  refine fun tag => ⟨∅, by simp [UnlinkBadState.init], ?_⟩
   intro nonce hcached
   simp [UnlinkBadState.init] at hcached
 
@@ -65,9 +64,7 @@ omit [Nonempty TagId] [DecidableEq TagId] [DecidableEq Nonce]
 private lemma unlinkBadReaderQueryImpl_state_eq
     (transcript : TagTranscript Nonce Digest)
     (st : UnlinkBadState TagId Nonce Digest) :
-    ∀ z ∈ support ((unlinkBadReaderQueryImpl (TagId := TagId)
-        (Nonce := Nonce) (Digest := Digest) transcript).run st),
-      z.2 = st := by
+    ∀ z ∈ support ((unlinkBadReaderQueryImpl transcript).run st), z.2 = st := by
   intro z hz
   unfold unlinkBadReaderQueryImpl at hz
   simpa using congrArg Prod.snd hz
@@ -78,8 +75,7 @@ a fresh nonce and digest and advances the state via `unlinkBadTagNext`. -/
 private lemma unlinkBadTagQueryImpl_run_of_lt
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (hslot : st.sessionsUsed tag < sessionsPerTag) :
-    (unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-      (sessionsPerTag := sessionsPerTag) tag).run st =
+    (unlinkBadTagQueryImpl (sessionsPerTag := sessionsPerTag) tag).run st =
       (($ᵗ Nonce : ProbComp Nonce) >>= fun nonce =>
         ($ᵗ Digest : ProbComp Digest) >>= fun auth =>
           pure (some ({ nonce := nonce, auth := auth } : TagTranscript Nonce Digest),
@@ -92,8 +88,7 @@ unchanged. -/
 private lemma unlinkBadTagQueryImpl_run_of_not_lt
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (hslot : ¬ st.sessionsUsed tag < sessionsPerTag) :
-    (unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-      (sessionsPerTag := sessionsPerTag) tag).run st = pure (none, st) := by
+    (unlinkBadTagQueryImpl (sessionsPerTag := sessionsPerTag) tag).run st = pure (none, st) := by
   simp [unlinkBadTagQueryImpl, hslot]
 
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Digest] [NeZero sessionsPerTag] in
@@ -102,8 +97,7 @@ omit [Fintype TagId] [Nonempty TagId] [DecidableEq Digest] [NeZero sessionsPerTa
 private lemma unlinkBadTagQueryImpl_support_of_lt
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (hslot : st.sessionsUsed tag < sessionsPerTag) :
-    ∀ z ∈ support ((unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce)
-        (Digest := Digest) (sessionsPerTag := sessionsPerTag) tag).run st),
+    ∀ z ∈ support ((unlinkBadTagQueryImpl (sessionsPerTag := sessionsPerTag) tag).run st),
       ∃ nonce auth,
         z = (some ({ nonce := nonce, auth := auth } : TagTranscript Nonce Digest),
           unlinkBadTagNext tag st nonce auth) := by
@@ -130,25 +124,21 @@ lemma unlinkBadTagNext_cacheBounded
   by_cases htag : tag' = tag
   · subst tag'
     refine ⟨insert nonce S, ?_, ?_⟩
-    · have hcard : (insert nonce S).card ≤ st.sessionsUsed tag + 1 :=
-        (Finset.card_insert_le nonce S).trans (by omega)
-      simpa [unlinkBadTagNext] using hcard
+    · simpa [unlinkBadTagNext] using
+        (Finset.card_insert_le nonce S).trans (by omega : S.card + 1 ≤ st.sessionsUsed tag + 1)
     · intro nonce' hcached
       by_cases hkey : (tag, nonce') = (tag, nonce)
       · simp only [Prod.mk.injEq, true_and] at hkey
         subst nonce'
         exact Finset.mem_insert_self nonce S
-      · have hsome : (st.responses (tag, nonce')).isSome = true := by
-          simpa [unlinkBadTagNext, QueryCache.cacheQuery_of_ne _ _ hkey] using hcached
-        exact Finset.mem_insert_of_mem (hS nonce' hsome)
+      · exact Finset.mem_insert_of_mem (hS nonce' (by
+          simpa [unlinkBadTagNext, QueryCache.cacheQuery_of_ne _ _ hkey] using hcached))
   · refine ⟨S, ?_, ?_⟩
     · simpa [unlinkBadTagNext, Function.update_of_ne htag] using hScard
     · intro nonce' hcached
-      have hkey : (tag', nonce') ≠ (tag, nonce) :=
-        fun h => htag (Prod.ext_iff.mp h).1
-      have hsome : (st.responses (tag', nonce')).isSome = true := by
-        simpa [unlinkBadTagNext, QueryCache.cacheQuery_of_ne _ _ hkey] using hcached
-      exact hS nonce' hsome
+      have hkey : (tag', nonce') ≠ (tag, nonce) := fun h => htag (Prod.ext_iff.mp h).1
+      exact hS nonce' (by
+        simpa [unlinkBadTagNext, QueryCache.cacheQuery_of_ne _ _ hkey] using hcached)
 
 omit [Fintype TagId] [Nonempty TagId]
     [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -207,15 +197,11 @@ the `- 1` arithmetic in `unlinkBadRemaining_tagNext`. -/
 lemma unlinkBadRemaining_pos_of_slot
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)
     (hslot : st.sessionsUsed tag < sessionsPerTag) :
-    0 < unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st := by
-  have hterm : 0 < sessionsPerTag - st.sessionsUsed tag := Nat.sub_pos_of_lt hslot
-  have hle : sessionsPerTag - st.sessionsUsed tag ≤
-      (Finset.univ : Finset TagId).sum
-        (fun tag' => sessionsPerTag - st.sessionsUsed tag') :=
-    Finset.single_le_sum (s := (Finset.univ : Finset TagId))
+    0 < unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st :=
+  lt_of_lt_of_le (Nat.sub_pos_of_lt hslot) (by
+    simpa [unlinkBadRemaining] using Finset.single_le_sum (s := (Finset.univ : Finset TagId))
       (f := fun tag' => sessionsPerTag - st.sessionsUsed tag')
-      (fun _ _ => Nat.zero_le _) (Finset.mem_univ tag)
-  exact lt_of_lt_of_le hterm (by simpa [unlinkBadRemaining] using hle)
+      (fun _ _ => Nat.zero_le _) (Finset.mem_univ tag))
 
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Digest] [NeZero sessionsPerTag] in
 /-- A single tag step raises `bad` with probability at most `sessionsUsed tag * maxNonceProb`:
@@ -229,8 +215,7 @@ private lemma unlinkBadTagStep_bad_le
     (hbounded : unlinkBadCacheBounded st) :
     Pr[fun z : Option (TagTranscript Nonce Digest) × UnlinkBadState TagId Nonce Digest =>
         z.2.bad = true |
-      (unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) tag).run st] ≤
+      (unlinkBadTagQueryImpl (sessionsPerTag := sessionsPerTag) tag).run st] ≤
       (st.sessionsUsed tag : ℝ≥0∞) * maxNonceProb := by
   by_cases hslot : st.sessionsUsed tag < sessionsPerTag
   · rw [unlinkBadTagQueryImpl_run_of_lt (sessionsPerTag := sessionsPerTag) tag st hslot,
@@ -302,9 +287,7 @@ private lemma simulateQ_unlinkBad_prob_le
     | inl tag =>
       simp only [unlinkBadQueryImpl, QueryImpl.add_apply_inl]
       by_cases hslot : st.sessionsUsed tag < sessionsPerTag
-      · let step :=
-          (unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) tag).run st
+      · let step := (unlinkBadTagQueryImpl (sessionsPerTag := sessionsPerTag) tag).run st
         let cont := fun z : Option (TagTranscript Nonce Digest) ×
             UnlinkBadState TagId Nonce Digest =>
           (simulateQ (unlinkBadQueryImpl (sessionsPerTag := sessionsPerTag)) (oa z.1)).run z.2
@@ -312,14 +295,9 @@ private lemma simulateQ_unlinkBad_prob_le
             Pr[fun z : Option (TagTranscript Nonce Digest) ×
                   UnlinkBadState TagId Nonce Digest => ¬ z.2.bad = false | step] ≤
               (sessionsPerTag : ℝ≥0∞) * maxNonceProb := by
-          have hbadStep :=
-            unlinkBadTagStep_bad_le (sessionsPerTag := sessionsPerTag)
-              tag st maxNonceProb hmax hbad hbounded
-          have hused_le :
-              (st.sessionsUsed tag : ℝ≥0∞) * maxNonceProb ≤
-                (sessionsPerTag : ℝ≥0∞) * maxNonceProb :=
-            mul_le_mul' (Nat.cast_le.mpr (hused tag)) le_rfl
-          simpa [step] using hbadStep.trans hused_le
+          simpa [step] using (unlinkBadTagStep_bad_le (sessionsPerTag := sessionsPerTag)
+            tag st maxNonceProb hmax hbad hbounded).trans
+              (mul_le_mul' (Nat.cast_le.mpr (hused tag)) le_rfl)
         have hRpos := unlinkBadRemaining_pos_of_slot
           (sessionsPerTag := sessionsPerTag) tag st hslot
         have hcont :
@@ -332,52 +310,35 @@ private lemma simulateQ_unlinkBad_prob_le
           obtain ⟨nonce, auth, rfl⟩ :=
             unlinkBadTagQueryImpl_support_of_lt (sessionsPerTag := sessionsPerTag)
               tag st hslot z (by simpa [step] using hz)
-          have hnextBounded :=
-            unlinkBadTagNext_cacheBounded tag st nonce auth hbounded
-          have hnextUsed :=
-            unlinkBadTagNext_sessionsUsed_le (sessionsPerTag := sessionsPerTag)
-              tag st nonce auth hslot hused
-          have hnextRemaining :=
-            unlinkBadRemaining_tagNext (sessionsPerTag := sessionsPerTag)
-              tag st nonce auth hslot
-          have hih :=
+          simpa [cont, unlinkBadRemaining_tagNext (sessionsPerTag := sessionsPerTag)
+            tag st nonce auth hslot] using
             ih (some ({ nonce := nonce, auth := auth } : TagTranscript Nonce Digest))
               (unlinkBadTagNext tag st nonce auth)
-              hnextBounded hzbad hnextUsed
-          simpa [cont, hnextRemaining] using hih
-        have hcombine := probEvent_bind_le_add (mx := step) (my := cont)
-          (p := fun z : Option (TagTranscript Nonce Digest) ×
-            UnlinkBadState TagId Nonce Digest => z.2.bad = false)
-          (q := fun y : Bool × UnlinkBadState TagId Nonce Digest => y.2.bad = false)
-          (ε₁ := (sessionsPerTag : ℝ≥0∞) * maxNonceProb)
-          (ε₂ := ((unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st - 1 : ℕ) :
-              ℝ≥0∞) * ((sessionsPerTag : ℝ≥0∞) * maxNonceProb))
-          hstep hcont
+              (unlinkBadTagNext_cacheBounded tag st nonce auth hbounded) hzbad
+              (unlinkBadTagNext_sessionsUsed_le (sessionsPerTag := sessionsPerTag)
+                tag st nonce auth hslot hused)
         calc
           Pr[fun z : Bool × UnlinkBadState TagId Nonce Digest => z.2.bad |
               step >>= cont]
               ≤ (sessionsPerTag : ℝ≥0∞) * maxNonceProb +
                   ((unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st - 1 : ℕ) :
                     ℝ≥0∞) * ((sessionsPerTag : ℝ≥0∞) * maxNonceProb) := by
-                simpa [step, cont] using hcombine
+                simpa [step, cont] using probEvent_bind_le_add (mx := step) (my := cont)
+                  (p := fun z : Option (TagTranscript Nonce Digest) ×
+                    UnlinkBadState TagId Nonce Digest => z.2.bad = false)
+                  (q := fun y : Bool × UnlinkBadState TagId Nonce Digest => y.2.bad = false)
+                  hstep hcont
           _ = (unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st : ℝ≥0∞) *
                 ((sessionsPerTag : ℝ≥0∞) * maxNonceProb) := by
-                let R := unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st
-                let c := (sessionsPerTag : ℝ≥0∞) * maxNonceProb
-                have hR : 1 + (R - 1) = R := Nat.add_sub_cancel' (Nat.succ_le_iff.mpr hRpos)
-                have hRcast : (1 : ℝ≥0∞) + ((R - 1 : ℕ) : ℝ≥0∞) = (R : ℝ≥0∞) := by
-                  exact_mod_cast hR
-                change c + ((R - 1 : ℕ) : ℝ≥0∞) * c = (R : ℝ≥0∞) * c
-                nth_rw 1 [← one_mul c]
+                have hRcast : (1 : ℝ≥0∞) +
+                    ((unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st - 1 : ℕ) : ℝ≥0∞) =
+                    (unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st : ℝ≥0∞) := by
+                  exact_mod_cast Nat.add_sub_cancel' (Nat.succ_le_iff.mpr hRpos)
+                nth_rw 1 [← one_mul ((sessionsPerTag : ℝ≥0∞) * maxNonceProb)]
                 rw [← add_mul, hRcast]
-      · change
-          Pr[fun z : Bool × UnlinkBadState TagId Nonce Digest => z.2.bad |
-            ((unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-                (sessionsPerTag := sessionsPerTag) tag).run st >>= fun p =>
-              (simulateQ (unlinkBadQueryImpl (sessionsPerTag := sessionsPerTag)) (oa p.1)).run
-                p.2)] ≤
-            (unlinkBadRemaining (sessionsPerTag := sessionsPerTag) st : ℝ≥0∞) *
-              ((sessionsPerTag : ℝ≥0∞) * maxNonceProb)
+      · change Pr[fun z : Bool × UnlinkBadState TagId Nonce Digest => z.2.bad |
+            ((unlinkBadTagQueryImpl tag).run st >>= fun p =>
+              (simulateQ unlinkBadQueryImpl (oa p.1)).run p.2)] ≤ _
         rw [unlinkBadTagQueryImpl_run_of_not_lt (sessionsPerTag := sessionsPerTag) tag st hslot]
         simpa using ih none st hbounded hbad hused
     | inr transcript =>
@@ -390,9 +351,7 @@ private lemma simulateQ_unlinkBad_prob_le
                 ((sessionsPerTag : ℝ≥0∞) * maxNonceProb)) := by
             apply ENNReal.tsum_le_tsum
             intro z
-            by_cases hmem :
-                z ∈ support ((unlinkBadReaderQueryImpl
-                    (TagId := TagId) (Nonce := Nonce) (Digest := Digest) transcript).run st)
+            by_cases hmem : z ∈ support ((unlinkBadReaderQueryImpl transcript).run st)
             · rw [unlinkBadReaderQueryImpl_state_eq transcript st z hmem]
               exact mul_le_mul' le_rfl (ih z.1 st hbounded hbad hused)
             · rw [probOutput_eq_zero_of_not_mem_support hmem]
@@ -416,16 +375,14 @@ theorem unlinkBadExp_le_sessionCollisionBound
     (maxNonceProb : ℝ)
     (hmax : ∀ nonce : Nonce,
       (Pr[= nonce | ($ᵗ Nonce)]).toReal ≤ maxNonceProb) :
-    (Pr[= true | unlinkBadExp (TagId := TagId) (Nonce := Nonce)
-      (Digest := Digest) (sessionsPerTag := sessionsPerTag) adversary]).toReal ≤
+    (Pr[= true | unlinkBadExp (sessionsPerTag := sessionsPerTag) adversary]).toReal ≤
       ((sessionsPerTag ^ 2 * Fintype.card TagId : ℕ) : ℝ) * maxNonceProb := by
   have hmax_ENNReal : ∀ n : Nonce,
       Pr[= n | ($ᵗ Nonce : ProbComp Nonce)] ≤ ENNReal.ofReal maxNonceProb := by
     intro n
     rw [← ENNReal.ofReal_toReal (ne_top_of_le_ne_top one_ne_top probOutput_le_one)]
     exact ENNReal.ofReal_le_ofReal (hmax n)
-  have hlhs : Pr[= true | unlinkBadExp (TagId := TagId) (Nonce := Nonce)
-        (Digest := Digest) (sessionsPerTag := sessionsPerTag) adversary] =
+  have hlhs : Pr[= true | unlinkBadExp (sessionsPerTag := sessionsPerTag) adversary] =
       Pr[fun z : Bool × UnlinkBadState TagId Nonce Digest => z.2.bad |
         (simulateQ (unlinkBadQueryImpl (sessionsPerTag := sessionsPerTag)) adversary).run
           UnlinkBadState.init] := by
@@ -436,20 +393,14 @@ theorem unlinkBadExp_le_sessionCollisionBound
     adversary (ENNReal.ofReal maxNonceProb)
     hmax_ENNReal UnlinkBadState.init unlinkBadCacheBounded_init (by simp [UnlinkBadState.init])
     (by simp [UnlinkBadState.init])
-  have hconv : (Pr[fun z : Bool × UnlinkBadState TagId Nonce Digest => z.2.bad |
-        (simulateQ (unlinkBadQueryImpl (sessionsPerTag := sessionsPerTag)) adversary).run
-          UnlinkBadState.init]).toReal ≤
-      ((unlinkBadRemaining (sessionsPerTag := sessionsPerTag)
-          (UnlinkBadState.init (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) :
-            ℝ≥0∞) *
-        ((sessionsPerTag : ℝ≥0∞) * ENNReal.ofReal maxNonceProb)).toReal :=
-    ENNReal.toReal_mono (by simp [ENNReal.mul_eq_top]) hcore
+  have hconv := ENNReal.toReal_mono (a := Pr[fun z : Bool × UnlinkBadState TagId Nonce Digest =>
+      z.2.bad | (simulateQ (unlinkBadQueryImpl (sessionsPerTag := sessionsPerTag)) adversary).run
+        UnlinkBadState.init]) (by simp [ENNReal.mul_eq_top]) hcore
   have hremaining :
       unlinkBadRemaining (sessionsPerTag := sessionsPerTag)
         (UnlinkBadState.init (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) =
           sessionsPerTag * Fintype.card TagId := by
-    simp [unlinkBadRemaining, UnlinkBadState.init, Finset.sum_const, Finset.card_univ,
-      mul_comm]
+    simp [unlinkBadRemaining, UnlinkBadState.init, Finset.sum_const, Finset.card_univ, mul_comm]
   have hsupp : (support ($ᵗ Nonce : ProbComp Nonce)).Nonempty := by
     rw [Set.nonempty_iff_ne_empty, ne_eq, ← probFailure_eq_one_iff]; simp
   have hmax_nonneg : 0 ≤ maxNonceProb := ENNReal.toReal_nonneg.trans (hmax hsupp.choose)
