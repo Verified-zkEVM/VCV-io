@@ -51,7 +51,7 @@ def verify (ring : NegacyclicRing Coeff) {rows blindCols : Nat}
     [DecidableEq (Commitment ring rows)]
     (A : PublicParams ring rows blindCols) (m : PolyVec ring.Poly rows)
     (c : Commitment ring rows) (r : Opening ring blindCols) : Bool :=
-  if _ : commitWithOpening ring A m r = c then true else false
+  commitWithOpening ring A m r == c
 
 /-- The blinded Ajtai commitment instantiated as `CommitmentScheme`. -/
 def commitmentScheme (ring : NegacyclicRing Coeff) (rows blindCols : Nat)

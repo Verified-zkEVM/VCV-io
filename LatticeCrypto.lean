@@ -29,6 +29,7 @@ import LatticeCrypto.Falcon.Primitives
 import LatticeCrypto.Falcon.Scheme
 import LatticeCrypto.Falcon.Security
 import LatticeCrypto.HardnessAssumptions.LearningWithErrors
+import LatticeCrypto.HardnessAssumptions.ModuleShortIntegerSolution
 import LatticeCrypto.HardnessAssumptions.ShortIntegerSolution
 import LatticeCrypto.MLDSA.Arithmetic
 import LatticeCrypto.MLDSA.Concrete.Encoding
@@ -59,6 +60,7 @@ import LatticeCrypto.MLKEM.Security
 import LatticeCrypto.Ring.Core
 import LatticeCrypto.Ring.IntegralLift
 import LatticeCrypto.Ring.Kernel
+import LatticeCrypto.Ring.Laws
 import LatticeCrypto.Ring.NTTCert
 import LatticeCrypto.Ring.Norms
 import LatticeCrypto.Ring.Rounding

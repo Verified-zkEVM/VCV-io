@@ -5,6 +5,7 @@ Authors: Tobias Rothmann
 -/
 
 import LatticeCrypto.Ajtai.Gadget
+import LatticeCrypto.HardnessAssumptions.ModuleShortIntegerSolution
 import VCVio.CryptoFoundations.CommitmentScheme
 
 /-!
@@ -16,6 +17,7 @@ and uses the trivial opening. Non-hiding, but binding under Module-SIS.
 -/
 
 open OracleComp
+open CommitmentScheme
 
 universe u
 
@@ -50,12 +52,19 @@ def verify (ring : NegacyclicRing Coeff) {rows cols : Nat}
     [DecidableEq (Commitment ring rows)]
     (A : PublicParams ring rows cols) (s : Message ring cols)
     (c : Commitment ring rows) (_opening : Opening) : Bool :=
-  if _ : commit ring A s = c then true else false
+  commit ring A s == c
 
 @[simp] theorem verify_commit (ring : NegacyclicRing Coeff) {rows cols : Nat}
     [DecidableEq (Commitment ring rows)]
     (A : PublicParams ring rows cols) (s : Message ring cols) :
     verify ring A s (commit ring A s) () = true := by
+  simp [verify]
+
+@[simp] theorem verify_eq_true_iff (ring : NegacyclicRing Coeff) {rows cols : Nat}
+    [DecidableEq (Commitment ring rows)]
+    (A : PublicParams ring rows cols) (s : Message ring cols)
+    (c : Commitment ring rows) (opening : Opening) :
+    verify ring A s c opening = true ↔ commit ring A s = c := by
   simp [verify]
 
 /-- The simple Ajtai commitment instantiated as `CommitmentScheme`. -/
@@ -81,6 +90,62 @@ theorem perfectlyCorrect (ring : NegacyclicRing Coeff) (rows cols : Nat)
   rcases hmem with rfl
   change verify ring A s (commit ring A s) () = true
   simp
+
+/-! ## Binding -/
+
+/-- A binding adversary against simple Ajtai commitments yields a Module-SIS adversary. -/
+def bindingAdvToModuleSIS (ring : NegacyclicRing Coeff) {rows cols : Nat}
+    [SampleableType (PublicParams ring rows cols)]
+    [DecidableEq (Message ring cols)]
+    [DecidableEq (Commitment ring rows)]
+    (adv : BindingAdv
+      (PublicParams ring rows cols)
+      (Message ring cols)
+      (Commitment ring rows)
+      Opening) :
+    ModuleSIS.Adversary ring rows cols (fun _ => true) :=
+  fun A => do
+    let (_c, s₁, _opening₁, s₂, _opening₂) ← adv A
+    pure { left := s₁, right := s₂ }
+
+/-- Binding of the simple Ajtai commitment reduces to collision-form Module-SIS. -/
+theorem bindingAdvantage_le_moduleSIS (ring : NegacyclicRing Coeff) (rows cols : Nat)
+    [SampleableType (PublicParams ring rows cols)]
+    [DecidableEq (Message ring cols)]
+    [DecidableEq (Commitment ring rows)]
+    (adv : BindingAdv
+      (PublicParams ring rows cols)
+      (Message ring cols)
+      (Commitment ring rows)
+      Opening) :
+    bindingAdvantage (commitmentScheme ring rows cols) adv ≤
+      ModuleSIS.advantage ring rows cols (fun _ => true)
+        (bindingAdvToModuleSIS ring adv) := by
+  unfold bindingAdvantage CommitmentScheme.bindingExp ModuleSIS.advantage
+    SIS.advantage SIS.experiment ModuleSIS.problem bindingAdvToModuleSIS
+    commitmentScheme ModuleSIS.relation
+  simp only [monad_norm]
+  refine probOutput_bind_mono fun A _ => ?_
+  refine probOutput_bind_mono fun ⟨c, s₁, opening₁, s₂, opening₂⟩ _ => ?_
+  by_cases hwin :
+      (decide (s₁ ≠ s₂) &&
+        verify ring A s₁ c opening₁ &&
+        verify ring A s₂ c opening₂) = true
+  · simp only [Bool.and_eq_true, decide_eq_true_eq] at hwin
+    rcases hwin with ⟨⟨hne, hverify₁⟩, hverify₂⟩
+    have hcommit₁ : commit ring A s₁ = c :=
+      (verify_eq_true_iff ring A s₁ c opening₁).1 hverify₁
+    have hcommit₂ : commit ring A s₂ = c :=
+      (verify_eq_true_iff ring A s₂ c opening₂).1 hverify₂
+    have hmat : ring.matVecMul A s₁ = ring.matVecMul A s₂ := by
+      simpa [commit] using hcommit₁.trans hcommit₂.symm
+    simp [hne, hcommit₁, hcommit₂, hmat]
+  · have hleftFalse :
+        ¬((s₁ ≠ s₂ ∧ commit ring A s₁ = c) ∧ commit ring A s₂ = c) := by
+      intro hleft
+      apply hwin
+      simpa [verify] using hleft
+    simp [hleftFalse]
 
 end Simple
 end Ajtai

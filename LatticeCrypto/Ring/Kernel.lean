@@ -188,6 +188,11 @@ def matVecMul (ring : NegacyclicRing Coeff) {rows cols : Nat}
     PolyVec ring.Poly rows :=
   A.map fun row => ring.dot row v
 
+/-- Left scalar multiplication of a polynomial vector by a ring element. -/
+def scalarVecMul (ring : NegacyclicRing Coeff) {cols : Nat}
+    (c : ring.Poly) (v : PolyVec ring.Poly cols) : PolyVec ring.Poly cols :=
+  v.map fun x => ring.mul c x
+
 end NegacyclicRing
 
 namespace NegacyclicRingSemantics

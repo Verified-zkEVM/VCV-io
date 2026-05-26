@@ -78,6 +78,29 @@ def flattenBlocks {blocks width : Nat}
         ⟨j.val % width, Nat.mod_lt _ (Nat.pos_of_ne_zero hwidth)⟩
       (xs.get block).get offset
 
+@[simp] theorem flattenBlocks_get_mk {blocks width : Nat}
+    (xs : PolyVec (PolyVec P width) blocks) (i : Fin blocks) (j : Fin width)
+    (h : i.val * width + j.val < blocks * width) :
+    (flattenBlocks xs).get ⟨i.val * width + j.val, h⟩ = (xs.get i).get j := by
+  by_cases hwidth : width = 0
+  · exact False.elim (Nat.not_lt_zero j.val (by simpa [hwidth] using j.isLt))
+  · simp [flattenBlocks, Vector.get, hwidth,
+      Nat.mul_add_div (Nat.pos_of_ne_zero hwidth), Nat.mul_add_mod_self_left,
+      Nat.div_eq_of_lt j.isLt, Nat.mod_eq_of_lt j.isLt, Nat.mul_comm]
+
+theorem get_get_eq_of_flattenBlocks_eq {blocks width : Nat}
+    {xs ys : PolyVec (PolyVec P width) blocks}
+    (h : flattenBlocks xs = flattenBlocks ys) (i : Fin blocks) (j : Fin width) :
+    (xs.get i).get j = (ys.get i).get j := by
+  by_cases hwidth : width = 0
+  · exact False.elim (Nat.not_lt_zero j.val (by simpa [hwidth] using j.isLt))
+  · have hidx : i.val * width + j.val < blocks * width := by
+      have hj : j.val < width := j.isLt
+      have hi : i.val + 1 ≤ blocks := Nat.succ_le_of_lt i.isLt
+      nlinarith [Nat.mul_le_mul_right width hi]
+    have hget := congr_arg (fun v => v.get ⟨i.val * width + j.val, hidx⟩) h
+    simpa using hget
+
 end PolyVec
 
 namespace PolyMatrix

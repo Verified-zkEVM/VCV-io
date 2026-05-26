@@ -43,5 +43,13 @@ def gadgetMul (ring : NegacyclicRing Coeff) (base : Coeff)
     {rows digits : Nat} (v : PolyVec ring.Poly (rows * digits)) : PolyVec ring.Poly rows :=
   ring.matVecMul (gadgetMatrix ring base rows digits) v
 
+/-- A gadget decomposition is lawful when gadget multiplication reconstructs its input. -/
+def IsLawfulGadgetDecomposition (ring : NegacyclicRing Coeff) (base : Coeff)
+    {rows digits : Nat}
+    (decompose : PolyVec ring.Poly rows → PolyVec ring.Poly (rows * digits)) : Prop :=
+  ∀ x, gadgetMul ring base (decompose x) = x
+
+-- TODO Gadget decomposition laws for the hachi Gadget matrix
+
 end Ajtai
 end LatticeCrypto
