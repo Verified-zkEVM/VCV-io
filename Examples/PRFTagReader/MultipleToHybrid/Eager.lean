@@ -120,6 +120,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
       ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
       ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) := by
   classical
+  haveI : Nonempty Digest :=
+    ⟨(SampleableType.selectElem (β := Digest)).defaultResult⟩
   induction oa using OracleComp.inductionOn generalizing qR qT qRInit sM sH sB with
   | pure b =>
     simp only [simulateQ_pure, StateT.run_pure, StateT.run'_eq, map_pure, bind_pure_comp]
@@ -135,28 +137,22 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
       -- Continuation query-bound facts: a tag query is neither charged by `isRight` nor by
       -- `pReaderNonce`, so the reader-side budgets pass straight through. The tag-step budget
       -- `qT` decrements by one (the head tag query consumes one unit).
-      have hqRf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isRight = true) qR := by
-        intro u
+      have hqRf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isRight = true) qR := fun u => by
         have := hqR
         rw [OracleComp.isQueryBoundP_query_bind_iff] at this
         simpa using this.2 u
       have hqTsplit := hqT
       rw [OracleComp.isQueryBoundP_query_bind_iff] at hqTsplit
-      have hqTpos : 0 < qT := by
-        rcases hqTsplit.1 with h | h
-        · exact absurd rfl h
-        · exact h
+      have hqTpos : 0 < qT := hqTsplit.1.resolve_left (fun h => absurd rfl h)
       obtain ⟨qT', rfl⟩ : ∃ qT', qT = qT' + 1 := ⟨qT - 1, by omega⟩
       have hqTf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isLeft = true) qT' := by
         intro u; simpa using hqTsplit.2 u
-      have hdistf : ∀ u, ∀ n, OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 1 := by
-        intro u n
+      have hdistf : ∀ u, ∀ n, OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 1 := fun u n => by
         have := hdist n
         rw [OracleComp.isQueryBoundP_query_bind_iff] at this
         simpa [pReaderNonce] using this.2 u
       have hfreshf : ∀ u, MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-          (sessionsPerTag := sessionsPerTag) (f u) sH sM.2 := by
-        intro u n tg hsome hns
+          (sessionsPerTag := sessionsPerTag) (f u) sH sM.2 := fun u n tg hsome hns => by
         have hb := hfresh n tg hsome hns
         rw [OracleComp.isQueryBoundP_query_bind_iff] at hb
         simpa [pReaderNonce] using hb.2 u
@@ -165,8 +161,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
         -- the per-cell coupling at a fresh nonce is delegated to `evalDist_uniformSample_bind_update`
         -- on each side. The bad/fresh split charges collisions into `Pr[·.2.bad]` and discharges
         -- the fresh case by `MultipleHybridCoupling_tag_step` + `ih`.
-        have hslotH : sH.1.sessionsUsed tag < sessionsPerTag := by
-          rw [← congrFun hInv.1 tag]; exact hslot
+        have hslotH : sH.1.sessionsUsed tag < sessionsPerTag :=
+          (congrFun hInv.1 tag).symm ▸ hslot
         set sidH : Fin sessionsPerTag := ⟨sH.1.sessionsUsed tag, hslotH⟩ with hsidH
         set advM : UnlinkState TagId :=
           { sM.1 with sessionsUsed :=
@@ -345,9 +341,9 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                           (some (⟨n, OracleComp.tableExtending sM.2 gM (tag, n)⟩ :
                             TagTranscript Nonce Digest))))] :=
           evalDist_probComp_bind_comm ($ᵗ (TagId × Nonce → Digest)) ($ᵗ Nonce) _
-        rw [show Pr[= true | _] = _ from probOutput_congr rfl hLHS_comm,
-            show Pr[= true | _] = _ from probOutput_congr rfl hRHS_comm,
-            show probEvent _ _ = _ from probEvent_congr' (fun _ _ => Iff.rfl) hBAD_comm]
+        rw [probOutput_congr rfl hLHS_comm,
+            probOutput_congr rfl hRHS_comm,
+            probEvent_congr' (fun _ _ => Iff.rfl) hBAD_comm]
         -- **Step 3.** Apply `probEvent_bind_le_add_bad_disagree` (4-way) with the shared
         -- `$ᵗ Nonce` draw, splitting on the *Sub-B-off-collision* set
         -- `D n := (sM.2 (tag, n)).isSome ∧ ¬ ∃ sid, sH.1.sessionNonce (tag, sid) = some n`.
@@ -403,8 +399,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
               rw [hInv.2.2.2.1]; exact hcoll
             have hadvBad : ∀ d : Digest,
                 (multipleBadAdvance tag sB
-                    (some (⟨n, d⟩ : TagTranscript Nonce Digest))).bad = true := by
-              intro d; simp [multipleBadAdvance, hInv.2.2.1, hcell]
+                    (some (⟨n, d⟩ : TagTranscript Nonce Digest))).bad = true := fun d => by
+              simp [multipleBadAdvance, hInv.2.2.1, hcell]
             -- The bad world fires `r := (·.2.bad = true)` with probability 1 on this `n`.
             have hPbadOne :
                 Pr[(fun z : Bool × UnlinkBadState TagId Nonce Digest => z.2.bad = true) | do
@@ -452,9 +448,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
           have hncoll : ¬ ∃ sid : Fin sessionsPerTag, sH.1.sessionNonce (tag, sid) = some n :=
             hcoll
           have hMustNone : sM.2 (tag, n) = none := by
-            rw [← Option.not_isSome_iff_eq_none]
-            intro hsome
-            exact hnD ⟨hsome, hncoll⟩
+            rw [← Option.not_isSome_iff_eq_none]; exact fun hsome => hnD ⟨hsome, hncoll⟩
           -- **Structural facts derivable from `hInv` at the off-collision nonce `n`:**
           -- the bad-world `responses` cell is unfilled, and the new hybrid cell `((tag, sidH), n)`
           -- is fresh (since `sidH` is the next-to-allocate slot and `hwo` / `hhyb1` rule out
@@ -462,18 +456,16 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
           have hBfresh : sB.responses (tag, n) = none := by
             rw [← Option.not_isSome_iff_eq_none, hInv.2.2.2.1]
             exact hncoll
-          have hSnNone : sH.1.sessionNonce (tag, sidH) = none := by
-            -- `sidH.val = sH.1.sessionsUsed tag`, so by `hInv.hwo` (clause 7) the session-nonce is
-            -- `none`.
-            exact hInv.2.2.2.2.2.2.1 tag sidH (le_refl _)
+          -- `sidH.val = sH.1.sessionsUsed tag`, so by `hInv.hwo` (clause 7) the session-nonce is `none`.
+          have hSnNone : sH.1.sessionNonce (tag, sidH) = none :=
+            hInv.2.2.2.2.2.2.1 tag sidH (le_refl _)
           have hHcellNone : sH.2 ((tag, sidH), n) = none := by
             -- Contrapositive of `hhyb1` (clause 8): if the hybrid cache cell were some, the
             -- session-nonce would be `some n`, contradicting `hSnNone`.
             rw [← Option.not_isSome_iff_eq_none]
             intro hsome
             have hsn := hInv.2.2.2.2.2.2.2.1 tag sidH n hsome
-            rw [hSnNone] at hsn
-            cases hsn
+            rw [hSnNone] at hsn; cases hsn
           by_cases hMcellNone : sM.2 (tag, n) = none
           · -- **Sub-case A (principal): the multi cache is unfilled at `(tag, n)`.** Couple the
             -- two outer table draws `gM, gH` via two `evalDist_uniformSample_bind_update_map`
@@ -492,16 +484,15 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
             -- every `u`.
             have hPostBad : ∀ u : Digest,
                 (multipleBadAdvance tag sB
-                  (some (⟨n, u⟩ : TagTranscript Nonce Digest))).bad = false := by
-              intro u
+                  (some (⟨n, u⟩ : TagTranscript Nonce Digest))).bad = false := fun u => by
               simp [multipleBadAdvance, hInv.2.2.1, hBfresh]
             -- **Per-`u` post-state coupling.** With both multi and hybrid caches unfilled at the
             -- target cell, `MultipleHybridCoupling_tag_step` packages the advance of all three states.
             -- We reshape `advH n` and `multipleBadAdvance tag sB (some ⟨n, u⟩)` into the
             -- canonical post-state form expected by the lemma.
             have hcMH' : sM.1.sessionsUsed tag = sH.1.sessionsUsed tag := congrFun hInv.1 tag
-            have hsidEq : (⟨sM.1.sessionsUsed tag, hslot⟩ : Fin sessionsPerTag) = sidH := by
-              apply Fin.eq_of_val_eq; exact hcMH'
+            have hsidEq : (⟨sM.1.sessionsUsed tag, hslot⟩ : Fin sessionsPerTag) = sidH :=
+              Fin.eq_of_val_eq hcMH'
             have hInvNew : ∀ u : Digest,
                 MultipleHybridCoupling (sessionsPerTag := sessionsPerTag)
                   ({ sM.1 with sessionsUsed :=
@@ -516,25 +507,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
               -- `MultipleHybridCoupling_tag_step` produces post-hybrid state with `⟨sM.1.sessionsUsed tag, hslot⟩`
               -- as the new session index; rewrite to the user-defined `sidH`.
               rw [hsidEq] at hstep
-              -- Reshape `multipleBadAdvance tag sB (some ⟨n, u⟩)` to the explicit record form.
-              have hBadEq :
-                  multipleBadAdvance tag sB (some (⟨n, u⟩ : TagTranscript Nonce Digest))
-                  = ({ sessionsUsed :=
-                          Function.update sB.sessionsUsed tag (sB.sessionsUsed tag + 1),
-                       responses := sB.responses.cacheQuery (tag, n)
-                         (u :: Option.getD (sB.responses (tag, n)) []),
-                       bad := sB.bad || (sB.responses (tag, n)).isSome } :
-                      UnlinkBadState TagId Nonce Digest) := by
-                simp [multipleBadAdvance]
-              rw [hBadEq]
-              -- Reshape `advH n` to the explicit `HybridState` record form used by the lemma.
-              have hadvHEq : advH n
-                  = ({ sessionsUsed :=
-                          Function.update sH.1.sessionsUsed tag (sH.1.sessionsUsed tag + 1),
-                       sessionNonce := Function.update sH.1.sessionNonce (tag, sidH) (some n) } :
-                      HybridState TagId Nonce sessionsPerTag) := by
-                rw [hadvH]
-              rw [hadvHEq]
+              simp only [multipleBadAdvance, hadvH]
               exact hstep
             -- **Per-`u` `MultipleHybridColFresh` stability.** The advanced multi cache adds the cell
             -- `(tag, n)`; the advanced hybrid session-nonce map adds `(tag, sidH) ↦ some n`.
@@ -667,15 +640,13 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
             -- `tableExtending sM.2 gM (tag, n) = gM (tag, n)`: the multi-side cell read collapses
             -- to a direct lookup in the freshly drawn table `gM`.
             have hMcellRead : ∀ gM : TagId × Nonce → Digest,
-                OracleComp.tableExtending sM.2 gM (tag, n) = gM (tag, n) := by
-              intro gM
+                OracleComp.tableExtending sM.2 gM (tag, n) = gM (tag, n) := fun gM => by
               simp [OracleComp.tableExtending, hMcellNone]
             -- **Cell-patch identity.** After patching `gM` at `(tag, n)` with `u`, the
             -- `tableExtending`-overlay equals the cache-extended overlay against the original `gM`.
             have hMpatchTable : ∀ (gM : TagId × Nonce → Digest) (u : Digest),
                 OracleComp.tableExtending sM.2 (Function.update gM (tag, n) u)
-                  = OracleComp.tableExtending (sM.2.cacheQuery (tag, n) u) gM := by
-              intro gM u
+                  = OracleComp.tableExtending (sM.2.cacheQuery (tag, n) u) gM := fun gM u => by
               rw [← OracleComp.tableExtending_update_of_none sM.2 gM hMcellNone u,
                 ← OracleComp.tableExtending_cacheQuery sM.2 gM (tag, n) u]
             -- **LHS distributional lift.** Define the multi-side continuation `contM gM u`
@@ -715,8 +686,6 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                 rw [hMcellRead gM]
               rw [hStep1]
               -- Step 2: apply the cell-extract helper.
-              haveI : Nonempty Digest :=
-                ⟨(SampleableType.selectElem (β := Digest)).defaultResult⟩
               exact evalDist_uniformSample_bind_cell_extract (R := Digest)
                 (D := TagId × Nonce) (tag, n)
                 (fun gM u =>
@@ -741,30 +710,21 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                           (some (⟨n, u⟩ : TagTranscript Nonce Digest)))] := by
               refine evalDist_bind_congr_of_support _ _ _ fun u _ => ?_
               refine evalDist_bind_congr_of_support _ _ _ fun gM _ => ?_
-              show 𝒟[(fun z => z.1) <$> contM (Function.update gM (tag, n) u) u] = _
-              rw [hcontM]
-              show 𝒟[(fun z => z.1) <$>
-                  (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-                    (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-                    (OracleComp.tableExtending sM.2 (Function.update gM (tag, n) u)))
-                    (f (some (⟨n, u⟩ : TagTranscript Nonce Digest)))).run
-                    (advM, multipleBadAdvance tag sB
-                      (some (⟨n, u⟩ : TagTranscript Nonce Digest)))] = _
+              simp only [hcontM]
               rw [hMpatchTable gM u]
             -- **Hybrid-side cell-patch transformation.** Same shape as the multi side, with the
             -- hybrid cell `((tag, sidH), n)`, the hybrid handler `hybridTableHandler`, and the
             -- hybrid post-state `advH n`. The cell-is-none hypothesis is `hHcellNone`.
             have hHcellRead : ∀ gH : (TagId × Fin sessionsPerTag) × Nonce → Digest,
-                OracleComp.tableExtending sH.2 gH ((tag, sidH), n) = gH ((tag, sidH), n) := by
-              intro gH
-              simp [OracleComp.tableExtending, hHcellNone]
+                OracleComp.tableExtending sH.2 gH ((tag, sidH), n) = gH ((tag, sidH), n) :=
+              fun gH => by simp [OracleComp.tableExtending, hHcellNone]
             have hHpatchTable :
                 ∀ (gH : (TagId × Fin sessionsPerTag) × Nonce → Digest) (u : Digest),
                   OracleComp.tableExtending sH.2 (Function.update gH ((tag, sidH), n) u)
-                    = OracleComp.tableExtending (sH.2.cacheQuery ((tag, sidH), n) u) gH := by
-              intro gH u
-              rw [← OracleComp.tableExtending_update_of_none sH.2 gH hHcellNone u,
-                ← OracleComp.tableExtending_cacheQuery sH.2 gH ((tag, sidH), n) u]
+                    = OracleComp.tableExtending (sH.2.cacheQuery ((tag, sidH), n) u) gH :=
+              fun gH u => by
+                rw [← OracleComp.tableExtending_update_of_none sH.2 gH hHcellNone u,
+                  ← OracleComp.tableExtending_cacheQuery sH.2 gH ((tag, sidH), n) u]
             set contH : ((TagId × Fin sessionsPerTag) × Nonce → Digest) → Digest →
                 ProbComp Bool :=
               fun gH u =>
@@ -787,8 +747,6 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                 refine evalDist_bind_congr_of_support _ _ _ fun gH _ => ?_
                 rw [hHcellRead gH]
               rw [hStep1]
-              haveI : Nonempty Digest :=
-                ⟨(SampleableType.selectElem (β := Digest)).defaultResult⟩
               exact evalDist_uniformSample_bind_cell_extract (R := Digest)
                 (D := (TagId × Fin sessionsPerTag) × Nonce) ((tag, sidH), n)
                 (fun gH u => contH gH u)
@@ -804,12 +762,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                         (f (some (⟨n, u⟩ : TagTranscript Nonce Digest)))).run' (advH n)] := by
               refine evalDist_bind_congr_of_support _ _ _ fun u _ => ?_
               refine evalDist_bind_congr_of_support _ _ _ fun gH _ => ?_
-              show 𝒟[contH (Function.update gH ((tag, sidH), n) u) u] = _
-              rw [hcontH]
-              show 𝒟[(simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce)
-                  (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-                  (OracleComp.tableExtending sH.2 (Function.update gH ((tag, sidH), n) u)))
-                  (f (some (⟨n, u⟩ : TagTranscript Nonce Digest)))).run' (advH n)] = _
+              simp only [hcontH]
               rw [hHpatchTable gH u]
             -- **Multi-side BAD cell-patch transformation.** Same `contM`/`hMcellRead`/`hMpatchTable`
             -- machinery as the LHS lift, just with the `(z.1, z.2.2)` projection.
@@ -833,8 +786,6 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                 refine evalDist_bind_congr_of_support _ _ _ fun gM _ => ?_
                 rw [hMcellRead gM]
               rw [hStep1]
-              haveI : Nonempty Digest :=
-                ⟨(SampleableType.selectElem (β := Digest)).defaultResult⟩
               exact evalDist_uniformSample_bind_cell_extract (R := Digest)
                 (D := TagId × Nonce) (tag, n)
                 (fun gM u =>
@@ -857,16 +808,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                           (some (⟨n, u⟩ : TagTranscript Nonce Digest)))] := by
               refine evalDist_bind_congr_of_support _ _ _ fun u _ => ?_
               refine evalDist_bind_congr_of_support _ _ _ fun gM _ => ?_
-              show 𝒟[(fun z => (z.1, z.2.2)) <$>
-                  contM (Function.update gM (tag, n) u) u] = _
-              rw [hcontM]
-              show 𝒟[(fun z => (z.1, z.2.2)) <$>
-                  (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-                    (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-                    (OracleComp.tableExtending sM.2 (Function.update gM (tag, n) u)))
-                    (f (some (⟨n, u⟩ : TagTranscript Nonce Digest)))).run
-                    (advM, multipleBadAdvance tag sB
-                      (some (⟨n, u⟩ : TagTranscript Nonce Digest)))] = _
+              simp only [hcontM]
               rw [hMpatchTable gM u]
             -- **Final integration step.** Rewrite the goal using the three cell-patch lifts to
             -- expose a shared outer `u ← $ᵗ Digest`; apply the disagreement-free pointwise bind
@@ -876,12 +818,9 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
             -- goal does not see them after subsequent tactics).
             simp only [hcontM, hcontH]
               at hLHS_lift hLHS_align hRHS_lift hRHS_align hBAD_lift hBAD_align
-            rw [show probEvent _ _ = _ from
-                probEvent_congr' (fun _ _ => Iff.rfl) (hLHS_lift.trans hLHS_align),
-              show probEvent _ _ = _ from
-                probEvent_congr' (fun _ _ => Iff.rfl) (hRHS_lift.trans hRHS_align),
-              show probEvent _ _ = _ from
-                probEvent_congr' (fun _ _ => Iff.rfl) (hBAD_lift.trans hBAD_align)]
+            rw [probEvent_congr' (fun _ _ => Iff.rfl) (hLHS_lift.trans hLHS_align),
+              probEvent_congr' (fun _ _ => Iff.rfl) (hRHS_lift.trans hRHS_align),
+              probEvent_congr' (fun _ _ => Iff.rfl) (hBAD_lift.trans hBAD_align)]
             refine probEvent_bind_le_add_bad_of_disagree'
               (D := fun _ : Digest => False)
               (fun u _ hF => absurd hF id)
@@ -904,8 +843,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
             exact absurd hMustNone hMcellNone
       · -- Slot exhausted: both table handlers return `none` with state untouched, so the step
         -- collapses to the continuation `f none` and the goal is exactly the induction hypothesis.
-        have hnotH : ¬ sH.1.sessionsUsed tag < sessionsPerTag := by
-          rw [← congrFun hInv.1 tag]; exact hslot
+        have hnotH : ¬ sH.1.sessionsUsed tag < sessionsPerTag :=
+          (congrFun hInv.1 tag).symm ▸ hslot
         have hM : ∀ g : TagId × Nonce → Digest,
             multipleBadTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
               (sessionsPerTag := sessionsPerTag) g (Sum.inl tag) (sM.1, sB)
@@ -1010,9 +949,7 @@ lemma multipleBad_le_hybrid_add_bad_add_slack_aux [Fintype Nonce] [Fintype Diges
               (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
                 (Digest := Digest) (sessionsPerTag := sessionsPerTag)
                 (OracleComp.tableExtending sM.2 gM)) oa).run (sM.1, sB)) := by
-      rw [map_bind]
-      refine bind_congr fun gM => ?_
-      rw [Functor.map_map]
+      simp only [map_bind, Functor.map_map]
     have hM' : (fun z : Bool × MultipleBadState TagId Nonce Digest sessionsPerTag =>
           (z.1, z.2.2)) <$>
         𝒟[(simulateQ (multipleBadQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
@@ -1053,10 +990,7 @@ lemma multipleBad_le_hybrid_add_bad_add_slack_aux [Fintype Nonce] [Fintype Diges
         (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending sH.2 gH)) oa).run'
           sH.1] := by
-    rw [probOutput_def, probOutput_def]
-    have := hH
-    rw [show ((sH.1, sH.2) : HybridState TagId Nonce sessionsPerTag × _) = sH from rfl] at this
-    rw [this]
+    rw [probOutput_def, probOutput_def, ← hH]
   rw [hMsucc, hHsucc, hMbad]
   exact multipleBadEager_le_hybridEager_aux oa qR qT qRInit sM sH sB hInv hqR hqT hdist hfresh
     hCacheBound hqRle
