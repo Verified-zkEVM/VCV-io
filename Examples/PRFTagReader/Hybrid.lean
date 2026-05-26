@@ -27,14 +27,6 @@ namespace PRFTagReader
 
 section UnlinkReduction
 
-variable {TagId Nonce Digest K : Type}
-  [DecidableEq TagId] [Fintype TagId] [Nonempty TagId]
-  [DecidableEq Nonce] [SampleableType Nonce]
-  [DecidableEq Digest] [SampleableType Digest]
-  {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
-
-section EagerComposed
-
 variable {TagId Nonce Digest : Type}
   [DecidableEq TagId] [Fintype TagId] [Nonempty TagId]
   [DecidableEq Nonce] [SampleableType Nonce]
@@ -122,8 +114,7 @@ acceptance against `gS`, with the state untouched. -/
 noncomputable def hybridReaderHandler (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest) :
     QueryImpl ((TagTranscript Nonce Digest) →ₒ ReaderReply)
       (StateT (HybridState TagId Nonce sessionsPerTag) ProbComp) := fun transcript => fun s =>
-  pure (ReaderReply.ofBool (hybridReaderAccepts (TagId := TagId) (Nonce := Nonce)
-    (Digest := Digest) (sessionsPerTag := sessionsPerTag) gS s.sessionNonce transcript), s)
+  pure (ReaderReply.ofBool (hybridReaderAccepts gS s.sessionNonce transcript), s)
 
 /-- Deterministic hybrid handler keyed on a single-session random-oracle table
 `gS : (TagId × Fin sessionsPerTag) × Nonce → Digest`: the session-nonce-recording single-session
@@ -131,10 +122,7 @@ tag oracle paired with the session-nonce-consulting reader oracle. -/
 noncomputable def hybridTableHandler (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest) :
     QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
       (StateT (HybridState TagId Nonce sessionsPerTag) ProbComp) :=
-  hybridTagHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-    (sessionsPerTag := sessionsPerTag) gS +
-  hybridReaderHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-    (sessionsPerTag := sessionsPerTag) gS
+  hybridTagHandler gS + hybridReaderHandler gS
 
 /-- `simulateQ hybridTableHandler` of a `query_bind`, run from a state and projected to its
 output: the per-query handler followed by the recursive simulation of the continuation. -/
@@ -144,12 +132,9 @@ lemma hybridTable_run'_query_bind' {α : Type}
     (f : (UnlinkOracleSpec TagId Nonce Digest).Range t →
       OracleComp (UnlinkOracleSpec TagId Nonce Digest) α)
     (s : HybridState TagId Nonce sessionsPerTag) :
-    (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) gS) (liftM (OracleSpec.query t) >>= f)).run' s =
-      (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) gS t s) >>= fun p =>
-        (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-          (sessionsPerTag := sessionsPerTag) gS) (f p.1)).run' p.2 := by
+    (simulateQ (hybridTableHandler gS) (liftM (OracleSpec.query t) >>= f)).run' s =
+      (hybridTableHandler gS t s) >>= fun p =>
+        (simulateQ (hybridTableHandler gS) (f p.1)).run' p.2 := by
   rw [simulateQ_query_bind, StateT.run'_eq, StateT.run_bind, map_bind]
   rfl
 
@@ -159,8 +144,7 @@ lemma hybridTableHandler_tag_run_of_not_lt
     (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest)
     (tag : TagId) (s : HybridState TagId Nonce sessionsPerTag)
     (hslot : ¬ s.sessionsUsed tag < sessionsPerTag) :
-    (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) gS (Sum.inl tag) s) = pure (none, s) := by
+    (hybridTableHandler gS (Sum.inl tag) s) = pure (none, s) := by
   unfold hybridTableHandler
   rw [QueryImpl.add_apply_inl]
   change (hybridTagHandler gS tag).run s = _
@@ -173,8 +157,7 @@ lemma hybridTableHandler_tag_run_of_lt
     (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest)
     (tag : TagId) (s : HybridState TagId Nonce sessionsPerTag)
     (hslot : s.sessionsUsed tag < sessionsPerTag) :
-    (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) gS (Sum.inl tag) s) =
+    (hybridTableHandler gS (Sum.inl tag) s) =
       ($ᵗ Nonce) >>= fun nonce =>
         pure (some (⟨nonce, gS ((tag, ⟨s.sessionsUsed tag, hslot⟩), nonce)⟩ :
             TagTranscript Nonce Digest),
@@ -195,13 +178,9 @@ table, state untouched. -/
 lemma hybridTableHandler_reader_run
     (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest)
     (transcript : TagTranscript Nonce Digest) (s : HybridState TagId Nonce sessionsPerTag) :
-    (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) gS (Sum.inr transcript) s) =
-      pure (ReaderReply.ofBool (hybridReaderAccepts (TagId := TagId) (Nonce := Nonce)
-        (Digest := Digest) (sessionsPerTag := sessionsPerTag) gS s.sessionNonce transcript), s) := by
-  unfold hybridTableHandler
-  rw [QueryImpl.add_apply_inr]
-  rfl
+    (hybridTableHandler gS (Sum.inr transcript) s) =
+      pure (ReaderReply.ofBool (hybridReaderAccepts gS s.sessionNonce transcript), s) := by
+  simp [hybridTableHandler, QueryImpl.add_apply_inr, hybridReaderHandler]
 
 omit [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest] in
 /-- Hybrid session-nonce acceptance is monotone in the table-cell agreement: whenever the hybrid
@@ -212,10 +191,9 @@ lemma hybridReaderAccepts_imp_singleReaderAccepts
     (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest)
     (sn : HybridSessionNonce TagId Nonce sessionsPerTag)
     (transcript : TagTranscript Nonce Digest)
-    (h : hybridReaderAccepts (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-      (sessionsPerTag := sessionsPerTag) gS sn transcript = true) :
-    unlinkReaderAccepts (TagId := TagId) (Slot := TagId × Fin sessionsPerTag)
-      (Nonce := Nonce) (Digest := Digest) (fun slot nonce => gS (slot, nonce))
+    (h : hybridReaderAccepts gS sn transcript = true) :
+    unlinkReaderAccepts (Slot := TagId × Fin sessionsPerTag)
+      (fun slot nonce => gS (slot, nonce))
       (singlePattern (TagId := TagId) sessionsPerTag) transcript = true := by
   unfold hybridReaderAccepts at h
   unfold unlinkReaderAccepts tagAccepts singlePattern
@@ -268,8 +246,7 @@ noncomputable def hybridLazyHandler :
         else
           pure (none, p)
     | Sum.inr transcript =>
-        pure (ReaderReply.ofBool (hybridCacheAccepts (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag) p.2 p.1.sessionNonce transcript), p)
+        pure (ReaderReply.ofBool (hybridCacheAccepts p.2 p.1.sessionNonce transcript), p)
 
 /-- `simulateQ hybridLazyHandler` of a `query_bind`, run from a state and projected to its
 output: the per-query handler followed by the recursive simulation of the continuation. -/
@@ -279,12 +256,9 @@ lemma hybridLazy_run'_query_bind' {α : Type}
       OracleComp (UnlinkOracleSpec TagId Nonce Digest) α)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) :
-    (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag)) (liftM (OracleSpec.query t) >>= f)).run' sH =
-      (hybridLazyHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) t sH) >>= fun p =>
-        (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-          (sessionsPerTag := sessionsPerTag)) (f p.1)).run' p.2 := by
+    (simulateQ hybridLazyHandler (liftM (OracleSpec.query t) >>= f)).run' sH =
+      (hybridLazyHandler t sH) >>= fun p =>
+        (simulateQ hybridLazyHandler (f p.1)).run' p.2 := by
   rw [simulateQ_query_bind, StateT.run'_eq, StateT.run_bind, map_bind]
   rfl
 
@@ -295,10 +269,8 @@ lemma hybridLazyHandler_tag_run_of_not_lt (tag : TagId)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (hslot : ¬ sH.1.sessionsUsed tag < sessionsPerTag) :
-    (hybridLazyHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) sH = pure (none, sH) := by
-  show (if _h : sH.1.sessionsUsed tag < sessionsPerTag then _ else pure (none, sH)) = _
-  rw [dif_neg hslot]
+    (hybridLazyHandler (Sum.inl tag)) sH = pure (none, sH) := by
+  change dite _ _ _ = _; exact dif_neg hslot
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `hybridLazyHandler` on a tag query with a free slot: sample a nonce, consult the cache at
@@ -307,8 +279,7 @@ lemma hybridLazyHandler_tag_run_of_lt (tag : TagId)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (hslot : sH.1.sessionsUsed tag < sessionsPerTag) :
-    (hybridLazyHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) sH =
+    (hybridLazyHandler (Sum.inl tag)) sH =
       ($ᵗ Nonce) >>= fun nonce =>
         idealCacheStep sH.2 ((tag, ⟨sH.1.sessionsUsed tag, hslot⟩), nonce) >>= fun r =>
           pure (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest),
@@ -330,11 +301,8 @@ cache, state untouched. -/
 lemma hybridLazyHandler_reader_run (transcript : TagTranscript Nonce Digest)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) :
-    (hybridLazyHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) sH =
-      pure (ReaderReply.ofBool (hybridCacheAccepts (TagId := TagId) (Nonce := Nonce)
-        (Digest := Digest) (sessionsPerTag := sessionsPerTag) sH.2 sH.1.sessionNonce transcript),
-        sH) := by
+    (hybridLazyHandler (Sum.inr transcript)) sH =
+      pure (ReaderReply.ofBool (hybridCacheAccepts sH.2 sH.1.sessionNonce transcript), sH) := by
   rfl
 
 /-- Session-nonce / cache consistency invariant for the lazy hybrid handler: every cell recorded in
@@ -365,13 +333,11 @@ the fresh key `(tag, sid)`, never overwriting an existing record. -/
 lemma hybridCacheConsistent_tag_step
     (tag : TagId) (s : HybridState TagId Nonce sessionsPerTag)
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
-    (hcons : HybridCacheConsistent (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-      (sessionsPerTag := sessionsPerTag) s c)
+    (hcons : HybridCacheConsistent s c)
     (hslot : s.sessionsUsed tag < sessionsPerTag) (nonce : Nonce)
     (r : Digest × (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (hr : r ∈ support (idealCacheStep c ((tag, ⟨s.sessionsUsed tag, hslot⟩), nonce))) :
-    HybridCacheConsistent (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-      (sessionsPerTag := sessionsPerTag)
+    HybridCacheConsistent
       ({ sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1)
          sessionNonce := Function.update s.sessionNonce (tag, ⟨s.sessionsUsed tag, hslot⟩)
           (some nonce) } : HybridState TagId Nonce sessionsPerTag)
@@ -383,8 +349,7 @@ lemma hybridCacheConsistent_tag_step
   · obtain ⟨rfl, rfl⟩ := Prod.mk.injEq .. ▸ hkey
     rw [Function.update_self] at hsn
     obtain rfl := Option.some.injEq .. ▸ hsn
-    rw [idealCacheStep_cache_self c _ r hr]
-    rfl
+    exact idealCacheStep_cache_self c _ r hr ▸ rfl
   · rw [Function.update_of_ne hkey] at hsn
     have hcell := hcons tag' sid' n' hsn
     by_cases hcellkey : ((tag', sid'), n') = ((tag, ⟨s.sessionsUsed tag, hslot⟩), nonce)
@@ -400,14 +365,10 @@ lemma hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending
     (s : HybridState TagId Nonce sessionsPerTag)
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (g : (TagId × Fin sessionsPerTag) × Nonce → Digest)
-    (hcons : HybridCacheConsistent (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-      (sessionsPerTag := sessionsPerTag) s c)
+    (hcons : HybridCacheConsistent s c)
     (transcript : TagTranscript Nonce Digest) :
-    hybridCacheAccepts (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) c s.sessionNonce transcript =
-      hybridReaderAccepts (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g) s.sessionNonce
-        transcript := by
+    hybridCacheAccepts c s.sessionNonce transcript =
+      hybridReaderAccepts (OracleComp.tableExtending c g) s.sessionNonce transcript := by
   unfold hybridCacheAccepts hybridReaderAccepts
   refine decide_eq_decide.mpr ⟨?_, ?_⟩
   · rintro ⟨tag, sid, hsn, hcv⟩
@@ -416,9 +377,8 @@ lemma hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending
   · rintro ⟨tag, sid, hsn, hcv⟩
     refine ⟨tag, sid, hsn, ?_⟩
     obtain ⟨v, hv⟩ := Option.isSome_iff_exists.mp (hcons tag sid transcript.nonce hsn)
-    rw [hv]
     rw [OracleComp.tableExtending, hv, Option.getD_some] at hcv
-    rw [hcv]
+    rw [hv, hcv]
 
 /-- **Hybrid-to-single, Step 1.** Running the lazy hybrid handler from a session-nonce / cache consistent
 state `(s, c)` has the same output distribution as sampling a full single-session random-oracle
@@ -430,13 +390,10 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
     (oa : UnlinkAdversary TagId Nonce Digest)
     (s : HybridState TagId Nonce sessionsPerTag)
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
-    (hcons : HybridCacheConsistent (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-      (sessionsPerTag := sessionsPerTag) s c) :
-    𝒟[(simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag)) oa).run' (s, c)] =
+    (hcons : HybridCacheConsistent s c) :
+    𝒟[(simulateQ hybridLazyHandler oa).run' (s, c)] =
       𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>= fun g =>
-            (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-              (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g)) oa).run' s] := by
+            (simulateQ (hybridTableHandler (OracleComp.tableExtending c g)) oa).run' s] := by
   induction oa using OracleComp.inductionOn generalizing s c with
   | pure b =>
     simp only [simulateQ_pure, StateT.run'_eq, StateT.run_pure, map_pure]
@@ -445,14 +402,11 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
   | query_bind t f ih =>
     rw [hybridLazy_run'_query_bind']
     have hrhs : 𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>= fun g =>
-          (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g))
+          (simulateQ (hybridTableHandler (OracleComp.tableExtending c g))
             (liftM (OracleSpec.query t) >>= f)).run' s]
         = 𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>= fun g =>
-            (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-              (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g) t s) >>= fun p =>
-              (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-                (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g))
+            (hybridTableHandler (OracleComp.tableExtending c g) t s) >>= fun p =>
+              (simulateQ (hybridTableHandler (OracleComp.tableExtending c g))
                 (f p.1)).run' p.2] := by
       refine congrArg _ (congrArg _ (funext fun g => ?_))
       rw [hybridTable_run'_query_bind']
@@ -461,38 +415,31 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
     | inl tag =>
       by_cases hslot : s.sessionsUsed tag < sessionsPerTag
       · rw [hybridLazyHandler_tag_run_of_lt tag (s, c) hslot]
-        set sid := (⟨s.sessionsUsed tag, hslot⟩ : Fin sessionsPerTag) with hsid
-        set adv : Nonce → HybridState TagId Nonce sessionsPerTag :=
-          fun nonce =>
-            { sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1),
-              sessionNonce := Function.update s.sessionNonce (tag, sid) (some nonce) } with hadv
+        set sid := (⟨s.sessionsUsed tag, hslot⟩ : Fin sessionsPerTag)
+        set adv : Nonce → HybridState TagId Nonce sessionsPerTag := fun nonce =>
+          { sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1),
+            sessionNonce := Function.update s.sessionNonce (tag, sid) (some nonce) }
         have hlhs_reassoc :
             ((($ᵗ Nonce) >>= fun nonce => idealCacheStep c ((tag, sid), nonce) >>= fun r =>
                 pure (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest), adv nonce, r.2))
               >>= fun p =>
-              (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
-                (Digest := Digest) (sessionsPerTag := sessionsPerTag)) (f p.1)).run' p.2)
+              (simulateQ hybridLazyHandler (f p.1)).run' p.2)
             = (($ᵗ Nonce) >>= fun nonce => idealCacheStep c ((tag, sid), nonce) >>= fun r =>
-                (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
-                  (Digest := Digest) (sessionsPerTag := sessionsPerTag))
+                (simulateQ hybridLazyHandler
                   (f (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest)))).run' (adv nonce, r.2)) := by
           simp only [bind_assoc, pure_bind]
         refine (congrArg evalDist hlhs_reassoc).trans ?_
         have hlhs_inner : ∀ (n : Nonce),
             𝒟[idealCacheStep c ((tag, sid), n) >>= fun r =>
-              (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
-                (Digest := Digest) (sessionsPerTag := sessionsPerTag))
+              (simulateQ hybridLazyHandler
                 (f (some (⟨n, r.1⟩ : TagTranscript Nonce Digest)))).run' (adv n, r.2)]
             = 𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>= fun g =>
-                  (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce)
-                    (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-                    (OracleComp.tableExtending c g))
+                  (simulateQ (hybridTableHandler (OracleComp.tableExtending c g))
                     (f (some (⟨n, OracleComp.tableExtending c g ((tag, sid), n)⟩ :
                       TagTranscript Nonce Digest)))).run' (adv n)] := by
           intro n
           set Mψ : ((TagId × Fin sessionsPerTag) × Nonce → Digest) → ProbComp Bool := fun g' =>
-            (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce)
-              (Digest := Digest) (sessionsPerTag := sessionsPerTag) g')
+            (simulateQ (hybridTableHandler g')
               (f (some (⟨n, g' ((tag, sid), n)⟩ : TagTranscript Nonce Digest)))).run' (adv n)
             with hMψ
           refine Eq.trans ?_ (evalDist_idealCacheStep_bind_uniformTable_comp c ((tag, sid), n) Mψ)
@@ -511,14 +458,11 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
               (($ᵗ Nonce) >>= fun nonce =>
                 pure (some (⟨nonce, OracleComp.tableExtending c g ((tag, sid), nonce)⟩ :
                   TagTranscript Nonce Digest), adv nonce)) >>= fun p =>
-                (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce)
-                  (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-                  (OracleComp.tableExtending c g)) (f p.1)).run' p.2)
+                (simulateQ (hybridTableHandler (OracleComp.tableExtending c g))
+                  (f p.1)).run' p.2)
             = (($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>= fun g =>
                 ($ᵗ Nonce) >>= fun n =>
-                (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce)
-                  (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-                  (OracleComp.tableExtending c g))
+                (simulateQ (hybridTableHandler (OracleComp.tableExtending c g))
                   (f (some (⟨n, OracleComp.tableExtending c g ((tag, sid), n)⟩ :
                     TagTranscript Nonce Digest)))).run' (adv n)) := by
           simp only [bind_assoc, pure_bind]
@@ -528,23 +472,20 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
         refine evalDist_bind_congr_of_support _ _ _ fun n _ => ?_
         exact hlhs_inner n
       · rw [hybridLazyHandler_tag_run_of_not_lt tag (s, c) hslot]
-        show 𝒟[(simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag)) (f none)).run' (s, c)] = _
+        change 𝒟[(simulateQ hybridLazyHandler (f none)).run' (s, c)] = _
         rw [ih none s c hcons]
         refine congrArg _ (congrArg _ (funext fun g => ?_))
         rw [hybridTableHandler_tag_run_of_not_lt _ tag s hslot]
         rfl
     | inr transcript =>
       rw [hybridLazyHandler_reader_run transcript (s, c)]
-      show 𝒟[(simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag))
-          (f (ReaderReply.ofBool (hybridCacheAccepts (TagId := TagId) (Nonce := Nonce)
-            (Digest := Digest) (sessionsPerTag := sessionsPerTag) c s.sessionNonce
+      change 𝒟[(simulateQ hybridLazyHandler
+          (f (ReaderReply.ofBool (hybridCacheAccepts c s.sessionNonce
             transcript)))).run' (s, c)] = _
       rw [ih _ s c hcons]
       refine congrArg _ (congrArg _ (funext fun g => ?_))
-      rw [hybridTableHandler_reader_run _ transcript s]
-      rw [hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending s c g hcons transcript]
+      rw [hybridTableHandler_reader_run _ transcript s,
+        hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending s c g hcons transcript]
       rfl
 
 /-- **Hybrid-to-single, deliverable 1.** Eager form of the hybrid-world success probability: running the
@@ -553,12 +494,10 @@ single-session random-oracle table `gS` up front and running the deterministic t
 handler. The hybrid analogue of `probOutput_singleIdeal_run'_eq_tableSample`. -/
 lemma probOutput_hybrid_run'_eq_tableSample [Fintype Nonce] [Finite Digest]
     (adv : UnlinkAdversary TagId Nonce Digest) :
-    Pr[= true | (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
-        (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run'
+    Pr[= true | (simulateQ (hybridLazyHandler (sessionsPerTag := sessionsPerTag)) adv).run'
         (HybridState.init, ∅)] =
       Pr[= true | ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>= fun gS =>
-        (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-          (sessionsPerTag := sessionsPerTag) gS) adv).run' HybridState.init] := by
+        (simulateQ (hybridTableHandler gS) adv).run' HybridState.init] := by
   rw [probOutput_def, probOutput_def,
     evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending adv HybridState.init ∅
       hybridCacheConsistent_init]
@@ -615,8 +554,7 @@ noncomputable def hybridSpareHandler :
     | Sum.inr transcript => do
         let rs ← idealCacheMapM ((Finset.univ : Finset TagId).toList.map
           (fun tag => (tag, transcript.nonce))) p.2.2
-        pure (ReaderReply.ofBool (hybridCacheAccepts (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag) p.2.1 p.1.sessionNonce transcript),
+        pure (ReaderReply.ofBool (hybridCacheAccepts p.2.1 p.1.sessionNonce transcript),
           p.1, p.2.1, rs.2)
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
@@ -627,10 +565,8 @@ lemma hybridSpareHandler_tag_run_of_not_lt (tag : TagId)
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache ×
       ((TagId × Nonce) →ₒ Digest).QueryCache)
     (hslot : ¬ p.1.sessionsUsed tag < sessionsPerTag) :
-    (hybridSpareHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) p = pure (none, p) := by
-  change (if _h : p.1.sessionsUsed tag < sessionsPerTag then _ else pure (none, p)) = _
-  rw [dif_neg hslot]
+    (hybridSpareHandler (Sum.inl tag)) p = pure (none, p) := by
+  change dite _ _ _ = _; exact dif_neg hslot
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `hybridSpareHandler` on a tag query with a free slot: sample a nonce, then branch on the spare
@@ -641,8 +577,7 @@ lemma hybridSpareHandler_tag_run_of_lt (tag : TagId)
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache ×
       ((TagId × Nonce) →ₒ Digest).QueryCache)
     (hslot : p.1.sessionsUsed tag < sessionsPerTag) :
-    (hybridSpareHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) p =
+    (hybridSpareHandler (Sum.inl tag)) p =
       ($ᵗ Nonce) >>= fun nonce =>
         (match p.2.2 (tag, nonce) with
           | some d =>
@@ -680,17 +615,12 @@ lemma hybridSpareHandler_reader_run (transcript : TagTranscript Nonce Digest)
     (p : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache ×
       ((TagId × Nonce) →ₒ Digest).QueryCache) :
-    (hybridSpareHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) p =
+    (hybridSpareHandler (Sum.inr transcript)) p =
       idealCacheMapM ((Finset.univ : Finset TagId).toList.map
           (fun tag => (tag, transcript.nonce))) p.2.2 >>= fun rs =>
-        pure (ReaderReply.ofBool (hybridCacheAccepts (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag) p.2.1 p.1.sessionNonce transcript),
+        pure (ReaderReply.ofBool (hybridCacheAccepts p.2.1 p.1.sessionNonce transcript),
           p.1, p.2.1, rs.2) := by
   rfl
-
-
-end EagerComposed
 
 end UnlinkReduction
 
