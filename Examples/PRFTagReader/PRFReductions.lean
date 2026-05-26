@@ -187,24 +187,18 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFTagImpl_run
       simulateQ impl
         (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
           OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) _) =
-      (pure (prfs.evalMultiple k d.1 d.2) : ProbComp Digest) := by
-    intro d
-    rw [simulateQ_spec_query]
-    show impl (Sum.inr d) = _
+      (pure (prfs.evalMultiple k d.1 d.2) : ProbComp Digest) := fun d => by
     simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.multiplePRFScheme]
   unfold unlinkToMultiplePRFTagImpl unlinkTagQueryImpl
   by_cases hs : s.sessionsUsed tag < sessionsPerTag
   · simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
       bind_pure_comp, pure_bind, dif_pos hs]
-    change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+    change simulateQ impl _ = _
     simp only [simulateQ_bind, simulateQ_map, monadLift_eq_self, hleft]
     refine bind_congr fun nonce => ?_
     erw [hquery (tag, nonce.1)]
     rfl
-  · simp only [StateT.run_bind, StateT.run_get,
-      bind_pure_comp, pure_bind, dif_neg hs]
-    change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
-    simp only [StateT.run_pure, simulateQ_pure]
+  · simp [hs]; rfl
 
 omit [DecidableEq TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
   [SampleableType Digest] in
@@ -228,10 +222,7 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run
       simulateQ impl
         (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
           OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) _) =
-      (pure (prfs.evalMultiple k d.1 d.2) : ProbComp Digest) := by
-    intro d
-    rw [simulateQ_spec_query]
-    show impl (Sum.inr d) = _
+      (pure (prfs.evalMultiple k d.1 d.2) : ProbComp Digest) := fun d => by
     simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.multiplePRFScheme]
   have hmapM :
       simulateQ impl
@@ -242,7 +233,7 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run
             OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) Digest))) =
       pure ((Finset.univ : Finset TagId).toList.map
         fun tag => prfs.evalMultiple k tag transcript.nonce) := by
-    show @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+    show simulateQ impl _ = _
     rw [simulateQ_list_mapM]
     induction (Finset.univ : Finset TagId).toList with
     | nil => rfl
@@ -267,7 +258,7 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run
       exact ⟨_, ⟨tag, rfl⟩, hd⟩
   unfold unlinkToMultiplePRFReaderImpl unlinkReaderQueryImpl
   simp only [bind_pure_comp]
-  change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
+  change simulateQ impl _ = _
   simp only [StateT.run_map, StateT.run_monadLift, simulateQ_bind, simulateQ_map,
     monadLift_eq_self, hmapM, pure_bind, simulateQ_pure, map_pure]
   rw [hAccept]
@@ -292,9 +283,7 @@ theorem simulateQ_prfReal_unlinkToMultiplePRFQueryImpl_run
           prfs k)
         adversary).run s := by
   induction adversary using OracleComp.inductionOn generalizing s with
-  | pure x =>
-    simp only [simulateQ_pure, StateT.run_pure]
-    rfl
+  | pure x => rfl
   | query_bind t f ih =>
     simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
     rcases t with tag | transcript
@@ -327,8 +316,7 @@ theorem prfRealExp_unlinkToMultiplePRFReduction_eq_unlinkMultipleExp
           (Digest := Digest) (sessionsPerTag := sessionsPerTag) adversary)] =
       Pr[= true | unlinkMultipleExp (TagId := TagId) (Nonce := Nonce)
         (Digest := Digest) (sessionsPerTag := sessionsPerTag) prfs adversary] := by
-  suffices h : PRFScheme.prfRealExp prfs.multiplePRFScheme
-      (unlinkToMultiplePRFReduction adversary) = unlinkMultipleExp prfs adversary by rw [h]
+  congr 1
   unfold PRFScheme.prfRealExp unlinkMultipleExp unlinkToMultiplePRFReduction
   refine bind_congr (m := ProbComp) fun k => ?_
   change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
@@ -366,26 +354,18 @@ lemma simulateQ_prfReal_unlinkToSinglePRFTagImpl_run
         (liftM ((unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)).query
             (Sum.inr d)) :
           OracleComp (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)) _) =
-      (pure (prfs.evalSingle k d.1.1 d.1.2 d.2) : ProbComp Digest) := by
-    intro d
-    rw [simulateQ_spec_query]
-    show impl (Sum.inr d) = _
+      (pure (prfs.evalSingle k d.1.1 d.1.2 d.2) : ProbComp Digest) := fun d => by
     simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.singlePRFScheme]
   unfold unlinkToSinglePRFTagImpl unlinkTagQueryImpl
   by_cases hs : s.sessionsUsed tag < sessionsPerTag
   · simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
       bind_pure_comp, pure_bind, dif_pos hs]
-    change @simulateQ _ (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest))
-      ProbComp _ impl _ _ = _
+    change simulateQ impl _ = _
     simp only [simulateQ_bind, simulateQ_map, monadLift_eq_self, hleft]
     refine bind_congr fun nonce => ?_
     erw [hquery ((tag, ⟨s.sessionsUsed tag, hs⟩), nonce.1)]
     rfl
-  · simp only [StateT.run_bind, StateT.run_get,
-      bind_pure_comp, pure_bind, dif_neg hs]
-    change @simulateQ _ (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest))
-      ProbComp _ impl _ _ = _
-    simp only [StateT.run_pure, simulateQ_pure]
+  · simp [hs]; rfl
 
 omit [DecidableEq TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
   [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -412,10 +392,7 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
         (liftM ((unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)).query
             (Sum.inr d)) :
           OracleComp (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)) _) =
-      (pure (prfs.evalSingle k d.1.1 d.1.2 d.2) : ProbComp Digest) := by
-    intro d
-    rw [simulateQ_spec_query]
-    show impl (Sum.inr d) = _
+      (pure (prfs.evalSingle k d.1.1 d.1.2 d.2) : ProbComp Digest) := fun d => by
     simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.singlePRFScheme]
   have hmapM :
       simulateQ impl
@@ -428,8 +405,7 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
       pure ((Finset.univ : Finset (TagId × Fin sessionsPerTag)).toList.map
         (fun slot : TagId × Fin sessionsPerTag =>
           prfs.evalSingle k slot.1 slot.2 transcript.nonce)) := by
-    show @simulateQ _ (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest))
-      ProbComp _ impl _ _ = _
+    show simulateQ impl _ = _
     rw [simulateQ_list_mapM]
     induction (Finset.univ : Finset (TagId × Fin sessionsPerTag)).toList with
     | nil => rfl
@@ -456,8 +432,7 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
       exact ⟨_, ⟨(tag, sid), rfl⟩, hd⟩
   unfold unlinkToSinglePRFReaderImpl unlinkReaderQueryImpl
   simp only [bind_pure_comp]
-  change @simulateQ _ (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest))
-    ProbComp _ impl _ _ = _
+  change simulateQ impl _ = _
   simp only [StateT.run_map, StateT.run_monadLift, simulateQ_bind, simulateQ_map,
     monadLift_eq_self, hmapM, pure_bind, simulateQ_pure, map_pure]
   rw [hAccept]
@@ -482,9 +457,7 @@ theorem simulateQ_prfReal_unlinkToSinglePRFQueryImpl_run
           prfs k)
         adversary).run s := by
   induction adversary using OracleComp.inductionOn generalizing s with
-  | pure x =>
-    simp only [simulateQ_pure, StateT.run_pure]
-    rfl
+  | pure x => rfl
   | query_bind t f ih =>
     simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
     rcases t with tag | transcript
@@ -517,14 +490,9 @@ theorem prfRealExp_unlinkToSinglePRFReduction_eq_unlinkSingleExp
           (Digest := Digest) (sessionsPerTag := sessionsPerTag) adversary)] =
       Pr[= true | unlinkSingleExp (TagId := TagId) (Nonce := Nonce)
         (Digest := Digest) (sessionsPerTag := sessionsPerTag) prfs adversary] := by
-  suffices h : PRFScheme.prfRealExp prfs.singlePRFScheme
-      (unlinkToSinglePRFReduction adversary) = unlinkSingleExp prfs adversary by rw [h]
-  unfold PRFScheme.prfRealExp unlinkSingleExp
+  congr 1
+  unfold PRFScheme.prfRealExp unlinkSingleExp unlinkToSinglePRFReduction
   refine bind_congr (m := ProbComp) fun k => ?_
-  show simulateQ (PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k)
-      (unlinkToSinglePRFReduction adversary) =
-    (simulateQ (unlinkSingleQueryImpl prfs k) adversary).run' UnlinkState.init
-  unfold unlinkToSinglePRFReduction
   change simulateQ (PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k)
       ((simulateQ unlinkToSinglePRFQueryImpl adversary).run UnlinkState.init >>=
         fun p => pure p.1) = _
@@ -566,7 +534,7 @@ lemma simulateQ_multipleIdeal_collapse
         (simulateQ (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
           (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run (s, c) := by
   induction adv using OracleComp.inductionOn generalizing s c with
-  | pure x => rw [simulateQ_pure, StateT.run_pure, simulateQ_pure]; rfl
+  | pure x => rfl
   | query_bind t f ih =>
     rw [simulateQ_bind, StateT.run_bind]
     change (simulateQ PRFScheme.prfIdealQueryImpl
@@ -614,7 +582,7 @@ lemma simulateQ_singleIdeal_collapse
         (simulateQ (singleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
           (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run (s, c) := by
   induction adv using OracleComp.inductionOn generalizing s c with
-  | pure x => rw [simulateQ_pure, StateT.run_pure, simulateQ_pure]; rfl
+  | pure x => rfl
   | query_bind t f ih =>
     rw [simulateQ_bind, StateT.run_bind]
     change (simulateQ PRFScheme.prfIdealQueryImpl
@@ -649,15 +617,9 @@ lemma prfIdealExp_unlinkToMultiplePRFReduction_eq_run'
   change (simulateQ PRFScheme.prfIdealQueryImpl
       ((simulateQ unlinkToMultiplePRFQueryImpl adv).run UnlinkState.init >>=
         fun p => pure p.1)).run' ∅ = _
-  rw [simulateQ_bind]
-  change ((simulateQ PRFScheme.prfIdealQueryImpl
-      ((simulateQ unlinkToMultiplePRFQueryImpl adv).run UnlinkState.init) >>=
-        fun p => simulateQ PRFScheme.prfIdealQueryImpl (pure p.1))).run' ∅ = _
-  rw [StateT.run'_eq, StateT.run_bind]
-  rw [simulateQ_multipleIdeal_collapse adv UnlinkState.init ∅]
-  rw [StateT.run'_eq, map_bind, bind_map_left]
-  exact bind_congr fun r => by
-    simp only [simulateQ_pure, StateT.run_pure, map_pure, Function.comp]; rfl
+  rw [simulateQ_bind, StateT.run'_eq, StateT.run_bind,
+    simulateQ_multipleIdeal_collapse adv UnlinkState.init ∅, map_bind, bind_map_left]
+  rfl
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- The single-session ideal-PRF experiment is the composed handler `singleIdealQueryImpl`
@@ -673,15 +635,9 @@ lemma prfIdealExp_unlinkToSinglePRFReduction_eq_run'
   change (simulateQ PRFScheme.prfIdealQueryImpl
       ((simulateQ unlinkToSinglePRFQueryImpl adv).run UnlinkState.init >>=
         fun p => pure p.1)).run' ∅ = _
-  rw [simulateQ_bind]
-  change ((simulateQ PRFScheme.prfIdealQueryImpl
-      ((simulateQ unlinkToSinglePRFQueryImpl adv).run UnlinkState.init) >>=
-        fun p => simulateQ PRFScheme.prfIdealQueryImpl (pure p.1))).run' ∅ = _
-  rw [StateT.run'_eq, StateT.run_bind]
-  rw [simulateQ_singleIdeal_collapse adv UnlinkState.init ∅]
-  rw [StateT.run'_eq, map_bind, bind_map_left]
-  exact bind_congr fun r => by
-    simp only [simulateQ_pure, StateT.run_pure, map_pure, Function.comp]; rfl
+  rw [simulateQ_bind, StateT.run'_eq, StateT.run_bind,
+    simulateQ_singleIdeal_collapse adv UnlinkState.init ∅, map_bind, bind_map_left]
+  rfl
 
 /-! ### Per-query reduction lemmas for the composed ideal handlers
 
@@ -714,8 +670,7 @@ lemma unlinkToMultiplePRFTagImpl_run_of_lt (tag : TagId) (s : UnlinkState TagId)
             { s with sessionsUsed :=
               Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) }) := by
   unfold unlinkToMultiplePRFTagImpl
-  simp [hslot, StateT.run_bind, StateT.run_get, StateT.run_monadLift, StateT.run_set,
-    StateT.run_pure, bind_assoc]
+  simp [hslot]
 
 /-- The lazy-random-oracle answer to a PRF-oracle query on domain point `d` against cache `c`:
 return the cached digest, or sample a fresh one and insert it. -/
@@ -754,37 +709,11 @@ lemma simulateQ_prfIdeal_query_inr {D : Type} [DecidableEq D]
   rw [simulateQ_query]
   change ((fun x => x) <$> PRFScheme.prfIdealQueryImpl (Sum.inr d)).run c = _
   rw [id_map']
-  change (OracleSpec.randomOracle d).run c = _
+  change (uniformSampleImpl.withCaching d).run c = _
   unfold idealCacheStep
   cases hc : c d with
-  | none =>
-    change (uniformSampleImpl.withCaching d).run c = _
-    rw [QueryImpl.withCaching_run_none uniformSampleImpl hc]
-    rfl
-  | some u =>
-    change (uniformSampleImpl.withCaching d).run c = _
-    rw [QueryImpl.withCaching_run_some uniformSampleImpl hc]
-
-omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
-  [DecidableEq Digest] [NeZero sessionsPerTag] in
-/-- `simulateQ prfIdealQueryImpl` distributes over a bind, threaded through the cache state. -/
-lemma simulateQ_prfIdeal_run_bind {D : Type} [DecidableEq D] {α β : Type}
-    (mx : OracleComp (PRFScheme.PRFOracleSpec D Digest) α)
-    (my : α → OracleComp (PRFScheme.PRFOracleSpec D Digest) β)
-    (c : (D →ₒ Digest).QueryCache) :
-    (simulateQ (PRFScheme.prfIdealQueryImpl (D := D) (R := Digest)) (mx >>= my)).run c =
-      (simulateQ (PRFScheme.prfIdealQueryImpl (D := D) (R := Digest)) mx).run c >>= fun p =>
-        (simulateQ (PRFScheme.prfIdealQueryImpl (D := D) (R := Digest)) (my p.1)).run p.2 := by
-  rw [simulateQ_bind, StateT.run_bind]
-
-omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
-  [DecidableEq Digest] [NeZero sessionsPerTag] in
-/-- `simulateQ prfIdealQueryImpl` of a `pure` returns the value paired with the unchanged cache. -/
-lemma simulateQ_prfIdeal_run_pure {D : Type} [DecidableEq D] {α : Type}
-    (a : α) (c : (D →ₒ Digest).QueryCache) :
-    (simulateQ (PRFScheme.prfIdealQueryImpl (D := D) (R := Digest))
-        (pure a : OracleComp (PRFScheme.PRFOracleSpec D Digest) α)).run c = pure (a, c) := by
-  rw [simulateQ_pure, StateT.run_pure]
+  | none => rw [QueryImpl.withCaching_run_none uniformSampleImpl hc]; rfl
+  | some u => rw [QueryImpl.withCaching_run_some uniformSampleImpl hc]
 
 /-- Folding the lazy-random-oracle lookup `idealCacheStep` over a list of domain points, threading
 the cache: this is the reader-oracle's behaviour under `prfIdealQueryImpl`. -/
@@ -808,7 +737,7 @@ lemma simulateQ_prfIdeal_run_mapM {D α : Type} [DecidableEq D]
             OracleComp (PRFScheme.PRFOracleSpec D Digest) Digest)))).run c =
       idealCacheMapM (l.map f) c := by
   induction l generalizing c with
-  | nil => simp [idealCacheMapM, simulateQ_pure, StateT.run_pure]
+  | nil => simp [idealCacheMapM]
   | cons a as ih =>
     rw [List.mapM_cons, List.map_cons]
     erw [simulateQ_bind, StateT.run_bind, simulateQ_prfIdeal_query_inr]
@@ -833,7 +762,7 @@ lemma unlinkToMultiplePRFReaderImpl_run
           OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) Digest))) >>= fun digests =>
         pure (ReaderReply.ofBool (decide (∃ d ∈ digests, d = transcript.auth)), s) := by
   unfold unlinkToMultiplePRFReaderImpl
-  simp [StateT.run_monadLift, bind_pure_comp]
+  simp
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- Multiple-session ideal handler on a tag query whose slot budget is exhausted: returns `none`,
@@ -895,11 +824,7 @@ lemma multipleIdealQueryImpl_tag_run_of_lt (tag : TagId) (s : UnlinkState TagId)
   change ((simulateQ PRFScheme.prfIdealQueryImpl
       ((unlinkToMultiplePRFTagImpl tag).run s)).run c) >>=
       (fun r => pure (r.1.1, r.1.2, r.2)) = _
-  rw [simulateQ_prfIdeal_unlinkToMultiplePRFTagImpl_run_of_lt tag s c hslot, bind_assoc]
-  refine bind_congr fun nonce => ?_
-  rw [bind_assoc]
-  refine bind_congr fun r => ?_
-  rw [pure_bind]
+  simp [simulateQ_prfIdeal_unlinkToMultiplePRFTagImpl_run_of_lt tag s c hslot]
 
 omit [Nonempty TagId] [SampleableType Nonce] [NeZero sessionsPerTag] in
 /-- Running the multiple-session reduction reader handler through the lazy random oracle: fold
@@ -935,9 +860,7 @@ lemma multipleIdealQueryImpl_reader_run
   change ((simulateQ PRFScheme.prfIdealQueryImpl
       ((unlinkToMultiplePRFReaderImpl transcript).run s)).run c) >>=
       (fun r => pure (r.1.1, r.1.2, r.2)) = _
-  rw [simulateQ_prfIdeal_unlinkToMultiplePRFReaderImpl_run transcript s c, bind_assoc]
-  refine bind_congr fun rs => ?_
-  rw [pure_bind]
+  simp [simulateQ_prfIdeal_unlinkToMultiplePRFReaderImpl_run transcript s c]
 
 /-! ### Per-query reduction lemmas, single-session ideal handler -/
 
@@ -968,7 +891,7 @@ lemma unlinkToSinglePRFTagImpl_run_of_lt (tag : TagId) (s : UnlinkState TagId)
             { s with sessionsUsed :=
               Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) }) := by
   unfold unlinkToSinglePRFTagImpl
-  simp [hslot, StateT.run_bind, StateT.run_get, StateT.run_monadLift, StateT.run_set]
+  simp [hslot]
 
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Digest] [NeZero sessionsPerTag] in
 /-- Running the single-session reduction tag handler (slot available) through the lazy random
@@ -1029,11 +952,7 @@ lemma singleIdealQueryImpl_tag_run_of_lt (tag : TagId) (s : UnlinkState TagId)
   change ((simulateQ PRFScheme.prfIdealQueryImpl
       ((unlinkToSinglePRFTagImpl tag).run s)).run c) >>=
       (fun r => pure (r.1.1, r.1.2, r.2)) = _
-  rw [simulateQ_prfIdeal_unlinkToSinglePRFTagImpl_run_of_lt tag s c hslot, bind_assoc]
-  refine bind_congr fun nonce => ?_
-  rw [bind_assoc]
-  refine bind_congr fun r => ?_
-  rw [pure_bind]
+  simp [simulateQ_prfIdeal_unlinkToSinglePRFTagImpl_run_of_lt tag s c hslot]
 
 omit [DecidableEq TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
   [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -1051,7 +970,7 @@ lemma unlinkToSinglePRFReaderImpl_run
             Digest))) >>= fun digests =>
         pure (ReaderReply.ofBool (decide (∃ d ∈ digests, d = transcript.auth)), s) := by
   unfold unlinkToSinglePRFReaderImpl
-  simp [StateT.run_monadLift, bind_pure_comp]
+  simp
 
 omit [Nonempty TagId] [SampleableType Nonce] [NeZero sessionsPerTag] in
 /-- Running the single-session reduction reader handler through the lazy random oracle: fold
@@ -1088,9 +1007,7 @@ lemma singleIdealQueryImpl_reader_run
   change ((simulateQ PRFScheme.prfIdealQueryImpl
       ((unlinkToSinglePRFReaderImpl transcript).run s)).run c) >>=
       (fun r => pure (r.1.1, r.1.2, r.2)) = _
-  rw [simulateQ_prfIdeal_unlinkToSinglePRFReaderImpl_run transcript s c, bind_assoc]
-  refine bind_congr fun rs => ?_
-  rw [pure_bind]
+  simp [simulateQ_prfIdeal_unlinkToSinglePRFReaderImpl_run transcript s c]
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- Base case of any coupling induction for `multipleIdeal_le_singleIdeal_add_bad`: on a `pure`
@@ -1177,10 +1094,9 @@ lemma unlinkBadQueryImpl_tag_run_of_not_lt (tag : TagId)
         (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) sB = pure (none, sB) := by
   unfold unlinkBadQueryImpl
   rw [QueryImpl.add_apply_inl]
-  change (unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-    (sessionsPerTag := sessionsPerTag) tag).run sB = _
+  change (unlinkBadTagQueryImpl tag).run sB = _
   unfold unlinkBadTagQueryImpl
-  simp [StateT.run_bind, StateT.run_get, hslot]
+  simp [hslot]
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `unlinkBadQueryImpl` on a tag query with a free slot: sample a nonce and a fresh digest,
@@ -1202,11 +1118,9 @@ lemma unlinkBadQueryImpl_tag_run_of_lt (tag : TagId)
               UnlinkBadState TagId Nonce Digest)) := by
   unfold unlinkBadQueryImpl
   rw [QueryImpl.add_apply_inl]
-  change (unlinkBadTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-    (sessionsPerTag := sessionsPerTag) tag).run sB = _
+  change (unlinkBadTagQueryImpl tag).run sB = _
   unfold unlinkBadTagQueryImpl
-  simp [StateT.run_bind, StateT.run_get, StateT.run_monadLift, StateT.run_set, hslot,
-    bind_pure_comp]
+  simp [hslot]
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `unlinkBadQueryImpl` on a reader query: deterministic acceptance against the recorded
@@ -1219,10 +1133,9 @@ lemma unlinkBadQueryImpl_reader_run (transcript : TagTranscript Nonce Digest)
         transcript.auth ∈ ((sB.responses (tag, transcript.nonce)).getD []))), sB) := by
   unfold unlinkBadQueryImpl
   rw [QueryImpl.add_apply_inr]
-  change (unlinkBadReaderQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-    transcript).run sB = _
+  change (unlinkBadReaderQueryImpl transcript).run sB = _
   unfold unlinkBadReaderQueryImpl
-  simp [StateT.run_bind, StateT.run_get]
+  simp
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- The `bad` flag of `unlinkBadQueryImpl` is monotone: a single per-query step started from a
