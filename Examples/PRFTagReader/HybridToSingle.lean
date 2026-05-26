@@ -318,11 +318,7 @@ lemma evalDist_simulateQ_hybridCoupledHandler_run'_eq_tableExtending
                 (simulateQ (hybridCoupledHandler (TagId := TagId) (Nonce := Nonce)
                   (Digest := Digest) (sessionsPerTag := sessionsPerTag))
                   (f (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest)))).run' (adv nonce, r.2)) := by
-          rw [bind_assoc]
-          refine bind_congr fun nonce => ?_
-          rw [bind_assoc]
-          refine bind_congr fun r => ?_
-          rw [pure_bind]
+          simp only [bind_assoc, pure_bind]
         refine (congrArg evalDist hlhs_reassoc).trans ?_
         have hlhs_inner : ∀ (n : Nonce),
             𝒟[idealCacheStep c ((tag, sid), n) >>= fun r =>
@@ -367,10 +363,7 @@ lemma evalDist_simulateQ_hybridCoupledHandler_run'_eq_tableExtending
                   (OracleComp.tableExtending c g))
                   (f (some (⟨n, OracleComp.tableExtending c g ((tag, sid), n)⟩ :
                     TagTranscript Nonce Digest)))).run' (adv n)) := by
-          refine bind_congr fun g => ?_
-          rw [bind_assoc]
-          refine bind_congr fun n => ?_
-          rw [pure_bind]
+          simp only [bind_assoc, pure_bind]
         refine Eq.trans ?_ (congrArg evalDist hrhs_swap).symm
         rw [evalDist_probComp_bind_comm ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest))
           ($ᵗ Nonce)]
@@ -400,9 +393,7 @@ lemma evalDist_simulateQ_hybridCoupledHandler_run'_eq_tableExtending
                 (f (ReaderReply.ofBool (hybridCacheAccepts (TagId := TagId) (Nonce := Nonce)
                   (Digest := Digest) (sessionsPerTag := sessionsPerTag) c s.sessionNonce
                   transcript)))).run' (s, rs.2)) := by
-        rw [bind_assoc]
-        refine bind_congr fun rs => ?_
-        rw [pure_bind]
+        simp only [bind_assoc, pure_bind]
       refine (congrArg evalDist hlhs_reassoc).trans ?_
       set Mψ : ((TagId × Fin sessionsPerTag) × Nonce → Digest) → ProbComp Bool := fun g' =>
         (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce)
@@ -510,8 +501,8 @@ lemma hybridColFresh_init (oa : UnlinkAdversary TagId Nonce Digest)
   intro n tag sid hsome _
   simp at hsome
 
-/-- **Hybrid-to-single, core coupling bound.** For any hybrid state `s` and single state `sS` with equal
-session counters, sharing a random-oracle cache `c`, the coupled hybrid handler's success
+/-- **Hybrid-to-single, core coupling bound.** For any hybrid state `s` and single state `sS`
+with equal session counters, sharing a random-oracle cache `c`, the coupled hybrid handler's success
 probability is bounded by the single-session ideal handler's plus the reader-slack term
 `qR * |TagId| * sessionsPerTag / |Digest|`, provided the adversary has pairwise-distinct reader
 nonces (`hdist`), at most `qR` reader queries (`hqR`), and the cache satisfies the coupling
@@ -543,21 +534,16 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
     cases t with
     | inl tag =>
       -- Tag query: the two handlers are pointwise identical; recurse with `ε₁ = 0`.
-      have hqRf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isRight) qR := by
-        intro u
-        have := hqR
-        rw [OracleComp.isQueryBoundP_query_bind_iff] at this
+      have hqRf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isRight) qR := fun u => by
+        have := hqR; rw [OracleComp.isQueryBoundP_query_bind_iff] at this
         simpa using this.2 u
-      have hdistf : ∀ u, ∀ n, OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 1 := by
-        intro u n
-        have := hdist n
-        rw [OracleComp.isQueryBoundP_query_bind_iff] at this
+      have hdistf : ∀ u, ∀ n, OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 1 := fun u n => by
+        have := hdist n; rw [OracleComp.isQueryBoundP_query_bind_iff] at this
         simpa [pReaderNonce] using this.2 u
       have hfreshf : ∀ u, ∀ n, OracleComp.IsQueryBoundP
           (liftM (OracleSpec.query (Sum.inl tag : (UnlinkOracleSpec TagId Nonce Digest).Domain))
             >>= f) (pReaderNonce n) 0 →
-          OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 0 := by
-        intro u n hb
+          OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 0 := fun u n hb => by
         rw [OracleComp.isQueryBoundP_query_bind_iff] at hb
         simpa [pReaderNonce] using hb.2 u
       have hcounter_tag : sS.sessionsUsed tag = s.sessionsUsed tag := (congrFun hcounter tag).symm
@@ -696,27 +682,22 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
       have hqRsplit := hqR
       rw [OracleComp.isQueryBoundP_query_bind_iff] at hqRsplit
       obtain ⟨hvalid, hbudget⟩ := hqRsplit
-      have hqRpos : 0 < qR := by
-        rcases hvalid with h | h
-        · exact absurd rfl h
-        · exact h
+      have hqRpos : 0 < qR := hvalid.resolve_left fun h => h rfl
       obtain ⟨qR', rfl⟩ : ∃ qR', qR = qR' + 1 := ⟨qR - 1, by omega⟩
       have hqRf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isRight) qR' := by
         intro u; simpa using hbudget u
       -- the residual budget at `n₀` is exhausted
-      have hb0 : ∀ u, OracleComp.IsQueryBoundP (f u) (pReaderNonce n₀) 0 := by
-        intro u
+      have hb0 : ∀ u, OracleComp.IsQueryBoundP (f u) (pReaderNonce n₀) 0 := fun u => by
         have := hdist n₀
         rw [OracleComp.isQueryBoundP_query_bind_iff] at this
         have h2 := this.2 u
-        simp only [pReaderNonce, hn₀, if_pos rfl] at h2
+        simp only [pReaderNonce, hn₀] at h2
         simpa using h2
       -- off-`n₀` budget transfers to the continuation
       have hbn : ∀ u, ∀ n, n ≠ n₀ → OracleComp.IsQueryBoundP
           (liftM (OracleSpec.query (Sum.inr transcript :
             (UnlinkOracleSpec TagId Nonce Digest).Domain)) >>= f) (pReaderNonce n) 0 →
-          OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 0 := by
-        intro u n hne hb
+          OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 0 := fun u n hne hb => by
         rw [OracleComp.isQueryBoundP_query_bind_iff] at hb
         have h2 := hb.2 u
         have hpfalse : ¬ pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest) n
@@ -724,16 +705,14 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
         simpa [hpfalse] using h2
       -- `hcol`: at the current reader nonce, no non-tag-drawn cached cell
       have hcol : ∀ (tag : TagId) (sid : Fin sessionsPerTag),
-          (c ((tag, sid), n₀)).isSome → s.sessionNonce (tag, sid) = some n₀ := by
-        intro tag sid hsome
-        by_contra hne
-        have hbad := hfresh n₀ tag sid hsome hne
-        rw [OracleComp.isQueryBoundP_query_bind_iff] at hbad
-        have hp : pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest) n₀
-            (Sum.inr transcript) := rfl
-        rcases hbad.1 with h | h
-        · exact h hp
-        · exact absurd h (lt_irrefl 0)
+          (c ((tag, sid), n₀)).isSome → s.sessionNonce (tag, sid) = some n₀ :=
+        fun tag sid hsome => by
+          by_contra hne
+          have hbad := hfresh n₀ tag sid hsome hne
+          rw [OracleComp.isQueryBoundP_query_bind_iff] at hbad
+          have hp : pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest) n₀
+              (Sum.inr transcript) := rfl
+          exact hbad.1.elim (fun h => h hp) (fun h => absurd h (lt_irrefl 0))
       -- reassociate both reader binds to a shared `mx`
       set mx : ProbComp (List Digest ×
           (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) :=
@@ -749,9 +728,7 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
               (simulateQ (hybridCoupledHandler (TagId := TagId) (Nonce := Nonce)
                 (Digest := Digest) (sessionsPerTag := sessionsPerTag))
                 (f (ReaderReply.ofBool hybBit))).run' (s, rs.2) := by
-        rw [bind_assoc]
-        refine bind_congr fun rs => ?_
-        rw [pure_bind]
+        simp only [bind_assoc, pure_bind]
       have hreassocS :
           (mx >>= fun rs =>
               pure (ReaderReply.ofBool (decide (∃ d ∈ rs.1, d = transcript.auth)), sS, rs.2))
@@ -762,9 +739,7 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
                 (Digest := Digest) (sessionsPerTag := sessionsPerTag))
                 (f (ReaderReply.ofBool (decide (∃ d ∈ rs.1, d = transcript.auth))))).run'
                 (sS, rs.2) := by
-        rw [bind_assoc]
-        refine bind_congr fun rs => ?_
-        rw [pure_bind]
+        simp only [bind_assoc, pure_bind]
       rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
       refine le_trans (le_of_eq (congrArg (fun m => probEvent m (· = true)) hreassocH)) ?_
       refine le_trans ?_ (le_of_eq (congrArg (fun z => z +
@@ -863,9 +838,9 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
         exact ih (ReaderReply.ofBool hybBit) qR' s sS rs.2 hcounter (hqRf _)
           hdistcont hwo hfresh'
 
-/-- **Hybrid-to-single.** Under `HasDistinctUnlinkReaderNonces` and a reader-query bound `qReader`, the hybrid
-world `H` (run as the lazy hybrid handler from the initial state) succeeds with probability at most
-that of the single-session ideal world plus the reader-slack term
+/-- **Hybrid-to-single.** Under `HasDistinctUnlinkReaderNonces` and a reader-query bound
+`qReader`, the hybrid world `H` (run as the lazy hybrid handler from the initial state) succeeds
+with probability at most that of the single-session ideal world plus the reader-slack term
 `qReader * |TagId| * sessionsPerTag / |Digest|`.
 
 The lazy hybrid handler and the coupled hybrid handler agree in distribution

@@ -144,9 +144,8 @@ lemma unlinkBadTagNext_cacheBounded
   · refine ⟨S, ?_, ?_⟩
     · simpa [unlinkBadTagNext, Function.update_of_ne htag] using hScard
     · intro nonce' hcached
-      have hkey : (tag', nonce') ≠ (tag, nonce) := by
-        intro h
-        exact htag (Prod.ext_iff.mp h).1
+      have hkey : (tag', nonce') ≠ (tag, nonce) :=
+        fun h => htag (Prod.ext_iff.mp h).1
       have hsome : (st.responses (tag', nonce')).isSome = true := by
         simpa [unlinkBadTagNext, QueryCache.cacheQuery_of_ne _ _ hkey] using hcached
       exact hS nonce' hsome
@@ -244,9 +243,8 @@ private lemma unlinkBadTagStep_bad_le
               unlinkBadTagNext tag st nonce auth)] =
           if (st.responses (tag, nonce)).isSome then 1 else 0 := by
       intro nonce
-      by_cases hcached : (st.responses (tag, nonce)).isSome = true
-      · simp [unlinkBadTagNext, hbad, hcached]
-      · simp [unlinkBadTagNext, hbad, hcached]
+      by_cases hcached : (st.responses (tag, nonce)).isSome = true <;>
+        simp [unlinkBadTagNext, hbad, hcached]
     simp_rw [hinner]
     obtain ⟨S, hScard, hS⟩ := hbounded tag
     calc
@@ -257,9 +255,8 @@ private lemma unlinkBadTagStep_bad_le
               ($ᵗ Nonce : ProbComp Nonce)] := by
             simp only [probEvent_eq_tsum_ite]
             refine tsum_congr fun nonce => ?_
-            by_cases hcached : (st.responses (tag, nonce)).isSome = true
-            · simp [hcached]
-            · simp [hcached]
+            by_cases hcached : (st.responses (tag, nonce)).isSome = true <;>
+              simp [hcached]
       _ ≤ Pr[fun nonce : Nonce => ∃ n ∈ S, nonce = n |
               ($ᵗ Nonce : ProbComp Nonce)] := by
             apply probEvent_mono
@@ -269,14 +266,12 @@ private lemma unlinkBadTagStep_bad_le
               ($ᵗ Nonce : ProbComp Nonce)] :=
             probEvent_exists_finset_le_sum S ($ᵗ Nonce : ProbComp Nonce)
               (fun n nonce => nonce = n)
-      _ ≤ ∑ _n ∈ S, maxNonceProb := by
-            apply Finset.sum_le_sum
-            intro n hn
-            simpa [probEvent_eq_eq_probOutput] using hmax n
+      _ ≤ ∑ _n ∈ S, maxNonceProb :=
+            Finset.sum_le_sum fun n _ => by simpa [probEvent_eq_eq_probOutput] using hmax n
       _ = (S.card : ℝ≥0∞) * maxNonceProb := by
             simp [Finset.sum_const, nsmul_eq_mul]
-      _ ≤ (st.sessionsUsed tag : ℝ≥0∞) * maxNonceProb := by
-            exact mul_le_mul' (Nat.cast_le.mpr hScard) le_rfl
+      _ ≤ (st.sessionsUsed tag : ℝ≥0∞) * maxNonceProb :=
+            mul_le_mul' (Nat.cast_le.mpr hScard) le_rfl
   · rw [unlinkBadTagQueryImpl_run_of_not_lt (sessionsPerTag := sessionsPerTag) tag st hslot]
     simp [hbad]
 
@@ -447,8 +442,8 @@ theorem unlinkBadExp_le_sessionCollisionBound
       ((unlinkBadRemaining (sessionsPerTag := sessionsPerTag)
           (UnlinkBadState.init (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) :
             ℝ≥0∞) *
-        ((sessionsPerTag : ℝ≥0∞) * ENNReal.ofReal maxNonceProb)).toReal := by
-    exact ENNReal.toReal_mono (by simp [ENNReal.mul_eq_top]) hcore
+        ((sessionsPerTag : ℝ≥0∞) * ENNReal.ofReal maxNonceProb)).toReal :=
+    ENNReal.toReal_mono (by simp [ENNReal.mul_eq_top]) hcore
   have hremaining :
       unlinkBadRemaining (sessionsPerTag := sessionsPerTag)
         (UnlinkBadState.init (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) =
@@ -456,10 +451,8 @@ theorem unlinkBadExp_le_sessionCollisionBound
     simp [unlinkBadRemaining, UnlinkBadState.init, Finset.sum_const, Finset.card_univ,
       mul_comm]
   have hsupp : (support ($ᵗ Nonce : ProbComp Nonce)).Nonempty := by
-    rw [Set.nonempty_iff_ne_empty, ne_eq, ← probFailure_eq_one_iff]
-    simp
-  obtain ⟨nonce0, _⟩ := hsupp
-  have hmax_nonneg : 0 ≤ maxNonceProb := ENNReal.toReal_nonneg.trans (hmax nonce0)
+    rw [Set.nonempty_iff_ne_empty, ne_eq, ← probFailure_eq_one_iff]; simp
+  have hmax_nonneg : 0 ≤ maxNonceProb := ENNReal.toReal_nonneg.trans (hmax hsupp.choose)
   simp only [
     hremaining, Nat.cast_mul, toReal_mul, toReal_natCast, ENNReal.toReal_ofReal hmax_nonneg
   ] at hconv

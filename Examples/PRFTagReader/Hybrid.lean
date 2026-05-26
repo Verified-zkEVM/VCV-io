@@ -476,11 +476,7 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
                 (simulateQ (hybridLazyHandler (TagId := TagId) (Nonce := Nonce)
                   (Digest := Digest) (sessionsPerTag := sessionsPerTag))
                   (f (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest)))).run' (adv nonce, r.2)) := by
-          rw [bind_assoc]
-          refine bind_congr fun nonce => ?_
-          rw [bind_assoc]
-          refine bind_congr fun r => ?_
-          rw [pure_bind]
+          simp only [bind_assoc, pure_bind]
         refine (congrArg evalDist hlhs_reassoc).trans ?_
         have hlhs_inner : ∀ (n : Nonce),
             𝒟[idealCacheStep c ((tag, sid), n) >>= fun r =>
@@ -525,10 +521,7 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
                   (OracleComp.tableExtending c g))
                   (f (some (⟨n, OracleComp.tableExtending c g ((tag, sid), n)⟩ :
                     TagTranscript Nonce Digest)))).run' (adv n)) := by
-          refine bind_congr fun g => ?_
-          rw [bind_assoc]
-          refine bind_congr fun n => ?_
-          rw [pure_bind]
+          simp only [bind_assoc, pure_bind]
         refine Eq.trans ?_ (congrArg evalDist hrhs_swap).symm
         rw [evalDist_probComp_bind_comm ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest))
           ($ᵗ Nonce)]

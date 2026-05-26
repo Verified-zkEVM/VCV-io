@@ -13,8 +13,9 @@ The reader-query branch of `multipleBadEager_le_hybridEager_aux`. Both table han
 reader query to a deterministic `pure (bit, state)`. The two reader bits agree everywhere except
 on the disagreement set where the multi reader accepts but the hybrid reader rejects; the
 disagreement mass is bounded by `|TagId| / |Digest|` per query via
-`probEvent_multipleReader_disagree_le`, the `MultipleHybridColFresh` witness `hfresh` rules out rogue cached
-cells at `transcript.nonce` so the `hcol` hypothesis of that lemma is satisfied, and `hdist` —
+`probEvent_multipleReader_disagree_le`, the `MultipleHybridColFresh` witness `hfresh` rules out
+rogue cached cells at `transcript.nonce` so the `hcol` hypothesis of that lemma is satisfied,
+and `hdist` —
 the per-nonce reader-uniqueness budget — together with `hCacheBound` provides the bookkeeping that
 prevents double-counting in the inductive step.
 
@@ -186,7 +187,7 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
           (Nonce := Nonce) (Digest := Digest) (fun tag nonce => g (tag, nonce))
           (multiplePattern (TagId := TagId) sessionsPerTag) transcript), sM.1, sB) := by
     intro g
-    show (multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+    change (multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
         (sessionsPerTag := sessionsPerTag) g (Sum.inr transcript)) sM.1
         >>= (fun r => pure (r.1, r.2, sB)) = _
     rw [multipleTableHandler_reader_run g transcript sM.1]; rfl
@@ -560,9 +561,8 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
               (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
                 (Digest := Digest) (sessionsPerTag := sessionsPerTag)
                 (OracleComp.tableExtending rs.2 gM))
-                (f (ReaderReply.ofBool bHconst))).run (sM.1, sB)) := by
-      refine bind_congr fun gM => ?_
-      exact hMψLHS_rewrite gM
+                (f (ReaderReply.ofBool bHconst))).run (sM.1, sB)) :=
+      bind_congr hMψLHS_rewrite
     have hBAD_inner :
         (($ᵗ (TagId × Nonce → Digest)) >>= fun gM =>
             MψBAD (OracleComp.tableExtending rs.2 gM))
@@ -572,9 +572,8 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
               (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
                 (Digest := Digest) (sessionsPerTag := sessionsPerTag)
                 (OracleComp.tableExtending rs.2 gM))
-                (f (ReaderReply.ofBool bHconst))).run (sM.1, sB)) := by
-      refine bind_congr fun gM => ?_
-      exact hMψBAD_rewrite gM
+                (f (ReaderReply.ofBool bHconst))).run (sM.1, sB)) :=
+      bind_congr hMψBAD_rewrite
     have hLHS_pe := probEvent_congr' (q := fun b : Bool => b = true)
       (fun _ _ => Iff.rfl) (congrArg evalDist hLHS_inner)
     have hBAD_pe := probEvent_congr'

@@ -180,15 +180,9 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFTagImpl_run
     fun d => pure (prfs.multiplePRFScheme.eval k d)
   let impl : QueryImpl (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp :=
     HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
-  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k := rfl
   have hleft : ∀ {α : Type} (oa : ProbComp α),
-      simulateQ impl (liftComp oa (unifSpec + ((TagId × Nonce) →ₒ Digest))) = oa := by
-    intro α oa
-    trans simulateQ (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) oa
-    · exact QueryImpl.simulateQ_add_liftComp_left
-        (impl₁' := HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp))
-        (impl₂' := so) oa
-    · exact simulateQ_ofLift_eq_self _
+      simulateQ impl (liftComp oa (unifSpec + ((TagId × Nonce) →ₒ Digest))) = oa := fun oa =>
+    (QueryImpl.simulateQ_add_liftComp_left _ _ oa).trans (simulateQ_ofLift_eq_self _)
   have hquery : ∀ (d : TagId × Nonce),
       simulateQ impl
         (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
@@ -199,7 +193,6 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFTagImpl_run
     show impl (Sum.inr d) = _
     simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.multiplePRFScheme]
   unfold unlinkToMultiplePRFTagImpl unlinkTagQueryImpl
-  rw [← hImplEq]
   by_cases hs : s.sessionsUsed tag < sessionsPerTag
   · simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
       bind_pure_comp, pure_bind, dif_pos hs]
@@ -231,7 +224,6 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run
     fun d => pure (prfs.multiplePRFScheme.eval k d)
   let impl : QueryImpl (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp :=
     HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
-  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k := rfl
   have hquery : ∀ (d : TagId × Nonce),
       simulateQ impl
         (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
@@ -275,7 +267,6 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run
       exact ⟨_, ⟨tag, rfl⟩, hd⟩
   unfold unlinkToMultiplePRFReaderImpl unlinkReaderQueryImpl
   simp only [bind_pure_comp]
-  rw [← hImplEq]
   change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
   simp only [StateT.run_map, StateT.run_monadLift, simulateQ_bind, simulateQ_map,
     monadLift_eq_self, hmapM, pure_bind, simulateQ_pure, map_pure]
@@ -314,8 +305,7 @@ theorem simulateQ_prfReal_unlinkToMultiplePRFQueryImpl_run
             (multiplePattern sessionsPerTag) tag).run s >>=
             fun p => (simulateQ (unlinkMultipleQueryImpl prfs k) (f p.1)).run p.2
       rw [simulateQ_bind, simulateQ_prfReal_unlinkToMultiplePRFTagImpl_run prfs k tag s]
-      refine bind_congr fun p => ?_
-      exact ih p.1 p.2
+      exact bind_congr fun p => ih p.1 p.2
     · change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
             ((unlinkToMultiplePRFReaderImpl transcript).run s >>=
               fun p => (simulateQ unlinkToMultiplePRFQueryImpl (f p.1)).run p.2) =
@@ -324,8 +314,7 @@ theorem simulateQ_prfReal_unlinkToMultiplePRFQueryImpl_run
             fun p => (simulateQ (unlinkMultipleQueryImpl prfs k) (f p.1)).run p.2
       rw [simulateQ_bind,
         simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run prfs k transcript s]
-      refine bind_congr fun p => ?_
-      exact ih p.1 p.2
+      exact bind_congr fun p => ih p.1 p.2
 
 /-- PRF-real faithfulness, multiple-session world: under the real PRF, each oracle query at
 `(tag, nonce)` returns `prfs.evalMultiple k tag nonce`, so the reduction runs exactly the
@@ -340,12 +329,8 @@ theorem prfRealExp_unlinkToMultiplePRFReduction_eq_unlinkMultipleExp
         (Digest := Digest) (sessionsPerTag := sessionsPerTag) prfs adversary] := by
   suffices h : PRFScheme.prfRealExp prfs.multiplePRFScheme
       (unlinkToMultiplePRFReduction adversary) = unlinkMultipleExp prfs adversary by rw [h]
-  unfold PRFScheme.prfRealExp unlinkMultipleExp
+  unfold PRFScheme.prfRealExp unlinkMultipleExp unlinkToMultiplePRFReduction
   refine bind_congr (m := ProbComp) fun k => ?_
-  show simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
-      (unlinkToMultiplePRFReduction adversary) =
-    (simulateQ (unlinkMultipleQueryImpl prfs k) adversary).run' UnlinkState.init
-  unfold unlinkToMultiplePRFReduction
   change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
       ((simulateQ unlinkToMultiplePRFQueryImpl adversary).run UnlinkState.init >>=
         fun p => pure p.1) = _
@@ -372,16 +357,10 @@ lemma simulateQ_prfReal_unlinkToSinglePRFTagImpl_run
     fun d => pure (prfs.singlePRFScheme.eval k d)
   let impl : QueryImpl (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)) ProbComp :=
     HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
-  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k := rfl
   have hleft : ∀ {α : Type} (oa : ProbComp α),
       simulateQ impl
-        (liftComp oa (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest))) = oa := by
-    intro α oa
-    trans simulateQ (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) oa
-    · exact QueryImpl.simulateQ_add_liftComp_left
-        (impl₁' := HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp))
-        (impl₂' := so) oa
-    · exact simulateQ_ofLift_eq_self _
+        (liftComp oa (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest))) = oa :=
+    fun oa => (QueryImpl.simulateQ_add_liftComp_left _ _ oa).trans (simulateQ_ofLift_eq_self _)
   have hquery : ∀ (d : (TagId × Fin sessionsPerTag) × Nonce),
       simulateQ impl
         (liftM ((unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)).query
@@ -393,7 +372,6 @@ lemma simulateQ_prfReal_unlinkToSinglePRFTagImpl_run
     show impl (Sum.inr d) = _
     simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.singlePRFScheme]
   unfold unlinkToSinglePRFTagImpl unlinkTagQueryImpl
-  rw [← hImplEq]
   by_cases hs : s.sessionsUsed tag < sessionsPerTag
   · simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
       bind_pure_comp, pure_bind, dif_pos hs]
@@ -429,7 +407,6 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
     fun d => pure (prfs.singlePRFScheme.eval k d)
   let impl : QueryImpl (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)) ProbComp :=
     HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
-  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k := rfl
   have hquery : ∀ (d : (TagId × Fin sessionsPerTag) × Nonce),
       simulateQ impl
         (liftM ((unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest)).query
@@ -479,7 +456,6 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
       exact ⟨_, ⟨(tag, sid), rfl⟩, hd⟩
   unfold unlinkToSinglePRFReaderImpl unlinkReaderQueryImpl
   simp only [bind_pure_comp]
-  rw [← hImplEq]
   change @simulateQ _ (unifSpec + (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest))
     ProbComp _ impl _ _ = _
   simp only [StateT.run_map, StateT.run_monadLift, simulateQ_bind, simulateQ_map,
@@ -519,8 +495,7 @@ theorem simulateQ_prfReal_unlinkToSinglePRFQueryImpl_run
             (singlePattern sessionsPerTag) tag).run s >>=
             fun p => (simulateQ (unlinkSingleQueryImpl prfs k) (f p.1)).run p.2
       rw [simulateQ_bind, simulateQ_prfReal_unlinkToSinglePRFTagImpl_run prfs k tag s]
-      refine bind_congr fun p => ?_
-      exact ih p.1 p.2
+      exact bind_congr fun p => ih p.1 p.2
     · change simulateQ (PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k)
             ((unlinkToSinglePRFReaderImpl transcript).run s >>=
               fun p => (simulateQ unlinkToSinglePRFQueryImpl (f p.1)).run p.2) =
@@ -529,8 +504,7 @@ theorem simulateQ_prfReal_unlinkToSinglePRFQueryImpl_run
             fun p => (simulateQ (unlinkSingleQueryImpl prfs k) (f p.1)).run p.2
       rw [simulateQ_bind,
         simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run prfs k transcript s]
-      refine bind_congr fun p => ?_
-      exact ih p.1 p.2
+      exact bind_congr fun p => ih p.1 p.2
 
 /-- PRF-real faithfulness, single-session world: under the real PRF, each oracle query at
 `((tag, sid), nonce)` returns `prfs.evalSingle k tag sid nonce`, so the reduction runs exactly the
@@ -610,8 +584,7 @@ lemma simulateQ_multipleIdeal_collapse
       simp only [multipleIdealQueryImpl, map_bind, map_pure]
       rw [bind_pure]
     rw [hhead, bind_map_left, simulateQ_spec_query]
-    refine bind_congr fun r => ?_
-    exact ih r.1 r.2.1 r.2.2
+    exact bind_congr fun r => ih r.1 r.2.1 r.2.2
 
 /-- Composed single-session ideal handler: run the reduction's query implementation, then
 interpret the resulting PRF-oracle queries through the lazy random oracle. -/
@@ -660,8 +633,7 @@ lemma simulateQ_singleIdeal_collapse
       simp only [singleIdealQueryImpl, map_bind, map_pure]
       rw [bind_pure]
     rw [hhead, bind_map_left, simulateQ_spec_query]
-    refine bind_congr fun r => ?_
-    exact ih r.1 r.2.1 r.2.2
+    exact bind_congr fun r => ih r.1 r.2.1 r.2.2
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- The multiple-session ideal-PRF experiment is the composed handler `multipleIdealQueryImpl`
@@ -684,9 +656,8 @@ lemma prfIdealExp_unlinkToMultiplePRFReduction_eq_run'
   rw [StateT.run'_eq, StateT.run_bind]
   rw [simulateQ_multipleIdeal_collapse adv UnlinkState.init ∅]
   rw [StateT.run'_eq, map_bind, bind_map_left]
-  refine bind_congr fun r => ?_
-  simp only [simulateQ_pure, StateT.run_pure, map_pure, Function.comp]
-  rfl
+  exact bind_congr fun r => by
+    simp only [simulateQ_pure, StateT.run_pure, map_pure, Function.comp]; rfl
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- The single-session ideal-PRF experiment is the composed handler `singleIdealQueryImpl`
@@ -709,9 +680,8 @@ lemma prfIdealExp_unlinkToSinglePRFReduction_eq_run'
   rw [StateT.run'_eq, StateT.run_bind]
   rw [simulateQ_singleIdeal_collapse adv UnlinkState.init ∅]
   rw [StateT.run'_eq, map_bind, bind_map_left]
-  refine bind_congr fun r => ?_
-  simp only [simulateQ_pure, StateT.run_pure, map_pure, Function.comp]
-  rfl
+  exact bind_congr fun r => by
+    simp only [simulateQ_pure, StateT.run_pure, map_pure, Function.comp]; rfl
 
 /-! ### Per-query reduction lemmas for the composed ideal handlers
 

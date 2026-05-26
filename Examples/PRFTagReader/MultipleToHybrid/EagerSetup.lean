@@ -103,9 +103,7 @@ lemma multipleBadTableHandler_step_preserves_bad (g : TagId × Nonce → Digest)
     obtain ⟨r, _, hz⟩ := (mem_support_bind_iff _ _ _).mp hz
     rw [mem_support_pure_iff] at hz
     subst hz
-    cases hr : r.1 with
-    | none => simp [multipleBadAdvance, hbad]
-    | some tr => simp [multipleBadAdvance, hbad]
+    cases hr : r.1 <;> simp [multipleBadAdvance, hbad]
   | inr transcript =>
     intro z hz
     change z ∈ support ((multipleTableHandler (TagId := TagId) (Nonce := Nonce)
@@ -366,11 +364,10 @@ lemma evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending
               (Nonce := Nonce) (Digest := Digest)
               (fun tag nonce => OracleComp.tableExtending c g (tag, nonce))
               (multiplePattern (TagId := TagId) sessionsPerTag) transcript), s, sB) := by
-        show (multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+        change (multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
             (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g)
             (Sum.inr transcript)) s >>= _ = _
-        rw [multipleTableHandler_reader_run _ transcript s]
-        rfl
+        rw [multipleTableHandler_reader_run _ transcript s]; rfl
       rw [hrhs_reader, hMψ]
       have hAccept : decide (∃ d ∈ cells.map (OracleComp.tableExtending c g),
             d = transcript.auth)
@@ -403,8 +400,7 @@ omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
 lemma chooseSid_spec (sn : HybridSessionNonce TagId Nonce sessionsPerTag)
     (tag : TagId) (n : Nonce) (h : ∃ sid : Fin sessionsPerTag, sn (tag, sid) = some n) :
     sn (tag, chooseSid (sessionsPerTag := sessionsPerTag) sn tag n) = some n := by
-  rw [chooseSid, dif_pos h]
-  exact h.choose_spec
+  rw [chooseSid, dif_pos h]; exact h.choose_spec
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
   [SampleableType Digest] in

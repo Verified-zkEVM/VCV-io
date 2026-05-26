@@ -247,9 +247,7 @@ lemma multipleBadStep_bad_le
               ($ᵗ Nonce : ProbComp Nonce)] := by
             simp only [probEvent_eq_tsum_ite]
             refine tsum_congr fun nonce => ?_
-            by_cases hcached : (sB.responses (tag, nonce)).isSome = true
-            · simp [hcached]
-            · simp [hcached]
+            by_cases hcached : (sB.responses (tag, nonce)).isSome = true <;> simp [hcached]
       _ ≤ Pr[fun nonce : Nonce => ∃ n ∈ S, nonce = n |
               ($ᵗ Nonce : ProbComp Nonce)] := by
             apply probEvent_mono
@@ -720,18 +718,11 @@ theorem unlinkPRFIdeal_gap_le_unlinkBad [Fintype Nonce] [Fintype Digest]
   have hnen : Nonempty Nonce := ⟨(SampleableType.selectElem (β := Nonce)).defaultResult⟩
   have hcardposD : 0 < Fintype.card Digest := Fintype.card_pos
   have hcardposN : 0 < Fintype.card Nonce := Fintype.card_pos
-  have hslackRt : slackR ≠ ⊤ := by
-    rw [hslackR]
-    refine ENNReal.div_ne_top (ENNReal.natCast_ne_top _) ?_
-    simp only [ne_eq, Nat.cast_eq_zero]; omega
-  have hslackNt : slackN ≠ ⊤ := by
-    rw [hslackN]
-    refine ENNReal.div_ne_top (ENNReal.natCast_ne_top _) ?_
-    simp only [ne_eq, Nat.cast_eq_zero]; omega
-  have hslackSt : slackS ≠ ⊤ := by
-    rw [hslackS]
-    refine ENNReal.div_ne_top (ENNReal.natCast_ne_top _) ?_
-    simp only [ne_eq, Nat.cast_eq_zero]; omega
+  have hslack_ne : ∀ (a b : ℕ), 0 < b → ((a : ℝ≥0∞) / (b : ℝ≥0∞)) ≠ ⊤ := fun a b hb =>
+    ENNReal.div_ne_top (ENNReal.natCast_ne_top _) (by simp only [ne_eq, Nat.cast_eq_zero]; omega)
+  have hslackRt : slackR ≠ ⊤ := hslack_ne _ _ hcardposD
+  have hslackNt : slackN ≠ ⊤ := hslack_ne _ _ hcardposN
+  have hslackSt : slackS ≠ ⊤ := hslack_ne _ _ hcardposD
   have hslackReq : slackR.toReal =
       ((qReader * Fintype.card TagId : ℕ) : ℝ) / (Fintype.card Digest : ℝ) := by
     rw [hslackR, ENNReal.toReal_div, ENNReal.toReal_natCast, ENNReal.toReal_natCast]

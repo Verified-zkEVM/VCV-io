@@ -107,13 +107,8 @@ flag is unset, all caches and the session-nonce map are empty. -/
 lemma MHBInv_init :
     MHBInv (TagId := TagId) (Nonce := Nonce) (Digest := Digest) (sessionsPerTag := sessionsPerTag)
       (UnlinkState.init, ∅) (HybridState.init, ∅) UnlinkBadState.init := by
-  refine ⟨rfl, rfl, rfl, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro tag n; simp [UnlinkBadState.init]
-  · intro tag sid n h; exact absurd h (by simp [HybridState.init, HybridSessionNonce.init])
-  · intro tag sid₁ sid₂ n h; exact absurd h (by simp [HybridState.init, HybridSessionNonce.init])
-  · intro tag sid _; rfl
-  · intro tag sid n h; exact absurd h (by simp)
-  · intro tag sid n h; exact absurd h (by simp [HybridState.init, HybridSessionNonce.init])
+  refine ⟨rfl, rfl, rfl, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intros <;>
+    simp_all [UnlinkBadState.init, HybridState.init, HybridSessionNonce.init]
 
 /-- The list of multiple-world cells inspected by a reader query at `transcript.nonce`: one cell
 `(tag, transcript.nonce)` per tag. -/
@@ -422,11 +417,9 @@ lemma multipleBadQueryImpl_tag_run (tag : TagId)
       (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) (Sum.inl tag)) s.1 >>= fun r =>
         pure (r.1, (r.2.1, r.2.2), multipleBadAdvance tag s.2 r.1) := by
-  show (multipleIdealLiftedQueryImpl (Sum.inl tag) s) >>= _ = _
+  change (multipleIdealLiftedQueryImpl (Sum.inl tag) s) >>= _ = _
   rw [multipleIdealLiftedQueryImpl_run, bind_assoc]
-  refine bind_congr fun r => ?_
-  rw [pure_bind]
-  rfl
+  refine bind_congr fun r => ?_; rw [pure_bind]; rfl
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `multipleBadQueryImpl` on a reader query: the multiple-ideal reader step, bad-world component
@@ -438,11 +431,9 @@ lemma multipleBadQueryImpl_reader_run (transcript : TagTranscript Nonce Digest)
       (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) (Sum.inr transcript)) s.1 >>= fun r =>
         pure (r.1, (r.2.1, r.2.2), s.2) := by
-  show (multipleIdealLiftedQueryImpl (Sum.inr transcript) s) >>= _ = _
+  change (multipleIdealLiftedQueryImpl (Sum.inr transcript) s) >>= _ = _
   rw [multipleIdealLiftedQueryImpl_run, bind_assoc]
-  refine bind_congr fun r => ?_
-  rw [pure_bind]
-  rfl
+  refine bind_congr fun r => ?_; rw [pure_bind]; rfl
 
 open OracleComp.ProgramLogic.Relational in
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
@@ -510,9 +501,7 @@ lemma multipleBadQueryImpl_step_preserves_bad
     obtain ⟨r, _, hz⟩ := (mem_support_bind_iff _ _ _).mp hz
     rw [mem_support_pure_iff] at hz
     subst hz
-    cases hr : r.1 with
-    | none => simp [multipleBadAdvance, hr, hbad]
-    | some tr => simp [multipleBadAdvance, hr, hbad]
+    cases hr : r.1 <;> simp [multipleBadAdvance, hr, hbad]
   | inr transcript =>
     intro z hz
     rw [multipleBadQueryImpl_reader_run transcript s] at hz
@@ -656,17 +645,8 @@ lemma MultipleHybridCoupling_init :
     MultipleHybridCoupling (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
       (sessionsPerTag := sessionsPerTag)
       (UnlinkState.init, ∅) (HybridState.init, ∅) UnlinkBadState.init := by
-  refine ⟨rfl, rfl, rfl, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro tag n
-    simp only [UnlinkBadState.init, QueryCache.empty_apply, Option.isSome_none,
-      Bool.false_eq_true, false_iff, not_exists]
-    intro sid h
-    exact absurd h (by simp [HybridState.init, HybridSessionNonce.init])
-  · intro tag sid n h; exact absurd h (by simp [HybridState.init, HybridSessionNonce.init])
-  · intro tag sid₁ sid₂ n h; exact absurd h (by simp [HybridState.init, HybridSessionNonce.init])
-  · intro tag sid _; rfl
-  · intro tag sid n h; exact absurd h (by simp)
-  · intro tag sid n h; exact absurd h (by simp [HybridState.init, HybridSessionNonce.init])
+  refine ⟨rfl, rfl, rfl, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intros <;>
+    simp_all [UnlinkBadState.init, HybridState.init, HybridSessionNonce.init]
 
 /-- Reader-aware hop-A coupling relation for the heterogeneous bad+slack `simulateQ` rule: relate a
 `MultipleBadState` (multiple-ideal state `s₁.1` together with a bad-world state `s₁.2`) and a
