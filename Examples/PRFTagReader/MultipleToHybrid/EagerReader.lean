@@ -131,38 +131,31 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
   -- right-not-left); `hdist` gives 0 residual reader queries at `n₀` in the continuation.
   have hqRsplit := hqR
   rw [OracleComp.isQueryBoundP_query_bind_iff] at hqRsplit
-  have hqRpos : 0 < qR := by
-    rcases hqRsplit.1 with h | h
-    · exact absurd rfl h
-    · exact h
-  obtain ⟨qR', rfl⟩ : ∃ qR', qR = qR' + 1 := ⟨qR - 1, by omega⟩
-  have hqRf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isRight = true) qR' := by
-    intro u; simpa using hqRsplit.2 u
+  obtain ⟨qR', rfl⟩ : ∃ qR', qR = qR' + 1 :=
+    ⟨qR - 1, by have := hqRsplit.1.resolve_left (fun h => absurd rfl h); omega⟩
+  have hqRf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isRight = true) qR' :=
+    fun u => by simpa using hqRsplit.2 u
   have hqTf : ∀ u, OracleComp.IsQueryBoundP (f u) (fun i => i.isLeft = true) qT := by
     intro u
-    have := hqT
-    rw [OracleComp.isQueryBoundP_query_bind_iff] at this
-    simpa using this.2 u
+    have h := hqT
+    rw [OracleComp.isQueryBoundP_query_bind_iff] at h
+    simpa using h.2 u
   have hdistf : ∀ u, ∀ n, OracleComp.IsQueryBoundP (f u) (pReaderNonce n) 1 := by
     intro u n
-    have := hdist n
-    rw [OracleComp.isQueryBoundP_query_bind_iff] at this
+    have h := hdist n
+    rw [OracleComp.isQueryBoundP_query_bind_iff] at h
+    have h2 := h.2 u
     by_cases hnn : n = n₀
-    · subst hnn
-      have h2 := this.2 u
-      simp only [pReaderNonce, hn₀] at h2
-      exact h2.mono (Nat.zero_le 1)
-    · have h2 := this.2 u
-      have hpf : ¬ pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-          n (Sum.inr transcript) := fun h => hnn h.symm
+    · subst hnn; simp only [pReaderNonce, hn₀] at h2; exact h2.mono (Nat.zero_le 1)
+    · have hpf : ¬ pReaderNonce (TagId := TagId) (Digest := Digest) n
+          (Sum.inr transcript) := fun h => hnn h.symm
       simpa [hpf] using h2
   have hb0 : ∀ u, OracleComp.IsQueryBoundP (f u) (pReaderNonce n₀) 0 := by
     intro u
-    have := hdist n₀
-    rw [OracleComp.isQueryBoundP_query_bind_iff] at this
-    have h2 := this.2 u
-    simp only [pReaderNonce, hn₀] at h2
-    exact h2
+    have h := hdist n₀
+    rw [OracleComp.isQueryBoundP_query_bind_iff] at h
+    have h2 := h.2 u
+    simp only [pReaderNonce, hn₀] at h2; exact h2
   -- `hfresh` at the head query rules out rogue cached cells at `n₀`: a multi cell at
   -- `(tag, n₀)` with no recorded session would force the head query to be at residual
   -- budget 0, contradicting the actual head reader query at `n₀`.
@@ -170,87 +163,66 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       ∃ sid : Fin sessionsPerTag, sH.1.sessionNonce (tag, sid) = some n₀ := by
     intro tag hsome
     by_contra hne
-    have hns : ∀ sid, sH.1.sessionNonce (tag, sid) ≠ some n₀ := by
-      intro sid hs; exact hne ⟨sid, hs⟩
-    have hbad := hfresh n₀ tag hsome hns
+    have hbad := hfresh n₀ tag hsome (fun sid hs => hne ⟨sid, hs⟩)
     rw [OracleComp.isQueryBoundP_query_bind_iff] at hbad
-    have hp : pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest) n₀
+    have hp : pReaderNonce (TagId := TagId) (Digest := Digest) n₀
         (Sum.inr transcript) := rfl
     rcases hbad.1 with h | h
     · exact h hp
     · exact absurd h (lt_irrefl 0)
   -- Reduce both handler calls to `pure`.
   have hMstep : ∀ g : TagId × Nonce → Digest,
-      multipleBadTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) g (Sum.inr transcript) (sM.1, sB)
-      = pure (ReaderReply.ofBool (unlinkReaderAccepts (TagId := TagId) (Slot := TagId)
-          (Nonce := Nonce) (Digest := Digest) (fun tag nonce => g (tag, nonce))
+      multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
+          g (Sum.inr transcript) (sM.1, sB)
+      = pure (ReaderReply.ofBool (unlinkReaderAccepts (Slot := TagId)
+          (fun tag nonce => g (tag, nonce))
           (multiplePattern (TagId := TagId) sessionsPerTag) transcript), sM.1, sB) := by
     intro g
-    change (multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) g (Sum.inr transcript)) sM.1
+    change (multipleTableHandler (sessionsPerTag := sessionsPerTag) g (Sum.inr transcript)) sM.1
         >>= (fun r => pure (r.1, r.2, sB)) = _
     rw [multipleTableHandler_reader_run g transcript sM.1]; rfl
   have hHstep : ∀ gS : (TagId × Fin sessionsPerTag) × Nonce → Digest,
-      hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) gS (Sum.inr transcript) sH.1
-      = pure (ReaderReply.ofBool (hybridReaderAccepts (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-          gS sH.1.sessionNonce transcript), sH.1) := fun gS =>
-    hybridTableHandler_reader_run gS transcript sH.1
+      hybridTableHandler gS (Sum.inr transcript) sH.1
+      = pure (ReaderReply.ofBool (hybridReaderAccepts gS sH.1.sessionNonce transcript), sH.1) :=
+    fun gS => hybridTableHandler_reader_run gS transcript sH.1
   -- The hybrid reader bit is independent of the table draw `gH`: every recorded session is
   -- already cached in `sH.2` by `hInv.hhyb2`, so `tableExtending sH.2 gH` reads the cache.
-  set bHconst : Bool := hybridCacheAccepts (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-    (sessionsPerTag := sessionsPerTag) sH.2 sH.1.sessionNonce transcript with hbHconst
+  set bHconst : Bool := hybridCacheAccepts sH.2 sH.1.sessionNonce transcript with hbHconst
   have hHbit_const : ∀ gH : (TagId × Fin sessionsPerTag) × Nonce → Digest,
-      hybridReaderAccepts (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending sH.2 gH)
+      hybridReaderAccepts (OracleComp.tableExtending sH.2 gH)
         sH.1.sessionNonce transcript = bHconst := by
     intro gH
     rw [hbHconst]
     unfold hybridReaderAccepts hybridCacheAccepts
     congr 1
-    apply propext
-    constructor
+    refine propext ⟨?_, ?_⟩
     · rintro ⟨tag, sid, hsn, hcell⟩
       have hHsome : (sH.2 ((tag, sid), transcript.nonce)).isSome :=
         hInv.2.2.2.2.2.2.2.2 tag sid transcript.nonce hsn
       rcases hHv : sH.2 ((tag, sid), transcript.nonce) with _ | v
       · exact absurd hHv (Option.isSome_iff_ne_none.mp hHsome)
-      · have hte : OracleComp.tableExtending sH.2 gH ((tag, sid), transcript.nonce) = v := by
-          simp [OracleComp.tableExtending, hHv]
-        rw [hte] at hcell
+      · rw [show OracleComp.tableExtending sH.2 gH ((tag, sid), transcript.nonce) = v by
+              simp [OracleComp.tableExtending, hHv]] at hcell
         exact ⟨tag, sid, hsn, by rw [hHv, hcell]⟩
     · rintro ⟨tag, sid, hsn, hcell⟩
-      refine ⟨tag, sid, hsn, ?_⟩
-      have hte : OracleComp.tableExtending sH.2 gH ((tag, sid), transcript.nonce)
-          = transcript.auth := by
-        simp [OracleComp.tableExtending, hcell]
-      exact hte
+      exact ⟨tag, sid, hsn, by simp [OracleComp.tableExtending, hcell]⟩
   -- Multi reader cells.
-  set cells := multipleReaderCells (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-    transcript with hcells
-  have hcellseq : cells = (Finset.univ : Finset TagId).toList.map
-      (fun tag => (tag, transcript.nonce)) := rfl
+  set cells := multipleReaderCells (TagId := TagId) (Digest := Digest) transcript with hcells
   -- **Step 1.** Reduce the three goal terms (LHS / RHS₁ / RHS₂ via `hMstep`/`hHstep`).
   -- After the reductions, the handler call collapses to a `pure` whose payload determines
   -- the reader bit deterministically from the (drawn) table.
   have hLHS_eq :
       (do let gM ← $ᵗ (TagId × Nonce → Digest)
-          let a ← multipleBadTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending sM.2 gM)
-            (Sum.inr transcript) (sM.1, sB)
+          let a ← multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
+            (OracleComp.tableExtending sM.2 gM) (Sum.inr transcript) (sM.1, sB)
           (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) => z.1) <$>
-            (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-              (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+            (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
               (OracleComp.tableExtending sM.2 gM)) (f a.1)).run a.2)
       = (do let gM ← $ᵗ (TagId × Nonce → Digest)
             (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) => z.1) <$>
-              (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-                (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+              (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
                 (OracleComp.tableExtending sM.2 gM))
-                (f (ReaderReply.ofBool (unlinkReaderAccepts (TagId := TagId) (Slot := TagId)
-                  (Nonce := Nonce) (Digest := Digest)
+                (f (ReaderReply.ofBool (unlinkReaderAccepts (Slot := TagId)
                   (fun tag nonce => OracleComp.tableExtending sM.2 gM (tag, nonce))
                   (multiplePattern (TagId := TagId) sessionsPerTag) transcript)))).run
                 (sM.1, sB)) := by
@@ -258,37 +230,30 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
     rw [hMstep (OracleComp.tableExtending sM.2 gM)]; rfl
   have hRHS_eq :
       (do let gH ← $ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)
-          let p ← hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending sH.2 gH)
+          let p ← hybridTableHandler (OracleComp.tableExtending sH.2 gH)
             (Sum.inr transcript) sH.1
-          (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag)
-            (OracleComp.tableExtending sH.2 gH)) (f p.1)).run' p.2)
+          (simulateQ (hybridTableHandler (OracleComp.tableExtending sH.2 gH))
+            (f p.1)).run' p.2)
       = (do let gH ← $ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)
-            (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-              (sessionsPerTag := sessionsPerTag)
+            (simulateQ (hybridTableHandler
               (OracleComp.tableExtending sH.2 gH)) (f (ReaderReply.ofBool bHconst))).run'
               sH.1) := by
     refine bind_congr fun gH => ?_
     rw [hHstep (OracleComp.tableExtending sH.2 gH), hHbit_const gH]; rfl
   have hBAD_eq :
       (do let gM ← $ᵗ (TagId × Nonce → Digest)
-          let a ← multipleBadTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending sM.2 gM)
-            (Sum.inr transcript) (sM.1, sB)
+          let a ← multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
+            (OracleComp.tableExtending sM.2 gM) (Sum.inr transcript) (sM.1, sB)
           (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) =>
               (z.1, z.2.2)) <$>
-            (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-              (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+            (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
               (OracleComp.tableExtending sM.2 gM)) (f a.1)).run a.2)
       = (do let gM ← $ᵗ (TagId × Nonce → Digest)
             (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) =>
                 (z.1, z.2.2)) <$>
-              (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-                (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+              (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
                 (OracleComp.tableExtending sM.2 gM))
-                (f (ReaderReply.ofBool (unlinkReaderAccepts (TagId := TagId) (Slot := TagId)
-                  (Nonce := Nonce) (Digest := Digest)
+                (f (ReaderReply.ofBool (unlinkReaderAccepts (Slot := TagId)
                   (fun tag nonce => OracleComp.tableExtending sM.2 gM (tag, nonce))
                   (multiplePattern (TagId := TagId) sessionsPerTag) transcript)))).run
                 (sM.1, sB)) := by
@@ -303,10 +268,8 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
   -- is to make `evalDist_idealCacheMapM_bind_uniformTable_comp` applicable.
   set MψLHS : (TagId × Nonce → Digest) → ProbComp Bool := fun g =>
     (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) => z.1) <$>
-      (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-        (Digest := Digest) (sessionsPerTag := sessionsPerTag) g)
-        (f (ReaderReply.ofBool (unlinkReaderAccepts (TagId := TagId) (Slot := TagId)
-          (Nonce := Nonce) (Digest := Digest)
+      (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag) g)
+        (f (ReaderReply.ofBool (unlinkReaderAccepts (Slot := TagId)
           (fun tag nonce => g (tag, nonce))
           (multiplePattern (TagId := TagId) sessionsPerTag) transcript)))).run
         (sM.1, sB) with hMψLHS_def
@@ -314,21 +277,17 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       ProbComp (Bool × UnlinkBadState TagId Nonce Digest) := fun g =>
     (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) =>
         (z.1, z.2.2)) <$>
-      (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-        (Digest := Digest) (sessionsPerTag := sessionsPerTag) g)
-        (f (ReaderReply.ofBool (unlinkReaderAccepts (TagId := TagId) (Slot := TagId)
-          (Nonce := Nonce) (Digest := Digest)
+      (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag) g)
+        (f (ReaderReply.ofBool (unlinkReaderAccepts (Slot := TagId)
           (fun tag nonce => g (tag, nonce))
           (multiplePattern (TagId := TagId) sessionsPerTag) transcript)))).run
         (sM.1, sB) with hMψBAD_def
   have hLHS_fold :
       (do let gM ← $ᵗ (TagId × Nonce → Digest)
           (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) => z.1) <$>
-            (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-              (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+            (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
               (OracleComp.tableExtending sM.2 gM))
-              (f (ReaderReply.ofBool (unlinkReaderAccepts (TagId := TagId) (Slot := TagId)
-                (Nonce := Nonce) (Digest := Digest)
+              (f (ReaderReply.ofBool (unlinkReaderAccepts (Slot := TagId)
                 (fun tag nonce => OracleComp.tableExtending sM.2 gM (tag, nonce))
                 (multiplePattern (TagId := TagId) sessionsPerTag) transcript)))).run
               (sM.1, sB))
@@ -338,11 +297,9 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       (do let gM ← $ᵗ (TagId × Nonce → Digest)
           (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) =>
               (z.1, z.2.2)) <$>
-            (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-              (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+            (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
               (OracleComp.tableExtending sM.2 gM))
-              (f (ReaderReply.ofBool (unlinkReaderAccepts (TagId := TagId) (Slot := TagId)
-                (Nonce := Nonce) (Digest := Digest)
+              (f (ReaderReply.ofBool (unlinkReaderAccepts (Slot := TagId)
                 (fun tag nonce => OracleComp.tableExtending sM.2 gM (tag, nonce))
                 (multiplePattern (TagId := TagId) sessionsPerTag) transcript)))).run
               (sM.1, sB))
@@ -379,17 +336,13 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       (((qR' + 1) * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞)
         = (Fintype.card TagId : ℕ) / (Fintype.card Digest : ℝ≥0∞)
           + ((qR' * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) := by
-    rw [← ENNReal.add_div]
-    congr 1
-    push_cast
-    ring
+    rw [← ENNReal.add_div]; congr 1; push_cast; ring
   refine le_trans (probEvent_bind_le_add_bad_disagree
     (mx := idealCacheMapM (Digest := Digest) cells sM.2)
     (my := fun rs => ($ᵗ (TagId × Nonce → Digest)) >>= fun gM =>
       MψLHS (OracleComp.tableExtending rs.2 gM))
     (oc := fun _ => ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>= fun gH =>
-      (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending sH.2 gH))
+      (simulateQ (hybridTableHandler (OracleComp.tableExtending sH.2 gH))
         (f (ReaderReply.ofBool bHconst))).run' sH.1)
     (ob := fun rs => ($ᵗ (TagId × Nonce → Digest)) >>= fun gM =>
       MψBAD (OracleComp.tableExtending rs.2 gM))
@@ -403,14 +356,12 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
   case hDcl =>
     -- Bound the disagreement mass by `|TagId|/|Digest|` via
     -- `probEvent_multipleReader_disagree_le`.
-    have hcorrCM : ∀ tag sid n, sH.1.sessionNonce (tag, sid) = some n →
-        sM.2 (tag, n) = sH.2 ((tag, sid), n) := hInv.2.2.2.2.1
     have hcol' : ∀ tag, (sM.2 (tag, transcript.nonce)).isSome →
-        ∃ sid, sH.1.sessionNonce (tag, sid) = some transcript.nonce := by
-      intro tag hsome; rw [← hn₀]; exact hcol tag (by rw [hn₀]; exact hsome)
+        ∃ sid, sH.1.sessionNonce (tag, sid) = some transcript.nonce :=
+      fun tag hsome => hn₀ ▸ hcol tag (hn₀ ▸ hsome)
     have hdisagree := probEvent_multipleReader_disagree_le (TagId := TagId) (Nonce := Nonce)
       (Digest := Digest) (sessionsPerTag := sessionsPerTag)
-      sM.2 sH.2 sH.1.sessionNonce transcript hcol' hcorrCM
+      sM.2 sH.2 sH.1.sessionNonce transcript hcol' hInv.2.2.2.2.1
     refine le_trans (probEvent_mono ?_) hdisagree
     intro rs _ hDrs
     exact ⟨hDrs.1, by rw [← hbHconst]; exact hDrs.2⟩
@@ -421,8 +372,7 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
     have hr2_not_mem : ∀ d : TagId × Nonce, d ∉ cells → rs.2 d = sM.2 d :=
       fun d hd => idealCacheMapM_cache_not_mem cells sM.2 rs hrs d hd
     have hMbit_eq : ∀ gM : TagId × Nonce → Digest,
-        unlinkReaderAccepts (TagId := TagId) (Slot := TagId) (Nonce := Nonce)
-          (Digest := Digest)
+        unlinkReaderAccepts
           (fun tag nonce => OracleComp.tableExtending rs.2 gM (tag, nonce))
           (multiplePattern (TagId := TagId) sessionsPerTag) transcript
         = decide (∃ d ∈ rs.1, d = transcript.auth) := by
@@ -443,71 +393,56 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       intro hbH
       rw [hbHconst, hybridCacheAccepts, decide_eq_true_eq] at hbH
       obtain ⟨tag, sid, hsn, hcell⟩ := hbH
-      have hcorrCM := hInv.2.2.2.2.1 tag sid transcript.nonce hsn
       have hmcell : sM.2 (tag, transcript.nonce) = some transcript.auth := by
-        rw [hcorrCM, hcell]
+        rw [hInv.2.2.2.2.1 tag sid transcript.nonce hsn, hcell]
       have hcellmem : (tag, transcript.nonce) ∈ cells := by
         rw [hcells, multipleReaderCells, List.mem_map]
         exact ⟨tag, Finset.mem_toList.mpr (Finset.mem_univ _), rfl⟩
-      exact decide_eq_true (⟨transcript.auth,
+      exact decide_eq_true ⟨transcript.auth,
         mem_drawn_of_cached_cell _ sM.2 rs hrs (tag, transcript.nonce) hcellmem
-          transcript.auth hmcell, rfl⟩)
+          transcript.auth hmcell, rfl⟩
     have hbit_const : decide (∃ d ∈ rs.1, d = transcript.auth) = bHconst := by
       rcases hbHv : bHconst with _ | _
-      · have hmf : decide (∃ d ∈ rs.1, d = transcript.auth) ≠ true := by
-          intro hmt; exact hDrs ⟨hmt, hbHv⟩
-        rcases hmv : decide (∃ d ∈ rs.1, d = transcript.auth) with _ | _
+      · rcases hmv : decide (∃ d ∈ rs.1, d = transcript.auth) with _ | _
         · rfl
-        · exact absurd hmv hmf
+        · exact absurd (hDrs ⟨hmv, hbHv⟩) id
       · exact hhyb_to_multi hbHv
     have hMbit_const : ∀ gM : TagId × Nonce → Digest,
-        unlinkReaderAccepts (TagId := TagId) (Slot := TagId) (Nonce := Nonce)
-          (Digest := Digest)
+        unlinkReaderAccepts
           (fun tag nonce => OracleComp.tableExtending rs.2 gM (tag, nonce))
           (multiplePattern (TagId := TagId) sessionsPerTag) transcript = bHconst :=
       fun gM => by rw [hMbit_eq gM, hbit_const]
     have hMψLHS_rewrite : ∀ gM : TagId × Nonce → Digest,
         MψLHS (OracleComp.tableExtending rs.2 gM)
         = (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) => z.1) <$>
-          (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-            (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+          (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
             (OracleComp.tableExtending rs.2 gM))
-            (f (ReaderReply.ofBool bHconst))).run (sM.1, sB) := by
-      intro gM
-      have h := hMbit_const gM
-      rw [hMψLHS_def]
-      dsimp only
-      rw [h]
+            (f (ReaderReply.ofBool bHconst))).run (sM.1, sB) := fun gM => by
+      rw [hMψLHS_def]; dsimp only; rw [hMbit_const gM]
     have hMψBAD_rewrite : ∀ gM : TagId × Nonce → Digest,
         MψBAD (OracleComp.tableExtending rs.2 gM)
         = (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) =>
             (z.1, z.2.2)) <$>
-          (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-            (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+          (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
             (OracleComp.tableExtending rs.2 gM))
-            (f (ReaderReply.ofBool bHconst))).run (sM.1, sB) := by
-      intro gM
-      have h := hMbit_const gM
-      rw [hMψBAD_def]
-      dsimp only
-      rw [h]
+            (f (ReaderReply.ofBool bHconst))).run (sM.1, sB) := fun gM => by
+      rw [hMψBAD_def]; dsimp only; rw [hMbit_const gM]
     have hInvNew : MultipleHybridCoupling (sessionsPerTag := sessionsPerTag) (sM.1, rs.2) sH sB :=
       MultipleHybridCoupling_reader_step sM sH sB hInv cells rs hrs
-    have hfreshNew : MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (sessionsPerTag := sessionsPerTag) (f (ReaderReply.ofBool bHconst)) sH rs.2 := by
+    have hfreshNew : MultipleHybridColFresh (sessionsPerTag := sessionsPerTag)
+        (f (ReaderReply.ofBool bHconst)) sH rs.2 := by
       intro n tag hsome hns
       by_cases hnn : n = n₀
       · subst hnn; exact hb0 _
       · have hcellnotmem : (tag, n) ∉ cells := by
           rw [hcells, multipleReaderCells, List.mem_map]
-          rintro ⟨tag', _, h⟩
+          rintro ⟨_, _, h⟩
           exact hnn (congrArg Prod.snd h).symm
-        have hr2eq : rs.2 (tag, n) = sM.2 (tag, n) := hr2_not_mem (tag, n) hcellnotmem
-        rw [hr2eq] at hsome
+        rw [hr2_not_mem (tag, n) hcellnotmem] at hsome
         have hb := hfresh n tag hsome hns
         rw [OracleComp.isQueryBoundP_query_bind_iff] at hb
-        have hpf : ¬ pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-            n (Sum.inr transcript) := fun h => hnn h.symm
+        have hpf : ¬ pReaderNonce (TagId := TagId) (Digest := Digest) n
+            (Sum.inr transcript) := fun h => hnn h.symm
         simpa [hpf] using hb.2 (ReaderReply.ofBool bHconst)
     have hCacheBoundNew : ∀ tag : TagId,
         (Finset.univ.filter (fun n : Nonce =>
@@ -529,12 +464,11 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
         · subst hnn; exact Finset.mem_insert_self _ _
         · refine Finset.mem_insert_of_mem ?_
           simp only [Finset.mem_filter, Finset.mem_univ, true_and]
-          refine ⟨?_, hns⟩
           have hcellnotmem : (tag, n) ∉ cells := by
             rw [hcells, multipleReaderCells, List.mem_map]
-            rintro ⟨tag', _, h⟩
+            rintro ⟨_, _, h⟩
             exact hnn (congrArg Prod.snd h).symm
-          rwa [hr2_not_mem (tag, n) hcellnotmem] at hsome
+          exact ⟨by rwa [hr2_not_mem (tag, n) hcellnotmem] at hsome, hns⟩
       calc (Finset.univ.filter (fun n : Nonce =>
             (rs.2 (tag, n)).isSome ∧
               ¬ ∃ sid : Fin sessionsPerTag, sH.1.sessionNonce (tag, sid) = some n)).card
@@ -558,8 +492,7 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
         = (($ᵗ (TagId × Nonce → Digest)) >>= fun gM =>
             (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) =>
                 z.1) <$>
-              (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-                (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+              (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
                 (OracleComp.tableExtending rs.2 gM))
                 (f (ReaderReply.ofBool bHconst))).run (sM.1, sB)) :=
       bind_congr hMψLHS_rewrite
@@ -569,8 +502,7 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
         = (($ᵗ (TagId × Nonce → Digest)) >>= fun gM =>
             (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) =>
                 (z.1, z.2.2)) <$>
-              (simulateQ (multipleBadTableHandler (TagId := TagId) (Nonce := Nonce)
-                (Digest := Digest) (sessionsPerTag := sessionsPerTag)
+              (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
                 (OracleComp.tableExtending rs.2 gM))
                 (f (ReaderReply.ofBool bHconst))).run (sM.1, sB)) :=
       bind_congr hMψBAD_rewrite
@@ -602,20 +534,13 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
           change Pr[⊥ | idealCacheStep c d >>= fun r =>
             idealCacheMapM ds r.2 >>= fun rs => pure (r.1 :: rs.1, rs.2)] = 0
           rw [probFailure_bind_eq_zero_iff]
-          refine ⟨?_, fun r _ => ?_⟩
-          · -- idealCacheStep never fails
-            unfold idealCacheStep
-            rcases hcr : c d with _ | _
-            · simp
-            · simp
-          · rw [probFailure_bind_eq_zero_iff]
-            exact ⟨ih r.2, fun _ _ => by simp⟩
+          refine ⟨by unfold idealCacheStep; rcases c d with _ | _ <;> simp, fun r _ => ?_⟩
+          rw [probFailure_bind_eq_zero_iff]
+          exact ⟨ih r.2, fun _ _ => by simp⟩
       exact hrec cells sM.2
-    rw [probEvent_bind_const, hPF, tsub_zero, one_mul]
-    rw [hslackeq]
+    rw [probEvent_bind_const, hPF, tsub_zero, one_mul, hslackeq]
     refine le_of_eq ?_
-    push_cast
-    ring
+    push_cast; ring
 
 end UnlinkReduction
 
