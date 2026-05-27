@@ -156,26 +156,42 @@ def hintWeight (h : Hint) : ℕ :=
 
 private structure BalancedDecomp (alpha m : ℕ) : Prop where
   hα   : 0 < alpha
-  hγ   : 0 < alpha / 2
-  h2α  : 2 * (alpha / 2) = alpha
-  hm   : 0 < m
-  hmdef: (modulus - 1) / alpha = m
+  heven: Even alpha
   hqm1 : alpha * m = modulus - 1
-  hq   : alpha < modulus
   hsmall : 2 * (alpha + 1) < modulus
-  hunit  : IsUnit (alpha : Coeff)
 
 private def BalancedDecomp.ofApproved {p : Params} (hp : p.isApproved) :
     BalancedDecomp (2 * p.gamma2) ((modulus - 1) / (2 * p.gamma2)) where
   hα     := by rcases hp with rfl | rfl | rfl <;> decide
-  hγ     := by rcases hp with rfl | rfl | rfl <;> decide
-  h2α    := by rw [Nat.mul_div_cancel_left p.gamma2 (show 0 < 2 by decide)]
-  hm     := by rcases hp with rfl | rfl | rfl <;> decide
-  hmdef  := by rcases hp with rfl | rfl | rfl <;> decide
+  heven  := by simp only [even_two, Even.mul_right]
   hqm1   := Nat.mul_div_cancel' (by rcases hp with rfl | rfl | rfl <;> decide)
-  hq     := by rcases hp with rfl | rfl | rfl <;> decide
   hsmall := by rcases hp with rfl | rfl | rfl <;> decide
-  hunit  := (ZMod.isUnit_iff_coprime _ _).mpr (by rcases hp with rfl | rfl | rfl <;> decide)
+
+namespace BalancedDecomp
+variable {alpha m : ℕ}
+
+@[simp] lemma h2α {ctx : BalancedDecomp alpha m} : 2 * (alpha / 2) = alpha :=
+  Nat.two_mul_div_two_of_even ctx.heven
+
+@[simp] lemma hγ {ctx : BalancedDecomp alpha m} : 0 < alpha / 2 := by
+  have := ctx.hα; rw[← ctx.h2α] at this; omega
+
+@[simp] lemma hmdef {ctx : BalancedDecomp alpha m} : (modulus - 1) / alpha = m :=
+  Nat.div_eq_of_eq_mul_right ctx.hα ctx.hqm1.symm
+
+@[simp] lemma hq {ctx : BalancedDecomp alpha m} : alpha < modulus := by have := ctx.hsmall; omega
+
+@[simp] lemma hm {ctx : BalancedDecomp alpha m} : 0 < m := by
+  have h : 0 < modulus - 1 := by decide
+  rw [← ctx.hqm1, mul_comm] at h
+  exact Nat.pos_of_mul_pos_right h
+
+lemma hunit {ctx : BalancedDecomp alpha m} : IsUnit (alpha : Coeff) :=
+  IsUnit.of_mul_eq_one (-(m : Coeff)) (by
+    rw[mul_neg, ← Nat.cast_mul, ctx.hqm1, Nat.cast_sub (show 1 ≤ modulus by norm_num [modulus]),
+      ZMod.natCast_self, zero_sub, neg_neg]; rfl)
+
+end BalancedDecomp
 
 private theorem coeff_cast_div_add_mod (r : Coeff) (s : ℕ) :
     s * ((r.val / s):Coeff) + ((r.val % s): Coeff) = r := by
