@@ -11,11 +11,8 @@ import LatticeCrypto.Ring.Kernel
 # Module-SIS Over Bundled Negacyclic Rings
 
 This file specializes the generic SIS game to the bundled lattice-ring matrix
-interface.  The relation is stated in collision form: given a random matrix
-`A`, find two distinct short vectors with the same image under `A`.
-
-For algebraic instantiations where `ring.matVecMul` is linear, this is the
-usual kernel form of Module-SIS by taking the difference of the two vectors.
+interface.  The relation is stated in kernel form: given a random matrix
+`A`, find a nonzero short vector in the kernel of `A`.
 -/
 
 open OracleComp ENNReal
@@ -27,22 +24,19 @@ namespace ModuleSIS
 
 variable {Coeff : Type u} [CommRing Coeff]
 
-/-- A collision-form Module-SIS solution for a matrix with `cols` columns. -/
-structure Solution (ring : NegacyclicRing Coeff) (cols : Nat) where
-  /-- First short vector. -/
-  left : PolyVec ring.Poly cols
-  /-- Second short vector. -/
-  right : PolyVec ring.Poly cols
+/-- A Module-SIS solution for a matrix with `cols` columns. -/
+abbrev Solution (ring : NegacyclicRing Coeff) (cols : Nat) :=
+  PolyVec ring.Poly cols
 
-/-- The collision-form Module-SIS relation for a fixed matrix. -/
+/-- The kernel-form Module-SIS relation for a fixed matrix. -/
 def relation (ring : NegacyclicRing Coeff) {rows cols : Nat}
     [DecidableEq (PolyVec ring.Poly cols)]
     [DecidableEq (PolyVec ring.Poly rows)]
     (isShort : Solution ring cols → Bool)
     (A : PolyMatrix ring.Poly rows cols) (z : Solution ring cols) : Bool :=
-  decide (z.left ≠ z.right) &&
+  decide (z ≠ 0) &&
     isShort z &&
-    decide (ring.matVecMul A z.left = ring.matVecMul A z.right)
+    decide (ring.matVecMul A z = 0)
 
 /-- Module-SIS as an instance of the generic SIS search game. -/
 def problem (ring : NegacyclicRing Coeff) (rows cols : Nat)

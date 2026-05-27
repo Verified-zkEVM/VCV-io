@@ -21,6 +21,14 @@ namespace NegacyclicRing
 
 variable {Coeff : Type u} [CommRing Coeff]
 
+/-- Proof-facing linearity laws for matrix-vector multiplication. -/
+structure LinearLaws (ring : NegacyclicRing Coeff) where
+  /-- Matrix-vector multiplication preserves vector subtraction. -/
+  matVecMul_sub :
+    ∀ {rows cols : Nat} (A : PolyMatrix ring.Poly rows cols)
+      (v w : PolyVec ring.Poly cols),
+      matVecMul ring A (v - w) = matVecMul ring A v - matVecMul ring A w
+
 /-- Proof-facing scalar/matrix-vector laws for a bundled negacyclic ring. -/
 structure ScalarMulLaws (ring : NegacyclicRing Coeff) where
   /-- Executable unit-like test used by protocols. -/
@@ -86,6 +94,8 @@ end ScalarMulLaws
 structure ScalarNormLaws (ring : NegacyclicRing Coeff) (normOps : NormOps ring.backend) where
   /-- Executable bound for multiplying an already scaled vector by one more bounded scalar. -/
   scalarVecMulMulL2NormSqBound : Nat → Nat → Nat
+  /-- Executable bound for subtracting two vectors with bounded `ℓ₂` norm. -/
+  subL2NormSqBound : Nat → Nat
   /-- Multiplication by a scalar with bounded `ℓ₁` norm preserves the configured `ℓ₂` bound. -/
   scalarVecMul_mul_l2NormSq_le :
     ∀ {cols : Nat} (c d : ring.Poly) (v : PolyVec ring.Poly cols) {kappa betaSq : Nat},
@@ -93,6 +103,12 @@ structure ScalarNormLaws (ring : NegacyclicRing Coeff) (normOps : NormOps ring.b
       PolyVec.l2NormSq normOps (scalarVecMul ring c v) ≤ betaSq →
       PolyVec.l2NormSq normOps (scalarVecMul ring (ring.mul c d) v) ≤
         scalarVecMulMulL2NormSqBound kappa betaSq
+  /-- Subtracting two bounded vectors preserves the configured difference bound. -/
+  sub_l2NormSq_le :
+    ∀ {cols : Nat} (v w : PolyVec ring.Poly cols) {boundSq : Nat},
+      PolyVec.l2NormSq normOps v ≤ boundSq →
+      PolyVec.l2NormSq normOps w ≤ boundSq →
+      PolyVec.l2NormSq normOps (v - w) ≤ subL2NormSqBound boundSq
 
 end NegacyclicRing
 end LatticeCrypto
