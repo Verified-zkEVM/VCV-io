@@ -170,23 +170,24 @@ private def BalancedDecomp.ofApproved {p : Params} (hp : p.isApproved) :
 namespace BalancedDecomp
 variable {alpha m : ℕ}
 
-@[simp] lemma h2α {ctx : BalancedDecomp alpha m} : 2 * (alpha / 2) = alpha :=
+@[simp] private lemma h2α {ctx : BalancedDecomp alpha m} : 2 * (alpha / 2) = alpha :=
   Nat.two_mul_div_two_of_even ctx.heven
 
-@[simp] lemma hγ {ctx : BalancedDecomp alpha m} : 0 < alpha / 2 := by
+@[simp] private lemma hγ {ctx : BalancedDecomp alpha m} : 0 < alpha / 2 := by
   have := ctx.hα; rw[← ctx.h2α] at this; omega
 
-@[simp] lemma hmdef {ctx : BalancedDecomp alpha m} : (modulus - 1) / alpha = m :=
+@[simp] private lemma hmdef {ctx : BalancedDecomp alpha m} : (modulus - 1) / alpha = m :=
   Nat.div_eq_of_eq_mul_right ctx.hα ctx.hqm1.symm
 
-@[simp] lemma hq {ctx : BalancedDecomp alpha m} : alpha < modulus := by have := ctx.hsmall; omega
+@[simp] private lemma hq {ctx : BalancedDecomp alpha m} : alpha < modulus := by
+  have := ctx.hsmall; omega
 
-@[simp] lemma hm {ctx : BalancedDecomp alpha m} : 0 < m := by
+@[simp] private lemma hm {ctx : BalancedDecomp alpha m} : 0 < m := by
   have h : 0 < modulus - 1 := by decide
   rw [← ctx.hqm1, mul_comm] at h
   exact Nat.pos_of_mul_pos_right h
 
-lemma hunit {ctx : BalancedDecomp alpha m} : IsUnit (alpha : Coeff) :=
+private lemma hunit {ctx : BalancedDecomp alpha m} : IsUnit (alpha : Coeff) :=
   IsUnit.of_mul_eq_one (-(m : Coeff)) (by
     rw[mul_neg, ← Nat.cast_mul, ctx.hqm1, Nat.cast_sub (show 1 ≤ modulus by norm_num [modulus]),
       ZMod.natCast_self, zero_sub, neg_neg]; rfl)
