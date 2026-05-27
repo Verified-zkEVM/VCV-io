@@ -157,14 +157,12 @@ def hintWeight (h : Hint) : ℕ :=
 private structure BalancedDecomp (alpha m : ℕ) : Prop where
   hα   : 0 < alpha
   hγ   : 0 < alpha / 2
-  h2leα: 2 ≤ alpha
   h2α  : 2 * (alpha / 2) = alpha
   hγ2  : 2 * (alpha / 2) < modulus
   hm   : 0 < m
   hmdef: (modulus - 1) / alpha = m
   hqm1 : alpha * m = modulus - 1
   hq   : alpha < modulus
-  hdvd : alpha ∣ modulus - 1
   hsmall : 2 * (alpha + 1) < modulus
   hunit  : IsUnit (alpha : Coeff)
 
@@ -172,14 +170,12 @@ private def BalancedDecomp.ofApproved {p : Params} (hp : p.isApproved) :
     BalancedDecomp (2 * p.gamma2) ((modulus - 1) / (2 * p.gamma2)) where
   hα     := by rcases hp with rfl | rfl | rfl <;> decide
   hγ     := by rcases hp with rfl | rfl | rfl <;> decide
-  h2leα  := by rcases hp with rfl | rfl | rfl <;> decide
   h2α    := by rw [Nat.mul_div_cancel_left p.gamma2 (show 0 < 2 by decide)]
   hγ2    := by rcases hp with rfl | rfl | rfl <;> decide
   hm     := by rcases hp with rfl | rfl | rfl <;> decide
   hmdef  := by rcases hp with rfl | rfl | rfl <;> decide
   hqm1   := Nat.mul_div_cancel' (by rcases hp with rfl | rfl | rfl <;> decide)
   hq     := by rcases hp with rfl | rfl | rfl <;> decide
-  hdvd   := by rcases hp with rfl | rfl | rfl <;> decide
   hsmall := by rcases hp with rfl | rfl | rfl <;> decide
   hunit  := (ZMod.isUnit_iff_coprime _ _).mpr (by rcases hp with rfl | rfl | rfl <;> decide)
 
@@ -510,7 +506,6 @@ private theorem highBitsCoeff_add_eq_of_small_of_isApproved
     have : alpha / 2 - 1 + alpha / 2 = alpha - 1 := by
       nth_rewrite 3 [← ctx.h2α]
       rw [two_mul, add_comm, Nat.add_sub_assoc]
-      have := ctx.h2leα
       omega
     exact (Int.natAbs_sub_le v w).trans (Nat.add_le_add hvbound hwbound |>.trans_eq this)
   have heq : alpha * (u : Coeff) + w = alpha * (r1 : Coeff) + v := by
