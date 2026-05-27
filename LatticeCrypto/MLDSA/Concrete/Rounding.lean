@@ -158,7 +158,6 @@ private structure BalancedDecomp (alpha m : ℕ) : Prop where
   hα   : 0 < alpha
   hγ   : 0 < alpha / 2
   h2α  : 2 * (alpha / 2) = alpha
-  hγ2  : 2 * (alpha / 2) < modulus
   hm   : 0 < m
   hmdef: (modulus - 1) / alpha = m
   hqm1 : alpha * m = modulus - 1
@@ -171,7 +170,6 @@ private def BalancedDecomp.ofApproved {p : Params} (hp : p.isApproved) :
   hα     := by rcases hp with rfl | rfl | rfl <;> decide
   hγ     := by rcases hp with rfl | rfl | rfl <;> decide
   h2α    := by rw [Nat.mul_div_cancel_left p.gamma2 (show 0 < 2 by decide)]
-  hγ2    := by rcases hp with rfl | rfl | rfl <;> decide
   hm     := by rcases hp with rfl | rfl | rfl <;> decide
   hmdef  := by rcases hp with rfl | rfl | rfl <;> decide
   hqm1   := Nat.mul_div_cancel' (by rcases hp with rfl | rfl | rfl <;> decide)
@@ -482,8 +480,9 @@ private theorem decomposeCoeff_unique {alpha m : ℕ} (ctx : BalancedDecomp alph
   have hlow_eq := add_left_cancel (hdecomp'.trans hdecomp.symm)
   have h2 : lowBitsCoeff r (alpha / 2) = r0 := by
     have cr_eq := congrArg centeredRepr hlow_eq
-    rwa [lowBits_centeredRepr r ctx.hγ ctx.hγ2,
-        centeredRepr_intCast_eq_of_natAbs_le r0 hr0 ctx.hγ2] at cr_eq
+    have hγ2 := by have := ctx.hq; rwa [← ctx.h2α] at this
+    rwa [lowBits_centeredRepr r ctx.hγ hγ2,
+        centeredRepr_intCast_eq_of_natAbs_le r0 hr0 hγ2] at cr_eq
   exact Prod.ext h1 h2
 
 private theorem highBitsCoeff_add_eq_of_small_of_isApproved
