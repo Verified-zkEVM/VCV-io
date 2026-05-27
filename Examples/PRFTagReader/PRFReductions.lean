@@ -281,29 +281,14 @@ theorem simulateQ_prfReal_unlinkToMultiplePRFQueryImpl_run
       (simulateQ
         (unlinkMultipleQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           prfs k)
-        adversary).run s := by
-  induction adversary using OracleComp.inductionOn generalizing s with
-  | pure x => rfl
-  | query_bind t f ih =>
-    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
-    rcases t with tag | transcript
-    · change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
-            ((unlinkToMultiplePRFTagImpl tag).run s >>=
-              fun p => (simulateQ unlinkToMultiplePRFQueryImpl (f p.1)).run p.2) =
-          (unlinkTagQueryImpl (fun tag nonce => prfs.evalMultiple k tag nonce)
-            (multiplePattern sessionsPerTag) tag).run s >>=
-            fun p => (simulateQ (unlinkMultipleQueryImpl prfs k) (f p.1)).run p.2
-      rw [simulateQ_bind, simulateQ_prfReal_unlinkToMultiplePRFTagImpl_run prfs k tag s]
-      exact bind_congr fun p => ih p.1 p.2
-    · change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
-            ((unlinkToMultiplePRFReaderImpl transcript).run s >>=
-              fun p => (simulateQ unlinkToMultiplePRFQueryImpl (f p.1)).run p.2) =
-          (unlinkReaderQueryImpl (fun tag nonce => prfs.evalMultiple k tag nonce)
-            (multiplePattern sessionsPerTag) transcript).run s >>=
-            fun p => (simulateQ (unlinkMultipleQueryImpl prfs k) (f p.1)).run p.2
-      rw [simulateQ_bind,
-        simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run prfs k transcript s]
-      exact bind_congr fun p => ih p.1 p.2
+        adversary).run s :=
+  simulateQ_StateT_compose unlinkToMultiplePRFQueryImpl
+    (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k) (unlinkMultipleQueryImpl prfs k)
+    (fun q s' => by
+      rcases q with tag | transcript
+      · exact simulateQ_prfReal_unlinkToMultiplePRFTagImpl_run prfs k tag s'
+      · exact simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run prfs k transcript s')
+    adversary s
 
 /-- PRF-real faithfulness, multiple-session world: under the real PRF, each oracle query at
 `(tag, nonce)` returns `prfs.evalMultiple k tag nonce`, so the reduction runs exactly the
@@ -455,29 +440,14 @@ theorem simulateQ_prfReal_unlinkToSinglePRFQueryImpl_run
       (simulateQ
         (unlinkSingleQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           prfs k)
-        adversary).run s := by
-  induction adversary using OracleComp.inductionOn generalizing s with
-  | pure x => rfl
-  | query_bind t f ih =>
-    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
-    rcases t with tag | transcript
-    · change simulateQ (PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k)
-            ((unlinkToSinglePRFTagImpl tag).run s >>=
-              fun p => (simulateQ unlinkToSinglePRFQueryImpl (f p.1)).run p.2) =
-          (unlinkTagQueryImpl (fun slot nonce => prfs.evalSingle k slot.1 slot.2 nonce)
-            (singlePattern sessionsPerTag) tag).run s >>=
-            fun p => (simulateQ (unlinkSingleQueryImpl prfs k) (f p.1)).run p.2
-      rw [simulateQ_bind, simulateQ_prfReal_unlinkToSinglePRFTagImpl_run prfs k tag s]
-      exact bind_congr fun p => ih p.1 p.2
-    · change simulateQ (PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k)
-            ((unlinkToSinglePRFReaderImpl transcript).run s >>=
-              fun p => (simulateQ unlinkToSinglePRFQueryImpl (f p.1)).run p.2) =
-          (unlinkReaderQueryImpl (fun slot nonce => prfs.evalSingle k slot.1 slot.2 nonce)
-            (singlePattern sessionsPerTag) transcript).run s >>=
-            fun p => (simulateQ (unlinkSingleQueryImpl prfs k) (f p.1)).run p.2
-      rw [simulateQ_bind,
-        simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run prfs k transcript s]
-      exact bind_congr fun p => ih p.1 p.2
+        adversary).run s :=
+  simulateQ_StateT_compose unlinkToSinglePRFQueryImpl
+    (PRFScheme.prfRealQueryImpl prfs.singlePRFScheme k) (unlinkSingleQueryImpl prfs k)
+    (fun q s' => by
+      rcases q with tag | transcript
+      · exact simulateQ_prfReal_unlinkToSinglePRFTagImpl_run prfs k tag s'
+      · exact simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run prfs k transcript s')
+    adversary s
 
 /-- PRF-real faithfulness, single-session world: under the real PRF, each oracle query at
 `((tag, sid), nonce)` returns `prfs.evalSingle k tag sid nonce`, so the reduction runs exactly the
@@ -532,27 +502,12 @@ lemma simulateQ_multipleIdeal_collapse
       (fun r : (Bool × UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache) =>
         ((r.1, r.2.1), r.2.2)) <$>
         (simulateQ (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run (s, c) := by
-  induction adv using OracleComp.inductionOn generalizing s c with
-  | pure x => rfl
-  | query_bind t f ih =>
-    rw [simulateQ_bind, StateT.run_bind]
-    change (simulateQ PRFScheme.prfIdealQueryImpl
-        ((simulateQ unlinkToMultiplePRFQueryImpl (liftM (OracleSpec.query t))).run s >>=
-          fun p => (simulateQ unlinkToMultiplePRFQueryImpl (f p.1)).run p.2)).run c = _
-    rw [simulateQ_bind, StateT.run_bind, simulateQ_bind, StateT.run_bind, map_bind]
-    have hhead : (simulateQ PRFScheme.prfIdealQueryImpl
-          ((simulateQ (unlinkToMultiplePRFQueryImpl (sessionsPerTag := sessionsPerTag))
-            (liftM (OracleSpec.query t))).run s)).run c =
-        (fun r : ((UnlinkOracleSpec TagId Nonce Digest).Range t × UnlinkState TagId ×
-            ((TagId × Nonce) →ₒ Digest).QueryCache) => ((r.1, r.2.1), r.2.2)) <$>
-          (multipleIdealQueryImpl (sessionsPerTag := sessionsPerTag) t).run (s, c) := by
-      rw [simulateQ_spec_query]
-      change _ = _ <$> (multipleIdealQueryImpl t (s, c))
-      simp only [multipleIdealQueryImpl, map_bind, map_pure]
-      rw [bind_pure]
-    rw [hhead, bind_map_left, simulateQ_spec_query]
-    exact bind_congr fun r => ih r.1 r.2.1 r.2.2
+          (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run (s, c) :=
+  simulateQ_StateT_StateT_compose unlinkToMultiplePRFQueryImpl
+    PRFScheme.prfIdealQueryImpl multipleIdealQueryImpl
+    (fun q s' c' => by
+      simp [multipleIdealQueryImpl]; rfl)
+    adv s c
 
 /-- Composed single-session ideal handler: run the reduction's query implementation, then
 interpret the resulting PRF-oracle queries through the lazy random oracle. -/
@@ -580,28 +535,12 @@ lemma simulateQ_singleIdeal_collapse
           (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) =>
         ((r.1, r.2.1), r.2.2)) <$>
         (simulateQ (singleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
-          (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run (s, c) := by
-  induction adv using OracleComp.inductionOn generalizing s c with
-  | pure x => rfl
-  | query_bind t f ih =>
-    rw [simulateQ_bind, StateT.run_bind]
-    change (simulateQ PRFScheme.prfIdealQueryImpl
-        ((simulateQ unlinkToSinglePRFQueryImpl (liftM (OracleSpec.query t))).run s >>=
-          fun p => (simulateQ unlinkToSinglePRFQueryImpl (f p.1)).run p.2)).run c = _
-    rw [simulateQ_bind, StateT.run_bind, simulateQ_bind, StateT.run_bind, map_bind]
-    have hhead : (simulateQ PRFScheme.prfIdealQueryImpl
-          ((simulateQ (unlinkToSinglePRFQueryImpl (sessionsPerTag := sessionsPerTag))
-            (liftM (OracleSpec.query t))).run s)).run c =
-        (fun r : ((UnlinkOracleSpec TagId Nonce Digest).Range t × UnlinkState TagId ×
-            (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) =>
-            ((r.1, r.2.1), r.2.2)) <$>
-          (singleIdealQueryImpl (sessionsPerTag := sessionsPerTag) t).run (s, c) := by
-      rw [simulateQ_spec_query]
-      change _ = _ <$> (singleIdealQueryImpl t (s, c))
-      simp only [singleIdealQueryImpl, map_bind, map_pure]
-      rw [bind_pure]
-    rw [hhead, bind_map_left, simulateQ_spec_query]
-    exact bind_congr fun r => ih r.1 r.2.1 r.2.2
+          (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run (s, c) :=
+  simulateQ_StateT_StateT_compose unlinkToSinglePRFQueryImpl
+    PRFScheme.prfIdealQueryImpl singleIdealQueryImpl
+    (fun q s' c' => by
+      simp [singleIdealQueryImpl]; rfl)
+    adv s c
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- The multiple-session ideal-PRF experiment is the composed handler `multipleIdealQueryImpl`
