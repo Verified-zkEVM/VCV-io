@@ -34,10 +34,11 @@ most `ε₁` under `mx`, and off `D` the continuation `my` is within `ε₂` of 
 continuation `oc`, then `Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] + ε₁ + ε₂`. The exceptional set `D`
 is charged its full mass `ε₁`; everywhere else the per-point gap `ε₂` is paid. -/
 lemma probEvent_bind_le_add_of_disagree {mx : m α}
-    {my oc : α → m β} {q : β → Prop} {D : α → Prop} [DecidablePred D] {ε₁ ε₂ : ℝ≥0∞}
-    (hD : Pr[D | mx] ≤ ε₁)
-    (h : ∀ x ∈ support mx, ¬ D x → Pr[q | my x] ≤ Pr[q | oc x] + ε₂) :
-    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] + ε₁ + ε₂ := by
+    {my oc : α → m β} {q : β → Prop} {D : α → Prop} {ε₁ ε₂ : ℝ≥0∞}
+    (hD : Pr[ D | mx] ≤ ε₁)
+    (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + ε₂) :
+    Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + ε₁ + ε₂ := by
+  classical
   have := Classical.decPred q
   rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
   calc ∑' x, Pr[= x | mx] * Pr[q | my x]
@@ -74,10 +75,11 @@ plus the per-step slack `ε`, while on `D` the `ob`-world (the bad world) alread
 `r` with probability `1`. The conclusion charges the disagreement to `Pr[r | mx >>= ob]`. -/
 lemma probEvent_bind_le_add_bad_of_disagree {mx : m α}
     {my : α → m β} {oc : α → m β} {ob : α → m γ}
-    {q : β → Prop} {r : γ → Prop} {D : α → Prop} [DecidablePred D] {ε : ℝ≥0∞}
-    (hbad : ∀ x ∈ support mx, D x → Pr[r | ob x] = 1)
-    (h : ∀ x ∈ support mx, ¬ D x → Pr[q | my x] ≤ Pr[q | oc x] + ε) :
-    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] + Pr[r | mx >>= ob] + ε := by
+    {q : β → Prop} {r : γ → Prop} {D : α → Prop} {ε : ℝ≥0∞}
+    (hbad : ∀ x ∈ support mx, D x → Pr[ r | ob x] = 1)
+    (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + ε) :
+    Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + Pr[ r | mx >>= ob] + ε := by
+  classical
   have := Classical.decPred q
   have := Classical.decPred r
   rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
@@ -118,10 +120,11 @@ fires `r` with probability `1`. Both cases are charged into the aggregate `Pr[r 
 the conclusion is the same shape as the three-way bound. -/
 lemma probEvent_bind_le_add_bad_of_disagree' {mx : m α}
     {my : α → m β} {oc : α → m β} {ob : α → m γ}
-    {q : β → Prop} {r : γ → Prop} {D : α → Prop} [DecidablePred D] {ε : ℝ≥0∞}
-    (hbad : ∀ x ∈ support mx, D x → Pr[r | ob x] = 1)
-    (h : ∀ x ∈ support mx, ¬ D x → Pr[q | my x] ≤ Pr[q | oc x] + Pr[r | ob x] + ε) :
-    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] + Pr[r | mx >>= ob] + ε := by
+    {q : β → Prop} {r : γ → Prop} {D : α → Prop} {ε : ℝ≥0∞}
+    (hbad : ∀ x ∈ support mx, D x → Pr[ r | ob x] = 1)
+    (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + Pr[ r | ob x] + ε) :
+    Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + Pr[ r | mx >>= ob] + ε := by
+  classical
   have := Classical.decPred q
   have := Classical.decPred r
   rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
@@ -158,10 +161,11 @@ mass `ε₁`; everywhere off `D` the `my`-world is bounded by the `oc`-world plu
 bad probability `Pr[r | ob x]` plus the slack `ε₂`. -/
 lemma probEvent_bind_le_add_bad_disagree {mx : m α}
     {my : α → m β} {oc : α → m β} {ob : α → m γ}
-    {q : β → Prop} {r : γ → Prop} {D : α → Prop} [DecidablePred D] {ε₁ ε₂ : ℝ≥0∞}
+    {q : β → Prop} {r : γ → Prop} {D : α → Prop} {ε₁ ε₂ : ℝ≥0∞}
     (hD : Pr[ D | mx] ≤ ε₁)
     (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + Pr[ r | ob x] + ε₂) :
-    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] + Pr[r | mx >>= ob] + ε₁ + ε₂ := by
+    Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + Pr[ r | mx >>= ob] + ε₁ + ε₂ := by
+  classical
   have := Classical.decPred q
   have := Classical.decPred r
   rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
