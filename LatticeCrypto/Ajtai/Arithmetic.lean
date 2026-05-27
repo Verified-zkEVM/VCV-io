@@ -25,6 +25,15 @@ namespace Ajtai
 
 -- TODO move gadget things to Gadget.lean keep this for "real" arithmetic
 
+/-
+TODO add the proper arithmetic primitves for ajtai commitments here, and also the Hachi/Greyhound
+primitives for Inner-Outer Ajtai commitments.
+
+Add more general arithmetic primitive(s) for the Simple and Hiding Atjati commitments and (a) more
+specialized one(s) for the Inner-Outer Ajtai commitment (if necessary, which it probably is).
+For the inner-outer commitment orientate on the Hachi parameters.
+-/
+
 variable {Coeff : Type u} [CommRing Coeff]
 
 /-- Entry of the base-`base` gadget matrix `I_rows ⊗ [1, base, ..., base^(digits-1)]`. -/

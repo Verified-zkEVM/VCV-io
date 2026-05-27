@@ -40,7 +40,8 @@ def bindingAdvToModuleSIS (ring : NegacyclicRing Coeff) {rows cols : Nat}
     let (_c, s₁, _opening₁, s₂, _opening₂) ← adv A
     pure (s₁ - s₂)
 
-/-- Binding of the simple Ajtai commitment reduces to Module-SIS. -/
+/-- Binding of the simple Ajtai commitment reduces to Module-SIS.
+TODO actually reduce to SIS. -/
 theorem bindingAdvantage_le_moduleSIS (ring : NegacyclicRing Coeff) (rows cols : Nat)
     [SampleableType (PublicParams ring rows cols)]
     [DecidableEq (Message ring cols)]

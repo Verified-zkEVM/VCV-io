@@ -10,9 +10,6 @@ import LatticeCrypto.Ajtai.Arithmetic
 # Ajtai Parameters
 
 Shared Ajtai parameter imports and namespace anchor.
-
-TODO add the proper parameters for ajtai commitments here, and also the Hachi/gReyhound parameters
-for Inner-Outer Ajtai commitments.
 -/
 
 universe u

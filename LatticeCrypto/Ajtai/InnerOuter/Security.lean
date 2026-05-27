@@ -11,10 +11,7 @@ import LatticeCrypto.Ring.Norms
 import Mathlib.Data.Fin.Tuple.Basic
 
 /-!
-# Security of the Inner-Outer Ajtai Commitment
-
-TODO split this into WeakBinding.lean and Binding.lean (WeakBinding potentially
-importing Binding.lean)
+# Security of the Inner-Outer Ajtai Commitment (Weak Binding)
 -/
 
 open OracleComp ENNReal
@@ -25,6 +22,10 @@ universe u
 namespace LatticeCrypto
 namespace Ajtai
 namespace InnerOuter
+
+/-! ## Hachi/Greyhound Weak Binding -/
+
+namespace WeakBinding
 
 variable {Coeff : Type u} [CommRing Coeff]
 
@@ -70,20 +71,7 @@ lemma polyVec_sub_ne_zero_of_ne {ring : NegacyclicRing Coeff} {n : Nat}
     simp
   exact sub_eq_zero.mp (hcoordVec.trans hzeroGet)
 
-/-! ## Binding -/
-
-namespace Binding
-
 variable {ring : NegacyclicRing Coeff}
-
-lemma exists_get_ne_of_ne {α : Type*} {n : Nat} {x y : Vector α n}
-    (h : x ≠ y) : ∃ i : Fin n, x.get i ≠ y.get i := by
-  by_contra hnone
-  apply h
-  apply Vector.ext
-  intro i hi
-  by_contra hxy
-  exact hnone ⟨⟨i, hi⟩, hxy⟩
 
 lemma block_eq_of_flattenBlocks_eq
     {blocks width : Nat} {xs ys : PolyVec (PolyVec ring.Poly width) blocks}
@@ -112,15 +100,6 @@ lemma firstDiff?_some_of_differs {α : Type*} [DecidableEq α] {n : Nat}
       refine ⟨i, ?_⟩
       simp
 
-lemma firstDiff?_some_of_ne {α : Type*} [DecidableEq α] {n : Nat}
-    {x y : Vector α n} (h : x ≠ y) :
-    ∃ i : Fin n, firstDiff? x y = some i ∧ x.get i ≠ y.get i := by
-  obtain ⟨i, hi⟩ := exists_get_ne_of_ne h
-  let hdiff : ∃ i : Fin n, x.get i != y.get i := ⟨i, by simpa using hi⟩
-  refine ⟨Fin.find (fun i => x.get i != y.get i) hdiff, ?_, ?_⟩
-  · exact Fin.find?_eq_some_find_of_exists hdiff
-  · simpa using Fin.find_spec hdiff
-
 lemma firstDiff?_eq_some_ne {α : Type*} [DecidableEq α] {n : Nat}
     {x y : Vector α n} {i : Fin n} (h : firstDiff? x y = some i) :
     x.get i ≠ y.get i := by
@@ -129,7 +108,7 @@ lemma firstDiff?_eq_some_ne {α : Type*} [DecidableEq α] {n : Nat}
   by_contra hxy
   simp [firstDiff?, hxy] at hmem
 
-/-- Common inner/outer witness selection used by ordinary and weak binding.
+/-- inner/outer witness selection.
 
 If the two outer witnesses are equal, use the first differing inner block;
 otherwise use the outer difference witness. -/
@@ -148,288 +127,11 @@ def outputFromFirstDiff
   else
     Sum.inr (flat₁ - flat₂)
 
-section Scheme
-
-variable {innerRows messageRows messageDigits outerRows blocks innerDigits : Nat}
-variable [DecidableEq (Message ring messageRows blocks)]
-variable [DecidableEq (PolyVec ring.Poly messageRows)]
-variable [DecidableEq (PolyVec ring.Poly innerRows)]
-variable [DecidableEq (PolyVec ring.Poly outerRows)]
-variable [DecidableEq (PolyVec ring.Poly (messageRows * messageDigits))]
-variable [DecidableEq (PolyVec ring.Poly (blocks * (innerRows * innerDigits)))]
-
-/-- Turn one successful binding output into either an inner or outer Module-SIS witness. -/
-def outputToModuleSIS
-    (m₁ m₂ : Message ring messageRows blocks)
-    (opening₁ opening₂ :
-      Opening ring innerRows messageRows messageDigits blocks innerDigits) :
-    Sum
-      (ModuleSIS.Solution ring (messageRows * messageDigits))
-      (ModuleSIS.Solution ring (blocks * (innerRows * innerDigits))) :=
-  let flat₁ := PolyVec.flattenBlocks opening₁.innerDecomp
-  let flat₂ := PolyVec.flattenBlocks opening₂.innerDecomp
-  outputFromFirstDiff (ring := ring) (innerCols := messageRows * messageDigits)
-    (outerCols := blocks * (innerRows * innerDigits)) (blocks := blocks)
-    m₁ m₂ flat₁ flat₂ fun i =>
-    opening₁.messageDecomp.get i - opening₂.messageDecomp.get i
 
 /-- Trivial fallback witness used on the branch where the other matrix yields the SIS witness. -/
 def dummySolution (ring : NegacyclicRing Coeff) (cols : Nat) :
     ModuleSIS.Solution ring cols :=
   Vector.ofFn fun _ => 0
-
-section Reductions
-
-variable [SampleableType (Simple.PublicParams ring innerRows (messageRows * messageDigits))]
-variable [SampleableType (Simple.PublicParams ring outerRows (blocks * (innerRows * innerDigits)))]
-
-/-- Reduction that uses a binding adversary to attack the inner Module-SIS matrix. -/
-def innerAdvToModuleSIS
-    (adv : BindingAdv
-      (PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-      (Message ring messageRows blocks)
-      (Commitment ring outerRows)
-      (Opening ring innerRows messageRows messageDigits blocks innerDigits)) :
-    ModuleSIS.Adversary ring innerRows (messageRows * messageDigits) (fun _ => true) :=
-  fun A => do
-    let B ← $ᵗ Simple.PublicParams ring outerRows (blocks * (innerRows * innerDigits))
-    let (_c, m₁, opening₁, m₂, opening₂) ← adv { innerMatrix := A, outerMatrix := B }
-    match outputToModuleSIS m₁ m₂ opening₁ opening₂ with
-    | Sum.inl z => pure z
-    | Sum.inr _ => pure (dummySolution ring (messageRows * messageDigits))
-
-/-- Reduction that uses a binding adversary to attack the outer Module-SIS matrix. -/
-def outerAdvToModuleSIS
-    (adv : BindingAdv
-      (PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-      (Message ring messageRows blocks)
-      (Commitment ring outerRows)
-      (Opening ring innerRows messageRows messageDigits blocks innerDigits)) :
-    ModuleSIS.Adversary ring outerRows (blocks * (innerRows * innerDigits)) (fun _ => true) :=
-  fun B => do
-    let A ← $ᵗ Simple.PublicParams ring innerRows (messageRows * messageDigits)
-    let (_c, m₁, opening₁, m₂, opening₂) ← adv { innerMatrix := A, outerMatrix := B }
-    match outputToModuleSIS m₁ m₂ opening₁ opening₂ with
-    | Sum.inl _ => pure (dummySolution ring (blocks * (innerRows * innerDigits)))
-    | Sum.inr z => pure z
-
-end Reductions
-
-/-- Facts obtained from a successful ordinary inner-outer opening verification. -/
-structure VerifiedOpening (base : Coeff)
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (c : Commitment ring outerRows) (m : Message ring messageRows blocks)
-    (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) : Prop where
-  outer_eq :
-    Simple.commit ring pp.outerMatrix (PolyVec.flattenBlocks opening.innerDecomp) = c
-  message_eq :
-    ∀ i : Fin blocks,
-      Simple.commit ring (gadgetMatrix ring base messageRows messageDigits)
-        (opening.messageDecomp.get i) = m.get i
-  inner_eq :
-    ∀ i : Fin blocks,
-      Simple.commit ring (gadgetMatrix ring base innerRows innerDigits)
-        (opening.innerDecomp.get i) =
-        Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i)
-
-omit [DecidableEq (Message ring messageRows blocks)]
-  [DecidableEq (PolyVec ring.Poly (messageRows * messageDigits))]
-  [DecidableEq (PolyVec ring.Poly (blocks * (innerRows * innerDigits)))] in
-/-- Extract component equations from a successful ordinary opening verification. -/
-theorem verifiedOpening_of_verify_eq_true
-    {base : Coeff}
-    {pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits}
-    {c : Commitment ring outerRows} {m : Message ring messageRows blocks}
-    {opening : Opening ring innerRows messageRows messageDigits blocks innerDigits}
-    (hverify : verify base pp m c opening = true) :
-    VerifiedOpening base pp c m opening := by
-  have hv := hverify
-  simp only [verify, Bool.and_eq_true] at hv
-  refine ⟨?_, ?_, ?_⟩
-  · simpa using
-      (Simple.verify_eq_true_iff ring pp.outerMatrix
-        (PolyVec.flattenBlocks opening.innerDecomp) c ()).1 hv.2
-  · intro i
-    have hMessageAll :
-        ∀ i ∈ List.finRange blocks,
-          Simple.verify ring (gadgetMatrix ring base messageRows messageDigits)
-            (opening.messageDecomp.get i) (m.get i) () = true := by
-      simpa [List.all_eq_true] using hv.1.1
-    exact
-      (Simple.verify_eq_true_iff ring
-        (gadgetMatrix ring base messageRows messageDigits)
-        (opening.messageDecomp.get i) (m.get i) ()).1
-        (hMessageAll i (List.mem_finRange i))
-  · intro i
-    have hInnerAll :
-        ∀ i ∈ List.finRange blocks,
-          Simple.verify ring (gadgetMatrix ring base innerRows innerDigits)
-            (opening.innerDecomp.get i)
-            (Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i)) () = true := by
-      simpa [List.all_eq_true] using hv.1.2
-    exact
-      (Simple.verify_eq_true_iff ring
-        (gadgetMatrix ring base innerRows innerDigits)
-        (opening.innerDecomp.get i)
-        (Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i)) ()).1
-        (hInnerAll i (List.mem_finRange i))
-
-/-- A successful double opening yields either an inner or an outer Module-SIS witness. -/
-theorem outputToModuleSIS_valid
-    (base : Coeff)
-    (linearLaws : NegacyclicRing.LinearLaws ring)
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (c : Commitment ring outerRows)
-    (m₁ m₂ : Message ring messageRows blocks)
-    (opening₁ opening₂ :
-      Opening ring innerRows messageRows messageDigits blocks innerDigits)
-    (hwin :
-      (decide (m₁ ≠ m₂) &&
-        verify base pp m₁ c opening₁ &&
-        verify base pp m₂ c opening₂) = true) :
-    match outputToModuleSIS m₁ m₂ opening₁ opening₂ with
-    | Sum.inl z => ModuleSIS.relation ring (fun _ => true) pp.innerMatrix z = true
-    | Sum.inr z => ModuleSIS.relation ring (fun _ => true) pp.outerMatrix z = true := by
-  classical
-  simp only [Bool.and_eq_true, decide_eq_true_eq] at hwin
-  rcases hwin with ⟨⟨hmNe, hverify₁⟩, hverify₂⟩
-  have hv₁ := verifiedOpening_of_verify_eq_true hverify₁
-  have hv₂ := verifiedOpening_of_verify_eq_true hverify₂
-  let flat₁ := PolyVec.flattenBlocks opening₁.innerDecomp
-  let flat₂ := PolyVec.flattenBlocks opening₂.innerDecomp
-  by_cases hflat : flat₁ = flat₂
-  · obtain ⟨i, hfind, hiNe⟩ := firstDiff?_some_of_ne hmNe
-    have hsNe : opening₁.messageDecomp.get i ≠ opening₂.messageDecomp.get i := by
-      intro hs
-      apply hiNe
-      calc
-        m₁.get i = Simple.commit ring (gadgetMatrix ring base messageRows messageDigits)
-            (opening₁.messageDecomp.get i) := (hv₁.message_eq i).symm
-        _ = Simple.commit ring (gadgetMatrix ring base messageRows messageDigits)
-            (opening₂.messageDecomp.get i) := by rw [hs]
-        _ = m₂.get i := hv₂.message_eq i
-    have hinnerEq :
-        Simple.commit ring pp.innerMatrix (opening₁.messageDecomp.get i) =
-          Simple.commit ring pp.innerMatrix (opening₂.messageDecomp.get i) := by
-      have hblock : opening₁.innerDecomp.get i = opening₂.innerDecomp.get i :=
-        block_eq_of_flattenBlocks_eq (by simpa [flat₁, flat₂] using hflat) i
-      calc
-        Simple.commit ring pp.innerMatrix (opening₁.messageDecomp.get i) =
-            Simple.commit ring (gadgetMatrix ring base innerRows innerDigits)
-              (opening₁.innerDecomp.get i) := (hv₁.inner_eq i).symm
-        _ = Simple.commit ring (gadgetMatrix ring base innerRows innerDigits)
-              (opening₂.innerDecomp.get i) := by rw [hblock]
-        _ = Simple.commit ring pp.innerMatrix (opening₂.messageDecomp.get i) := hv₂.inner_eq i
-    have hsNonzero :
-        opening₁.messageDecomp.get i - opening₂.messageDecomp.get i ≠ 0 :=
-      polyVec_sub_ne_zero_of_ne hsNe
-    have hker :
-        ring.matVecMul pp.innerMatrix
-            (opening₁.messageDecomp.get i - opening₂.messageDecomp.get i) = 0 := by
-      rw [linearLaws.matVecMul_sub pp.innerMatrix
-        (opening₁.messageDecomp.get i) (opening₂.messageDecomp.get i)]
-      exact polyVec_sub_eq_zero_of_eq (by simpa [Simple.commit] using hinnerEq)
-    simp [outputToModuleSIS, outputFromFirstDiff, flat₁, flat₂, hflat, hfind,
-      ModuleSIS.relation, hsNonzero, hker]
-  · have houterEq : Simple.commit ring pp.outerMatrix flat₁ =
-        Simple.commit ring pp.outerMatrix flat₂ := by
-      simpa [flat₁, flat₂] using hv₁.outer_eq.trans hv₂.outer_eq.symm
-    have houterNonzero : flat₁ - flat₂ ≠ 0 :=
-      polyVec_sub_ne_zero_of_ne hflat
-    have hker : ring.matVecMul pp.outerMatrix (flat₁ - flat₂) = 0 := by
-      rw [linearLaws.matVecMul_sub pp.outerMatrix flat₁ flat₂]
-      exact polyVec_sub_eq_zero_of_eq (by simpa [Simple.commit] using houterEq)
-    simp [outputToModuleSIS, outputFromFirstDiff, flat₁, flat₂, hflat, ModuleSIS.relation,
-      houterNonzero, hker]
-
-
-section Advantages
-
-variable [SampleableType (Simple.PublicParams ring innerRows (messageRows * messageDigits))]
-variable [SampleableType (Simple.PublicParams ring outerRows (blocks * (innerRows * innerDigits)))]
-
--- TODO replace fun true with a proper norm
--- The direct Module-SIS RHS unfolds to reductions with swapped independent samples.
-/-- Binding is bounded by the standard inner and outer Module-SIS advantages. -/
-theorem bindingAdvantage_le_moduleSIS (base : Coeff)
-    (linearLaws : NegacyclicRing.LinearLaws ring)
-    (decomp : Decomposition ring messageRows messageDigits innerRows innerDigits)
-    (adv : BindingAdv
-      (PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-      (Message ring messageRows blocks)
-      (Commitment ring outerRows)
-      (Opening ring innerRows messageRows messageDigits blocks innerDigits)) :
-    bindingAdvantage
-        (commitmentScheme (outerRows := outerRows) (blocks := blocks) base decomp) adv ≤
-      ModuleSIS.advantage ring innerRows (messageRows * messageDigits) (fun _ => true)
-          (innerAdvToModuleSIS adv) +
-        ModuleSIS.advantage ring outerRows (blocks * (innerRows * innerDigits)) (fun _ => true)
-          (outerAdvToModuleSIS adv) := by
-  unfold bindingAdvantage CommitmentScheme.bindingExp
-    ModuleSIS.advantage SIS.advantage SIS.experiment ModuleSIS.problem
-    innerAdvToModuleSIS outerAdvToModuleSIS commitmentScheme
-  simp only [monad_norm]
-  rw [← probOutput_bind_bind_swap
-    (mx := (($ᵗ PolyMatrix ring.Poly innerRows (messageRows * messageDigits)) :
-      ProbComp (PolyMatrix ring.Poly innerRows (messageRows * messageDigits))))
-    (my := (($ᵗ PolyMatrix ring.Poly outerRows (blocks * (innerRows * innerDigits))) :
-      ProbComp (PolyMatrix ring.Poly outerRows (blocks * (innerRows * innerDigits)))))
-    (z := true)]
-  refine (probOutput_bind_congr_le_add
-    (mx := (($ᵗ PolyMatrix ring.Poly innerRows (messageRows * messageDigits)) :
-      ProbComp (PolyMatrix ring.Poly innerRows (messageRows * messageDigits))))
-    (y := true) (z₁ := true) (z₂ := true)) ?_
-  intro A _
-  refine (probOutput_bind_congr_le_add
-    (mx := (($ᵗ PolyMatrix ring.Poly outerRows (blocks * (innerRows * innerDigits))) :
-      ProbComp (PolyMatrix ring.Poly outerRows (blocks * (innerRows * innerDigits)))))
-    (y := true) (z₁ := true) (z₂ := true)) ?_
-  intro B _
-  refine (probOutput_bind_congr_le_add
-    (mx := (adv { innerMatrix := A, outerMatrix := B } :
-      ProbComp (Commitment ring outerRows × Message ring messageRows blocks ×
-        Opening ring innerRows messageRows messageDigits blocks innerDigits ×
-        Message ring messageRows blocks ×
-        Opening ring innerRows messageRows messageDigits blocks innerDigits)))
-    (y := true) (z₁ := true) (z₂ := true)) ?_
-  intro ⟨c, m₁, opening₁, m₂, opening₂⟩ _
-  by_cases hwin :
-      (decide (m₁ ≠ m₂) &&
-        verify base { innerMatrix := A, outerMatrix := B } m₁ c opening₁ &&
-        verify base { innerMatrix := A, outerMatrix := B } m₂ c opening₂) = true
-  · have hvalid := outputToModuleSIS_valid (ring := ring) (base := base)
-      (linearLaws := linearLaws)
-      { innerMatrix := A, outerMatrix := B } c m₁ m₂ opening₁ opening₂ hwin
-    have hleftTrue :
-        (m₁ ≠ m₂ ∧
-            verify base { innerMatrix := A, outerMatrix := B } m₁ c opening₁ = true) ∧
-          verify base { innerMatrix := A, outerMatrix := B } m₂ c opening₂ = true := by
-      simpa [Bool.and_eq_true, decide_eq_true_eq] using hwin
-    cases hsol : outputToModuleSIS m₁ m₂ opening₁ opening₂ with
-    | inl z =>
-        simp [hsol] at hvalid
-        simp [hleftTrue, hvalid]
-    | inr z =>
-        simp [hsol] at hvalid
-        simp [hleftTrue, hvalid]
-  · have hleftFalse :
-        ¬((m₁ ≠ m₂ ∧
-              verify base { innerMatrix := A, outerMatrix := B } m₁ c opening₁ = true) ∧
-            verify base { innerMatrix := A, outerMatrix := B } m₂ c opening₂ = true) := by
-      intro hleft
-      apply hwin
-      simpa [Bool.and_eq_true, decide_eq_true_eq] using hleft
-    simp [hleftFalse]
-
-end Advantages
-
-end Scheme
-
-end Binding
-
-/-! ## Hachi/Greyhound Weak Binding -/
-
-namespace WeakBinding
 
 variable {ring : NegacyclicRing Coeff}
 
@@ -482,7 +184,7 @@ abbrev Adversary :=
 def openingsDiffer
     (opening₁ opening₂ :
       Opening ring innerRows messageRows messageDigits blocks innerDigits) : Bool :=
-  Binding.differs opening₁.message opening₂.message
+  differs opening₁.message opening₂.message
 
 section Experiment
 
@@ -535,7 +237,7 @@ def outputToModuleSIS
       (ModuleSIS.Solution ring (blocks * (innerRows * innerDigits))) :=
   let flat₁ := PolyVec.flattenBlocks opening₁.innerDecomp
   let flat₂ := PolyVec.flattenBlocks opening₂.innerDecomp
-  Binding.outputFromFirstDiff (ring := ring) (innerCols := messageRows * messageDigits)
+  outputFromFirstDiff (ring := ring) (innerCols := messageRows * messageDigits)
     (outerCols := blocks * (innerRows * innerDigits)) (blocks := blocks)
     opening₁.message opening₂.message flat₁ flat₂ fun i =>
     scaledMessage opening₁ opening₂ i - scaledMessage opening₂ opening₁ i
@@ -679,7 +381,7 @@ theorem inner_commit_eq_of_flatten_eq
     Simple.commit ring pp.innerMatrix (opening₁.message.get i) =
       Simple.commit ring pp.innerMatrix (opening₂.message.get i) := by
   have hblock : opening₁.innerDecomp.get i = opening₂.innerDecomp.get i :=
-    Binding.block_eq_of_flattenBlocks_eq hflat i
+    block_eq_of_flattenBlocks_eq hflat i
   calc
     Simple.commit ring pp.innerMatrix (opening₁.message.get i) =
         Simple.commit ring (gadgetMatrix ring base innerRows innerDigits)
@@ -833,16 +535,16 @@ theorem outputToModuleSIS_valid
   let flat₁ := PolyVec.flattenBlocks opening₁.innerDecomp
   let flat₂ := PolyVec.flattenBlocks opening₂.innerDecomp
   by_cases hflat : flat₁ = flat₂
-  · obtain ⟨i, hfind⟩ := Binding.firstDiff?_some_of_differs hdiff
+  · obtain ⟨i, hfind⟩ := firstDiff?_some_of_differs hdiff
     have hmsgNe : opening₁.message.get i ≠ opening₂.message.get i :=
-      Binding.firstDiff?_eq_some_ne hfind
+      firstDiff?_eq_some_ne hfind
     have hrel := inner_relation_of_verified scalarLaws linearLaws normLaws hv₁ hv₂
       (by simpa [flat₁, flat₂] using hflat) hmsgNe
-    simpa [outputToModuleSIS, Binding.outputFromFirstDiff, flat₁, flat₂, hflat, hfind]
+    simpa [outputToModuleSIS, outputFromFirstDiff, flat₁, flat₂, hflat, hfind]
       using hrel
   · have hrel := outer_relation_of_verified linearLaws normLaws hv₁ hv₂
       (by simpa [flat₁, flat₂] using hflat)
-    simpa [outputToModuleSIS, Binding.outputFromFirstDiff, flat₁, flat₂, hflat] using hrel
+    simpa [outputToModuleSIS, outputFromFirstDiff, flat₁, flat₂, hflat] using hrel
 
 section Advantages
 
@@ -863,7 +565,7 @@ def innerAdvToModuleSIS
     let (_u, opening₁, opening₂) ← adv pp
     match outputToModuleSIS opening₁ opening₂ with
     | Sum.inl z => pure z
-    | Sum.inr _ => pure (Binding.dummySolution ring (messageRows * messageDigits))
+    | Sum.inr _ => pure (dummySolution ring (messageRows * messageDigits))
 
 /-- Reduction that uses a weak-binding adversary to attack the outer Module-SIS matrix. -/
 def outerAdvToModuleSIS
@@ -878,7 +580,7 @@ def outerAdvToModuleSIS
       { innerMatrix := A, outerMatrix := B }
     let (_u, opening₁, opening₂) ← adv pp
     match outputToModuleSIS opening₁ opening₂ with
-    | Sum.inl _ => pure (Binding.dummySolution ring (blocks * (innerRows * innerDigits)))
+    | Sum.inl _ => pure (dummySolution ring (blocks * (innerRows * innerDigits)))
     | Sum.inr z => pure z
 
 omit [SampleableType (Simple.PublicParams ring innerRows (messageRows * messageDigits))]
@@ -910,7 +612,7 @@ theorem sample_advantage_le_moduleSIS (base : Coeff)
                   (normLaws.scalarVecMulMulL2NormSqBound kappa betaSq)))
             A <$> match outputToModuleSIS opening₁ opening₂ with
               | Sum.inl z => pure z
-              | Sum.inr _ => pure (Binding.dummySolution ring (messageRows * messageDigits))) :
+              | Sum.inr _ => pure (dummySolution ring (messageRows * messageDigits))) :
             ProbComp Bool)
           true +
         probOutput
@@ -918,7 +620,7 @@ theorem sample_advantage_le_moduleSIS (base : Coeff)
             (fun z =>
               decide (PolyVec.l2NormSq normOps z ≤ normLaws.subL2NormSqBound gammaSq))
             B <$> match outputToModuleSIS opening₁ opening₂ with
-              | Sum.inl _ => pure (Binding.dummySolution ring (blocks * (innerRows * innerDigits)))
+              | Sum.inl _ => pure (dummySolution ring (blocks * (innerRows * innerDigits)))
               | Sum.inr z => pure z) : ProbComp Bool)
           true := by
   let pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits :=
@@ -940,7 +642,7 @@ theorem sample_advantage_le_moduleSIS (base : Coeff)
             (fun z =>
               decide (PolyVec.l2NormSq normOps z ≤
                 normLaws.subL2NormSqBound gammaSq))
-            B (Binding.dummySolution ring (blocks * (innerRows * innerDigits))))
+            B (dummySolution ring (blocks * (innerRows * innerDigits))))
           (by
             intro hwin
             left
@@ -969,7 +671,7 @@ theorem sample_advantage_le_moduleSIS (base : Coeff)
               decide (PolyVec.l2NormSq normOps z ≤
                 normLaws.subL2NormSqBound
                   (normLaws.scalarVecMulMulL2NormSqBound kappa betaSq)))
-            A (Binding.dummySolution ring (messageRows * messageDigits)))
+            A (dummySolution ring (messageRows * messageDigits)))
           (ModuleSIS.relation ring
             (fun z =>
               decide (PolyVec.l2NormSq normOps z ≤
