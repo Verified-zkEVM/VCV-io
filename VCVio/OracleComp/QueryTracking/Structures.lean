@@ -460,6 +460,19 @@ lemma wasQueried_eq_decide_mem_map_fst [spec.DecidableEq]
       exact hq ((getQ_ne_nil_iff_mem_map_fst log t).mpr hm)
     simp [wasQueried, hq, hm]
 
+lemma wasQueried_cons_self [spec.DecidableEq] {t : spec.Domain} {u : spec.Range t}
+    {log : QueryLog spec} :
+    wasQueried (⟨t, u⟩ :: log) t = true := by
+  rw [wasQueried_eq_decide_mem_map_fst]
+  simp [List.mem_cons]
+
+lemma wasQueried_cons_of_ne [spec.DecidableEq] {t t' : spec.Domain}
+    {u : spec.Range t'} {log : QueryLog spec} (hne : t' ≠ t) :
+    wasQueried (⟨t', u⟩ :: log) t = wasQueried log t := by
+  simp only [wasQueried_eq_decide_mem_map_fst, List.map_cons, List.mem_cons]
+  congr 1; exact propext ⟨fun h => h.elim (fun h' => absurd h'.symm hne) id,
+    fun h => Or.inr h⟩
+
 section prod
 
 variable {ι₁ ι₂} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
