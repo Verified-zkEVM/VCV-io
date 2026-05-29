@@ -2147,114 +2147,97 @@ lemma expectedQuerySlack_resource_le
         Pr[= z | (impl t).run (s, false)] *
           expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) (qS - 1) z.2
       set B : ℝ≥0∞ := R s + qS + qH with hB
-      by_cases hSt : chargedQuery t
-      · simp only [hSt, if_true] at hcontS
-        have hqS_pos : 0 < qS := hcanS.resolve_left (· hSt)
-        have hqS_cast : (((qS - 1 : ℕ) : ℝ≥0∞) + 1) = (qS : ℝ≥0∞) := by
-          exact_mod_cast Nat.sub_add_cancel (hqS_pos)
-        rw [expectedQuerySlack_query_bind,
-          expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
-        suffices h : ∀ z : spec.Range t × σ × Bool,
-            z ∈ support ((impl t).run (s, false)) →
-            expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) (qS - 1) z.2
-              ≤ (qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * B * β by
-          have h_tail : Sum ≤ (qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * B * β := by
+      suffices h : ∀ (z : spec.Range t × σ × Bool) (qS' : ℕ),
+          z ∈ support ((impl t).run (s, false)) →
+          OracleComp.IsQueryBoundP (cont z.1) chargedQuery qS' →
+          R z.2.1 + qS' + qH' ≤ B →
+          expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) qS' z.2
+            ≤ (qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β by
+        by_cases hSt : chargedQuery t
+        · let qS': ℕ := qS - 1
+          simp only [hSt, if_true] at hcontS
+          have hqS_pos : 0 < qS := hcanS.resolve_left (· hSt)
+          have hqS_cast : (((qS - 1 : ℕ) : ℝ≥0∞) + 1) = (qS : ℝ≥0∞) := by
+            exact_mod_cast Nat.sub_add_cancel hqS_pos
+          rw [expectedQuerySlack_query_bind,
+            expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
+          have h_tail : Sum ≤ qS' * ζ + qS' * B * β := by
             calc ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run (s, false)] * _
                 ≤ ∑' z : spec.Range t × σ × Bool,
-                    Pr[= z | (impl t).run (s, false)] *
-                      ((qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * B * β) :=
+                    Pr[= z | (impl t).run (s, false)] * (qS' * ζ + qS' * B * β) :=
                     ENNReal.tsum_le_tsum fun z => by
                       by_cases hz : z ∈ support ((impl t).run (s, false))
-                      · gcongr; exact h z hz
+                      · gcongr
+                        have hRz : R z.2.1 ≤ R s + 1 := h_growth t (s, false) rfl (Or.inl hSt) z hz
+                        have hbudget : R z.2.1 + qS' + qH' ≤ B := by
+                          by_cases hHt : growthQuery t
+                          · simp only [qH', hHt, if_true]
+                            calc R z.2.1 + qS' + (qH - 1 : ℕ)
+                                ≤ (R s + 1) + qS' + (qH - 1 : ℕ) := by gcongr
+                              _ = R s + qS + (qH - 1 : ℕ) := by
+                                rw [add_assoc (R s), add_comm 1, hqS_cast]
+                              _ ≤ R s + qS + qH               := by
+                                gcongr; exact_mod_cast Nat.sub_le qH 1
+                          · simp only [qH', hHt, if_false]
+                            calc R z.2.1 + qS' + qH
+                                ≤ (R s + 1) + qS' + qH := by gcongr
+                              _ = R s + qS + qH        := by
+                                rw [add_assoc (R s), add_comm 1, hqS_cast]
+                        exact h z qS' hz (hcontS z.1) hbudget
                       · simp [probOutput_eq_zero_of_not_mem_support hz]
-              _ ≤ (qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * B * β := by
+              _ ≤ qS' * ζ + qS' * B * β := by
                     rw [ENNReal.tsum_mul_right]
                     exact le_of_le_of_eq
                       (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
           calc ζ + R s * β + Sum
-              ≤ ζ + R s * β + ((qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * B * β) := by
+              ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) := by
                     exact add_le_add_right h_tail (ζ + R s * β)
           _ ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by
             calc
-              ζ + R s * β + (((qS - 1 : ℕ) : ℝ≥0∞) * ζ + ((qS - 1 : ℕ) : ℝ≥0∞) * B * β)
-                  ≤ ζ + B * β + (((qS - 1 : ℕ) : ℝ≥0∞) * ζ + ((qS - 1 : ℕ) : ℝ≥0∞) * B * β) := by
+              ζ + R s * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β)
+                  ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
                 gcongr; exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
-              _ = (((qS - 1 : ℕ) : ℝ≥0∞) + (1 : ℝ≥0∞)) * ζ +
-                (((qS - 1 : ℕ) : ℝ≥0∞) + (1 : ℝ≥0∞)) * B * β := by ring_nf
+              _ = ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * ζ +
+                ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * B * β := by ring_nf
               _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [hqS_cast]
-        intro ⟨u, s', bad'⟩ hz
-        cases bad'
-        · have hih := ih u (qS := qS - 1) (qH := qH') (hcontS u) (hcontH' u) s'
-          refine hih.trans ?_
-          have hRz := h_growth t (s, false) rfl (Or.inl hSt) (u, s', false) hz
-          have hRz' : R s' ≤ R s + 1 := by simpa only [hSt] using hRz
-          have hbudget : R s' + (qS - 1 : ℕ) + qH' ≤ R s + qS + qH := by
-            by_cases hHt : growthQuery t
-            · simp only [qH', hHt, if_true]
-              calc R s' + (qS - 1 : ℕ) + (qH - 1 : ℕ)
-                _ ≤ (R s + 1) + (qS - 1 : ℕ) + (qH - 1 : ℕ) := by gcongr
-                _ = R s + qS + (qH - 1 : ℕ) := by rw[add_assoc (R s), add_comm 1, hqS_cast]
-                _ ≤ R s + qS + qH := by gcongr; exact_mod_cast Nat.sub_le qH 1
-            · simp only [qH', hHt, if_false]
-              calc R s' + (qS - 1 : ℕ) + qH
-                _ ≤ (R s + 1) + (qS - 1 : ℕ) + qH := by gcongr
-                _ = R s + qS + qH := by rw[add_assoc (R s), add_comm 1, hqS_cast]
-          have hmul :
-              ((qS - 1 : ℕ) : ℝ≥0∞) * (R s' + (qS - 1 : ℕ) + qH') * β
-                ≤ ((qS - 1 : ℕ) : ℝ≥0∞) * B * β :=
-            mul_le_mul' (mul_le_mul' le_rfl hbudget) le_rfl
-          simpa only [add_assoc, add_left_comm, add_comm] using
-            add_le_add_left hmul (((qS - 1 : ℕ) : ℝ≥0∞) * ζ)
-        · simp only [expectedQuerySlack_bad_eq_zero, natCast_sub, Nat.cast_one, zero_le]
-      · simp only [hSt, if_false] at hcontS
-        rw [expectedQuerySlack_query_bind,
-          expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
-        suffices h : ∀ z : spec.Range t × σ × Bool,
-            z ∈ support ((impl t).run (s, false)) →
-            expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) qS z.2
-              ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β by
+        · simp only [hSt, if_false] at hcontS
+          rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
           calc ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run (s, false)] * _
               ≤ ∑' z : spec.Range t × σ × Bool,
                   Pr[= z | (impl t).run (s, false)] *
                     ((qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β) :=
                   ENNReal.tsum_le_tsum fun z => by
                     by_cases hz : z ∈ support ((impl t).run (s, false))
-                    · gcongr; exact h z hz
+                    · gcongr
+                      have hRz : R z.2.1 ≤ R s + if growthQuery t then (1 : ℝ≥0∞) else 0 := by
+                        by_cases hHt : growthQuery t
+                        · simpa only [hHt] using h_growth t (s, false) rfl (Or.inr hHt) z hz
+                        · simpa only [hHt, ↓reduceIte, add_zero] using
+                            h_free t (s, false) rfl hSt hHt z hz
+                      have hbudget : R z.2.1  + qS + qH' ≤ R s + qS + qH := by
+                        by_cases hHt : growthQuery t
+                        · simp only [qH', hHt, if_true] at ⊢ hRz
+                          calc R z.2.1  + qS + (qH - 1 : ℕ)
+                            _ ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by
+                              rw[add_assoc, add_assoc]
+                              exact add_le_add_left hRz (qS +(qH - 1 : ℕ))
+                            _ = R s + qS + qH := by
+                              have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
+                                exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
+                              rw [add_assoc, add_left_comm, add_assoc (R s), add_comm 1, hqH_cast]
+                              ring_nf
+                        · simp only [qH', hHt, if_false, add_zero] at ⊢ hRz
+                          rw[add_assoc, add_assoc]; exact add_le_add_left hRz (qS + qH)
+                      exact h z qS hz (hcontS z.1) hbudget
                     · simp [probOutput_eq_zero_of_not_mem_support hz]
             _ ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by
                   rw [ENNReal.tsum_mul_right]
                   exact le_of_le_of_eq
                     (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
-        rintro ⟨u, s', bad'⟩ hz
-        cases bad'
-        · have hih := ih u (qS := qS) (qH := qH') (hcontS u) (hcontH' u) s'
-          refine hih.trans ?_
-          have hRz : R s' ≤ R s + if growthQuery t then (1 : ℝ≥0∞) else 0 := by
-            by_cases hHt : growthQuery t
-            · simpa only [hHt] using
-                h_growth t (s, false) rfl (Or.inr hHt) (u, s', false) hz
-            · simpa only [hHt, ↓reduceIte, add_zero] using
-              h_free t (s, false) rfl hSt hHt (u, s', false) hz
-          have hbudget : R s' + qS + qH' ≤ R s + qS + qH := by
-            by_cases hHt : growthQuery t
-            · simp only [qH', hHt, if_true] at ⊢ hRz
-              calc R s' + qS + (qH - 1 : ℕ)
-                _ ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by
-                  rw[add_assoc, add_assoc]
-                  exact add_le_add_left hRz (qS +(qH - 1 : ℕ))
-                _ = R s + qS + qH := by
-                  have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
-                    exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
-                  rw [add_assoc, add_left_comm, add_assoc (R s), add_comm 1, hqH_cast]
-                  ring_nf
-            · simp only [qH', hHt, if_false, add_zero] at ⊢ hRz
-              rw[add_assoc, add_assoc]; exact add_le_add_left hRz (qS + qH)
-          have hmul :
-              (qS : ℝ≥0∞) * (R s' + qS + qH') * β
-                ≤ (qS : ℝ≥0∞) * B * β :=
-            mul_le_mul' (mul_le_mul' le_rfl hbudget) le_rfl
-          exact add_le_add_right hmul ((qS : ℝ≥0∞) * ζ)
-        · simp [expectedQuerySlack_bad_eq_zero]
+      rintro ⟨u, s', bad'⟩ qS' hz hcontS' hbudget
+      cases bad'
+      · exact (ih u hcontS' (hcontH' u) s').trans (by gcongr)
+      · simp [expectedQuerySlack_bad_eq_zero]
 
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
