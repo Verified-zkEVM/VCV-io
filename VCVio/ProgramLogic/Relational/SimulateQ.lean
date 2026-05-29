@@ -2157,8 +2157,7 @@ lemma expectedQuerySlack_resource_le
                 Pr[= z | (impl t).run (s, false)] *
                   expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β)
                     (cont z.1) (qS - 1) z.2)
-              ≤ (qS - 1 : ℕ) * ζ +
-                  (qS - 1 : ℕ) * (R s + qS + qH) * β := by
+              ≤ (qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * (R s + qS + qH) * β := by
           calc
             (∑' z : spec.Range t × σ × Bool,
                 Pr[= z | (impl t).run (s, false)] *
@@ -2305,8 +2304,7 @@ lemma expectedQuerySlack_resource_le
                 · rcases z with ⟨u, s', bad'⟩
                   gcongr
                   cases bad'
-                  · have hih := ih u (qS := qS) (qH := qH')
-                      (hcontS u) (hcontH' u) s'
+                  · have hih := ih u (qS := qS) (qH := qH') (hcontS u) (hcontH' u) s'
                     refine hih.trans ?_
                     have hRz : R s' ≤ R s + if growthQuery t then (1 : ℝ≥0∞) else 0 := by
                       by_cases hHt : growthQuery t
@@ -2322,22 +2320,16 @@ lemma expectedQuerySlack_resource_le
                           have hnat : (qH - 1) + 1 = qH := Nat.sub_add_cancel hqH_pos
                           exact_mod_cast hnat
                         simp only [qH', hHt, if_true]
-                        have hRz' : R s' ≤ R s + 1 := by
-                          simpa [hSt, hHt] using hRz
+                        have hRz' : R s' ≤ R s + 1 := by simpa only [hSt, hHt] using hRz
                         calc
-                          R s' + qS + (qH - 1 : ℕ)
-                              ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by
-                                gcongr
+                          R s' + qS + (qH - 1 : ℕ) ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by gcongr
                           _ = R s + qS + qH := by
-                                rw [show (R s + 1) + (qS : ℝ≥0∞) +
-                                    ((qH - 1 : ℕ) : ℝ≥0∞) =
-                                  R s + (qS : ℝ≥0∞) +
-                                    (((qH - 1 : ℕ) : ℝ≥0∞) + 1) by
-                                    simp only [add_assoc, add_left_comm, add_comm], hqH_cast]
+                            rw [add_assoc, add_left_comm, add_assoc (R s), add_comm 1, hqH_cast]
+                            ring_nf
                       · simp only [qH', hHt, if_false]
                         have hRz' : R s' ≤ R s := by
-                          simpa [hSt, hHt] using hRz
-                        gcongr
+                          simpa only [hHt, ↓reduceIte, add_zero] using hRz
+                        rw[add_assoc, add_assoc]; exact add_le_add_left hRz' (qS + qH)
                     have hmul :
                         (qS : ℝ≥0∞) * (R s' + qS + qH') * β
                           ≤ (qS : ℝ≥0∞) * (R s + qS + qH) * β :=
