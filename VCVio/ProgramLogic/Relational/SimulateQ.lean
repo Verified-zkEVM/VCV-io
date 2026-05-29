@@ -2203,22 +2203,21 @@ lemma expectedQuerySlack_resource_le
                         · simpa only [hHt] using h_growth t (s, false) rfl (Or.inr hHt) z hz
                         · simpa only [hHt, ↓reduceIte, add_zero] using
                             h_free t (s, false) rfl hSt hHt z hz
-                      have hbudget : R z.2.1  + qS + qH' ≤ R s + qS + qH := by
-                        by_cases hHt : growthQuery t
-                        · simp only [qH', hHt, if_true] at ⊢ hRz
-                          calc R z.2.1  + qS + (qH - 1 : ℕ)
-                            _ ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by
-                              rw[add_assoc, add_assoc]
-                              exact add_le_add_left hRz (qS +(qH - 1 : ℕ))
-                            _ = R s + qS + qH := by
+                      have hbudget : R z.2.1 + qS + qH' ≤ B := by
+                        calc R z.2.1 + qS + qH'
+                            ≤ (R s + if growthQuery t then (1 : ℝ≥0∞) else 0) + qS + qH' := by
+                              gcongr
+                          _ = R s + qS + qH' + if growthQuery t then (1 : ℝ≥0∞) else 0 := by ring_nf
+                          _ ≤ B := by
+                            simp only [qH']
+                            by_cases hHt : growthQuery t
+                            · simp only [hHt, if_true]
                               have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
                                 exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
-                              rw [add_assoc, add_left_comm, add_assoc (R s), add_comm 1, hqH_cast]
-                              ring_nf
-                        · simp only [qH', hHt, if_false, add_zero] at ⊢ hRz
-                          rw[add_assoc, add_assoc]; exact add_le_add_left hRz (qS + qH)
+                              rw[add_assoc, hqH_cast]
+                            · simp only [hHt, if_false]; ring_nf; exact le_refl _
                       exact h z qS hz (hcontS z.1) hbudget
-                    · simp [probOutput_eq_zero_of_not_mem_support hz]
+                    · simp only [probOutput_eq_zero_of_not_mem_support hz, zero_mul, le_refl]
             _ ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by
                   rw [ENNReal.tsum_mul_right]
                   exact le_of_le_of_eq
@@ -2226,7 +2225,7 @@ lemma expectedQuerySlack_resource_le
       rintro ⟨u, s', bad'⟩ qS' hz hcontS' hbudget
       cases bad'
       · exact (ih u hcontS' (hcontH' u) s').trans (by gcongr)
-      · simp [expectedQuerySlack_bad_eq_zero]
+      · simp only [expectedQuerySlack_bad_eq_zero, zero_le]
 
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
