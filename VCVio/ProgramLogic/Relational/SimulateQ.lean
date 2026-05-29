@@ -2170,19 +2170,13 @@ lemma expectedQuerySlack_resource_le
                       · gcongr
                         have hRz : R z.2.1 ≤ R s + 1 := h_growth t (s, false) rfl (Or.inl hSt) z hz
                         have hbudget : R z.2.1 + qS' + qH' ≤ B := by
-                          by_cases hHt : growthQuery t
-                          · simp only [qH', hHt, if_true]
-                            calc R z.2.1 + qS' + (qH - 1 : ℕ)
-                                ≤ (R s + 1) + qS' + (qH - 1 : ℕ) := by gcongr
-                              _ = R s + qS + (qH - 1 : ℕ) := by
-                                rw [add_assoc (R s), add_comm 1, hqS_cast]
-                              _ ≤ R s + qS + qH               := by
-                                gcongr; exact_mod_cast Nat.sub_le qH 1
-                          · simp only [qH', hHt, if_false]
-                            calc R z.2.1 + qS' + qH
-                                ≤ (R s + 1) + qS' + qH := by gcongr
-                              _ = R s + qS + qH        := by
-                                rw [add_assoc (R s), add_comm 1, hqS_cast]
+                          calc R z.2.1 + qS' + qH'
+                              ≤ (R s + 1) + qS' + qH' := by gcongr
+                            _ = R s + qS + qH' := by rw [add_assoc (R s), add_comm 1, hqS_cast]
+                            _ ≤ B := by
+                              simp only [B, qH']; gcongr; split_ifs
+                              · exact tsub_le_self
+                              · exact le_rfl
                         exact h z qS' hz (hcontS z.1) hbudget
                       · simp [probOutput_eq_zero_of_not_mem_support hz]
               _ ≤ qS' * ζ + qS' * B * β := by
@@ -2190,16 +2184,11 @@ lemma expectedQuerySlack_resource_le
                     exact le_of_le_of_eq
                       (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
           calc ζ + R s * β + Sum
-              ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) := by
-                    exact add_le_add_right h_tail (ζ + R s * β)
-          _ ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by
-            calc
-              ζ + R s * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β)
-                  ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
-                gcongr; exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
-              _ = ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * ζ +
-                ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * B * β := by ring_nf
-              _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [hqS_cast]
+            ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) := add_le_add_right h_tail (ζ + R s * β)
+          _ ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
+            gcongr; exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
+          _ = ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * ζ + ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * B * β := by ring_nf
+          _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [hqS_cast]
         · simp only [hSt, if_false] at hcontS
           rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
           calc ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run (s, false)] * _
