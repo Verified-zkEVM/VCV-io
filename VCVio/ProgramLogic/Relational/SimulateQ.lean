@@ -2235,32 +2235,22 @@ lemma expectedQuerySlack_resource_le
                     rw [hprob, zero_mul, zero_mul]
               _ = (∑' z : spec.Range t × σ × Bool,
                     Pr[= z | (impl t).run (s, false)]) *
-                  ((qS - 1 : ℕ) * ζ +
-                    (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
+                  ((qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
                     rw [ENNReal.tsum_mul_right]
-              _ ≤ 1 * ((qS - 1 : ℕ) * ζ +
-                    (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
+              _ ≤ 1 * ((qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
                     gcongr
                     exact tsum_probOutput_le_one
-              _ = (qS - 1 : ℕ) * ζ +
-                    (qS - 1 : ℕ) * (R s + qS + qH) * β := one_mul _
+              _ = (qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * (R s + qS + qH) * β := one_mul _
         calc
           ζ + R s * β +
               (∑' z : spec.Range t × σ × Bool,
                 Pr[= z | (impl t).run (s, false)] *
                   expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β)
                     (cont z.1) (qS - 1) z.2)
-              ≤ ζ + R s * β +
-                  ((qS - 1 : ℕ) * ζ +
-                    (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
+              ≤ ζ + R s * β + ((qS - 1 : ℕ) * ζ + (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
                     gcongr
           _ ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * (R s + qS + qH) * β := by
                     set B : ℝ≥0∞ := R s + qS + qH with hB
-                    have hqS_cast :
-                        (1 : ℝ≥0∞) + ((qS - 1 : ℕ) : ℝ≥0∞) = (qS : ℝ≥0∞) := by
-                      rw [add_comm]
-                      have hnat : (qS - 1) + 1 = qS := Nat.sub_add_cancel hqS_pos
-                      exact_mod_cast hnat
                     calc
                       ζ + R s * β +
                           (((qS - 1 : ℕ) : ℝ≥0∞) * ζ +
@@ -2276,7 +2266,8 @@ lemma expectedQuerySlack_resource_le
                             ((1 : ℝ≥0∞) + ((qS - 1 : ℕ) : ℝ≥0∞)) * B * β := by
                                 ring_nf
                       _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by
-                                rw [hqS_cast]
+                                rw [show 1 + ((qS - 1 : ℕ) : ℝ≥0∞) = qS by
+                                    rw [add_comm]; exact_mod_cast Nat.sub_add_cancel hqS_pos]
                       _ = (qS : ℝ≥0∞) * ζ +
                             (qS : ℝ≥0∞) * (R s + qS + qH) * β := by
                                 rw [hB]
@@ -2314,45 +2305,33 @@ lemma expectedQuerySlack_resource_le
                           h_free t (s, false) rfl hSt hHt (u, s', false) hz
                     have hbudget : R s' + qS + qH' ≤ R s + qS + qH := by
                       by_cases hHt : growthQuery t
-                      · have hqH_pos : 0 < qH := hcanH.resolve_left (· hHt)
-                        have hqH_cast :
-                            (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
-                          have hnat : (qH - 1) + 1 = qH := Nat.sub_add_cancel hqH_pos
-                          exact_mod_cast hnat
-                        simp only [qH', hHt, if_true]
-                        have hRz' : R s' ≤ R s + 1 := by simpa only [hSt, hHt] using hRz
+                      · simp only [qH', hHt, if_true] at ⊢ hRz
                         calc
-                          R s' + qS + (qH - 1 : ℕ) ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by gcongr
+                          R s' + qS + (qH - 1 : ℕ) ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by
+                            rw[add_assoc, add_assoc]
+                            exact add_le_add_left hRz (qS +(qH - 1 : ℕ))
                           _ = R s + qS + qH := by
+                            have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
+                              exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
                             rw [add_assoc, add_left_comm, add_assoc (R s), add_comm 1, hqH_cast]
                             ring_nf
-                      · simp only [qH', hHt, if_false]
-                        have hRz' : R s' ≤ R s := by
-                          simpa only [hHt, ↓reduceIte, add_zero] using hRz
-                        rw[add_assoc, add_assoc]; exact add_le_add_left hRz' (qS + qH)
+                      · simp only [qH', hHt, if_false, add_zero] at ⊢ hRz
+                        rw[add_assoc, add_assoc]; exact add_le_add_left hRz (qS + qH)
                     have hmul :
                         (qS : ℝ≥0∞) * (R s' + qS + qH') * β
                           ≤ (qS : ℝ≥0∞) * (R s + qS + qH) * β :=
                       mul_le_mul' (mul_le_mul' le_rfl hbudget) le_rfl
-                    simpa only [add_assoc, add_left_comm, add_comm] using
-                      add_le_add_left hmul ((qS : ℝ≥0∞) * ζ)
-                  ·
-                    simp
-                · have hprob :
-                      Pr[= z | (impl t).run (s, false)] = 0 :=
-                    probOutput_eq_zero_of_not_mem_support hz
-                  rw [hprob, zero_mul, zero_mul]
+                    exact add_le_add_right hmul ((qS : ℝ≥0∞) * ζ)
+                  · rw[expectedQuerySlack_bad_eq_zero]; exact zero_le _
+                · rw [probOutput_eq_zero_of_not_mem_support hz, zero_mul, zero_mul]
             _ = (∑' z : spec.Range t × σ × Bool,
                   Pr[= z | (impl t).run (s, false)]) *
-                ((qS : ℝ≥0∞) * ζ +
-                  (qS : ℝ≥0∞) * (R s + qS + qH) * β) := by
+                ((qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * (R s + qS + qH) * β) := by
                   rw [ENNReal.tsum_mul_right]
-            _ ≤ 1 * ((qS : ℝ≥0∞) * ζ +
-                  (qS : ℝ≥0∞) * (R s + qS + qH) * β) := by
+            _ ≤ 1 * ((qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * (R s + qS + qH) * β) := by
                   gcongr
                   exact tsum_probOutput_le_one
-            _ = (qS : ℝ≥0∞) * ζ +
-                  (qS : ℝ≥0∞) * (R s + qS + qH) * β := one_mul _
+            _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * (R s + qS + qH) * β := one_mul _
 
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
