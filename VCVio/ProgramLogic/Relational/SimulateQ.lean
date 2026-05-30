@@ -2141,8 +2141,6 @@ lemma expectedQuerySlack_resource_le
       obtain ⟨hcanS, hcontS⟩ := h_qS
       obtain ⟨hcanH, hcontH⟩ := h_qH
       let qH' : ℕ := if growthQuery t then qH - 1 else qH
-      have hcontH' : ∀ u, OracleComp.IsQueryBoundP (cont u) growthQuery qH' := by
-        by_cases hHt : growthQuery t <;> simpa only [hHt, qH'] using hcontH
       let Sum : ℕ → ℝ≥0∞ := fun qS' => ∑' z : spec.Range t × σ × Bool,
         Pr[= z | (impl t).run (s, false)] *
           expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) qS' z.2
@@ -2223,7 +2221,7 @@ lemma expectedQuerySlack_resource_le
                     (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
       rintro ⟨u, s', bad'⟩ qS' hz hcontS' hbudget
       cases bad'
-      · exact (ih u hcontS' (hcontH' u) s').trans (by gcongr)
+      · exact (ih u hcontS' (hcontH u) s').trans (by gcongr)
       · simp only [expectedQuerySlack_bad_eq_zero, zero_le]
 
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
