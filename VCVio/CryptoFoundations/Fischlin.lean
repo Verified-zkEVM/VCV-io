@@ -82,7 +82,7 @@ the prover queries `H` on each input and keeps the best. -/
 private def fischlinSearchAux {Stmt Wit Commit PrvState Chal Resp M : Type}
     {rel : Stmt → Wit → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     [MonadLiftT ProbComp m] [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) m]
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ) :
     List Chal → Option (Chal × Resp × Fin (2 ^ b)) → m (Option (Chal × Resp))
@@ -121,7 +121,7 @@ sigma-protocol verification for each repetition, and verifies that the sum of ha
 values is at most `S`. -/
 def Fischlin
     {m : Type → Type v} [Monad m]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) (ρ b S : ℕ) (M : Type)
     [DecidableEq M] [MonadLiftT ProbComp m]
     [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) m] :
@@ -182,7 +182,7 @@ end runtime
 
 section costAccounting
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) (ρ b : ℕ) (M : Type)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp) (ρ b : ℕ) (M : Type)
 
 variable {m : Type → Type v} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
@@ -191,7 +191,7 @@ variable {m : Type → Type v} [Monad m] [LawfulMonad m]
 private def fischlinSearchAuxWithUnitCost
     {Stmt Wit Commit PrvState Chal Resp M : Type} {rel : Stmt → Wit → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m] [MonadLiftT ProbComp m]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
@@ -291,7 +291,7 @@ private def fischlinSearchAuxWithAddCost
     {κ : Type} [AddMonoid κ]
     {Stmt Wit Commit PrvState Chal Resp M : Type} {rel : Stmt → Wit → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m] [MonadLiftT ProbComp m]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
@@ -417,7 +417,7 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
 
 section verifyCostAccounting
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSet m]
@@ -526,7 +526,7 @@ end verifyCostAccounting
 
 section signCostAccounting
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSet m]
@@ -758,7 +758,7 @@ end signCostAccounting
 
 section expectedWeightedQueryCost
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSPMF m]
@@ -787,7 +787,7 @@ end expectedWeightedQueryCost
 
 section expectedQueries
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSPMF m]
@@ -811,7 +811,7 @@ end expectedQueries
 
 section expectedQueriesPMF
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalPMF m]
@@ -842,7 +842,7 @@ section security
 variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal]
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel)
   (ρ b S : ℕ) (M : Type) [DecidableEq M]
 

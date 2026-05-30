@@ -42,7 +42,7 @@ signature scheme. The signing algorithm commits, queries the random oracle on (m
 commitment), and then responds to the challenge. -/
 def FiatShamir
     {m : Type → Type v} [Monad m]
-    (sigmaAlg : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (sigmaAlg : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) (M : Type)
     [MonadLiftT ProbComp m] [HasQuery (M × Commit →ₒ Chal) m] :
     SignatureAlg m
@@ -172,7 +172,7 @@ end semantics
 section naturality
 
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 variable {m : Type → Type u} [Monad m]
@@ -219,7 +219,7 @@ end naturality
 section costAccounting
 
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
@@ -419,7 +419,7 @@ end costAccounting
 section correctness
 
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 open scoped Classical in
@@ -427,6 +427,7 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect [SampleableType Chal]
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (hc : σ.PerfectlyComplete) :
     SignatureAlg.PerfectlyComplete
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)
@@ -550,7 +551,7 @@ theorem perfectlyCorrect [SampleableType Chal]
             let r ← $ᵗ Chal
             let s ← σ.respond pk sk e r
             pure (σ.verify pk c r s))
-          (x := true) (h := by simpa using hc pk sk hrel))
+          (x := true) (h := by rw [← hsc]; simpa using hc pk sk hrel))
     · simpa [OracleComp.ProgramLogic.propInd, hx] using
         (OracleComp.ProgramLogic.triple_zero
           (oa := do

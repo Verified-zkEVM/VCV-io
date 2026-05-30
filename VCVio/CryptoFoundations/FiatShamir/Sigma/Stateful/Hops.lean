@@ -100,7 +100,7 @@ abbrev cmaH3Costly :
 /-- Boolean distinguishing advantage for the native H3 pair from the direct
 initial CMA state. -/
 noncomputable abbrev cmaH3Advantage
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool) : ℝ :=
@@ -112,7 +112,7 @@ noncomputable abbrev cmaH3Advantage
 
 /-- Expected accumulated H3 signing loss in the real game. -/
 noncomputable abbrev cmaH3ExpectedLoss
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (ζ_zk β : ℝ≥0∞)
     {α : Type}
@@ -126,7 +126,7 @@ noncomputable abbrev cmaH3ExpectedLoss
 
 /-- Per-query facts for the native H3 hop. -/
 structure CmaH3StepFacts
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk β : ℝ≥0∞) : Prop where
@@ -161,7 +161,7 @@ structure CmaH3StepFacts
 
 /-- Computation-specific facts for applying the native H3 hop. -/
 structure CmaH3RunFacts
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (ζ_zk β : ℝ≥0∞)
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
@@ -210,7 +210,7 @@ cache count grows by at most one if and only if the query is `cmaH3Costly` or
 `IsHashQuery`. The three callable corollaries below are projections of this
 single case-blast. -/
 private theorem cmaReal_step_normal_form
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
     (p : CmaState M Commit Chal Stmt Wit)
@@ -308,7 +308,7 @@ private theorem cmaReal_step_normal_form
 
 /-- One step of the real CMA game preserves the bad flag exactly. -/
 theorem cmaReal_bad_preserved
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
     (p : CmaState M Commit Chal Stmt Wit)
@@ -319,7 +319,7 @@ theorem cmaReal_bad_preserved
 
 /-- Once the real CMA bad flag is true, one real step keeps it true. -/
 theorem cmaReal_bad_mono
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) :
     ∀ (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
       (p : CmaState M Commit Chal Stmt Wit), p.2 = true →
@@ -329,7 +329,7 @@ theorem cmaReal_bad_mono
 
 /-- The real CMA game never reaches bad from the initial state. -/
 theorem cmaReal_probEvent_bad_eq_zero
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     {α : Type}
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α) :
@@ -348,7 +348,7 @@ theorem cmaReal_probEvent_bad_eq_zero
 
 /-- One real CMA step preserves keypair validity. -/
 theorem cmaReal_valid_preserved
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
     (p : CmaState M Commit Chal Stmt Wit)
@@ -360,7 +360,7 @@ theorem cmaReal_valid_preserved
 
 /-- The real CMA handler preserves keypair validity while bad is false. -/
 theorem cmaReal_preserves_valid
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) :
     (cmaReal M Commit Chal σ hr).PreservesNoBadInvariant
       (CmaData.Valid (rel := rel)) := by
@@ -370,7 +370,7 @@ theorem cmaReal_preserves_valid
 /-- One real CMA step grows the direct random-oracle cache by at most one on
 signing or hash queries, and does not grow it on other queries. -/
 theorem cmaReal_roCacheCount_step_le
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
     (p : CmaState M Commit Chal Stmt Wit)
@@ -389,7 +389,7 @@ If the adversary makes at most `qS` signing queries and at most `qH` random
 oracle queries, the accumulated state-dependent signing slack is bounded by the
 standard `qS * ζ + qS * (qS + qH) * β` expression. -/
 theorem cmaH3ExpectedLoss_le_queryBounds
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (ζ_zk β : ℝ≥0∞)
     {α : Type}
@@ -425,7 +425,7 @@ theorem cmaH3ExpectedLoss_le_queryBounds
 
 /-- Build the native H3 run facts from the query bound and expected-loss bound. -/
 theorem cmaH3RunFacts_of_queryBound_expectedLoss
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (ζ_zk β : ℝ≥0∞)
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
@@ -444,7 +444,7 @@ theorem cmaH3RunFacts_of_queryBound_expectedLoss
 
 /-- The real and simulated CMA handlers agree on every non-signing query. -/
 theorem cmaReal_eq_cmaSim_of_not_costly
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
@@ -531,7 +531,7 @@ private def cmaSignKeyedData
   | none => (s.1, s.2.1, some (pk, sk))
 
 private noncomputable def cmaRealSignGhostDist
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (m : M)
     (s : CmaData M Commit Chal Stmt Wit) :
@@ -552,7 +552,7 @@ private noncomputable def cmaRealSignGhostDist
         challenge := ch, ghostResponse := ghostResp, actualResponse := ghostResp }
 
 private noncomputable def cmaRealSignPublicDist
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (s : CmaData M Commit Chal Stmt Wit) :
     ProbComp (CmaSignPublic Stmt Wit Commit Chal Resp) := do
@@ -643,7 +643,8 @@ private lemma cmaSignKeySource_sound
 
 omit [DecidableEq M] [DecidableEq Commit] in
 private lemma cmaRealSignGhost_public_evalDist_eq_publicDist
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (hr : GenerableRelation Stmt Wit rel)
     (m : M)
     (s : CmaData M Commit Chal Stmt Wit) :
@@ -654,7 +655,7 @@ private lemma cmaRealSignGhost_public_evalDist_eq_publicDist
   cases keypair with
   | some key =>
       simp only [cmaRealSignGhostDist, cmaRealSignPublicDist, cmaSignKeySource,
-        SigmaProtocol.realTranscript, cmaSignPublicOfTranscript, evalDist_bind,
+        SigmaProtocol.realTranscript, hsc, cmaSignPublicOfTranscript, evalDist_bind,
         evalDist_map, map_bind, pure_bind, bind_pure_comp, Functor.map_map]
       refine bind_congr fun cp => ?_
       refine bind_congr fun ch => ?_
@@ -679,7 +680,7 @@ private lemma cmaRealSignGhost_public_evalDist_eq_publicDist
             y
   | none =>
       simp only [cmaRealSignGhostDist, cmaRealSignPublicDist, cmaSignKeySource,
-        SigmaProtocol.realTranscript, cmaSignPublicOfTranscript, evalDist_bind,
+        SigmaProtocol.realTranscript, hsc, cmaSignPublicOfTranscript, evalDist_bind,
         evalDist_map, map_bind, bind_pure_comp, Functor.map_map]
       refine bind_congr fun key => ?_
       refine bind_congr fun cp => ?_
@@ -704,9 +705,9 @@ private lemma cmaRealSignGhost_public_evalDist_eq_publicDist
             (probFailure_evalDist_eq_zero (σ.respond key.1 key.2 cp.2 cachedCh))
             y
 
-omit [DecidableEq M] [DecidableEq Commit] in
+omit [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 private lemma cmaSignPublicDist_tv_le_hvzk
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
@@ -765,7 +766,7 @@ private lemma cmaSignPublicDist_tv_le_hvzk
 
 omit [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 private lemma simTranscript_cacheHit_prob_le_roCacheCount_mul
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (β : ℝ≥0∞)
     (hCommit : σ.simCommitPredictability simT β)
@@ -826,7 +827,7 @@ private lemma simTranscript_cacheHit_prob_le_roCacheCount_mul
 
 omit [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 private lemma cmaSimSignPublicBad_prob_le_roCacheCount_mul
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (β : ℝ≥0∞)
@@ -867,7 +868,7 @@ private lemma cmaSimSignPublicBad_prob_le_roCacheCount_mul
               rw [HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
 private lemma cmaRealSignStep_evalDist_eq_ghost
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (m : M)
     (s : CmaData M Commit Chal Stmt Wit) :
@@ -1011,7 +1012,8 @@ private lemma cmaSimSignStep_evalDist_eq_public
           simp [hcache, cmaSimSignPublicOut, cmaSignKeyedData, cmaSignPublicOfTranscript]
 
 theorem cmaReal_cmaSim_tv_sign_le_cmaSignEpsCore_of_valid
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
@@ -1069,7 +1071,7 @@ theorem cmaReal_cmaSim_tv_sign_le_cmaSignEpsCore_of_valid
         𝒟[CmaRealSignGhost.public <$> realGhost] =
           𝒟[cmaRealSignPublicDist M Commit Chal σ hr s] := by
       simpa [realGhost] using
-        cmaRealSignGhost_public_evalDist_eq_publicDist M Commit Chal σ hr m s
+        cmaRealSignGhost_public_evalDist_eq_publicDist M Commit Chal σ hsc hr m s
     have hbound :=
       cmaSignPublicDist_tv_le_hvzk M Commit Chal σ hr simT ζ_zk hζ_zk hHVZK s hvalid
     simpa [tvDist, simPub, hpub_eval] using hbound
@@ -1090,7 +1092,8 @@ theorem cmaReal_cmaSim_tv_sign_le_cmaSignEpsCore_of_valid
     _ = cmaSignEpsCore M Commit Chal ζ_zk β s := rfl
 
 theorem cmaReal_cmaSim_tv_costly_le_cmaSignEpsCore_of_valid
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
@@ -1109,13 +1112,14 @@ theorem cmaReal_cmaSim_tv_costly_le_cmaSignEpsCore_of_valid
   · exact (False.elim ht)
   · exact (False.elim ht)
   · exact cmaReal_cmaSim_tv_sign_le_cmaSignEpsCore_of_valid
-      M Commit Chal σ hr simT ζ_zk β hζ_zk hHVZK hCommit m s hvalid
+      M Commit Chal σ hsc hr simT ζ_zk β hζ_zk hHVZK hCommit m s hvalid
   · exact (False.elim ht)
 
 /-- Build the native H3 step facts from HVZK and simulator commit
 predictability. -/
 theorem cmaH3StepFacts_of_hvzk_predictability
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
@@ -1127,7 +1131,7 @@ theorem cmaH3StepFacts_of_hvzk_predictability
     intro t ht s hvalid
     exact
       cmaReal_cmaSim_tv_costly_le_cmaSignEpsCore_of_valid
-        M Commit Chal σ hr simT ζ_zk β hζ_zk hHVZK hCommit t ht s hvalid
+        M Commit Chal σ hsc hr simT ζ_zk β hζ_zk hHVZK hCommit t ht s hvalid
   stepEqFree := cmaReal_eq_cmaSim_of_not_costly M Commit Chal σ hr simT
   badMono := cmaReal_bad_mono M Commit Chal σ hr
 
@@ -1140,7 +1144,7 @@ identical-until-bad instantiation. The hypotheses are factored into per-query
 step facts and computation-specific run facts; no heap package or state
 projection appears in the statement. -/
 theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedQuerySlack
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk β : ℝ≥0∞)
@@ -1184,7 +1188,8 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedQuerySlack
 /-- Fully assembled native H3 bound from HVZK, simulator commit
 predictability, and adversary signing/hash query budgets. -/
 theorem cmaReal_cmaSim_advantage_le_H3_bound
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
@@ -1203,7 +1208,7 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
   exact cmaReal_cmaSim_advantage_le_H3_bound_of_expectedQuerySlack
     M Commit Chal σ hr simT ζ_zk β A qS
     ((qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + qH) * β)
-    (cmaH3StepFacts_of_hvzk_predictability M Commit Chal σ hr simT
+    (cmaH3StepFacts_of_hvzk_predictability M Commit Chal σ hsc hr simT
       ζ_zk β hζ_zk hHVZK hCommit)
     (cmaH3RunFacts_of_queryBound_expectedLoss M Commit Chal σ hr ζ_zk β A qS
       ((qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + qH) * β)
