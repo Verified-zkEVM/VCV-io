@@ -2140,14 +2140,14 @@ lemma expectedQuerySlack_resource_le
       obtain ⟨hcanS, hcontS⟩ := h_qS
       obtain ⟨hcanH, hcontH⟩ := h_qH
       let qH' : ℕ := if growthQuery t then qH - 1 else qH
-      let Sum : ℕ → ℝ≥0∞ := fun qS' => ∑' z : spec.Range t × σ × Bool,
+      let slackSum : ℕ → ℝ≥0∞ := fun n => ∑' z : spec.Range t × σ × Bool,
         Pr[= z | (impl t).run (s, false)] *
-          expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) qS' z.2
+          expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) n z.2
       set B : ℝ≥0∞ := R s + qS + qH with hB
       suffices h_tail : ∀ (n : ℕ),
           (∀ u, OracleComp.IsQueryBoundP (cont u) chargedQuery n) →
           (∀ z ∈ support ((impl t).run (s, false)), R z.2.1 + n + qH' ≤ B) →
-          Sum n ≤ (n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β from by
+          slackSum n ≤ (n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β from by
         by_cases hSt : chargedQuery t
         · let qS': ℕ := qS - 1
           simp only [hSt, if_true] at hcontS
@@ -2166,7 +2166,7 @@ lemma expectedQuerySlack_resource_le
                 simp only [B, qH']; gcongr; split_ifs
                 · exact tsub_le_self
                 · exact le_rfl
-          calc ζ + R s * β + Sum qS'
+          calc ζ + R s * β + slackSum qS'
             ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) :=
               add_le_add_right (h_tail qS' hcontS hbudget) (ζ + R s * β)
           _ ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
@@ -2195,7 +2195,7 @@ lemma expectedQuerySlack_resource_le
                 · simp only [hHt, if_false]; ring_nf; exact le_refl _
           exact h_tail qS hcontS hbudget
       intro n hcont' hRz_bound
-      calc Sum n
+      calc slackSum n
           ≤ ∑' z, Pr[= z | (impl t).run (s, false)] * ((n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β) :=
               ENNReal.tsum_le_tsum fun z => by
                 by_cases hz : z ∈ support ((impl t).run (s, false))
