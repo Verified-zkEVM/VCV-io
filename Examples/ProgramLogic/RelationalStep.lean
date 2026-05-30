@@ -398,13 +398,13 @@ example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
 example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
     post a b ⊑
       rwp⟦(pure a : OracleComp spec α) ~ (pure b : OracleComp spec β) |
-        post ; epost⟨⟩, epost⟨⟩⟧ := by
+        post; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
 
 example (a : α) (b : β)
     (f : α → OracleComp spec γ) (g : β → OracleComp spec δ)
     (post : γ → δ → ℝ≥0∞) :
-    rwp⟦f a ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+    rwp⟦f a ~ g b | post; epost⟨⟩, epost⟨⟩⟧ ⊑
       rwp⟦
         (do
           let x ← (pure a : OracleComp spec α)
@@ -413,7 +413,7 @@ example (a : α) (b : β)
         (do
           let y ← (pure b : OracleComp spec β)
           g y)
-      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+      | post; epost⟨⟩, epost⟨⟩⟧ := by
   rvcgen
 
 example [DecidableEq γ] [DecidableEq δ] (a : α) (b : β)
@@ -428,41 +428,41 @@ example [DecidableEq γ] [DecidableEq δ] (a : α) (b : β)
         (do
           let y ← (pure b : OracleComp spec β)
           pure (g y))
-      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+      | post; epost⟨⟩, epost⟨⟩⟧ := by
   rvcgen
 
 example (a : α) (b : β)
     (f : α → OracleComp spec γ)
     (post : γ → β → ℝ≥0∞) :
-    rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+    rwp⟦f a ~ (pure b : OracleComp spec β) | post; epost⟨⟩, epost⟨⟩⟧ ⊑
       rwp⟦
         (do
           let x ← (pure a : OracleComp spec α)
           f x)
         ~
         (pure b : OracleComp spec β)
-      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+      | post; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep left
   rvcgen
 
 example (a : α) (b : β)
     (g : β → OracleComp spec δ)
     (post : α → δ → ℝ≥0∞) :
-    rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+    rwp⟦(pure a : OracleComp spec α) ~ g b | post; epost⟨⟩, epost⟨⟩⟧ ⊑
       rwp⟦
         (pure a : OracleComp spec α)
         ~
         (do
           let y ← (pure b : OracleComp spec β)
           g y)
-      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+      | post; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep right
   rvcgen
 
 example (a : α) (b : β)
     (f : α → OracleComp spec γ)
     (post : γ → β → ℝ≥0∞) :
-    ⦃rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧⦄
+    ⦃rwp⟦f a ~ (pure b : OracleComp spec β) | post; epost⟨⟩, epost⟨⟩⟧⦄
       (do
         let x ← (pure a : OracleComp spec α)
         f x) ≈ₑ (pure b : OracleComp spec β)
@@ -473,7 +473,7 @@ example (a : α) (b : β)
 example (a : α) (b : β)
     (g : β → OracleComp spec δ)
     (post : α → δ → ℝ≥0∞) :
-    ⦃rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧⦄
+    ⦃rwp⟦(pure a : OracleComp spec α) ~ g b | post; epost⟨⟩, epost⟨⟩⟧⦄
       (pure a : OracleComp spec α) ≈ₑ
       (do
         let y ← (pure b : OracleComp spec β)

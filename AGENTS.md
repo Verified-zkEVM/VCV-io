@@ -177,6 +177,24 @@ After adding new `.lean` files: `./scripts/update-lib.sh`
 
 Lean toolchain and Mathlib must stay in sync (both currently `v4.29.0`). Files should stay under 1500 lines.
 
+## Pre-CI Checks
+
+Before pushing, run `./scripts/preflight.sh`. It runs the same gates as CI in
+the same order and fails fast:
+
+1. `lake build`
+2. `lake lint` (Batteries env-linters via the `batteries/runLinter` driver)
+3. `lake exe mathlib/lint-style` (Mathlib's text-based style linter)
+4. `lake exe mk_all --lib X --check` for each of the seven libraries
+   (`ToMathlib`, `VCVio`, `FFI`, `LatticeCrypto`, `Examples`, `VCVioWidgets`, `Interop`)
+5. `scripts/check-interop-isolation.sh`
+6. `scripts/check-agent-docs.py` and `scripts/extract-doc-fragments.py --check`
+
+`lake lint` requires a successful `lake build` first; the script ordering
+enforces this. Not mirrored locally: the warning-budget check
+(`scripts/check-warning-log.py`) requires the CI timed-build harness — re-run
+via the GitHub Actions log if you need that audit.
+
 ## Further Reading
 
 Before working in a specific area, read the relevant guide in `docs/agents/`:

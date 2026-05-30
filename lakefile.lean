@@ -2,6 +2,8 @@ import Lake
 open Lake DSL
 
 package VCVio where
+  -- `lake lint` delegates to Batteries' env-linter driver (Mathlib/cslib idiom).
+  lintDriver := "batteries/runLinter"
   -- Settings applied to both builds and interactive editing
   leanOptions := #[
     ⟨`pp.unicode.fun, true⟩, -- pretty-prints `fun a ↦ b`
