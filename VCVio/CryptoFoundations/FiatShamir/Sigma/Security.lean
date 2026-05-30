@@ -38,7 +38,6 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
     [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
     {rel : Stmt → Wit → Bool}
 
-attribute [local instance] Fintype.ofFinite
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
