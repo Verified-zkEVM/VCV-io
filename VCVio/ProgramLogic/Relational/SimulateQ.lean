@@ -2151,74 +2151,68 @@ lemma expectedQuerySlack_resource_le
           R z.2.1 + qS' + qH' ≤ B →
           expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) qS' z.2
             ≤ (qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β by
-        by_cases hSt : chargedQuery t
-        · let qS': ℕ := qS - 1
-          simp only [hSt, if_true] at hcontS
-          have hqS_pos : 0 < qS := hcanS.resolve_left (· hSt)
-          have hqS_cast : (((qS - 1 : ℕ) : ℝ≥0∞) + 1) = (qS : ℝ≥0∞) := by
-            exact_mod_cast Nat.sub_add_cancel hqS_pos
-          rw [expectedQuerySlack_query_bind,
-            expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
-          have h_tail : Sum qS' ≤ qS' * ζ + qS' * B * β := by
-            calc Sum qS' ≤ ∑' z : spec.Range t × σ × Bool,
-                    Pr[= z | (impl t).run (s, false)] * (qS' * ζ + qS' * B * β) :=
-                    ENNReal.tsum_le_tsum fun z => by
-                      by_cases hz : z ∈ support ((impl t).run (s, false))
-                      · gcongr
-                        have hRz : R z.2.1 ≤ R s + 1 := h_growth t (s, false) rfl (Or.inl hSt) z hz
-                        have hbudget : R z.2.1 + qS' + qH' ≤ B := by
-                          calc R z.2.1 + qS' + qH'
-                              ≤ (R s + 1) + qS' + qH' := by gcongr
-                            _ = R s + qS + qH' := by rw [add_assoc (R s), add_comm 1, hqS_cast]
-                            _ ≤ B := by
-                              simp only [B, qH']; gcongr; split_ifs
-                              · exact tsub_le_self
-                              · exact le_rfl
-                        exact h z qS' hz (hcontS z.1) hbudget
-                      · simp [probOutput_eq_zero_of_not_mem_support hz]
-              _ ≤ qS' * ζ + qS' * B * β := by
-                    rw [ENNReal.tsum_mul_right]
-                    exact le_of_le_of_eq
-                      (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
-          calc ζ + R s * β + Sum qS'
-            ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) := add_le_add_right h_tail (ζ + R s * β)
-          _ ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
-            gcongr; exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
-          _ = ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * ζ + ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * B * β := by ring_nf
-          _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [hqS_cast]
-        · simp only [hSt, if_false] at hcontS
-          rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
-          calc Sum qS
-              ≤ ∑' z : spec.Range t × σ × Bool,
-                  Pr[= z | (impl t).run (s, false)] *
-                    ((qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β) :=
-                  ENNReal.tsum_le_tsum fun z => by
-                    by_cases hz : z ∈ support ((impl t).run (s, false))
-                    · gcongr
-                      have hRz : R z.2.1 ≤ R s + if growthQuery t then (1 : ℝ≥0∞) else 0 := by
-                        by_cases hHt : growthQuery t
-                        · simpa only [hHt] using h_growth t (s, false) rfl (Or.inr hHt) z hz
-                        · simpa only [hHt, ↓reduceIte, add_zero] using
-                            h_free t (s, false) rfl hSt hHt z hz
-                      have hbudget : R z.2.1 + qS + qH' ≤ B := by
-                        calc R z.2.1 + qS + qH'
-                            ≤ (R s + if growthQuery t then (1 : ℝ≥0∞) else 0) + qS + qH' := by
-                              gcongr
-                          _ = R s + qS + qH' + if growthQuery t then (1 : ℝ≥0∞) else 0 := by ring_nf
-                          _ ≤ B := by
-                            simp only [qH']
-                            by_cases hHt : growthQuery t
-                            · simp only [hHt, if_true]
-                              have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
-                                exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
-                              rw[add_assoc, hqH_cast]
-                            · simp only [hHt, if_false]; ring_nf; exact le_refl _
-                      exact h z qS hz (hcontS z.1) hbudget
-                    · simp only [probOutput_eq_zero_of_not_mem_support hz, zero_mul, le_refl]
-            _ ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by
-                  rw [ENNReal.tsum_mul_right]
-                  exact le_of_le_of_eq
-                    (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
+        suffices h_tail : ∀ (n : ℕ),
+          (∀ u, OracleComp.IsQueryBoundP (cont u) chargedQuery n) →
+          (∀ z ∈ support ((impl t).run (s, false)), R z.2.1 + n + qH' ≤ B) →
+          Sum n ≤ (n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β from by
+          by_cases hSt : chargedQuery t
+          · let qS': ℕ := qS - 1
+            simp only [hSt, if_true] at hcontS
+            have hqS_pos : 0 < qS := hcanS.resolve_left (· hSt)
+            have hqS_cast : (((qS - 1 : ℕ) : ℝ≥0∞) + 1) = (qS : ℝ≥0∞) := by
+              exact_mod_cast Nat.sub_add_cancel hqS_pos
+            rw [expectedQuerySlack_query_bind,
+              expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
+            have hbudget : ∀ z ∈ support ((impl t).run (s, false)), R z.2.1 + qS' + qH' ≤ B := by
+              intro z hz
+              have hRz : R z.2.1 ≤ R s + 1 := h_growth t (s, false) rfl (Or.inl hSt) z hz
+              calc R z.2.1 + qS' + qH'
+                  ≤ (R s + 1) + qS' + qH' := by gcongr
+                _ = R s + qS + qH' := by rw [add_assoc (R s), add_comm 1, hqS_cast]
+                _ ≤ B := by
+                  simp only [B, qH']; gcongr; split_ifs
+                  · exact tsub_le_self
+                  · exact le_rfl
+            calc ζ + R s * β + Sum qS'
+              ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) :=
+                add_le_add_right (h_tail qS' hcontS hbudget) (ζ + R s * β)
+            _ ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
+              gcongr; exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
+            _ = ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * ζ + ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * B * β := by ring_nf
+            _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [hqS_cast]
+          · simp only [hSt, if_false] at hcontS
+            rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
+            have hbudget : ∀ z ∈ support ((impl t).run (s, false)), R z.2.1 + qS + qH' ≤ B := by
+              intro z hz
+              have hRz : R z.2.1 ≤ R s + if growthQuery t then (1 : ℝ≥0∞) else 0 := by
+                by_cases hHt : growthQuery t
+                · simpa only [hHt] using h_growth t (s, false) rfl (Or.inr hHt) z hz
+                · simpa only [hHt, ↓reduceIte, add_zero] using
+                    h_free t (s, false) rfl hSt hHt z hz
+              calc R z.2.1 + qS + qH'
+                  ≤ (R s + if growthQuery t then (1 : ℝ≥0∞) else 0) + qS + qH' := by
+                    gcongr
+                _ = R s + qS + qH' + if growthQuery t then (1 : ℝ≥0∞) else 0 := by ring_nf
+                _ ≤ B := by
+                  simp only [qH']
+                  by_cases hHt : growthQuery t
+                  · simp only [hHt, if_true]
+                    have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
+                      exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
+                    rw[add_assoc, hqH_cast]
+                  · simp only [hHt, if_false]; ring_nf; exact le_refl _
+            exact h_tail qS hcontS hbudget
+        intro n hcont' hRz_bound
+        calc Sum n
+            ≤ ∑' z, Pr[= z | (impl t).run (s, false)] * ((n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β) :=
+                ENNReal.tsum_le_tsum fun z => by
+                  by_cases hz : z ∈ support ((impl t).run (s, false))
+                  · gcongr; exact h z n hz (hcont' z.1) (hRz_bound z hz)
+                  · simp [probOutput_eq_zero_of_not_mem_support hz]
+          _ ≤ (n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β := by
+                rw [ENNReal.tsum_mul_right]
+                exact le_of_le_of_eq
+                  (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
       rintro ⟨u, s', bad'⟩ qS' hz hcontS' hbudget
       cases bad'
       · exact (ih u hcontS' (hcontH u) s').trans (by gcongr)
