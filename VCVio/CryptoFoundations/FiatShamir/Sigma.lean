@@ -42,9 +42,10 @@ signature scheme. The signing algorithm commits, queries the random oracle on (m
 commitment), and then responds to the challenge. -/
 def FiatShamir
     {m : Type → Type v} [Monad m]
-    (sigmaAlg : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
+    {mσ : Type → Type} [Monad mσ]
+    (sigmaAlg : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel mσ)
     (hr : GenerableRelation Stmt Wit rel) (M : Type)
-    [MonadLiftT ProbComp m] [HasQuery (M × Commit →ₒ Chal) m] :
+    [MonadLiftT ProbComp m] [MonadLiftT mσ m] [HasQuery (M × Commit →ₒ Chal) m] :
     SignatureAlg m
       (M := M) (PK := Stmt) (SK := Wit) (S := Commit × Resp) where
   keygen := monadLift hr.gen
