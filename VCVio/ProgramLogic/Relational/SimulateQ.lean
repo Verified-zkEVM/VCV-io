@@ -2160,39 +2160,37 @@ lemma expectedQuerySlack_resource_le
             intro z hz
             have hRz : R z.2.1 ≤ R s + 1 := h_growth t (s, false) rfl (Or.inl hSt) z hz
             calc R z.2.1 + qS' + qH'
-                ≤ (R s + 1) + qS' + qH' := by gcongr
+                ≤ (R s + 1) + qS' + qH' := by
+                  rw [add_assoc, add_assoc]; exact add_le_add_left hRz (qS' + qH')
               _ = R s + qS + qH' := by rw [add_assoc (R s), add_comm 1, hqS_cast]
               _ ≤ B := by
-                simp only [B, qH']; gcongr; split_ifs
+                dsimp only [B, qH']; gcongr; split_ifs
                 · exact tsub_le_self
                 · exact le_rfl
           calc ζ + R s * β + slackSum qS'
-            ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) :=
-              add_le_add_right (h_tail qS' hcontS hbudget) (ζ + R s * β)
-          _ ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
-            gcongr; exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
-          _ = ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * ζ + ((qS' : ℝ≥0∞) + (1 : ℝ≥0∞)) * B * β := by ring_nf
-          _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [hqS_cast]
+            ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
+                gcongr
+                · exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
+                · exact h_tail qS' hcontS hbudget
+          _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [← hqS_cast]; ring
         · simp only [hSt, if_false] at hcontS
           rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
           have hbudget : ∀ z ∈ support ((impl t).run (s, false)), R z.2.1 + qS + qH' ≤ B := by
             intro z hz
             have hRz : R z.2.1 ≤ R s + if growthQuery t then (1 : ℝ≥0∞) else 0 := by
-              by_cases hHt : growthQuery t
-              · simpa only [hHt] using h_growth t (s, false) rfl (Or.inr hHt) z hz
-              · simpa only [hHt, ↓reduceIte, add_zero] using
-                  h_free t (s, false) rfl hSt hHt z hz
+              by_cases hHt : growthQuery t <;> simp only [hHt, ↓reduceIte, add_zero]
+              · exact h_growth t (s, false) rfl (Or.inr hHt) z hz
+              · exact h_free t (s, false) rfl hSt hHt z hz
             calc R z.2.1 + qS + qH'
-                ≤ (R s + if growthQuery t then (1 : ℝ≥0∞) else 0) + qS + qH' := by gcongr
+                ≤ (R s + if growthQuery t then (1 : ℝ≥0∞) else 0) + (qS + qH') := by
+                  rw [add_assoc]; exact add_le_add_left hRz (qS + qH')
               _ = R s + qS + qH' + if growthQuery t then (1 : ℝ≥0∞) else 0 := by ring_nf
               _ ≤ B := by
-                simp only [qH']
-                by_cases hHt : growthQuery t
-                · simp only [hHt, if_true]
-                  have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
+                by_cases hHt : growthQuery t <;> simp only [qH', hHt, ↓reduceIte]
+                · have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
                     exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
                   rw [add_assoc, hqH_cast]
-                · simp only [hHt, if_false]; ring_nf; exact le_refl _
+                · ring_nf; exact le_refl _
           exact h_tail qS hcontS hbudget
       intro n hcont' hRz_bound
       calc slackSum n
