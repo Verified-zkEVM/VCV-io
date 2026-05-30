@@ -2143,9 +2143,9 @@ lemma expectedQuerySlack_resource_le
       let qH' : ℕ := if growthQuery t then qH - 1 else qH
       have hcontH' : ∀ u, OracleComp.IsQueryBoundP (cont u) growthQuery qH' := by
         by_cases hHt : growthQuery t <;> simpa only [hHt, qH'] using hcontH
-      set Sum : ℝ≥0∞ := ∑' z : spec.Range t × σ × Bool,
+      let Sum : ℕ → ℝ≥0∞ := fun qS' => ∑' z : spec.Range t × σ × Bool,
         Pr[= z | (impl t).run (s, false)] *
-          expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) (qS - 1) z.2
+          expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) qS' z.2
       set B : ℝ≥0∞ := R s + qS + qH with hB
       suffices h : ∀ (z : spec.Range t × σ × Bool) (qS' : ℕ),
           z ∈ support ((impl t).run (s, false)) →
@@ -2161,9 +2161,8 @@ lemma expectedQuerySlack_resource_le
             exact_mod_cast Nat.sub_add_cancel hqS_pos
           rw [expectedQuerySlack_query_bind,
             expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
-          have h_tail : Sum ≤ qS' * ζ + qS' * B * β := by
-            calc ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run (s, false)] * _
-                ≤ ∑' z : spec.Range t × σ × Bool,
+          have h_tail : Sum qS' ≤ qS' * ζ + qS' * B * β := by
+            calc Sum qS' ≤ ∑' z : spec.Range t × σ × Bool,
                     Pr[= z | (impl t).run (s, false)] * (qS' * ζ + qS' * B * β) :=
                     ENNReal.tsum_le_tsum fun z => by
                       by_cases hz : z ∈ support ((impl t).run (s, false))
@@ -2183,7 +2182,7 @@ lemma expectedQuerySlack_resource_le
                     rw [ENNReal.tsum_mul_right]
                     exact le_of_le_of_eq
                       (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
-          calc ζ + R s * β + Sum
+          calc ζ + R s * β + Sum qS'
             ≤ ζ + R s * β + (qS' * ζ + qS' * B * β) := add_le_add_right h_tail (ζ + R s * β)
           _ ≤ ζ + B * β + ((qS' : ℝ≥0∞) * ζ + (qS' : ℝ≥0∞) * B * β) := by
             gcongr; exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans le_self_add
@@ -2191,7 +2190,7 @@ lemma expectedQuerySlack_resource_le
           _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by rw [hqS_cast]
         · simp only [hSt, if_false] at hcontS
           rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
-          calc ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run (s, false)] * _
+          calc Sum qS
               ≤ ∑' z : spec.Range t × σ × Bool,
                   Pr[= z | (impl t).run (s, false)] *
                     ((qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β) :=
