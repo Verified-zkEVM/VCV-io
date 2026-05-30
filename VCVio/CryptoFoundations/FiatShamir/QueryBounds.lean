@@ -25,7 +25,10 @@ open OracleComp OracleSpec
 
 namespace FiatShamir
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    {rel : Stmt → Wit → Bool}
+
+attribute [local instance] Fintype.ofFinite
 
 section bounds
 
@@ -110,12 +113,14 @@ lemma nmaHashQueryBound_bind {α β : Type}
       (oa := oa >>= ob) (Q₁ + Q₂) :=
   OracleComp.isQueryBoundP_bind h1 (fun x _ => h2 x)
 
-lemma nmaHashQueryBound_liftComp_zero {α : Type}
+lemma nmaHashQueryBound_liftComp_zero [Inhabited Chal] [Finite Chal] {α : Type}
     (oa : ProbComp α) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) 0 := by
   -- The lifted handler routes every uniform query into the `.inl` arm, which never matches
   -- `(· matches .inr _)`, so the predicate-targeted bound is uniformly 0 per step.
+  letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
   rw [nmaHashQueryBound, OracleComp.liftComp_def]
   refine OracleComp.IsQueryBoundP.simulateQ_of_step
     (p := fun _ : ℕ => False)

@@ -970,7 +970,9 @@ private lemma unlinkBadReaderQueryImpl_state_eq
       z.2 = st := by
   intro z hz
   unfold unlinkBadReaderQueryImpl at hz
-  simpa using congrArg Prod.snd hz
+  simp only [StateT.run_bind, StateT.run_get, StateT.run_pure, pure_bind,
+    support_pure, Set.mem_singleton_iff] at hz
+  exact congrArg Prod.snd hz
 
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Digest] [NeZero sessionsPerTag] in
 /-- When the tag still has a free slot (`sessionsUsed tag < sessionsPerTag`), the tag oracle samples

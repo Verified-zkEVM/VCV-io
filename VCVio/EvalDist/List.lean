@@ -12,24 +12,27 @@ import ToMathlib.General
 This file contains lemmas for `probEvent` and `probOutput` of computations involving `List`.
 We also include `Vector` as a related case.
 
-All lemmas are generic over any monad `m` with `[HasEvalSPMF m]`.
+All lemmas are generic over any monad `m` with `[MonadLiftT m SPMF]`.
 -/
 
 universe u v w
 
 variable {α β γ : Type v}
-    {m : Type _ → Type _} [Monad m] [HasEvalSPMF m]
+    {m : Type _ → Type _} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 open List
 
 section cons_append
 
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [EvalDistCompatible m] in
 lemma cons_mem_support_seq_map_cons_iff [LawfulMonad m]
     (mx : m α) (my : m (List α)) (x : α) (xs : List α) :
     x :: xs ∈ support (cons <$> mx <*> my) ↔ x ∈ support mx ∧ xs ∈ support my := by
   rw [support_seq_map_eq_image2]
   exact Set.mem_image2_iff injective2_cons
 
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [EvalDistCompatible m] in
 lemma cons_mem_finSupport_seq_map_cons_iff [LawfulMonad m] [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (my : m (List α)) (x : α) (xs : List α) :
     x :: xs ∈ finSupport (cons <$> mx <*> my) ↔
@@ -37,11 +40,13 @@ lemma cons_mem_finSupport_seq_map_cons_iff [LawfulMonad m] [HasEvalFinset m] [De
   simp_rw [mem_finSupport_iff_mem_support]
   exact cons_mem_support_seq_map_cons_iff mx my x xs
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 lemma probOutput_cons_seq_map_cons_eq_mul [LawfulMonad m]
     (mx : m α) (my : m (List α)) (x : α) (xs : List α) :
     Pr[= x :: xs | cons <$> mx <*> my] = Pr[= x | mx] * Pr[= xs | my] :=
   probOutput_seq_map_eq_mul_of_injective2 mx my cons injective2_cons x xs
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 lemma probOutput_cons_seq_map_cons_eq_mul' [LawfulMonad m]
     (mx : m α) (my : m (List α)) (x : α) (xs : List α) :
     Pr[= x :: xs | (fun xs x => x :: xs) <$> my <*> mx] =
@@ -49,6 +54,7 @@ lemma probOutput_cons_seq_map_cons_eq_mul' [LawfulMonad m]
   (probOutput_seq_map_swap mx my cons (x :: xs)).trans
     (probOutput_cons_seq_map_cons_eq_mul mx my x xs)
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 @[simp]
 lemma probOutput_map_append_left [LawfulMonad m] [DecidableEq α]
     (xs : List α) (mx : m (List α)) (ys : List α) :
@@ -70,6 +76,7 @@ end cons_append
 
 section mapM
 
+omit [LawfulMonadLiftT m SetM] in
 lemma probFailure_list_mapM_loop (xs : List α) (f : α → m β) (ys : List β) :
     Pr[⊥ | List.mapM.loop f xs ys] = 1 - (xs.map (1 - Pr[⊥ | f ·])).prod := by
   revert ys
@@ -87,11 +94,13 @@ lemma probFailure_list_mapM_loop (xs : List α) (f : α → m β) (ys : List β)
       · simp
       · simp [h]
 
+omit [LawfulMonadLiftT m SetM] in
 @[simp, grind =]
 lemma probFailure_list_mapM (xs : List α) (f : α → m β) :
     Pr[⊥ | xs.mapM f] = 1 - (xs.map (1 - Pr[⊥ | f ·])).prod := by
   rw [mapM, probFailure_list_mapM_loop]
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 @[simp]
 lemma probOutput_list_mapM_loop [DecidableEq β]
     (xs : List α) (f : α → m β) (ys : List β)
@@ -157,6 +166,7 @@ lemma probOutput_list_mapM_loop [DecidableEq β]
       intro y
       rw [if_neg (fun ⟨hl, ht⟩ => hcond ⟨by omega, take_mono y ht⟩), mul_zero]
 
+omit [LawfulMonadLiftT m SetM] in
 lemma probOutput_bind_eq_mul {mx : m α} {my : α → m β} {y : β} (x : α)
     (h : ∀ x' ∈ support mx, y ∈ support (my x') → x' = x) :
     Pr[= y | mx >>= my] = Pr[= x | mx] * Pr[= y | my x] := by
@@ -260,6 +270,7 @@ section ListVector
 
 variable {n : ℕ} (mx : m α) (my : m (List.Vector α n))
 
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [EvalDistCompatible m] in
 @[simp]
 lemma support_seq_map_vector_cons [LawfulMonad m] :
     support ((· ::ᵥ ·) <$> mx <*> my) =
@@ -272,12 +283,14 @@ lemma support_seq_map_vector_cons [LawfulMonad m] :
   · rintro ⟨hh, ht⟩
     exact ⟨xs.head, hh, xs.tail, ht, List.Vector.cons_head_tail xs⟩
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 @[simp]
 lemma probOutput_seq_map_vector_cons_eq_mul [LawfulMonad m] (xs : List.Vector α (n + 1)) :
     Pr[= xs | (· ::ᵥ ·) <$> mx <*> my] = Pr[= xs.head | mx] * Pr[= xs.tail | my] := by
   conv_lhs => rw [show xs = xs.head ::ᵥ xs.tail from (List.Vector.cons_head_tail xs).symm]
   exact probOutput_seq_map_eq_mul_of_injective2 mx my _ Vector.injective2_cons xs.head xs.tail
 
+omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 @[simp]
 lemma probOutput_seq_map_vector_cons_eq_mul' [LawfulMonad m] (xs : List.Vector α (n + 1)) :
     Pr[= xs | (fun xs x => x ::ᵥ xs) <$> my <*> mx] =
@@ -302,13 +315,14 @@ section ListVectorMmap
 
 variable {n : ℕ}
 
+omit [LawfulMonadLiftT m SetM] in
 @[simp]
 lemma neverFail_list_vector_mmap {f : α → m β} {as : List.Vector α n}
     (h : ∀ x ∈ as.toList, NeverFail (f x)) : NeverFail (List.Vector.mmap f as) := by
   induction as using List.Vector.inductionOn with
   | nil => simp [List.Vector.mmap]
   | @cons n x xs ih =>
-    simp only [List.Vector.mmap_cons, HasEvalSPMF.neverFail_bind_iff]
+    simp only [List.Vector.mmap_cons, neverFail_bind_iff]
     exact ⟨h x (by simp), fun _ _ =>
       ⟨ih (fun x' hx' => h x' (by simp [hx'])), fun _ _ => inferInstance⟩⟩
 
@@ -320,24 +334,28 @@ end ListVectorMmap
 
 -- TODO: mem_support_vector_mapM and neverFail_vector_mapM for Std.Vector —
 -- Vector.mapM (Std/Batteries) uses MonadSatisfying internally and doesn't
--- reduce cleanly for generic HasEvalSPMF monads.
+-- reduce cleanly for generic `[MonadLiftT m SPMF]` monads.
 
 /-! ## NeverFail lemmas for list monadic operations -/
 
 section NeverFail
 
-variable {α β : Type*} {m : Type _ → Type _} [Monad m] [LawfulMonad m] [HasEvalSPMF m]
+variable {α β : Type*} {m : Type _ → Type _} [Monad m] [LawfulMonad m]
+  [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [LawfulMonadLiftT m SetM] in
 @[simp]
 lemma neverFail_list_mapM {f : α → m β} {as : List α}
     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (as.mapM f) := by
   induction as with
   | nil => rw [List.mapM_nil]; infer_instance
   | cons a as ih =>
-    simp only [List.mapM_cons, HasEvalSPMF.neverFail_bind_iff]
+    simp only [List.mapM_cons, neverFail_bind_iff]
     exact ⟨h a (.head ..), fun _ _ =>
       ⟨ih (fun x hx => h x (.tail _ hx)), fun _ _ => inferInstance⟩⟩
 
+omit [LawfulMonadLiftT m SetM] in
 omit [LawfulMonad m] in
 @[simp]
 lemma neverFail_list_mapM' {f : α → m β} {as : List α}
@@ -345,10 +363,11 @@ lemma neverFail_list_mapM' {f : α → m β} {as : List α}
   induction as with
   | nil => rw [List.mapM'_nil]; infer_instance
   | cons a as ih =>
-    simp only [List.mapM'_cons, HasEvalSPMF.neverFail_bind_iff]
+    simp only [List.mapM'_cons, neverFail_bind_iff]
     exact ⟨h a (.head ..), fun _ _ =>
       ⟨ih (fun x hx => h x (.tail _ hx)), fun _ _ => inferInstance⟩⟩
 
+omit [LawfulMonadLiftT m SetM] in
 @[simp]
 lemma neverFail_list_flatMapM {f : α → m (List β)} {as : List α}
     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (as.flatMapM f) := by
@@ -356,26 +375,28 @@ lemma neverFail_list_flatMapM {f : α → m (List β)} {as : List α}
   | nil => simp only [List.flatMapM_nil]; infer_instance
   | cons a as ih =>
     simp only [List.flatMapM_cons, bind_pure_comp,
-      HasEvalSPMF.neverFail_bind_iff, HasEvalSPMF.neverFail_map_iff]
+      neverFail_bind_iff, neverFail_map_iff]
     exact ⟨h a (.head ..), fun _ _ => ih (fun x hx => h x (.tail _ hx))⟩
 
+omit [LawfulMonadLiftT m SetM] in
 @[simp]
 lemma neverFail_list_filterMapM {f : α → m (Option β)} {as : List α}
     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (as.filterMapM f) := by
   induction as with
   | nil => simp only [List.filterMapM_nil]; infer_instance
   | cons a as ih =>
-    simp only [List.filterMapM_cons, HasEvalSPMF.neverFail_bind_iff]
+    simp only [List.filterMapM_cons, neverFail_bind_iff]
     refine ⟨h a (.head ..), fun y _ => ?_⟩
     have h_tail := ih (fun x hx => h x (.tail _ hx))
     cases y with
     | none => exact h_tail
     | some b =>
-      simp only [HasEvalSPMF.neverFail_bind_iff]
+      simp only [neverFail_bind_iff]
       exact ⟨h_tail, fun _ _ => inferInstance⟩
 
 variable {s : Type*}
 
+omit [LawfulMonadLiftT m SetM] in
 omit [LawfulMonad m] in
 @[simp]
 lemma neverFail_list_foldlM {f : s → α → m s} {init : s} {as : List α}
@@ -383,16 +404,17 @@ lemma neverFail_list_foldlM {f : s → α → m s} {init : s} {as : List α}
   induction as generalizing init with
   | nil => rw [List.foldlM_nil]; infer_instance
   | cons b bs ih =>
-    simp only [List.foldlM_cons, HasEvalSPMF.neverFail_bind_iff]
+    simp only [List.foldlM_cons, neverFail_bind_iff]
     exact ⟨h init b (.head ..), fun _ _ => ih (fun i x hx => h i x (.tail _ hx))⟩
 
+omit [LawfulMonadLiftT m SetM] in
 @[simp]
 lemma neverFail_list_foldrM {f : α → s → m s} {init : s} {as : List α}
     (h : ∀ i, ∀ x ∈ as, NeverFail (f x i)) : NeverFail (as.foldrM f init) := by
   induction as generalizing init with
   | nil => rw [List.foldrM_nil]; infer_instance
   | cons b bs ih =>
-    simp only [List.foldrM_cons, HasEvalSPMF.neverFail_bind_iff]
+    simp only [List.foldrM_cons, neverFail_bind_iff]
     exact ⟨ih (fun i x hx => h i x (.tail _ hx)), fun y _ => h y b (.head ..)⟩
 
 end NeverFail

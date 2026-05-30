@@ -15,8 +15,8 @@ import VCVio.OracleComp.Constructions.SampleableType
 
 This file defines simple security experiments that succeed unless they terminate with failure.
 Each experiment carries bundled subprobabilistic semantics, so the experiment can be interpreted
-through an internal semantic monad instead of requiring a global `HasEvalSPMF` instance on the
-ambient monad.
+through an internal semantic monad instead of requiring a global `MonadLiftT _ SPMF` instance
+on the ambient monad.
 
 We also define `BoundedAdversary α β` as an oracle computation bundled with a query bound.
 -/

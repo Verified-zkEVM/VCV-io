@@ -59,7 +59,7 @@ namespace OracleComp.Rel.Loom.Coherence
 
 variable {ι₁ ι₂ : Type u}
 variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable [IsUniformSpec spec₁] [IsUniformSpec spec₂]
 variable {α β : Type}
 
 /-! ## Bound: `eRelWP` on an indicator post is always `≤ 1`

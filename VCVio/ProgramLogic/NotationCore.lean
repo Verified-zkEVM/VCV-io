@@ -50,7 +50,7 @@ namespace OracleComp.ProgramLogic
 
 variable {ι₁ : Type u}
 variable {spec₁ : OracleSpec ι₁}
-variable [spec₁.Fintype] [spec₁.Inhabited]
+variable [IsUniformSpec spec₁]
 variable {α β : Type}
 
 /-! ## Convenience predicates -/
@@ -181,7 +181,7 @@ macro_rules
 
 /-- `probEvent` equals WP of propInd postcondition. -/
 lemma probEvent_eq_wp_propInd {ι : Type u} {spec : OracleSpec ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Pr[ p | oa] = wp oa (fun x => 𝟙⟦p x⟧) := by
   classical
@@ -198,7 +198,7 @@ lemma Relational.RelPost.indicator_eq_propInd {α β : Type}
 /-- Almost-sure correctness: `Triple 𝟙⟦True⟧ c (fun x => 𝟙⟦p x⟧)` iff
 `Pr[ p | c] = 1`. -/
 lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Triple (𝟙⟦True⟧ : ℝ≥0∞) oa (fun x => 𝟙⟦p x⟧) ↔
       Pr[ p | oa] = 1 := by
@@ -207,7 +207,7 @@ lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
 
 /-- Lower-bound event goals are exactly quantitative triples with indicator postconditions. -/
 lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (r : ℝ≥0∞) :
     Triple r oa (fun x => 𝟙⟦p x⟧) ↔ r ≤ Pr[ p | oa] := by
   rw [triple_iff_le_wp, ← probEvent_eq_wp_propInd]
@@ -216,7 +216,7 @@ lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
 
 /-- WP of a disjunction indicator is bounded by the sum of individual WP indicators. -/
 theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p q : α → Prop) :
     wp oa (fun x => 𝟙⟦p x ∨ q x⟧) ≤
         wp oa (fun x => 𝟙⟦p x⟧) +
@@ -226,7 +226,7 @@ theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι}
 
 /-- Monotonicity for event probabilities, exposed through the program-logic namespace. -/
 theorem probEvent_mono {ι : Type u} {spec : OracleSpec ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) {p q : α → Prop}
     (h : ∀ x, p x → q x) :
     Pr[ p | oa] ≤ Pr[ q | oa] :=
@@ -234,7 +234,7 @@ theorem probEvent_mono {ι : Type u} {spec : OracleSpec ι}
 
 /-- Markov inequality: if `a ≤ f x` whenever `p x`, then `a * Pr[ p | oa] ≤ E[f | oa]`. -/
 theorem markov_bound {ι : Type u} {spec : OracleSpec ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (f : α → ℝ≥0∞) (a : ℝ≥0∞)
     (p : α → Prop) (hf : ∀ x, p x → a ≤ f x) :
     a * Pr[ p | oa] ≤ wp oa f := by
@@ -247,12 +247,12 @@ theorem markov_bound {ι : Type u} {spec : OracleSpec ι}
 
 /-- `Triple` with precondition `1` and indicator postcondition when the event is almost sure. -/
 theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι}
-    [spec.Fintype] [spec.Inhabited] {α : Type}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (h : ∀ x ∈ support oa, p x) :
     Triple (1 : ℝ≥0∞) oa (fun x => 𝟙⟦p x⟧) := by
   rw [show (1 : ℝ≥0∞) = 𝟙⟦True⟧ from propInd_true.symm]
   exact (triple_propInd_iff_probEvent_eq_one oa p).mpr
-    (probEvent_eq_one ⟨HasEvalPMF.probFailure_eq_zero oa, h⟩)
+    (probEvent_eq_one ⟨probFailure_of_liftM_PMF oa, h⟩)
 
 /-! ## Bridge lemmas: game equivalence and advantage -/
 
