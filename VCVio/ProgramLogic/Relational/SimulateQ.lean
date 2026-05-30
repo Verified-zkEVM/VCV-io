@@ -2134,8 +2134,7 @@ lemma expectedQuerySlack_resource_le
     expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) oa qS (s, false)
       ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * (R s + qS + qH) * β := by
   induction oa using OracleComp.inductionOn generalizing qS qH s with
-  | pure x =>
-      simp
+  | pure x => simp only [expectedQuerySlack_pure, zero_le]
   | query_bind t cont ih =>
       rw [isQueryBoundP_query_bind_iff] at h_qS h_qH
       obtain ⟨hcanS, hcontS⟩ := h_qS
@@ -2192,7 +2191,7 @@ lemma expectedQuerySlack_resource_le
                 · simp only [hHt, if_true]
                   have hqH_cast : (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
                     exact_mod_cast Nat.sub_add_cancel (hcanH.resolve_left (· hHt))
-                  rw[add_assoc, hqH_cast]
+                  rw [add_assoc, hqH_cast]
                 · simp only [hHt, if_false]; ring_nf; exact le_refl _
           exact h_tail qS hcontS hbudget
       intro n hcont' hRz_bound
@@ -2209,8 +2208,7 @@ lemma expectedQuerySlack_resource_le
                 · simp [probOutput_eq_zero_of_not_mem_support hz]
         _ ≤ (n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β := by
               rw [ENNReal.tsum_mul_right]
-              exact le_of_le_of_eq
-                (mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one) rfl
+              exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
 
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
