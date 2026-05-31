@@ -1,4 +1,5 @@
 import ToMathlib.Analysis.MeanInequalities
+import ToMathlib.Combinatorics.FinPairs
 import ToMathlib.Control.AlternativeMonad
 import ToMathlib.Control.Lawful.MonadControl
 import ToMathlib.Control.Lawful.MonadFunctor
