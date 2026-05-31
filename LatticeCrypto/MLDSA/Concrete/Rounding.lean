@@ -503,12 +503,10 @@ private theorem highBitsCoeff_add_eq_of_centeredRepr_lt
       rw [centeredRepr_intCast s, Int.cast_add, ← add_assoc, decomposeCoeff_eq r ctx.h2α hdecomp_r]
     exact (decomposeCoeff_eq (r + s) ctx.h2α hdecomp_rs).trans hcandidate.symm
   simp only [highBitsCoeff, hdecomp_rs, hdecomp_r] at hneq
-  cases show r1 < u ∨ u < r1 from lt_or_gt_of_ne hneq.symm with
-  | inl hr1ltu =>
-    use r1, u, v, w; refine ⟨hr1ltu, ?_, hdiffbound, heq.symm⟩
+  rcases lt_or_gt_of_ne hneq.symm with hr1ltu | hultr1
+  · use r1, u, v, w; refine ⟨hr1ltu, ?_, hdiffbound, heq.symm⟩
     · simpa [highBitsCoeff, hdecomp_rs] using highBitsCoeff_lt_m ctx (r + s)
-  | inr hultr1 =>
-    use u, r1, w, v; refine ⟨hultr1, ?_, ?_, heq⟩
+  · use u, r1, w, v; refine ⟨hultr1, ?_, ?_, heq⟩
     · simpa [highBitsCoeff, hdecomp_r] using highBitsCoeff_lt_m ctx r
     · rw [show w - v = -(v - w) from by ring, Int.natAbs_neg]; exact hdiffbound
 
@@ -534,21 +532,20 @@ private theorem useHintCoeff_shift_sub_le
         · use r0 - alpha; constructor
           · simp only [useHintCoeff, if_true, hdec, hr0pos, ctx.h2α, ctx.hmdef]
             rw [Nat.mod_eq_of_lt hwrap, ←hdecomp]
-            push_cast
-            ring_nf
+            push_cast; ring
           · omega
         · use r0 - alpha - 1; constructor
           · rw [show useHintCoeff true r (alpha / 2) = 0 by
                 simp [useHintCoeff, hdec, hr0pos, ctx.h2α, ctx.hmdef, show r1 + 1 = m by omega]]
             simp [← hdecomp, show r1 = m - 1 by omega, alpha_mul_pred_m_eq ctx]
-            ring_nf
+            ring
           · omega
       · by_cases hr1zero : r1 = 0
         · use r0 + alpha + 1; constructor
           · rw [show useHintCoeff true r (alpha / 2) = m - 1 by
                   simp [useHintCoeff, hdec, hr0pos, hr1zero, ctx.h2α, ctx.hmdef],
               alpha_mul_pred_m_eq ctx, ← hdecomp, hr1zero]
-            push_cast; ring_nf
+            push_cast; ring
           · omega
         · use r0 + alpha; constructor
           · have huse : useHintCoeff true r (alpha / 2) = r1 - 1 := by
@@ -557,7 +554,7 @@ private theorem useHintCoeff_shift_sub_le
               rw [show r1 + m - 1 = r1 - 1 + m by omega, Nat.add_mod_right,
                     Nat.mod_eq_of_lt (by omega)]
             rw [huse, ← hdecomp, Nat.cast_sub (Nat.pos_of_ne_zero hr1zero)]
-            push_cast; ring_nf
+            push_cast; ring
           · omega
 
 private theorem highBitsCoeff_eq_of_pos_overflow {alpha m : ℕ} (ctx : BalancedDecomp alpha m)
@@ -657,13 +654,6 @@ private theorem useHintCoeff_makeHintCoeff_eq_of_small
       simp only [makeHintCoeff, ne_eq, hneq, not_false_eq_true, decide_true, huse]
       rw [highBitsCoeff_eq_of_neg_overflow ctx r1 v hr1lt (by omega) hv_hi hsum]
 
-private theorem mul_left_injective_of_isUnit {c : Coeff} (hc : IsUnit c) :
-    Function.Injective fun x : Coeff => c * x := by
-  intro x y hxy
-  rcases hc with ⟨u, rfl⟩
-  have hxy' := congrArg (fun z : Coeff => ↑u⁻¹ * z) hxy
-  simpa [mul_assoc] using hxy'
-
 theorem highBitsShift_injective_of_isApproved (p : Params)
     (hp : p.isApproved) :
     Function.Injective (highBitsShift p) := by
@@ -671,7 +661,7 @@ theorem highBitsShift_injective_of_isApproved (p : Params)
   refine Poly.ext_get_eq fun j => ?_
   have hcoeff : (2 * p.gamma2 : ℕ) * x.get j = (2 * p.gamma2 : ℕ) * y.get j := by
     simpa [highBitsShift] using congrArg (fun v : Rq => v.get j) hxy
-  exact mul_left_injective_of_isUnit (BalancedDecomp.ofApproved hp).hunit hcoeff
+  exact IsUnit.mul_right_injective (BalancedDecomp.ofApproved hp).hunit hcoeff
 
 /-- Concrete `Power2RoundOps` with `Power2High = Rq`. -/
 def concretePower2RoundOps : MLDSA.Power2RoundOps where
