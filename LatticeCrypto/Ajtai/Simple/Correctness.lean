@@ -34,16 +34,22 @@ variable {Coeff : Type u} [CommRing Coeff]
     verify ring A s c opening = true ↔ commit ring A s = c := by
   simp [verify]
 
-/-- Simple Ajtai commitments are perfectly correct by construction. -/
+/-- Simple Ajtai commitments are correct on short messages: an honest commitment to a
+message accepted by `isShort` always verifies. The shortness side condition is intrinsic
+to the scheme's `verify`, so unconditional `PerfectlyCorrect` does not hold once `isShort`
+rejects some messages. -/
 theorem perfectlyCorrect (ring : NegacyclicRing Coeff) (rows cols : Nat)
+    (isShort : Message ring cols → Bool)
     [SampleableType (PublicParams ring rows cols)]
-    [DecidableEq (Commitment ring rows)] :
-    (commitmentScheme ring rows cols).PerfectlyCorrect := by
-  intro A _ s cd hmem
+    [DecidableEq (Commitment ring rows)]
+    (A : PublicParams ring rows cols) (s : Message ring cols) (hs : isShort s = true)
+    (cd : Commitment ring rows × Opening)
+    (hmem : cd ∈ support ((commitmentScheme ring rows cols isShort).commit A s)) :
+    (commitmentScheme ring rows cols isShort).verify A s cd.1 cd.2 = true := by
   simp only [commitmentScheme, support_pure, Set.mem_singleton_iff] at hmem
   rcases hmem with rfl
-  change verify ring A s (commit ring A s) () = true
-  simp
+  change (isShort s && verify ring A s (commit ring A s) ()) = true
+  simp [hs]
 
 end Simple
 end Ajtai

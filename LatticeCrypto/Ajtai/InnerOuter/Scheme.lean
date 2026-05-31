@@ -5,13 +5,17 @@ Authors: Tobias Rothmann
 -/
 
 import LatticeCrypto.Ajtai.Simple.Scheme
-import LatticeCrypto.Ajtai.Arithmetic
+import LatticeCrypto.Ajtai.Gadget
+import LatticeCrypto.Ring.VectorCommRing
 import VCVio.CryptoFoundations.CommitmentScheme
 
 /-!
 # Inner-Outer Ajtai Commitment Scheme
 
-Definitions for the Greyhound/Hachi inner-outer commitment composition.
+Definitions for the Greyhound/Hachi inner-outer commitment composition. The scheme
+operations and security live over the canonical vector-backed negacyclic ring
+`vectorNegacyclicRing (ZMod q) d`; the data containers are parameterized by the ring
+they store (always instantiated at that canonical ring throughout the development).
 -/
 
 open OracleComp ENNReal
@@ -59,64 +63,65 @@ abbrev Commitment (ring : NegacyclicRing Coeff) (outerRows : Nat) :=
 
 section Scheme
 
-variable {ring : NegacyclicRing Coeff}
+variable {q : ℕ} [NeZero q] [Fact (1 < q)] {d : ℕ} [NeZero d]
+
 variable {innerRows messageRows messageDigits outerRows blocks innerDigits : Nat}
 
 /-- Honest opening generation from the supplied decomposition operations. -/
 def openMessage
-    (decomp : Decomposition ring messageRows messageDigits innerRows innerDigits)
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (m : Message ring messageRows blocks) :
-    Opening ring innerRows messageRows messageDigits blocks innerDigits :=
+    (decomp : Decomposition R messageRows messageDigits innerRows innerDigits)
+    (pp : PublicParams R innerRows messageRows messageDigits outerRows blocks innerDigits)
+    (m : Message R messageRows blocks) :
+    Opening R innerRows messageRows messageDigits blocks innerDigits :=
   let ss := m.map decomp.message
   { messageDecomp := ss
-    innerDecomp := ss.map fun s => decomp.inner (Simple.commit ring pp.innerMatrix s) }
+    innerDecomp := ss.map fun s => decomp.inner (Simple.commit R pp.innerMatrix s) }
 
 /-- Compute the outer commitment from an opening. -/
 def commitWithOpening
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) :
-    Commitment ring outerRows :=
-  Simple.commit ring pp.outerMatrix (PolyVec.flattenBlocks opening.innerDecomp)
+    (pp : PublicParams R innerRows messageRows messageDigits outerRows blocks innerDigits)
+    (opening : Opening R innerRows messageRows messageDigits blocks innerDigits) :
+    Commitment R outerRows :=
+  Simple.commit R pp.outerMatrix (PolyVec.flattenBlocks opening.innerDecomp)
 
-variable [DecidableEq (PolyVec ring.Poly messageRows)]
-variable [DecidableEq (PolyVec ring.Poly innerRows)]
-variable [DecidableEq (Commitment ring outerRows)]
+variable [DecidableEq (PolyVec (vectorNegacyclicRing (ZMod q) d).Poly messageRows)]
+variable [DecidableEq (PolyVec (vectorNegacyclicRing (ZMod q) d).Poly innerRows)]
+variable [DecidableEq (Commitment (vectorNegacyclicRing (ZMod q) d) outerRows)]
 
 /-- Verify a inner-outer opening. -/
-def verify (base : Coeff)
-    (pp : PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-    (m : Message ring messageRows blocks)
-    (c : Commitment ring outerRows)
-    (opening : Opening ring innerRows messageRows messageDigits blocks innerDigits) : Bool :=
+def verify (base : ZMod q)
+    (pp : PublicParams R innerRows messageRows messageDigits outerRows blocks innerDigits)
+    (m : Message R messageRows blocks)
+    (c : Commitment R outerRows)
+    (opening : Opening R innerRows messageRows messageDigits blocks innerDigits) : Bool :=
   (List.finRange blocks).all (fun i =>
-    Simple.verify ring (gadgetMatrix ring base messageRows messageDigits)
+    Simple.verify R (gadgetMatrix R base messageRows messageDigits)
       (opening.messageDecomp.get i) (m.get i) ()) &&
     (List.finRange blocks).all (fun i =>
-      Simple.verify ring (gadgetMatrix ring base innerRows innerDigits)
+      Simple.verify R (gadgetMatrix R base innerRows innerDigits)
         (opening.innerDecomp.get i)
-        (Simple.commit ring pp.innerMatrix (opening.messageDecomp.get i)) ()) &&
-    Simple.verify ring pp.outerMatrix (PolyVec.flattenBlocks opening.innerDecomp) c ()
+        (Simple.commit R pp.innerMatrix (opening.messageDecomp.get i)) ()) &&
+    Simple.verify R pp.outerMatrix (PolyVec.flattenBlocks opening.innerDecomp) c ()
 
 section CommitmentScheme
 
-variable [SampleableType (Simple.PublicParams ring innerRows (messageRows * messageDigits))]
-variable [SampleableType (Simple.PublicParams ring outerRows (blocks * (innerRows * innerDigits)))]
-variable [DecidableEq (PolyVec ring.Poly messageRows)]
-variable [DecidableEq (PolyVec ring.Poly innerRows)]
-variable [DecidableEq (Commitment ring outerRows)]
+variable [SampleableType
+  (Simple.PublicParams (vectorNegacyclicRing (ZMod q) d) innerRows (messageRows * messageDigits))]
+variable [SampleableType
+  (Simple.PublicParams (vectorNegacyclicRing (ZMod q) d) outerRows
+    (blocks * (innerRows * innerDigits)))]
 
 /-- The inner-outer Ajtai commitment instantiated as `CommitmentScheme`. -/
-def commitmentScheme (base : Coeff)
-    (decomp : Decomposition ring messageRows messageDigits innerRows innerDigits) :
+def commitmentScheme (base : ZMod q)
+    (decomp : Decomposition R messageRows messageDigits innerRows innerDigits) :
     CommitmentScheme
-      (PublicParams ring innerRows messageRows messageDigits outerRows blocks innerDigits)
-      (Message ring messageRows blocks)
-      (Commitment ring outerRows)
-      (Opening ring innerRows messageRows messageDigits blocks innerDigits) where
+      (PublicParams R innerRows messageRows messageDigits outerRows blocks innerDigits)
+      (Message R messageRows blocks)
+      (Commitment R outerRows)
+      (Opening R innerRows messageRows messageDigits blocks innerDigits) where
   setup := do
-    let A ← $ᵗ Simple.PublicParams ring innerRows (messageRows * messageDigits)
-    let B ← $ᵗ Simple.PublicParams ring outerRows (blocks * (innerRows * innerDigits))
+    let A ← $ᵗ Simple.PublicParams R innerRows (messageRows * messageDigits)
+    let B ← $ᵗ Simple.PublicParams R outerRows (blocks * (innerRows * innerDigits))
     pure { innerMatrix := A, outerMatrix := B }
   commit pp m := do
     let opening := openMessage decomp pp m

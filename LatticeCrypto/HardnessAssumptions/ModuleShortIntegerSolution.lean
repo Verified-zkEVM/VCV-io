@@ -36,7 +36,7 @@ def relation (ring : NegacyclicRing Coeff) {rows cols : Nat}
     (A : PolyMatrix ring.Poly rows cols) (z : Solution ring cols) : Bool :=
   decide (z ≠ 0) &&
     isShort z &&
-    decide (ring.matVecMul A z = 0)
+    decide (A *ᵥ z = 0)
 
 /-- Module-SIS as an instance of the generic SIS search game. -/
 def problem (ring : NegacyclicRing Coeff) (rows cols : Nat)

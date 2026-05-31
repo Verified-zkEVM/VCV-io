@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao
+Authors: Quang Dao, Tobias Rothmann
 -/
 import LatticeCrypto.Ring.VectorBackend
 import Mathlib.Data.ZMod.Basic
@@ -19,14 +19,16 @@ Backend-generic norm infrastructure for the lattice ring layer. Defines:
   norm bounds.
 - `centeredRepr` and associated lemmas: the canonical centered representative
   for `ZMod q`, mapping each element to `[-(q-1)/2, (q-1)/2]`.
+- `lpNormPowOf`: the generic un-rooted `ℓ_p` norm `Σᵢ |cᵢ|^p`, with `l1NormOf`
+  (`p = 1`) and `l2NormSqOf` (`p = 2`) as special cases.
 - Generic norm constructors (`cInfNormOf`, `l1NormOf`, `l2NormSqOf`) and their
-  specialized vector-backend versions (`cInfNorm`, `l1Norm`, `l2NormSq`).
+  specialized vector-backend versions (`cInfNorm`, `l1Norm`, `l2NormSq`,
+  `lpNormPow`).
 - `PolyVec` norm lifts and `zmodPolyNormOps`.
 
 `MLDSA.Arithmetic` and `Falcon.Arithmetic` assemble scheme-local norm aliases
 from `zmodPolyNormOps`.
 -/
-
 
 open scoped BigOperators
 
@@ -47,8 +49,11 @@ centered `ℓ∞`, `ℓ₁`, and squared `ℓ₂`. Constructed generically via
 `normOpsOfCenteredView`, or directly via `zmodPolyNormOps` for `ZMod q`
 coefficients. -/
 structure NormOps {Coeff : Type*} (backend : PolyBackend Coeff) where
+  /-- The centered `ℓ∞` norm of a backend polynomial. -/
   cInfNorm : backend.Poly → ℕ
+  /-- The `ℓ₁` norm `Σᵢ |cᵢ|` of a backend polynomial. -/
   l1Norm : backend.Poly → ℕ
+  /-- The squared `ℓ₂` norm `Σᵢ |cᵢ|²` of a backend polynomial. -/
   l2NormSq : backend.Poly → ℕ
 
 namespace NormOps
@@ -175,17 +180,26 @@ section GenericNorms
 
 variable {Coeff : Type*} (backend : PolyBackend Coeff) (view : CenteredCoeffView Coeff)
 
+/-- Backend-generic `p`-th-power `ℓ_p` "norm" `Σᵢ |cᵢ|^p`, i.e. the un-rooted `ℓ_p`
+norm of the centered coefficient vector.
+
+Keeping the sum un-rooted keeps the value in `ℕ` (no square root). The two cases the
+lattice schemes actually use are `l1NormOf` (`p = 1`) and `l2NormSqOf` (`p = 2`),
+both defined below as special cases. -/
+def lpNormPowOf (p : ℕ) (poly : backend.Poly) : ℕ :=
+  ∑ i : Fin backend.degree, (view.repr (backend.coeff poly i)).natAbs ^ p
+
 /-- Backend-generic centered infinity norm. -/
 def cInfNormOf (p : backend.Poly) : ℕ :=
   Finset.sup Finset.univ fun i : Fin backend.degree => (view.repr (backend.coeff p i)).natAbs
 
-/-- Backend-generic `ℓ₁` norm. -/
+/-- Backend-generic `ℓ₁` norm `Σᵢ |cᵢ|`, the `p = 1` case of `lpNormPowOf`. -/
 def l1NormOf (p : backend.Poly) : ℕ :=
-  ∑ i : Fin backend.degree, (view.repr (backend.coeff p i)).natAbs
+  lpNormPowOf backend view 1 p
 
-/-- Backend-generic squared `ℓ₂` norm. -/
+/-- Backend-generic squared `ℓ₂` norm `Σᵢ |cᵢ|²`, the `p = 2` case of `lpNormPowOf`. -/
 def l2NormSqOf (p : backend.Poly) : ℕ :=
-  ∑ i : Fin backend.degree, (view.repr (backend.coeff p i)).natAbs ^ 2
+  lpNormPowOf backend view 2 p
 
 /-- Construct a generic norm bundle from a centered coefficient view. -/
 def normOpsOfCenteredView : NormOps backend where
@@ -215,6 +229,16 @@ def l2NormSq (p : Poly (ZMod q) n) : ℕ :=
 def pairL2NormSq (p₁ p₂ : Poly (ZMod q) n) : ℕ :=
   l2NormSq p₁ + l2NormSq p₂
 
+/-- The un-rooted `ℓ_p` norm on the canonical vector backend. -/
+def lpNormPow (p : ℕ) (poly : Poly (ZMod q) n) : ℕ :=
+  lpNormPowOf (vectorBackend (ZMod q) n) (zmodCenteredCoeffView q) p poly
+
+theorem l1Norm_eq_lpNormPow (p : Poly (ZMod q) n) : l1Norm p = lpNormPow 1 p :=
+  rfl
+
+theorem l2NormSq_eq_lpNormPow (p : Poly (ZMod q) n) : l2NormSq p = lpNormPow 2 p :=
+  rfl
+
 theorem cInfNorm_le_iff {p : Poly (ZMod q) n} {b : ℕ} :
     cInfNorm p ≤ b ↔ ∀ i : Fin n, (centeredRepr (p.get i)).natAbs ≤ b := by
   simp [cInfNorm, cInfNormOf, vectorBackend, zmodCenteredCoeffView, Finset.sup_le_iff]
@@ -241,7 +265,8 @@ theorem cInfNorm_le_halfq (p : Poly (ZMod q) n) : cInfNorm p ≤ q / 2 :=
 
 theorem l1Norm_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : cInfNorm p ≤ b) : l1Norm p ≤ n * b := by
-  unfold l1Norm l1NormOf
+  unfold l1Norm l1NormOf lpNormPowOf
+  simp only [pow_one]
   calc
     ∑ i : Fin n, (centeredRepr (p.get i)).natAbs
       ≤ ∑ _i : Fin n, b := Finset.sum_le_sum fun i _ => (cInfNorm_le_iff.mp h) i
@@ -249,12 +274,39 @@ theorem l1Norm_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
 
 theorem l2NormSq_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : cInfNorm p ≤ b) : l2NormSq p ≤ n * b ^ 2 := by
-  unfold l2NormSq l2NormSqOf
+  unfold l2NormSq l2NormSqOf lpNormPowOf
   calc
     ∑ i : Fin n, (centeredRepr (p.get i)).natAbs ^ 2
       ≤ ∑ _i : Fin n, b ^ 2 :=
         Finset.sum_le_sum fun i _ => Nat.pow_le_pow_left (cInfNorm_le_iff.mp h i) 2
     _ = n * b ^ 2 := by simp [Finset.sum_const]
+
+/-- The squared `ℓ₂` norm is bounded by the square of the `ℓ₁` norm (`Σ aᵢ² ≤ (Σ aᵢ)²`). -/
+theorem l2NormSq_le_l1Norm_sq (p : Poly (ZMod q) n) : l2NormSq p ≤ l1Norm p ^ 2 := by
+  unfold l2NormSq l2NormSqOf l1Norm l1NormOf lpNormPowOf
+  simp only [pow_one]
+  calc
+    ∑ i : Fin n, (centeredRepr (p.get i)).natAbs ^ 2
+      ≤ ∑ i : Fin n, (centeredRepr (p.get i)).natAbs
+          * ∑ j : Fin n, (centeredRepr (p.get j)).natAbs := by
+        refine Finset.sum_le_sum (fun i _ => ?_)
+        rw [pow_two]
+        exact Nat.mul_le_mul le_rfl
+          (Finset.single_le_sum (f := fun j : Fin n => (centeredRepr (p.get j)).natAbs)
+            (fun j _ => Nat.zero_le _) (Finset.mem_univ i))
+    _ = (∑ i : Fin n, (centeredRepr (p.get i)).natAbs) ^ 2 := by
+        rw [← Finset.sum_mul, ← pow_two]
+
+/-- The `ℓ₁` norm is bounded by the squared `ℓ₂` norm (`Σ aᵢ ≤ Σ aᵢ²`, since `a ≤ a²`). -/
+theorem l1Norm_le_l2NormSq (p : Poly (ZMod q) n) : l1Norm p ≤ l2NormSq p := by
+  unfold l1Norm l1NormOf l2NormSq l2NormSqOf lpNormPowOf
+  simp only [pow_one]
+  exact Finset.sum_le_sum (fun i _ => Nat.le_self_pow (by norm_num) _)
+
+/-- A nonzero `ℓ₁` norm forces a nonzero squared `ℓ₂` norm (both vanish iff `p = 0`). -/
+theorem l2NormSq_pos_of_l1Norm_pos {p : Poly (ZMod q) n} (h : 0 < l1Norm p) :
+    0 < l2NormSq p :=
+  lt_of_lt_of_le h (l1Norm_le_l2NormSq p)
 
 end SpecializedVectorNorms
 
@@ -277,11 +329,8 @@ theorem component_cInfNorm_le (v : PolyVec backend.Poly k) (j : Fin k) :
     ops.cInfNorm (v.get j) ≤ PolyVec.cInfNorm ops v :=
   Finset.le_sup (f := fun j => ops.cInfNorm (v.get j)) (Finset.mem_univ j)
 
-/-- The `ℓ₁` norm of a polynomial vector. -/
-def l1Norm (v : PolyVec backend.Poly k) : ℕ :=
-  Finset.sup Finset.univ fun j : Fin k => ops.l1Norm (v.get j)
-
-/-- The squared `ℓ₂` norm of a polynomial vector. -/
+/-- The squared `ℓ₂` norm of a polynomial vector (sum of component squared `ℓ₂`
+norms, matching the `‖w‖₂ = (Σⱼ ‖wⱼ‖²)^{1/2}` convention). -/
 def l2NormSq (v : PolyVec backend.Poly k) : ℕ :=
   ∑ j : Fin k, ops.l2NormSq (v.get j)
 
@@ -290,5 +339,44 @@ end PolyVec
 /-- The canonical backend-generic norm bundle for `ZMod q` coefficients. -/
 def zmodPolyNormOps (q : ℕ) [NeZero q] (backend : PolyBackend (ZMod q)) : NormOps backend :=
   normOpsOfCenteredView backend (zmodCenteredCoeffView q)
+
+/-! ## Notation
+
+Scoped notation (`open scoped LatticeCrypto`, or being inside `namespace
+LatticeCrypto`) for the centered norms. Two families:
+
+* Bare bars `‖p‖∞`, `‖p‖₁`, `‖p‖₂²`, `‖(p₁, p₂)‖₂²` denote the canonical centered
+  norms on the vector backend `Poly (ZMod q) n` (`cInfNorm`, `l1Norm`, `l2NormSq`,
+  `pairL2NormSq`).
+* `⟪ops⟫`-annotated bars `‖f‖⟪ops⟫∞`, `‖f‖⟪ops⟫₁`, `‖f‖⟪ops⟫₂²`, `‖(s₁, s₂)‖⟪ops⟫₂²`
+  denote the norms of a `NormOps` bundle `ops`, applied either to a single backend
+  polynomial or — by overloading the same syntax — to a `PolyVec`.
+
+The trailing subscript on the closing bar keeps these distinct from Mathlib's
+`‖·‖` (`Norm.norm`). -/
+
+@[inherit_doc cInfNorm]
+scoped notation:max "‖" p "‖∞" => LatticeCrypto.cInfNorm p
+@[inherit_doc l1Norm]
+scoped notation:max "‖" p "‖₁" => LatticeCrypto.l1Norm p
+@[inherit_doc l2NormSq]
+scoped notation:max "‖" p "‖₂²" => LatticeCrypto.l2NormSq p
+@[inherit_doc pairL2NormSq]
+scoped notation:max "‖(" p₁ "," p₂ ")" "‖₂²" => LatticeCrypto.pairL2NormSq p₁ p₂
+
+@[inherit_doc NormOps.cInfNorm]
+scoped notation:max "‖" f "‖⟪" ops "⟫∞" => LatticeCrypto.NormOps.cInfNorm ops f
+@[inherit_doc NormOps.l1Norm]
+scoped notation:max "‖" f "‖⟪" ops "⟫₁" => LatticeCrypto.NormOps.l1Norm ops f
+@[inherit_doc NormOps.l2NormSq]
+scoped notation:max "‖" f "‖⟪" ops "⟫₂²" => LatticeCrypto.NormOps.l2NormSq ops f
+@[inherit_doc NormOps.pairL2NormSq]
+scoped notation:max "‖(" p₁ "," p₂ ")" "‖⟪" ops "⟫₂²" =>
+  LatticeCrypto.NormOps.pairL2NormSq ops p₁ p₂
+
+@[inherit_doc PolyVec.cInfNorm]
+scoped notation:max "‖" v "‖⟪" ops "⟫∞" => LatticeCrypto.PolyVec.cInfNorm ops v
+@[inherit_doc PolyVec.l2NormSq]
+scoped notation:max "‖" v "‖⟪" ops "⟫₂²" => LatticeCrypto.PolyVec.l2NormSq ops v
 
 end LatticeCrypto

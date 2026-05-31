@@ -292,7 +292,7 @@ theorem concretePower2Round_remainder_eq_low (r : Rq) :
     exact sub_eq_iff_eq_add'.2 (power2RoundCoeff_eq (r.get j)).symm
 
 theorem concretePower2Round_bound (r : Rq) :
-    cInfNorm (r - power2RoundShift (power2RoundHigh r)) ≤ 2 ^ (droppedBits - 1) := by
+    ‖r - power2RoundShift (power2RoundHigh r)‖∞ ≤ 2 ^ (droppedBits - 1) := by
   rw [concretePower2Round_remainder_eq_low]
   refine cInfNorm_le_of_coeff_le ?_
   intro i
@@ -317,7 +317,7 @@ theorem concreteRounding_high_low_decomp (p : Params) (r : Rq) :
 
 theorem concreteRounding_lowBits_bound (p : Params)
     (hγ : 0 < p.gamma2) (hq : 2 * p.gamma2 < modulus) (r : Rq) :
-    cInfNorm (lowBits p r) ≤ p.gamma2 := by
+    ‖lowBits p r‖∞ ≤ p.gamma2 := by
   refine cInfNorm_le_of_coeff_le ?_
   intro i
   rw [lowBits_get]
@@ -895,7 +895,7 @@ theorem concreteRounding_high_low_decomp_of_isApproved (p : Params)
 
 theorem concreteRounding_lowBits_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
-    cInfNorm (lowBits p r) ≤ p.gamma2 :=
+    ‖lowBits p r‖∞ ≤ p.gamma2 :=
   concreteRounding_lowBits_bound p (gamma2_pos_of_isApproved hp)
     (gamma2_double_lt_modulus_of_isApproved hp) r
 
@@ -929,8 +929,7 @@ def concretePower2RoundOps : MLDSA.Power2RoundOps where
   shift2 := power2RoundShift
 
 theorem concretePower2Round_bound_field (r : Rq) :
-    cInfNorm
-      (r - concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r)) ≤
+    ‖r - concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r)‖∞ ≤
         2 ^ (droppedBits - 1) := by
   simpa [concretePower2RoundOps] using concretePower2Round_bound r
 
@@ -946,8 +945,8 @@ def concreteRoundingOps (p : Params) : MLDSA.RoundingOps (2 * p.gamma2) where
 
 theorem concreteRounding_lowBits_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
-    cInfNorm ((concreteRoundingOps p).lowBits r) ≤ (2 * p.gamma2) / 2 := by
-  change cInfNorm (lowBits p r) ≤ (2 * p.gamma2) / 2
+    ‖ (concreteRoundingOps p).lowBits r‖∞ ≤ (2 * p.gamma2) / 2 := by
+  change ‖lowBits p r‖∞ ≤ (2 * p.gamma2) / 2
   simp only [gamma2_half]
   exact concreteRounding_lowBits_bound_of_isApproved p hp r
 
@@ -959,7 +958,7 @@ theorem concreteRounding_shift_injective_field_of_isApproved (p : Params)
 
 theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
     (hp : p.isApproved) (z r : Rq) :
-    cInfNorm z ≤ p.gamma2 →
+    ‖z‖∞ ≤ p.gamma2 →
     useHint p (makeHint p z r) r = highBits p (r + z) := by
   intro hz
   refine Poly.ext_get_eq fun j => ?_
@@ -970,7 +969,7 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
 
 theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
-    cInfNorm (r - highBitsShift p (useHint p h r)) ≤ 2 * p.gamma2 + 1 := by
+    ‖r - highBitsShift p (useHint p h r)‖∞ ≤ 2 * p.gamma2 + 1 := by
   apply cInfNorm_le_iff.mpr
   intro j
   have hcoeff : (r - highBitsShift p (useHint p h r)).get j =
@@ -984,8 +983,8 @@ theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
 
 theorem concreteRounding_hide_low_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
-    cInfNorm s ≤ b →
-    cInfNorm (lowBits p r) + b < p.gamma2 →
+    ‖s‖∞ ≤ b →
+    ‖lowBits p r‖∞ + b < p.gamma2 →
     highBits p (r + s) = highBits p r := by
   intro hs hlow
   refine Poly.ext_get_eq fun j => ?_
@@ -1001,15 +1000,14 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
 
 theorem concreteRounding_useHint_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
-    cInfNorm
-      (r - (concreteRoundingOps p).shift ((concreteRoundingOps p).useHint h r)) ≤
+    ‖r - (concreteRoundingOps p).shift ((concreteRoundingOps p).useHint h r)‖∞ ≤
         2 * p.gamma2 + 1 := by
-  change cInfNorm (r - highBitsShift p (useHint p h r)) ≤ 2 * p.gamma2 + 1
+  change ‖r - highBitsShift p (useHint p h r)‖∞ ≤ 2 * p.gamma2 + 1
   exact concreteRounding_useHint_bound_of_isApproved p hp r h
 
 theorem concreteRounding_useHint_correct_field_of_isApproved (p : Params)
     (hp : p.isApproved) (z r : Rq) :
-    cInfNorm z ≤ (2 * p.gamma2) / 2 →
+    ‖z‖∞ ≤ (2 * p.gamma2) / 2 →
     (concreteRoundingOps p).useHint ((concreteRoundingOps p).makeHint z r) r =
       (concreteRoundingOps p).highBits (r + z) := by
   intro hz
@@ -1018,8 +1016,8 @@ theorem concreteRounding_useHint_correct_field_of_isApproved (p : Params)
 
 theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
-    cInfNorm s ≤ b →
-    cInfNorm ((concreteRoundingOps p).lowBits r) + b < (2 * p.gamma2) / 2 →
+    ‖s‖∞ ≤ b →
+    ‖ (concreteRoundingOps p).lowBits r‖∞ + b < (2 * p.gamma2) / 2 →
     (concreteRoundingOps p).highBits (r + s) = (concreteRoundingOps p).highBits r := by
   intro hs hlow
   change highBits p (r + s) = highBits p r
@@ -1029,7 +1027,7 @@ theorem concretePower2RoundLaws :
     Power2RoundOps.Laws (ring := coeffRing) concretePower2RoundOps cInfNorm := by
   refine { power2Round_bound := ?_ }
   intro r
-  change cInfNorm (coeffRing.sub _ _) ≤ _
+  change ‖coeffRing.sub _ _‖∞ ≤ _
   simp only [coeffRing_sub_eq]
   exact concretePower2Round_bound_field r
 
@@ -1044,7 +1042,7 @@ theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     lowBits_bound := concreteRounding_lowBits_bound_field_of_isApproved p hp
     hide_low r s b h1 h2 := by
       change cp.highBits (coeffRing.add r s) = cp.highBits r
-      change cInfNorm (lowBits p r) + b < 2 * p.gamma2 / 2 at h2
+      change ‖lowBits p r‖∞ + b < 2 * p.gamma2 / 2 at h2
       simp only [coeffRing_add_eq, gamma2_half] at ⊢ h2
       exact concreteRounding_hide_low_of_isApproved p hp r s b h1 h2
     shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
@@ -1053,7 +1051,7 @@ theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
       simp only [coeffRing_add_eq]
       exact concreteRounding_useHint_correct_field_of_isApproved p hp z r h
     useHint_bound r h := by
-      change cInfNorm (coeffRing.sub _ _) ≤ _
+      change ‖coeffRing.sub _ _‖∞ ≤ _
       simp only [coeffRing_sub_eq]
       exact concreteRounding_useHint_bound_of_isApproved p hp r h
   }

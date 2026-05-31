@@ -5,15 +5,19 @@ Authors: Tobias Rothmann
 -/
 
 import LatticeCrypto.Ring.Kernel
+import LatticeCrypto.Ring.Norms
 
 /-!
 # Ajtai Arithmetic
 
-The main object is `Ajtai.gadgetMatrix ring base rows digits`, the block
-diagonal gadget matrix
-`I_rows ⊗ [1, base, base^2, ..., base^(digits - 1)]`.  It maps
-`rows * digits` ring elements to `rows` ring elements and is used by the
-inner-outer Hachi commitment layer.
+This file provides the scoped notation shared by the Ajtai commitment layers
+(`Simple` and `InnerOuter`): `R` for the canonical vector-backed negacyclic ring
+`vectorNegacyclicRing (ZMod q) d` and `normOps` for its centered norm bundle
+`zmodPolyNormOps q (vectorBackend (ZMod q) d)`. Both expand against the free
+identifiers `q` and `d`, which must be in scope at the use site.
+
+The gadget matrices built on top of this layer live in
+`LatticeCrypto.Ajtai.Gadget`.
 -/
 
 open scoped BigOperators
@@ -23,7 +27,22 @@ universe u
 namespace LatticeCrypto
 namespace Ajtai
 
--- TODO move gadget things to Gadget.lean keep this for "real" arithmetic
+/-! ## Canonical ring notation
+
+Scoped notation for the canonical vector-backed negacyclic ring and its centered
+norm bundle, shared across the `Simple` and `InnerOuter` commitment layers. The
+expansions reference the free identifiers `q` and `d`, resolved at the use site;
+typical contexts carry `{q : ℕ} [NeZero q] [Fact (1 < q)] {d : ℕ} [NeZero d]`. -/
+
+set_option quotPrecheck false in
+set_option hygiene false in
+/-- The canonical vector-backed negacyclic ring `ZMod q[X]/(Xᵈ + 1)`. -/
+scoped notation:max "R" => vectorNegacyclicRing (ZMod q) d
+
+set_option quotPrecheck false in
+set_option hygiene false in
+/-- The canonical centered-norm bundle on `R`. -/
+scoped notation:max "normOps" => zmodPolyNormOps q (vectorBackend (ZMod q) d)
 
 /-
 TODO add the proper arithmetic primitves for ajtai commitments here, and also the Hachi/Greyhound
@@ -33,34 +52,6 @@ Add more general arithmetic primitive(s) for the Simple and Hiding Atjati commit
 specialized one(s) for the Inner-Outer Ajtai commitment (if necessary, which it probably is).
 For the inner-outer commitment orientate on the Hachi parameters.
 -/
-
-variable {Coeff : Type u} [CommRing Coeff]
-
-/-- Entry of the base-`base` gadget matrix `I_rows ⊗ [1, base, ..., base^(digits-1)]`. -/
-def gadgetEntry (ring : NegacyclicRing Coeff) (base : Coeff)
-    {rows digits : Nat} (i : Fin rows) (j : Fin (rows * digits)) : ring.Poly :=
-  if j.val / digits = i.val then
-    ring.scalarPoly (base ^ (j.val % digits))
-  else
-    ring.zero
-
-/-- The base-`base` gadget matrix `I_rows ⊗ [1, base, ..., base^(digits-1)]`. -/
-def gadgetMatrix (ring : NegacyclicRing Coeff) (base : Coeff)
-    (rows digits : Nat) : PolyMatrix ring.Poly rows (rows * digits) :=
-  Vector.ofFn fun i => Vector.ofFn fun j => gadgetEntry ring base i j
-
-/-- Apply the gadget matrix to a decomposed vector. -/
-def gadgetMul (ring : NegacyclicRing Coeff) (base : Coeff)
-    {rows digits : Nat} (v : PolyVec ring.Poly (rows * digits)) : PolyVec ring.Poly rows :=
-  ring.matVecMul (gadgetMatrix ring base rows digits) v
-
-/-- A gadget decomposition is lawful when gadget multiplication reconstructs its input. -/
-def IsLawfulGadgetDecomposition (ring : NegacyclicRing Coeff) (base : Coeff)
-    {rows digits : Nat}
-    (decompose : PolyVec ring.Poly rows → PolyVec ring.Poly (rows * digits)) : Prop :=
-  ∀ x, gadgetMul ring base (decompose x) = x
-
--- TODO Gadget decomposition laws for the hachi Gadget matrix
 
 end Ajtai
 end LatticeCrypto

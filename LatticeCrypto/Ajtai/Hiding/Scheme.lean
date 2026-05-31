@@ -5,6 +5,7 @@ Authors: Tobias Rothmann
 -/
 
 import LatticeCrypto.Ajtai.Simple.Scheme
+import LatticeCrypto.Ajtai.Gadget
 import VCVio.CryptoFoundations.CommitmentScheme
 
 /-!

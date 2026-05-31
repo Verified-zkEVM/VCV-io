@@ -121,6 +121,14 @@ abbrev Quotient (ring : NegacyclicRing Coeff) : Type _ :=
 def coeff (ring : NegacyclicRing Coeff) (p : ring.Poly) : Fin ring.degree → Coeff :=
   ring.backend.coeff p
 
+/-- The constant coefficient of an executable negacyclic-ring element. -/
+def constantCoeff (ring : NegacyclicRing Coeff) (p : ring.Poly) : Coeff :=
+  ring.backend.constantCoeff p
+
+/-- An executable ring element has zero constant coefficient. -/
+def HasZeroConstantCoeff (ring : NegacyclicRing Coeff) (p : ring.Poly) : Prop :=
+  ring.backend.HasZeroConstantCoeff p
+
 instance (ring : NegacyclicRing Coeff) : Zero ring.Poly :=
   ⟨ring.zero⟩
 
@@ -194,6 +202,26 @@ def scalarVecMul (ring : NegacyclicRing Coeff) {cols : Nat}
   v.map fun x => ring.mul c x
 
 end NegacyclicRing
+
+/-! ## Notation
+
+Mathlib-style infix notation for the bundled matrix/vector operations. The
+underlying `NegacyclicRing` is inferred from the operand types (which are
+projections `ring.Poly`), so these read exactly like their Mathlib analogues:
+
+* `A *ᵥ v` for `NegacyclicRing.matVecMul` — matrix–vector product
+  (cf. `Matrix.mulVec`).
+* `u ⬝ᵥ v` for `NegacyclicRing.dot` — dot product (cf. `Matrix.dotProduct`).
+
+Left scalar multiplication `NegacyclicRing.scalarVecMul` coincides with the
+ordinary scalar action `•` on the canonical vector-backed ring; see
+`LatticeCrypto.scalarVecMul_eq_smul`. The precedences match Mathlib's. -/
+
+@[inherit_doc NegacyclicRing.matVecMul]
+scoped notation:73 A:74 " *ᵥ " v:73 => NegacyclicRing.matVecMul (ring := _) A v
+
+@[inherit_doc NegacyclicRing.dot]
+scoped notation:72 u:73 " ⬝ᵥ " v:72 => NegacyclicRing.dot (ring := _) u v
 
 namespace NegacyclicRingSemantics
 

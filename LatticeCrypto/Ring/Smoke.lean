@@ -122,7 +122,7 @@ def mldsaNegacyclicRoundtrip (f g : MLDSA.Rq) : MLDSA.Rq :=
   MLDSA.negacyclicMul f g
 
 def mldsaNormRoundtrip (f : MLDSA.Rq) : ℕ :=
-  MLDSA.normOps.l2NormSq f
+  ‖f‖⟪MLDSA.normOps⟫₂²
 
 noncomputable def mlkemQuotientRoundtrip (ops : MLKEM.NTTRingOps) (f : MLKEM.Rq) :
     MLKEM.Quotient :=

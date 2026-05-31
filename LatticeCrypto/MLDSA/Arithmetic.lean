@@ -9,6 +9,8 @@ import LatticeCrypto.Ring.Transform
 import LatticeCrypto.Ring.Norms
 import LatticeCrypto.Ring.Rounding
 
+open scoped LatticeCrypto
+
 /-!
 # ML-DSA Arithmetic Assembly
 
@@ -109,11 +111,11 @@ def normOps : LatticeCrypto.NormOps polyBackend :=
 
 /-- The centered infinity norm of an ML-DSA polynomial. -/
 abbrev polyNorm (f : Rq) : ℕ :=
-  normOps.cInfNorm f
+  ‖f‖⟪normOps⟫∞
 
 /-- The centered infinity norm of an ML-DSA polynomial vector. -/
 abbrev polyVecNorm {k : ℕ} (v : RqVec k) : ℕ :=
-  LatticeCrypto.PolyVec.cInfNorm normOps v
+  ‖v‖⟪normOps⟫∞
 
 /-- Whether all coefficients of a polynomial are in `[-b, b]`. -/
 def polyBounded (f : Rq) (b : ℕ) : Prop :=

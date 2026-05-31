@@ -12,6 +12,7 @@
     "files.readonlyInclude": {
       "**/.elan/**": true,
       "**/.lake/**": true
-    }
+    },
+    "chat.checkpoints.showFileChanges": true,
+    "chat.agent.sandbox.enabled": "off"
   }
-  

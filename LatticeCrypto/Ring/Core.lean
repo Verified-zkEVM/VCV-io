@@ -154,6 +154,25 @@ variable {Coeff : Type u}
 def coeffArray (backend : PolyBackend Coeff) (p : backend.Poly) : Array Coeff :=
   Array.ofFn fun i : Fin backend.degree => backend.coeff p i
 
+/-- The constant coefficient of a backend polynomial, if the degree is positive. -/
+def constantCoeff [Zero Coeff] (backend : PolyBackend Coeff) (p : backend.Poly) : Coeff :=
+  if h : 0 < backend.degree then backend.coeff p ⟨0, h⟩ else 0
+
+/-- A backend polynomial has zero constant coefficient. -/
+def HasZeroConstantCoeff [Zero Coeff] (backend : PolyBackend Coeff)
+    (p : backend.Poly) : Prop :=
+  backend.constantCoeff p = 0
+
+@[simp] theorem constantCoeff_of_pos [Zero Coeff] (backend : PolyBackend Coeff)
+    (p : backend.Poly) (h : 0 < backend.degree) :
+    backend.constantCoeff p = backend.coeff p ⟨0, h⟩ := by
+  simp [constantCoeff, h]
+
+@[simp] theorem constantCoeff_of_eq_zero [Zero Coeff] (backend : PolyBackend Coeff)
+    (p : backend.Poly) (h : backend.degree = 0) :
+    backend.constantCoeff p = 0 := by
+  simp [constantCoeff, h]
+
 @[simp] theorem coeff_build_apply (backend : PolyBackend Coeff)
     (f : Fin backend.degree → Coeff) (i : Fin backend.degree) :
     backend.coeff (backend.build f) i = f i :=

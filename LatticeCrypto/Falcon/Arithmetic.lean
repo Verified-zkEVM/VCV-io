@@ -9,6 +9,8 @@ import LatticeCrypto.Ring.Transform
 import LatticeCrypto.Ring.Norms
 import LatticeCrypto.Ring.IntegralLift
 
+open scoped LatticeCrypto
+
 /-!
 # Falcon Arithmetic Assembly
 
@@ -117,11 +119,11 @@ def normOps (n : ℕ) : LatticeCrypto.NormOps (polyBackend n) :=
 
 /-- The squared `ℓ₂` norm of a Falcon polynomial. -/
 abbrev polyL2NormSq (f : Rq n) : ℕ :=
-  (normOps n).l2NormSq f
+  ‖f‖⟪normOps n⟫₂²
 
 /-- The squared `ℓ₂` norm of a pair of Falcon polynomials `(s₁, s₂)`. -/
 abbrev pairL2NormSq (s₁ s₂ : Rq n) : ℕ :=
-  (normOps n).pairL2NormSq s₁ s₂
+  ‖(s₁, s₂)‖⟪normOps n⟫₂²
 
 end Norms
 

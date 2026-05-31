@@ -6,6 +6,8 @@ Authors: Quang Dao
 import LatticeCrypto.MLDSA.Scheme
 import LatticeCrypto.MLDSA.Encoding
 
+open scoped LatticeCrypto
+
 /-!
 # ML-DSA FIPS 204 Signature Algorithms
 
@@ -242,7 +244,7 @@ lemma useHintVec_makeHintVec_eq_highBitsVec
     (h_norm_ct0 : polyVecNorm ct0 < p.gamma2)
     (h_norm_r0 : polyVecNorm (prims.lowBitsVec (w - cs2)) < p.gamma2 - p.beta)
     (h_cs2_bound : ∀ (j : Fin p.k),
-      LatticeCrypto.cInfNorm (cs2.get j) ≤ p.beta) :
+      ‖cs2.get j‖∞ ≤ p.beta) :
     prims.useHintVec (prims.makeHintVec (-ct0) (w - cs2 + ct0))
       (w - cs2 + ct0) = prims.highBitsVec w := by
   apply Vector.ext
@@ -306,7 +308,7 @@ theorem fipsSign_fipsVerify_correct'
       nttOps.coeffMatVecMul (prims.expandA pk.rho) y - nttOps.coeffScalarVecMul c sk.s2 +
         nttOps.coeffScalarVecMul c sk.t0)
     (h_cs2_bound : ∀ (c : Rq) (j : Fin p.k),
-      LatticeCrypto.cInfNorm ((nttOps.coeffScalarVecMul c sk.s2).get j) ≤ p.beta)
+      ‖ (nttOps.coeffScalarVecMul c sk.s2).get j‖∞ ≤ p.beta)
     (h_sign : fipsSignLoop p prims nttOps sk
       (prims.expandA pk.rho) (prims.hashMessage sk.tr msg)
       rhoDoublePrime maxAttempts = some sig) :

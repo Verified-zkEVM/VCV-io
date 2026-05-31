@@ -11,6 +11,7 @@ import VCVio.CryptoFoundations.CommitmentScheme
 # Simple Ajtai Commitment Scheme
 
 Definitions for the simple non-hiding Ajtai commitment over a bundled negacyclic ring.
+This definition is simply matrix multiplication `A *ᵥ s`.
 -/
 
 open OracleComp
@@ -39,7 +40,7 @@ abbrev Commitment (ring : NegacyclicRing Coeff) (rows : Nat) :=
 /-- Deterministically commit by multiplying the public matrix by the message vector. -/
 def commit (ring : NegacyclicRing Coeff) {rows cols : Nat}
     (A : PublicParams ring rows cols) (s : Message ring cols) : Commitment ring rows :=
-  ring.matVecMul A s
+  A *ᵥ s
 
 /-- The simple Ajtai commitment has no auxiliary opening data. -/
 abbrev Opening := Unit
@@ -51,8 +52,13 @@ def verify (ring : NegacyclicRing Coeff) {rows cols : Nat}
     (c : Commitment ring rows) (_opening : Opening) : Bool :=
   commit ring A s == c
 
-/-- The simple Ajtai commitment instantiated as `CommitmentScheme`. -/
+/-- The simple Ajtai commitment instantiated as `CommitmentScheme`.
+
+An opening is valid only when the message is accepted by the short-vector predicate
+`isShort` (as required for the binding reduction to Module-SIS): verification checks
+both shortness of the message and the matrix product. -/
 def commitmentScheme (ring : NegacyclicRing Coeff) (rows cols : Nat)
+    (isShort : Message ring cols → Bool)
     [SampleableType (PublicParams ring rows cols)]
     [DecidableEq (Commitment ring rows)] :
     CommitmentScheme
@@ -62,7 +68,7 @@ def commitmentScheme (ring : NegacyclicRing Coeff) (rows cols : Nat)
       Opening where
   setup := $ᵗ PublicParams ring rows cols
   commit A s := pure (commit ring A s, ())
-  verify A s c opening := verify ring A s c opening
+  verify A s c opening := isShort s && verify ring A s c opening
 
 end Simple
 end Ajtai

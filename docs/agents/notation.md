@@ -73,6 +73,38 @@ Each type has `@[simp]` bridge lemmas (e.g., `Raw.hasPar`) that normalize
 
 Precedence ensures `A ∥ B ⊞ C ⊠ K` parses as `((A ∥ B) ⊞ C) ⊠ K`.
 
+## Lattice Norms
+
+Scoped notation (`open scoped LatticeCrypto`, or inside `namespace LatticeCrypto`)
+for the centered polynomial norms in `LatticeCrypto/Ring/Norms.lean`. The trailing
+subscript on the closing bar keeps these distinct from Mathlib's `‖·‖`
+(`Norm.norm`); none of these are Mathlib `Norm` instances (they live in `ℕ`).
+
+### Bare bars — canonical `ZMod q` vector backend (`Poly (ZMod q) n`)
+
+| Notation | Meaning | Input method |
+|----------|---------|--------------|
+| `‖p‖∞` | `cInfNorm p` (centered `ℓ∞`) | `\|\|` … `\infty` |
+| `‖p‖₁` | `l1Norm p` (`ℓ₁`) | `\|\|` … `\1` |
+| `‖p‖₂²` | `l2NormSq p` (squared `ℓ₂`) | `\|\|` … `\2\^2` |
+| `‖(p₁, p₂)‖₂²` | `pairL2NormSq p₁ p₂` | as above |
+
+### `⟪ops⟫`-annotated bars — a `NormOps` bundle `ops`
+
+Overloaded for a single backend polynomial (`NormOps.*`) and, by the same syntax,
+for a `PolyVec` (`PolyVec.*`); elaboration picks the type-correct one. `⟪ ⟫` is
+`\langle\langle` / `\rangle\rangle`.
+
+| Notation | Meaning |
+|----------|---------|
+| `‖f‖⟪ops⟫∞` | `ops.cInfNorm f` / `PolyVec.cInfNorm ops f` |
+| `‖f‖⟪ops⟫₁` | `ops.l1Norm f` |
+| `‖f‖⟪ops⟫₂²` | `ops.l2NormSq f` / `PolyVec.l2NormSq ops f` |
+| `‖(s₁, s₂)‖⟪ops⟫₂²` | `ops.pairL2NormSq s₁ s₂` |
+
+Scheme-local norm aliases (`Falcon.pairL2NormSq`, `MLDSA.polyNorm`, …) are *not*
+these globals and keep their named form.
+
 ## Legacy Notation (Do NOT Use)
 
 | Dead notation | Replacement |
