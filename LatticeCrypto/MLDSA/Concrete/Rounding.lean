@@ -316,14 +316,6 @@ theorem concreteRounding_lowBits_bound (p : Params)
   rcases hdec : decomposeCoeff (r.get i) p.gamma2 with ⟨r1, r0⟩
   exact lowBitsCoeff_bound (r := r.get i) hγ hdec
 
-private theorem gamma2_pos {p : Params} (hp : p.isApproved) :
-    0 < p.gamma2 := by
-  rcases hp with rfl | rfl | rfl <;> decide
-
-private theorem two_gamma2_lt_modulus {p : Params} (hp : p.isApproved) :
-    2 * p.gamma2 < modulus := by
-  rcases hp with rfl | rfl | rfl <;> decide
-
 private theorem highBitsCoeff_lt_m {alpha m : ℕ}
     (ctx : BalancedDecomp alpha m) (r : Coeff) :
     highBitsCoeff r (alpha / 2) < m := by
@@ -708,18 +700,19 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
   refine Poly.ext_get_eq fun j => ?_
   simp only [highBits, Vector.get_ofFn, Rq.get_add]
   apply congrArg fun n : ℕ => (n : Coeff)
-  have hr : (lowBitsCoeff (r.get j) p.gamma2).natAbs < p.gamma2 - b := by
-    have hcoeff : (lowBitsCoeff (r.get j) p.gamma2).natAbs ≤ cInfNorm (lowBits p r) := by
+  let ctx := BalancedDecomp.ofApproved hp
+  have hr : (lowBitsCoeff (r.get j) (p.gamma2)).natAbs < (p.gamma2) - b := by
+    have hcoeff : (lowBitsCoeff (r.get j) (p.gamma2)).natAbs ≤ cInfNorm (lowBits p r) := by
       have := coeff_le_cInfNorm (lowBits p r) j
-      rwa [lowBits_get, centeredRepr_intCast_lowBitsCoeff (r := r.get j)
-        (hγ := gamma2_pos hp)
-        (hq := two_gamma2_lt_modulus hp)] at this
+      rwa [lowBits_get, centeredRepr_intCast_lowBitsCoeff (gamma2 := p.gamma2) (r := r.get j)
+        (hγ := by haveI := ctx.hα; omega)
+        (hq := ctx.hq)] at this
     exact hcoeff.trans_lt (Nat.lt_sub_of_add_lt hlow)
   set alpha : ℕ := 2 * p.gamma2
   have : p.gamma2 = alpha /2 := by omega
   rw [this] at hr ⊢
   exact highBitsCoeff_add_eq_of_centeredRepr_lt
-    (BalancedDecomp.ofApproved hp) (r.get j) (s.get j) (cInfNorm_le_iff.mp hs j) hr
+    ctx (r.get j) (s.get j) (cInfNorm_le_iff.mp hs j) hr
 
 theorem concretePower2RoundLaws :
     Power2RoundOps.Laws (ring := coeffRing) concretePower2RoundOps cInfNorm where
@@ -729,8 +722,9 @@ theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     RoundingOps.Laws (ring := coeffRing) (concreteRoundingOps p) cInfNorm where
   high_low_decomp := concreteRounding_high_low_decomp p
   lowBits_bound r := by
-    simpa using concreteRounding_lowBits_bound p (gamma2_pos hp)
-      (two_gamma2_lt_modulus hp) r
+    let ctx := BalancedDecomp.ofApproved hp
+    have hγ : 0 <  p.gamma2 := by haveI := ctx.hα; omega
+    simpa using concreteRounding_lowBits_bound p hγ ctx.hq r
   hide_low r s b hs hlow :=
     concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa using hlow)
   shift_injective := highBitsShift_injective_of_isApproved p hp
