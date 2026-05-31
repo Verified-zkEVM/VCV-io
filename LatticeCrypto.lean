@@ -67,10 +67,7 @@ import LatticeCrypto.MLKEM.KPKE
 import LatticeCrypto.MLKEM.Params
 import LatticeCrypto.MLKEM.Primitives
 import LatticeCrypto.MLKEM.Security
-import LatticeCrypto.Ring.Automorphism
 import LatticeCrypto.Ring.Core
-import LatticeCrypto.Ring.GaloisAutomorphism
-import LatticeCrypto.Ring.GaloisSubfield
 import LatticeCrypto.Ring.IntegralLift
 import LatticeCrypto.Ring.Kernel
 import LatticeCrypto.Ring.NTTCert

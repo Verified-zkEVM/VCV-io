@@ -705,39 +705,6 @@ private theorem useHintCoeff_correct_of_small_of_isApproved
     · have : highBitsCoeff (r + z) (alpha / 2) = highBitsCoeff r (alpha / 2) := by
         rw [highBitsCoeff, hzcast, decomposeCoeff_mid_of_isApproved ctx r z0 r0 r1 hdec hlo hhi]
       exact absurd this.symm hneq
-    rcases show (p.gamma2 : ℤ) < v ∨ v ≤ -(p.gamma2 : ℤ) by omega with hvpos | hvneg
-    · have hr0pos : 0 < r0 := by omega
-      have huse : useHintCoeff true r p.gamma2 = (r1 + 1) % m := by
-        simp [useHintCoeff, hdec, hr0pos, m, alpha]
-      have hgoal : highBitsCoeff (r + z) p.gamma2 = (r1 + 1) % m :=
-        highBitsCoeff_of_pos_overflow p hp r1 v hr1lt hvpos (by omega) hsum
-      rw [hhint, huse, hgoal]
-    · have hr0nonpos : ¬ 0 < r0 := by omega
-      have huse : useHintCoeff true r p.gamma2 = (r1 + m - 1) % m := by
-        simp [useHintCoeff, hdec, hr0nonpos, m, alpha]
-      have hbdry : v = -(p.gamma2 : ℤ) → 0 < r1 := fun hveq => by
-        by_contra hr1z
-        have hr1z' : r1 = 0 := by omega
-        have hcoeff : (-(p.gamma2 : ℤ)) = r + z := by
-          simpa [hr1z', hveq] using hsum
-        have hzero : highBitsCoeff (r + z) p.gamma2 = 0 :=
-          hcoeff ▸ highBitsCoeff_of_repr p hp 0 (-(p.gamma2 : ℤ)) ctx.hm
-            (by simp) (by omega) (by simp)
-        exact hneq (by simpa [hr1eq, hr1z'] using hzero.symm)
-      have hgoal : highBitsCoeff (r + z) p.gamma2 = (r1 + m - 1) % m :=
-        highBitsCoeff_of_neg_overflow p hp r1 v hr1lt (by omega) hvneg hbdry hsum
-      rw [hhint, huse, hgoal]
-
-theorem concreteRounding_high_low_decomp_of_isApproved (p : Params)
-    (_hp : p.isApproved) (r : Rq) :
-    highBitsShift p (highBits p r) + lowBits p r = r :=
-  concreteRounding_high_low_decomp p r
-
-theorem concreteRounding_lowBits_bound_of_isApproved (p : Params)
-    (hp : p.isApproved) (r : Rq) :
-    ‖lowBits p r‖∞ ≤ p.gamma2 :=
-  concreteRounding_lowBits_bound p (gamma2_pos_of_isApproved hp)
-    (gamma2_double_lt_modulus_of_isApproved hp) r
     · have huse : useHintCoeff true r (alpha / 2) = (r1 + m - 1) % m := by
         simp [useHintCoeff, hdec, show ¬0 < r0 by omega, ctx.h2α, ctx.hmdef]
       have hv_hi : v < -(alpha / 2 : ℤ) ∨ (v = -(alpha / 2 : ℤ) ∧ 0 < r1) := by
@@ -776,11 +743,6 @@ def concretePower2RoundOps : MLDSA.Power2RoundOps where
   power2Round := power2RoundHigh
   shift2 := power2RoundShift
 
-theorem concretePower2Round_bound_field (r : Rq) :
-    ‖r - concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r)‖∞ ≤
-        2 ^ (droppedBits - 1) := by
-  simpa [concretePower2RoundOps] using concretePower2Round_bound r
-
 /-- Concrete `RoundingOps` with `High = Rq` and Boolean hints. -/
 def concreteRoundingOps (p : Params) : MLDSA.RoundingOps (2 * p.gamma2) where
   High := High
@@ -790,19 +752,6 @@ def concreteRoundingOps (p : Params) : MLDSA.RoundingOps (2 * p.gamma2) where
   shift := highBitsShift p
   makeHint := makeHint p
   useHint := useHint p
-
-theorem concreteRounding_lowBits_bound_field_of_isApproved (p : Params)
-    (hp : p.isApproved) (r : Rq) :
-    ‖ (concreteRoundingOps p).lowBits r‖∞ ≤ (2 * p.gamma2) / 2 := by
-  change ‖lowBits p r‖∞ ≤ (2 * p.gamma2) / 2
-  simp only [gamma2_half]
-  exact concreteRounding_lowBits_bound_of_isApproved p hp r
-
-theorem concreteRounding_shift_injective_field_of_isApproved (p : Params)
-    (hp : p.isApproved) :
-    Function.Injective (concreteRoundingOps p).shift := by
-  change Function.Injective (highBitsShift p)
-  exact highBitsShift_injective_of_isApproved p hp
 
 theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
     (hp : p.isApproved) (z r : Rq) :
@@ -818,14 +767,6 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
 theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
     ‖r - highBitsShift p (useHint p h r)‖∞ ≤ 2 * p.gamma2 + 1 := by
-  apply cInfNorm_le_iff.mpr
-  intro j
-  have hcoeff : (r - highBitsShift p (useHint p h r)).get j =
-      r.get j -
-        (((2 * p.gamma2 : ℕ) : Coeff) *
-          (useHintCoeff (h.get j) (r.get j) p.gamma2 : Coeff)) := by
-    simp only [Rq.get_sub, highBitsShift, Nat.cast_mul, Nat.cast_ofNat, useHint, Vector.map_ofFn,
-    cInfNorm (r - highBitsShift p (useHint p h r)) ≤ 2 * p.gamma2 + 1 := by
   refine cInfNorm_le_iff.mpr fun j => ?_
   simp only [Rq.get_sub, highBitsShift, Nat.cast_mul, Nat.cast_ofNat, useHint, Vector.map_ofFn,
       Vector.get_ofFn, Function.comp_apply]
@@ -841,73 +782,8 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
   refine Poly.ext_get_eq fun j => ?_
   simp only [highBits, Vector.get_ofFn, Rq.get_add]
   apply congrArg fun n : ℕ => (n : Coeff)
-  apply highBitsCoeff_add_eq_of_small_of_isApproved p hp
-  · exact cInfNorm_le_iff.mp hs j
-  · have hcoeff := coeff_le_cInfNorm (lowBits p r) j
-    rw [lowBits_get, lowBits_centeredRepr (r := r.get j)
-      (hγ := gamma2_pos_of_isApproved hp)
-      (hq := gamma2_double_lt_modulus_of_isApproved hp)] at hcoeff
-    omega
-
-theorem concreteRounding_useHint_bound_field_of_isApproved (p : Params)
-    (hp : p.isApproved) (r : Rq) (h : Hint) :
-    ‖r - (concreteRoundingOps p).shift ((concreteRoundingOps p).useHint h r)‖∞ ≤
-        2 * p.gamma2 + 1 := by
-  change ‖r - highBitsShift p (useHint p h r)‖∞ ≤ 2 * p.gamma2 + 1
-  exact concreteRounding_useHint_bound_of_isApproved p hp r h
-
-theorem concreteRounding_useHint_correct_field_of_isApproved (p : Params)
-    (hp : p.isApproved) (z r : Rq) :
-    ‖z‖∞ ≤ (2 * p.gamma2) / 2 →
-    (concreteRoundingOps p).useHint ((concreteRoundingOps p).makeHint z r) r =
-      (concreteRoundingOps p).highBits (r + z) := by
-  intro hz
-  change useHint p (makeHint p z r) r = highBits p (r + z)
-  exact concreteRounding_useHint_correct_of_isApproved p hp z r (by simpa [gamma2_half] using hz)
-
-theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
-    (hp : p.isApproved) (r s : Rq) (b : ℕ) :
-    ‖s‖∞ ≤ b →
-    ‖ (concreteRoundingOps p).lowBits r‖∞ + b < (2 * p.gamma2) / 2 →
-    (concreteRoundingOps p).highBits (r + s) = (concreteRoundingOps p).highBits r := by
-  intro hs hlow
-  change highBits p (r + s) = highBits p r
-  exact concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa [gamma2_half] using hlow)
-
-theorem concretePower2RoundLaws :
-    Power2RoundOps.Laws (ring := coeffRing) concretePower2RoundOps cInfNorm := by
-  refine { power2Round_bound := ?_ }
-  intro r
-  change ‖coeffRing.sub _ _‖∞ ≤ _
-  simp only [coeffRing_sub_eq]
-  exact concretePower2Round_bound_field r
-
-theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
-    RoundingOps.Laws (ring := coeffRing) (concreteRoundingOps p) cInfNorm := by
-  let cp := concreteRoundingOps p
-  refine {
-    high_low_decomp x := by
-      change coeffRing.add (cp.shift (cp.highBits x)) (cp.lowBits x) = x
-      simp only [coeffRing_add_eq]
-      exact concreteRounding_high_low_decomp p x
-    lowBits_bound := concreteRounding_lowBits_bound_field_of_isApproved p hp
-    hide_low r s b h1 h2 := by
-      change cp.highBits (coeffRing.add r s) = cp.highBits r
-      change ‖lowBits p r‖∞ + b < 2 * p.gamma2 / 2 at h2
-      simp only [coeffRing_add_eq, gamma2_half] at ⊢ h2
-      exact concreteRounding_hide_low_of_isApproved p hp r s b h1 h2
-    shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
-    useHint_correct z r h := by
-      change cp.useHint (cp.makeHint z r) r = cp.highBits (coeffRing.add r z)
-      simp only [coeffRing_add_eq]
-      exact concreteRounding_useHint_correct_field_of_isApproved p hp z r h
-    useHint_bound r h := by
-      change ‖coeffRing.sub _ _‖∞ ≤ _
-      simp only [coeffRing_sub_eq]
-      exact concreteRounding_useHint_bound_of_isApproved p hp r h
-  }
   have hr : (lowBitsCoeff (r.get j) p.gamma2).natAbs < p.gamma2 - b := by
-    have hcoeff : (lowBitsCoeff (r.get j) p.gamma2).natAbs ≤ cInfNorm (lowBits p r) := by
+    have hcoeff : (lowBitsCoeff (r.get j) p.gamma2).natAbs ≤ ‖lowBits p r‖∞ := by
       have := coeff_le_cInfNorm (lowBits p r) j
       rwa [lowBits_get, lowBits_centeredRepr (r := r.get j)
         (hγ := gamma2_pos_of_isApproved hp)
