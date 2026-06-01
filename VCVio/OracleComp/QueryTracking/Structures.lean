@@ -460,12 +460,14 @@ lemma wasQueried_eq_decide_mem_map_fst [spec.DecidableEq]
       exact hq ((getQ_ne_nil_iff_mem_map_fst log t).mpr hm)
     simp [wasQueried, hq, hm]
 
+@[simp]
 lemma wasQueried_cons_self [spec.DecidableEq] {t : spec.Domain} {u : spec.Range t}
     {log : QueryLog spec} :
     wasQueried (⟨t, u⟩ :: log) t = true := by
   rw [wasQueried_eq_decide_mem_map_fst]
   simp [List.mem_cons]
 
+@[simp]
 lemma wasQueried_cons_of_ne [spec.DecidableEq] {t t' : spec.Domain}
     {u : spec.Range t'} {log : QueryLog spec} (hne : t' ≠ t) :
     wasQueried (⟨t', u⟩ :: log) t = wasQueried log t := by
