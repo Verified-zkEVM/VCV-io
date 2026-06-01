@@ -140,36 +140,29 @@ private theorem simulateQ_prfReal_macToPRFQueryImpl_run
     simulateQ (prfRealQueryImpl prf k)
         ((simulateQ (macToPRFQueryImpl (D := D) (R := R)) oa).run) =
       (simulateQ (ufCmaImpl prf k) oa).run := by
-  let so : QueryImpl (D →ₒ R) ProbComp := fun d => pure (prf.eval k d)
-  let impl : QueryImpl (unifSpec + (D →ₒ R)) ProbComp :=
-    HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
-  have hImplEq : impl = prfRealQueryImpl prf k := rfl
   induction oa using OracleComp.inductionOn with
   | pure x =>
     simp only [simulateQ_pure, WriterT.run_pure]
-    rw [show prfRealQueryImpl prf k = impl from hImplEq.symm]
-    rfl
   | query_bind t f ih =>
-    rw [show prfRealQueryImpl prf k = impl from hImplEq.symm]
-    simp (config := { zeta := false }) only [simulateQ_bind, WriterT.run_bind']
+    simp only [simulateQ_bind, WriterT.run_bind']
     erw [simulateQ_bind]
     cases t with
     | inl n =>
-      simp (config := { zeta := false }) only [macToPRFQueryImpl, ufCmaImpl,
+      simp only [macToPRFQueryImpl, ufCmaImpl,
         QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, simulateQ_spec_query,
         HasQuery.toQueryImpl_apply]
       erw [simulateQ_bind]
       refine bind_congr fun ⟨v, w⟩ => ?_
       erw [simulateQ_map]; congr 1
-      rw [hImplEq]; exact ih v
+      exact ih v
     | inr msg =>
-      simp (config := { zeta := false }) only [macToPRFQueryImpl, ufCmaImpl,
+      simp only [macToPRFQueryImpl, ufCmaImpl,
         QueryImpl.add_apply_inr, QueryImpl.withLogging_apply, prfFuncQuery,
         toMacAlg, MacAlg.taggingOracle, simulateQ_spec_query]
       erw [simulateQ_bind]
       refine bind_congr fun ⟨v, w⟩ => ?_
       erw [simulateQ_map]; congr 1
-      rw [hImplEq]; exact ih v
+      exact ih v
 
 /-- The prfRealExp with the reduction equals the UF-CMA body as a `ProbComp` computation. -/
 private theorem prfRealExp_macToPRFReduction_eq_body (prf : PRFScheme K D R)
@@ -232,23 +225,15 @@ private theorem log_cache_invariant_aux [SampleableType R]
         ((simulateQ (macToPRFQueryImpl (D := D) (R := R)) oa).run)).run cache₀))
     (msg : D) (hcache : z.2 msg ≠ none) :
     cache₀ msg ≠ none ∨ QueryLog.wasQueried z.1.2 msg = true := by
-  let idealImpl : QueryImpl (unifSpec + (D →ₒ R))
-      (StateT ((D →ₒ R).QueryCache) ProbComp) :=
-    (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
-      (StateT ((D →ₒ R).QueryCache) ProbComp) +
-    (D →ₒ R).randomOracle
-  have hIdealEq : idealImpl = prfIdealQueryImpl := rfl
   induction oa using OracleComp.inductionOn generalizing cache₀ z with
   | pure x =>
-    rw [show prfIdealQueryImpl = idealImpl from hIdealEq.symm] at hmem
     simp only [simulateQ_pure, WriterT.run_pure'] at hmem
     subst hmem; exact Or.inl hcache
   | query_bind t f ih =>
     cases t with
     | inl n =>
-      rw [show prfIdealQueryImpl = idealImpl from hIdealEq.symm] at hmem
-      simp only [simulateQ_bind, macToPRFQueryImpl, idealImpl,
-        WriterT.run_bind'] at hmem
+      simp only [simulateQ_bind, macToPRFQueryImpl] at hmem
+      simp only [WriterT.run_bind'] at hmem
       erw [simulateQ_bind] at hmem
       simp only [simulateQ_spec_query,
         QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply,
@@ -258,9 +243,7 @@ private theorem log_cache_invariant_aux [SampleableType R]
       simp only [Set.mem_iUnion, exists_prop] at hmem
       obtain ⟨⟨⟨val, log_q⟩, cache_mid⟩, hu, hmem⟩ := hmem
       erw [simulateQ_bind, simulateQ_spec_query] at hu
-      simp only [QueryImpl.add_apply_inl,
-        QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
-        monadLift_self,
+      simp only [monadLift_self,
         StateT.run_bind,
         support_bind,
         Set.mem_iUnion,
@@ -279,9 +262,8 @@ private theorem log_cache_invariant_aux [SampleableType R]
       have := ih val cache_mid z hmem hcache
       rwa [hcache_eq] at this
     | inr msg' =>
-      simp only [simulateQ_bind, WriterT.run_bind', macToPRFQueryImpl,
-        prfFuncQuery] at hmem
-      rw [show prfIdealQueryImpl = idealImpl from hIdealEq.symm] at hmem
+      simp only [simulateQ_bind, macToPRFQueryImpl, prfFuncQuery] at hmem
+      simp only [WriterT.run_bind'] at hmem
       erw [simulateQ_bind] at hmem
       simp only [simulateQ_spec_query,
         QueryImpl.add_apply_inr, StateT.run_bind] at hmem
@@ -312,7 +294,7 @@ private theorem log_cache_invariant_aux [SampleableType R]
         erw [simulateQ_bind] at hro
         simp only [StateT.run_bind] at hro
         erw [simulateQ_spec_query] at hro
-        simp only [idealImpl, QueryImpl.add_apply_inr] at hro
+        simp only [prfIdealQueryImpl, QueryImpl.add_apply_inr] at hro
         rw [support_bind] at hro
         simp only [Set.mem_iUnion, exists_prop] at hro
         obtain ⟨⟨q_val, q_cache⟩, hro_q, hmem2⟩ := hro
@@ -336,8 +318,7 @@ private theorem log_cache_invariant_aux [SampleableType R]
             exact congrFun hro_q.2 msg
         have hmem_ih : ((res, inner_log), inner_cache) ∈ support
             ((simulateQ prfIdealQueryImpl
-              (simulateQ macToPRFQueryImpl (f val)).run).run cache_mid) := by
-          rwa [show prfIdealQueryImpl = idealImpl from hIdealEq.symm]
+              (simulateQ macToPRFQueryImpl (f val)).run).run cache_mid) := hinner
         have hinv := ih val cache_mid ((res, inner_log), inner_cache) hmem_ih hcache
         rcases hinv with hinv | hinv
         · left; rwa [hcache_mid_eq] at hinv

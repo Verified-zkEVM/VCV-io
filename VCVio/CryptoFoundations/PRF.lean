@@ -43,7 +43,7 @@ variable {K D R : Type}
 
 /-- Oracle interface for PRF distinguishers: unrestricted access to uniform sampling plus
 oracle access to the candidate function. -/
-def PRFOracleSpec (_D R : Type) := unifSpec + (_D →ₒ R)
+@[reducible] def PRFOracleSpec (_D R : Type) := unifSpec + (_D →ₒ R)
 
 /-- A PRF adversary gets oracle access to uniform sampling and a function `D → R`,
 and outputs a boolean guess (`true` = "real PRF", `false` = "random function"). -/
