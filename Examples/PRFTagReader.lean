@@ -684,9 +684,9 @@ private theorem simulateQ_prfReal_authToPRFQueryImpl_run
   induction adversary using OracleComp.inductionOn generalizing s with
   | pure x =>
     simp only [simulateQ_pure, StateT.run_pure]
-    rfl
   | query_bind t f ih =>
-    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
+    simp only [simulateQ_bind, simulateQ_spec_query]
+    simp only [StateT.run_bind]
     rcases t with tag | transcript
     · change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
             ((authToPRFTagImpl tag).run s >>=
