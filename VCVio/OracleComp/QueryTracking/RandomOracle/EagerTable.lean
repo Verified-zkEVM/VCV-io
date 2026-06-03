@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Quang Dao. All rights reserved.
+Copyright (c) 2026 Oleksandr Vovkotrub. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao
+Authors: Oleksandr Vovkotrub
 -/
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.Constructions.SampleableType
@@ -38,11 +38,6 @@ namespace OracleComp
 
 variable {D R : Type} [DecidableEq D] [Finite D] [Finite R] [Nonempty R]
   [SampleableType R] [SampleableType (D → R)]
-
-/-- View a function `f : D → R` as a total answer function (`QueryImpl (D →ₒ R) Id`) for the
-single-oracle constant-range specification `D →ₒ R`. Each query at index `t : D` is answered by
-`f t`. -/
-@[reducible] def tableImpl (f : D → R) : QueryImpl (D →ₒ R) Id := fun t => f t
 
 /-- The total answer table obtained by overlaying a `QueryCache` on top of a full function table:
 cached entries take priority, uncached coordinates fall through to `g`. -/
@@ -94,7 +89,8 @@ through `cacheQuery`. -/
 theorem evalDist_simulateQ_randomOracle_run'_eq_tableExtending
     {α : Type} (oa : OracleComp (D →ₒ R) α) (c : (D →ₒ R).QueryCache) :
     𝒟[(simulateQ randomOracle oa).run' c] =
-      𝒟[do let g ← $ᵗ (D → R); pure (evalWithAnswerFn (tableImpl (tableExtending c g)) oa)] := by
+      𝒟[do let g ← $ᵗ (D → R);
+            pure (evalWithAnswerFn (QueryImpl.ofFn (tableExtending c g)) oa)] := by
   classical
   letI := Fintype.ofFinite D
   letI := Fintype.ofFinite R
@@ -124,14 +120,16 @@ theorem evalDist_simulateQ_randomOracle_run'_eq_tableExtending
       rw [map_bind]
       rfl
     have heval : ∀ g : D → R,
-        evalWithAnswerFn (tableImpl (tableExtending c g)) (liftM ((D →ₒ R).query t) >>= k)
-          = evalWithAnswerFn (tableImpl (tableExtending c g))
+        evalWithAnswerFn (QueryImpl.ofFn (tableExtending c g)) (liftM ((D →ₒ R).query t) >>= k)
+          = evalWithAnswerFn (QueryImpl.ofFn (tableExtending c g))
               (k (tableExtending c g t)) := by
       intro g
       rw [evalWithAnswerFn_bind]
-      change evalWithAnswerFn (tableImpl (tableExtending c g))
-        (k (simulateQ (tableImpl (tableExtending c g)) (liftM ((D →ₒ R).query t)))) = _
+      change evalWithAnswerFn (QueryImpl.ofFn (tableExtending c g))
+        (k (simulateQ (QueryImpl.ofFn (tableExtending c g))
+          (liftM ((D →ₒ R).query t)))) = _
       rw [simulateQ_spec_query]
+      rfl
     rw [hred]
     simp_rw [heval]
     rcases hc : c t with _ | u
@@ -147,9 +145,10 @@ theorem evalDist_simulateQ_randomOracle_run'_eq_tableExtending
         rw [map_eq_bind_pure_comp]; simp [bind_assoc]]
       -- The continuation, abstracted as a function of the full table.
       set ψ : (D → R) → α := fun g' =>
-        evalWithAnswerFn (tableImpl (tableExtending c g')) (k (tableExtending c g' t)) with hψ
+        evalWithAnswerFn (QueryImpl.ofFn (tableExtending c g')) (k (tableExtending c g' t))
+        with hψ
       have hfun : ∀ u : R, (fun g : D → R =>
-            evalWithAnswerFn (tableImpl (tableExtending (c.cacheQuery t u) g)) (k u))
+            evalWithAnswerFn (QueryImpl.ofFn (tableExtending (c.cacheQuery t u) g)) (k u))
           = fun g : D → R => ψ (Function.update g t u) := by
         intro u
         funext g
@@ -192,7 +191,7 @@ uniform and independent, sampling on demand matches pre-sampling the whole table
 theorem evalDist_simulateQ_randomOracle_run'_empty_eq_uniformTable
     {α : Type} (oa : OracleComp (D →ₒ R) α) :
     𝒟[(simulateQ randomOracle oa).run' ∅] =
-      𝒟[do let g ← $ᵗ (D → R); pure (evalWithAnswerFn (tableImpl g) oa)] := by
+      𝒟[do let g ← $ᵗ (D → R); pure (evalWithAnswerFn (QueryImpl.ofFn g) oa)] := by
   rw [evalDist_simulateQ_randomOracle_run'_eq_tableExtending oa ∅]
   refine congrArg _ ?_
   refine congrArg _ (funext fun g => ?_)
