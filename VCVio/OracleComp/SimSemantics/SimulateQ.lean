@@ -211,3 +211,57 @@ lemma simulateQ_list_forM (f : α → OracleComp spec PUnit) (xs : List α) :
     rw [h, simulateQ_bind]; congr 1; funext; exact ih
 
 end List
+
+/-! ## Composition of simulations via a per-query bridge -/
+
+section Compose
+
+universe u' v'
+
+variable {ι₁ ι₂ : Type*} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+
+/-- Two-stage simulation: if a "reduction" `red : QueryImpl spec₁ (StateT σ (OracleComp spec₂))`
+followed by an inner `impl : QueryImpl spec₂ n` agrees per-query with a "combined" handler
+`game : QueryImpl spec₁ (StateT σ n)`, then the agreement extends to every outer computation by
+structural induction. This packages the boilerplate induction reused across PRF-style reductions. -/
+theorem simulateQ_StateT_compose
+    {σ : Type u'} {n : Type u' → Type v'} [Monad n] [LawfulMonad n]
+    (red : QueryImpl spec₁ (StateT σ (OracleComp spec₂)))
+    (impl : QueryImpl spec₂ n)
+    (game : QueryImpl spec₁ (StateT σ n))
+    (bridge : ∀ (q : spec₁.Domain) (s : σ),
+      simulateQ impl ((red q).run s) = (game q).run s)
+    {α : Type u'} (oa : OracleComp spec₁ α) (s : σ) :
+    simulateQ impl ((simulateQ red oa).run s) = (simulateQ game oa).run s := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x => simp [StateT.run_pure]
+  | query_bind t f ih =>
+    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
+    rw [bridge t s]
+    exact bind_congr fun p => ih p.1 p.2
+
+/-- Three-layer simulation collapse: if a "reduction" `red : QueryImpl spec₁ (StateT σ
+(OracleComp spec₂))` followed by an inner cached `impl : QueryImpl spec₂ (StateT τ n)` agrees
+per-query with a single "combined" handler `combined : QueryImpl spec₁ (StateT (σ × τ) n)` up to
+the natural reassociation `α × σ × τ ≃ (α × σ) × τ`, then the agreement extends to every outer
+computation. This packages the boilerplate induction used by lazy-random-oracle / cached-PRF
+collapses. -/
+theorem simulateQ_StateT_StateT_compose
+    {σ τ : Type u'} {n : Type u' → Type v'} [Monad n] [LawfulMonad n]
+    (red : QueryImpl spec₁ (StateT σ (OracleComp spec₂)))
+    (impl : QueryImpl spec₂ (StateT τ n))
+    (combined : QueryImpl spec₁ (StateT (σ × τ) n))
+    (bridge : ∀ (q : spec₁.Domain) (s : σ) (c : τ),
+      (simulateQ impl ((red q).run s)).run c =
+        (fun r : spec₁.Range q × σ × τ => ((r.1, r.2.1), r.2.2)) <$> combined q (s, c))
+    {α : Type u'} (oa : OracleComp spec₁ α) (s : σ) (c : τ) :
+    (simulateQ impl ((simulateQ red oa).run s)).run c =
+      (fun r : α × σ × τ => ((r.1, r.2.1), r.2.2)) <$> (simulateQ combined oa).run (s, c) := by
+  induction oa using OracleComp.inductionOn generalizing s c with
+  | pure x => simp [StateT.run_pure]
+  | query_bind t f ih =>
+    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
+    rw [bridge t s c, bind_map_left, map_bind]
+    exact bind_congr fun r => ih r.1 r.2.1 r.2.2
+
+end Compose
