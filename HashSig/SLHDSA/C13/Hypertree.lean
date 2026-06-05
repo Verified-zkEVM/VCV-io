@@ -54,18 +54,33 @@ def htSign (prims : Primitives) (forsPk : prims.Y) (sk : prims.SkSeed) (pk : pri
   let root0 := xmssRoot prims sk pk (layerAdrs 0 (htTree0 htIdx))
   (sig0, xmssSign prims root0 sk pk (layerAdrs 1 (htTree1 htIdx)) (htLeaf1 htIdx) count1)
 
-/-- Hypertree verification (`d = 2`): climb both layers and compare to the public root. -/
+/-- The WOTS+C base address signing the value at hypertree layer `layer` (key-pair = the
+layer's leaf index), against which that layer's fixed digit-sum gate is checked. -/
+def htWotsAdrs (layer htIdx : ℕ) : Adrs :=
+  if layer = 0 then wotsLeafAdrs (layerAdrs 0 (htTree0 htIdx)) (htLeaf0 htIdx)
+  else wotsLeafAdrs (layerAdrs 1 (htTree1 htIdx)) (htLeaf1 htIdx)
+
+/-- Hypertree verification (`d = 2`): enforce each layer's WOTS+C fixed digit-sum gate
+(`SPHINCs-C13Asm.sol`: `digitSum == targetSum`), then climb both layers and compare to the
+public root. -/
 def htVerify (prims : Primitives) [DecidableEq prims.Y] (forsPk : prims.Y) (sig : HtSig prims)
     (pk : prims.PkSeed) (htIdx : ℕ) (pkRoot : prims.Y) : Bool :=
   let node0 := xmssPkFromSig prims (htLeaf0 htIdx) sig.1 forsPk pk (layerAdrs 0 (htTree0 htIdx))
   let node1 := xmssPkFromSig prims (htLeaf1 htIdx) sig.2 node0 pk (layerAdrs 1 (htTree1 htIdx))
-  decide (node1 = pkRoot)
+  digitSumOk prims pk (htWotsAdrs 0 htIdx) forsPk sig.1.2.1
+    && digitSumOk prims pk (htWotsAdrs 1 htIdx) node0 sig.2.2.1
+    && decide (node1 = pkRoot)
 
 /-- **C13 hypertree correctness** (`d = 2`): verification of an honest hypertree signature
-against the key-generation root succeeds, for any `htIdx < 2^h`. -/
+against the key-generation root succeeds, for any `htIdx < 2^h`, **provided each layer's WOTS+C
+counter grinds the digits to `targetSum`** (the `digitSum_* = targetSum` hypotheses, the
+verifier-side gate the grind establishes; the forced-zero analogue of `slhSignInternal`). -/
 theorem htVerify_htSign (prims : Primitives) [DecidableEq prims.Y] (forsPk : prims.Y)
     (sk : prims.SkSeed) (pk : prims.PkSeed) (htIdx count0 count1 : ℕ)
-    (hHt : htIdx < 2 ^ params.h) :
+    (hHt : htIdx < 2 ^ params.h)
+    (hd0 : digitSum prims pk (htWotsAdrs 0 htIdx) forsPk count0 = targetSum)
+    (hd1 : digitSum prims pk (htWotsAdrs 1 htIdx)
+      (xmssRoot prims sk pk (layerAdrs 0 (htTree0 htIdx))) count1 = targetSum) :
     htVerify prims forsPk (htSign prims forsPk sk pk htIdx count0 count1) pk htIdx
         (htRoot prims sk pk) = true := by
   unfold htVerify htSign htRoot
@@ -81,6 +96,6 @@ theorem htVerify_htSign (prims : Primitives) [DecidableEq prims.Y] (forsPk : pri
     exact hHt
   have ht1 : htTree1 htIdx = 0 := by unfold htTree1; exact Nat.div_eq_of_lt h0
   rw [ht1]
-  simp
+  simp [xmssSign, digitSumOk, hd0, hd1]
 
 end SLHDSA.C13

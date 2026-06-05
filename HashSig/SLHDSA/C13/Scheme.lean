@@ -82,21 +82,34 @@ def slhVerifyInternal (prims : Primitives) [DecidableEq prims.Y] (msg : List Byt
   let forsPk := forsCPkFromSig prims sig.2.1 digest pk.pkSeed fAdrs
   forcedZeroOk digest && htVerify prims forsPk sig.2.2 pk.pkSeed (htIdxOf digest) pk.pkRoot
 
-/-- **C13 correctness** (conditional on the forced-zero grind): an honestly generated signature
-verifies, given that the message randomizer was ground so the last FORS index is `0`. Composes
-FORS+C correctness with `d = 2` hypertree correctness. -/
+/-- **C13 correctness** (conditional on the three grinds): an honestly generated signature
+verifies, given that signing ground (a) the message randomizer so the last FORS index is `0`
+(`hfz`) and (b) each layer's WOTS+C counter so the `l` base-`w` digits sum to `targetSum`
+(`hd0`/`hd1` — the verifier-side gates the grind establishes). Composes FORS+C correctness with
+`d = 2` hypertree correctness. -/
 theorem slhVerifyInternal_slhSignInternal (prims : Primitives) [DecidableEq prims.Y]
     (msg : List Byte) (skSeed : prims.SkSeed) (skPrf : prims.SkPrf) (pkSeed : prims.PkSeed)
     (addrnd : prims.Y) (count0 count1 : ℕ)
     (hfz : forsIdx (prims.Hmsg (prims.PRFmsg skPrf addrnd msg) pkSeed
-      (htRoot prims skSeed pkSeed) msg) (params.k - 1) = 0) :
+      (htRoot prims skSeed pkSeed) msg) (params.k - 1) = 0)
+    (hd0 : digitSum prims pkSeed
+      (htWotsAdrs 0 (htIdxOf (prims.Hmsg (prims.PRFmsg skPrf addrnd msg) pkSeed
+        (htRoot prims skSeed pkSeed) msg)))
+      (forsPkGen prims skSeed pkSeed (forsAdrsOf (prims.Hmsg (prims.PRFmsg skPrf addrnd msg)
+        pkSeed (htRoot prims skSeed pkSeed) msg))) count0 = targetSum)
+    (hd1 : digitSum prims pkSeed
+      (htWotsAdrs 1 (htIdxOf (prims.Hmsg (prims.PRFmsg skPrf addrnd msg) pkSeed
+        (htRoot prims skSeed pkSeed) msg)))
+      (xmssRoot prims skSeed pkSeed (layerAdrs 0 (htTree0 (htIdxOf
+        (prims.Hmsg (prims.PRFmsg skPrf addrnd msg) pkSeed (htRoot prims skSeed pkSeed) msg)))))
+      count1 = targetSum) :
     slhVerifyInternal prims msg
         (slhSignInternal prims msg (slhKeygenInternal prims skSeed skPrf pkSeed).2 addrnd
           count0 count1)
         (slhKeygenInternal prims skSeed skPrf pkSeed).1 = true := by
   simp only [slhKeygenInternal, slhSignInternal, slhVerifyInternal]
   rw [forsCPkFromSig_forsCSign prims _ skSeed pkSeed _ hfz,
-    htVerify_htSign prims _ skSeed pkSeed _ count0 count1 (htIdxOf_lt _)]
+    htVerify_htSign prims _ skSeed pkSeed _ count0 count1 (htIdxOf_lt _) hd0 hd1]
   simp [forcedZeroOk, hfz]
 
 end SLHDSA.C13
