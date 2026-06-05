@@ -124,7 +124,7 @@ private def parseHex (s : String) : ByteArray := Id.run do
   return o
 
 /-- Verify the embedded C13 reference vector and a tampered-message rejection. -/
-def main : IO Unit := do
+def runKat : IO Unit := do
   let pkSeed : Bytes 16 := baSliceToB16 (parseHex seedHex) 0
   let pkRoot : Bytes 16 := baSliceToB16 (parseHex rootHex) 0
   let msg := (parseHex msgHex).toList
@@ -138,4 +138,8 @@ def main : IO Unit := do
     throw (IO.userError "SLH-DSA-C13 KAT failed")
 
 end SLHDSA.C13.KAT
+
+/-- Executable entry point for the `slhdsa_c13_kat` differential KAT. `lean_exe` resolves the
+root-level `main`, so this forwards to the namespaced `runKat`. -/
+def main : IO Unit := SLHDSA.C13.KAT.runKat
 

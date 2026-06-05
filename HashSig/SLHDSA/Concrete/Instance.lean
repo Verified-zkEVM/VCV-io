@@ -124,4 +124,25 @@ def verifyBytes (pkSeed pkRoot : Bytes 16) (msg : List Byte) (sigBytes : ByteArr
   letI : DecidableEq shaPrimitives.Y := inferInstanceAs (DecidableEq (Bytes 16))
   slhVerify shaPrimitives ⟨pkSeed, pkRoot⟩ msg (decodeSignature sigBytes)
 
+/-! ### Completeness transfers to the concrete bundle
+
+The carrier instances are supplied explicitly: the structure projections `shaPrimitives.SkSeed`
+… are definitionally `Bytes 16`, but instance synthesis does not unfold them, so the abstract
+`slhdsaAlg_perfectlyComplete` cannot be specialized to `shaPrimitives` by `inferInstance` alone. -/
+
+instance : SampleableType shaPrimitives.SkSeed := inferInstanceAs (SampleableType (Bytes 16))
+instance : SampleableType shaPrimitives.SkPrf := inferInstanceAs (SampleableType (Bytes 16))
+instance : SampleableType shaPrimitives.PkSeed := inferInstanceAs (SampleableType (Bytes 16))
+instance : SampleableType shaPrimitives.Y := inferInstanceAs (SampleableType (Bytes 16))
+instance : DecidableEq shaPrimitives.Y := inferInstanceAs (DecidableEq (Bytes 16))
+
+/-- **Perfect completeness at the concrete SHA2-128-24 bundle.** The abstract
+`slhdsaAlg_perfectlyComplete` (proved for any `Primitives`) specialized to `shaPrimitives` — the
+exact bundle `verifyBytes` executes. This is the in-tree object asserting that the proved
+`Pr[verify (sign m)] = 1` property holds for the concrete code path the KAT exercises, closing the
+gap between the abstract theorem and the executable instance. -/
+theorem shaPrimitives_perfectlyComplete :
+    (slhdsaAlg shaPrimitives).PerfectlyComplete ProbCompRuntime.probComp :=
+  slhdsaAlg_perfectlyComplete shaPrimitives
+
 end SLHDSA.Concrete

@@ -272,6 +272,13 @@ lean_lib VCVioTest
 /-- Lattice crypto test support modules (helpers, ACVP vectors). -/
 lean_lib LatticeCryptoTest
 
+/-- SLH-DSA known-answer test executables (differential tests vs external reference signers).
+Test-only and deliberately kept out of the `HashSig` library aggregate: each KAT module carries a
+root-level `main`, and a `submodules` glob builds them independently so the entry points never
+collide. -/
+lean_lib HashSigTest where
+  globs := #[.submodules `HashSigTest]
+
 /-- Smoke test: imports VCVio and prints OK. -/
 lean_exe smoke_test where
   root := `VCVioTest.Smoke
@@ -290,8 +297,8 @@ lean_exe falcon_test where
 
 /-- SLH-DSA-SHA2-128-24 known-answer test: pure-Lean concrete verify vs the C reference vector. -/
 lean_exe slhdsa_kat where
-  root := `HashSig.SLHDSA.Concrete.KAT
+  root := `HashSigTest.SLHDSA.Sha2KAT
 
 /-- C13 known-answer test: pure-Lean keccak256 concrete verify vs the reference signer vector. -/
 lean_exe slhdsa_c13_kat where
-  root := `HashSig.SLHDSA.C13.KAT
+  root := `HashSigTest.SLHDSA.C13KAT

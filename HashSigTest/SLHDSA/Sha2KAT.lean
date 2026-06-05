@@ -126,7 +126,7 @@ private def parseHex (s : String) : ByteArray := Id.run do
   return o
 
 /-- Verify the embedded reference vector and a tampered-message rejection. -/
-def main : IO Unit := do
+def runKat : IO Unit := do
   let ba := parseHex vectorHex
   let pkSeed := baSliceToB16 ba 0
   let pkRoot := baSliceToB16 ba 16
@@ -140,3 +140,7 @@ def main : IO Unit := do
     throw (IO.userError "SLH-DSA-SHA2-128-24 KAT failed")
 
 end SLHDSA.Concrete.KAT
+
+/-- Executable entry point for the `slhdsa_kat` differential KAT. `lean_exe` resolves the
+root-level `main`, so this forwards to the namespaced `runKat`. -/
+def main : IO Unit := SLHDSA.Concrete.KAT.runKat
