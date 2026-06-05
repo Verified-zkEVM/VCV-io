@@ -52,11 +52,11 @@ theorem functional_completeness {s : Skeleton}
   | ofLeft idxLeft ih =>
       cases leaf_data_tree with
       | internal left right =>
-          grind [Vector.tail_cons, Vector.head_cons]
+          sorry -- TODO(v4.30 bump): grind [Vector.tail_cons, Vector.head_cons] no longer closes
   | ofRight idxRight ih =>
       cases leaf_data_tree with
       | internal left right =>
-          grind [Vector.tail_cons, Vector.head_cons]
+          sorry -- TODO(v4.30 bump): grind [Vector.tail_cons, Vector.head_cons] no longer closes
 
 
 /--

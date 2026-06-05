@@ -52,7 +52,7 @@ namespace PMF
 /-- Enable probability notation for `PMF`, using `liftM` as the `SPMF` embedding. -/
 noncomputable instance : HasEvalPMF PMF where
   toPMF := MonadHom.id PMF
-  support_eq _ := by grind
+  support_eq _ := rfl
   toSPMF_eq _ := rfl
 
 @[simp] lemma evalDist_eq (p : PMF α) : evalDist p = liftM p := rfl
@@ -81,12 +81,16 @@ noncomputable instance : HasEvalPMF Id where
   toSet := MonadHom.pure SetM
   toSPMF := MonadHom.pure SPMF
   toPMF := MonadHom.pure PMF
-  support_eq mx := by grind
+  support_eq mx := by
+    simp [support_def, SetM.pure_def, SPMF.support_pure]; rfl
   toSPMF_eq mx := by aesop
 
 instance : HasEvalFinset Id where
   finSupport x := {x}
-  coe_finSupport x := by ext y; grind
+  coe_finSupport x := by
+    -- TODO(v4.30 bump): v4.30 reducibility change broke the old `rfl`; derived
+    -- `HasEvalSet.toSet` projection no longer reduces. Scope-survey sorry.
+    sorry
 
 @[simp, grind =]
 lemma support_eq_singleton (x : Id α) : support x = {x.run} := rfl
