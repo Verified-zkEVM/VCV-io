@@ -10,6 +10,7 @@ import Lean.Meta.Sym.Simp.DiscrTree
 import Lean.Elab.Tactic.Do.Attr
 import ToMathlib.Control.Monad.RelWP
 import VCVio.ProgramLogic.Tactics.Common.SpecIR
+import VCVio.ProgramLogic.Tactics.Common.SymCompat
 
 /-!
 # VCSpec Registry

@@ -61,13 +61,13 @@ packaged as the reusable capability `HasDummyAdversaryFactor`.
   `UCSecure (Execution.ofSemantics sem) ε π F` with the identity simulator `S := A`.
 -/
 
-universe u
+universe p q u
 
 namespace Interaction
 namespace UC
 namespace Standard
 
-variable {T : OpenTheory.{u}}
+variable {T : OpenTheory.{p, q, u}}
 
 /-! ## Standard UC roles -/
 
@@ -85,9 +85,9 @@ because each direction generally carries traffic in both directions.
 -/
 structure ProtocolBoundary where
   /-- Interface to the environment / honest parties. -/
-  main : PortBoundary
+  main : PortBoundary.{p, q}
   /-- Interface to the adversary / network. -/
-  adv  : PortBoundary
+  adv  : PortBoundary.{p, q}
 
 namespace ProtocolBoundary
 
@@ -97,32 +97,32 @@ abbrev toPort (Δ : ProtocolBoundary) : PortBoundary :=
 
 end ProtocolBoundary
 
-variable {Δ : ProtocolBoundary} {back : PortBoundary}
+  variable {Δ : ProtocolBoundary.{p, q}} {back : PortBoundary.{p, q}}
 
 /-- A *protocol* is an open system exposing its full
 `(main ⊗ adv)` boundary. -/
-abbrev Protocol (T : OpenTheory.{u}) (Δ : ProtocolBoundary) : Type u :=
-  T.Obj Δ.toPort
+  abbrev Protocol (T : OpenTheory.{p, q, u}) (Δ : ProtocolBoundary.{p, q}) : Type u :=
+    T.Obj Δ.toPort
 
 /-- A *functionality* is the ideal-world counterpart of a protocol; the
 same type, used as the trusted reference object. -/
-abbrev Functionality (T : OpenTheory.{u}) (Δ : ProtocolBoundary) : Type u :=
-  T.Obj Δ.toPort
+  abbrev Functionality (T : OpenTheory.{p, q, u}) (Δ : ProtocolBoundary.{p, q}) : Type u :=
+    T.Obj Δ.toPort
 
 /-- An *adversary* speaks to the protocol over the swapped `adv` side
 and to the environment over a back-channel `back`. -/
-abbrev Adversary (T : OpenTheory.{u}) (Δ : ProtocolBoundary)
-    (back : PortBoundary) : Type u :=
-  T.Obj (PortBoundary.tensor (PortBoundary.swap Δ.adv) back)
+  abbrev Adversary (T : OpenTheory.{p, q, u}) (Δ : ProtocolBoundary.{p, q})
+      (back : PortBoundary.{p, q}) : Type u :=
+    T.Obj (PortBoundary.tensor (PortBoundary.swap Δ.adv) back)
 
 /-- An *environment* speaks to the protocol over the swapped `main`
 side and to the adversary over the swapped back-channel. By
 definitional equality of `swap` and `tensor`, this is exactly a
 `T.Plug (PortBoundary.tensor Δ.main back)`. -/
-abbrev Environment (T : OpenTheory.{u}) (Δ : ProtocolBoundary)
-    (back : PortBoundary) : Type u :=
-  T.Obj (PortBoundary.tensor
-    (PortBoundary.swap Δ.main) (PortBoundary.swap back))
+  abbrev Environment (T : OpenTheory.{p, q, u}) (Δ : ProtocolBoundary.{p, q})
+      (back : PortBoundary.{p, q}) : Type u :=
+    T.Obj (PortBoundary.tensor
+      (PortBoundary.swap Δ.main) (PortBoundary.swap back))
 
 /-- A *simulator* maps a real-world adversary to an ideal-world
 adversary on the same back-channel.
@@ -131,16 +131,16 @@ This is the lightweight presentation form. A more structural variant
 keeps the simulator as an open system on
 `Δ.adv ⊗ swap Δ.adv` and applies it via `wire`; both variants are
 interconvertible in any compact-closed `OpenTheory`. -/
-abbrev Simulator (T : OpenTheory.{u}) (Δ : ProtocolBoundary)
-    (back : PortBoundary) : Type u :=
+  abbrev Simulator (T : OpenTheory.{p, q, u}) (Δ : ProtocolBoundary.{p, q})
+      (back : PortBoundary.{p, q}) : Type u :=
   Adversary T Δ back → Adversary T Δ back
 
 /-- The *dummy adversary*: the canonical bidirectional relay between
 the adversary's view of the protocol (`swap Δ.adv`) and the
 environment's view of that same channel (`Δ.adv` on the back-channel).
 It is the coevaluation `idWire Δ.adv` provided by `HasIdWire`. -/
-def dummyAdversary [OpenTheory.HasIdWire T]
-    (Δ : ProtocolBoundary) :
+  def dummyAdversary [OpenTheory.HasIdWire T]
+      (Δ : ProtocolBoundary.{p, q}) :
     Adversary T Δ Δ.adv :=
   OpenTheory.HasIdWire.idWire Δ.adv
 
@@ -177,7 +177,7 @@ arbitrary.
 def UCSecure (exec : Execution T) (ε : ℝ)
     {Δ : ProtocolBoundary}
     (π F : Protocol T Δ) : Prop :=
-  ∀ (back : PortBoundary) (A : Adversary T Δ back),
+    ∀ (back : PortBoundary.{p, q}) (A : Adversary T Δ back),
   ∃ S : Adversary T Δ back,
   ∀ Z : Environment T Δ back,
     exec.distAdvantage (EXEC π A Z) (EXEC F S Z) ≤ ε
@@ -215,7 +215,7 @@ direction also needs a decomposition principle for arbitrary plugs into an
 adversary/environment pair. The concrete syntax models can provide that
 principle as an instance of this class.
 -/
-class HasDummyAdversaryFactor (T : OpenTheory.{u}) extends OpenTheory.IsCompactClosed T where
+  class HasDummyAdversaryFactor (T : OpenTheory.{p, q, u}) extends OpenTheory.IsCompactClosed T where
   toObservedCompUCSecure_dummy :
     {sem : Semantics T} → {ε : ℝ} →
     {Δ : ProtocolBoundary} → {π F : Protocol T Δ} →

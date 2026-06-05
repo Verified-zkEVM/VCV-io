@@ -271,28 +271,29 @@ instance : CellSpec Id where
     | .counter => 0
     | .flag    => false
 
-example : (Heap.empty : Heap Id).get .counter = 0 := rfl
+example : (Heap.empty : Heap Id).get .counter = (0 : Nat) := rfl
 
-example : ((Heap.empty : Heap Id).update .counter 5).get .counter = 5 := by
+example : ((Heap.empty : Heap Id).update .counter (5 : Nat)).get .counter = (5 : Nat) := by
   simp
 
-example : ((Heap.empty : Heap Id).update .counter 5).get .flag = false := by
+example : ((Heap.empty : Heap Id).update .counter (5 : Nat)).get .flag = false := by
   rw [Heap.get_update_of_ne (by decide : (Id.flag : Id) ≠ .counter)]
   rfl
 
-example : (Heap.split Id Id (Heap.empty : Heap (Id ⊕ Id))).1.get .counter = 0 :=
+example : (Heap.split Id Id (Heap.empty : Heap (Id ⊕ Id))).1.get .counter = (0 : Nat) :=
   rfl
 
 example :
     let h0 : Heap Id := Heap.empty
-    let h1 : Heap Id := h0.update .counter 7
-    (Heap.split Id Id).symm (h1, h0) (.inl .counter) = 7 := by
+    let h1 : Heap Id := h0.update .counter (7 : Nat)
+    (Heap.split Id Id).symm (h1, h0) (.inl .counter) = (7 : Nat) := by
   simp
 
 example :
     let h0 : Heap Id := Heap.empty
-    let h1 : Heap Id := h0.update .counter 7
-    (Heap.split Id Id).symm (h1, h0) (.inr .counter) = 0 := by
+    let h1 : Heap Id := h0.update .counter (7 : Nat)
+    (Heap.split Id Id).symm (h1, h0) (.inr .counter) = (0 : Nat) := by
   simp
+  rfl
 
 end HeapExample

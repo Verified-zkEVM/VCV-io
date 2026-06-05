@@ -7,6 +7,7 @@ module
 
 public import Mathlib.Data.Nat.Choose.Basic
 public import Mathlib.Algebra.BigOperators.Intervals
+public import Mathlib.Data.Fintype.Prod
 public import Mathlib.Order.Fin.Basic
 
 /-!

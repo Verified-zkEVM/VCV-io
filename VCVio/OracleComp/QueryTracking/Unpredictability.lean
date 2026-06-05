@@ -159,7 +159,6 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
           simp only [StateT.lift, monad_norm,
             modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
             StateT.modifyGet, StateT.run]
-          rfl
         rw [hstep]; simp [monad_norm]
       rw [hrun]
       -- Decompose: ∑ u, Pr[=u|query t] * Pr[event | cont(u)]

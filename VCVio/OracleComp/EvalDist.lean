@@ -190,7 +190,7 @@ lemma probOutput_liftM_eq_div (q : OracleQuery spec α) (x : α) :
 @[simp, grind =]
 lemma probOutput_query (t : spec.Domain) (u : spec.Range t) :
     Pr[= u | (query t : OracleComp spec _)] = (Fintype.card (spec.Range t) : ℝ≥0∞)⁻¹ := by
-  simp; rfl
+  simp
 
 @[grind =]
 lemma probEvent_liftM_eq_div (q : OracleQuery spec α) (p : α → Prop) :
@@ -212,7 +212,7 @@ lemma probOutput_query_eq_div (t : spec.Domain) (u : spec.Range t) :
 lemma probEvent_query (t : spec.Domain) (p : spec.Range t → Prop) [DecidablePred p] :
     Pr[ p | (query t : OracleComp spec _)] =
       Finset.card {x | p x} / Fintype.card (spec.Range t) := by
-  simp [probEvent_liftM_eq_div]; rfl
+  simp [probEvent_liftM_eq_div]
 
 end evalDist
 

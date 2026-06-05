@@ -64,10 +64,10 @@ theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i :
   induction n with
   | zero =>
     have hi : i = 0 := Fin.eq_zero i
-    subst hi
-    simp only [buildMerkleTree_with_hash, Fin.isValue, Nat.pow_zero, getPutativeRoot_with_hash,
-      getRoot]
-    simp
+    subst i
+    simp [buildMerkleTree_with_hash, getPutativeRoot_with_hash, getRoot]
+    change List.Vector.get leaves 0 = leaves.head
+    exact List.Vector.get_zero leaves
   | succ n ih =>
     -- Abbreviate the upper layer and the upper tree.
     let lastLayer := buildLayer_with_hash (α := α) n leaves hashFn
@@ -83,8 +83,7 @@ theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i :
       have hnew :
           hashFn (leaves.get i, leaves.get (siblingIndex i)) =
             lastLayer.get ⟨i.val / 2, by grind only⟩ := by
-        simp [lastLayer, buildLayer_with_hash, siblingIndex, hsign, hdiv]
-        congr
+          simp [lastLayer, buildLayer_with_hash, siblingIndex, hsign, hdiv]
       -- Unfold and apply the induction hypothesis on the upper tree.
       -- `generateProof` and `getRoot` reduce via `Cache.upper_cons` and `Cache.leaves_cons`.
       simp [buildMerkleTree_with_hash, lastLayer, generateProof,

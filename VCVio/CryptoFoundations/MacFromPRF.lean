@@ -142,7 +142,7 @@ private theorem simulateQ_prfReal_macToPRFQueryImpl_run
       (simulateQ (ufCmaImpl prf k) oa).run := by
   induction oa using OracleComp.inductionOn with
   | pure x =>
-    simp only [simulateQ_pure, WriterT.run_pure]
+    simp only [simulateQ_pure, WriterT.run_pure']
   | query_bind t f ih =>
     simp only [simulateQ_bind, WriterT.run_bind']
     erw [simulateQ_bind]

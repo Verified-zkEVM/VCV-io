@@ -55,7 +55,7 @@ lemma withPregen_run_cons (so : QueryImpl spec m) {t : spec.Domain}
     {seed : QuerySeed spec} {u : spec.Range t} {us : List (spec.Range t)}
     (h : seed t = u :: us) :
     (so.withPregen t).run seed = pure (u, Function.update seed t us) := by
-  rw [withPregen_apply, StateT.run_mk, h]; rfl
+  rw [withPregen_apply, StateT.run_mk, h]
 
 /-- Seed-miss: `withPregen` falls back to a single call of `so`, threading the seed unchanged. -/
 lemma withPregen_run_nil (so : QueryImpl spec m) {t : spec.Domain}
@@ -451,7 +451,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             simp [QuerySeed.addValue, QuerySeed.addValues, hσi]
           rw [QuerySeed.pop_eq_some_of_cons _ _ v [] hlist]
           suffices Function.update (σ.addValue i v) i
-              ([] : List (spec₀.Range i)) = σ by rw [this]; rfl
+              ([] : List (spec₀.Range i)) = σ by rw [this]
           funext j; by_cases hj : j = i
           · subst hj; simp [hσi]
           · rw [Function.update_of_ne hj]
@@ -470,7 +470,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             simp [QuerySeed.addValue, QuerySeed.addValues, hσi]
           rw [QuerySeed.pop_eq_some_of_cons _ _ u₀ (rest ++ [v]) hlist]
           suffices Function.update (σ.addValue i v) i (rest ++ [v]) =
-              QuerySeed.addValue (Function.update σ i rest) i v by rw [this]; rfl
+              QuerySeed.addValue (Function.update σ i rest) i v by rw [this]
           funext j; by_cases hj : j = i
           · subst hj; simp [QuerySeed.addValue, QuerySeed.addValues]
           · simp [Function.update_of_ne hj, QuerySeed.addValue,
@@ -502,7 +502,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             (QuerySeed.addValues_of_ne σ [_] hti).trans hσt
           rw [QuerySeed.pop_eq_some_of_cons _ _ u₀ rest hlist]
           suffices Function.update (σ.addValue i v) t rest =
-              QuerySeed.addValue (Function.update σ t rest) i v by rw [this]; rfl
+              QuerySeed.addValue (Function.update σ t rest) i v by rw [this]
           change Function.update (Function.update σ i (σ i ++ [v])) t rest =
             Function.update (Function.update σ t rest) i
               ((Function.update σ t rest) i ++ [v])

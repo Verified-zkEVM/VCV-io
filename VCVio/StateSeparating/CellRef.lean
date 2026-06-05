@@ -1054,8 +1054,8 @@ def demoSpec : OracleSpec.{0, 0} DemoQuery := fun _ => PUnit
 /-- A toy probabilistic handler with heap effects. Two branches write cells,
 and one branch reads the flag without modifying it. -/
 def demoImpl : QueryImpl demoSpec (StateT (Heap DemoCell) ProbComp)
-  | .touchLog => logRef.writeM 1
-  | .touchCache => cacheRef.writeM 1
+  | .touchLog => logRef.writeM (1 : Nat)
+  | .touchCache => cacheRef.writeM (1 : Nat)
   | .readFlag => do
       let _ ← (flagRef.readM : StateT (Heap DemoCell) ProbComp Bool)
       pure PUnit.unit
@@ -1073,14 +1073,16 @@ theorem demoImpl_writesOnly :
   cases t with
   | touchLog =>
       simpa [demoImpl, demoWrites, logRef] using
-        (CellRef.writeM_supportWritesOnly_single logRef 1
+        (CellRef.writeM_supportWritesOnly_single logRef (1 : Nat)
           : CellRef.SupportWritesOnly
-              (logRef.writeM 1 : StateT (Heap DemoCell) ProbComp PUnit) {DemoCell.log})
+              (logRef.writeM (1 : Nat) : StateT (Heap DemoCell) ProbComp PUnit)
+                {DemoCell.log})
   | touchCache =>
       simpa [demoImpl, demoWrites, cacheRef] using
-        (CellRef.writeM_supportWritesOnly_single cacheRef 1
+        (CellRef.writeM_supportWritesOnly_single cacheRef (1 : Nat)
           : CellRef.SupportWritesOnly
-              (cacheRef.writeM 1 : StateT (Heap DemoCell) ProbComp PUnit) {DemoCell.cache})
+              (cacheRef.writeM (1 : Nat) : StateT (Heap DemoCell) ProbComp PUnit)
+                {DemoCell.cache})
   | readFlag =>
       have hbind :
           CellRef.SupportWritesOnly
@@ -1135,7 +1137,8 @@ theorem demoClient_prob_flag_true_eq_zero :
     Pr[ fun z => flagRef.get z.2 = true |
       (simulateQ demoImpl demoClient).run (Heap.empty : Heap DemoCell)] = 0 :=
   CellRef.SupportPreserves.prob_final_eq_eq_zero_of_ne
-    demoClient_supportPreserves_flag (Heap.empty : Heap DemoCell) (by decide)
+    demoClient_supportPreserves_flag (Heap.empty : Heap DemoCell) (by
+      simp [flagRef, CellRef.get])
 
 /-- Probability-one preservation for the framed flag. -/
 theorem demoClient_prob_flag_unchanged_eq_one (h : Heap DemoCell) :
@@ -1146,57 +1149,54 @@ theorem demoClient_prob_flag_unchanged_eq_one (h : Heap DemoCell) :
 /-- Increment the cache counter and append one log entry. The program never
 writes `flagRef`. -/
 def cacheAndLogStep : StateT (Heap DemoCell) Id PUnit := do
-  let cache ← cacheRef.read
+  let cache : Nat ← cacheRef.read
   let _ ← cacheRef.write (cache + 1)
-  let log ← logRef.read
+  let log : Nat ← logRef.read
   logRef.write (log + 1)
 
 /-- The step writes only `.cache` and `.log`. -/
 theorem cacheAndLogStep_writesOnly :
     CellRef.WritesOnly cacheAndLogStep ({DemoCell.cache, DemoCell.log} : Set DemoCell) := by
-  classical
-  intro r hr h
-  rcases r with ⟨id⟩
-  cases id with
-  | log =>
-      exact False.elim (hr
-        (show DemoCell.log = DemoCell.cache ∨ DemoCell.log = DemoCell.log from Or.inr rfl))
-  | cache =>
-      exact False.elim (hr
-        (show DemoCell.cache = DemoCell.cache ∨ DemoCell.cache = DemoCell.log from
-          Or.inl rfl))
-  | flag =>
-      change
-        (((h.update DemoCell.cache (h.get DemoCell.cache + 1)).update
-            DemoCell.log
-            (((h.update DemoCell.cache (h.get DemoCell.cache + 1)).get
-              DemoCell.log) + 1)).get DemoCell.flag =
-          h.get DemoCell.flag)
-      simp
+  unfold cacheAndLogStep
+  intro r hr
+  apply CellRef.preserves_bind
+  · exact CellRef.preserves_read cacheRef r
+  · intro (cache : Nat)
+    apply CellRef.preserves_bind
+    · exact (CellRef.write_writesOnly_single cacheRef (cache + (1 : Nat))) r (by
+        intro hmem
+        exact hr (Or.inl hmem))
+    · intro _
+      apply CellRef.preserves_bind
+      · exact CellRef.preserves_read logRef r
+      · intro (log : Nat)
+        exact (CellRef.write_writesOnly_single logRef (log + (1 : Nat))) r (by
+          intro hmem
+          exact hr (Or.inr hmem))
 
 /-- A compositional footprint for `cacheAndLogStep`. Reads contribute no writes,
 writes contribute singleton footprints, and binds union the footprints. -/
 def cacheAndLogFootprint :
     CellRef.WriteFootprint
-      (cacheRef.read >>= fun cache =>
-        cacheRef.write (cache + 1) >>= fun _ =>
-          logRef.read >>= fun log =>
-            logRef.write (log + 1)) where
+      ((cacheRef.read : StateT (Heap DemoCell) Id Nat) >>= fun (cache : Nat) =>
+        cacheRef.write (cache + (1 : Nat)) >>= fun _ =>
+          (logRef.read : StateT (Heap DemoCell) Id Nat) >>= fun (log : Nat) =>
+            logRef.write (log + (1 : Nat))) where
   writes := {DemoCell.cache, DemoCell.log}
   sound := by
     intro r hr
     apply CellRef.preserves_bind
     · exact CellRef.preserves_read cacheRef r
-    · intro cache
+    · intro (cache : Nat)
       apply CellRef.preserves_bind
-      · exact (CellRef.write_writesOnly_single cacheRef (cache + 1)) r (by
+      · exact (CellRef.write_writesOnly_single cacheRef (cache + (1 : Nat))) r (by
           intro hmem
           exact hr (Or.inl hmem))
       · intro _
         apply CellRef.preserves_bind
         · exact CellRef.preserves_read logRef r
-        · intro log
-          exact (CellRef.write_writesOnly_single logRef (log + 1)) r (by
+        · intro (log : Nat)
+          exact (CellRef.write_writesOnly_single logRef (log + (1 : Nat))) r (by
             intro hmem
             exact hr (Or.inr hmem))
 
@@ -1205,7 +1205,7 @@ state update in the final proof. -/
 theorem cacheAndLogStep_preserves_flag_via_footprint :
     CellRef.Preserves cacheAndLogStep flagRef := by
   unfold cacheAndLogStep
-  exact cacheAndLogFootprint.preserves flagRef (by
+  exact CellRef.WriteFootprint.preserves cacheAndLogFootprint flagRef (by
     intro h
     rcases h with h | h
     · cases h
@@ -1214,34 +1214,35 @@ theorem cacheAndLogStep_preserves_flag_via_footprint :
 /-- A smaller example that uses the generic frame combinators directly: two
 writes outside the flag cell preserve the flag. -/
 def writeCacheThenLog : StateT (Heap DemoCell) Id PUnit := do
-  let _ ← cacheRef.write 1
-  logRef.write 1
+  let _ ← cacheRef.write (1 : Nat)
+  logRef.write (1 : Nat)
 
 theorem writeCacheThenLog_preserves_flag :
     CellRef.Preserves writeCacheThenLog flagRef := by
   unfold writeCacheThenLog
   apply CellRef.preserves_bind
-  · exact (CellRef.write_writesOnly_single cacheRef 1) flagRef (by
+  · exact (CellRef.write_writesOnly_single cacheRef (1 : Nat)) flagRef (by
       intro h
       cases h)
   · intro _
-    exact (CellRef.write_writesOnly_single logRef 1) flagRef (by
+    exact (CellRef.write_writesOnly_single logRef (1 : Nat)) flagRef (by
       intro h
       cases h)
 
 /-- A compositional footprint for the two-write program. The write set is
 computed by `WriteFootprint.bind`: first `{cache}`, then `{log}`. -/
 def writeCacheThenLogFootprint :
-    CellRef.WriteFootprint (cacheRef.write 1 >>= fun _ => logRef.write 1) :=
-  (CellRef.WriteFootprint.write cacheRef 1).bind fun _ =>
-    CellRef.WriteFootprint.write logRef 1
+    CellRef.WriteFootprint (cacheRef.write (1 : Nat) >>= fun _ =>
+      logRef.write (1 : Nat)) :=
+  (CellRef.WriteFootprint.write cacheRef (1 : Nat)).bind fun _ =>
+    CellRef.WriteFootprint.write logRef (1 : Nat)
 
 /-- Once the footprint says the write set is `{cache, log}`, flag preservation
 is a one-line frame application plus a membership proof. -/
 theorem writeCacheThenLog_preserves_flag_via_footprint :
     CellRef.Preserves writeCacheThenLog flagRef := by
   unfold writeCacheThenLog
-  exact writeCacheThenLogFootprint.preserves flagRef (by
+  exact CellRef.WriteFootprint.preserves writeCacheThenLogFootprint flagRef (by
     intro h
     rcases h with h | ⟨_, h⟩
     · cases h

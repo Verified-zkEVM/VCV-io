@@ -613,7 +613,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
           change (StateT.lift (PFunctor.FreeM.lift (query t)) cache₀ >>= _) = _
           simp only [StateT.lift, monad_norm,
             modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
-            StateT.modifyGet, StateT.run]; rfl
+            StateT.modifyGet, StateT.run]
         rw [hstep]; simp [monad_norm]
       rw [hrun]
       -- Apply probEvent_bind_le_add to decompose:

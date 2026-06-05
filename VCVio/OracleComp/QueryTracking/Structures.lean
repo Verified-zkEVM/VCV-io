@@ -675,7 +675,7 @@ lemma pop_eq_some_of_cons (seed : QuerySeed spec) (i : ι)
     (u : spec.Range i) (us : List (spec.Range i))
     (h : seed i = u :: us) :
     seed.pop i = some (u, Function.update seed i us) := by
-  unfold pop; simp [h]; rfl
+  unfold pop; simp [h]
 
 lemma cons_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
     (u : spec.Range i) (rest : QuerySeed spec)

@@ -342,7 +342,7 @@ does not change which outputs are reachable. This is the support analogue of
       exact (LawfulSubSpec.onResponse_bijective (h := h) t).surjective.range_eq
     rw [hs]; simp only [support_liftM]
     dsimp [OracleSpec.query, OracleQuery.cont, OracleQuery.input]
-    rw [Set.range_id]; rfl
+    rw [Set.range_id]
 
 @[simp, grind =] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
     x ∈ support (liftComp mx superSpec) ↔ x ∈ support mx := by

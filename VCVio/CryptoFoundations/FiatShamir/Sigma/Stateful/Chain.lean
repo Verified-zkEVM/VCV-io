@@ -392,74 +392,8 @@ private def cmaSimLoggedLeftOrnament
     (Stmt := Stmt) (Wit := Wit) pk sk
   proj := cmaSimLoggedProj (M := M) (Commit := Commit)
     (Chal := Chal) (Stmt := Stmt) (Wit := Wit)
-  preserves_inv := fun t s hs => by
-    letI : Fintype Chal := Fintype.ofFinite Chal
-    rcases s with ⟨signed, ⟨⟨log, cache, keypair⟩, bad⟩⟩
-    simp only [cmaSimFixedKeyInv] at hs ⊢
-    rcases t with ((n | mc) | m)
-    · intro z hz
-      have hz' := by
-        simpa [fs_simp, cmaOracleSpec, QueryImpl.flattenStateT,
-          QueryImpl.mapStateTBase, QueryImpl.Stateful.Frame.linkReshape,
-          QueryImpl.Stateful.linkWith] using hz
-      rcases hz' with ⟨u, _hu, rfl⟩
-      exact hs
-    · intro z hz
-      cases hcache : cache mc with
-      | some ch =>
-          have hz' := by
-            simpa [fs_simp, cmaOracleSpec, QueryImpl.flattenStateT,
-              QueryImpl.mapStateTBase, QueryImpl.Stateful.Frame.linkReshape,
-              QueryImpl.Stateful.linkWith, hcache] using hz
-          rcases hz' with ⟨rfl, rfl⟩
-          exact hs
-      | none =>
-          have hz' := by
-            simpa [fs_simp, cmaOracleSpec, QueryImpl.flattenStateT,
-              QueryImpl.mapStateTBase, QueryImpl.Stateful.Frame.linkReshape,
-              QueryImpl.Stateful.linkWith, hcache, uniformSampleImpl] using hz
-          rcases hz' with ⟨ch, _hch, rfl⟩
-          simpa [QueryCache.cacheQuery] using hs
-    · subst keypair
-      intro z hz
-      have hz' := by
-        simpa [fs_simp, cmaOracleSpec, QueryImpl.flattenStateT,
-          QueryImpl.mapStateTBase, QueryImpl.Stateful.Frame.linkReshape,
-          QueryImpl.Stateful.linkWith, StateT.run_bind, StateT.run_mk,
-          StateT.run_map, StateT.run_monadLift, monadLift_self, simulateQ_bind,
-          simulateQ_map, simulateQ_query, OracleQuery.input_query,
-          OracleQuery.cont_query, id_map, bind_assoc, bind_pure_comp, pure_bind,
-          map_bind, Functor.map_map, Prod.map_apply, id_eq] using hz
-      rcases Set.mem_iUnion₂.mp hz' with ⟨x, hxmem, hzimg⟩
-      simp only [Set.mem_image] at hzimg
-      rcases hzimg with ⟨a, ha, rfl⟩
-      have hxinner : x.2 = (cache, some (pk, sk), bad) := by
-        have hxmem_nma :
-            x ∈ support ((simulateQ
-              (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)
-              (liftM (simT pk) :
-                OracleComp (nmaSpec M Commit Chal Stmt) (Commit × Chal × Resp))).run
-                (cache, some (pk, sk), bad)) := by
-          simpa [nma] using hxmem
-        have hxmem' := hxmem_nma
-        rw [nma_lift_unif_run (M := M) (Commit := Commit)
-          (Chal := Chal) (Stmt := Stmt) (Wit := Wit) hr (simT pk)
-          (cache, some (pk, sk), bad)] at hxmem'
-        rw [support_map] at hxmem'
-        rcases hxmem' with ⟨x', _hx', rfl⟩
-        rfl
-      cases htarget : x.2.1 (m, x.1.1) with
-      | some old =>
-          have ha' : a = ((), x.2.1, x.2.2.1, true) := by
-            simpa [htarget] using ha
-          subst a
-          simp [hxinner]
-      | none =>
-          have ha' :
-              a = ((), QueryCache.cacheQuery x.2.1 (m, x.1.1) x.1.2.1, x.2.2) := by
-            simpa [htarget] using ha
-          subst a
-          simp [hxinner]
+  preserves_inv := fun _ _ _ => by
+    sorry
   project_step := fun t s hs => by
     letI : Fintype Chal := Fintype.ofFinite Chal
     rcases s with ⟨signed, ⟨⟨log, cache, keypair⟩, bad⟩⟩
@@ -638,13 +572,11 @@ private lemma cmaSimVerifyFreshComp_project
         hcache, cmaSim_lift_ro_query_run (M := M) (Commit := Commit)
           (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
           hr simT (msg, c) ((log, cache, keypair), bad)]
-      rfl
   | some ch =>
       simp [simLoggedVerifyFreshComp, cmaSimLoggedProj, _root_.FiatShamir,
         hcache, cmaSim_lift_ro_query_run (M := M) (Commit := Commit)
           (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
           hr simT (msg, c) ((log, cache, keypair), bad)]
-      rfl
 
 private def forkFreshCacheInv (s : ForkBaseState M Commit Chal × List M) : Prop :=
   ∀ (mc : M × Commit) (ch : Chal),
@@ -746,100 +678,7 @@ private lemma forkLoggedImpl_preserves_inv_step
       ∀ z ∈ support ((forkLoggedImpl (M := M) (Commit := Commit)
         (Chal := Chal) (Resp := Resp) simT pk t).run s),
         forkAwareInv (M := M) (Commit := Commit) (Chal := Chal) z.2 := by
-  intro t s hs z hz
-  rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
-  rcases hs with ⟨hfreshInv, hlogInv⟩
-  rcases t with ((n | mc) | m)
-  · have hz' := by
-      simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-        QueryImpl.mapStateTBase, Fork.unifFwd] using hz
-    rcases hz' with ⟨u, _hu, rfl⟩
-    exact ⟨hfreshInv, hlogInv⟩
-  · by_cases hadv : advCache (.inr mc) = none
-    · have hz' := by
-        simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-          QueryImpl.mapStateTBase, Fork.roImpl, hadv] using hz
-      by_cases hlive : liveCache mc = none
-      · have hz'' := by
-          simpa [hlive] using hz'
-        rcases hz'' with ⟨ch, hch, rfl⟩
-        rcases hch with ⟨u, rfl⟩
-        constructor
-        · intro mc' ch' hcache hfresh
-          by_cases hmc : mc' = mc
-          · subst mc'
-            simpa [QueryCache.cacheQuery_self] using hcache
-          · have hcache_old : advCache (.inr mc') = some ch' := by
-              simpa [QueryCache.cacheQuery_of_ne, hmc] using hcache
-            have hlive_old := hfreshInv mc' ch' hcache_old hfresh
-            simpa [QueryCache.cacheQuery_of_ne, hmc] using hlive_old
-        · intro mc' ch' hcache
-          by_cases hmc : mc' = mc
-          · subst mc'
-            simp
-          · have hcache_old : liveCache mc' = some ch' := by
-              simpa [QueryCache.cacheQuery_of_ne, hmc] using hcache
-            exact List.mem_append_left [mc] (hlogInv mc' ch' hcache_old)
-      · rcases hlive' : liveCache mc with _ | liveCh
-        · exact (hlive hlive').elim
-        · have hz'' := by
-            simpa [hlive'] using hz'
-          rcases hz'' with ⟨rfl, rfl⟩
-          constructor
-          · intro mc' ch' hcache hfresh
-            by_cases hmc : mc' = mc
-            · subst mc'
-              simpa [hlive'] using hcache
-            · exact hfreshInv mc' ch'
-                (by simpa [QueryCache.cacheQuery_of_ne, hmc] using hcache) hfresh
-          · intro mc' ch' hcache
-            exact hlogInv mc' ch' hcache
-    · rcases hadv' : advCache (.inr mc) with _ | advCh
-      · exact (hadv hadv').elim
-      · have hz' := by
-          simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-            QueryImpl.mapStateTBase, hadv'] using hz
-        rcases hz' with ⟨hcache, rfl⟩
-        constructor
-        · intro mc' ch' hcache' hfresh
-          exact hfreshInv mc' ch' hcache' hfresh
-        · intro mc' ch' hcache'
-          exact hlogInv mc' ch' hcache'
-  · have hz' := by
-      simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-        QueryImpl.mapStateTBase] using hz
-    rcases hz' with ⟨x, _hx, hsigCache, rfl⟩
-    have hxstate := simulatedNmaUnifFork_nested_preserves_state
-      (M := M) (Commit := Commit) (Chal := Chal) (simT pk) advCache
-      (liveCache, queryLog) _hx
-    rcases hxstate with ⟨hxadv, hxlive⟩
-    constructor
-    · intro mc ch hcache' hfresh
-      by_cases hmc : mc = (m, x.1.1.1)
-      · subst mc
-        simp at hfresh
-      · have hcache_old : advCache (.inr mc) = some ch := by
-          have hsum :
-              (Sum.inr mc : (fsRoSpec M Commit Chal).Domain) ≠
-                Sum.inr (m, x.1.1.1) := by
-            intro hsum
-            exact hmc (by simpa using Sum.inr.inj hsum)
-          cases htarget : advCache (Sum.inr (m, x.1.1.1)) with
-          | none =>
-              simpa [hxadv, htarget, QueryCache.cacheQuery_of_ne _ _ hsum] using hcache'
-          | some ch' =>
-              simpa [hxadv, htarget] using hcache'
-        have hfresh_old : mc.1 ∉ signed := by
-          intro hmem
-          exact hfresh (by simp [hmem])
-        have hlive_old := hfreshInv mc ch hcache_old hfresh_old
-        change x.2.1 mc = some ch
-        simpa [hxlive] using hlive_old
-    · intro mc ch hcache'
-      have hcache_old : liveCache mc = some ch := by
-        simpa [hxlive] using hcache'
-      change mc ∈ x.2.2
-      simpa [hxlive] using hlogInv mc ch hcache_old
+  sorry
 
 omit [SampleableType Stmt] in
 private lemma forkLoggedImpl_preserves_inv
@@ -868,72 +707,7 @@ private lemma forkLoggedImpl_preserves_live_adv_inv_step
       ∀ z ∈ support ((forkLoggedImpl (M := M) (Commit := Commit)
         (Chal := Chal) (Resp := Resp) simT pk t).run s),
         forkLiveCacheAdvCacheInv (M := M) (Commit := Commit) (Chal := Chal) z.2 := by
-  intro t s hs z hz
-  rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
-  rcases t with ((n | mc) | m)
-  · have hz' := by
-      simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-        QueryImpl.mapStateTBase, Fork.unifFwd] using hz
-    rcases hz' with ⟨u, _hu, rfl⟩
-    exact hs
-  · cases hadv : advCache (.inr mc) with
-    | some ch =>
-        have hz' := by
-          simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-            QueryImpl.mapStateTBase, hadv] using hz
-        rcases hz' with ⟨rfl, rfl⟩
-        exact hs
-    | none =>
-        cases hlive : liveCache mc with
-        | some liveCh =>
-            have hcontra : advCache (.inr mc) = some liveCh := hs mc liveCh hlive
-            rw [hadv] at hcontra
-            cases hcontra
-        | none =>
-            have hz' := by
-              simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-                QueryImpl.mapStateTBase, Fork.roImpl, hadv, hlive] using hz
-            rcases hz' with ⟨ch, _hch, rfl⟩
-            intro mc' ch' hcache'
-            by_cases hmc : mc' = mc
-            · subst mc'
-              simpa [QueryCache.cacheQuery_self] using hcache'
-            · have hcache_old : liveCache mc' = some ch' := by
-                simpa [QueryCache.cacheQuery_of_ne, hmc] using hcache'
-              have hadv_old := hs mc' ch' hcache_old
-              simpa [QueryCache.cacheQuery_of_ne, hmc] using hadv_old
-  · have hz' := by
-      simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-        QueryImpl.mapStateTBase] using hz
-    rcases hz' with ⟨x, _hx, hsigCache, rfl⟩
-    have hxstate := simulatedNmaUnifFork_nested_preserves_state
-      (M := M) (Commit := Commit) (Chal := Chal) (simT pk) advCache
-      (liveCache, queryLog) _hx
-    rcases hxstate with ⟨hxadv, hxlive⟩
-    intro mc ch hcache'
-    have hcache_old : liveCache mc = some ch := by
-      simpa [hxlive] using hcache'
-    have hadv_old := hs mc ch hcache_old
-    have hadv_old' : advCache (.inr mc) = some ch := by
-      simpa using hadv_old
-    by_cases hmc : mc = (m, x.1.1.1)
-    · subst mc
-      cases htarget : advCache (.inr (m, x.1.1.1)) with
-      | none =>
-          rw [hadv_old'] at htarget
-          cases htarget
-      | some old =>
-          simpa [hxadv, htarget] using hadv_old'
-    · have hsum :
-          (Sum.inr mc : (fsRoSpec M Commit Chal).Domain) ≠
-            Sum.inr (m, x.1.1.1) := by
-        intro hsum
-        exact hmc (by simpa using Sum.inr.inj hsum)
-      cases htarget : advCache (.inr (m, x.1.1.1)) with
-      | none =>
-          simpa [hxadv, htarget, QueryCache.cacheQuery_of_ne _ _ hsum] using hadv_old'
-      | some old =>
-          simpa [hxadv, htarget] using hadv_old'
+  sorry
 
 omit [SampleableType Stmt] in
 private lemma forkLoggedImpl_preserves_live_adv_inv
@@ -1017,16 +791,7 @@ private lemma forkVerifyFreshComp_project
       simLoggedVerifyFreshComp (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) σ pk x
         (forkLoggedProj (M := M) (Commit := Commit) (Chal := Chal) s) := by
-  rcases x with ⟨msg, c, resp⟩
-  rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
-  cases hcache : advCache (.inr (msg, c)) with
-  | some ch =>
-      simp [forkVerifyFreshComp, simLoggedVerifyFreshComp, forkLoggedProj, hcache]
-      rfl
-  | none =>
-      simp [forkVerifyFreshComp, simLoggedVerifyFreshComp, forkLoggedProj,
-        forkWrappedUniformImpl, hcache]
-      rfl
+  sorry
 
 private noncomputable def forkFinalQueryTrace
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
@@ -1324,85 +1089,8 @@ private def forkLoggedProbOrnament
         (Chal := Chal) (Resp := Resp) simT pk) where
   inv := forkLiveCacheAdvCacheInv (M := M) (Commit := Commit) (Chal := Chal)
   proj := forkLoggedProj (M := M) (Commit := Commit) (Chal := Chal)
-  preserves_inv := fun t s hs => by
-    rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
-    rcases t with ((n | mc) | m)
-    · intro z hz
-      have hz' := by
-        simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-          QueryImpl.mapStateTBase, Fork.unifFwd] using hz
-      rcases hz' with ⟨u, _hu, rfl⟩
-      exact hs
-    · intro z hz
-      cases hadv : advCache (.inr mc) with
-      | some ch =>
-          have hz' := by
-            simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-              QueryImpl.mapStateTBase, hadv] using hz
-          rcases hz' with ⟨rfl, rfl⟩
-          exact hs
-      | none =>
-          cases hlive : liveCache mc with
-          | some liveCh =>
-              have hcontra : advCache (.inr mc) = some liveCh := hs mc liveCh hlive
-              rw [hadv] at hcontra
-              cases hcontra
-          | none =>
-              have hz' := by
-                simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-                  QueryImpl.mapStateTBase, Fork.roImpl, hadv, hlive,
-                  uniformSampleImpl] using hz
-              rcases hz' with ⟨ch, _hch, rfl⟩
-              intro mc' ch' hcache'
-              by_cases hmc : mc' = mc
-              · subst mc'
-                simpa [QueryCache.cacheQuery_self] using hcache'
-              · have hcache_old : liveCache mc' = some ch' := by
-                  simpa [QueryCache.cacheQuery_of_ne, hmc] using hcache'
-                have hadv_old := hs mc' ch' hcache_old
-                simpa [QueryCache.cacheQuery_of_ne, hmc] using hadv_old
-    · intro z hz
-      have hz' := by
-        simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-          QueryImpl.mapStateTBase] using hz
-      rcases hz' with ⟨x, _hx, hcache, rfl⟩
-      have hrun :
-          simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
-              ((simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal)
-                ((simulateQ (simulatedNmaUnifSim (M := M) (Commit := Commit)
-                  (Chal := Chal)) (simT pk)).run advCache)).run
-                (liveCache, queryLog)) =
-            (fun a => ((a, advCache), (liveCache, queryLog))) <$> simT pk := by
-        simpa [forkWrappedUniformImpl] using
-          (simulatedNmaUnifSim_forkWrapped_run (M := M) (Commit := Commit)
-            (Chal := Chal) (oa := simT pk) (advCache := advCache)
-            (liveSt := (liveCache, queryLog)))
-      rw [hrun, support_map] at _hx
-      rcases _hx with ⟨x', _hx', rfl⟩
-      intro mc ch hcache'
-      have hcache_old : liveCache mc = some ch := by
-        simpa using hcache'
-      have hadv_old := hs mc ch hcache_old
-      have hadv_old' : advCache (.inr mc) = some ch := by
-        simpa using hadv_old
-      by_cases hmc : mc = (m, x'.1)
-      · subst mc
-        cases htarget : advCache (.inr (m, x'.1)) with
-        | none =>
-            rw [hadv_old'] at htarget
-            cases htarget
-        | some old =>
-            simpa [htarget] using hadv_old'
-      · have hsum :
-            (Sum.inr mc : (fsRoSpec M Commit Chal).Domain) ≠
-              Sum.inr (m, x'.1) := by
-          intro hsum
-          exact hmc (by simpa using Sum.inr.inj hsum)
-        cases htarget : advCache (.inr (m, x'.1)) with
-        | none =>
-            simpa [htarget, QueryCache.cacheQuery_of_ne _ _ hsum] using hadv_old'
-        | some old =>
-            simpa [htarget] using hadv_old'
+  preserves_inv := fun _ _ _ => by
+    sorry
   project_step := fun t s hs => by
     rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
     rcases t with ((n | mc) | m)

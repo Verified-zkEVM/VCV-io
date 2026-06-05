@@ -16,9 +16,9 @@ package VCVio where
 /-
 Interop backends — pinned to explicit git revisions so reproducible builds are
 guaranteed and bumping a pin is a deliberate, reviewed change. The current
-branch keeps **Hax enabled by default** because `Interop.lean` imports the
+compatibility branch keeps **Hax enabled by default** because `Interop.lean` imports the
 Hax-backed bridge and examples; Aeneas stays commented out until upstream
-ships a Lean v4.29-compatible release. The CI TCB-isolation check
+ships a Lean v4.28-compatible release. The CI TCB-isolation check
 (`scripts/check-interop-isolation.sh`) still protects against accidental
 cross-imports regardless of which backend requires are active.
 
@@ -26,12 +26,13 @@ Important: `require mathlib` must come **after** any Interop backend `require`s
 so Mathlib's transitive pins (in particular `Qq`) win over the backends'. Lake
 warns and `lake exe cache get` fails otherwise.
 
-Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0). Latest `main` as of
-2026-04-16. Subdirectory: `hax-lib/proof-libs/lean`.
+Hax: pinned to the `Verified-zkEVM/hax` Lean 4.28 compatibility branch while
+the Lean-facing VCVio surface is backported to 4.28. Subdirectory:
+`hax-lib/proof-libs/lean`.
 -/
 require Hax from git
-  "https://github.com/cryspen/hax" @
-  "492a34e3" / "hax-lib/proof-libs/lean"
+  "https://github.com/Verified-zkEVM/hax" @
+  "c9bb077a74d39be48b0a11da89918d1af1c470f5" / "hax-lib/proof-libs/lean"
 
 /-
 Loom2 (Verse Lab fork): foundation for the Loom-style WP / Triple program-logic
@@ -40,20 +41,18 @@ upstream PR https://github.com/leanprover/lean4/pull/12965 in the
 `Std.Internal.Do.{WPMonad,PredTrans,Triple,Assertion,ExceptPost}` namespace
 (temporarily prefixed `Std.Do'` in Loom2 to avoid clashing once it merges).
 
-Pinned to our `quangvdao/loom2` fork on branch `v4.29.0`, which patches only
-the toolchain (4 config-only commits over upstream `verse-lab/loom2`). When
-upstream Lean ships these foundations in a stable release, drop this require
-and re-import from `Std.Do.…` directly.
+Pinned to the `Verified-zkEVM/loom2` fork's Lean 4.28 compatibility branch.
+When upstream Lean ships these foundations in a stable release, drop this
+require and re-import from `Std.Do.…` directly.
 -/
 require loom2 from git
-  "https://github.com/quangvdao/loom2" @
-  "eccaa1eb"
+  "https://github.com/Verified-zkEVM/loom2" @
+  "14ca9e4d6d4a8734e22fea99b1280fa7d7f8bafc"
 
 /-
-Aeneas: upstream pins Lean 4.28.0-rc1. Lake happily resolves aeneas against
-our root Mathlib v4.29.0 and Lean v4.29.0, but aeneas's source has three
-real regressions under that stack — see `Interop/Aeneas/README.md` for the
-exact diagnostics. Leave this commented until upstream ships a v4.29 build
+Aeneas: upstream pins Lean 4.28.0-rc1, but remains optional here — see
+`Interop/Aeneas/README.md` for the exact diagnostics from the previous
+compatibility review. Leave this commented until upstream ships a v4.28 build
 (or pin to a patched fork). Latest upstream `main` as of 2026-04-17 is
 `ba600392`; subdirectory `backends/lean`.
 -/
@@ -61,11 +60,11 @@ exact diagnostics. Leave this commented until upstream ships a v4.29 build
 --   "https://github.com/AeneasVerif/aeneas" @
 --   "ba600392" / "backends/lean"
 
-require "leanprover-community" / "mathlib" @ git "v4.29.0"
+require "leanprover-community" / "mathlib" @ git "v4.28.0"
 
 require PolyFun from git
   "https://github.com/Verified-zkEVM/PolyFun.git" @
-  "cf8b35c0caa10c7f484d207abe07f2d496b852af"
+  "f0501bdcb4ca8e43705b2efea7d72227052cc86e"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio

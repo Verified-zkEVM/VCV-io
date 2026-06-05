@@ -62,13 +62,35 @@ section basic
 
 variable {m : Type u → Type v} [Monad m] {ω : Type u} {α β γ : Type u}
 
+@[simp]
+lemma run_mk (x : m (α × ω)) : (WriterT.mk x : WriterT ω m α).run = x := rfl
+
+@[simp]
+lemma run_tell (w : ω) : (tell w : WriterT ω m PUnit).run = pure (PUnit.unit, w) := rfl
+
 
 section monoid
 
 variable [Monoid ω]
 
 @[simp]
+lemma run_pure (x : α) :
+    (pure x : WriterT ω m α).run = pure (x, 1) := rfl
+
+@[simp]
+lemma run_bind (x : WriterT ω m α) (f : α → WriterT ω m β) :
+    (x >>= f).run =
+      x.run >>= fun (a, w₁) => (fun (b, w₂) => (b, w₁ * w₂)) <$> (f a).run := rfl
+
+@[simp]
+lemma run_map (x : WriterT ω m α) (f : α → β) :
+    (f <$> x).run = Prod.map f id <$> x.run := rfl
+
+@[simp]
 lemma run_monadLift (x : m α) : (monadLift x : WriterT ω m α).run = (·, 1) <$> x := rfl
+
+@[simp]
+lemma run_liftM_monoid (x : m α) : (liftM x : WriterT ω m α).run = (·, 1) <$> x := rfl
 
 lemma liftM_def (x : m α) :
     (liftM x : WriterT ω m α) = WriterT.mk ((·, 1) <$> x) := rfl
@@ -88,15 +110,26 @@ lemma run_seqLeft {m : Type u → Type v} [Monad m] {ω : Type u} [Monoid ω] {�
 /-- `Prod.fst <$> WriterT.run` preserves `pure` (Monoid flavour). -/
 lemma fst_map_run_pure [LawfulMonad m] (x : α) :
     Prod.fst <$> ((pure x : WriterT ω m α).run) = pure x := by
-  simp [WriterT.run_pure]
+  change Prod.fst <$> (pure (x, 1) : m (α × ω)) = pure x
+  simp
 
 /-- `Prod.fst <$> WriterT.run` preserves `bind` (Monoid flavour) — i.e. it is a
 monad morphism `WriterT ω m → m`. -/
 lemma fst_map_run_bind [LawfulMonad m] (b : WriterT ω m α) (f : α → WriterT ω m β) :
     Prod.fst <$> (b >>= f).run =
       (Prod.fst <$> b.run) >>= fun x => Prod.fst <$> (f x).run := by
-  simp only [WriterT.run_bind, map_bind, Functor.map_map]
-  exact (bind_map_left (m := m) Prod.fst b.run (fun x => Prod.fst <$> (f x).run)).symm
+  change Prod.fst <$>
+      (b.run >>= fun x => (fun y => (y.1, x.2 * y.2)) <$> (f x.1).run) = _
+  calc
+    Prod.fst <$>
+        (b.run >>= fun x => (fun y => (y.1, x.2 * y.2)) <$> (f x.1).run)
+        = (b.run >>= fun x => Prod.fst <$> (f x.1).run) := by
+          rw [map_bind]
+          apply bind_congr
+          intro x
+          simp [Functor.map_map]
+    _ = _ := by
+      exact (bind_map_left (m := m) Prod.fst b.run (fun x => Prod.fst <$> (f x).run)).symm
 
 end monoid
 
@@ -106,6 +139,9 @@ variable [EmptyCollection ω]
 
 @[simp]
 lemma run_monadLift' (x : m α) : (monadLift x : WriterT ω m α).run = (·, ∅) <$> x := rfl
+
+@[simp]
+lemma run_liftM (x : m α) : (liftM x : WriterT ω m α).run = (·, ∅) <$> x := rfl
 
 lemma liftM_def' (x : m α) :
     (liftM x : WriterT ω m α) = WriterT.mk ((·, ∅) <$> x) := rfl
@@ -244,12 +280,14 @@ lemma run_addTell [AddMonoid ω] (w : ω) :
 @[simp]
 lemma outputs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
     (addTell (M := M) w).outputs = pure ⟨⟩ := by
-  simp [outputs, addTell]
+  rw [outputs_def, run_addTell]
+  simp
 
 @[simp]
 lemma costs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
     (addTell (M := M) w).costs = pure w := by
-  simp [costs, addTell]
+  rw [costs_def, run_addTell]
+  simp
 
 section costPredicates
 

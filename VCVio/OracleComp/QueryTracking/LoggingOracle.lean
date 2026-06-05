@@ -286,7 +286,7 @@ lemma run_simulateQ_loggingOracle_query_bind
         (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
           <$> (simulateQ loggingOracle (mx u)).run := by
   simp [loggingOracle, QueryImpl.withLogging_apply, OracleQuery.cont_query,
-    Function.id_def]
+    Function.id_def, Prod.map]
 
 section isQueryBound
 

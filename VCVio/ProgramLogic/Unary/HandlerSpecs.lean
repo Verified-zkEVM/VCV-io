@@ -441,6 +441,22 @@ end seededOracle
 
 section loggingOracle
 
+/-- Support points of a single `loggingOracle` call carry exactly the singleton
+query/response log for that call. -/
+private lemma loggingOracle_support_log (t : spec.Domain) {v : spec.Range t}
+    {w : QueryLog spec}
+    (hmem : (v, w) ∈ support
+      (loggingOracle t :
+        WriterT (QueryLog spec) (OracleComp spec) (spec.Range t)).run) :
+    w = [⟨t, v⟩] := by
+  rw [OracleSpec.loggingOracle, QueryImpl.run_withLogging_apply,
+    QueryImpl.ofLift_apply] at hmem
+  rcases (mem_support_bind_iff _ _ _).1 hmem with ⟨u, _hu, hpair⟩
+  simp only [support_pure, Set.mem_singleton_iff, Prod.mk.injEq] at hpair
+  rcases hpair with ⟨hv, hw⟩
+  cases hv
+  exact hw
+
 /-- Spec for `loggingOracle t` over `WriterT (QueryLog spec) (OracleComp spec)`:
 the writer log accumulates the query / response pair `⟨t, v⟩`. Proved purely
 with `mvcgen` plus a single bridging step to bring the residual
@@ -458,14 +474,11 @@ theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
         WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ v log' => ⌜log' = log₀ ++ [⟨t, v⟩]⌝) := by
-  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.postInsert
-    QueryImpl.ofLift
-  mvcgen
-  rename_i s _ heq
-  subst heq
-  rw [wpProp_iff_forall_support]
-  intro a _
-  mvcgen
+  rw [triple_writerT_iff_forall_support]
+  intro log hlog v w hmem
+  subst hlog
+  have hw := loggingOracle_support_log (t := t) hmem
+  simpa [hw]
 
 /-- Log-monotonicity corollary: the log only grows (as a list-prefix). Derived
 directly from `loggingOracle_triple` via `mvcgen` (no support-layer escape). -/
@@ -475,15 +488,12 @@ theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
         WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ _ log' => ⌜log₀ <+: log'⌝) := by
-  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.postInsert
-    QueryImpl.ofLift
-  mvcgen
-  rename_i s _ heq
-  subst heq
-  rw [wpProp_iff_forall_support]
-  intro a _
-  mvcgen
-  exact ⟨[⟨t, a⟩], rfl⟩
+  rw [triple_writerT_iff_forall_support]
+  intro log hlog v w hmem
+  subst hlog
+  have hw := loggingOracle_support_log (t := t) hmem
+  rw [hw]
+  exact ⟨[⟨t, v⟩], rfl⟩
 
 /-- `mvcgen` example: two consecutive logged queries extend the log with
 both entries in order. The full proof is `mvcgen [loggingOracle_triple]`
@@ -528,8 +538,8 @@ theorem countingOracle_triple (t : spec.Domain) (qc₀ : QueryCount ι) :
       WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run =
         (fun x => (x, QueryCount.single t * (1 : QueryCount ι))) <$>
           (HasQuery.query t : OracleComp spec _) := by
-    change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query, monad_norm]
+    simp [OracleSpec.countingOracle, QueryImpl.withCounting_apply, QueryImpl.ofLift_apply,
+      WriterT.run_liftM_monoid, HasQuery.instOfMonadLift_query, monad_norm]
   rw [hrun] at hmem
   simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
@@ -596,8 +606,8 @@ theorem costOracle_triple (costFn : spec.Domain → ω)
   have hrun : (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run =
       (fun x => (x, costFn t * (1 : ω))) <$>
         (HasQuery.query t : OracleComp spec _) := by
-    change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query, monad_norm]
+    simp [costOracle, QueryImpl.withCost_apply, QueryImpl.ofLift_apply,
+      WriterT.run_liftM_monoid, HasQuery.instOfMonadLift_query, monad_norm]
   rw [hrun] at hmem
   simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
@@ -718,8 +728,22 @@ example (t₁ t₂ : spec.Domain)
       (spred(fun s => ⌜cache₀ ≤ s.1 ∧ s.2 = log₀⌝))
       (⇓ p s' =>
         ⌜cache₀ ≤ s'.1 ∧ s'.2 = log₀ ++ [⟨t₁, p.1⟩, ⟨t₂, p.2⟩]⌝) := by
-  mvcgen [cachingLoggingOracle_triple]
-  all_goals grind
+  rw [triple_stateT_iff_forall_support]
+  intro s hs p s' hmem
+  simp only [StateT.run_bind] at hmem
+  rcases (mem_support_bind_iff _ _ _).1 hmem with ⟨⟨v₁, s₁⟩, hmem₁, hrest⟩
+  simp only [StateT.run_bind] at hrest
+  rcases (mem_support_bind_iff _ _ _).1 hrest with ⟨⟨v₂, s₂⟩, hmem₂, hpure⟩
+  simp only [support_pure, Set.mem_singleton_iff] at hpure
+  cases hpure
+  have hstep₁ := cachingLoggingOracle_triple (t := t₁) (cache₀ := cache₀) (log₀ := log₀)
+  rw [triple_stateT_iff_forall_support] at hstep₁
+  have h₁ := hstep₁ s hs v₁ s₁ hmem₁
+  have hstep₂ := cachingLoggingOracle_triple (t := t₂) (cache₀ := cache₀)
+    (log₀ := log₀ ++ [⟨t₁, v₁⟩])
+  rw [triple_stateT_iff_forall_support] at hstep₂
+  have h₂ := hstep₂ s₁ ⟨h₁.1, h₁.2.2⟩ v₂ s' hmem₂
+  exact ⟨h₂.1, by simpa [List.append_assoc] using h₂.2.2⟩
 
 /-- Whole-program lift: `simulateQ cachingLoggingOracle oa` preserves cache
 monotonicity for any `oa`. Derived via the generic

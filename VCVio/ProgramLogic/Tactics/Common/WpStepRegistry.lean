@@ -9,6 +9,7 @@ import Lean.Meta.Sym.Pattern
 import Lean.Meta.Sym.Simp.DiscrTree
 import Lean.Elab.Tactic.Do.Attr
 import VCVio.ProgramLogic.Tactics.Common.Core
+import VCVio.ProgramLogic.Tactics.Common.SymCompat
 
 /-!
 # `@[wpStep]` Registry

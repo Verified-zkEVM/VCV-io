@@ -1799,9 +1799,9 @@ private theorem replayRun_state_correct_aux
   induction main using OracleComp.inductionOn generalizing st₀ x_first log_cont z with
   | pure x =>
       have hlog_nil : log_cont = [] := by
-        simp only [replayFirstRun, simulateQ_pure, WriterT.run_pure,
-          support_pure, Set.mem_singleton_iff, Prod.mk.injEq] at h_first
-        exact h_first.2
+        simp only [replayFirstRun, simulateQ_pure, WriterT.run_pure',
+          support_pure, Set.mem_singleton_iff] at h_first
+        exact congrArg Prod.snd h_first
       subst hlog_nil
       simp only [QueryLog.countQ, QueryLog.getQ_nil, List.length_nil,
         Nat.le_zero] at h_can_reach

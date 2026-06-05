@@ -81,14 +81,14 @@ private theorem wpProp_and (oa : OracleComp spec α) (p q : α → Prop) :
   constructor
   · intro h
     exact ⟨fun x hx => (h x hx).1, fun x hx => (h x hx).2⟩
-  · intro h x hx
-    exact ⟨h.1 x hx, h.2 x hx⟩
+  · rintro ⟨hp, hq⟩ x hx
+    exact ⟨hp x hx, hq x hx⟩
 
 /-- `Std.Do` `WP` instance for `OracleComp`, scoped to almost-sure correctness. -/
 noncomputable instance instWPOracleComp : Std.Do.WP (OracleComp spec) .pure where
   wp oa :=
-    { trans := fun Q => ⌜wpProp (spec := spec) oa (fun a => (Q.1 a).down)⌝
-      conjunctiveRaw := by
+    { apply := fun Q => ⌜wpProp (spec := spec) oa (fun a => (Q.1 a).down)⌝
+      conjunctive := by
         intro Q₁ Q₂
         apply SPred.pure_congr
         simp [wpProp_and] }
@@ -99,10 +99,12 @@ noncomputable instance instWPMonadOracleComp : Std.Do.WPMonad (OracleComp spec) 
   toWP := instWPOracleComp (spec := spec)
   wp_pure a := by
     ext Q
+    simp only [WP.wp, instWPOracleComp, PredTrans.apply_Pure_pure]
     change wpProp (spec := spec) (pure a) (fun a => (Q.1 a).down) ↔ (Q.1 a).down
     exact wpProp_pure a _
   wp_bind x f := by
     ext Q
+    simp only [WP.wp, instWPOracleComp, PredTrans.apply_Bind_bind]
     change wpProp (spec := spec) (x >>= f) (fun b => (Q.1 b).down) ↔
       wpProp x (fun a => wpProp (f a) (fun b => (Q.1 b).down))
     exact wpProp_bind x f _
@@ -132,7 +134,7 @@ theorem triple_stateT_iff_forall_support {σ α : Type}
         ∀ a s', (a, s') ∈ support (mx.run s) → (Q.1 a s').down := by
   classical
   rw [Std.Do.Triple.iff]
-  simp only [SPred.entails_1]
+  simp only [SPred.entails_1, WP.wp, PredTrans.pushArg_apply]
   refine forall_congr' (fun s => ?_)
   refine imp_congr_right (fun _hP => ?_)
   change wpProp (spec := spec) (mx.run s) (fun p => (Q.1 p.1 p.2).down) ↔ _
@@ -160,7 +162,8 @@ theorem triple_writerT_iff_forall_support {ω α : Type}
         ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s ++ w)).down := by
   classical
   rw [Std.Do.Triple.iff]
-  simp only [SPred.entails_1]
+  simp only [SPred.entails_1, WP.wp, WriterT.wpAppend, PredTrans.apply_pushArg,
+    PredTrans.apply_Functor_map]
   refine forall_congr' (fun s => ?_)
   refine imp_congr_right (fun _hP => ?_)
   change wpProp (spec := spec) mx.run
@@ -188,7 +191,8 @@ theorem triple_writerT_iff_forall_support_monoid {ω α : Type} [Monoid ω]
         ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s * w)).down := by
   classical
   rw [Std.Do.Triple.iff]
-  simp only [SPred.entails_1]
+  simp only [SPred.entails_1, WP.wp, WriterT.wpMonoid, PredTrans.apply_pushArg,
+    PredTrans.apply_Functor_map]
   refine forall_congr' (fun s => ?_)
   refine imp_congr_right (fun _hP => ?_)
   change wpProp (spec := spec) mx.run
