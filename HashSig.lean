@@ -1,8 +1,11 @@
 import HashSig.SLHDSA.Address
 import HashSig.SLHDSA.C13.ForsC
+import HashSig.SLHDSA.C13.Hypertree
 import HashSig.SLHDSA.C13.Params
 import HashSig.SLHDSA.C13.Primitives
+import HashSig.SLHDSA.C13.Scheme
 import HashSig.SLHDSA.C13.WotsC
+import HashSig.SLHDSA.C13.Xmss
 import HashSig.SLHDSA.Concrete.Instance
 import HashSig.SLHDSA.Concrete.KAT
 import HashSig.SLHDSA.Concrete.Keccak
