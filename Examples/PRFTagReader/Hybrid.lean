@@ -32,6 +32,7 @@ variable {TagId Nonce Digest : Type}
   [DecidableEq Nonce] [SampleableType Nonce]
   [DecidableEq Digest] [SampleableType Digest]
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
 /-! #### Milestone 5: the hybrid table handler
 

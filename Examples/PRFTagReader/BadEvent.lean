@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import Examples.PRFTagReader.Collision
+import Examples.PRFTagReader.Defs
 
 /-!
 # PRF Tag/Reader Protocol — Bad-Event Bound

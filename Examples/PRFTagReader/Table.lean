@@ -55,7 +55,9 @@ variable {TagId Nonce Digest : Type}
   [DecidableEq TagId] [Fintype TagId] [Nonempty TagId]
   [DecidableEq Nonce] [SampleableType Nonce]
   [DecidableEq Digest] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
 /-- Deterministic real multiple-session handler keyed directly on a random-oracle table
 `g : TagId × Nonce → Digest`. This is `unlinkMultipleQueryImpl prfs k` for any PRF package whose

@@ -34,6 +34,8 @@ variable {TagId Nonce Digest K : Type}
   [DecidableEq Nonce] [SampleableType Nonce]
   [DecidableEq Digest] [SampleableType Digest]
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
 /-- **Reader step of the eager-coupled core.** Closes the `| inr transcript =>` branch of the
 `query_bind` case inside `multipleBadEager_le_hybridEager_aux`. Both table handlers collapse the

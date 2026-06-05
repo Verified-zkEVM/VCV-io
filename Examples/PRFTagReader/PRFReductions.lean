@@ -198,7 +198,7 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFTagImpl_run
     refine bind_congr fun nonce => ?_
     erw [hquery (tag, nonce.1)]
     rfl
-  · simp [hs]; rfl
+  · simp [hs]
 
 omit [DecidableEq TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
   [SampleableType Digest] in
@@ -350,7 +350,7 @@ lemma simulateQ_prfReal_unlinkToSinglePRFTagImpl_run
     refine bind_congr fun nonce => ?_
     erw [hquery ((tag, ⟨s.sessionsUsed tag, hs⟩), nonce.1)]
     rfl
-  · simp [hs]; rfl
+  · simp [hs]
 
 omit [DecidableEq TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
   [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -506,7 +506,7 @@ lemma simulateQ_multipleIdeal_collapse
   simulateQ_StateT_StateT_compose unlinkToMultiplePRFQueryImpl
     PRFScheme.prfIdealQueryImpl multipleIdealQueryImpl
     (fun q s' c' => by
-      simp [multipleIdealQueryImpl]; rfl)
+      simp [multipleIdealQueryImpl])
     adv s c
 
 /-- Composed single-session ideal handler: run the reduction's query implementation, then
@@ -539,7 +539,7 @@ lemma simulateQ_singleIdeal_collapse
   simulateQ_StateT_StateT_compose unlinkToSinglePRFQueryImpl
     PRFScheme.prfIdealQueryImpl singleIdealQueryImpl
     (fun q s' c' => by
-      simp [singleIdealQueryImpl]; rfl)
+      simp [singleIdealQueryImpl])
     adv s c
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in

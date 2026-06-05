@@ -5,8 +5,6 @@ Authors: Quang Dao
 -/
 
 import Examples.PRFTagReader.Defs
-import Examples.PRFTagReader.Auth
-import Examples.PRFTagReader.Collision
 import Examples.PRFTagReader.BadEvent
 
 /-!
@@ -24,16 +22,11 @@ The development defines:
 - a single-session unlinkability game, where each session uses an independent per-session secret;
 - an intermediate bad-event world that records nonce collisions across repeated sessions.
 
-The theorem statements package the intended security story: authentication reduces to PRF security
-plus an ideal-world argument, and unlinkability reduces to PRF security plus a nonce collision
-bound.
+The theorem statements package the intended security story: unlinkability reduces to PRF security
+plus a nonce collision bound.
 
 The content is split across the `Examples.PRFTagReader.*` modules:
 
 - `Defs`: protocol definitions, game states, oracle specs, experiments;
-- `Auth`: the auth→PRF reduction and authentication security
-  (`authExp_le_prfAdvantage_add_authRF`, `authIdealExp_eq_zero`,
-  `authRFExp_eq_authRFDirectExp`);
-- `Collision`: the random-oracle infrastructure and collision-bound theorems;
-- `BadEvent`: the bad-event world and the session collision bound.
+- `BadEvent`: the bad-event world used by the unlinkability reduction.
 -/

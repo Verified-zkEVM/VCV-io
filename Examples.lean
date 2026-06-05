@@ -23,9 +23,7 @@ import Examples.OneTimePad.HeapPar
 import Examples.OneTimePad.LeakageFree
 import Examples.OneTimePad.UC
 import Examples.PRFTagReader
-import Examples.PRFTagReader.Auth
 import Examples.PRFTagReader.BadEvent
-import Examples.PRFTagReader.Collision
 import Examples.PRFTagReader.Defs
 import Examples.PRFTagReader.Hybrid
 import Examples.PRFTagReader.HybridToSingle
