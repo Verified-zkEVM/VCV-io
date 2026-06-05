@@ -43,9 +43,9 @@ variable {TagId Nonce Digest K : Type}
 
 /-! ### Multiple-to-hybrid: the eager-table instrumented multiple handler
 
-The `MultipleHybridCoupling`-`inductionOn` route for the coupling bound is a proven dead end: a
-`Prop`-valued state coupling cannot encode the run-determined session index that a later tag query
-reads back. The eager route fixes this by sampling the random-oracle table up front.
+The coupling bound is established by sampling the random-oracle table up front: a `Prop`-valued
+state coupling cannot encode the run-determined session index that a later tag query reads back,
+but an eagerly-sampled table fixes the digest at every cell from the start.
 
 `multipleBadTableHandler g` is the deterministic-table instrumented multiple handler: it runs the
 deterministic real handler `multipleTableHandler g` on the multiple-ideal component and threads the
@@ -118,8 +118,7 @@ lemma multipleBadTableHandler_step_preserves_bad (g : TagId × Nonce → Digest)
 
 omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- **Eager-table full-run bad monotonicity.** Starting `simulateQ multipleBadTableHandler` from a
-state whose bad flag is set, every reachable output keeps `bad = true`. The eager-table analogue of
-`multipleBadQueryImpl_run_preserves_bad`. -/
+state whose bad flag is set, every reachable output keeps `bad = true`. -/
 lemma multipleBadTableHandler_run_preserves_bad {α : Type} (g : TagId × Nonce → Digest)
     (oa : OracleComp (UnlinkOracleSpec TagId Nonce Digest) α)
     (p : UnlinkState TagId × UnlinkBadState TagId Nonce Digest) (hbad : p.2.bad = true) :

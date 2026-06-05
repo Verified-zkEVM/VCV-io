@@ -16,9 +16,8 @@ single-session ideal world (per-session PRF cell): tag oracles run on the single
 keyed on `(tag, sid, nonce)`, but the reader oracle inspects only cells that the tag oracle has
 already touched, via the recorded `sessionNonce` map.
 
-This file also introduces the spare-fed hop-A hybrid handler `hybridSpareHandler` and the
-`HybridCacheConsistent` invariant connecting `hybridLazyHandler` runs to
-`hybridCacheAccepts`-based reader decisions.
+This file also introduces the `HybridCacheConsistent` invariant connecting `hybridLazyHandler`
+runs to `hybridCacheAccepts`-based reader decisions.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -182,25 +181,6 @@ lemma hybridTableHandler_reader_run
     (hybridTableHandler gS (Sum.inr transcript) s) =
       pure (ReaderReply.ofBool (hybridReaderAccepts gS s.sessionNonce transcript), s) := by
   simp [hybridTableHandler, QueryImpl.add_apply_inr, hybridReaderHandler]
-
-omit [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest] in
-/-- Hybrid session-nonce acceptance is monotone in the table-cell agreement: whenever the hybrid
-reader accepts a transcript at session-nonce map `sn` and table `gS`, the single-session reader
-`unlinkReaderAccepts … singlePattern` at the same table also accepts it — `H`'s accept condition
-inspects a *subset* of the cells the single reader checks (only the drawn ones). -/
-lemma hybridReaderAccepts_imp_singleReaderAccepts
-    (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest)
-    (sn : HybridSessionNonce TagId Nonce sessionsPerTag)
-    (transcript : TagTranscript Nonce Digest)
-    (h : hybridReaderAccepts gS sn transcript = true) :
-    unlinkReaderAccepts (Slot := TagId × Fin sessionsPerTag)
-      (fun slot nonce => gS (slot, nonce))
-      (singlePattern (TagId := TagId) sessionsPerTag) transcript = true := by
-  unfold hybridReaderAccepts at h
-  unfold unlinkReaderAccepts tagAccepts singlePattern
-  simp only [decide_eq_true_eq] at h ⊢
-  obtain ⟨tag, sid, _, hcell⟩ := h
-  exact ⟨tag, sid, hcell⟩
 
 /-! #### Hybrid-to-single: the lazy hybrid handler and its eager-table equivalence
 
@@ -503,125 +483,6 @@ lemma probOutput_hybrid_run'_eq_tableSample [Fintype Nonce] [Finite Digest]
     evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending adv HybridState.init ∅
       hybridCacheConsistent_init]
   simp only [OracleComp.tableExtending_empty]
-
-/-! #### Multiple-to-hybrid: the spare-fed hybrid handler
-
-The hop-A coupling pairs the multiple world against the hybrid world. The multiple world's reader
-queries *write* random-oracle cells keyed on `(TagId × Nonce)` that a later multiple tag query may
-reuse; the hybrid world's reader is read-only, so there is no cell for the coupling to align with.
-`hybridSpareHandler` is a distribution-preserving reformulation of `hybridLazyHandler` carrying an
-extra **spare reservoir** — a `((TagId × Nonce) →ₒ Digest).QueryCache` with the same key shape as
-the multiple world's cache. Its reader, beyond the read-only session-cache acceptance test of
-`hybridLazyHandler`, folds `idealCacheStep` over `(tag, transcript.nonce)` for every tag, drawing
-fresh uniform digests into the reservoir (write-once: `idealCacheStep` skips cells already cached).
-Its tag oracle draws a nonce `n` and, if the reservoir already holds `(tag, n)`, consumes that
-spare as the tag digest; otherwise it draws fresh exactly as `hybridLazyHandler` does. -/
-
-/-- Spare-fed hybrid handler: `hybridLazyHandler` augmented with a spare reservoir keyed on
-`(TagId × Nonce)`. The reader additionally populates the reservoir with fresh uniform digests at
-`(tag, transcript.nonce)` for every tag (write-once via `idealCacheStep`), leaving the read-only
-output bit unchanged. The tag oracle draws a nonce `n`; if the reservoir holds a spare at
-`(tag, n)` it consumes it as the tag digest, recording it in the session cell `((tag, sid), n)` and
-*clearing* the reservoir cell so the spare is consumed at most once; otherwise it draws fresh via
-`idealCacheStep` on the session cache. -/
-noncomputable def hybridSpareHandler :
-    QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
-      (StateT (HybridState TagId Nonce sessionsPerTag ×
-        (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache ×
-        ((TagId × Nonce) →ₒ Digest).QueryCache) ProbComp) :=
-  fun q => fun p => match q with
-    | Sum.inl tag => do
-        let s := p.1
-        if h : s.sessionsUsed tag < sessionsPerTag then
-          let sid : Fin sessionsPerTag := ⟨s.sessionsUsed tag, h⟩
-          let nonce ← ($ᵗ Nonce : ProbComp Nonce)
-          match p.2.2 (tag, nonce) with
-          | some d =>
-              pure (some (⟨nonce, d⟩ : TagTranscript Nonce Digest),
-                ({ sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1)
-                   sessionNonce := Function.update s.sessionNonce (tag, sid) (some nonce) } :
-                  HybridState TagId Nonce sessionsPerTag),
-                p.2.1.cacheQuery ((tag, sid), nonce) d,
-                Function.update p.2.2 (tag, nonce) none)
-          | none => do
-              let r ← idealCacheStep p.2.1 ((tag, sid), nonce)
-              pure (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest),
-                ({ sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1)
-                   sessionNonce := Function.update s.sessionNonce (tag, sid) (some nonce) } :
-                  HybridState TagId Nonce sessionsPerTag),
-                r.2, p.2.2)
-        else
-          pure (none, p)
-    | Sum.inr transcript => do
-        let rs ← idealCacheMapM ((Finset.univ : Finset TagId).toList.map
-          (fun tag => (tag, transcript.nonce))) p.2.2
-        pure (ReaderReply.ofBool (hybridCacheAccepts p.2.1 p.1.sessionNonce transcript),
-          p.1, p.2.1, rs.2)
-
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- `hybridSpareHandler` on a tag query whose slot budget is exhausted: returns `none`, state
-unchanged. -/
-lemma hybridSpareHandler_tag_run_of_not_lt (tag : TagId)
-    (p : HybridState TagId Nonce sessionsPerTag ×
-      (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache ×
-      ((TagId × Nonce) →ₒ Digest).QueryCache)
-    (hslot : ¬ p.1.sessionsUsed tag < sessionsPerTag) :
-    (hybridSpareHandler (Sum.inl tag)) p = pure (none, p) := by
-  change dite _ _ _ = _; exact dif_neg hslot
-
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- `hybridSpareHandler` on a tag query with a free slot: sample a nonce, then branch on the spare
-reservoir. The handler reduces to sampling a nonce followed by the reservoir-keyed continuation
-`hybridSpareTagStep`, which consumes a reservoir spare when present and draws fresh otherwise. -/
-lemma hybridSpareHandler_tag_run_of_lt (tag : TagId)
-    (p : HybridState TagId Nonce sessionsPerTag ×
-      (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache ×
-      ((TagId × Nonce) →ₒ Digest).QueryCache)
-    (hslot : p.1.sessionsUsed tag < sessionsPerTag) :
-    (hybridSpareHandler (Sum.inl tag)) p =
-      ($ᵗ Nonce) >>= fun nonce =>
-        (match p.2.2 (tag, nonce) with
-          | some d =>
-              pure (some (⟨nonce, d⟩ : TagTranscript Nonce Digest),
-                ({ sessionsUsed :=
-                    Function.update p.1.sessionsUsed tag (p.1.sessionsUsed tag + 1)
-                   sessionNonce := Function.update p.1.sessionNonce
-                    (tag, ⟨p.1.sessionsUsed tag, hslot⟩) (some nonce) } :
-                  HybridState TagId Nonce sessionsPerTag),
-                p.2.1.cacheQuery ((tag, ⟨p.1.sessionsUsed tag, hslot⟩), nonce) d,
-                Function.update p.2.2 (tag, nonce) none)
-          | none =>
-              idealCacheStep p.2.1 ((tag, ⟨p.1.sessionsUsed tag, hslot⟩), nonce) >>= fun r =>
-                pure (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest),
-                  ({ sessionsUsed :=
-                      Function.update p.1.sessionsUsed tag (p.1.sessionsUsed tag + 1)
-                     sessionNonce := Function.update p.1.sessionNonce
-                      (tag, ⟨p.1.sessionsUsed tag, hslot⟩) (some nonce) } :
-                    HybridState TagId Nonce sessionsPerTag),
-                  r.2, p.2.2)) := by
-  change (if h : p.1.sessionsUsed tag < sessionsPerTag then
-      ($ᵗ Nonce) >>= fun nonce =>
-        (match p.2.2 (tag, nonce) with
-          | some d => pure (_, _, _, Function.update p.2.2 (tag, nonce) none)
-          | none => idealCacheStep p.2.1 ((tag, ⟨p.1.sessionsUsed tag, h⟩), nonce) >>= fun r =>
-              pure (_, _, r.2, p.2.2))
-      else pure (none, p)) = _
-  rw [dif_pos hslot]
-
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- `hybridSpareHandler` on a reader query: fold `idealCacheStep` over the reservoir cells
-`(tag, transcript.nonce)` for every tag (write-once spare population), and return the read-only
-session-cache acceptance bit unchanged from `hybridLazyHandler`. -/
-lemma hybridSpareHandler_reader_run (transcript : TagTranscript Nonce Digest)
-    (p : HybridState TagId Nonce sessionsPerTag ×
-      (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache ×
-      ((TagId × Nonce) →ₒ Digest).QueryCache) :
-    (hybridSpareHandler (Sum.inr transcript)) p =
-      idealCacheMapM ((Finset.univ : Finset TagId).toList.map
-          (fun tag => (tag, transcript.nonce))) p.2.2 >>= fun rs =>
-        pure (ReaderReply.ofBool (hybridCacheAccepts p.2.1 p.1.sessionNonce transcript),
-          p.1, p.2.1, rs.2) := by
-  rfl
 
 end UnlinkReduction
 
