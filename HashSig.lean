@@ -1,4 +1,6 @@
 import HashSig.SLHDSA.Address
+import HashSig.SLHDSA.Concrete.Instance
+import HashSig.SLHDSA.Concrete.KAT
 import HashSig.SLHDSA.Concrete.Sha2
 import HashSig.SLHDSA.Encoding
 import HashSig.SLHDSA.Fors

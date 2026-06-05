@@ -287,3 +287,7 @@ lean_exe mldsa_test where
 /-- Falcon test executable (links against c-fn-dsa FFI). -/
 lean_exe falcon_test where
   root := `LatticeCryptoTest.Falcon.Main
+
+/-- SLH-DSA-SHA2-128-24 known-answer test: pure-Lean concrete verify vs the C reference vector. -/
+lean_exe slhdsa_kat where
+  root := `HashSig.SLHDSA.Concrete.KAT
