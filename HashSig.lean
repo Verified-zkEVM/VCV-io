@@ -1,4 +1,5 @@
 import HashSig.SLHDSA.Address
+import HashSig.SLHDSA.C13.Params
 import HashSig.SLHDSA.Concrete.Instance
 import HashSig.SLHDSA.Concrete.KAT
 import HashSig.SLHDSA.Concrete.Keccak
