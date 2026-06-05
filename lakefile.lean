@@ -291,3 +291,7 @@ lean_exe falcon_test where
 /-- SLH-DSA-SHA2-128-24 known-answer test: pure-Lean concrete verify vs the C reference vector. -/
 lean_exe slhdsa_kat where
   root := `HashSig.SLHDSA.Concrete.KAT
+
+/-- C13 known-answer test: pure-Lean keccak256 concrete verify vs the reference signer vector. -/
+lean_exe slhdsa_c13_kat where
+  root := `HashSig.SLHDSA.C13.KAT
