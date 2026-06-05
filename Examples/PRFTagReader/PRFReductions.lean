@@ -4,7 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Oleksandr Vovkotrub
 -/
 
-import Examples.PRFTagReader
+import Examples.PRFTagReader.Defs
+import Examples.PRFTagReader.BadEvent
 import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
 import VCVio.ProgramLogic.Relational.SimulateQ
 

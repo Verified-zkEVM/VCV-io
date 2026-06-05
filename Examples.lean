@@ -34,7 +34,7 @@ import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
 import Examples.PRFTagReader.MultipleToHybrid.Setup
 import Examples.PRFTagReader.PRFReductions
 import Examples.PRFTagReader.Table
-import Examples.PRFTagReaderUnlinkReduction
+import Examples.PRFTagReader.UnlinkReduction
 import Examples.PRGfromPRF
 import Examples.Pedersen
 import Examples.ProgramLogic.Probability

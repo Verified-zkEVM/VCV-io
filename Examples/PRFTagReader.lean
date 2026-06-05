@@ -6,6 +6,7 @@ Authors: Oleksandr Vovkotrub
 
 import Examples.PRFTagReader.Defs
 import Examples.PRFTagReader.BadEvent
+import Examples.PRFTagReader.UnlinkReduction
 
 /-!
 # PRF Tag/Reader Protocol
