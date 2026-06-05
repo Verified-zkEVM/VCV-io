@@ -66,9 +66,10 @@ theorem chain_compose (prims : Primitives p) (pkSeed : prims.PkSeed) (adrs : Adr
 def wotsSkAdrs (adrs : Adrs) (i : ℕ) : Adrs :=
   ((adrs.setTypeAndClear .wotsPrf).setKeyPairAddress adrs.getKeyPairAddress).setChainAddress i
 
-/-- Base address for the `F`-steps of chain `i` (type `WOTS_HASH`, chain address `i`). -/
+/-- Base address for the `F`-steps of chain `i` (type `WOTS_HASH`, key-pair preserved,
+chain address `i`). -/
 def wotsChainAdrs (adrs : Adrs) (i : ℕ) : Adrs :=
-  (adrs.setTypeAndClear .wotsHash).setChainAddress i
+  ((adrs.setTypeAndClear .wotsHash).setKeyPairAddress adrs.getKeyPairAddress).setChainAddress i
 
 /-- Address for compressing the `len` chain ends into the WOTS public key (type `WOTS_PK`). -/
 def wotsPkAdrs (adrs : Adrs) : Adrs :=
