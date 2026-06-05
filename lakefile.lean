@@ -76,6 +76,11 @@ lean_lib FFI
 /-- Lattice-based cryptography: ring arithmetic, hardness assumptions, and scheme definitions. -/
 lean_lib LatticeCrypto
 
+/-- Hash-based signatures: SLH-DSA (SPHINCS+, FIPS 205) proof-level specs and security.
+Peer of `LatticeCrypto`; may depend on `VCVio`/`ToMathlib` (and Mathlib), but nothing in
+`VCVio`/`ToMathlib`/`FFI`/`Interop` may import it. -/
+lean_lib HashSig
+
 /-- Example constructions of cryptographic primitives. -/
 lean_lib Examples
 /-- Optional proof widget experiments and visualizations. -/
