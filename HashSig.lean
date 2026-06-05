@@ -1,4 +1,5 @@
 import HashSig.SLHDSA.Address
+import HashSig.SLHDSA.Concrete.Sha2
 import HashSig.SLHDSA.Encoding
 import HashSig.SLHDSA.Fors
 import HashSig.SLHDSA.Hypertree
