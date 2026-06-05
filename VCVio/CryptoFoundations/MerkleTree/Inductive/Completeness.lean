@@ -52,11 +52,24 @@ theorem functional_completeness {s : Skeleton}
   | ofLeft idxLeft ih =>
       cases leaf_data_tree with
       | internal left right =>
-          sorry -- TODO(v4.30 bump): grind [Vector.tail_cons, Vector.head_cons] no longer closes
+          have hl := ih left
+          -- TODO(v4.30 bump): v4.30 regressed the original
+          -- `grind [Vector.tail_cons, Vector.head_cons]`. The math is straightforward
+          -- (unfold `populateUp_internal` / sub-tree lemmas, apply `hl`), but reducing
+          -- `getPutativeRootWithHash`'s `proof.tail`/`proof.head` on the dependent-length
+          -- `List.Vector` defeats both `simp` (motive not type-correct on the `(n+1)-1`
+          -- index) and `grind`. Needs a manual dependent-vector rewrite. Useful lemmas:
+          -- populateUp_internal, populateUp_getRootValue, FullData.internal_getRootValue,
+          -- LeafData.get_ofLeft, LeafData.{left,right}Subtree_internal,
+          -- FullData.{left,right}Subtree_internal, List.Vector.{head,tail}_cons.
+          sorry
   | ofRight idxRight ih =>
       cases leaf_data_tree with
       | internal left right =>
-          sorry -- TODO(v4.30 bump): grind [Vector.tail_cons, Vector.head_cons] no longer closes
+          have hr := ih right
+          -- TODO(v4.30 bump): symmetric to the `ofLeft` case above — same dependent
+          -- `List.Vector` `.tail`/`.head` reduction regression. Uses `LeafData.get_ofRight`.
+          sorry
 
 
 /--

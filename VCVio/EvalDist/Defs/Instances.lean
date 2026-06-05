@@ -88,9 +88,10 @@ noncomputable instance : HasEvalPMF Id where
 instance : HasEvalFinset Id where
   finSupport x := {x}
   coe_finSupport x := by
-    -- TODO(v4.30 bump): v4.30 reducibility change broke the old `rfl`; derived
-    -- `HasEvalSet.toSet` projection no longer reduces. Scope-survey sorry.
-    sorry
+    show (↑({x.run} : Finset _) : Set _) = support x
+    rw [HasEvalSPMF.support_eq]
+    show (↑({x.run} : Finset _) : Set _) = (MonadHom.pure SPMF x).support
+    rw [MonadHom.pure_apply, SPMF.support_pure, Finset.coe_singleton]
 
 @[simp, grind =]
 lemma support_eq_singleton (x : Id α) : support x = {x.run} := rfl
