@@ -7,11 +7,11 @@ Authors: Oleksandr Vovkotrub
 import Examples.PRFTagReader.Defs
 
 /-!
-# PRF Tag/Reader Protocol — Bad-Event Bound
+# PRF Tag/Reader Protocol: Bad-Event Bound
 
-The bad-event world for the multiple-session unlinkability game, which records nonce collisions
-across repeated sessions of a tag. Proves the per-step bad-event bounds and the overall session
-collision bound `unlinkBadExp_le_sessionCollisionBound`.
+The bad-event world for the multiple-session unlinkability game records nonce collisions across
+repeated sessions of a tag. The per-step bad-event bound `unlinkBadTagStep_bad_le` feeds into the
+overall session collision bound `unlinkBadExp_le_sessionCollisionBound`.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -31,7 +31,7 @@ def unlinkBadRemaining (st : UnlinkBadState TagId Nonce Digest) : ℕ :=
   (Finset.univ : Finset TagId).sum fun tag => sessionsPerTag - st.sessionsUsed tag
 
 /-- Reachable bad-event states only cache nonces that came from successful tag sessions. For each
-tag, we retain a finite witness set of cached nonces whose size is bounded by that tag's session
+tag there is a finite witness set of cached nonces whose size is bounded by that tag's session
 counter. -/
 def unlinkBadCacheBounded (st : UnlinkBadState TagId Nonce Digest) : Prop :=
   ∀ tag : TagId, ∃ nonces : Finset Nonce,
@@ -204,8 +204,8 @@ lemma unlinkBadRemaining_pos_of_slot
       (fun _ _ => Nat.zero_le _) (Finset.mem_univ tag))
 
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Digest] [NeZero sessionsPerTag] in
-/-- A single tag step raises `bad` with probability at most `sessionsUsed tag * maxNonceProb`:
-the new nonce collides with one of the (at most `sessionsUsed tag`) previously cached nonces,
+/-- A single tag step raises `bad` with probability at most `sessionsUsed tag * maxNonceProb`.
+The new nonce collides with one of the (at most `sessionsUsed tag`) previously cached nonces,
 each matchable with probability at most `maxNonceProb`. -/
 private lemma unlinkBadTagStep_bad_le
     (tag : TagId) (st : UnlinkBadState TagId Nonce Digest)

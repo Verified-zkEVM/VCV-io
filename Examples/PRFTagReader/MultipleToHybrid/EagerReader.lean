@@ -7,17 +7,15 @@ Authors: Oleksandr Vovkotrub
 import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
 
 /-!
-# PRF Tag/Reader Protocol — Multiple-to-hybrid eager coupling, reader step
+# PRF Tag/Reader Protocol: multiple-to-hybrid eager coupling, reader step
 
-The reader-query branch of `multipleBadEager_le_hybridEager_aux`. Both table handlers reduce on a
-reader query to a deterministic `pure (bit, state)`. The two reader bits agree everywhere except
-on the disagreement set where the multi reader accepts but the hybrid reader rejects; the
-disagreement mass is bounded by `|TagId| / |Digest|` per query via
-`probEvent_multipleReader_disagree_le`, the `MultipleHybridColFresh` witness `hfresh` rules out
-rogue cached cells at `transcript.nonce` so the `hcol` hypothesis of that lemma is satisfied,
-and `hdist` —
-the per-nonce reader-uniqueness budget — together with `hCacheBound` provides the bookkeeping that
-prevents double-counting in the inductive step.
+Reader-query branch of `multipleBadEager_le_hybridEager_aux`. Both table handlers reduce on a
+reader query to a deterministic `pure (bit, state)`. The two reader bits agree off the
+disagreement set where the multi reader accepts but the hybrid reader rejects; that disagreement
+mass is bounded by `|TagId| / |Digest|` per query via `probEvent_multipleReader_disagree_le`,
+the `MultipleHybridColFresh` witness `hfresh` rules out rogue cached cells at `transcript.nonce`,
+and `hdist` (the per-nonce reader-uniqueness budget) together with `hCacheBound` provides the
+bookkeeping that prevents double-counting in the inductive step.
 
 The lemma `multipleBadEager_reader_step` discharges the `| inr transcript =>` branch of the
 `query_bind` case in the headline aux lemma.
@@ -37,7 +35,7 @@ variable {TagId Nonce Digest K : Type}
   [SampleableType (TagId × Nonce → Digest)]
   [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
-/-- **Reader step of the eager-coupled core.** Closes the `| inr transcript =>` branch of the
+/-- Reader step of the eager-coupled core. Closes the `| inr transcript =>` branch of the
 `query_bind` case inside `multipleBadEager_le_hybridEager_aux`. Both table handlers collapse the
 head reader query to a deterministic `pure`; lazifying the multi-side table draw to
 `idealCacheMapM cells sM.2` exposes a disagreement set bounded by `|TagId| / |Digest|`
@@ -210,9 +208,9 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       exact ⟨tag, sid, hsn, by simp [OracleComp.tableExtending, hcell]⟩
   -- Multi reader cells.
   set cells := multipleReaderCells (TagId := TagId) (Digest := Digest) transcript with hcells
-  -- **Step 1.** Reduce the three goal terms (LHS / RHS₁ / RHS₂ via `hMstep`/`hHstep`).
-  -- After the reductions, the handler call collapses to a `pure` whose payload determines
-  -- the reader bit deterministically from the (drawn) table.
+  -- Step 1: reduce the three goal terms (LHS / RHS₁ / RHS₂ via `hMstep`/`hHstep`). After the
+  -- reductions, the handler call collapses to a `pure` whose payload determines the reader bit
+  -- deterministically from the (drawn) table.
   have hLHS_eq :
       (do let gM ← $ᵗ (TagId × Nonce → Digest)
           let a ← multipleBadTableHandler (sessionsPerTag := sessionsPerTag)
@@ -263,11 +261,10 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
     rw [hMstep (OracleComp.tableExtending sM.2 gM)]; rfl
   rw [hLHS_eq, hRHS_eq, hBAD_eq]
   classical
-  -- **Step 2.** Lazify the multi-side eager table draw to `idealCacheMapM cells sM.2`
-  -- followed by an inner remaining draw. After lazification the multi reader bit becomes
-  -- a function of the drawn list `rs.1`.
-  -- Wrap both LHS and BAD terms as `Mψ (tableExtending sM.2 gM)` for some `Mψ`. The point
-  -- is to make `evalDist_idealCacheMapM_bind_uniformTable_comp` applicable.
+  -- Step 2: lazify the multi-side eager table draw to `idealCacheMapM cells sM.2` followed by an
+  -- inner remaining draw. After lazification the multi reader bit becomes a function of the
+  -- drawn list `rs.1`. Wrap both LHS and BAD terms as `Mψ (tableExtending sM.2 gM)` for some
+  -- `Mψ`, so that `evalDist_idealCacheMapM_bind_uniformTable_comp` applies.
   set MψLHS : (TagId × Nonce → Digest) → ProbComp Bool := fun g =>
     (fun z : Bool × (UnlinkState TagId × UnlinkBadState TagId Nonce Digest) => z.1) <$>
       (simulateQ (multipleBadTableHandler (sessionsPerTag := sessionsPerTag) g)
@@ -327,11 +324,11 @@ lemma multipleBadEager_reader_step [Fintype Nonce] [Fintype Digest]
       show probEvent _ _ = _ from probEvent_congr' (fun _ _ => Iff.rfl)
         (hBAD_fold ▸ hBAD_lazify)]
   rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
-  -- **Step 3.** Apply `probEvent_bind_le_add_bad_disagree` with the lazy
+  -- Step 3: apply `probEvent_bind_le_add_bad_disagree` with the lazy
   -- `mx := idealCacheMapM cells sM.2` and disagreement set
   -- `D rs := decide (∃ d ∈ rs.1, d = transcript.auth) = true ∧ bHconst = false`.
-  -- Off `D`: the multi reader bit equals `bHconst`, so we recurse via the IH.
-  -- On `D`: charged to `ε₁ := |TagId|/|Digest|` (via `probEvent_multipleReader_disagree_le`).
+  -- Off `D`: the multi reader bit equals `bHconst`, so the IH closes the bound.
+  -- On `D`: charged to `ε₁ := |TagId|/|Digest|` via `probEvent_multipleReader_disagree_le`.
   set D : List Digest × ((TagId × Nonce) →ₒ Digest).QueryCache → Prop :=
     fun rs => decide (∃ d ∈ rs.1, d = transcript.auth) = true ∧ bHconst = false with hD
   have hslackeq :

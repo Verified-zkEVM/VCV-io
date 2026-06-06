@@ -7,18 +7,18 @@ Authors: Oleksandr Vovkotrub
 import Examples.PRFTagReader.HybridToSingle
 
 /-!
-# PRF Tag/Reader Protocol — Multiple-to-hybrid coupling setup
+# PRF Tag/Reader Protocol: multiple-to-hybrid coupling setup
 
-Coupling infrastructure for the multiple-session → hybrid transition of the unlinkability
-reduction. Includes:
+Coupling infrastructure for the multiple-session to hybrid transition of the unlinkability
+reduction.
 
-* the multiple-vs-hybrid reader-aware cache coupling `MultipleHybridCoupling`;
-* the instrumented multiple-session handler `multipleBadQueryImpl` with its bad-flag advance
-  `multipleBadAdvance` and per-query reductions;
-* the spare-draw distribution-neutrality lemmas (`evalDist_bind_const_eq`,
-  `evalDist_idealCacheMapM_bind_const_eq`);
-* the `MultipleHybridColFresh` predicate tracking collision-freshness across reader queries;
-* initial-state lemmas (`MultipleHybridCoupling_init`, `multipleHybridColFresh_init`).
+* `MultipleHybridCoupling`: the reader-aware multiple-vs-hybrid cache coupling.
+* `multipleBadQueryImpl`: the instrumented multiple-session handler, with bad-flag advance
+  `multipleBadAdvance` and per-query reduction lemmas.
+* `evalDist_bind_const_eq`, `evalDist_idealCacheMapM_bind_const_eq`: spare-draw
+  distribution-neutrality.
+* `MultipleHybridColFresh`: the collision-freshness predicate threaded across reader queries.
+* `MultipleHybridCoupling_init`, `multipleHybridColFresh_init`: initial-state witnesses.
 
 The eager-table coupling proof itself (`multipleBadEager_le_hybridEager_aux`) lives in the
 sibling `MultipleToHybrid.Eager` module.
@@ -40,20 +40,7 @@ variable {TagId Nonce Digest K : Type}
 
 section EagerComposed
 
-/-! ### Multiple-to-hybrid: the multiple-vs-hybrid cache coupling
-
-This couples the multiple-session ideal handler `multipleIdealQueryImpl` (a lazy random oracle
-over `TagId × Nonce`, whose tag oracle reuses the cell `(tag, nonce)` whenever two sessions of one
-tag draw the same nonce) against the per-session-fresh hybrid handler `hybridLazyHandler` (a lazy
-random oracle over `(TagId × Fin sessionsPerTag) × Nonce`, whose tag oracle always consults a fresh
-session slot `(tag, sid)`). Off the within-tag nonce collision the two worlds produce the same
-fresh-uniform digest, so the gap is charged to two terms: the collision goes into the bad-world
-probability `Pr[bad]` and the reader-cell asymmetry goes into the reader-slack
-`qReader * |TagId| / |Digest|`.
-
-The coupling is `MultipleHybridCoupling`: a reader-aware state relation on the three handler
-states (the multiple cache, the hybrid cache + session-nonce map, and the bad-world `responses`
-cache). -/
+/-! ### Multiple-vs-hybrid cache coupling -/
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce]
   [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -82,14 +69,14 @@ lemma multipleReaderCells_length (transcript : TagTranscript Nonce Digest) :
   rw [List.length_map, Finset.length_toList, Finset.card_univ]
 
 omit [Nonempty TagId] [SampleableType Nonce] in
-/-- **Per-reader-query multiple-vs-hybrid disagreement bound.** Fix a multiple cache `cM`, a hybrid
-cache `cH` and a session-nonce map `sn`. Suppose every multiple cell `(tag, transcript.nonce)` that
-is *already cached* was produced by a tag draw — recorded in `sn` (`hcol`) — and that every
-tag-drawn cell of the multiple cache mirrors the hybrid cache (`hcorr`, the cache
-correspondence). Then, folding `idealCacheStep` over the `|TagId|` multiple reader cells, the
-probability that the multiple reader accepts while the hybrid reader (`hybridCacheAccepts`) rejects
-is at most `|TagId| / |Digest|`: the only way they disagree is a fresh draw at a never-drawn cell
-hitting the authenticator, bounded by `probEvent_idealCacheMapM_mem_le`. -/
+/-- Per-reader-query multiple-vs-hybrid disagreement bound. Fix a multiple cache `cM`, a hybrid
+cache `cH` and a session-nonce map `sn`. Suppose every already-cached multiple cell
+`(tag, transcript.nonce)` was produced by a tag draw recorded in `sn` (`hcol`), and that every
+tag-drawn cell of the multiple cache mirrors the hybrid cache (`hcorr`). Then, folding
+`idealCacheStep` over the `|TagId|` multiple reader cells, the probability that the multiple
+reader accepts while the hybrid reader (`hybridCacheAccepts`) rejects is at most
+`|TagId| / |Digest|`: the only way they disagree is a fresh draw at a never-drawn cell hitting
+the authenticator, bounded by `probEvent_idealCacheMapM_mem_le`. -/
 lemma probEvent_multipleReader_disagree_le [Fintype Digest]
     (cM : ((TagId × Nonce) →ₒ Digest).QueryCache)
     (cH : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
@@ -241,16 +228,15 @@ private lemma tag_step_shared_clauses
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [SampleableType Digest] [NeZero sessionsPerTag] in
-/-! ### Multiple-to-hybrid: the instrumented multiple-session handler
+/-! ### Instrumented multiple-session handler
 
-`multipleIdealQueryImpl`'s state — a lazy random-oracle cache over `(TagId × Nonce)` — cannot
-express "a within-tag tag–tag nonce collision has occurred": the cache key does not record whether
-a cell was written by a tag draw or by a reader query, and a collision is history. The
-instrumented handler `multipleBadQueryImpl` carries, beside the multiple-ideal state, a full
-bad-world `UnlinkBadState` whose `bad` flag fires exactly on a tag-written cell collision. Its
-*output bit* is identical to `multipleIdealQueryImpl`'s — the instrumentation only threads an extra
-state component — so `Pr[= true]` is unchanged (`probOutput_multipleBad_run'_eq_multipleIdeal`),
-while `Pr[bad]` is exactly the bad-world collision probability
+`multipleIdealQueryImpl`'s state, a lazy random-oracle cache over `(TagId × Nonce)`, cannot
+express "a within-tag tag/tag nonce collision has occurred": the cache key does not record
+whether a cell was written by a tag draw or by a reader query. The instrumented handler
+`multipleBadQueryImpl` carries, beside the multiple-ideal state, a full bad-world
+`UnlinkBadState` whose `bad` flag fires exactly on a tag-written cell collision. Its output
+bit is identical to that of `multipleIdealQueryImpl` (`probOutput_multipleBad_run'_eq_multipleIdeal`),
+while `Pr[bad]` is the bad-world collision probability
 (`probEvent_multipleBad_bad_eq_unlinkBad`). -/
 
 /-- Joint handler state for the instrumented multiple-session world: the multiple-ideal state
@@ -261,9 +247,9 @@ abbrev MultipleBadState (TagId Nonce Digest : Type) (sessionsPerTag : ℕ) : Typ
     UnlinkBadState TagId Nonce Digest
 
 /-- Bad-world state advance on a tag query: given the previous bad state `sB` and the transcript
-the multiple-ideal tag oracle produced, advance `sB` exactly as `unlinkBadTagQueryImpl` would —
-recording the drawn digest and firing `bad` on a repeat `(tag, nonce)`. A `none` transcript (slot
-exhausted) leaves `sB` untouched. -/
+the multiple-ideal tag oracle produced, advance `sB` exactly as `unlinkBadTagQueryImpl` would,
+recording the drawn digest and firing `bad` on a repeat `(tag, nonce)`. A `none` transcript
+(slot exhausted) leaves `sB` untouched. -/
 def multipleBadAdvance (tag : TagId)
     (sB : UnlinkBadState TagId Nonce Digest)
     (r : Option (TagTranscript Nonce Digest)) : UnlinkBadState TagId Nonce Digest :=
@@ -277,15 +263,15 @@ def multipleBadAdvance (tag : TagId)
 
 /-- `multipleIdealQueryImpl` re-targeted to the larger `MultipleBadState` monad: runs the
 multiple-ideal handler on the inner state component and threads the extra `UnlinkBadState`
-component through unchanged. This is the "base" handler that `multipleBadQueryImpl` instruments
+component through unchanged. This is the base handler that `multipleBadQueryImpl` instruments
 via `QueryImpl.postInsert`.
 
 Exists to bridge a framework gap: there is no standard `MonadLift` instance between
 `StateT σ₁ m` and `StateT (σ₁ × σ₂) m`, so `postInsert` cannot lift a handler in the
-smaller-state monad into the larger-state monad directly. The right fix is a general
+smaller-state monad into the larger-state monad directly. The intended fix is a general
 `StateT.liftWith : MonadLift (StateT σ₁ m) (StateT (σ₁ × σ₂) m)` instance under
-`VCVio/OracleComp/SimSemantics/StateT/`; until that lands, the manual lift here is the
-template for future bad-flag-style instrumentation. -/
+`VCVio/OracleComp/SimSemantics/StateT/`. Until then the manual lift here serves as the
+template for bad-flag-style instrumentation. -/
 noncomputable def multipleIdealLiftedQueryImpl :
     QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
       (StateT (MultipleBadState TagId Nonce Digest sessionsPerTag) ProbComp) :=
@@ -294,15 +280,15 @@ noncomputable def multipleIdealLiftedQueryImpl :
         (sessionsPerTag := sessionsPerTag) q) p.1 >>= fun r =>
       pure (r.1, (r.2, p.2))
 
-/-- Instrumented multiple-session handler: defined via `QueryImpl.postInsert` on top of
+/-- Instrumented multiple-session handler defined via `QueryImpl.postInsert` on top of
 `multipleIdealLiftedQueryImpl`. The inserted side effect is a `modify` on the bad-world component
-that fires `multipleBadAdvance` on a tag query and is a no-op on a reader query. The output bit and
-inner-state evolution match `multipleIdealQueryImpl` exactly; only the extra `UnlinkBadState`
+that fires `multipleBadAdvance` on a tag query and is a no-op on a reader query. The output bit
+and inner-state evolution match `multipleIdealQueryImpl` exactly; only the extra `UnlinkBadState`
 component carries the bad-flag instrumentation.
 
-This shape validates the `postInsert` combinator for the "bad-flag" pattern: future reductions can
-use the same idiom (lift the base ideal handler to the larger state, then `postInsert` a
-`modify`-based bad-flag advance). -/
+The shape validates the `postInsert` combinator for the bad-flag pattern: subsequent reductions
+can lift the base ideal handler to the larger state, then `postInsert` a `modify`-based bad-flag
+advance. -/
 noncomputable def multipleBadQueryImpl :
     QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
       (StateT (MultipleBadState TagId Nonce Digest sessionsPerTag) ProbComp) :=
@@ -357,9 +343,10 @@ lemma multipleBadQueryImpl_reader_run (transcript : TagTranscript Nonce Digest)
 
 open OracleComp.ProgramLogic.Relational in
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- **Multiple-to-hybrid, output equivalence.** The instrumented handler `multipleBadQueryImpl` produces the
-same output distribution as `multipleIdealQueryImpl`: the bad-world component it threads beside the
-multiple-ideal state never feeds back into the output bit. Hence `Pr[= true]` is unchanged. -/
+/-- Output equivalence for the multiple-to-hybrid step: the instrumented handler
+`multipleBadQueryImpl` produces the same output distribution as `multipleIdealQueryImpl`, since
+the bad-world component threaded beside the multiple-ideal state never feeds back into the
+output bit. Hence `Pr[= true]` is unchanged. -/
 lemma probOutput_multipleBad_run'_eq_multipleIdeal
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (s : UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache)
@@ -381,7 +368,7 @@ lemma probOutput_multipleBad_run'_eq_multipleIdeal
         (sessionsPerTag := sessionsPerTag))
       (fun s₁ s₂ => s₁.1 = s₂) adversary ?_ (s, sB) s rfl
     intro t s₁ s₂ hs
-    -- the head: `multipleBadQueryImpl t s₁` is `multipleIdealQueryImpl t s₁.1 >>= pure (…)`
+    -- `multipleBadQueryImpl t s₁` is `multipleIdealQueryImpl t s₁.1 >>= pure (…)`
     subst hs
     cases t with
     | inl tag =>
@@ -426,31 +413,31 @@ lemma multipleBadQueryImpl_step_preserves_bad
     obtain ⟨r, _, hz⟩ := (mem_support_bind_iff _ _ _).mp hz
     rw [mem_support_pure_iff] at hz; subst hz; exact hbad
 
-/-! ### Multiple-to-hybrid: spare uniform draws are distribution-neutral
+/-! ### Spare uniform draws are distribution-neutral
 
-The hop-A coupling pairs each multiple-cache cell written by a *reader* query with a reserved
+The hop-A coupling pairs each multiple-cache cell written by a reader query with a reserved
 hybrid "spare" digest. Operationally the hybrid side draws those spares and discards them. The
-lemma below is the soundness core making that free: appending any failure-free probabilistic
-prefix to a computation — in particular a fold of fresh uniform digest draws via
-`idealCacheMapM` — leaves the output distribution unchanged. `ProbComp` never fails
-(`probFailure_eq_zero`), so a discarded draw cannot shift any output probability. -/
+lemma below is the soundness core: appending any failure-free probabilistic prefix to a
+computation, in particular a fold of fresh uniform digest draws via `idealCacheMapM`, leaves
+the output distribution unchanged. `ProbComp` never fails (`probFailure_eq_zero`), so a
+discarded draw cannot shift any output probability. -/
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce]
   [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- Appending a failure-free probabilistic prefix and discarding its result is
-distribution-neutral: `𝒟[mx >>= fun _ => my] = 𝒟[my]`. Since every `ProbComp` has zero failure
-probability, the discarded draw `mx` contributes only the constant factor `1`. -/
+distribution-neutral: `𝒟[mx >>= fun _ => my] = 𝒟[my]`. Every `ProbComp` has zero failure
+probability, so the discarded draw `mx` contributes only the constant factor `1`. -/
 lemma evalDist_bind_const_eq {α β : Type} (mx : ProbComp α) (my : ProbComp β) :
     𝒟[mx >>= fun _ => my] = 𝒟[my] := by
   refine evalDist_ext fun y => ?_
   rw [probOutput_bind_const, probFailure_eq_zero, tsub_zero, one_mul]
 
 omit [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest] [NeZero sessionsPerTag] in
-/-- **Spare draws are distribution-neutral.** Folding `idealCacheStep` over an arbitrary list of
-domain points — drawing a fresh uniform digest at every uncached cell — and then discarding the
-result leaves the output distribution unchanged. This is the soundness core of the hop-A
-spare-draws coupling: the hybrid reader may draw `|TagId|` spare digests it never reads, matching
-the cells the multiple reader writes, without shifting any output probability. -/
+/-- Spare draws are distribution-neutral: folding `idealCacheStep` over an arbitrary list of
+domain points (drawing a fresh uniform digest at every uncached cell) and discarding the result
+leaves the output distribution unchanged. The hybrid reader may draw `|TagId|` spare digests it
+never reads, matching the cells the multiple reader writes, without shifting any output
+probability. -/
 lemma evalDist_idealCacheMapM_bind_const_eq {D β : Type} [DecidableEq D]
     (l : List D) (c : (D →ₒ Digest).QueryCache) (my : ProbComp β) :
     𝒟[idealCacheMapM l c >>= fun _ => my] = 𝒟[my] :=
@@ -458,24 +445,24 @@ lemma evalDist_idealCacheMapM_bind_const_eq {D β : Type} [DecidableEq D]
 
 end EagerComposed
 
-/-! ### Multiple-to-hybrid: the reader-aware coupling relation
+/-! ### Reader-aware coupling relation
 
 The heterogeneous bad+slack `simulateQ` rule couples the instrumented multiple handler
 `multipleBadQueryImpl` (state `MultipleBadState`, the multiple-ideal state paired with the
 bad-world `UnlinkBadState`) against the lazy hybrid handler `hybridLazyHandler` (state
 `HybridState × QueryCache`). `MultipleHybridCoupling` is the three-way state relation between
-multiple-ideal, hybrid, and bad-world states that the rule consumes (re-pairing the multiple-ideal
-and bad-world components inside the `MultipleBadState`). -/
+multiple-ideal, hybrid, and bad-world states that the rule consumes, re-pairing the
+multiple-ideal and bad-world components inside the `MultipleBadState`. -/
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce]
   [SampleableType Nonce] [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
-/-! ### Multiple-to-hybrid: `MultipleHybridCoupling`
+/-! ### `MultipleHybridCoupling`
 
-`MultipleHybridCoupling` distinguishes multiple-cache cells written by *tag* queries from those
-written by *reader* queries: a cell `(tag, n)` is *tag-written* exactly when some hybrid session
+`MultipleHybridCoupling` distinguishes multiple-cache cells written by tag queries from those
+written by reader queries: a cell `(tag, n)` is tag-written exactly when some hybrid session
 recorded the draw, `∃ sid, sH.sessionNonce (tag, sid) = some n`. The bad-world `responses` cache
-mirrors precisely the *tag-written* cells (clause `hbadcol`), not the whole multiple cache, so a
-reader query — which writes only reader cells — preserves the invariant. The cache correspondence
+mirrors precisely the tag-written cells (clause `hbadcol`), not the whole multiple cache, so a
+reader query (which writes only reader cells) preserves the invariant. The cache correspondence
 `hcorr` already quantifies only over recorded sessions and is itself reader-stable: reader-written
 cells (whose nonce is in no session) are simply not constrained. -/
 
@@ -483,10 +470,10 @@ cells (whose nonce is in no session) are simply not constrained. -/
 (`UnlinkState × multiple cache`), a lazy-hybrid state `sH` (`HybridState × hybrid cache`) and a
 bad-world state `sB` (`UnlinkBadState`).
 
-Its clauses are: `hbadcol` records that the bad-world `responses` cache holds an entry at `(tag, n)` *exactly* for the
-tag-written cells — those `n` recorded by some session of `tag`. This makes the invariant stable
-under reader queries, which write the multiple cache but not the bad-world or session-nonce
-components. -/
+The clause `hbadcol` records that the bad-world `responses` cache holds an entry at `(tag, n)`
+exactly for the tag-written cells, those `n` recorded by some session of `tag`. This makes the
+invariant stable under reader queries, which write the multiple cache but not the bad-world or
+session-nonce components. -/
 def MultipleHybridCoupling
     (sM : UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (sH : HybridState TagId Nonce sessionsPerTag ×
@@ -519,17 +506,18 @@ lemma MultipleHybridCoupling_init :
   refine ⟨rfl, rfl, rfl, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intros <;>
     simp_all [UnlinkBadState.init, HybridState.init, HybridSessionNonce.init]
 
-/-- **Multiple-to-hybrid freshness invariant** (the `HybridColFresh`-analogue for the multiple cache). A cached
-multiple-cache cell `(tag, n)` that was *not* produced by a tag draw — no session of `tag` recorded
-the nonce `n` in the hybrid session-nonce map `sH.1.sessionNonce` — can only have been written by
-an earlier *reader* query. Under `HasDistinctUnlinkReaderNonces` a second reader query at `n` is
-then impossible, which is recorded here as the residual reader budget at `n` being exhausted.
+/-- Multiple-to-hybrid freshness invariant, the `HybridColFresh`-analogue for the multiple
+cache. A cached multiple-cache cell `(tag, n)` that was not produced by a tag draw (no session
+of `tag` recorded the nonce `n` in the hybrid session-nonce map `sH.1.sessionNonce`) can only
+have been written by an earlier reader query. Under `HasDistinctUnlinkReaderNonces` a second
+reader query at `n` is then impossible, recorded here as the residual reader budget at `n`
+being exhausted.
 
-The hybrid tag oracle records `sessionNonce (tag, sid) := some n` exactly when it draws nonce `n`
-for session `(tag, sid)`, and the hop-A cache correspondence `MultipleHybridCoupling.hcorr` ties tag-drawn
-multiple cells to recorded sessions; so a cached multiple cell with no recorded session is genuinely
-reader-written. This predicate is the freshness witness that the reader-step coupling threads
-through the induction, exactly mirroring `HybridColFresh` in hop B. -/
+The hybrid tag oracle records `sessionNonce (tag, sid) := some n` exactly when it draws nonce
+`n` for session `(tag, sid)`, and the cache correspondence `MultipleHybridCoupling.hcorr` ties
+tag-drawn multiple cells to recorded sessions; so a cached multiple cell with no recorded
+session is genuinely reader-written. This predicate is the freshness witness threaded through
+the reader-step coupling induction, mirroring `HybridColFresh` in the hybrid-to-single hop. -/
 def MultipleHybridColFresh (oa : UnlinkAdversary TagId Nonce Digest)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
@@ -551,13 +539,12 @@ lemma multipleHybridColFresh_init (oa : UnlinkAdversary TagId Nonce Digest)
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [NeZero sessionsPerTag] in
-/-- **Multiple-to-hybrid, reader-step coupling stability.** A multiple-session reader query folds
-`idealCacheStep` over its cells, extending the multiple cache `sM.2` to some `r.2` while leaving
-the session counters, the hybrid state and the bad-world state untouched. Because `idealCacheStep`
-only fills `none` cells — never overwriting an already-cached cell — and every tag-written cell is
-already cached (clause `hcorr` together with the hybrid cache/session-nonce consistency), the
-reader-extended state still satisfies `MultipleHybridCoupling`. This is the precise sense in which the
-reader-aware invariant is stable across reader queries. -/
+/-- Reader-step coupling stability. A multiple-session reader query folds `idealCacheStep` over
+its cells, extending the multiple cache `sM.2` to some `r.2` while leaving the session counters,
+the hybrid state, and the bad-world state untouched. Because `idealCacheStep` only fills `none`
+cells (never overwriting an already-cached cell) and every tag-written cell is already cached
+(clause `hcorr` together with the hybrid cache/session-nonce consistency), the reader-extended
+state still satisfies `MultipleHybridCoupling`. -/
 lemma MultipleHybridCoupling_reader_step
     (sM : UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (sH : HybridState TagId Nonce sessionsPerTag ×
@@ -576,10 +563,11 @@ lemma MultipleHybridCoupling_reader_step
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- **Multiple-to-hybrid, off-collision tag-step coupling stability.** Given `MultipleHybridCoupling sM sH sB`, a free
+/-- Off-collision tag-step coupling stability. Given `MultipleHybridCoupling sM sH sB`, a free
 slot `hslot`, an off-collision nonce `n` (`sM.2 (tag, n) = none`) and a digest `u`, the three
-post-states produced by the off-collision tag step — the multiple, hybrid and bad worlds all
-caching the fresh digest `u` for tag `tag` at nonce `n` — again satisfy `MultipleHybridCoupling`.
+post-states produced by the off-collision tag step (the multiple, hybrid, and bad worlds all
+caching the fresh digest `u` for tag `tag` at nonce `n`) again satisfy
+`MultipleHybridCoupling`.
 
 Off-collision means no session of `tag` had drawn `n` before, so the new draw both extends the
 session-nonce map at the fresh slot `sid` and writes a fresh bad-world `responses` entry; the
@@ -647,7 +635,7 @@ lemma MultipleHybridCoupling_tag_step
         · rw [Function.update_of_ne hts] at hsn'
           exact ⟨sid', hsn'⟩
 
-/-! ### Multiple-to-hybrid: closing `multipleIdeal_le_hybrid_add_bad`
+/-! ### Closing `multipleIdeal_le_hybrid_add_bad`
 
 The reader and tag per-query coupling steps are discharged below and assembled through the
 heterogeneous bad+slack `simulateQ` rule `probOutput_simulateQ_run'_le_add_bad_add_slack`. -/
@@ -671,7 +659,7 @@ lemma mem_drawn_of_cached_cell {D : Type} [DecidableEq D]
   simp [OracleComp.tableExtending, hr2, hcd]
 
 omit [Nonempty TagId] [SampleableType Nonce] [NeZero sessionsPerTag] in
-/-- **Multiple-to-hybrid, reader-step output domination.** Under `MultipleHybridCoupling sM sH sB`, whenever the lazy
+/-- Reader-step output domination. Under `MultipleHybridCoupling sM sH sB`, whenever the lazy
 hybrid reader accepts a transcript (`hybridCacheAccepts` reads `true`), the multiple reader also
 accepts: the accepting hybrid session cell mirrors a cached multiple cell holding the
 authenticator, which the multiple reader fold reads back into its drawn list. Hence the two

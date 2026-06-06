@@ -10,19 +10,12 @@ import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
 import VCVio.ProgramLogic.Relational.SimulateQ
 
 /-!
-# PRF Tag/Reader Protocol — PRF Reductions and Composed Ideal Handlers
+# PRF reductions and composed ideal handlers for the tag/reader unlinkability game
 
-The PRF reductions for the multiple-session and single-session unlinkability worlds, together
-with the composed ideal-world handlers (`multipleIdealQueryImpl`, `singleIdealQueryImpl`,
-`unlinkBadQueryImpl`), per-query reduction lemmas, structural `query_bind` reductions, and the
-pairwise-distinct-reader-nonce predicate `HasDistinctUnlinkReaderNonces`.
-
-This is the first module of the unlinkability reduction split; downstream modules
-(`Table`, `Hybrid`, `HybridToSingle`, `MultipleToHybrid.Setup`,
-`MultipleToHybrid.EagerSetup`, `MultipleToHybrid.EagerReader`, `MultipleToHybrid.Eager`,
-`MultipleBadCollision`) extend this
-infrastructure to the eager-table coupling chain culminating in
-`unlinkabilityAdvantage_le_two_prf_plus_collision`.
+PRF reductions for the multiple-session and single-session unlinkability worlds, the composed
+ideal-world handlers `multipleIdealQueryImpl`, `singleIdealQueryImpl`, and `unlinkBadQueryImpl`,
+their per-query and `query_bind` reduction lemmas, and the pairwise-distinct-reader-nonce
+predicate `HasDistinctUnlinkReaderNonces`.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -40,7 +33,8 @@ variable {TagId Nonce Digest K : Type}
 /-! ## Multiple-session reduction
 
 The multiple-session world hashes through a single per-tag secret. Replacing that secret by a PRF
-oracle on `(TagId × Nonce)` turns the game into a PRF distinguisher. -/
+oracle on `(TagId × Nonce)` turns the game into a PRF distinguisher.
+-/
 
 /-- Tag-oracle implementation of the multiple-session reduction: sample a nonce uniformly and
 query the PRF oracle on `(tag, nonce)` for the authenticator. Models `unlinkTagQueryImpl` under the
@@ -159,9 +153,9 @@ noncomputable def unlinkToSinglePRFReduction
 
 /-! ## Bridge lemmas
 
-The three lemmas below are the analytic content of the reduction. The first two are PRF-real
-faithfulness lemmas (each provable by the same simulation-collapse argument as the auth-side
-`prfRealExp_authToPRFReduction_eq_authExp`); the third is the identical-until-bad coupling. -/
+PRF-real faithfulness for the multiple- and single-session reductions, proved by the same
+simulation-collapse argument as the auth-side `prfRealExp_authToPRFReduction_eq_authExp`.
+-/
 
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce] [DecidableEq Digest]
   [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -266,10 +260,10 @@ lemma simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run
   rfl
 
 omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] in
-/-- Inductive helper, multiple-session world: simulating the unlinkability adversary through the
-reduction's query implementation and then through the real PRF query implementation is the same,
-state-by-state, as simulating it directly through the real multiple-session query implementation
-with the hash set to `prfs.evalMultiple k`. -/
+/-- Multiple-session compose: simulating the unlinkability adversary through the reduction's query
+implementation and then through the real PRF query implementation matches, state-by-state, the
+direct simulation through the real multiple-session query implementation with the hash set to
+`prfs.evalMultiple k`. -/
 theorem simulateQ_prfReal_unlinkToMultiplePRFQueryImpl_run
     (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag) (k : K)
     (adversary : UnlinkAdversary TagId Nonce Digest)
@@ -425,10 +419,10 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
   rfl
 
 omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] in
-/-- Inductive helper, single-session world: simulating the unlinkability adversary through the
-reduction's query implementation and then through the real PRF query implementation is the same,
-state-by-state, as simulating it directly through the real single-session query implementation
-with the hash set to `prfs.evalSingle k`. -/
+/-- Single-session compose: simulating the unlinkability adversary through the reduction's query
+implementation and then through the real PRF query implementation matches, state-by-state, the
+direct simulation through the real single-session query implementation with the hash set to
+`prfs.evalSingle k`. -/
 theorem simulateQ_prfReal_unlinkToSinglePRFQueryImpl_run
     (prfs : TagReaderPRFs K TagId Nonce Digest sessionsPerTag) (k : K)
     (adversary : UnlinkAdversary TagId Nonce Digest)
@@ -473,12 +467,11 @@ theorem prfRealExp_unlinkToSinglePRFReduction_eq_unlinkSingleExp
 
 /-! ### Composed ideal-world handlers
 
-The two ideal-PRF experiments are each a `simulateQ` of the lazy random oracle applied to the
-output of a `simulateQ` of the reduction's query implementation. The `*IdealQueryImpl` definitions
-below package that nested simulation as a single stateful handler over the unlinkability oracle
-interface, with state `UnlinkState TagId × QueryCache`. The `simulateQ_*Ideal_collapse` lemmas show
-that simulating the adversary through the composed handler reproduces the nested simulation up to
-the obvious reassociation of the product state. -/
+`multipleIdealQueryImpl` and `singleIdealQueryImpl` package the nested simulation of each ideal-PRF
+experiment as a single stateful handler over the unlinkability oracle interface, with state
+`UnlinkState TagId × QueryCache`. The `simulateQ_*Ideal_collapse` lemmas identify the composed
+handler with the nested simulation up to reassociation of the product state.
+-/
 
 /-- Composed multiple-session ideal handler: run the reduction's query implementation, then
 interpret the resulting PRF-oracle queries through the lazy random oracle. -/
@@ -581,9 +574,9 @@ lemma prfIdealExp_unlinkToSinglePRFReduction_eq_run'
 
 /-! ### Per-query reduction lemmas for the composed ideal handlers
 
-The `*IdealQueryImpl` handlers are `simulateQ`-wrappers; the lemmas below give their explicit
-reduced forms on each oracle query, so that a coupling induction can reason about them concretely.
-The lazy-random-oracle lookup at a domain point is exposed via `QueryCache` operations. -/
+Explicit reduced forms of `*IdealQueryImpl` on each oracle query. The lazy-random-oracle lookup at
+a domain point is exposed via `QueryCache` operations.
+-/
 
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce] [DecidableEq Digest]
   [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -723,8 +716,7 @@ lemma multipleIdealQueryImpl_tag_run_of_not_lt (tag : TagId) (s : UnlinkState Ta
 omit [Fintype TagId] [Nonempty TagId] [DecidableEq Digest] [NeZero sessionsPerTag] in
 /-- Running the multiple-session reduction tag handler (slot available) through the lazy random
 oracle: sample a nonce, consult the cache at `(tag, nonce)` via `idealCacheStep`, and advance the
-session counter. The proof uses `erw` to bridge the reducible-defeq gap between the unfolded spec
-`unifSpec + ((TagId × Nonce) →ₒ Digest)` and `PRFScheme.PRFOracleSpec (TagId × Nonce) Digest`. -/
+session counter. -/
 lemma simulateQ_prfIdeal_unlinkToMultiplePRFTagImpl_run_of_lt
     (tag : TagId) (s : UnlinkState TagId)
     (c : ((TagId × Nonce) →ₒ Digest).QueryCache)
@@ -950,10 +942,9 @@ lemma singleIdealQueryImpl_reader_run
   simp [simulateQ_prfIdeal_unlinkToSinglePRFReaderImpl_run transcript s c]
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- Base case of any coupling induction for `multipleIdeal_le_singleIdeal_add_bad`: on a `pure`
-adversary the multiple- and single-session ideal handlers return the same bit, so the
-multiple-world success probability is trivially bounded by the single-world one plus the
-bad-event probability. Holds for arbitrary (not necessarily coupled) initial states. -/
+/-- Pure-adversary base case of `multipleIdeal_le_singleIdeal_add_bad`: on a `pure b` adversary the
+multiple- and single-session ideal handlers return `b`, so the multiple-world success probability
+is bounded by the single-world one plus the bad-event probability for arbitrary initial states. -/
 lemma multipleIdeal_le_singleIdeal_add_bad_pure (b : Bool)
     (sM : UnlinkState TagId × ((TagId × Nonce) →ₒ Digest).QueryCache)
     (sS : UnlinkState TagId × (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
@@ -970,11 +961,11 @@ lemma multipleIdeal_le_singleIdeal_add_bad_pure (b : Bool)
 
 /-! ### Structural reductions of the composed ideal handlers on a `query_bind`
 
-The next two lemmas expose `simulateQ … (query_bind t f)` run from a state as a single monadic
-`bind`: the per-query handler applied to the head, then the recursive `simulateQ` of the
-continuation threaded through the resulting state. They are pure rewriting facts (`simulateQ` is a
-monad morphism), and they turn the coupling induction into a sequence of `bind`-decomposition
-steps that `probEvent_bind_le_add` / `probEvent_bind_congr_le_add` can attack. -/
+`simulateQ … (query_bind t f)` run from a state is a single monadic `bind`: the per-query handler
+applied to the head, then the recursive `simulateQ` of the continuation threaded through the
+resulting state. These rewrites turn a coupling induction into `bind`-decomposition steps for
+`probEvent_bind_le_add` / `probEvent_bind_congr_le_add`.
+-/
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `simulateQ multipleIdealQueryImpl` of a `query_bind`, run from a state and projected to its
@@ -1141,12 +1132,12 @@ lemma probEvent_unlinkBad_bad_eq_one_of_bad
 
 /-! ### Pairwise-distinct reader nonces
 
-The reader-slack half of the coupling is sound only when the adversary's reader queries carry
-pairwise-distinct nonces: a reader query at nonce `n` programs an entire column of the random
-oracle, and the coupling between the multiple- and single-session worlds can charge that column
-only once. `HasDistinctUnlinkReaderNonces` is the unlinkability analogue of
-`PRFTagReader.HasDistinctReaderNonces` from the authentication collision proof: it bounds, for
-every nonce `n`, the number of reader queries carrying `n` by `1`. -/
+`HasDistinctUnlinkReaderNonces` bounds, for every nonce `n`, the number of reader queries carrying
+`n` by `1`. It is the unlinkability analogue of `PRFTagReader.HasDistinctReaderNonces` from the
+authentication collision proof, and underpins the reader-slack half of the multiple-vs-single
+coupling: a reader query at nonce `n` programs an entire column of the random oracle, which the
+coupling can charge only once.
+-/
 
 /-- Per-nonce reader-query predicate on the unlinkability oracle interface. `pReaderNonce n` holds
 of a reader query exactly when its transcript carries the nonce `n`, and never holds of a tag

@@ -11,23 +11,19 @@ import Examples.PRFTagReader.UnlinkReduction
 /-!
 # PRF Tag/Reader Protocol
 
-This file formalizes a simple RFID-style tag/reader protocol. Each tag is assigned a secret and,
-when queried, samples a fresh nonce `n` and outputs `(n, F(secret, n))`. A reader accepts a
-transcript `(n, a)` whenever some registered tag secret makes `a` equal to `F(secret, n)`.
+Formalization of a simple RFID-style tag/reader protocol. Each tag holds a secret and, on query,
+samples a fresh nonce `n` and outputs `(n, F(secret, n))`. A reader accepts a transcript `(n, a)`
+whenever some registered tag secret makes `a` equal to `F(secret, n)`.
 
-The development defines:
+Main security statements:
 
-- an active authentication game, where the adversary wins by making the reader accept a transcript
-  that was not previously emitted by the honest tag oracle;
-- a multiple-session unlinkability game, where all sessions of a tag reuse the same per-tag secret;
-- a single-session unlinkability game, where each session uses an independent per-session secret;
-- an intermediate bad-event world that records nonce collisions across repeated sessions.
+- active authentication: the adversary wins by making the reader accept a transcript not previously
+  emitted by the honest tag oracle;
+- multiple-session unlinkability: all sessions of a tag share a single per-tag secret;
+- single-session unlinkability: each session uses an independent fresh secret;
+- a bad-event world tracking nonce collisions across repeated sessions, bridging the two
+  unlinkability games via PRF security plus a collision bound.
 
-The theorem statements package the intended security story: unlinkability reduces to PRF security
-plus a nonce collision bound.
-
-The content is split across the `Examples.PRFTagReader.*` modules:
-
-- `Defs`: protocol definitions, game states, oracle specs, experiments;
-- `BadEvent`: the bad-event world used by the unlinkability reduction.
+Content is split across `Examples.PRFTagReader.Defs` (protocol, games, oracle specs) and
+`Examples.PRFTagReader.BadEvent` (bad-event world used by the unlinkability reduction).
 -/

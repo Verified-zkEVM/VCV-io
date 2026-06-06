@@ -7,17 +7,19 @@ Authors: Oleksandr Vovkotrub
 import Examples.PRFTagReader.Table
 
 /-!
-# PRF Tag/Reader Protocol — Hybrid Handler
+# PRF Tag/Reader Protocol: Hybrid Handler
 
-Milestone 5 of the unlinkability reduction: the hybrid table handler `hybridTableHandler`, its
-state `HybridState`, and the lazy-form companion `hybridLazyHandler`. The hybrid world is the
-intermediate game between the multiple-session ideal world (per-tag PRF cell) and the
-single-session ideal world (per-session PRF cell): tag oracles run on the single-session table
-keyed on `(tag, sid, nonce)`, but the reader oracle inspects only cells that the tag oracle has
-already touched, via the recorded `sessionNonce` map.
+The hybrid game intermediate between the multiple-session and single-session ideal worlds for
+the unlinkability reduction. Tag oracles run on the single-session table keyed on
+`(tag, sid, nonce)`, while the reader oracle inspects only cells that the tag oracle has
+already touched, via a recorded `sessionNonce` map.
 
-This file also introduces the `HybridCacheConsistent` invariant connecting `hybridLazyHandler`
-runs to `hybridCacheAccepts`-based reader decisions.
+Main definitions:
+
+* `hybridTableHandler`: the deterministic hybrid handler against a pre-sampled table.
+* `hybridLazyHandler`: the lazy-form companion against a random-oracle cache.
+* `HybridCacheConsistent`: the invariant connecting `hybridLazyHandler` runs to
+  `hybridCacheAccepts`-based reader decisions.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -33,29 +35,7 @@ variable {TagId Nonce Digest : Type}
   {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
   [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
-/-! #### Milestone 5: the hybrid table handler
-
-The 2-hop hybrid game closing the unlinkability reduction. The hybrid world `H` runs on the
-*single-session* random-oracle table `gS : (TagId × Fin sessionsPerTag) × Nonce → Digest`, with:
-
-* a tag oracle identical to the single-session world's — session `i` of `tag` reads
-  `gS ((tag, i), nonce)`, so tag queries are *per-session fresh*;
-* a *session-nonce-based* reader oracle. The hybrid state carries, beside the session counters, a
-  `sessionNonce : TagId × Fin sessionsPerTag → Option Nonce` recording, for each `(tag, sid)`, the
-  nonce that session `sid` of `tag` drew. On a reader query at transcript `(n, v)`, the reader
-  accepts when some session `(tag, sid)` has a recorded draw `sessionNonce (tag, sid) = some n`
-  with `gS ((tag, sid), n) = v` — i.e. it inspects exactly the cells that honest tag queries
-  actually produced.
-
-The `sessionNonce` map is *write-once*: each session `(tag, sid)` draws exactly once (the tag
-oracle writes `sessionNonce (tag, sessionsUsed tag)` and strictly increments `sessionsUsed tag`),
-so a tag drawing the same nonce twice records *both* draws on distinct keys, never orphaning a
-cell. This is what makes the reader sound against the within-tag nonce-collision case, and what
-makes the column-freshness invariant of hop B step-stable.
-
-Because its tag oracle matches the single world's, `H` and Single can be coupled on one shared
-table `gS` and differ only in the reader (hop B): `H`'s reader checks only the drawn cells, a
-subset of the single reader's all-cells check, paying the reader-slack term. -/
+/-! #### Hybrid table handler -/
 
 /-- Per-session nonce map: records, for each session `(tag, sid)`, the nonce that session drew in
 its tag query, or `none` if that session has not been used yet. The hybrid world threads a
@@ -182,15 +162,7 @@ lemma hybridTableHandler_reader_run
       pure (ReaderReply.ofBool (hybridReaderAccepts gS s.sessionNonce transcript), s) := by
   simp [hybridTableHandler, QueryImpl.add_apply_inr, hybridReaderHandler]
 
-/-! #### Hybrid-to-single: the lazy hybrid handler and its eager-table equivalence
-
-`hybridTableHandler` runs the hybrid world `H` against a *pre-sampled* single-session table `gS`.
-For the hop-B coupling we instead need `H` and `Single` to share a *lazily-sampled* random-oracle
-cache, so that the cells the single reader inspects but the hybrid reader does not are genuinely
-fresh at each reader query. `hybridLazyHandler` is that lazy form: its state is
-`HybridState × QueryCache` over the single-session domain `(TagId × Fin sessionsPerTag) × Nonce`,
-its tag oracle samples a nonce and consults the cache via `idealCacheStep` (recording the draw in
-the session-nonce map), and its reader oracle inspects only the drawn cache cells. -/
+/-! #### Lazy hybrid handler -/
 
 /-- Reader acceptance for the lazy hybrid world, read directly off the random-oracle cache `c`:
 accept the transcript when some session `(tag, sid)` has a recorded draw
@@ -288,9 +260,9 @@ lemma hybridLazyHandler_reader_run (transcript : TagTranscript Nonce Digest)
 
 /-- Session-nonce / cache consistency invariant for the lazy hybrid handler: every cell recorded in
 the session-nonce map is already present in the random-oracle cache. The lazy hybrid tag oracle
-maintains this invariant — it records `sessionNonce (tag, sid) := some nonce` exactly when it
-caches the cell `((tag, sid), nonce)` — and it is what lets the lazy reader (which reads only
-cached cells) agree with the table reader (which reads the overlaid table `tableExtending c g`). -/
+maintains this invariant by recording `sessionNonce (tag, sid) := some nonce` exactly when it
+caches the cell `((tag, sid), nonce)`, which lets the lazy reader (reading only cached cells)
+agree with the table reader (reading the overlaid table `tableExtending c g`). -/
 def HybridCacheConsistent
     (s : HybridState TagId Nonce sessionsPerTag)
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) : Prop :=
@@ -361,10 +333,10 @@ lemma hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending
     rw [OracleComp.tableExtending, hv, Option.getD_some] at hcv
     rw [hv, hcv]
 
-/-- **Hybrid-to-single, Step 1.** Running the lazy hybrid handler from a session-nonce / cache consistent
-state `(s, c)` has the same output distribution as sampling a full single-session random-oracle
-table `g`, overlaying the cache `c`, and running the deterministic table hybrid handler
-`hybridTableHandler (tableExtending c g)` from `s`. The hybrid analogue of
+/-- Running the lazy hybrid handler from a session-nonce / cache consistent state `(s, c)` has the
+same output distribution as sampling a full single-session random-oracle table `g`, overlaying the
+cache `c`, and running the deterministic table hybrid handler `hybridTableHandler
+(tableExtending c g)` from `s`. The hybrid analogue of
 `evalDist_simulateQ_singleIdealQueryImpl_run'_eq_tableExtending`. -/
 lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
     [Fintype Nonce] [Finite Digest]
@@ -469,10 +441,10 @@ lemma evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending
         hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending s c g hcons transcript]
       rfl
 
-/-- **Hybrid-to-single, deliverable 1.** Eager form of the hybrid-world success probability: running the
-lazy hybrid handler from the initial state has the same success probability as sampling a full
-single-session random-oracle table `gS` up front and running the deterministic table hybrid
-handler. The hybrid analogue of `probOutput_singleIdeal_run'_eq_tableSample`. -/
+/-- Eager form of the hybrid-world success probability: running the lazy hybrid handler from the
+initial state has the same success probability as sampling a full single-session random-oracle
+table `gS` up front and running the deterministic table hybrid handler. The hybrid analogue of
+`probOutput_singleIdeal_run'_eq_tableSample`. -/
 lemma probOutput_hybrid_run'_eq_tableSample [Fintype Nonce] [Finite Digest]
     (adv : UnlinkAdversary TagId Nonce Digest) :
     Pr[= true | (simulateQ (hybridLazyHandler (sessionsPerTag := sessionsPerTag)) adv).run'

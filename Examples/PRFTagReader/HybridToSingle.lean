@@ -8,19 +8,18 @@ import Examples.PRFTagReader.Hybrid
 import VCVio.EvalDist.Monad.Disagreement
 
 /-!
-# PRF Tag/Reader Protocol — Hybrid-to-single coupling with reader-slack
+# PRF Tag/Reader Protocol: hybrid-to-single coupling with reader slack
 
-Bounding the gap between the hybrid world and the single-session ideal world. Deliverables
-2-4:
+Bounds the gap between the hybrid world and the single-session ideal world.
 
-* **Deliverable 2**: the per-reader-query slack bound `probEvent_coupledReader_disagree_le`,
-  which charges each reader-query column to `qReader * |TagId| * sessionsPerTag / |Digest|`
-  via a union bound over `idealCacheStep`.
-* **Deliverable 3**: the coupled reader step and the lazy-vs-coupled coupling theorem
-  `evalDist_simulateQ_hybridCoupledHandler_run'_eq_lazy`.
-* **Deliverable 4**: the coupled hybrid-vs-single coupling theorem
-  `hybridCoupled_le_singleIdeal_add_readerSlack_aux` and the headline hybrid-to-single
-  bound `hybrid_le_singleIdeal_add_readerSlack`.
+Main results:
+
+* `probEvent_coupledReader_disagree_le`: the per-reader-query slack bound, charging each
+  reader-query column to `qReader * |TagId| * sessionsPerTag / |Digest|` via a union bound
+  over `idealCacheStep`.
+* `evalDist_simulateQ_hybridCoupledHandler_run'_eq_lazy`: the coupled reader step agrees in
+  distribution with the lazy hybrid handler.
+* `hybrid_le_singleIdeal_add_readerSlack`: the headline hybrid-to-single bound.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -37,21 +36,14 @@ variable {TagId Nonce Digest K : Type}
   [SampleableType (TagId × Nonce → Digest)]
   [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
-/-! #### Hybrid-to-single, deliverable 2: the per-reader-query slack bound
-
-A single reader query under the single-session ideal handler folds `idealCacheStep` over the
-column of cells `l`. The hybrid reader inspects only the *already cached* cells; a cell that is
-uncached in `c` is sampled fresh. The lemma below bounds the probability that the fresh draws
-produce the target authenticator `v` at a cell whose cache slot does not already hold `v`, by
-`l.length / |Digest|`. This is the per-step disagreement bound between the hybrid and single
-readers. -/
+/-! #### Per-reader-query slack bound -/
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
   [NeZero sessionsPerTag] in
-/-- **Per-reader-query slack.** Folding `idealCacheStep` over a list `l` of distinct cells: the
-probability that the produced digest list contains the target `v` while no cache slot of `l`
-already holds `v` is at most `l.length / |Digest|`. Every such occurrence of `v` is a fresh
-uniform draw, and a union bound over the list gives the stated cell-count-over-`|Digest|` bound. -/
+/-- Folding `idealCacheStep` over a list `l` of distinct cells, the probability that the produced
+digest list contains the target `v` while no cache slot of `l` already holds `v` is at most
+`l.length / |Digest|`. Each occurrence of `v` is a fresh uniform draw, and a union bound over the
+list gives the stated cell-count-over-`|Digest|` bound. -/
 lemma probEvent_idealCacheMapM_mem_le {D : Type} [DecidableEq D] [Fintype Digest]
     (l : List D) (hnd : l.Nodup) (c : (D →ₒ Digest).QueryCache) (v : Digest) :
     Pr[fun rs : List Digest × (D →ₒ Digest).QueryCache =>
@@ -114,14 +106,7 @@ lemma probEvent_idealCacheMapM_mem_le {D : Type} [DecidableEq D] [Fintype Digest
           · exact h
         · rw [hrcache d' hd']; exact hfresh d' (Or.inr hd')
 
-/-! #### Hybrid-to-single, deliverable 3: the coupled reader step and the coupling theorem
-
-`hybridCoupledHandler` is the hybrid world run *in lockstep* with the single-session ideal handler:
-its tag oracle is the lazy hybrid tag oracle and its reader oracle folds `idealCacheStep` over the
-whole column of cells — exactly as the single reader does, so the two threads keep an identical
-random-oracle cache — but its acceptance bit is the session-nonce bit `hybridCacheAccepts` read off
-the *pre-extension* cache. The two handlers therefore differ only in the reader's output bit, and
-the per-reader-query disagreement is bounded by `probEvent_idealCacheMapM_mem_le`. -/
+/-! #### Coupled reader step and coupling theorem -/
 
 /-- The column of single-session cells inspected by a reader query at `transcript.nonce`. -/
 noncomputable def hybridReaderCells (transcript : TagTranscript Nonce Digest) :
@@ -149,13 +134,13 @@ lemma hybridReaderCells_length (transcript : TagTranscript Nonce Digest) :
     Fintype.card_fin]
 
 omit [Nonempty TagId] [SampleableType Nonce] in
-/-- **Per-reader-query coupled disagreement bound.** Fix a cache `c` in which every cached
+/-- Per-reader-query coupled disagreement bound. Given a cache `c` in which every cached
 column-`transcript.nonce` cell is recorded in the session-nonce map `sn` (the column-freshness
-invariant guaranteed, at the current reader query, by `HasDistinctUnlinkReaderNonces`). Folding
-`idealCacheStep` over the whole column, the probability that the single-session acceptance bit
-exceeds the hybrid session-nonce bit `hybridCacheAccepts c sn transcript` is at most
-`|TagId| * sessionsPerTag / |Digest|`: the only way they disagree is a fresh draw at an undrawn
-cell hitting the authenticator, and `probEvent_idealCacheMapM_mem_le` bounds that. -/
+invariant guaranteed by `HasDistinctUnlinkReaderNonces` at the current reader query), folding
+`idealCacheStep` over the whole column bounds the probability that the single-session acceptance
+bit exceeds the hybrid session-nonce bit `hybridCacheAccepts c sn transcript` by
+`|TagId| * sessionsPerTag / |Digest|`. The only way they disagree is a fresh draw at an undrawn
+cell hitting the authenticator, bounded by `probEvent_idealCacheMapM_mem_le`. -/
 lemma probEvent_coupledReader_disagree_le [Fintype Digest]
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (sn : HybridSessionNonce TagId Nonce sessionsPerTag)
@@ -186,13 +171,13 @@ lemma probEvent_coupledReader_disagree_le [Fintype Digest]
   rw [hybridCacheAccepts, decide_eq_false_iff_not] at hreject
   exact hreject ⟨slot.1, slot.2, hdrawn, hcc⟩
 
-/-- **Coupled hybrid handler.** The hybrid world run *in lockstep* with the single-session ideal
+/-- The coupled hybrid handler runs the hybrid world in lockstep with the single-session ideal
 handler. Its tag oracle is the lazy hybrid tag oracle (`hybridLazyHandler` on `Sum.inl`); its
-reader oracle folds `idealCacheStep` over the *whole* single-session column — exactly as
-`singleIdealQueryImpl` does — so the random-oracle cache evolves identically in the two worlds.
-The reader's output bit, however, is the session-nonce bit `hybridCacheAccepts` read off the
-*pre-fold* cache, so the coupled handler returns the same answers as `hybridLazyHandler` while
-maintaining a cache in lockstep with `singleIdealQueryImpl`. -/
+reader oracle folds `idealCacheStep` over the whole single-session column, exactly as
+`singleIdealQueryImpl` does, so the random-oracle cache evolves identically in the two worlds.
+The reader's output bit is the session-nonce bit `hybridCacheAccepts` read off the pre-fold
+cache, so the coupled handler returns the same answers as `hybridLazyHandler` while maintaining
+a cache in lockstep with `singleIdealQueryImpl`. -/
 noncomputable def hybridCoupledHandler :
     QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
       (StateT (HybridState TagId Nonce sessionsPerTag ×
@@ -228,8 +213,8 @@ lemma hybridCoupledHandler_tag_run (tag : TagId)
       hybridLazyHandler (Sum.inl tag) sH := rfl
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- `hybridCoupledHandler` on a reader query: fold `idealCacheStep` over the whole single-session
-column, return the session-nonce bit read off the pre-fold cache, advance the cache. -/
+/-- `hybridCoupledHandler` on a reader query folds `idealCacheStep` over the whole single-session
+column, returns the session-nonce bit read off the pre-fold cache, and advances the cache. -/
 lemma hybridCoupledHandler_reader_run (transcript : TagTranscript Nonce Digest)
     (sH : HybridState TagId Nonce sessionsPerTag ×
       (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) :
@@ -239,7 +224,7 @@ lemma hybridCoupledHandler_reader_run (transcript : TagTranscript Nonce Digest)
         pure (ReaderReply.ofBool (hybridCacheAccepts sH.2 sH.1.sessionNonce transcript),
           sH.1, rs.2) := rfl
 
-/-- **Coupled hybrid eager-table equivalence.** Running the coupled hybrid handler from a
+/-- Coupled hybrid eager-table equivalence. Running the coupled hybrid handler from a
 session-nonce / cache consistent state `(s, c)` has the same output distribution as sampling a full
 single-session random-oracle table `g`, overlaying the cache `c`, and running the deterministic
 table hybrid handler `hybridTableHandler (tableExtending c g)` from `s`. The hybrid analogue of
@@ -381,7 +366,7 @@ lemma evalDist_simulateQ_hybridCoupledHandler_run'_eq_tableExtending
         hybridCacheAccepts_eq_hybridReaderAccepts_tableExtending s c g hcons transcript]
       rfl
 
-/-- **Coupled hybrid handler distributional equivalence.** Running the coupled hybrid handler from
+/-- Coupled hybrid handler distributional equivalence. Running the coupled hybrid handler from
 the initial state has the same output distribution as running the lazy hybrid handler. Both equal
 the eager-table form (`evalDist_simulateQ_hybridCoupledHandler_run'_eq_tableExtending` and
 `evalDist_simulateQ_hybridLazyHandler_run'_eq_tableExtending`); caching the extra column cells the
@@ -407,21 +392,13 @@ lemma probOutput_hybridCoupled_run'_eq_lazy [Fintype Nonce] [Finite Digest]
         (HybridState.init, ∅)] := by
   rw [probOutput_def, probOutput_def, evalDist_simulateQ_hybridCoupledHandler_run'_eq_lazy oa]
 
-/-! #### Hybrid-to-single, deliverable 4: the coupled hybrid-vs-single coupling theorem
+/-! #### Coupled hybrid-vs-single coupling theorem -/
 
-The coupled hybrid handler `hybridCoupledHandler` and the single-session ideal handler
-`singleIdealQueryImpl` evolve their random-oracle cache and session counters in lockstep — they
-differ only in the reader oracle's *output bit*. The hybrid reader accepts on a subset of the
-single reader's cells, so the only disagreement is the single reader accepting on a non-tag-drawn
-cell. Under `HasDistinctUnlinkReaderNonces` that cell is genuinely fresh, and
-`probEvent_coupledReader_disagree_le` bounds the per-reader-query gap by
-`|TagId| * sessionsPerTag / |Digest|`. -/
-
-/-- Coupling invariant for hop B: a cached column-`n` cell that was *not* produced by the tag draw
-of its own session forces the residual computation to make no further reader query at `n`. Tag
-draws set the cache cell and the `sessionNonce` record together, so a non-tag-drawn cached cell can
-only come from an earlier reader query; `HasDistinctUnlinkReaderNonces` then rules out a second
-reader query at that nonce. -/
+/-- Coupling invariant: a cached column-`n` cell not produced by the tag draw of its own session
+forces the residual computation to make no further reader query at `n`. Tag draws set the cache
+cell and the `sessionNonce` record together, so a non-tag-drawn cached cell can only come from an
+earlier reader query, and `HasDistinctUnlinkReaderNonces` then rules out a second reader query at
+that nonce. -/
 def HybridColFresh (oa : UnlinkAdversary TagId Nonce Digest)
     (s : HybridState TagId Nonce sessionsPerTag)
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) : Prop :=
@@ -451,12 +428,12 @@ lemma hybridColFresh_init (oa : UnlinkAdversary TagId Nonce Digest)
   intro n tag sid hsome _
   simp at hsome
 
-/-- **Hybrid-to-single, core coupling bound.** For any hybrid state `s` and single state `sS`
-with equal session counters, sharing a random-oracle cache `c`, the coupled hybrid handler's success
+/-- Hybrid-to-single core coupling bound. For any hybrid state `s` and single state `sS` with
+equal session counters, sharing a random-oracle cache `c`, the coupled hybrid handler's success
 probability is bounded by the single-session ideal handler's plus the reader-slack term
 `qR * |TagId| * sessionsPerTag / |Digest|`, provided the adversary has pairwise-distinct reader
 nonces (`hdist`), at most `qR` reader queries (`hqR`), and the cache satisfies the coupling
-invariants `HybridColFresh`/`HybridWriteOnce`. Proved by induction on the adversary. -/
+invariants `HybridColFresh` and `HybridWriteOnce`. Proved by induction on the adversary. -/
 lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
     (oa : UnlinkAdversary TagId Nonce Digest) (qR : ℕ)
     (s : HybridState TagId Nonce sessionsPerTag) (sS : UnlinkState TagId)
@@ -751,7 +728,7 @@ lemma hybridCoupled_le_singleIdeal_add_readerSlack_aux [Fintype Digest]
         exact ih (ReaderReply.ofBool hybBit) qR' s sS rs.2 hcounter (hqRf _)
           hdistcont hwo hfresh'
 
-/-- **Hybrid-to-single.** Under `HasDistinctUnlinkReaderNonces` and a reader-query bound
+/-- Hybrid-to-single bound. Under `HasDistinctUnlinkReaderNonces` and a reader-query bound
 `qReader`, the hybrid world `H` (run as the lazy hybrid handler from the initial state) succeeds
 with probability at most that of the single-session ideal world plus the reader-slack term
 `qReader * |TagId| * sessionsPerTag / |Digest|`.
@@ -759,7 +736,7 @@ with probability at most that of the single-session ideal world plus the reader-
 The lazy hybrid handler and the coupled hybrid handler agree in distribution
 (`probOutput_hybridCoupled_run'_eq_lazy`), and the coupled handler is bounded against
 `singleIdealQueryImpl` by `hybridCoupled_le_singleIdeal_add_readerSlack_aux`; the empty cache and
-initial state satisfy the coupling invariants `hybridColFresh_init` / `hybridWriteOnce_init`. -/
+initial state satisfy the coupling invariants `hybridColFresh_init` and `hybridWriteOnce_init`. -/
 theorem hybrid_le_singleIdeal_add_readerSlack [Fintype Nonce] [Fintype Digest]
     (adversary : UnlinkAdversary TagId Nonce Digest) (qReader : ℕ)
     (hdist : HasDistinctUnlinkReaderNonces adversary)

@@ -9,12 +9,12 @@ import Examples.PRFTagReader.MultipleBadCollision
 /-!
 # Unlinkability PRF Reduction
 
-This file builds the PRF reduction for the tag/reader unlinkability game defined in
-`Examples.PRFTagReader`. The unlinkability advantage `unlinkabilityAdvantage` is the gap between
-the multiple-session world `unlinkMultipleExp` (all sessions of a tag share one secret) and the
-single-session world `unlinkSingleExp` (each session uses an independent secret).
+Top-level PRF reduction for the tag/reader unlinkability game of `Examples.PRFTagReader`. The
+unlinkability advantage `unlinkabilityAdvantage` is the gap between the multiple-session world
+`unlinkMultipleExp` (all sessions of a tag share one secret) and the single-session world
+`unlinkSingleExp` (each session uses an independent secret).
 
-The reduction follows a three-hop game-playing argument:
+The reduction telescopes three bounds:
 
 * a PRF hop replacing `prfs.evalMultiple` by a lazy random function turns `unlinkMultipleExp` into
   the ideal-PRF world of `unlinkToMultiplePRFReduction`;
@@ -23,19 +23,10 @@ The reduction follows a three-hop game-playing argument:
 * a second PRF hop replacing `prfs.evalSingle` turns `unlinkSingleExp` into the ideal-PRF world of
   `unlinkToSinglePRFReduction`.
 
-Telescoping the three bounds yields `unlinkabilityAdvantage_le_two_prf_plus_collision`: the
-unlinkability advantage is bounded by two PRF advantages plus `Pr[unlinkBadExp]`. Chaining the
-proven `unlinkBadExp_le_sessionCollisionBound` then gives the explicit session-collision bounds.
-
-The bulk of the proof is broken into the dependency chain
-
-```
-PRFReductions → Table → Hybrid → HybridToSingle → MultipleToHybrid.Setup
-  → MultipleToHybrid.EagerSetup → MultipleToHybrid.EagerReader
-  → MultipleToHybrid.Eager → MultipleBadCollision
-```
-
-this top-level module composes those modules into the headline theorems.
+The headline `unlinkabilityAdvantage_le_two_prf_plus_collision` bounds the advantage by two PRF
+advantages plus `Pr[unlinkBadExp]`. Chaining `unlinkBadExp_le_sessionCollisionBound` then yields
+the explicit session-collision bounds in
+`unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound` and its uniform-Nonce specialization.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -109,13 +100,10 @@ theorem unlinkabilityAdvantage_le_two_prf_plus_collision [Fintype Nonce] [Fintyp
   have hB : SR - S ≤ |S - SR| := (le_abs_self (SR - S)).trans_eq (abs_sub_comm SR S)
   linarith [h3]
 
-/-! ## Explicit session-collision bounds
-
-Chaining the proven `unlinkBadExp_le_sessionCollisionBound` onto the reduction theorem gives the
-explicit unlinkability bounds in terms of the nonce-collision parameters. -/
+/-! ## Explicit session-collision bounds -/
 
 /-- Final unlinkability bound: two PRF advantages, an explicit closed-form bound for the
-`multipleBadQueryImpl` collision term, and the chained reader/tag slack terms from Hops A and B.
+`multipleBadQueryImpl` collision term, and the chained reader/tag slack terms.
 
 The bad-event collision term is discharged inline via `multipleBad_bad_le_sessionCollisionBound`,
 which ports the union-bound induction `simulateQ_unlinkBad_prob_le` to the multiple-bad handler.

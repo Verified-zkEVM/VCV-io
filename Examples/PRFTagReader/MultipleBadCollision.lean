@@ -7,20 +7,20 @@ Authors: Oleksandr Vovkotrub
 import Examples.PRFTagReader.MultipleToHybrid.Eager
 
 /-!
-# PRF Tag/Reader Protocol — Multiple-Bad Collision Bound
+# PRF Tag/Reader Protocol: Multiple-Bad Collision Bound
 
-Composes the two hops into the multiple-vs-single ideal-world bound and discharges the
-multiple-bad collision term in closed form:
+Composes the multiple-to-hybrid and hybrid-to-single transitions into the multiple-vs-single
+ideal-world bound, and discharges the multiple-bad collision term in closed form.
 
-* `multipleIdeal_le_hybrid_add_bad` (multiple → hybrid) and
-  `hybrid_le_singleIdeal_add_readerSlack` (hybrid → single, from
-  `Hybrid`/`HybridToSingle`) combine to give `multipleIdeal_le_singleIdeal_add_bad`;
-* `multipleBadStep_*` lemmas track the per-step bad-flag bound and the session counter;
-* `simulateQ_multipleBad_prob_le` unrolls those step lemmas to a union bound, yielding
-  `multipleBad_bad_le_sessionCollisionBound`;
-* the bad-event bridge `probOutput_unlinkBadExp_eq` connects `unlinkBadExp` to the bad flag of
-  the instrumented multiple-bad handler, and `unlinkPRFIdeal_gap_le_unlinkBad` packages the
-  middle hop of the headline reduction.
+Main results:
+
+* `multipleIdeal_le_singleIdeal_add_bad`: chains `multipleIdeal_le_hybrid_add_bad` with
+  `hybrid_le_singleIdeal_add_readerSlack` into the multiple-vs-single bound.
+* `simulateQ_multipleBad_prob_le` and `multipleBad_bad_le_sessionCollisionBound`: union bound on
+  the bad flag of `multipleBadQueryImpl`, yielding the explicit
+  `sessionsPerTag^2 * |TagId| * maxNonceProb` session-collision bound.
+* `unlinkPRFIdeal_gap_le_unlinkBad`: packages the multiple/single ideal-PRF gap as the bad event
+  plus three additive slacks.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -37,35 +37,18 @@ variable {TagId Nonce Digest K : Type}
   [SampleableType (TagId × Nonce → Digest)]
   [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
-/-! ### Multiple-vs-single bound via the hybrid
+/-! ### Multiple-vs-single bound via the hybrid -/
 
-The multiple-vs-single bound `multipleIdeal_le_singleIdeal_add_bad` follows by chaining the two
-hops:
-
-* **Multiple→Hybrid** (`multipleIdeal_le_hybrid_add_bad`): the multiple-session ideal world is
-  bounded by the hybrid world plus the within-tag nonce-collision probability (the `bad` flag of
-  the instrumented `multipleBadQueryImpl`) plus the reader/tag slacks
-  `qReader * |TagId| / |Digest|` and `qReader * qTag / |Nonce|`.
-* **Hybrid→Single** (`hybrid_le_singleIdeal_add_readerSlack`): the hybrid world is bounded by the
-  single-session ideal world plus the reader-slack term
-  `qReader * |TagId| * sessionsPerTag / |Digest|`.
-
-Combining the two yields the headline bound below, with the nonce-collision term expressed in the
-`multipleBadQueryImpl` shape (this is the shape that the multiple→hybrid transition actually
-produces; downstream consumers either match this shape or take the bridge as a hypothesis). -/
-
-/-- Core coupling bound for the unlinkability reduction, proved by chaining the multiple→hybrid
-transition (`multipleIdeal_le_hybrid_add_bad`) and the hybrid→single transition
-(`hybrid_le_singleIdeal_add_readerSlack`).
+/-- Core coupling bound for the unlinkability reduction, obtained by chaining
+`multipleIdeal_le_hybrid_add_bad` and `hybrid_le_singleIdeal_add_readerSlack`.
 
 The multiple-session ideal world is bounded by the single-session ideal world plus the
 within-tag nonce-collision probability (carried by the instrumented `multipleBadQueryImpl`'s
 `bad` flag) plus three additive slack terms:
 
-* `qReader * Fintype.card TagId / Fintype.card Digest` (multiple→hybrid reader-cell asymmetry
-  between the multiple and hybrid worlds);
-* `qReader * qTag / Fintype.card Nonce` (multiple→hybrid Sub-B tag-cache aliasing slack);
-* `qReader * Fintype.card TagId * sessionsPerTag / Fintype.card Digest` (hybrid→single
+* `qReader * Fintype.card TagId / Fintype.card Digest` (multiple-to-hybrid reader-cell asymmetry);
+* `qReader * qTag / Fintype.card Nonce` (multiple-to-hybrid Sub-B tag-cache aliasing slack);
+* `qReader * Fintype.card TagId * sessionsPerTag / Fintype.card Digest` (hybrid-to-single
   reader-cell asymmetry).
 
 The bound assumes `HasDistinctUnlinkReaderNonces` (each nonce is carried by at most one reader
@@ -94,7 +77,7 @@ lemma multipleIdeal_le_singleIdeal_add_bad [Fintype Nonce] [Fintype Digest]
     adversary qReader qTag hqReader hqTag hdist
   have hB := hybrid_le_singleIdeal_add_readerSlack (sessionsPerTag := sessionsPerTag)
     adversary qReader hdist hqReader
-  -- Chain the two transitions: hybrid ≤ single + hybrid→single slack, applied inside hA's RHS.
+  -- Chain the two transitions: hybrid ≤ single + hybrid-to-single slack, applied inside hA's RHS.
   calc Pr[= true | (simulateQ (multipleIdealQueryImpl (TagId := TagId) (Nonce := Nonce)
               (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adversary).run'
               (UnlinkState.init, ∅)]
@@ -130,21 +113,14 @@ lemma multipleIdeal_le_singleIdeal_add_bad [Fintype Nonce] [Fintype Digest]
         ring_nf
         rfl
 
-/-! ### Multiple-vs-single bound: session-collision bound for `multipleBadQueryImpl`
-
-The induction port `simulateQ_multipleBad_prob_le` mirrors the proven
-`simulateQ_unlinkBad_prob_le`: at each tag step the bad flag fires with probability at most
-`sessionsUsed tag * maxNonceProb`, and the per-tag session counter (synchronised with the
-multiple-ideal state) drops by exactly one. The composed bound is
-`unlinkBadRemaining sB * sessionsPerTag * maxNonceProb`, which collapses at the initial state to
-the explicit `sessionsPerTag^2 * |TagId| * maxNonceProb` session collision bound. -/
+/-! ### Session-collision bound for `multipleBadQueryImpl` -/
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- Per-step tag bound for `multipleBadQueryImpl`: a single tag query raises the bad flag with
-probability at most `sB.sessionsUsed tag * maxNonceProb`. The proof factors through
-`multipleIdealQueryImpl_tag_run_of_lt`'s `idealCacheStep`-based form; the inner `idealCacheStep`
+probability at most `sB.sessionsUsed tag * maxNonceProb`. The proof factors through the
+`idealCacheStep`-based form of `multipleIdealQueryImpl_tag_run_of_lt`; the inner `idealCacheStep`
 draw is distribution-neutral for the bad bit because `multipleBadAdvance` only inspects the
-*nonce* component of the transcript via `(sB.responses (tag, nonce)).isSome`. -/
+nonce component of the transcript via `(sB.responses (tag, nonce)).isSome`. -/
 lemma multipleBadStep_bad_le
     (tag : TagId) (s : UnlinkState TagId)
     (c : ((TagId × Nonce) →ₒ Digest).QueryCache)
@@ -174,7 +150,7 @@ lemma multipleBadStep_bad_le
     rw [probEvent_bind_pure_comp]
     -- Now the event is `(multipleBadAdvance tag sB r.1).bad = true`, evaluated on the multiple-
     -- ideal tag step. Unfold the tag step to its `idealCacheStep` form, factoring the structure
-    -- update through a `set` to sidestep the 4.29 rewrite/elaboration quirk on `{ s with … }`.
+    -- update through a `set` to sidestep the 4.29 rewrite/elaboration quirk on `{ s with ... }`.
     rw [multipleIdealQueryImpl_tag_run_of_lt tag s c hslot]
     set advU := ({ sessionsUsed :=
         Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } : UnlinkState TagId)
@@ -217,7 +193,6 @@ lemma multipleBadStep_bad_le
         (if (sB.responses (tag, x)).isSome then 1 else 0)) fun x => ?_).trans_le ?_
     · exact congrArg (Pr[= x | ($ᵗ Nonce : ProbComp Nonce)] * ·) (hinner x)
     -- The remaining inequality is the classic union bound, identical to `unlinkBadTagStep_bad_le`.
-    -- Now mirror the proof of `unlinkBadTagStep_bad_le`.
     obtain ⟨S, hScard, hS⟩ := hbounded tag
     calc
       ∑' nonce : Nonce,
@@ -358,11 +333,11 @@ lemma multipleBadStep_preserves
     exact ⟨hbounded, hused, hsync⟩
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- **Bad-event union bound for `multipleBadQueryImpl`.** Starting from a multiple-bad state
+/-- Bad-event union bound for `multipleBadQueryImpl`. Starting from a multiple-bad state
 satisfying the cache-boundedness, session-used-≤-`sessionsPerTag`, and sync invariants, with the
 bad flag unset, the probability that bad fires under any adversary is at most
-`unlinkBadRemaining sB * sessionsPerTag * maxNonceProb`. Direct port of
-`simulateQ_unlinkBad_prob_le` to the multiple-bad handler. -/
+`unlinkBadRemaining sB * sessionsPerTag * maxNonceProb`. Multiple-bad analogue of
+`simulateQ_unlinkBad_prob_le`. -/
 lemma simulateQ_multipleBad_prob_le
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (maxNonceProb : ℝ≥0∞)
@@ -511,10 +486,10 @@ lemma simulateQ_multipleBad_prob_le
               ((sessionsPerTag : ℝ≥0∞) * maxNonceProb) := one_mul _
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
-/-- **Final session-collision bound** for the multiple-bad handler. Chains
-`simulateQ_multipleBad_prob_le` at the initial state, where the `unlinkBadRemaining` collapses to
+/-- Session-collision bound for the multiple-bad handler. Specializes
+`simulateQ_multipleBad_prob_le` to the initial state, where `unlinkBadRemaining` collapses to
 `sessionsPerTag * |TagId|`, giving the explicit `sessionsPerTag^2 * |TagId| * maxNonceProb`
-session-collision bound. The headline analogue of `unlinkBadExp_le_sessionCollisionBound`. -/
+bound. Headline analogue of `unlinkBadExp_le_sessionCollisionBound`. -/
 theorem multipleBad_bad_le_sessionCollisionBound
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (maxNonceProb : ℝ)
@@ -546,7 +521,7 @@ theorem multipleBad_bad_le_sessionCollisionBound
     ENNReal.toReal_ofReal hmax_nonneg] at hconv
   grind
 
-/-! ### Multiple-vs-single bound: bad-event bridge -/
+/-! ### Bad-event bridge -/
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- `unlinkBadExp` outputs `true` exactly with the probability that the bad flag fires. -/
@@ -565,10 +540,11 @@ lemma probOutput_unlinkBadExp_eq
 /-- Coupling bound for the two random-function worlds (the ideal-PRF experiments of the multiple-
 and single-session reductions): the gap is bounded by the within-tag nonce-collision probability
 (carried by the instrumented `multipleBadQueryImpl`'s `bad` flag) plus three additive slack terms
-from chaining Hops A and B. The two worlds are not identical-until-bad — their reader oracles
-diverge unconditionally because the single-session reader checks `Fintype.card TagId *
-sessionsPerTag` random-oracle cells against the multiple world's `Fintype.card TagId` — so the
-bound also carries `qReader * Fintype.card TagId * sessionsPerTag / Fintype.card Digest`. -/
+from chaining the multiple-to-hybrid and hybrid-to-single transitions. The two worlds are not
+identical-until-bad, since their reader oracles diverge unconditionally: the single-session
+reader checks `Fintype.card TagId * sessionsPerTag` random-oracle cells against the multiple
+world's `Fintype.card TagId`. The bound therefore also carries
+`qReader * Fintype.card TagId * sessionsPerTag / Fintype.card Digest`. -/
 theorem unlinkPRFIdeal_gap_le_unlinkBad [Fintype Nonce] [Fintype Digest]
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (qReader qTag : ℕ)

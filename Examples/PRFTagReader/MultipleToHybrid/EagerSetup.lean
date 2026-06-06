@@ -7,24 +7,17 @@ Authors: Oleksandr Vovkotrub
 import Examples.PRFTagReader.MultipleToHybrid.Setup
 
 /-!
-# PRF Tag/Reader Protocol — Multiple-to-hybrid eager coupling, shared setup
+# PRF tag/reader protocol: multiple-to-hybrid eager coupling, shared setup
 
-Shared definitions and helpers for the eager-table multiple-vs-hybrid coupling proof. This
-module hosts:
+Shared definitions and helpers for the eager-table multiple-vs-hybrid coupling proof:
 
-* the deterministic-table instrumented multiple-session handler `multipleBadTableHandler` and its
-  per-step / per-run bad-flag monotonicity lemmas
-  (`multipleBadTable_run_query_bind'`, `multipleBadTableHandler_step_preserves_bad`,
-  `multipleBadTableHandler_run_preserves_bad`);
-* the eager equivalence
-  `evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending` lifting the lazy-vs-eager
-  equivalence to the instrumented handler;
+* the deterministic-table instrumented multiple-session handler `multipleBadTableHandler`
+  with its per-step and per-run bad-flag monotonicity lemmas;
+* the eager equivalence `evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending`
+  lifting the lazy-vs-eager equivalence to the instrumented handler;
 * the multiple-to-hybrid cell embedding `couplingEmbed` built from `chooseSid`, with its
   injectivity lemma and the table-projection distribution lemma
   `evalDist_couplingProject_uniformSample`.
-
-The headline aux lemma `multipleBadEager_le_hybridEager_aux` and its two large sub-branches live
-in the sibling modules `MultipleToHybrid.Eager` and `MultipleToHybrid.EagerReader`.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -41,20 +34,10 @@ variable {TagId Nonce Digest K : Type}
   [SampleableType (TagId × Nonce → Digest)]
   [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
-/-! ### Multiple-to-hybrid: the eager-table instrumented multiple handler
-
-The coupling bound is established by sampling the random-oracle table up front: a `Prop`-valued
-state coupling cannot encode the run-determined session index that a later tag query reads back,
-but an eagerly-sampled table fixes the digest at every cell from the start.
-
-`multipleBadTableHandler g` is the deterministic-table instrumented multiple handler: it runs the
-deterministic real handler `multipleTableHandler g` on the multiple-ideal component and threads the
-bad-world `UnlinkBadState` via `multipleBadAdvance` exactly as `multipleBadQueryImpl` does. The
-eager equivalence `evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending` lifts the
-lazy-vs-eager equivalence to the instrumented handler, threading the bad state. -/
+/-! ### Eager-table instrumented multiple handler -/
 
 /-- Deterministic-table instrumented multiple-session handler: runs `multipleTableHandler g` on the
-multiple-ideal component (now just `UnlinkState`) and, on a tag query, advances the bad-world
+multiple-ideal component (just `UnlinkState`) and, on a tag query, advances the bad-world
 component via `multipleBadAdvance`. The eager-table analogue of `multipleBadQueryImpl`. -/
 noncomputable def multipleBadTableHandler (g : TagId × Nonce → Digest) :
     QueryImpl (UnlinkOracleSpec TagId Nonce Digest)
@@ -87,10 +70,9 @@ lemma multipleBadTable_run_query_bind' {α : Type} (g : TagId × Nonce → Diges
   rfl
 
 omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- **Eager-table single-step bad monotonicity.** If the bad flag is already set in the
+/-- Eager-table single-step bad monotonicity: if the bad flag is already set in the
 multiple-bad state `p.2`, then every reachable output of `multipleBadTableHandler g t p` keeps
-`bad = true`. The eager-table analogue of `multipleBadQueryImpl_step_preserves_bad`; the proof
-case-splits on tag vs. reader and unfolds `multipleBadAdvance`. -/
+`bad = true`. The eager-table analogue of `multipleBadQueryImpl_step_preserves_bad`. -/
 lemma multipleBadTableHandler_step_preserves_bad (g : TagId × Nonce → Digest)
     (t : (UnlinkOracleSpec TagId Nonce Digest).Domain)
     (p : UnlinkState TagId × UnlinkBadState TagId Nonce Digest) (hbad : p.2.bad = true) :
@@ -117,7 +99,7 @@ lemma multipleBadTableHandler_step_preserves_bad (g : TagId × Nonce → Digest)
     exact hbad
 
 omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- **Eager-table full-run bad monotonicity.** Starting `simulateQ multipleBadTableHandler` from a
+/-- Eager-table full-run bad monotonicity: starting `simulateQ multipleBadTableHandler` from a
 state whose bad flag is set, every reachable output keeps `bad = true`. -/
 lemma multipleBadTableHandler_run_preserves_bad {α : Type} (g : TagId × Nonce → Digest)
     (oa : OracleComp (UnlinkOracleSpec TagId Nonce Digest) α)
@@ -135,13 +117,10 @@ lemma multipleBadTableHandler_run_preserves_bad {α : Type} (g : TagId × Nonce 
     obtain ⟨q, hq, hz⟩ := hz
     exact ih q.1 q.2 (multipleBadTableHandler_step_preserves_bad g t p hbad q hq) z hz
 
-/-- **Eager-table equivalence for the instrumented multiple handler.** Running the instrumented
-multiple handler `multipleBadQueryImpl` from `((s, c), sB)` has the same *full-output* distribution
-(output bit, multiple-ideal state and bad-world state) as sampling a full random-oracle table `g`,
-overlaying the cache `c`, and running the deterministic instrumented table handler
-`multipleBadTableHandler (tableExtending c g)` from `(s, sB)`.
-
-Proved by induction on the adversary, generalized over the state. It mirrors
+/-- Eager-table equivalence for the instrumented multiple handler: running
+`multipleBadQueryImpl` from `((s, c), sB)` has the same full-output distribution (output bit,
+multiple-ideal state, bad-world state) as sampling a full random-oracle table `g`, overlaying the
+cache `c`, and running `multipleBadTableHandler (tableExtending c g)` from `(s, sB)`. Mirrors
 `evalDist_simulateQ_multipleIdealQueryImpl_run'_eq_tableExtending`, threading the bad-world
 component (which `multipleBadAdvance` advances deterministically from the realized transcript). -/
 lemma evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending
@@ -405,7 +384,7 @@ lemma chooseSid_spec (sn : HybridSessionNonce TagId Nonce sessionsPerTag)
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
   [SampleableType Digest] in
-/-- Off-collision (`hcf`), `chooseSid sn tag n` is *the* session that drew `n`. -/
+/-- Off-collision (`hcf`), `chooseSid sn tag n` is the session that drew `n`. -/
 lemma chooseSid_eq (sn : HybridSessionNonce TagId Nonce sessionsPerTag)
     (hcf : ∀ tag sid₁ sid₂ n, sn (tag, sid₁) = some n → sn (tag, sid₂) = some n → sid₁ = sid₂)
     (tag : TagId) (sid : Fin sessionsPerTag) (n : Nonce) (hsn : sn (tag, sid) = some n) :
@@ -430,10 +409,10 @@ lemma couplingEmbed_injective
   exact Prod.ext h.1.1 h.2
 
 omit [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest] in
-/-- **State-dependent table coupling.** Drawing a uniform hybrid (fine) table `gH` and projecting
-it along the coupling embedding yields the uniform distribution on multiple (coarse) tables. This
-is the marginalization step underlying the hop-A coupled-table comparison: it lets a multiple-world
-table draw be replaced by a projection of a single hybrid-world draw. -/
+/-- State-dependent table coupling: drawing a uniform hybrid (fine) table `gH` and projecting
+it along the coupling embedding yields the uniform distribution on multiple (coarse) tables.
+This marginalization step underlies the coupled-table comparison, letting a multiple-world table
+draw be replaced by a projection of a single hybrid-world draw. -/
 lemma evalDist_couplingProject_uniformSample [Fintype Nonce] [Finite Digest]
     (sn : HybridSessionNonce TagId Nonce sessionsPerTag) :
     𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>=

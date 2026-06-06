@@ -9,14 +9,14 @@ import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 import VCVio.OracleComp.QueryTracking.QueryBound
 
 /-!
-# PRF Tag/Reader Protocol — Definitions
+# PRF Tag/Reader Protocol Definitions
 
 Core definitions for the RFID-style tag/reader protocol: transcripts, reader replies, session
 patterns, the keyed-hash family packaging, game states, oracle specifications, adversary
 abbreviations, the real and ideal authentication games, the random-function authentication game,
 the unlinkability games, and the bad-event world.
 
-The auth→PRF reduction and the security theorems built on these definitions live in the sibling
+The auth-to-PRF reduction and the security theorems built on these definitions live in the sibling
 `Auth`, `Collision`, and `BadEvent` modules.
 -/
 
