@@ -393,6 +393,27 @@ lemma isQueryBoundP_congr_pred {oa : OracleComp spec α} {p p' : ι → Prop}
     · rw [if_pos ((hpp t).mpr ht'), if_pos ht']
     · rw [if_neg (fun h => ht' ((hpp t).mp h)), if_neg ht']
 
+/-- Antitone in the predicate: if every `p`-index is also a `p'`-index, then a `p'`-targeted
+bound is a `p`-targeted bound at the same budget. The `p`-indices form a sub-collection of the
+`p'`-indices, so any path makes at most as many `p`-queries as `p'`-queries. -/
+lemma IsQueryBoundP.of_imp {oa : OracleComp spec α} {p p' : ι → Prop}
+    [DecidablePred p] [DecidablePred p'] {n : ℕ}
+    (himp : ∀ t, p t → p' t) (h : IsQueryBoundP oa p' n) :
+    IsQueryBoundP oa p n := by
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure _ => trivial
+  | query_bind t mx ih =>
+      rw [isQueryBoundP_query_bind_iff] at h
+      rw [isQueryBoundP_query_bind_iff]
+      refine ⟨?_, fun u => ?_⟩
+      · by_cases hpt : p t
+        · exact Or.inr (h.1.resolve_left (not_not.mpr (himp t hpt)))
+        · exact Or.inl hpt
+      · refine (ih u (h.2 u)).mono ?_
+        by_cases hpt : p t
+        · simp only [if_pos hpt, if_pos (himp t hpt), le_refl]
+        · simp only [if_neg hpt]; split <;> omega
+
 @[simp]
 lemma isQueryBoundP_map_iff (oa : OracleComp spec α) (f : α → β) (n : ℕ) :
     IsQueryBoundP (f <$> oa) p n ↔ IsQueryBoundP oa p n :=

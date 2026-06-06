@@ -2243,4 +2243,221 @@ theorem ofReal_tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad
 
 end IdenticalUntilBadEpsilonStateDep
 
+/-! ### Heterogeneous-state bad + slack `simulateQ` rule
+
+A fully heterogeneous (`σ₁ ≠ σ₂`, `spec₁ ≠ spec₂`) one-directional `simulateQ` induction
+rule carrying both a monotone bad event on side `1` and per-charged-query slack `ε`.
+
+Unlike the `tvDist`-based bounds above, this rule does not require the two simulations to
+have the same output/state type: the conclusion is a one-directional `Pr[= true]`
+inequality
+
+  `Pr[= true | run' impl₁] ≤ Pr[= true | run' impl₂] + Pr[bad] + q · ε`,
+
+which is exactly the shape consumed by cross-domain crypto reductions that couple a
+per-tag random oracle against a per-session one. The accounting term `q · ε` comes from
+the charged-query budget `IsQueryBoundP oa charged q`. -/
+
+section HeterogeneousBadSlack
+
+variable {ι : Type} {spec : OracleSpec ι}
+variable {ι₁ ι₂ : Type} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable {σ₁ σ₂ : Type}
+
+omit [spec₁.Fintype] [spec₁.Inhabited] in
+/-- Bad propagation for a general (non-flag) bad predicate: starting the simulation from a
+bad state, every output state stays bad. The heterogeneous-state analogue of
+`mem_support_simulateQ_run_of_bad`. -/
+private lemma mem_support_simulateQ_run_of_bad_general
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (bad : σ₁ → Prop)
+    (hmono : ∀ (t : spec.Domain) (s₁ : σ₁), bad s₁ →
+      ∀ z ∈ support ((impl₁ t).run s₁), bad z.2)
+    (oa : OracleComp spec α) (s₁ : σ₁) (hbad : bad s₁) :
+    ∀ z ∈ support ((simulateQ impl₁ oa).run s₁), bad z.2 := by
+  induction oa using OracleComp.inductionOn generalizing s₁ with
+  | pure x =>
+      intro z hz
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      exact hbad
+  | query_bind t cont ih =>
+      intro z hz
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind, support_bind, Set.mem_iUnion,
+        exists_prop] at hz
+      obtain ⟨⟨u, s₁'⟩, h_mem, h_z⟩ := hz
+      exact ih u s₁' (hmono t s₁ hbad (u, s₁') h_mem) z h_z
+
+/-- A simulation started from a bad state has bad probability exactly `1`. The
+heterogeneous-state analogue of `probEvent_simulateQ_run_bad_eq_one_of_bad`. -/
+private lemma probEvent_bad_simulateQ_run_eq_one_of_bad
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (bad : σ₁ → Prop)
+    (hmono : ∀ (t : spec.Domain) (s₁ : σ₁), bad s₁ →
+      ∀ z ∈ support ((impl₁ t).run s₁), bad z.2)
+    (oa : OracleComp spec α) (s₁ : σ₁) (hbad : bad s₁) :
+    Pr[ bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₁] = 1 := by
+  rw [probEvent_eq_one_iff]
+  refine ⟨by simp, ?_⟩
+  intro z hz
+  exact mem_support_simulateQ_run_of_bad_general impl₁ bad hmono oa s₁ hbad z hz
+
+/-- Inductive core of `probOutput_simulateQ_run'_le_add_bad_add_slack`, stated on the
+joint `run` distribution with the event `fun z => z.1 = true`. -/
+private theorem probEvent_fst_simulateQ_run_le_add_bad_add_slack
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
+    (R : σ₁ → σ₂ → Prop)
+    (bad : σ₁ → Prop)
+    (charged : spec.Domain → Prop) [DecidablePred charged]
+    (ε : ℝ≥0∞)
+    (hmono : ∀ (t : spec.Domain) (s₁ : σ₁), bad s₁ →
+      ∀ z ∈ support ((impl₁ t).run s₁), bad z.2)
+    (hstep : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂), R s₁ s₂ → ¬ bad s₁ →
+      ∀ (k₁ : spec.Range t × σ₁ → OracleComp spec₁ (Bool × σ₁))
+        (k₂ : spec.Range t × σ₂ → OracleComp spec₂ (Bool × σ₂)) (c : ℝ≥0∞),
+        (∀ (u : spec.Range t) (s₁' : σ₁) (s₂' : σ₂), R s₁' s₂' →
+          Pr[ fun z => z.1 = true | k₁ (u, s₁')] ≤
+            Pr[ fun z => z.1 = true | k₂ (u, s₂')] +
+            Pr[ bad ∘ Prod.snd | k₁ (u, s₁')] + c) →
+        Pr[ fun z => z.1 = true | (impl₁ t).run s₁ >>= k₁] ≤
+          Pr[ fun z => z.1 = true | (impl₂ t).run s₂ >>= k₂] +
+          Pr[ bad ∘ Prod.snd | (impl₁ t).run s₁ >>= k₁] +
+          (c + (if charged t then ε else 0)))
+    (oa : OracleComp spec Bool) :
+    ∀ {q : ℕ}, OracleComp.IsQueryBoundP oa charged q →
+      ∀ (s₁ : σ₁) (s₂ : σ₂), R s₁ s₂ →
+        Pr[ fun z => z.1 = true | (simulateQ impl₁ oa).run s₁] ≤
+          Pr[ fun z => z.1 = true | (simulateQ impl₂ oa).run s₂] +
+          Pr[ bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₁] +
+          (q : ℝ≥0∞) * ε := by
+  induction oa using OracleComp.inductionOn generalizing σ₂ with
+  | pure x =>
+      intro q _ s₁ s₂ _
+      simp only [simulateQ_pure, StateT.run_pure, probEvent_pure]
+      exact le_add_right (le_add_right le_rfl)
+  | @query_bind t cont ih =>
+      intro q hqb s₁ s₂ hR
+      by_cases hbad : bad s₁
+      · -- bad branch: `Pr[ bad ∘ snd | sim₁] = 1` dominates everything.
+        have hbad1 : Pr[ bad ∘ Prod.snd | (simulateQ impl₁ (query t >>= cont)).run s₁] = 1 :=
+          probEvent_bad_simulateQ_run_eq_one_of_bad impl₁ bad hmono _ s₁ hbad
+        refine le_trans probEvent_le_one ?_
+        rw [hbad1]
+        exact le_add_right le_add_self
+      · -- good branch: rewrite both sides to head-bind form and apply `hstep`.
+        rw [isQueryBoundP_query_bind_iff] at hqb
+        obtain ⟨hvalid, hcont⟩ := hqb
+        have hsim₁ : (simulateQ impl₁ (query t >>= cont)).run s₁ =
+            (impl₁ t).run s₁ >>= fun z => (simulateQ impl₁ (cont z.1)).run z.2 := by
+          simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+            OracleQuery.cont_query, StateT.run_bind]
+        have hsim₂ : (simulateQ impl₂ (query t >>= cont)).run s₂ =
+            (impl₂ t).run s₂ >>= fun z => (simulateQ impl₂ (cont z.1)).run z.2 := by
+          simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+            OracleQuery.cont_query, StateT.run_bind]
+        rw [hsim₁, hsim₂]
+        set k₁ : spec.Range t × σ₁ → OracleComp spec₁ (Bool × σ₁) :=
+          fun z => (simulateQ impl₁ (cont z.1)).run z.2 with hk₁
+        set k₂ : spec.Range t × σ₂ → OracleComp spec₂ (Bool × σ₂) :=
+          fun z => (simulateQ impl₂ (cont z.1)).run z.2 with hk₂
+        -- The slack carried past one query: `(q-1)·ε` if charged, else `q·ε`.
+        set c : ℝ≥0∞ := ((if charged t then q - 1 else q : ℕ) : ℝ≥0∞) * ε with hc
+        -- Continuation bound for *every* `R`-related result (bad ones handled by monotonicity).
+        have hcont_bound : ∀ (u : spec.Range t) (s₁' : σ₁) (s₂' : σ₂), R s₁' s₂' →
+            Pr[ fun z => z.1 = true | k₁ (u, s₁')] ≤
+              Pr[ fun z => z.1 = true | k₂ (u, s₂')] +
+              Pr[ bad ∘ Prod.snd | k₁ (u, s₁')] + c := by
+          intro u s₁' s₂' hR'
+          by_cases hbad' : bad s₁'
+          · -- bad continuation: `Pr[ bad ∘ snd | k₁] = 1` dominates.
+            have hbad1' : Pr[ bad ∘ Prod.snd | k₁ (u, s₁')] = 1 :=
+              probEvent_bad_simulateQ_run_eq_one_of_bad impl₁ bad hmono (cont u) s₁' hbad'
+            refine le_trans probEvent_le_one ?_
+            rw [hbad1']
+            exact le_add_right le_add_self
+          · -- good continuation: apply the inductive hypothesis at the decremented budget.
+            have hib : OracleComp.IsQueryBoundP (cont u) charged
+                (if charged t then q - 1 else q) := hcont u
+            exact ih u impl₂ R hstep hib s₁' s₂' hR'
+        -- Apply the per-step premise; then absorb `c + slack` into `q·ε`.
+        refine le_trans (hstep t s₁ s₂ hR hbad k₁ k₂ c hcont_bound) ?_
+        have hcabs : c + (if charged t then ε else 0) ≤ (q : ℝ≥0∞) * ε := by
+          rcases hvalid with hnc | hpos
+          · -- `t` uncharged: `c = q·ε`, slack term is `0`.
+            rw [hc, if_neg hnc, if_neg hnc, add_zero]
+          · -- `t` charged: `c = (q-1)·ε`, slack term is `ε`, and `0 < q`.
+            by_cases hch : charged t
+            · rw [hc, if_pos hch, if_pos hch]
+              have hq : ((q - 1 : ℕ) : ℝ≥0∞) + 1 = (q : ℝ≥0∞) := by
+                have : ((q - 1 : ℕ) + 1 : ℕ) = q := Nat.succ_pred_eq_of_pos hpos
+                exact_mod_cast congrArg (Nat.cast : ℕ → ℝ≥0∞) this
+              rw [show ((q - 1 : ℕ) : ℝ≥0∞) * ε + ε = (((q - 1 : ℕ) : ℝ≥0∞) + 1) * ε by
+                rw [add_mul, one_mul], hq]
+            · rw [hc, if_neg hch, if_neg hch, add_zero]
+        gcongr
+
+/-- **Heterogeneous-state bad + slack `simulateQ` rule.**
+
+Couples two stateful oracle simulations with *different* state types `σ₁`, `σ₂` and
+*different* base specs `spec₁`, `spec₂`, related by a coupling invariant `R`. It carries a
+monotone bad event `bad` on side `1` together with per-charged-query slack `ε`, charged
+queries being designated by the predicate `charged`. If the computation `oa` makes at most
+`q` charged queries (`IsQueryBoundP oa charged q`), then
+
+  `Pr[= true | run' impl₁ oa] ≤ Pr[= true | run' impl₂ oa] + Pr[bad] + q · ε`.
+
+The per-query premise `hstep` is the bind-level coupling step: from `R`-related, non-bad
+states, one query head together with any pair of continuations satisfying a continuation
+bound yields the head-bind bound, paying `ε` for charged queries. This packages exactly
+the obligation a concrete cross-domain reduction must discharge for its oracle pair.
+
+Only `impl₁` requires bad monotonicity (`hmono`), since the bound is one-directional and
+mentions `Pr[bad]` only on side `1`. -/
+theorem probOutput_simulateQ_run'_le_add_bad_add_slack
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
+    (R : σ₁ → σ₂ → Prop)
+    (bad : σ₁ → Prop)
+    (charged : spec.Domain → Prop) [DecidablePred charged]
+    (ε : ℝ≥0∞)
+    (hmono : ∀ (t : spec.Domain) (s₁ : σ₁), bad s₁ →
+      ∀ z ∈ support ((impl₁ t).run s₁), bad z.2)
+    (hstep : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂), R s₁ s₂ → ¬ bad s₁ →
+      ∀ (k₁ : spec.Range t × σ₁ → OracleComp spec₁ (Bool × σ₁))
+        (k₂ : spec.Range t × σ₂ → OracleComp spec₂ (Bool × σ₂)) (c : ℝ≥0∞),
+        (∀ (u : spec.Range t) (s₁' : σ₁) (s₂' : σ₂), R s₁' s₂' →
+          Pr[ fun z => z.1 = true | k₁ (u, s₁')] ≤
+            Pr[ fun z => z.1 = true | k₂ (u, s₂')] +
+            Pr[ bad ∘ Prod.snd | k₁ (u, s₁')] + c) →
+        Pr[ fun z => z.1 = true | (impl₁ t).run s₁ >>= k₁] ≤
+          Pr[ fun z => z.1 = true | (impl₂ t).run s₂ >>= k₂] +
+          Pr[ bad ∘ Prod.snd | (impl₁ t).run s₁ >>= k₁] +
+          (c + (if charged t then ε else 0)))
+    (oa : OracleComp spec Bool) {q : ℕ}
+    (hbound : OracleComp.IsQueryBoundP oa charged q)
+    (s₁ : σ₁) (s₂ : σ₂) (hR : R s₁ s₂) :
+    Pr[= true | (simulateQ impl₁ oa).run' s₁] ≤
+      Pr[= true | (simulateQ impl₂ oa).run' s₂] +
+      Pr[ bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₁] +
+      (q : ℝ≥0∞) * ε := by
+  have hjoint := probEvent_fst_simulateQ_run_le_add_bad_add_slack
+    impl₁ impl₂ R bad charged ε hmono hstep oa hbound s₁ s₂ hR
+  have hproj₁ : Pr[= true | (simulateQ impl₁ oa).run' s₁] =
+      Pr[ fun z : Bool × σ₁ => z.1 = true | (simulateQ impl₁ oa).run s₁] := by
+    rw [← probEvent_eq_eq_probOutput _ true, StateT.run'_eq,
+      show (fun x : Bool × σ₁ => x.1) = Prod.fst from rfl, probEvent_map]
+    rfl
+  have hproj₂ : Pr[= true | (simulateQ impl₂ oa).run' s₂] =
+      Pr[ fun z : Bool × σ₂ => z.1 = true | (simulateQ impl₂ oa).run s₂] := by
+    rw [← probEvent_eq_eq_probOutput _ true, StateT.run'_eq,
+      show (fun x : Bool × σ₂ => x.1) = Prod.fst from rfl, probEvent_map]
+    rfl
+  rw [hproj₁, hproj₂]
+  exact hjoint
+
+end HeterogeneousBadSlack
+
 end OracleComp.ProgramLogic.Relational

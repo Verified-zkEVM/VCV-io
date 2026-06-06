@@ -77,6 +77,7 @@ import VCVio.EvalDist.Instances.OptionT
 import VCVio.EvalDist.Instances.ReaderT
 import VCVio.EvalDist.List
 import VCVio.EvalDist.Monad.Basic
+import VCVio.EvalDist.Monad.Disagreement
 import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Monad.Seq
 import VCVio.EvalDist.Option
@@ -123,6 +124,7 @@ import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Eager
+import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
