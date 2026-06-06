@@ -692,7 +692,7 @@ lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[ p | mx] ≤ P
   split_ifs with hp hq
   · exact le_rfl
   · exact le_of_eq (probOutput_eq_zero_of_not_mem_support (fun hx => hq (h x hx hp)))
-  · exact zero_le _
+  · exact zero_le
   · exact le_rfl
 
 /-- If `p` implies `q` on the `finSupport` of a computation then it is more likely to happen. -/
@@ -738,7 +738,7 @@ lemma probEvent_eq_one_iff :
     have h3 : Pr[ fun x => ¬p x | mx] = 0 := by
       have hcancel : AddLECancellable (1 : ℝ≥0∞) :=
         WithTop.addLECancellable_iff_ne_top.mpr one_ne_top
-      exact le_antisymm (hcancel (by rw [add_zero]; exact hcompl.le)) (zero_le _)
+      exact le_antisymm (hcancel (by rw [add_zero]; exact hcompl.le)) (zero_le)
     rw [probEvent_eq_zero_iff] at h3
     exact by_contra (h3 x hx)
   · intro ⟨hf, hp⟩

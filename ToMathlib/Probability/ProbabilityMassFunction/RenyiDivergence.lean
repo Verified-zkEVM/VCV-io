@@ -197,7 +197,7 @@ theorem renyiMGF_map_le (a : ℝ) (ha : 1 ≤ a) (f : α' → β) (p q : PMF α'
         have hQlt : ∑' x, Q x ≠ ⊤ :=
           ne_top_of_le_ne_top (by rw [q.tsum_coe]; exact one_ne_top)
             (ENNReal.tsum_le_tsum fun x => by
-              simp only [Q]; split_ifs <;> [exact le_rfl; exact zero_le _])
+              simp only [Q]; split_ifs <;> [exact le_rfl; exact zero_le])
         have hpw : ∀ x, ((P x) ^ a * (Q x) ^ (1 - a)) ^ (a⁻¹ : ℝ) *
             (Q x) ^ ((a - 1) / a : ℝ) = P x := by
           intro x
@@ -336,7 +336,7 @@ theorem renyiMGF_bind_right_le (a : ℝ) (ha : 1 ≤ a) (f : α' → PMF β) (p 
         have hQlt : ∑' x, Q x ≠ ⊤ :=
           ne_top_of_le_ne_top (by rw [q.tsum_coe]; exact one_ne_top)
             (ENNReal.tsum_le_tsum fun x => by
-              exact mul_le_of_le_one_right (zero_le _) (PMF.coe_le_one (f x) y))
+              exact mul_le_of_le_one_right (zero_le) (PMF.coe_le_one (f x) y))
         have hpw : ∀ x, ((P x) ^ a * (Q x) ^ (1 - a)) ^ (a⁻¹ : ℝ) *
             (Q x) ^ ((a - 1) / a : ℝ) = P x := by
           intro x
@@ -504,7 +504,7 @@ theorem renyiDiv_prob_bound (a : ℝ) (ha : 1 < a) (p q : PMF α) (E : α → Pr
   have ha0 : (0 : ℝ) < a := lt_trans zero_lt_one ha
   have has : (0 : ℝ) < a / (a - 1) := div_pos ha0 ham1
   by_cases hR : p.renyiDiv a q = ⊤
-  · rw [hR, ENNReal.div_top]; exact zero_le _
+  · rw [hR, ENNReal.div_top]; exact zero_le
   · rw [renyiDiv_eq_rpow ha] at hR ⊢
     have hM : p.renyiMGF a q ≠ ⊤ := by
       intro hM; exact hR (by rw [hM]; exact ENNReal.top_rpow_of_pos (inv_pos.mpr ham1))
@@ -556,7 +556,7 @@ theorem renyiDiv_prob_bound (a : ℝ) (ha : 1 < a) (p q : PMF α) (E : α → Pr
         apply ENNReal.tsum_le_tsum; intro x; simp only [F]
         split_ifs with hE
         · rw [← ENNReal.rpow_mul, hainv, ENNReal.rpow_one]
-        · rw [ENNReal.zero_rpow_of_pos ha0]; exact zero_le _
+        · rw [ENNReal.zero_rpow_of_pos ha0]; exact zero_le
       have hGq : (∑' x, G x ^ (a / (a - 1) : ℝ)) ^ (1 / (a / (a - 1)) : ℝ) =
           qE ^ ((a - 1) / a : ℝ) := by
         congr 1
@@ -599,7 +599,7 @@ theorem renyiMGF_le_of_pointwise_le (a : ℝ) (ha : 1 < a) (p q : PMF α)
   by_cases hpx : p x = 0
   · simp [hpx, ENNReal.zero_rpow_of_pos ha0]
   · have hqx : q x ≠ 0 := by
-      intro h; exact hpx (le_antisymm (by simpa [h] using hδ x) (zero_le _))
+      intro h; exact hpx (le_antisymm (by simpa [h] using hδ x) (zero_le))
     have hqt := PMF.apply_ne_top q x
     set r := p x / q x with hr_def
     have hrq : r * q x = p x := ENNReal.div_mul_cancel hqx hqt

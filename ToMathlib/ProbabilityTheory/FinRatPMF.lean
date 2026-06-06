@@ -82,7 +82,7 @@ private lemma probOfList_ne_zero_of_mem [DecidableEq α] {l : List (α × ℚ≥
     simpa using hmem
   have hle : q ≤ probOfList l x := by
     simpa [probOfList] using
-      (List.single_le_sum (fun _ _ => by exact zero_le _) q hqmem)
+      (List.single_le_sum (fun _ _ => by exact zero_le) q hqmem)
   exact (lt_of_lt_of_le (show 0 < q from pos_iff_ne_zero.mpr hq) hle).ne'
 
 private lemma probOfList_eq_zero_of_not_mem_supportOfList [DecidableEq α]
@@ -465,7 +465,7 @@ lemma support_uniformList_of_nodup [DecidableEq α] {l : List α} (hl : l ≠ []
 lemma prob_le_one [DecidableEq α] (p : Raw α) (x : α) : p.prob x ≤ 1 := by
   by_cases hx : x ∈ p.support
   · calc
-      p.prob x ≤ p.support.sum p.prob := Finset.single_le_sum (fun _ _ => by exact zero_le _ ) hx
+      p.prob x ≤ p.support.sum p.prob := Finset.single_le_sum (fun _ _ => by exact zero_le ) hx
       _ = 1 := sum_prob_eq_one p
   · simp [prob_eq_zero_of_not_mem_support p hx]
 
@@ -579,7 +579,7 @@ lemma mem_support_bind_iff [DecidableEq α] [DecidableEq β] (m : Raw α) (f : �
     have hle :
         m.prob x * (f x).prob y ≤ ∑ a ∈ m.support, m.prob a * (f a).prob y :=
       Finset.single_le_sum
-        (f := fun a => m.prob a * (f a).prob y) (fun _ _ => by exact zero_le _) hx
+        (f := fun a => m.prob a * (f a).prob y) (fun _ _ => by exact zero_le) hx
     exact pos_iff_ne_zero.mp (lt_of_lt_of_le hpos hle)
 
 @[simp] lemma support_bind [DecidableEq α] [DecidableEq β] (m : Raw α) (f : α → Raw β) :
