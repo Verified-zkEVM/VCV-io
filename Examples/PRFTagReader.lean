@@ -6,6 +6,8 @@ Authors: Oleksandr Vovkotrub
 
 import Examples.PRFTagReader.Defs
 import Examples.PRFTagReader.BadEvent
+import Examples.PRFTagReader.Auth
+import Examples.PRFTagReader.Collision
 import Examples.PRFTagReader.UnlinkReduction
 
 /-!
@@ -24,6 +26,9 @@ Main security statements:
 - a bad-event world tracking nonce collisions across repeated sessions, bridging the two
   unlinkability games via PRF security plus a collision bound.
 
-Content is split across `Examples.PRFTagReader.Defs` (protocol, games, oracle specs) and
-`Examples.PRFTagReader.BadEvent` (bad-event world used by the unlinkability reduction).
+Content is split across `Examples.PRFTagReader.Defs` (protocol, games, oracle specs),
+`Examples.PRFTagReader.BadEvent` (bad-event world used by the unlinkability reduction),
+`Examples.PRFTagReader.Auth` (authentication PRF reduction), and
+`Examples.PRFTagReader.Collision` (random-function authentication collision bound, distinct-nonce
+regime).
 -/
