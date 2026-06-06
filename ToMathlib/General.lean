@@ -504,30 +504,6 @@ def induction₂ {α β} {motive : {n : ℕ} → Vector α n → Vector β n →
         v_insert hd ⟨⟨tl⟩, by simpa using hSize⟩ hd' ⟨⟨tl'⟩, by simpa using hSize'⟩
         (ih ⟨⟨tl⟩, by simpa using hSize⟩ ⟨⟨tl'⟩, by simpa using hSize'⟩)
 
-
-section add
--- Define vector addition more generally
-
-instance {α : Type} {n : ℕ} [Add α] : Add (Vector α n) where
-  add v1 v2 := Vector.ofFn (v1.get + v2.get)
-
-instance {α : Type} {n : ℕ} [Zero α] : Zero (Vector α n) where
-  zero := Vector.ofFn (0)
-
-@[simp]
-theorem vectorofFn_get {α : Type} {n : ℕ} (v : Fin n → α) : (Vector.ofFn v).get = v := by
-  ext i
-  apply Vector.getElem_ofFn
-
-@[simp]
-theorem vectorAdd_get {α : Type} {n : ℕ} [Add α] [Zero α]
- (vx : Vector α n) (vy : Vector α n)
- : (vx + vy).get = vx.get + vy.get := by
-  change (Vector.ofFn (vx.get + vy.get)).get = vx.get + vy.get
-  simp
-
-end add
-
 end Vector
 
 open Classical in
