@@ -429,7 +429,7 @@ theorem decaps_usesWeightedQueryCostAtMost {ω : Type}
       · simpa [henc] using
           AddWriterT.pathwiseCostAtMost_mono
             (AddWriterT.pathwiseCostAtMost_pure (m := m) (policy.onReject fb c : Option K))
-            (by exact zero_le wKey)
+            (by exact zero_le)
 
 /-- If deterministic decryption fails immediately, decapsulation has expected weighted query cost
 `0`. -/

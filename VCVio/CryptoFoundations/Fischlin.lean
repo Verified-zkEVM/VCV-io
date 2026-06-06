@@ -403,7 +403,7 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
           · simpa [hh] using
               AddWriterT.pathwiseCostAtMost_mono
                 (AddWriterT.pathwiseCostAtMost_pure ((some (chal, resp)) : Option (Chal × Resp)))
-                (zero_le _)
+                (zero_le)
           · let newBest : Option (Chal × Resp × Fin (2 ^ b)) := match best with
               | none => some (chal, resp, h)
               | some (ω', resp', h') =>

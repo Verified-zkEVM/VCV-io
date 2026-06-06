@@ -102,7 +102,7 @@ lemma propInd_mono {P Q : Prop} (h : P → Q) : propInd P ≤ propInd Q := by
   split_ifs with hp hq
   · exact le_refl 1
   · exact absurd (h hp) hq
-  · exact zero_le _
+  · exact zero_le
   · exact le_refl 0
 
 lemma propInd_le_one (P : Prop) : propInd P ≤ 1 := by

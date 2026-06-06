@@ -244,7 +244,7 @@ private lemma binding_rest_noCollision_le_inv
           rw [hrun₁]
           simp [hneq, hv₀, hv₁]
       · rw [hrun₀]
-        refine le_of_eq_of_le ?_ (zero_le _)
+        refine le_of_eq_of_le ?_ (zero_le)
         apply probEvent_eq_zero
         intro z hz hwin
         simp only [simulateQ_bind, simulateQ_pure] at hz
@@ -255,7 +255,7 @@ private lemma binding_rest_noCollision_le_inv
         simp only [StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
         rw [hz] at hwin
         simp [hneq, hv₀] at hwin
-  · refine le_of_eq_of_le ?_ (zero_le _)
+  · refine le_of_eq_of_le ?_ (zero_le)
     apply probEvent_eq_zero
     intro z hz hwin
     simp only [simulateQ_bind, simulateQ_pure] at hz

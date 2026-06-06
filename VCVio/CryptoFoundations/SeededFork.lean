@@ -269,7 +269,7 @@ theorem expectedQueryCount_seededForkWithSeedValue_le
             refine ENNReal.tsum_le_tsum ?_
             intro seed
             by_cases hseed : seed ∈ support (generateSeed spec qb js)
-            · refine mul_le_mul_of_nonneg_left ?_ (zero_le _)
+            · refine mul_le_mul_of_nonneg_left ?_ (zero_le)
               have hseedCov := generateSeed_covers_queryBound (spec := spec) qb js hjs hseed
               have hwp : wp ($ᵗ spec.Range i) (fun u =>
                     expectedCost (seededForkWithSeedValue main qb i cf seed u)
@@ -848,7 +848,7 @@ theorem le_probOutput_seededFork (s : Fin (qb i + 1)) :
                           if cf a_1.1 = some s then
                             pure (some (a.1, a_1.1))
                           else
-                            pure none] := zero_le _
+                            pure none] := zero_le
               have haux :
                   (1 : ℝ≥0∞) ≤
                     Pr[= z |
@@ -882,7 +882,7 @@ theorem le_probOutput_seededFork (s : Fin (qb i + 1)) :
                       (fun r ↦ Option.map (Prod.map cf cf) r) <$>
                         (if cf x.1 = some s then
                           (pure (some (a.1, x.1)) : OracleComp spec (Option (α × α)))
-                         else pure none)] := zero_le _
+                         else pure none)] := zero_le
                 have hxs' : (some s : Option (Fin (qb i + 1))) ≠ cf x.1 := by
                   simpa [eq_comm] using hxs
                 simp [hxs, hxs', z]
@@ -955,7 +955,7 @@ theorem le_probOutput_seededFork (s : Fin (qb i + 1)) :
                       if (seed i)[↑s]? = some u then
                         (pure (some s) : OracleComp spec (Option (Fin (qb i + 1))))
                       else pure none] :=
-              le_add_of_nonneg_right (zero_le _)
+              le_add_of_nonneg_right (zero_le)
             exact le_trans hmono' hadd
         · have hts' : (some t : Option (Fin (qb i + 1))) ≠ some s := by
             simpa using hts
@@ -975,7 +975,7 @@ theorem le_probOutput_seededFork (s : Fin (qb i + 1)) :
                     ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
             simpa using hzero
           rw [hzero']
-          exact zero_le _
+          exact zero_le
   have hNoGuardMinusLeRhs :
       Pr[= z | noGuardComp] - Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp] ≤
         Pr[= z | f <$> seededFork main qb js i cf] :=

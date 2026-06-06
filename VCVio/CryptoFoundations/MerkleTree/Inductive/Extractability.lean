@@ -679,7 +679,7 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     refine (probEvent_mono'' (q := fun b : Bool => b = true) ?_).trans
       (probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth h_pos leaf root proof).le
     rintro _ ⟨h_v, _⟩; exact h_v
-  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le _)
+  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le)
     rintro _ _ ⟨_, h⟩; exact h_get h
 
 private theorem extractabilityGame_verified_extractor_none_le_inv_card

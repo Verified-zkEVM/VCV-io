@@ -586,7 +586,7 @@ lemma probEvent_bind_congr_le_add {mx : m α} {my oc : α → m β}
     _ = (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + (∑' x, Pr[= x | mx]) * ε := by
         rw [ENNReal.tsum_mul_right]
     _ ≤ (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + ε :=
-        add_le_add le_rfl (mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one)
+        add_le_add le_rfl (mul_le_of_le_one_left (zero_le) tsum_probOutput_le_one)
 
 end congr_mono
 

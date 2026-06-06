@@ -108,7 +108,7 @@ theorem probEvent_log_entry_eq_le {α : Type}
               (simulateQ loggingOracle (mx u)).run] = 0 :=
           fun u => probEvent_eq_zero fun _ _ => hne u
         simp only [hzero, mul_zero, tsum_zero]
-        exact zero_le _
+        exact zero_le
     | succ k' =>
       -- k > 0: decompose with probEvent_bind_eq_tsum, use ih.
       rw [probEvent_bind_eq_tsum]
@@ -162,7 +162,7 @@ theorem probEvent_log_output_match_le {α : Type}
   induction oa using OracleComp.inductionOn generalizing k with
   | pure _ =>
     simp only [simulateQ_pure]
-    refine le_of_eq_of_le (probEvent_eq_zero fun z hmem h => ?_) (zero_le _)
+    refine le_of_eq_of_le (probEvent_eq_zero fun z hmem h => ?_) (zero_le)
     simp only [WriterT.run_pure', List.empty_eq, support_pure,
       Set.mem_singleton_iff] at hmem; obtain ⟨_, rfl⟩ := hmem
     obtain ⟨s, v, hlog, _⟩ := h; simp at hlog
@@ -562,7 +562,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
       simp only [StateT.run] at hz
       obtain ⟨rfl, rfl⟩ := hz
       exact hnocoll h
-    rw [this]; exact zero_le _
+    rw [this]; exact zero_le
   | query_bind t mx ih =>
     intro m k hm cache₀ hnocoll hbnd
     rw [isTotalQueryBound_query_bind_iff] at hm

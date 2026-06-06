@@ -276,7 +276,7 @@ theorem fsAbortSignLoop_usesWeightedQueryCostAtMost
               (AddWriterT.pathwiseCostAtMost_mono
                 (AddWriterT.pathwiseCostAtMost_pure
                   (m := m) (ω := κ) (x := (some (attempt.1, z) : Option (Commit × Resp))))
-                (zero_le _))
+                (zero_le))
         | none =>
             simpa [cont, hAttempt, HasQuery.UsesCostAtMost] using hRec
       simpa [HasQuery.UsesCostAtMost, HasQuery.Program.withAddCost, fsAbortSignLoop, succ_nsmul',

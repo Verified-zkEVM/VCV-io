@@ -382,7 +382,7 @@ theorem prfIdealExp_macToPRFReduction_le [Nonempty R] [SampleableType R] [Fintyp
               simp only [randomOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind,
                 hcache, StateT.run_pure, pure_bind, hinv, Bool.not_true, Bool.false_and,
                 probOutput_pure, reduceCtorEq, ↓reduceIte]
-              exact zero_le _
+              exact zero_le
             | none =>
               have hro : ((D →ₒ R).randomOracle msg).run cache =
                   (fun u => (u, cache.cacheQuery msg u)) <$> ($ᵗ R) :=
@@ -401,7 +401,7 @@ theorem prfIdealExp_macToPRFReduction_le [Nonempty R] [SampleableType R] [Fintyp
                       · exfalso
                         simp only [Bool.true_eq, Bool.and_eq_true, decide_eq_true_eq] at h1
                         exact h2 h1.2.symm
-                      · exact zero_le _
+                      · exact zero_le
                       · exact le_rfl
                 _ = c := tsum_ite_eq τ (fun _ => c)
           · simp [probOutput_eq_zero_of_not_mem_support hmem]
