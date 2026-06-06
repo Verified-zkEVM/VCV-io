@@ -1125,6 +1125,8 @@ specialization). -/
 def HasDistinctReaderNonces (adversary : AuthAdversary TagId Nonce Digest) : Prop :=
   ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pNonce n) 1
 
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] in
 /-- `HasDistinctReaderNonces` unfolds definitionally to a per-nonce reader-query bound: it holds
 exactly when, for every nonce `n`, at most one reader query carries `n`. Use this lemma to
 discharge the hypothesis from a per-nonce `IsQueryBoundP` family, or to peel it back when a proof
@@ -1134,7 +1136,8 @@ lemma hasDistinctReaderNonces_iff (adversary : AuthAdversary TagId Nonce Digest)
       ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pNonce n) 1 :=
   Iff.rfl
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- Every `pNonce n`-query is a reader query: `pNonce n` is false on tag (`Sum.inl`) queries and,
 on reader (`Sum.inr`) queries, refines `Sum.isRight`. -/
 lemma pNonce_imp_isRight (n : Nonce) (t : (AuthOracleSpec TagId Nonce Digest).Domain) :
@@ -1143,7 +1146,8 @@ lemma pNonce_imp_isRight (n : Nonce) (t : (AuthOracleSpec TagId Nonce Digest).Do
   | inl x => exact fun h => (h : (False : Prop)).elim
   | inr tr => exact fun _ => rfl
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- Intro lemma: an adversary making at most one reader query has pairwise-distinct reader nonces.
 A single reader query cannot collide with itself, so the per-nonce bound holds for free; this is
 the common case where no bespoke distinctness argument is needed. Adversaries with no reader

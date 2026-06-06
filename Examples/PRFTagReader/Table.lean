@@ -63,7 +63,8 @@ noncomputable def multipleTableHandler (g : TagId × Nonce → Digest) :
   unlinkReaderQueryImpl (Slot := TagId) (fun tag nonce => g (tag, nonce))
     (multiplePattern sessionsPerTag)
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `simulateQ multipleIdealQueryImpl` of a `query_bind`, run from a state and projected to its
 output bit: the per-query handler followed by the recursive simulation of the continuation.
 General-codomain version of `multipleIdeal_run'_query_bind`. -/
@@ -79,7 +80,9 @@ lemma multipleIdeal_run'_query_bind' {α : Type}
           (f p.1)).run' p.2 := by
   rw [simulateQ_query_bind, StateT.run'_eq, StateT.run_bind, map_bind]; rfl
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `simulateQ multipleTableHandler` of a `query_bind`, run from a state and projected to its
 output: the per-query handler followed by the recursive simulation of the continuation. -/
 lemma multipleTable_run'_query_bind' {α : Type} (g : TagId × Nonce → Digest)
@@ -94,7 +97,9 @@ lemma multipleTable_run'_query_bind' {α : Type} (g : TagId × Nonce → Digest)
           (f p.1)).run' p.2 := by
   rw [simulateQ_query_bind, StateT.run'_eq, StateT.run_bind, map_bind]; rfl
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `multipleTableHandler` on a tag query with the slot budget exhausted: returns `none`. -/
 lemma multipleTableHandler_tag_run_of_not_lt (g : TagId × Nonce → Digest)
     (tag : TagId) (s : UnlinkState TagId)
@@ -108,7 +113,9 @@ lemma multipleTableHandler_tag_run_of_not_lt (g : TagId × Nonce → Digest)
   unfold unlinkTagQueryImpl
   simp [StateT.run_bind, StateT.run_get, hslot]
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `multipleTableHandler` on a tag query with a free slot: sample a nonce, look up the table at
 `(tag, nonce)`, advance the session counter. -/
 lemma multipleTableHandler_tag_run_of_lt (g : TagId × Nonce → Digest)
@@ -127,7 +134,9 @@ lemma multipleTableHandler_tag_run_of_lt (g : TagId × Nonce → Digest)
   simp [StateT.run_bind, StateT.run_get, StateT.run_monadLift, StateT.run_set,
     hslot, multiplePattern, bind_pure_comp]
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `multipleTableHandler` on a reader query: deterministic acceptance against the table, with the
 state untouched. -/
 lemma multipleTableHandler_reader_run (g : TagId × Nonce → Digest)
@@ -494,12 +503,12 @@ over the state: the tag-query case uses the single-cell absorption
 `evalDist_idealCacheStep_bind_uniformTable`, the reader-query case uses the list absorption
 `evalDist_idealCacheMapM_bind_uniformTable`. -/
 
-omit [Nonempty TagId] in
+omit [Nonempty TagId] [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Running the composed multiple-session ideal handler from state `(s, c)` has the same output
 distribution as sampling a full random-oracle table `g`, overlaying the cache `c`, and running
 the deterministic real multiple-session table handler. -/
 lemma evalDist_simulateQ_multipleIdealQueryImpl_run'_eq_tableExtending
-    [Fintype Nonce] [Finite Digest]
+    [Finite Digest]
     (oa : UnlinkAdversary TagId Nonce Digest)
     (s : UnlinkState TagId) (c : ((TagId × Nonce) →ₒ Digest).QueryCache) :
     𝒟[(simulateQ (multipleIdealQueryImpl (sessionsPerTag := sessionsPerTag)) oa).run' (s, c)] =
@@ -530,7 +539,9 @@ lemma evalDist_simulateQ_multipleIdealQueryImpl_run'_eq_tableExtending
       by_cases hslot : s.sessionsUsed tag < sessionsPerTag
       · -- tag query, slot available
         rw [multipleIdealQueryImpl_tag_run_of_lt tag s c hslot]
-        set adv := ({ s with sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } : UnlinkState TagId) with hadv
+        set adv := ({ s with
+              sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } :
+            UnlinkState TagId) with hadv
         have hlhs_reassoc :
             ((($ᵗ Nonce) >>= fun nonce => idealCacheStep c (tag, nonce) >>= fun r =>
                 pure (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest), adv, r.2)) >>= fun p =>
@@ -675,7 +686,8 @@ noncomputable def singleTableHandler (g : (TagId × Fin sessionsPerTag) × Nonce
   unlinkReaderQueryImpl (Slot := TagId × Fin sessionsPerTag) (fun slot nonce => g (slot, nonce))
     (singlePattern sessionsPerTag)
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `simulateQ singleIdealQueryImpl` of a `query_bind`, run from a state and projected to its
 output: general-codomain version of `singleIdeal_run'_query_bind`. -/
 lemma singleIdeal_run'_query_bind' {α : Type}
@@ -690,7 +702,9 @@ lemma singleIdeal_run'_query_bind' {α : Type}
           (f p.1)).run' p.2 := by
   rw [simulateQ_query_bind, StateT.run'_eq, StateT.run_bind, map_bind]; rfl
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `simulateQ singleTableHandler` of a `query_bind`, run from a state and projected to its
 output. -/
 lemma singleTable_run'_query_bind' {α : Type}
@@ -704,7 +718,9 @@ lemma singleTable_run'_query_bind' {α : Type}
         (simulateQ (singleTableHandler g) (f p.1)).run' p.2 := by
   rw [simulateQ_query_bind, StateT.run'_eq, StateT.run_bind, map_bind]; rfl
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `singleTableHandler` on a tag query with the slot budget exhausted: returns `none`. -/
 lemma singleTableHandler_tag_run_of_not_lt
     (g : (TagId × Fin sessionsPerTag) × Nonce → Digest)
@@ -718,7 +734,9 @@ lemma singleTableHandler_tag_run_of_not_lt
   unfold unlinkTagQueryImpl
   simp [StateT.run_bind, StateT.run_get, hslot]
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `singleTableHandler` on a tag query with a free slot: sample a nonce, look up the table at
 `((tag, sid), nonce)`, advance the session counter. -/
 lemma singleTableHandler_tag_run_of_lt
@@ -739,7 +757,9 @@ lemma singleTableHandler_tag_run_of_lt
   simp [StateT.run_bind, StateT.run_get, StateT.run_monadLift, StateT.run_set,
     hslot, singlePattern, bind_pure_comp]
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- `singleTableHandler` on a reader query: deterministic acceptance against the table. -/
 lemma singleTableHandler_reader_run
     (g : (TagId × Fin sessionsPerTag) × Nonce → Digest)
@@ -751,12 +771,12 @@ lemma singleTableHandler_reader_run
   unfold singleTableHandler unlinkReaderQueryImpl
   rw [QueryImpl.add_apply_inr]; rfl
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [SampleableType (TagId × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- Running the composed single-session ideal handler from state `(s, c)` has the same output
 distribution as sampling a full random-oracle table `g`, overlaying the cache `c`, and running
 the deterministic real single-session table handler. -/
 lemma evalDist_simulateQ_singleIdealQueryImpl_run'_eq_tableExtending
-    [Fintype Nonce] [Finite Digest]
+    [Finite Digest]
     (oa : UnlinkAdversary TagId Nonce Digest)
     (s : UnlinkState TagId)
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) :
@@ -784,7 +804,9 @@ lemma evalDist_simulateQ_singleIdealQueryImpl_run'_eq_tableExtending
     | inl tag =>
       by_cases hslot : s.sessionsUsed tag < sessionsPerTag
       · rw [singleIdealQueryImpl_tag_run_of_lt tag s c hslot]
-        set adv := ({ s with sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } : UnlinkState TagId) with hadv
+        set adv := ({ s with
+              sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } :
+            UnlinkState TagId) with hadv
         set sid := (⟨s.sessionsUsed tag, hslot⟩ : Fin sessionsPerTag) with hsid
         have hlhs_reassoc :
             ((($ᵗ Nonce) >>= fun nonce => idealCacheStep c ((tag, sid), nonce) >>= fun r =>
@@ -912,10 +934,10 @@ ideal-world success probabilities are exposed as table-sampled deterministic run
 cache (`tableExtending ∅ g = g`). These are the eager forms on which the coupled-table union
 bound operates. -/
 
-omit [Nonempty TagId] in
+omit [Nonempty TagId] [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Eager form of the multiple-session ideal success probability: sample a full random-oracle
 table `g`, then run the deterministic real multiple-session table handler. -/
-lemma probOutput_multipleIdeal_run'_eq_tableSample [Fintype Nonce] [Finite Digest]
+lemma probOutput_multipleIdeal_run'_eq_tableSample [Finite Digest]
     (adv : UnlinkAdversary TagId Nonce Digest) :
     Pr[= true | (simulateQ (multipleIdealQueryImpl (sessionsPerTag := sessionsPerTag)) adv).run'
         (UnlinkState.init, ∅)] =
@@ -926,10 +948,10 @@ lemma probOutput_multipleIdeal_run'_eq_tableSample [Fintype Nonce] [Finite Diges
     evalDist_simulateQ_multipleIdealQueryImpl_run'_eq_tableExtending adv UnlinkState.init ∅]
   simp only [OracleComp.tableExtending_empty]
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [SampleableType (TagId × Nonce → Digest)] [NeZero sessionsPerTag] in
 /-- Eager form of the single-session ideal success probability: sample a full random-oracle
 table `g`, then run the deterministic real single-session table handler. -/
-lemma probOutput_singleIdeal_run'_eq_tableSample [Fintype Nonce] [Finite Digest]
+lemma probOutput_singleIdeal_run'_eq_tableSample [Finite Digest]
     (adv : UnlinkAdversary TagId Nonce Digest) :
     Pr[= true | (simulateQ (singleIdealQueryImpl (sessionsPerTag := sessionsPerTag)) adv).run'
         (UnlinkState.init, ∅)] =
@@ -946,14 +968,15 @@ def projectTable
     (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest) : TagId × Nonce → Digest :=
   fun p => gS ((p.1, (0 : Fin sessionsPerTag)), p.2)
 
-omit [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest] in
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
+  [DecidableEq Digest] in
 /-- Projecting a uniform single-session table is a uniform multiple-session table: drawing a
 uniform single-session random-oracle table `gS` and projecting it onto the reference session
 slot via `projectTable` yields the uniform distribution on multiple-session tables. The
 marginalization step of the coupled-table union bound; the reference-slot cells of `gS` are
 themselves jointly uniform and independent of the off-slot cells. -/
 lemma evalDist_projectTable_uniformSample
-    [Fintype Nonce] [Finite Digest] [Nonempty Digest] :
+    [Finite TagId] [Finite Nonce] [Finite Digest] [Nonempty Digest] :
     𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>=
         fun gS => pure (projectTable (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) gS)] =

@@ -39,6 +39,7 @@ variable {TagId Nonce Digest K : Type}
 
 /-! ### Multiple-vs-single bound via the hybrid -/
 
+omit [Nonempty TagId] in
 /-- Core coupling bound for the unlinkability reduction, obtained by chaining
 `multipleIdeal_le_hybrid_add_bad` and `hybrid_le_singleIdeal_add_readerSlack`.
 
@@ -115,7 +116,8 @@ lemma multipleIdeal_le_singleIdeal_add_bad [Fintype Nonce] [Fintype Digest]
 
 /-! ### Session-collision bound for `multipleBadQueryImpl` -/
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [NeZero sessionsPerTag] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Per-step tag bound for `multipleBadQueryImpl`: a single tag query raises the bad flag with
 probability at most `sB.sessionsUsed tag * maxNonceProb`. The proof factors through the
 `idealCacheStep`-based form of `multipleIdealQueryImpl_tag_run_of_lt`; the inner `idealCacheStep`
@@ -229,7 +231,8 @@ lemma multipleBadStep_bad_le
       simp [multipleBadAdvance, hbad]
     exact h0 ▸ zero_le _
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [NeZero sessionsPerTag] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Bad-bit invariant: in any reachable state of `multipleBadQueryImpl`, the bad-world component's
 session counters equal the multiple-ideal state's session counters. Used to swap the slot check
 from `s.sessionsUsed` to `sB.sessionsUsed` in the per-step bound. -/
@@ -261,7 +264,8 @@ lemma multipleBadStep_sessionsUsed_eq
     subst hr
     simp [multipleBadAdvance, hsync]
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [NeZero sessionsPerTag] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Reader queries leave the bad-world component untouched: in any reachable state of
 `multipleBadQueryImpl` on a reader query, the bad-state is unchanged. -/
 lemma multipleBadStep_reader_state_eq
@@ -278,7 +282,8 @@ lemma multipleBadStep_reader_state_eq
   subst hz
   rfl
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [NeZero sessionsPerTag] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Cache-bounded and sessions-used invariants of the bad-world state are preserved by reachable
 states of `multipleBadQueryImpl`. The reader branch leaves `sB` untouched; the tag branch threads
 through `unlinkBadTagNext_cacheBounded`/`unlinkBadTagNext_sessionsUsed_le` via the bridge between
@@ -332,7 +337,8 @@ lemma multipleBadStep_preserves
     subst hr
     exact ⟨hbounded, hused, hsync⟩
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [NeZero sessionsPerTag] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Bad-event union bound for `multipleBadQueryImpl`. Starting from a multiple-bad state
 satisfying the cache-boundedness, session-used-≤-`sessionsPerTag`, and sync invariants, with the
 bad flag unset, the probability that bad fires under any adversary is at most
@@ -485,7 +491,8 @@ lemma simulateQ_multipleBad_prob_le
         _ = (unlinkBadRemaining (sessionsPerTag := sessionsPerTag) sB : ℝ≥0∞) *
               ((sessionsPerTag : ℝ≥0∞) * maxNonceProb) := one_mul _
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [NeZero sessionsPerTag] [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Session-collision bound for the multiple-bad handler. Specializes
 `simulateQ_multipleBad_prob_le` to the initial state, where `unlinkBadRemaining` collapses to
 `sessionsPerTag * |TagId|`, giving the explicit `sessionsPerTag^2 * |TagId| * maxNonceProb`
@@ -523,7 +530,9 @@ theorem multipleBad_bad_le_sessionCollisionBound
 
 /-! ### Bad-event bridge -/
 
-omit [Nonempty TagId] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [NeZero sessionsPerTag]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- `unlinkBadExp` outputs `true` exactly with the probability that the bad flag fires. -/
 lemma probOutput_unlinkBadExp_eq
     (adversary : UnlinkAdversary TagId Nonce Digest) :
@@ -537,6 +546,7 @@ lemma probOutput_unlinkBadExp_eq
   refine tsum_congr fun z => ?_
   by_cases hz : z.2.bad <;> simp [hz]
 
+omit [Nonempty TagId] in
 /-- Coupling bound for the two random-function worlds (the ideal-PRF experiments of the multiple-
 and single-session reductions): the gap is bounded by the within-tag nonce-collision probability
 (carried by the instrumented `multipleBadQueryImpl`'s `bad` flag) plus three additive slack terms

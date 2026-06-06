@@ -285,6 +285,7 @@ theorem simulateQ_prfReal_unlinkToMultiplePRFQueryImpl_run
       · exact simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run prfs k transcript s')
     adversary s
 
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] in
 /-- PRF-real faithfulness, multiple-session world: under the real PRF, each oracle query at
 `(tag, nonce)` returns `prfs.evalMultiple k tag nonce`, so the reduction runs exactly the
 multiple-session unlinkability game. -/
@@ -418,7 +419,7 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
   rw [hAccept]
   rfl
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- Single-session compose: simulating the unlinkability adversary through the reduction's query
 implementation and then through the real PRF query implementation matches, state-by-state, the
 direct simulation through the real single-session query implementation with the hash set to
@@ -444,6 +445,7 @@ theorem simulateQ_prfReal_unlinkToSinglePRFQueryImpl_run
       · exact simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run prfs k transcript s')
     adversary s
 
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- PRF-real faithfulness, single-session world: under the real PRF, each oracle query at
 `((tag, sid), nonce)` returns `prfs.evalSingle k tag sid nonce`, so the reduction runs exactly the
 single-session unlinkability game. -/
@@ -1162,6 +1164,8 @@ multiple-vs-single coupling would face. -/
 def HasDistinctUnlinkReaderNonces (adversary : UnlinkAdversary TagId Nonce Digest) : Prop :=
   ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pReaderNonce n) 1
 
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] in
 /-- `HasDistinctUnlinkReaderNonces` unfolds definitionally to a per-nonce reader-query bound: it
 holds exactly when, for every nonce `n`, at most one reader query carries `n`. -/
 lemma hasDistinctUnlinkReaderNonces_iff (adversary : UnlinkAdversary TagId Nonce Digest) :
@@ -1169,8 +1173,8 @@ lemma hasDistinctUnlinkReaderNonces_iff (adversary : UnlinkAdversary TagId Nonce
       ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pReaderNonce n) 1 :=
   Iff.rfl
 
-omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest]
-  [NeZero sessionsPerTag] in
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- Every `pReaderNonce n`-query is a reader query: `pReaderNonce n` is false on tag (`Sum.inl`)
 queries and, on reader (`Sum.inr`) queries, refines `Sum.isRight`. -/
 lemma pReaderNonce_imp_isRight (n : Nonce)
@@ -1180,8 +1184,8 @@ lemma pReaderNonce_imp_isRight (n : Nonce)
   | inl x => exact fun h => (h : (False : Prop)).elim
   | inr tr => exact fun _ => rfl
 
-omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest]
-  [NeZero sessionsPerTag] in
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- An adversary making at most one reader query has pairwise-distinct reader nonces: a single
 reader query cannot collide with itself. Adversaries with no reader queries also qualify. -/
 theorem hasDistinctUnlinkReaderNonces_of_readerBound

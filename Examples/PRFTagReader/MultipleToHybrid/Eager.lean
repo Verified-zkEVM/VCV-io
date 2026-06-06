@@ -35,6 +35,7 @@ variable {TagId Nonce Digest K : Type}
   [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
 
+omit [Nonempty TagId] in
 /-- Deterministic-table form of the multiple-to-hybrid coupling bound. With both worlds
 eagerized (`multipleBadTableHandler` against `tableExtending sM2 gM`, `hybridTableHandler` against
 `tableExtending sH2 gH`), the multiple-success probability is bounded by the hybrid-success
@@ -56,7 +57,8 @@ a fresh `u ← $ᵗ Digest` and `MultipleHybridCoupling_tag_step` advances all t
 The reader step folds over the column at `transcript.nonce`; per-cell coupling from the tag-step
 patching maintains `tableExtending sM.2 gM (tag, n) = tableExtending sH.2 gH ((tag, chosen-sid), n)`
 for every tag-drawn `(tag, n)`. Non-recorded cells contribute mass `|TagId| / |Digest|` per
-reader query via `probEvent_multipleReader_disagree_le` + `multipleReader_accepts_of_hybridCacheAccepts`;
+reader query via `probEvent_multipleReader_disagree_le` +
+`multipleReader_accepts_of_hybridCacheAccepts`;
 `hdist` rules out a repeat reader query at the same nonce, so the bookkeeping does not
 double-count. -/
 lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
@@ -128,14 +130,16 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
         have := hdist n
         rw [OracleComp.isQueryBoundP_query_bind_iff] at this
         simpa [pReaderNonce] using this.2 u
-      have hfreshf : ∀ u, MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+      have hfreshf : ∀ u, MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce)
+          (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) (f u) sH sM.2 := fun u n tg hsome hns => by
         have hb := hfresh n tg hsome hns
         rw [OracleComp.isQueryBoundP_query_bind_iff] at hb
         simpa [pReaderNonce] using hb.2 u
       by_cases hslot : sM.1.sessionsUsed tag < sessionsPerTag
       · -- Slot-available tag step: unfold both table handlers to their nonce-sampling forms;
-        -- the per-cell coupling at a fresh nonce is delegated to `evalDist_uniformSample_bind_update`
+        -- the per-cell coupling at a fresh nonce is delegated to
+        -- `evalDist_uniformSample_bind_update`
         -- on each side. The bad/fresh split charges collisions into `Pr[·.2.bad]` and discharges
         -- the fresh case by `MultipleHybridCoupling_tag_step` + `ih`.
         have hslotH : sH.1.sessionsUsed tag < sessionsPerTag :=
@@ -175,7 +179,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
           rw [hybridTableHandler_tag_run_of_lt gS tag sH.1 hslotH, ← hsidH]
         -- Step 1: lift `hMstep`/`hHstep` into the goal by `bind_congr`, flattening the inner
         -- `($ᵗ Nonce) >>= pure (…)` against the outer continuation via `bind_assoc` + `pure_bind`.
-        -- This is a syntactic equality (no `evalDist` needed) because `hMstep`/`hHstep` are equalities
+        -- This is a syntactic equality (no `evalDist` needed) because `hMstep`/`hHstep` are
+        -- equalities
         -- of `ProbComp` values and `bind_congr` rewrites under the outer table draws.
         have hLHS_eq :
             (do let gM ← $ᵗ (TagId × Nonce → Digest)
@@ -211,7 +216,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                   (OracleComp.tableExtending sH.2 gH)) (f p.1)).run' p.2)
             = (do let gH ← $ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)
                   let n ← $ᵗ Nonce
-                  (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+                  (simulateQ (hybridTableHandler (TagId := TagId) (Nonce := Nonce)
+                    (Digest := Digest)
                     (sessionsPerTag := sessionsPerTag)
                     (OracleComp.tableExtending sH.2 gH))
                     (f (some (⟨n, OracleComp.tableExtending sH.2 gH ((tag, sidH), n)⟩ :
@@ -433,7 +439,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
           have hBfresh : sB.responses (tag, n) = none := by
             rw [← Option.not_isSome_iff_eq_none, hInv.2.2.2.1]
             exact hncoll
-          -- `sidH.val = sH.1.sessionsUsed tag`, so by `hInv.hwo` (clause 7) the session-nonce is `none`.
+          -- `sidH.val = sH.1.sessionsUsed tag`, so by `hInv.hwo` (clause 7) the session-nonce is
+          -- `none`.
           have hSnNone : sH.1.sessionNonce (tag, sidH) = none :=
             hInv.2.2.2.2.2.2.1 tag sidH (le_refl _)
           have hHcellNone : sH.2 ((tag, sidH), n) = none := by
@@ -450,7 +457,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
             -- `tableExtending sM.2 (gM_patched) (tag, n) = u` (by `tableExtending_update_of_none`
             -- and `hMcellNone`) and `tableExtending sH.2 (gH_patched) ((tag, sidH), n) = u`
             -- (by `hHcellNone`). The advanced multi state `mbAdv tag sB (some ⟨n, u⟩)` has
-            -- `bad = false` (by `hBfresh`), so `MultipleHybridCoupling_tag_step` holds at every `u` and
+            -- `bad = false` (by `hBfresh`), so `MultipleHybridCoupling_tag_step` holds at every `u`
+            -- and
             -- `ih (some ⟨n, u⟩) qR (advM, sM.2.cacheQuery (tag, n) u)
             --     (advH n_with_session, sH.2.cacheQuery ((tag, sidH), n) u)
             --     (mbAdv tag sB (some ⟨n, u⟩))` provides the inductive bound at the patched
@@ -481,7 +489,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
               intro u
               have hstep := MultipleHybridCoupling_tag_step (sessionsPerTag := sessionsPerTag)
                 tag n u sM sH sB hInv hslot hMcellNone
-              -- `MultipleHybridCoupling_tag_step` produces post-hybrid state with `⟨sM.1.sessionsUsed tag, hslot⟩`
+              -- `MultipleHybridCoupling_tag_step` produces post-hybrid state with
+              -- `⟨sM.1.sessionsUsed tag, hslot⟩`
               -- as the new session index; rewrite to the user-defined `sidH`.
               rw [hsidEq] at hstep
               simp only [multipleBadAdvance, hadvH]
@@ -493,7 +502,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
             -- lifts the pre-advance freshness witness `hfreshf (some ⟨n, u⟩)` at `(tag', n')`.
             have hFreshNew : ∀ u : Digest,
                 MultipleHybridColFresh (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-                  (sessionsPerTag := sessionsPerTag) (f (some (⟨n, u⟩ : TagTranscript Nonce Digest)))
+                  (sessionsPerTag := sessionsPerTag)
+                  (f (some (⟨n, u⟩ : TagTranscript Nonce Digest)))
                   (advH n, sH.2.cacheQuery ((tag, sidH), n) u)
                   (sM.2.cacheQuery (tag, n) u) := by
               intro u n' tag' hcell hns
@@ -503,7 +513,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                 -- contradicting the universal `≠ some n'` hypothesis at `sidH`.
                 obtain ⟨htag, hnn⟩ := Prod.mk.inj hkey
                 refine absurd ?_ (hns sidH)
-                show (advH n).sessionNonce (tag', sidH) = some n'
+                change (advH n).sessionNonce (tag', sidH) = some n'
                 rw [hadvH, htag, hnn]
                 exact Function.update_self _ _ _
               · -- The freshly cached cell is elsewhere; reduce to the pre-advance witness.
@@ -518,9 +528,10 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                     rw [htg, hsd, hInv.2.2.2.2.2.2.1 tag sidH (le_refl _)] at hsn
                     cases hsn
                   · refine hns sid ?_
-                    show (advH n).sessionNonce (tag', sid) = some n'
+                    change (advH n).sessionNonce (tag', sid) = some n'
                     rw [hadvH]
-                    show Function.update sH.1.sessionNonce (tag, sidH) (some n) (tag', sid) = some n'
+                    change Function.update sH.1.sessionNonce (tag, sidH) (some n) (tag', sid)
+                      = some n'
                     rw [Function.update_of_ne hts]
                     exact hsn
                 exact hfreshf (some (⟨n, u⟩ : TagTranscript Nonce Digest)) n' tag' hcell' hns'
@@ -547,13 +558,14 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
               simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hn' ⊢
               obtain ⟨hsome, hnos⟩ := hn'
               by_cases hkey : (tag', n') = (tag, n)
-              · -- The freshly added cell at `(tag, n)` has session `sidH` in `advH n`, contradicting
+              · -- The freshly added cell at `(tag, n)` has session `sidH` in `advH n`,
+                -- contradicting
                 -- the no-session hypothesis.
                 obtain ⟨htg, hnn⟩ := Prod.mk.inj hkey
                 exfalso
                 refine hnos ⟨sidH, ?_⟩
                 rw [hadvH, htg, hnn]
-                show Function.update sH.1.sessionNonce (tag, sidH) (some n) (tag, sidH) = some n
+                change Function.update sH.1.sessionNonce (tag, sidH) (some n) (tag, sidH) = some n
                 exact Function.update_self _ _ _
               · -- Off the freshly added cell, the multi cache is unchanged at `(tag', n')` and the
                 -- hybrid session-nonce check reduces to the pre-step universal nonexistence.
@@ -563,7 +575,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                   -- Pre-step session-nonce equals post-step except at `(tag, sidH)`.
                   refine hnos ⟨sid, ?_⟩
                   rw [hadvH]
-                  show Function.update sH.1.sessionNonce (tag, sidH) (some n) (tag', sid) =
+                  change Function.update sH.1.sessionNonce (tag, sidH) (some n) (tag', sid) =
                     some n'
                   by_cases hts : (tag', sid) = (tag, sidH)
                   · -- `(tag', sid) = (tag, sidH)` is impossible: `hsn` gives
@@ -614,7 +626,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
                 (hInvNew u) (hqRf _) (hqTf _) (hdistf _) (hFreshNew u)
                 (hCacheBoundNew u) hqRle
             -- Cell-read simplification at the off-collision multi cell: with `hMcellNone`,
-            -- `tableExtending sM.2 gM (tag, n) = gM (tag, n)`, so the multi-side cell read collapses
+            -- `tableExtending sM.2 gM (tag, n) = gM (tag, n)`, so the multi-side cell read
+            -- collapses
             -- to a direct lookup in the freshly drawn table `gM`.
             have hMcellRead : ∀ gM : TagId × Nonce → Digest,
                 OracleComp.tableExtending sM.2 gM (tag, n) = gM (tag, n) := fun gM => by
@@ -815,7 +828,8 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
           · -- Sub-case B: unreachable. This branch presupposes `sM.2 (tag, n) ≠ none`, but
             -- `hMustNone : sM.2 (tag, n) = none` follows from `hnD` (the off-`D` hypothesis) and
             -- `hncoll`. The Sub-B mass has been folded into the Sub-B-off-collision disagreement
-            -- set `D` and charged by `hCacheBound` at the outer `probEvent_bind_le_add_bad_disagree`
+            -- set `D` and charged by `hCacheBound` at the outer
+            -- `probEvent_bind_le_add_bad_disagree`
             -- application above.
             exact absurd hMustNone hMcellNone
       · -- Slot exhausted: both table handlers return `none` with state untouched, so the step
@@ -837,7 +851,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
               (sessionsPerTag := sessionsPerTag) gS (Sum.inl tag) sH.1
             = pure (none, sH.1) :=
           fun gS => hybridTableHandler_tag_run_of_not_lt gS tag sH.1 hnotH
-        simp only [hM, hH, pure_bind]
+        simp only [hM, hH]
         -- Weaken the IH's `qRInit * qT' / |Nonce|` slack to the head's
         -- `qRInit * (qT' + 1) / |Nonce|`. `pure_bind` simp aligns the do-block shape; `gcongr`
         -- decomposes the +-chain, leaving only the slack weakening.
@@ -851,6 +865,7 @@ lemma multipleBadEager_le_hybridEager_aux [Fintype Nonce] [Fintype Digest]
           (Sum.inr transcript)) >>= f) rfl qR qT qRInit sM sH sB hInv hqR hqT hdist hfresh
         hCacheBound hqRle ih
 
+omit [Nonempty TagId] in
 /-- Core multiple-to-hybrid coupling bound. Threaded by the reader-aware coupling invariant
 `MultipleHybridCoupling` and the freshness witness `MultipleHybridColFresh`, the instrumented
 multiple handler's success probability is bounded by the lazy hybrid handler's plus the
@@ -972,6 +987,7 @@ lemma multipleBad_le_hybrid_add_bad_add_slack_aux [Fintype Nonce] [Fintype Diges
   exact multipleBadEager_le_hybridEager_aux oa qR qT qRInit sM sH sB hInv hqR hqT hdist hfresh
     hCacheBound hqRle
 
+omit [Nonempty TagId] in
 /-- Multiple-to-hybrid bound. Under `HasDistinctUnlinkReaderNonces` and a reader-query bound
 `qReader`, the multiple-session ideal world succeeds with probability at most that of the hybrid
 world plus the within-tag nonce-collision probability plus the reader-slack term

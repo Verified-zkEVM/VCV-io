@@ -52,7 +52,9 @@ noncomputable def multipleBadTableHandler (g : TagId × Nonce → Digest) :
             (sessionsPerTag := sessionsPerTag) g (Sum.inr transcript)) p.1 >>= fun r =>
           pure (r.1, r.2, p.2)
 
-omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- `simulateQ multipleBadTableHandler` of a `query_bind`, run from a state and projected to its
 full output. -/
 lemma multipleBadTable_run_query_bind' {α : Type} (g : TagId × Nonce → Digest)
@@ -69,7 +71,9 @@ lemma multipleBadTable_run_query_bind' {α : Type} (g : TagId × Nonce → Diges
   rw [simulateQ_query_bind, StateT.run_bind]
   rfl
 
-omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Eager-table single-step bad monotonicity: if the bad flag is already set in the
 multiple-bad state `p.2`, then every reachable output of `multipleBadTableHandler g t p` keeps
 `bad = true`. The eager-table analogue of `multipleBadQueryImpl_step_preserves_bad`. -/
@@ -98,7 +102,9 @@ lemma multipleBadTableHandler_step_preserves_bad (g : TagId × Nonce → Digest)
     subst hz
     exact hbad
 
-omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag] in
+omit [Nonempty TagId] [SampleableType Digest] [NeZero sessionsPerTag]
+  [SampleableType (TagId × Nonce → Digest)]
+  [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Eager-table full-run bad monotonicity: starting `simulateQ multipleBadTableHandler` from a
 state whose bad flag is set, every reachable output keeps `bad = true`. -/
 lemma multipleBadTableHandler_run_preserves_bad {α : Type} (g : TagId × Nonce → Digest)
@@ -117,6 +123,7 @@ lemma multipleBadTableHandler_run_preserves_bad {α : Type} (g : TagId × Nonce 
     obtain ⟨q, hq, hz⟩ := hz
     exact ih q.1 q.2 (multipleBadTableHandler_step_preserves_bad g t p hbad q hq) z hz
 
+omit [Nonempty TagId] [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)] in
 /-- Eager-table equivalence for the instrumented multiple handler: running
 `multipleBadQueryImpl` from `((s, c), sB)` has the same full-output distribution (output bit,
 multiple-ideal state, bad-world state) as sampling a full random-oracle table `g`, overlaying the
@@ -124,7 +131,7 @@ cache `c`, and running `multipleBadTableHandler (tableExtending c g)` from `(s, 
 `evalDist_simulateQ_multipleIdealQueryImpl_run'_eq_tableExtending`, threading the bad-world
 component (which `multipleBadAdvance` advances deterministically from the realized transcript). -/
 lemma evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending
-    [Fintype Nonce] [Finite Digest]
+    [Finite Digest]
     (oa : UnlinkAdversary TagId Nonce Digest)
     (s : UnlinkState TagId) (c : ((TagId × Nonce) →ₒ Digest).QueryCache)
     (sB : UnlinkBadState TagId Nonce Digest) :
@@ -171,7 +178,9 @@ lemma evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending
         rw [multipleBadQueryImpl_tag_run tag ((s, c), sB)]
         dsimp only
         rw [multipleIdealQueryImpl_tag_run_of_lt tag s c hslot]
-        set advU := ({ s with sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } : UnlinkState TagId) with hadvU
+        set advU := ({ s with
+          sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } :
+            UnlinkState TagId) with hadvU
         -- Normalise the LHS: pull the nonce/cell binds to the top.
         have hlhs_norm :
             ((((($ᵗ Nonce) >>= fun nonce => idealCacheStep c (tag, nonce) >>= fun r =>
@@ -256,7 +265,7 @@ lemma evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending
                       OracleComp.tableExtending c g (tag, n)⟩ :
                       TagTranscript Nonce Digest)))) := by
           refine bind_congr fun g => ?_
-          show ((multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+          change ((multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
               (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g)
               (Sum.inl tag)) s >>= (fun r => pure (r.1, r.2,
                 multipleBadAdvance tag sB r.1))) >>= _ = _
@@ -271,14 +280,14 @@ lemma evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending
         rw [multipleBadQueryImpl_tag_run tag ((s, c), sB)]
         dsimp only
         rw [multipleIdealQueryImpl_tag_run_of_not_lt tag s c hslot]
-        show 𝒟[(fun z : Bool × MultipleBadState TagId Nonce Digest sessionsPerTag =>
+        change 𝒟[(fun z : Bool × MultipleBadState TagId Nonce Digest sessionsPerTag =>
             (z.1, z.2.2)) <$>
             (simulateQ (multipleBadQueryImpl (TagId := TagId) (Nonce := Nonce)
               (Digest := Digest) (sessionsPerTag := sessionsPerTag)) (f none)).run
               ((s, c), multipleBadAdvance tag sB none)] = _
         rw [ih none s c (multipleBadAdvance tag sB none)]
         refine congrArg _ (congrArg _ (funext fun g => ?_))
-        show _ = ((multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
+        change _ = ((multipleTableHandler (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
             (sessionsPerTag := sessionsPerTag) (OracleComp.tableExtending c g)
             (Sum.inl tag)) s >>= (fun r => pure (r.1, r.2,
               multipleBadAdvance tag sB r.1))) >>= _
@@ -408,12 +417,13 @@ lemma couplingEmbed_injective
   simp only [couplingEmbed, Prod.mk.injEq] at h
   exact Prod.ext h.1.1 h.2
 
-omit [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest] in
+omit [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest] [DecidableEq TagId]
+  [Fintype TagId] in
 /-- State-dependent table coupling: drawing a uniform hybrid (fine) table `gH` and projecting
 it along the coupling embedding yields the uniform distribution on multiple (coarse) tables.
 This marginalization step underlies the coupled-table comparison, letting a multiple-world table
 draw be replaced by a projection of a single hybrid-world draw. -/
-lemma evalDist_couplingProject_uniformSample [Fintype Nonce] [Finite Digest]
+lemma evalDist_couplingProject_uniformSample [Finite TagId] [Finite Nonce] [Finite Digest]
     (sn : HybridSessionNonce TagId Nonce sessionsPerTag) :
     𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>=
         fun gH => pure (gH ∘ couplingEmbed (sessionsPerTag := sessionsPerTag) sn)] =

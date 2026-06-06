@@ -35,6 +35,7 @@ variable {TagId Nonce Digest K : Type}
   [SampleableType (TagId × Nonce → Digest)]
   [SampleableType ((TagId × Fin sessionsPerTag) × Nonce → Digest)]
 
+omit [Nonempty TagId] in
 /-- Reader step of the eager-coupled core. Closes the `| inr transcript =>` branch of the
 `query_bind` case inside `multipleBadEager_le_hybridEager_aux`. Both table handlers collapse the
 head reader query to a deterministic `pure`; lazifying the multi-side table draw to
