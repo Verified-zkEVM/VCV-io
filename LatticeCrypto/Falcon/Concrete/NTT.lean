@@ -101,12 +101,9 @@ def ntt (logn : ℕ) (f : Rq (2 ^ logn)) : Tq (2 ^ logn) := butterflyNTT logn f
 def invNTT (logn : ℕ) (fHat : Tq (2 ^ logn)) : Rq (2 ^ logn) :=
   butterflyInvNTT logn fHat
 
-def concreteNTTRingOps (logn : ℕ) : NTTRingOps (2 ^ logn) where
+@[reducible] def concreteNTTRingOps (logn : ℕ) : NTTRingOps (2 ^ logn) where
   toHat := ntt logn
   fromHat := invNTT logn
-  zeroHat := 0
-  addHat := (· + ·)
-  subHat := (· - ·)
   mulHat := multiplyNTTs
 
 end Falcon.Concrete

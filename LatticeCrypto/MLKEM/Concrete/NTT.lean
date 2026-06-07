@@ -280,13 +280,46 @@ theorem ntt_add_toRq (f g : Rq) : (ntt (f + g) : Rq) = (ntt f : Rq) + (ntt g : R
 theorem ntt_sub_toRq (f g : Rq) : (ntt (f - g) : Rq) = (ntt f : Rq) - (ntt g : Rq) :=
   LatticeCrypto.NTTCert.applyMatrix_sub (backend := polyBackend) nttMatrix hsub_rq f g
 
+/-- The concrete NTT is additive. -/
+theorem ntt_add (f g : Rq) : ntt (f + g) = ntt f + ntt g := by
+  apply LatticeCrypto.TransformPoly.ext
+  simpa using ntt_add_toRq f g
+
+/-- The concrete NTT preserves subtraction. -/
+theorem ntt_sub (f g : Rq) : ntt (f - g) = ntt f - ntt g := by
+  apply LatticeCrypto.TransformPoly.ext
+  simpa using ntt_sub_toRq f g
+
+private theorem invNTT_add (g h : Tq) : invNTT (g + h) = invNTT g + invNTT h := by
+  apply ntt_injective
+  rw [ntt_invNTT, ntt_add, ntt_invNTT, ntt_invNTT]
+
+private theorem invNTT_sub (g h : Tq) : invNTT (g - h) = invNTT g - invNTT h := by
+  apply ntt_injective
+  rw [ntt_invNTT, ntt_sub, ntt_invNTT, ntt_invNTT]
+
+private theorem hinvadd_tq (fHat gHat : Tq) :
+    polyBackend.coeff (fHat + gHat).coeffs =
+      fun i => polyBackend.coeff fHat.coeffs i + polyBackend.coeff gHat.coeffs i := by
+  funext i; exact coeffRing.add_coeff fHat.coeffs gHat.coeffs i
+
+private theorem negacyclicMul_coeff (a b : Rq) (k : Fin ringDegree) :
+    polyBackend.coeff (negacyclicMul a b) k =
+      LatticeCrypto.negacyclicConvCoeff (polyBackend.coeff a) (polyBackend.coeff b) k :=
+  LatticeCrypto.negacyclicMulPure_coeff polyKernel a b k
+
+private theorem negacyclicMul_add_right (a b c : Rq) :
+    negacyclicMul a (b + c) = negacyclicMul a b + negacyclicMul a c :=
+  LatticeCrypto.vectorRing_mul_add_right a b c
+
+private theorem negacyclicMul_sub_right (a b c : Rq) :
+    negacyclicMul a (b - c) = negacyclicMul a b - negacyclicMul a c :=
+  LatticeCrypto.vectorRing_mul_sub_right a b c
+
 /-- Concrete `NTTRingOps` instance for ML-KEM. -/
-def concreteNTTRingOps : NTTRingOps where
+@[reducible] def concreteNTTRingOps : NTTRingOps where
   toHat := ntt
   fromHat := invNTT
-  zeroHat := 0
-  addHat := (· + ·)
-  subHat := (· - ·)
   mulHat := multiplyNTTs
 
 /-- Proof bundle showing that the concrete ML-KEM NTT implementation satisfies the abstract
@@ -297,16 +330,31 @@ noncomputable def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
   toHat_zero := by
     apply LatticeCrypto.TransformPoly.ext
     exact LatticeCrypto.NTTCert.applyMatrix_zero (backend := polyBackend) nttMatrix hzero_rq
-  toHat_mul := by
-    intro f g
-    simp [concreteNTTRingOps, multiplyNTTs, invNTT_ntt]
-  toHat_add := by
-    intro f g
+  toHat_mul f g := by
+    change ntt (negacyclicMul f g) = multiplyNTTs (ntt f) (ntt g)
+    simp only [multiplyNTTs, invNTT_ntt]
+  toHat_add f g := by
     apply LatticeCrypto.TransformPoly.ext
     simpa using ntt_add_toRq f g
-  toHat_sub := by
-    intro f g
+  toHat_sub f g := by
     apply LatticeCrypto.TransformPoly.ext
     simpa using ntt_sub_toRq f g
+  mul_add f g h := by
+    change multiplyNTTs f (g + h) = multiplyNTTs f g + multiplyNTTs f h
+    simp only [multiplyNTTs, invNTT_add]
+    rw [← ntt_add]
+    exact congrArg ntt (negacyclicMul_add_right _ _ _)
+  mul_sub f g h := by
+    change multiplyNTTs f (g - h) = multiplyNTTs f g - multiplyNTTs f h
+    simp only [multiplyNTTs, invNTT_sub]
+    rw [← ntt_sub]
+    exact congrArg ntt (negacyclicMul_sub_right _ _ _)
+  mul_comm f g := by
+    change multiplyNTTs f g = multiplyNTTs g f
+    simp only [multiplyNTTs, LatticeCrypto.vectorRing_mul_comm]
+  mul_assoc f g h := by
+    change multiplyNTTs (multiplyNTTs f g) h = multiplyNTTs f (multiplyNTTs g h)
+    simp only [multiplyNTTs, invNTT_ntt]
+    exact congrArg ntt (mul_assoc (invNTT f) (invNTT g) (invNTT h))
 
 end MLKEM.Concrete
