@@ -23,7 +23,7 @@ open OracleComp OracleSpec
 open scoped OracleSpec.PrimitiveQuery
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 /-- CMA-to-NMA reduction for Fiat-Shamir signatures built from a Sigma protocol.
@@ -43,6 +43,7 @@ verifier slot). The replay-forking denominator is therefore `qH + 1`. -/
 theorem cma_to_nma_advantage_bound
     [DecidableEq M] [DecidableEq Commit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hHVZK : σ.HVZK simTranscript ζ_zk)
@@ -60,7 +61,7 @@ theorem cma_to_nma_advantage_bound
           ENNReal.ofReal ((qS : ℝ) * ζ_zk) + (qS : ENNReal) * (qS + qH) * β := by
   refine ⟨Stateful.nmaAdvFromCmaWithFinalQuery σ hr M adv simTranscript, ?_⟩
   exact Stateful.cma_advantage_le_fork_bound_of_h1h2 σ hr M
-    simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
+    hsc simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
     (by
       have hFresh :
           adv.advantage (_root_.FiatShamir.runtime M) ≤

@@ -165,7 +165,7 @@ direct named CMA game. -/
 
 /-- Fixed-key real Fiat-Shamir signing over the shared random-oracle cache. -/
 @[reducible, fs_simp] noncomputable def cmaRealFixedSign
-    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel)
     (pk : Stmt) (sk : Wit) :
     QueryImpl (signSpec M Commit Resp)
@@ -179,7 +179,7 @@ direct named CMA game. -/
 
 /-- Source-query part of the real CMA game over the full direct CMA state. -/
 @[fs_simp] noncomputable def cmaRealSourceFull
-    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl.Stateful unifSpec (cmaSourceSpec M Commit Chal Resp)
       (CmaState M Commit Chal Stmt Wit)
@@ -231,7 +231,7 @@ direct named CMA game. -/
 /-- Source-query part of the real CMA game over the concrete sum interface used
 by `SignatureAlg.unforgeableAdv`. -/
 @[fs_simp] noncomputable def cmaRealSourceFullSum
-    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl.Stateful unifSpec
       ((unifSpec + roSpec M Commit Chal) + signSpec M Commit Resp)
@@ -245,7 +245,7 @@ by `SignatureAlg.unforgeableAdv`. -/
 On signing queries, this runs the real Sigma protocol and appends the message
 to the signed log. The bad flag is preserved and never set by real signing. -/
 @[fs_simp] noncomputable def cmaReal
-    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (sigma : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl.Stateful unifSpec (cmaSpec M Commit Chal Resp Stmt)
       (CmaState M Commit Chal Stmt Wit)

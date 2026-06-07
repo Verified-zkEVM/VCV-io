@@ -35,7 +35,7 @@ namespace FiatShamir
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 omit [SampleableType Stmt] [SampleableType Wit] in
@@ -56,6 +56,7 @@ This step is independent of special soundness and the forking lemma. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hHVZK : σ.HVZK simTranscript ζ_zk)
@@ -73,7 +74,7 @@ theorem euf_cma_to_nma
           ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
           (qS : ENNReal) * (qS + qH) * β :=
   cma_to_nma_advantage_bound (σ := σ) (hr := hr) (M := M)
-    simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
+    hsc simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
 
 omit [SampleableType Stmt] in
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
@@ -129,6 +130,7 @@ where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so the
 bound is trivially satisfied when the simulation loss exceeds the advantage. -/
 theorem euf_cma_bound
     [SampleableType Chal]
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (hss : σ.SpeciallySound)
     (hss_nf : ∀ ω₁ p₁ ω₂ p₂, Pr[⊥ | σ.extract ω₁ p₁ ω₂ p₂] = 0)
     [Fintype Chal] [Inhabited Chal]
@@ -150,7 +152,7 @@ theorem euf_cma_bound
         Pr[= true | hardRelationExp hr reduction] := by
   haveI : DecidableEq M := Classical.decEq M
   haveI : DecidableEq Commit := Classical.decEq Commit
-  obtain ⟨nmaAdv, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
+  obtain ⟨nmaAdv, hAdv⟩ := euf_cma_to_nma σ hr M hsc simTranscript
     ζ_zk hζ_zk hhvzk β hPredSim adv qS qH hQ
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH
   refine ⟨reduction, le_trans ?_ hRed⟩
