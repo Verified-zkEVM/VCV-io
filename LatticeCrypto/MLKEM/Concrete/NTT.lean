@@ -324,7 +324,7 @@ private theorem negacyclicMul_sub_right (a b c : Rq) :
 
 /-- Proof bundle showing that the concrete ML-KEM NTT implementation satisfies the abstract
 `NTTRingLaws`. -/
-noncomputable def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
+@[reducible] noncomputable def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
   fromHat_toHat := invNTT_ntt
   toHat_fromHat := ntt_invNTT
   toHat_zero := by
