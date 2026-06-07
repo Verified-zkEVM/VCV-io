@@ -1073,13 +1073,13 @@ theorem demoImpl_writesOnly :
   cases t with
   | touchLog =>
       simpa [demoImpl, demoWrites, logRef] using
-        (CellRef.writeM_supportWritesOnly_single logRef 1
-          : CellRef.SupportWritesOnly
+        (CellRef.writeM_supportWritesOnly_single logRef 1 :
+          CellRef.SupportWritesOnly
               (logRef.writeM 1 : StateT (Heap DemoCell) ProbComp PUnit) {DemoCell.log})
   | touchCache =>
       simpa [demoImpl, demoWrites, cacheRef] using
-        (CellRef.writeM_supportWritesOnly_single cacheRef 1
-          : CellRef.SupportWritesOnly
+        (CellRef.writeM_supportWritesOnly_single cacheRef 1 :
+          CellRef.SupportWritesOnly
               (cacheRef.writeM 1 : StateT (Heap DemoCell) ProbComp PUnit) {DemoCell.cache})
   | readFlag =>
       have hbind :

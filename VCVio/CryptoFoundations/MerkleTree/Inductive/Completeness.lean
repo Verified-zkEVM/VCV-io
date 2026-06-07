@@ -35,9 +35,9 @@ This references the functional versions of `getPutativeRoot` and `buildMerkleTre
 -/
 @[simp, grind =]
 theorem functional_completeness {s : Skeleton}
-  (idx : SkeletonLeafIndex s)
-  (leaf_data_tree : LeafData α s)
-  (hash : α → α → α) :
+    (idx : SkeletonLeafIndex s)
+    (leaf_data_tree : LeafData α s)
+    (hash : α → α → α) :
   getPutativeRootWithHash
     idx
     (leaf_data_tree.get idx)
@@ -54,9 +54,9 @@ theorem functional_completeness {s : Skeleton}
       | internal left right =>
           have hl := ih left
           simp only [buildMerkleTreeWithHash] at hl ⊢
-          grind [getPutativeRootWithHash, generateProof, populateUp_internal,
+          grind [getPutativeRootWithHash, generateProof,
             populateUp_getRootValue, FullData.internal_getRootValue,
-            LeafData.get_ofLeft, LeafData.leftSubtree_internal, LeafData.rightSubtree_internal,
+            LeafData.leftSubtree_internal, LeafData.rightSubtree_internal,
             FullData.leftSubtree_internal, FullData.rightSubtree_internal,
             SkeletonLeafIndex.depth, List.Vector.head_cons, List.Vector.tail_cons]
   | ofRight idxRight ih =>
@@ -64,9 +64,9 @@ theorem functional_completeness {s : Skeleton}
       | internal left right =>
           have hr := ih right
           simp only [buildMerkleTreeWithHash] at hr ⊢
-          grind [getPutativeRootWithHash, generateProof, populateUp_internal,
+          grind [getPutativeRootWithHash, generateProof,
             populateUp_getRootValue, FullData.internal_getRootValue,
-            LeafData.get_ofRight, LeafData.leftSubtree_internal, LeafData.rightSubtree_internal,
+            LeafData.leftSubtree_internal, LeafData.rightSubtree_internal,
             FullData.leftSubtree_internal, FullData.rightSubtree_internal,
             SkeletonLeafIndex.depth, List.Vector.head_cons, List.Vector.tail_cons]
 

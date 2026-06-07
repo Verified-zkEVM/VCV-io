@@ -1,2 +1,11 @@
 ToMathlib/Control/WriterT.lean : line 6 : ERR_MOD : Module docstring missing, or too late
+ToMathlib/OrderEnrichedCategory.lean : line 6 : ERR_MOD : Module docstring missing, or too late
 ToMathlib/Probability/ProbabilityMassFunction/TailSums.lean : line 6 : ERR_MOD : Module docstring missing, or too late
+ToMathlib/ProbabilityTheory/FinRatPMF.lean : line 6 : ERR_MOD : Module docstring missing, or too late
+ToMathlib/ProbabilityTheory/OptimalCoupling.lean : line 6 : ERR_MOD : Module docstring missing, or too late
+VCVio/CryptoFoundations/ReplayFork.lean : line 1 : ERR_NUM_LIN : 4100 file contains 3910 lines, try to split it up
+VCVio/ProgramLogic/Relational/Quantitative.lean : line 1 : ERR_NUM_LIN : 1900 file contains 1714 lines, try to split it up
+VCVio/ProgramLogic/Relational/SimulateQ.lean : line 1 : ERR_NUM_LIN : 2600 file contains 2463 lines, try to split it up
+lakefile.lean : line 1 : ERR_COP : Malformed or missing copyright header
+lakefile.lean : line 2 : ERR_MOD : Module docstring missing, or too late
+lakefile.lean : line 1 : ERR_TAC2 : imported Lake in a file linted by the style checker

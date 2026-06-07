@@ -774,7 +774,7 @@ noncomputable def toPMF [DecidableEq α] (p : Raw α) : PMF α :=
       have hsum : p.support.sum p.prob = (1 : ℚ≥0) := by
         rw [sum_prob_eq_sum]
         simpa [Raw.toList] using p.sum_eq_one
-      rw [← ENNReal.coe_finset_sum, ← NNRat.cast_sum (K := NNReal)]
+      rw [← ENNReal.coe_finsetSum, ← NNRat.cast_sum (K := NNReal)]
       change (((p.support.sum p.prob : ℚ≥0) : NNReal) : ENNReal) = 1
       simpa using congrArg (fun q : ℚ≥0 => ((q : NNReal) : ENNReal)) hsum)
     (fun a ha => by simp [prob_eq_zero_of_not_mem_support p ha])
@@ -807,7 +807,7 @@ noncomputable def toPMF [DecidableEq α] (p : Raw α) : PMF α :=
       ∑' a, m.toPMF a * (f a).toPMF y
   rw [tsum_eq_sum (s := m.support)]
   · simp_rw [Raw.toPMF_apply, ← ENNReal.coe_mul, ← NNRat.cast_mul]
-    rw [← ENNReal.coe_finset_sum, ← NNRat.cast_sum (K := NNReal), Raw.prob_bind]
+    rw [← ENNReal.coe_finsetSum, ← NNRat.cast_sum (K := NNReal), Raw.prob_bind]
   · intro x hx
     simp [Raw.toPMF_apply, prob_eq_zero_of_not_mem_support m hx]
 

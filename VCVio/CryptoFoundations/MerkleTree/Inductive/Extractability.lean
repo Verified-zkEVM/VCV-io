@@ -490,7 +490,7 @@ private lemma chainInLog_of_extractor_internal_step_left
   have h_root_value : (extractor sr log y).getRootValue = some y :=
     optionPopulateDown_getRootValue _ _
   grind [Nat.succ_eq_add_one, List.Vector.toList_cons, generateProof, SkeletonLeafIndex.depth,
-    FullData.leftSubtree_internal, FullData.rightSubtree_internal, List.map_cons]
+    FullData.leftSubtree_internal, FullData.rightSubtree_internal]
 
 /-- Post-IH assembly for the `ofRight` case of `chainInLog_of_extractor_get_ne_none`.
 Symmetric to `chainInLog_of_extractor_internal_step_left`: the recursive witness
@@ -519,7 +519,7 @@ private lemma chainInLog_of_extractor_internal_step_right
   have h_root_value : (extractor sl log x).getRootValue = some x :=
     optionPopulateDown_getRootValue _ _
   grind [Nat.succ_eq_add_one, List.Vector.toList_cons, generateProof, SkeletonLeafIndex.depth,
-    FullData.leftSubtree_internal, FullData.rightSubtree_internal, List.map_cons]
+    FullData.leftSubtree_internal, FullData.rightSubtree_internal]
 
 /-- **Extractor recovery to a log chain.** When the extractor's path at `idx`
 is intact (the value there is `≠ none`), the extracted leaf value and proof
@@ -593,8 +593,7 @@ is the reciprocal of the range size.
 private lemma probOutput_singleHash_eq_inv_card
     [Fintype α] [Inhabited α]
     (a b root : α) :
-    Pr[= root | (singleHash (m := OracleComp (spec α)) a b
-                  : OracleComp (spec α) α)] =
+    Pr[= root | (singleHash (m := OracleComp (spec α)) a b : OracleComp (spec α) α)] =
       (Fintype.card α : ENNReal)⁻¹ := by
   have h : (singleHash (m := OracleComp (spec α)) a b : OracleComp (spec α) α) =
       (liftM ((spec α).query (a, b)) : OracleComp (spec α) α) := by
@@ -610,15 +609,14 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
     [Fintype α] [Inhabited α]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
     (leaf : α) (proof : List.Vector α idx.depth) (root : α) :
-    Pr[= root | (getPutativeRoot (m := OracleComp (spec α)) idx leaf proof
-                  : OracleComp (spec α) α)] =
+    Pr[= root | (getPutativeRoot (m := OracleComp (spec α)) idx leaf proof :
+        OracleComp (spec α) α)] =
       (Fintype.card α : ENNReal)⁻¹ := by
   cases idx with
   | ofLeaf => exact absurd h_pos (Nat.lt_irrefl _)
   | @ofLeft sl sr idxLeft =>
     rw [show (getPutativeRoot (m := OracleComp (spec α))
-              (SkeletonLeafIndex.ofLeft idxLeft) leaf proof
-              : OracleComp (spec α) α) =
+              (SkeletonLeafIndex.ofLeft idxLeft) leaf proof : OracleComp (spec α) α) =
         (getPutativeRoot (m := OracleComp (spec α)) idxLeft leaf proof.tail) >>=
           fun a => (singleHash a proof.head : OracleComp (spec α) α) from rfl,
       probOutput_bind_eq_tsum]
@@ -626,8 +624,7 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
       ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
   | @ofRight sl sr idxRight =>
     rw [show (getPutativeRoot (m := OracleComp (spec α))
-              (SkeletonLeafIndex.ofRight idxRight) leaf proof
-              : OracleComp (spec α) α) =
+              (SkeletonLeafIndex.ofRight idxRight) leaf proof : OracleComp (spec α) α) =
         (getPutativeRoot (m := OracleComp (spec α)) idxRight leaf proof.tail) >>=
           fun a => (singleHash proof.head a : OracleComp (spec α) α) from rfl,
       probOutput_bind_eq_tsum]
@@ -642,11 +639,11 @@ private lemma probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth
     [DecidableEq α] [Fintype α] [Inhabited α]
     {s : Skeleton} {idx : SkeletonLeafIndex s} (h_pos : 0 < idx.depth)
     (leaf root : α) (proof : List.Vector α idx.depth) :
-    Pr[(· = true) | (verifyProof (m := OracleComp (spec α)) idx leaf root proof
-                      : OracleComp (spec α) Bool)] =
+    Pr[(· = true) | (verifyProof (m := OracleComp (spec α)) idx leaf root proof :
+        OracleComp (spec α) Bool)] =
       (Fintype.card α : ENNReal)⁻¹ := by
-  rw [show (verifyProof (m := OracleComp (spec α)) idx leaf root proof
-              : OracleComp (spec α) Bool) =
+  rw [show (verifyProof (m := OracleComp (spec α)) idx leaf root proof :
+            OracleComp (spec α) Bool) =
         (getPutativeRoot (m := OracleComp (spec α)) idx leaf proof) >>=
           fun r => (pure (r == root) : OracleComp (spec α) Bool) from rfl]
   rw [show (fun r : α => (pure (r == root) : OracleComp (spec α) Bool)) =
@@ -665,8 +662,8 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     (proof : List.Vector α idx.depth) (log_c : (spec α).QueryLog) :
     Pr[fun verified : Bool => verified = true ∧
          (extractor s log_c root).get idx.toNodeIndex = none |
-       (verifyProof (m := OracleComp (spec α)) idx leaf root proof
-         : OracleComp (spec α) Bool)] ≤
+       (verifyProof (m := OracleComp (spec α)) idx leaf root proof :
+         OracleComp (spec α) Bool)] ≤
       (Fintype.card α : ENNReal)⁻¹ := by
   by_cases h_get : (extractor s log_c root).get idx.toNodeIndex = none
   · have h_pos : 0 < idx.depth := by
@@ -758,8 +755,7 @@ theorem extractability [DecidableEq α] [Fintype α] [Inhabited α]
     Pr[AdversaryWinsExtractabilityGame |
         extractabilityGame 𝒜] ≤
         ((qb + s.depth) ^ 2 : ENNReal) / (2 * Fintype.card α)
-        + 1 / (Fintype.card α)
-    := by
+        + 1 / (Fintype.card α) := by
   calc
     -- Rewrite the game to include the combined query log.
     _ = Pr[AdversaryWinsExtractabilityGame ∘ Prod.fst |

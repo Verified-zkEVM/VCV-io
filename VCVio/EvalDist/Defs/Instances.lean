@@ -88,9 +88,9 @@ noncomputable instance : HasEvalPMF Id where
 instance : HasEvalFinset Id where
   finSupport x := {x}
   coe_finSupport x := by
-    show (↑({x.run} : Finset _) : Set _) = support x
+    change (↑({x.run} : Finset _) : Set _) = support x
     rw [HasEvalSPMF.support_eq]
-    show (↑({x.run} : Finset _) : Set _) = (MonadHom.pure SPMF x).support
+    change (↑({x.run} : Finset _) : Set _) = (MonadHom.pure SPMF x).support
     rw [MonadHom.pure_apply, SPMF.support_pure, Finset.coe_singleton]
 
 @[simp, grind =]
