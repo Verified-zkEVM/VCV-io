@@ -52,23 +52,11 @@ theorem functional_completeness {s : Skeleton}
   | ofLeft idxLeft ih =>
       cases leaf_data_tree with
       | internal left right =>
-          have hl := ih left
-          simp only [buildMerkleTreeWithHash] at hl ⊢
-          grind [getPutativeRootWithHash, generateProof,
-            populateUp_getRootValue, FullData.internal_getRootValue,
-            LeafData.leftSubtree_internal, LeafData.rightSubtree_internal,
-            FullData.leftSubtree_internal, FullData.rightSubtree_internal,
-            SkeletonLeafIndex.depth, List.Vector.head_cons, List.Vector.tail_cons]
+          grind [List.Vector.tail_cons, List.Vector.head_cons, SkeletonLeafIndex.depth]
   | ofRight idxRight ih =>
       cases leaf_data_tree with
       | internal left right =>
-          have hr := ih right
-          simp only [buildMerkleTreeWithHash] at hr ⊢
-          grind [getPutativeRootWithHash, generateProof,
-            populateUp_getRootValue, FullData.internal_getRootValue,
-            LeafData.leftSubtree_internal, LeafData.rightSubtree_internal,
-            FullData.leftSubtree_internal, FullData.rightSubtree_internal,
-            SkeletonLeafIndex.depth, List.Vector.head_cons, List.Vector.tail_cons]
+          grind [List.Vector.tail_cons, List.Vector.head_cons, SkeletonLeafIndex.depth]
 
 
 /--

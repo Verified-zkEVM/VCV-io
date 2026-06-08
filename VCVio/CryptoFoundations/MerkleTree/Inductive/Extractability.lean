@@ -489,8 +489,7 @@ private lemma chainInLog_of_extractor_internal_step_left
   refine ⟨extLeaf, y ::ᵥ extProof, h_extLeaf, ?_, x, List.mem_of_find?_eq_some hf, h_chain⟩
   have h_root_value : (extractor sr log y).getRootValue = some y :=
     optionPopulateDown_getRootValue _ _
-  grind [Nat.succ_eq_add_one, List.Vector.toList_cons, generateProof, SkeletonLeafIndex.depth,
-    FullData.leftSubtree_internal, FullData.rightSubtree_internal]
+  grind [Nat.succ_eq_add_one, List.Vector.toList_cons, SkeletonLeafIndex.depth]
 
 /-- Post-IH assembly for the `ofRight` case of `chainInLog_of_extractor_get_ne_none`.
 Symmetric to `chainInLog_of_extractor_internal_step_left`: the recursive witness
@@ -518,8 +517,7 @@ private lemma chainInLog_of_extractor_internal_step_right
   refine ⟨extLeaf, x ::ᵥ extProof, h_extLeaf, ?_, y, List.mem_of_find?_eq_some hf, h_chain⟩
   have h_root_value : (extractor sl log x).getRootValue = some x :=
     optionPopulateDown_getRootValue _ _
-  grind [Nat.succ_eq_add_one, List.Vector.toList_cons, generateProof, SkeletonLeafIndex.depth,
-    FullData.leftSubtree_internal, FullData.rightSubtree_internal]
+  grind [Nat.succ_eq_add_one, List.Vector.toList_cons, SkeletonLeafIndex.depth]
 
 /-- **Extractor recovery to a log chain.** When the extractor's path at `idx`
 is intact (the value there is `≠ none`), the extracted leaf value and proof

@@ -232,26 +232,23 @@ private theorem decomposeCoeff_eq
       ZMod.natCast_self, zero_sub, Nat.cast_one]
   split_ifs at hdecomp with h hs hs <;>
     simp only [Prod.mk.injEq] at hdecomp <;>
-    obtain ⟨rfl, rfl⟩ := hdecomp
-  · push_cast
-    calc
-      (alpha : Coeff) * 0 + ((t : Coeff) - 1) = -1 + (t : Coeff) := by ring
-      _ = (alpha : Coeff) * q + (t : Coeff) := by rw [hwrap q hs]
+    obtain ⟨rfl, rfl⟩ := hdecomp <;>
+    push_cast <;> try exact hdam
+  · calc
+      (alpha : Coeff) * 0 + ((t : Coeff) - 1) = (alpha : Coeff) * q + (t : Coeff) := by
+        rw [hwrap q hs]
+        ring
       _ = r := hdam
-  · push_cast
-    exact hdam
-  · push_cast
-    have hq : (alpha : Coeff) * q = -1 - (alpha : Coeff) := by
-      have hq1 := hwrap (q + 1) hs
-      rw [Nat.cast_add, Nat.cast_one, mul_add, mul_one] at hq1
-      exact eq_sub_of_add_eq hq1
+  · have hq1 := hwrap (q + 1) hs
+    rw [Nat.cast_add, Nat.cast_one, mul_add, mul_one] at hq1
     calc
       (alpha : Coeff) * 0 + ((t : Coeff) - (alpha : Coeff) - 1) =
-          (-1 - (alpha : Coeff)) + (t : Coeff) := by ring
-      _ = (alpha : Coeff) * q + (t : Coeff) := by rw [hq]
+          (alpha : Coeff) * q + (t : Coeff) := by
+        have hq := eq_sub_of_add_eq hq1
+        rw [hq]
+        ring
       _ = r := hdam
-  · push_cast
-    ring_nf
+  · ring_nf
     exact hdam
 
 private theorem lowBitsCoeff_bound (r : Coeff) {r1 gamma2 : ℕ} {r0 : ℤ} (hγ : 0 < gamma2)

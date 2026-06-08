@@ -88,10 +88,10 @@ noncomputable instance : HasEvalPMF Id where
 instance : HasEvalFinset Id where
   finSupport x := {x}
   coe_finSupport x := by
-    change (↑({x.run} : Finset _) : Set _) = support x
+    ext y
     rw [HasEvalSPMF.support_eq]
-    change (↑({x.run} : Finset _) : Set _) = (MonadHom.pure SPMF x).support
-    rw [MonadHom.pure_apply, SPMF.support_pure, Finset.coe_singleton]
+    change y ∈ (↑({x.run} : Finset _) : Set _) ↔ y ∈ (MonadHom.pure SPMF x).support
+    simp [MonadHom.pure_apply, SPMF.support_pure]
 
 @[simp, grind =]
 lemma support_eq_singleton (x : Id α) : support x = {x.run} := rfl
