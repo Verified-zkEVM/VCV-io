@@ -32,7 +32,7 @@ namespace OracleComp.ProgramLogic.Relational
 
 variable {ι₁ : Type u} {ι₂ : Type v}
 variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable [IsUniformSpec spec₁] [IsUniformSpec spec₂]
 variable {α β γ δ : Type}
 
 /-- Relational postconditions over two output spaces. -/
@@ -289,7 +289,7 @@ lemma relTriple_symm {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
 /-- Transport a relational triple across equality of the left output distribution. -/
 lemma relTriple_of_evalDist_eq_left
     {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
-    [spec₃.Fintype] [spec₃.Inhabited]
+    [IsUniformSpec spec₃]
     {oa : OracleComp spec₁ α} {oa' : OracleComp spec₂ α}
     {ob : OracleComp spec₃ β} {R : RelPost α β}
     (heq : 𝒟[oa] = 𝒟[oa']) (h : RelTriple oa' ob R) :
@@ -306,7 +306,7 @@ lemma relTriple_of_evalDist_eq_left
 /-- Transport a relational triple across equality of the right output distribution. -/
 lemma relTriple_of_evalDist_eq_right
     {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
-    [spec₃.Fintype] [spec₃.Inhabited]
+    [IsUniformSpec spec₃]
     {oa : OracleComp spec₁ α}
     {ob : OracleComp spec₂ β} {ob' : OracleComp spec₃ β}
     {R : RelPost α β}
@@ -411,7 +411,7 @@ lemma evalDist_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleCo
 /-- Transitivity through an intermediate computation related to the left side by `EqRel`. -/
 lemma relTriple_trans_eqRel_left
     {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
-    [spec₃.Fintype] [spec₃.Inhabited]
+    [IsUniformSpec spec₃]
     {oa : OracleComp spec₁ α} {mid : OracleComp spec₂ α}
     {ob : OracleComp spec₃ β} {R : RelPost α β}
     (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob R) :
@@ -424,7 +424,7 @@ lemma relTriple_trans_eqRel_left
 /-- Transitivity through an intermediate computation related to the right side by `EqRel`. -/
 lemma relTriple_trans_eqRel_right
     {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
-    [spec₃.Fintype] [spec₃.Inhabited]
+    [IsUniformSpec spec₃]
     {oa : OracleComp spec₁ α}
     {mid : OracleComp spec₂ β} {ob : OracleComp spec₃ β}
     {R : RelPost α β}
@@ -438,7 +438,7 @@ lemma relTriple_trans_eqRel_right
 /-- Transitivity of equality-relation relational triples through an intermediate computation. -/
 lemma relTriple_trans_eqRel
     {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
-    [spec₃.Fintype] [spec₃.Inhabited]
+    [IsUniformSpec spec₃]
     {oa : OracleComp spec₁ α} {mid : OracleComp spec₂ α}
     {ob : OracleComp spec₃ α}
     (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob (EqRel α)) :

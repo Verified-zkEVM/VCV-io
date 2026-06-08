@@ -241,21 +241,21 @@ private def mkUnaryPostLERfl (post postTy : Expr) : MetaM Expr := do
     let h ← mkAppOptM ``le_rfl #[none, none, some lhs]
     mkLambdaFVars #[a] h
 
-private def oracleSpecInstancesFrom (xs : Array Expr) : MetaM (Option Expr × Option Expr) := do
-  let mut fintype? := none
-  let mut inhabited? := none
+/-- Scan the theorem's binder mvars `xs` for an `IsUniformSpec ?spec` instance
+binder and return it, so `mkAppOptM` can forward the unresolved mvar into
+`triple_conseq`'s instance slot instead of trying to synthesize it eagerly
+(which fails while `?spec` is still a free metavariable). -/
+private def isUniformSpecInstanceFrom (xs : Array Expr) : MetaM (Option Expr) := do
   for x in xs do
     let ty ← whnfR (← inferType x)
-    if ty.getAppFn.isConstOf ``OracleSpec.Fintype then
-      fintype? := some x
-    else if ty.getAppFn.isConstOf ``OracleSpec.Inhabited then
-      inhabited? := some x
-  return (fintype?, inhabited?)
+    if ty.getAppFn.isConstOf ``OracleSpec.IsUniformSpec then
+      return some x
+  return none
 
-private def mkTripleConseqApp (fintype? inhabited? : Option Expr)
+private def mkTripleConseqApp (uniform? : Option Expr)
     (pre preAbstract prog postSpec postAbstract hpre hpost specProof : Expr) : MetaM Expr :=
   mkAppOptM ``OracleComp.ProgramLogic.triple_conseq
-    #[none, none, fintype?, inhabited?, none, some pre, some preAbstract, some prog,
+    #[none, none, uniform?, none, some pre, some preAbstract, some prog,
       some postSpec, some postAbstract, some hpre, some hpost, some specProof]
 
 /-- Generalize a folded unary `Triple pre prog post` proof into a reusable
@@ -264,7 +264,7 @@ backward-rule source by abstracting concrete `post` and always abstracting
 private def mkUnaryTripleBackwardProof (proofArgs : Array Expr)
     (pre _prog postSpec specProof : Expr) :
     MetaM Expr := do
-  let (fintype?, inhabited?) ← oracleSpecInstancesFrom proofArgs
+  let uniform? ← isUniformSpecInstanceFrom proofArgs
   let mut postAbstract := postSpec.consumeMData
   unless postAbstract.isMVar do
     let postTy ← inferType postSpec
@@ -275,7 +275,7 @@ private def mkUnaryTripleBackwardProof (proofArgs : Array Expr)
     let preAbstract ← mkFreshExprMVar (userName := `pre) preTy
     let hpreTy ← mkLE preAbstract pre
     let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
-    return (← mkTripleConseqApp fintype? inhabited?
+    return (← mkTripleConseqApp uniform?
       pre preAbstract _prog postSpec postAbstract hpre hpost specProof)
   let preTy ← inferType pre
   let preAbstract ← mkFreshExprMVar (userName := `pre) preTy
@@ -283,7 +283,7 @@ private def mkUnaryTripleBackwardProof (proofArgs : Array Expr)
   let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
   let postTy ← inferType postAbstract
   let hpost ← mkUnaryPostLERfl postAbstract postTy
-  mkTripleConseqApp fintype? inhabited?
+  mkTripleConseqApp uniform?
     pre preAbstract _prog postAbstract postAbstract hpre hpost specProof
 
 /-- Generalize a raw unary `pre ⊑ wp prog post epost` proof into a reusable

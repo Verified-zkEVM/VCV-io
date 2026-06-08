@@ -124,7 +124,7 @@ When lifting `OracleComp spec α` to `OracleComp superSpec α` (e.g., a sub-comp
 | `liftComp_pure` | `liftComp (pure x) superSpec = pure x` |
 | `liftComp_bind` | `liftComp (mx >>= my) superSpec = liftComp mx superSpec >>= ...` |
 
-### Probability lemmas (additionally require `[spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]` and `Fintype`/`Inhabited` on both specs)
+### Probability lemmas (additionally require `[spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]` and uniform probability specs on both specs)
 
 | Lemma | Signature |
 |-------|-----------|
@@ -237,14 +237,17 @@ These are genuinely custom and stay as hand-written `QueryImpl` definitions. If 
 
 ### evalDist IS simulateQ
 
-`evalDist : OracleComp spec α → PMF α` is *definitionally* (`rfl`) `simulateQ` into `PMF`, with each query interpreted as the uniform distribution over its response type. The `HasEvalPMF` instance at `VCVio/OracleComp/EvalDist.lean:154-156` reads:
+For `OracleComp`, `support` is always available and is *definitionally* `simulateQ` into `SetM`, with each query interpreted by `Set.univ`.
+
+`evalDist : OracleComp spec α → SPMF α` is available under `[IsProbabilitySpec spec]` and is *definitionally* (`rfl`) `simulateQ` into `PMF`, then lifted to `SPMF`, with each query interpreted by `IsProbabilitySpec.toPMF`:
 
 ```lean
-noncomputable instance : HasEvalPMF (OracleComp spec) where
-  toPMF := simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)
+noncomputable instance instMonadLiftTPMF [IsProbabilitySpec spec] :
+    MonadLiftT (OracleComp spec) PMF where
+  monadLift mx := simulateQ IsProbabilitySpec.toPMF mx
 ```
 
-(requires `[spec.Fintype] [spec.Inhabited]`). `support : OracleComp spec α → Set α` has the same shape but target `SetM` with `impl _ := Set.univ`. Both are instances of the same universal fold, not separate primitives.
+Uniform response semantics are supplied by `[IsUniformSpec spec]`, which bundles `[spec.Fintype]`, `[spec.Inhabited]`, `[IsProbabilitySpec spec]`, and a proof that `toPMF` is `PMF.uniformOfFintype`. The bridge from `support` to `SPMF.support 𝒟[...]` is `EvalDistCompatible (OracleComp spec)` and also requires `[IsUniformSpec spec]`.
 
 Distinct from the `PMF`-target `evalDist`, there is also a *syntactic* uniform-sampling handler that rewrites queries into `ProbComp` (i.e. target `OracleComp unifSpec`, not `PMF`):
 

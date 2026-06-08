@@ -53,13 +53,6 @@ instance {spec : OracleSpec ι} [h : spec.DecidableEq] :
 instance {spec : OracleSpec ι} [h : spec.DecidableEq] (t : spec.Domain) :
   DecidableEq (spec.Range t) := h.decidableEq_B t
 
-/-- Type-class gadget to enable probability notation for computation over an `OracleSpec`.
-Can be defined for any `spec` with `spec.Range` finite and inhabited, but generally should
-only be instantied for things like `coinSpec` or `unifSpec`.
-TODO: Examine if this should be used as a requirement in `evalDist` instances.
-Just forces more explicit differentiation of when the semantics should apply. -/
-protected class IsProbSpec (spec : OracleSpec ι) [spec.Inhabited] [spec.Fintype]
-
 section ofFn
 
 @[reducible, always_inline] def ofFn {ι : Type u} (F : ι → Type v) : OracleSpec ι := F

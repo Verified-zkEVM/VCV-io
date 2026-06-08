@@ -27,7 +27,8 @@ universe u v
 
 open ENNReal
 
-variable {α β γ : Type u} {m : Type u → Type v} [Monad m] [HasEvalSPMF m]
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
+  [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
 
 /-- **Disagreement-aware additive bind bound.** If the disagreement set `D` has probability at
 most `ε₁` under `mx`, and off `D` the continuation `my` is within `ε₂` of the reference

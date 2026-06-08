@@ -111,7 +111,7 @@ heavyweight `hax_mvcgen <;> bv_decide` combination, transport to
 `RustOracleComp` is one line of Lean — no extra tactic machinery, no
 repeated `bv_decide`, no knowledge of the postcondition shape beyond
 what `triple_liftRustM` asks for. -/
-theorem adc_u32_Lifted_spec [spec.Fintype] [spec.Inhabited]
+theorem adc_u32_Lifted_spec [IsUniformSpec spec]
     (a b carry_in : u32) :
     ⦃⌜carry_in ≤ 1⌝⦄
     (adc_u32_Lifted (spec := spec) a b carry_in)

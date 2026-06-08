@@ -166,7 +166,7 @@ spec as the hypothesis. For concrete constructor-level programs the
 `@[simp]` commutation lemmas above still do the job directly. -/
 
 @[spec]
-theorem triple_liftRustM [spec.Fintype] [spec.Inhabited]
+theorem triple_liftRustM [IsUniformSpec spec]
     (x : RustM α)
     {Q : PostCond α (.except Interop.Rust.Error (.except PUnit .pure))}
     {P : Assertion (.except Interop.Rust.Error (.except PUnit .pure))}

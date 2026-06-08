@@ -324,7 +324,8 @@ instance SampleableType.Finite (α : Type) [SampleableType α] : Finite α :=
 /-- We avoid making this an instance globally as many types already have a `Fintype` instance
 that would not be definitionally equal to this one. -/
 @[reducible]
-def SampleableType.Fintype (α : Type) [h : SampleableType α] [DecidableEq α] : Fintype α where
+noncomputable def SampleableType.Fintype (α : Type) [h : SampleableType α] [DecidableEq α] :
+    Fintype α where
   elems := finSupport ($ᵗ α)
   complete := by grind
 
@@ -509,7 +510,7 @@ lemma evalDist_uniformSample_bind_update
   letI := Fintype.ofFinite R
   haveI : Nonempty (D → R) := ⟨fun _ => Classical.arbitrary R⟩
   refine evalDist_ext fun h => ?_
-  rw [probOutput_uniformSample (D → R) h, HasEvalSPMF.probOutput_bind_eq_sum_fintype]
+  rw [probOutput_uniformSample (D → R) h, probOutput_bind_eq_sum_fintype]
   -- For each fixed `u`, count the tables `g` whose `t`-update equals `h`.
   have hinner : ∀ u : R,
       Pr[= h | (do let g ← $ᵗ (D → R); pure (Function.update g t u))]
@@ -807,7 +808,7 @@ lemma probOutput_decide_eq_uniformBool_half
       Pr[= false | f false] := by
     rw [probOutput_bind_eq_tsum]; simp
   have hsum : Pr[= true | f false] + Pr[= false | f false] = 1 := by
-    have := HasEvalPMF.sum_probOutput_eq_one (f false)
+    have := sum_probOutput_of_liftM_PMF (f false)
     rwa [Fintype.sum_bool] at this
   rw [htrue, hfalse, h true, ← mul_add, hsum, mul_one]
   simp [one_div]
@@ -828,7 +829,7 @@ namespace uniformSampleImpl
 variable [∀ i, SampleableType (spec.Range i)]
 
 @[simp]
-lemma evalDist_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma evalDist_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) :
     𝒟[simulateQ uniformSampleImpl oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
@@ -836,19 +837,19 @@ lemma evalDist_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma probOutput_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma probOutput_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (x : α) :
     Pr[= x | simulateQ uniformSampleImpl oa] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ oa)) x
 
 @[simp]
-lemma probEvent_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma probEvent_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Pr[ p | simulateQ uniformSampleImpl oa] = Pr[ p | oa] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
 
 @[simp]
-lemma support_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma support_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) :
     support (simulateQ uniformSampleImpl oa) = support oa := by
   induction oa using OracleComp.inductionOn with
@@ -856,7 +857,7 @@ lemma support_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma finSupport_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma finSupport_simulateQ [IsUniformSpec spec] {α : Type}
     [DecidableEq α] (oa : OracleComp spec α) :
     finSupport (simulateQ uniformSampleImpl oa) = finSupport oa := by
   simp [finSupport_eq_iff_support_eq_coe]

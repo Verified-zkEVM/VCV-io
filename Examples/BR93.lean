@@ -80,8 +80,12 @@ theorem correct (hcorrect : tdp.Correct) :
     obtain ⟨c, hc, hy⟩ := hy
     rw [mem_support_bind_iff] at hc
     obtain ⟨r, _, hc⟩ := hc
-    simp only [support_pure, Set.mem_singleton_iff] at hc hy
-    subst hc; subst hy
+    rw [mem_support_bind_iff] at hy
+    obtain ⟨msg', hmsg', hy⟩ := hy
+    simp only [support_pure, Set.mem_singleton_iff] at hc hmsg' hy
+    obtain rfl := hc
+    obtain rfl := hmsg'
+    obtain rfl := hy
     simp [hcorrect pk sk hpksk r]
   change Pr[= true | mx] = 1
   exact probOutput_eq_one_of_support_subset_singleton
