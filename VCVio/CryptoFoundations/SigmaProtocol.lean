@@ -60,7 +60,7 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Boo
 
 section complete
 
-variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
+variable [SampleableType Chal] [IsUniformSpec unifSpec]
 
 /-- A Σ-protocol is perfectly complete if the honest prover always convinces the verifier
 on valid statement-witness pairs. -/
@@ -103,7 +103,7 @@ end speciallySound
 
 section hvzk
 
-variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
+variable [SampleableType Chal] [IsUniformSpec unifSpec]
 
 /-- The honest prover's transcript distribution for a Σ-protocol. -/
 def realTranscript (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)

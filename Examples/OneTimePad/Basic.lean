@@ -45,7 +45,7 @@ lemma complete (sp : ℕ) : (oneTimePad sp).Complete := by
         ($ᵗ BitVec sp : ProbComp (BitVec sp)) := by
     simp [SymmEncAlg.CompleteExp, oneTimePad, monad_norm]
   rw [hsimp, probOutput_eq_one_iff]
-  exact ⟨HasEvalPMF.probFailure_eq_zero _,
+  exact ⟨probFailure_of_liftM_PMF _,
     support_map_const (mx := ($ᵗ BitVec sp : ProbComp (BitVec sp))) (y := some msg)
       (by simp [support_uniformSample])⟩
 

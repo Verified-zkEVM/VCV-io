@@ -128,9 +128,9 @@ section correctness
 
 variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
+  [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
 
 omit hr in
-variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- When the simulated signing loop produces `some (w, z)`, the random-oracle cache
 contains a challenge `c` at `(msg, w)` satisfying `ids.verify pk w c z = true`.
 
@@ -213,7 +213,8 @@ lemma fsAbortSignLoop_cache_invariant
           simp only [hs, StateT.run_bind] at h_query
           obtain ⟨⟨_, _⟩, _, h_cache⟩ :=
             (mem_support_bind_iff _ _ _).mp h_query
-          dsimp at h_cache
+          simp only [StateT.run_modifyGet, support_pure, Set.mem_singleton_iff,
+            Prod.mk.injEq] at h_cache
           obtain ⟨rfl, rfl⟩ := h_cache
           exact QueryCache.cacheQuery_self _ (msg, w_c) c_q
       · apply ids.verify_of_complete hc hrel
@@ -226,7 +227,6 @@ lemma fsAbortSignLoop_cache_invariant
           support_pure, Set.mem_singleton_iff]
         exact ⟨some z, h_rsp_mem, by simp [Option.map]⟩
 
-variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- When the random-oracle cache already contains the challenge for `(msg, w)`,
 verification of signature `(w, z)` deterministically returns `true`. -/
 lemma verify_eq_true_of_cached
@@ -269,7 +269,6 @@ Unlike the CRYPTO 2023 paper and EasyCrypt formalization (which use an unbounded
 and do not state a correctness theorem), this formulation uses a bounded loop with
 `maxAttempts` iterations, matching FIPS 204 Algorithm 7 (ML-DSA.Sign_internal). -/
 theorem correct
-    [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
     (hc : ids.Complete) (maxAttempts : ℕ) (δ : ENNReal)
     (h_abort : ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
       ∀ msg : M,
@@ -309,7 +308,7 @@ theorem correct
     have habort := h_abort pk sk hrel msg
     have habort' : Pr[= none | 𝒟[signOnly pk sk]] ≤ δ := by
       convert habort using 2
-    have hnoFail : Pr[⊥ | signVerify pk sk] = 0 := HasEvalPMF.probFailure_eq_zero _
+    have hnoFail : Pr[⊥ | signVerify pk sk] = 0 := probFailure_of_liftM_PMF _
     rw [show (1 : ENNReal) - δ = 1 - δ from rfl]
     calc
       Pr[= true | signVerify pk sk]

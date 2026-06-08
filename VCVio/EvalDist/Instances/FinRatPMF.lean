@@ -19,17 +19,51 @@ namespace Raw
 
 variable {α : Type u}
 
-noncomputable instance : HasEvalPMF Raw where
-  toPMF := Raw.toPMFHom
-  support_eq _ := rfl
-  toSPMF_eq _ := rfl
+noncomputable instance : MonadLift Raw PMF where
+  monadLift := Raw.toPMFHom.toFun _
+
+noncomputable instance : LawfulMonadLift Raw PMF where
+  monadLift_pure := Raw.toPMFHom.toFun_pure'
+  monadLift_bind := Raw.toPMFHom.toFun_bind'
+
+/-- Direct `MonadLiftT Raw SetM` defined via the underlying PMF support. The generic
+`MonadLiftT SPMF SetM` is non-transitive (declared as `MonadLiftT`, not `MonadLift`,
+so `monadLiftTrans` cannot chain through it), so every monad with probabilistic
+semantics declares its `SetM` lift directly. -/
+noncomputable instance instMonadLiftTRawSetM : MonadLiftT Raw SetM where
+  monadLift mx := ((liftM mx : PMF _).support : Set _)
+
+noncomputable instance instLawfulMonadLiftTRawSetM : LawfulMonadLiftT Raw SetM where
+  monadLift_pure x := by
+    change ((liftM (pure x : Raw _) : PMF _).support : Set _) = {x}
+    have : (liftM (pure x : Raw _) : PMF _) = pure x :=
+      LawfulMonadLift.monadLift_pure (m := Raw) (n := PMF) x
+    rw [this]; exact PMF.support_pure x
+  monadLift_bind mx my := by
+    change ((liftM (mx >>= my) : PMF _).support : Set _) =
+      Bind.bind (m := SetM)
+        ((liftM mx : PMF _).support : Set _)
+        (fun x => ((liftM (my x) : PMF _).support : Set _))
+    have hbind : (liftM (mx >>= my) : PMF _) =
+        (liftM mx : PMF _) >>= fun x => (liftM (my x) : PMF _) :=
+      LawfulMonadLift.monadLift_bind (m := Raw) (n := PMF) mx my
+    rw [hbind]; exact PMF.support_bind _ _
+
+/-- Compatibility: `Raw`'s SetM support equals the SPMF support of its `evalDist`. -/
+noncomputable instance : EvalDistCompatible Raw where
+  support_eq_SPMF_support mx := by
+    change ((liftM mx : PMF _).support : Set _) =
+      SPMF.support (liftM (liftM mx : PMF _) : SPMF _)
+    rw [SPMF.support_liftM]
 
 instance : HasEvalFinset Raw where
   finSupport := Raw.support
   coe_finSupport mx := by
     ext x
     rw [Finset.mem_coe, _root_.mem_support_iff, Raw.mem_support_iff]
-    rw [probOutput_def, HasEvalPMF.evalDist_of_hasEvalPMF_def, SPMF.liftM_apply]
+    rw [probOutput_def, evalDist_def]
+    change mx.prob x ≠ 0 ↔ (liftM (liftM mx : PMF _) : SPMF _) x ≠ 0
+    rw [SPMF.liftM_apply]
     change mx.prob x ≠ 0 ↔ ((@Raw.toPMF _ (Classical.decEq _) mx) x) ≠ 0
     simp [Raw.toPMF_apply, Raw.prob_eq_prob inferInstance (Classical.decEq _) mx x]
 

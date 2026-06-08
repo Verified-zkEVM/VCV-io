@@ -22,7 +22,7 @@ namespace OracleComp.ProgramLogic
 
 variable {ι₁ : Type u}
 variable {spec₁ : OracleSpec ι₁}
-variable [spec₁.Fintype] [spec₁.Inhabited]
+variable [IsUniformSpec spec₁]
 variable {α : Type}
 
 /-- Game equivalence from exact pRHL equality coupling. -/

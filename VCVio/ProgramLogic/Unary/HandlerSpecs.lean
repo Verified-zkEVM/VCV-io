@@ -155,7 +155,7 @@ to a polymorphic universe would require polymorphising the entire
 `wpProp` bridge, which the whole `ProgramLogic.Unary.*` stack is not yet
 set up to support. -/
 variable {ι : Type}
-variable {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+variable {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
 
 /-! ## Generic invariant-preservation for `simulateQ` -/
 

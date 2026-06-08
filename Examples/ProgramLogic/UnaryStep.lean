@@ -24,7 +24,7 @@ open scoped OracleComp.ProgramLogic
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 /-! ## Notation examples -/
@@ -429,7 +429,7 @@ example :
 section LiftComp
 
 variable {ι' : Type} {superSpec : OracleSpec ι'}
-variable [superSpec.Fintype] [superSpec.Inhabited]
+variable [IsUniformSpec superSpec]
 variable [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
 example (oa : OracleComp spec α) (post : α → ℝ≥0∞) :

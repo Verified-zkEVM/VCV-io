@@ -48,7 +48,7 @@ in every coupled output. This is the strongest leakage judgment, corresponding t
 constant-time execution for deterministic channels.
 
 Defined via `RelTriple'` (the pRHL indicator pattern from `QuantitativeDefs.lean`). -/
-def TraceNoninterference [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+def TraceNoninterference [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     (oa₁ : OracleComp spec₁ (α × ω))
     (oa₂ : OracleComp spec₂ (β × ω)) : Prop :=
   ProgramLogic.Relational.RelTriple' oa₁ oa₂ (fun z₁ z₂ => z₁.2 = z₂.2)
@@ -61,7 +61,7 @@ only the trace cannot distinguish between the two computations.
 
 The comparison is made at the `SPMF` level via `evalDist`, allowing computations over
 different oracle specs to be compared. -/
-def ProbLeakFree [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+def ProbLeakFree [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     (oa₁ : OracleComp spec₁ (α × ω))
     (oa₂ : OracleComp spec₂ (β × ω)) : Prop :=
   𝒟[Prod.snd <$> oa₁] = 𝒟[Prod.snd <$> oa₂]
@@ -71,7 +71,7 @@ def ProbLeakFree [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec�
 /-- Approximate trace independence: the trace distributions differ by at most `ε` in total
 variation distance. This enables game-hopping arguments where each hop introduces a small
 leakage discrepancy. -/
-def LeakageBound [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+def LeakageBound [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     (ε : ℝ) (oa₁ : OracleComp spec₁ (α × ω))
     (oa₂ : OracleComp spec₂ (β × ω)) : Prop :=
   SPMF.tvDist (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₂]) ≤ ε
@@ -81,7 +81,7 @@ def LeakageBound [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec�
 /-- Exact trace noninterference implies distributional trace independence:
 if traces always match in every coupling, their distributions must be equal. -/
 theorem traceNoninterference_implies_probLeakFree
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : TraceNoninterference oa₁ oa₂) :
     ProbLeakFree oa₁ oa₂ :=
@@ -89,7 +89,7 @@ theorem traceNoninterference_implies_probLeakFree
 
 /-- `ProbLeakFree` is equivalent to `LeakageBound 0`. -/
 theorem probLeakFree_iff_leakageBound_zero
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)} :
     ProbLeakFree oa₁ oa₂ ↔ LeakageBound 0 oa₁ oa₂ := by
   simp only [ProbLeakFree, LeakageBound]
@@ -104,8 +104,8 @@ theorem probLeakFree_iff_leakageBound_zero
 has leakage at most `ε₁` and the second pair at most `ε₂`, then the outer pair has
 leakage at most `ε₁ + ε₂`. -/
 theorem leakageBound_triangle
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
-    [spec₃.Fintype] [spec₃.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
+    [IsUniformSpec spec₃]
     {ε₁ ε₂ : ℝ}
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     {oa₃ : OracleComp spec₃ (γ × ω)}
@@ -120,20 +120,20 @@ theorem leakageBound_triangle
 
 /-- `ProbLeakFree` is reflexive. -/
 @[simp]
-theorem probLeakFree_refl [spec₁.Fintype] [spec₁.Inhabited]
+theorem probLeakFree_refl [IsUniformSpec spec₁]
     (oa : OracleComp spec₁ (α × ω)) :
     ProbLeakFree oa oa := rfl
 
 /-- `ProbLeakFree` is symmetric. -/
 theorem probLeakFree_symm
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : ProbLeakFree oa₁ oa₂) :
     ProbLeakFree oa₂ oa₁ := h.symm
 
 /-- `LeakageBound` with `ε = 0` implies `ProbLeakFree`. -/
 theorem probLeakFree_of_leakageBound_zero
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound 0 oa₁ oa₂) :
     ProbLeakFree oa₁ oa₂ :=
@@ -141,14 +141,14 @@ theorem probLeakFree_of_leakageBound_zero
 
 /-- `LeakageBound` is reflexive with bound `0`. -/
 @[simp]
-theorem leakageBound_refl [spec₁.Fintype] [spec₁.Inhabited]
+theorem leakageBound_refl [IsUniformSpec spec₁]
     (oa : OracleComp spec₁ (α × ω)) :
     LeakageBound 0 oa oa := by
   unfold LeakageBound; simp
 
 /-- `LeakageBound` is symmetric. -/
 theorem leakageBound_symm
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {ε : ℝ} {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound ε oa₁ oa₂) :
     LeakageBound ε oa₂ oa₁ := by
@@ -157,7 +157,7 @@ theorem leakageBound_symm
 
 /-- Monotonicity: a smaller leakage bound implies a larger one. -/
 theorem leakageBound_mono
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {ε₁ ε₂ : ℝ} (hε : ε₁ ≤ ε₂)
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound ε₁ oa₁ oa₂) :
@@ -167,7 +167,7 @@ theorem leakageBound_mono
 
 /-- Mapping the result component preserves distributional trace independence. -/
 theorem probLeakFree_map_fst
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : ProbLeakFree oa₁ oa₂) {δ : Type} (f₁ : α → γ) (f₂ : β → δ) :
     ProbLeakFree (Prod.map f₁ id <$> oa₁) (Prod.map f₂ id <$> oa₂) := by
@@ -176,7 +176,7 @@ theorem probLeakFree_map_fst
 
 /-- Mapping the result component preserves approximate trace independence. -/
 theorem leakageBound_map_fst
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {ε : ℝ} {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound ε oa₁ oa₂) {δ : Type} (f₁ : α → γ) (f₂ : β → δ) :
     LeakageBound ε (Prod.map f₁ id <$> oa₁) (Prod.map f₂ id <$> oa₂) := by
@@ -185,7 +185,7 @@ theorem leakageBound_map_fst
 
 /-- Mapping the result component preserves trace noninterference. -/
 theorem traceNoninterference_map_fst
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : TraceNoninterference oa₁ oa₂) {δ : Type} (f₁ : α → γ) (f₂ : β → δ) :
     TraceNoninterference (Prod.map f₁ id <$> oa₁) (Prod.map f₂ id <$> oa₂) := by
@@ -196,7 +196,7 @@ theorem traceNoninterference_map_fst
 /-- Mapping the trace component with the same function preserves distributional trace
 independence. -/
 theorem probLeakFree_map_snd
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : ProbLeakFree oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     ProbLeakFree (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
@@ -207,7 +207,7 @@ theorem probLeakFree_map_snd
 /-- Mapping the trace component with the same function preserves approximate trace
 independence. -/
 theorem leakageBound_map_snd
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {ε : ℝ} {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound ε oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     LeakageBound ε (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
@@ -217,7 +217,7 @@ theorem leakageBound_map_snd
 
 /-- Mapping the trace component with the same function preserves trace noninterference. -/
 theorem traceNoninterference_map_snd
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : TraceNoninterference oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     TraceNoninterference (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
@@ -239,7 +239,7 @@ private lemma snd_map_bind_snd {m : Type → Type _} [Monad m] [LawfulMonad m]
 The continuations may depend on both the result and the trace, but whenever the
 traces match, the continuations must themselves be trace noninterfering. -/
 theorem traceNoninterference_bind
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {δ ω' : Type}
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     {f₁ : (α × ω) → OracleComp spec₁ (γ × ω')}
@@ -257,7 +257,7 @@ theorem traceNoninterference_bind
 /-- Distributional trace independence is preserved by bind when the continuation
 depends only on the trace (second component). -/
 theorem probLeakFree_bind_of_trace_only
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {δ ω' : Type}
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : ProbLeakFree oa₁ oa₂)
@@ -271,7 +271,7 @@ theorem probLeakFree_bind_of_trace_only
 /-- Approximate trace independence is preserved by bind when the continuation depends
 only on the trace and produces identical trace distributions. -/
 theorem leakageBound_bind_of_trace_only
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {ε : ℝ} {δ ω' : Type}
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound ε oa₁ oa₂)

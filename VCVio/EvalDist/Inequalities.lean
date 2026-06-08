@@ -11,7 +11,7 @@ import ToMathlib.Data.ENNReal.SumSquares
 
 Inequalities relating per-element bounds and their probabilistic averages, for use in
 forking-lemma-style game-hopping arguments where the outermost step marginalizes over a
-random key (or, more generally, an arbitrary `HasEvalSPMF` monad output).
+random key (or, more generally, an arbitrary `MonadLiftT m SPMF` monad output).
 
 The headline lemma is `marginalized_jensen_forking_bound`: given a per-element bound
 `acc x · (acc x / q − hinv) ≤ B x` and weights `Pr[= x | mx]` for some monadic computation
@@ -32,13 +32,14 @@ universe u v
 
 namespace OracleComp.EvalDist
 
-variable {m : Type → Type v} [Monad m] [HasEvalSPMF m]
+variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF]
 
+omit [Monad m] in
 /-- **Marginalized Jensen / Cauchy-Schwarz step for the forking lemma.**
 
 If a per-element bound `acc x · (acc x / q − hinv) ≤ B x` holds for every `x` (with
 `acc x ≤ 1`), and we marginalize over the output distribution of any `mx : m X` with
-`HasEvalSPMF`, then the marginalized expectation `μ := ∑' x, Pr[= x | mx] · acc x`
+`[MonadLiftT m SPMF]`, then the marginalized expectation `μ := ∑' x, Pr[= x | mx] · acc x`
 satisfies the same forking-bound shape:
 
   `μ · (μ / q − hinv) ≤ ∑' x, Pr[= x | mx] · B x`.
