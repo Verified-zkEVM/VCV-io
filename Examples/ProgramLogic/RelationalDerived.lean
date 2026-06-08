@@ -1,4 +1,4 @@
-/-
+/- 
 Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
@@ -87,14 +87,14 @@ example :
 @[local vcspec] theorem rawRWP_wrappedTruePair :
     (1 : ℝ≥0∞) ⊑
       rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
-        (fun x y => if x = y then (1 : ℝ≥0∞) else 0); epost⟨⟩, epost⟨⟩⟧ := by
+        (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
   unfold wrappedTrueLeft wrappedTrueRight
   rvcstep
 
 example :
     (1 : ℝ≥0∞) ⊑
       rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
-        (fun _ _ => (1 : ℝ≥0∞)); epost⟨⟩, epost⟨⟩⟧ := by
+        (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
   intro a b
   split_ifs <;> simp
@@ -105,14 +105,14 @@ example :
 @[local vcspec] theorem rawRWP_wrappedAuxPairStep (_haux : True) :
     (1 : ℝ≥0∞) ⊑
       rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
-        (fun x y => if x = y then (1 : ℝ≥0∞) else 0); epost⟨⟩, epost⟨⟩⟧ := by
+        (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
   unfold rawAuxLeft rawAuxRight
   rvcstep
 
 example :
     (1 : ℝ≥0∞) ⊑
       rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
-        (fun _ _ => (1 : ℝ≥0∞)); epost⟨⟩, epost⟨⟩⟧ := by
+        (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
   intro a b
   split_ifs <;> simp

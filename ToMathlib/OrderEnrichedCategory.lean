@@ -1,21 +1,16 @@
-/-
-Copyright (c) 2026 VCV-io Contributors. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
-Authors: VCV-io Contributors
--/
 module
 
 public import Mathlib.CategoryTheory.Enriched.Basic
 public import Mathlib.Order.Category.Preord
 public import Mathlib.Order.Monotone.Basic
 
+open CategoryTheory
+
 /-! # Order enriched category
 
 We show that the general definition of an enriched category over a monoidal category specializes to
 an order-enriched category when the monoidal category is the category of preorders.
 -/
-
-open CategoryTheory
 
 @[expose] public section
 

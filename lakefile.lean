@@ -61,11 +61,11 @@ exact diagnostics. Leave this commented until upstream ships a v4.29 build
 --   "https://github.com/AeneasVerif/aeneas" @
 --   "ba600392" / "backends/lean"
 
+require "leanprover-community" / "mathlib" @ git "v4.30.0"
+
 require PolyFun from git
   "https://github.com/Verified-zkEVM/PolyFun.git" @
   "5d3a160ed751b9227af90adb9da41d0eae2e0238"
-
-require "leanprover-community" / "mathlib" @ git "v4.30.0"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio

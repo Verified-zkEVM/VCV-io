@@ -563,7 +563,8 @@ lemma fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
       · right; simpa [ReplayForkState.noteObserved] using h
     calc (Prod.fst <$> (do
             let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
-            (simulateQ (replayOracle i) (oa u)).run (st.noteObserved t u)) : OracleComp spec α)
+            (simulateQ (replayOracle i) (oa u)).run (st.noteObserved t u))
+            : OracleComp spec α)
         = (do
             let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
             Prod.fst <$> (simulateQ (replayOracle i) (oa u)).run

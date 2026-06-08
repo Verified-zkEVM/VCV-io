@@ -6,10 +6,6 @@ Authors: James Waters
 import VCVio.ProgramLogic.Unary.SimulateQ
 import Examples.CommitmentScheme.Hiding.CountBounds
 
-/-!
-# Averaged logging bounds for commitment-scheme hiding
--/
-
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}

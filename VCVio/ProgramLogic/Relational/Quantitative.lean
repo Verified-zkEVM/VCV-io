@@ -137,7 +137,8 @@ private def fiber {α β : Type*} (f : α → β) (b : β) : Set α := {a | f a 
 
 For an observation value outside the support of `f <$> p`, the choice of
 distribution is irrelevant; we use an arbitrary support point of `p`. -/
-noncomputable def condOnMap {α β : Type*} (p : PMF α) (f : α → β) (b : β) : PMF α := by
+noncomputable def condOnMap {α β : Type*} (p : PMF α) (f : α → β) (b : β) : PMF α :=
+  by
     classical
     exact
       if h : ∃ a ∈ fiber f b, a ∈ p.support then
@@ -234,7 +235,8 @@ is used. Since the observation has zero mass there, this does not affect the
 rebuilt distribution, but it makes pointwise continuation equalities easier
 to state. -/
 noncomputable def mapKernelWithFallback {α β γ : Type*}
-    (p : PMF α) (f : α → β) (out : α → γ) (fallback : β → γ) (b : β) : PMF γ := by
+    (p : PMF α) (f : α → β) (out : α → γ) (fallback : β → γ) (b : β) : PMF γ :=
+  by
     classical
     exact
       if h : ∃ a ∈ fiber f b, a ∈ p.support then
