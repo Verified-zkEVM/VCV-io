@@ -2263,10 +2263,8 @@ section HeterogeneousBadSlack
 
 variable {ι : Type} {spec : OracleSpec ι}
 variable {ι₁ ι₂ : Type} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
 variable {σ₁ σ₂ : Type}
 
-omit [spec₁.Fintype] [spec₁.Inhabited] in
 /-- Bad propagation for a general (non-flag) bad predicate: starting the simulation from a
 bad state, every output state stays bad. The heterogeneous-state analogue of
 `mem_support_simulateQ_run_of_bad`. -/
@@ -2293,7 +2291,7 @@ private lemma mem_support_simulateQ_run_of_bad_general
 
 /-- A simulation started from a bad state has bad probability exactly `1`. The
 heterogeneous-state analogue of `probEvent_simulateQ_run_bad_eq_one_of_bad`. -/
-private lemma probEvent_bad_simulateQ_run_eq_one_of_bad
+private lemma probEvent_bad_simulateQ_run_eq_one_of_bad [IsUniformSpec spec₁]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (bad : σ₁ → Prop)
     (hmono : ∀ (t : spec.Domain) (s₁ : σ₁), bad s₁ →
@@ -2308,6 +2306,7 @@ private lemma probEvent_bad_simulateQ_run_eq_one_of_bad
 /-- Inductive core of `probOutput_simulateQ_run'_le_add_bad_add_slack`, stated on the
 joint `run` distribution with the event `fun z => z.1 = true`. -/
 private theorem probEvent_fst_simulateQ_run_le_add_bad_add_slack
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R : σ₁ → σ₂ → Prop)
@@ -2418,6 +2417,7 @@ the obligation a concrete cross-domain reduction must discharge for its oracle p
 Only `impl₁` requires bad monotonicity (`hmono`), since the bound is one-directional and
 mentions `Pr[bad]` only on side `1`. -/
 theorem probOutput_simulateQ_run'_le_add_bad_add_slack
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R : σ₁ → σ₂ → Prop)

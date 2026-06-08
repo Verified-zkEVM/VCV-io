@@ -510,7 +510,7 @@ lemma evalDist_uniformSample_bind_update
   letI := Fintype.ofFinite R
   haveI : Nonempty (D → R) := ⟨fun _ => Classical.arbitrary R⟩
   refine evalDist_ext fun h => ?_
-  rw [probOutput_uniformSample (D → R) h, HasEvalSPMF.probOutput_bind_eq_sum_fintype]
+  rw [probOutput_uniformSample (D → R) h, probOutput_bind_eq_sum_fintype]
   -- For each fixed `u`, count the tables `g` whose `t`-update equals `h`.
   have hinner : ∀ u : R,
       Pr[= h | (do let g ← $ᵗ (D → R); pure (Function.update g t u))]
