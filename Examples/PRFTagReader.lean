@@ -561,26 +561,10 @@ private lemma simulateQ_prfReal_authToPRFTagImpl_run
     simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
         ((authToPRFTagImpl tag).run s) =
       (authTagQueryImpl (fun tag nonce => prfs.evalMultiple k tag nonce) tag).run s := by
-  let so : QueryImpl ((TagId × Nonce) →ₒ Digest) ProbComp :=
-    fun d => pure (prfs.multiplePRFScheme.eval k d)
-  let impl : QueryImpl (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp :=
-    HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
-  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k := rfl
-  have hleft : ∀ {α : Type} (oa : ProbComp α),
-      simulateQ impl (liftComp oa (unifSpec + ((TagId × Nonce) →ₒ Digest))) = oa := by
-    intro α oa
-    trans simulateQ (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) oa
-    · exact QueryImpl.simulateQ_add_liftComp_left
-        (impl₁' := HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp))
-        (impl₂' := so) oa
-    · exact simulateQ_ofLift_eq_self _
   unfold authToPRFTagImpl authTagQueryImpl authPRFQuery
   simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
-    bind_pure_comp, pure_bind]
-  rw [← hImplEq]
-  change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
-  simp only [simulateQ_bind, simulateQ_map, monadLift_eq_self,
-    hleft]
+    bind_pure_comp, pure_bind, simulateQ_bind, simulateQ_map, monadLift_eq_self,
+    PRFScheme.simulateQ_prfRealQueryImpl_liftComp]
   rfl
 
 omit [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
@@ -593,42 +577,21 @@ private lemma simulateQ_prfReal_authToPRFReaderImpl_run
     simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
         ((authToPRFReaderImpl transcript).run s) =
       (authReaderQueryImpl (fun tag nonce => prfs.evalMultiple k tag nonce) transcript).run s := by
-  let so : QueryImpl ((TagId × Nonce) →ₒ Digest) ProbComp :=
-    fun d => pure (prfs.multiplePRFScheme.eval k d)
-  let impl : QueryImpl (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp :=
-    HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) + so
-  have hImplEq : impl = PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k := rfl
-  have hquery : ∀ (d : TagId × Nonce),
-      simulateQ impl
-        (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
-          OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) _) =
-      (pure (prfs.evalMultiple k d.1 d.2) : ProbComp Digest) := by
-    intro d
-    rw [simulateQ_spec_query]
-    show impl (Sum.inr d) = _
-    simp [impl, so, QueryImpl.add_apply_inr, TagReaderPRFs.multiplePRFScheme]
   have hquery_pair : ∀ (tag : TagId),
-      simulateQ impl
+      simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
         (Prod.mk tag <$> authPRFQuery tag transcript.nonce :
           OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)) (TagId × Digest)) =
         pure (tag, prfs.evalMultiple k tag transcript.nonce) := by
     intro tag
-    have step : simulateQ impl
-        (authPRFQuery tag transcript.nonce) =
-        (pure (prfs.evalMultiple k tag transcript.nonce) : ProbComp Digest) := by
-      show @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
-      exact hquery (tag, transcript.nonce)
-    change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
-    rw [simulateQ_map, step]
-    rfl
+    simp only [authPRFQuery, simulateQ_map]
+    erw [PRFScheme.simulateQ_prfRealQueryImpl_inr, map_pure]; rfl
   have hmapM :
-      simulateQ impl
+      simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
         ((Finset.univ : Finset TagId).toList.mapM
           (m := OracleComp (unifSpec + ((TagId × Nonce) →ₒ Digest)))
           (fun tag => Prod.mk tag <$> authPRFQuery tag transcript.nonce)) =
       pure ((Finset.univ : Finset TagId).toList.map
         fun tag => (tag, prfs.evalMultiple k tag transcript.nonce)) := by
-    show @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
     rw [simulateQ_list_mapM]
     induction (Finset.univ : Finset TagId).toList with
     | nil => rfl
@@ -657,10 +620,7 @@ private lemma simulateQ_prfReal_authToPRFReaderImpl_run
     aesop
   unfold authToPRFReaderImpl authReaderQueryImpl
   simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
-    bind_pure_comp, pure_bind]
-  rw [← hImplEq]
-  change @simulateQ _ (unifSpec + ((TagId × Nonce) →ₒ Digest)) ProbComp _ impl _ _ = _
-  simp only [simulateQ_bind, simulateQ_map, monadLift_eq_self,
+    bind_pure_comp, pure_bind, simulateQ_bind, simulateQ_map, monadLift_eq_self,
     hmapM, pure_bind, map_pure]
   rw [hForged, hAccept]
   rfl
@@ -684,9 +644,9 @@ private theorem simulateQ_prfReal_authToPRFQueryImpl_run
   induction adversary using OracleComp.inductionOn generalizing s with
   | pure x =>
     simp only [simulateQ_pure, StateT.run_pure]
-    rfl
   | query_bind t f ih =>
-    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
+    simp only [simulateQ_bind, simulateQ_spec_query]
+    simp only [StateT.run_bind]
     rcases t with tag | transcript
     · change simulateQ (PRFScheme.prfRealQueryImpl prfs.multiplePRFScheme k)
             ((authToPRFTagImpl tag).run s >>=
