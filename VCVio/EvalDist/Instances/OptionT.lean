@@ -10,8 +10,8 @@ import VCVio.EvalDist.Defs.AlternativeMonad
 /-!
 # Probability Distributions on Potentially Failing Computations
 
-This file gives an instance to extend a `evalDist` instance on a monad to one transformed by
-the `OptionT` monad transformer.
+This file lifts `MonadLiftT _ SetM` and `MonadLiftT _ SPMF` semantics through the
+`OptionT` monad transformer.
 
 dt: should add more instances and connecting lemmas
 -/
@@ -117,7 +117,7 @@ end HasEvalFinset
 
 section EvalSPMF
 
-/-- Lift a `MonadLiftT m SPMF` instance to `MonadLift (OptionT m) SPMF`. Failure in `OptionT`
+/-- Lift a `MonadLiftT m SPMF` instance to `MonadLiftT (OptionT m) SPMF`. Failure in `OptionT`
 contributes to the failure mass of the resulting `SPMF`. -/
 noncomputable instance instMonadLiftTSPMF (m : Type u → Type v) [Monad m]
     [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] :

@@ -10,7 +10,7 @@ import Mathlib.Control.Lawful
 # Evaluation Semantics for ExceptT (ErrorT)
 
 This file provides evaluation semantics for `ExceptT ε m` computations, lifting
-`MonadLiftT m PMF` to `MonadLift (ExceptT ε m) SPMF`.
+`MonadLiftT m PMF` to `MonadLiftT (ExceptT ε m) SPMF`.
 
 `ExceptT ε m α` represents computations that can fail with an error of type `ε`
 or succeed with a value of type `α`. The underlying type is `m (Except ε α)`.
@@ -18,11 +18,11 @@ or succeed with a value of type `α`. The underlying type is `m (Except ε α)`.
 ## Main definitions
 
 * `ExceptT.toSPMF'`: Monad homomorphism `ExceptT ε m →ᵐ SPMF` when `m` lifts into `PMF`
-* Instance `MonadLift (ExceptT ε m) SPMF` when `[MonadLiftT m PMF] [LawfulMonadLiftT m PMF]`
+* Instance `MonadLiftT (ExceptT ε m) SPMF` when `[MonadLiftT m PMF] [LawfulMonadLiftT m PMF]`
 
 ## Design notes
 
-Similar to `OptionT`, we lift `MonadLiftT m PMF` to `MonadLift (ExceptT ε m) SPMF` because
+Similar to `OptionT`, we lift `MonadLiftT m PMF` to `MonadLiftT (ExceptT ε m) SPMF` because
 error cases contribute failure mass. We map:
 - `Except.ok x` → probability mass at `some x`
 - `Except.error e` → failure mass (mapped to `none`)
@@ -194,6 +194,34 @@ noncomputable instance instLawfulMonadLiftTSPMF (ε : Type u) (m : Type u → Ty
     LawfulMonadLiftT (ExceptT ε m) SPMF where
   monadLift_pure := ExceptT.toSPMF'.toFun_pure'
   monadLift_bind := ExceptT.toSPMF'.toFun_bind'
+
+/-- The successful-output support of `ExceptT ε m` agrees with the output support of its
+`SPMF` semantics, provided the underlying monad has the corresponding bridge. Errors only
+contribute failure mass, not successful outputs. -/
+instance instEvalDistCompatible (ε : Type u) (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [EvalDistCompatible m] :
+    EvalDistCompatible (ExceptT ε m) where
+  support_eq_SPMF_support {α} mx := by
+    change Except.ok ⁻¹' (SetM.run (liftM mx.run : SetM (Except ε α))) =
+      SPMF.support ((liftM mx.run : SPMF (Except ε α)) >>= fun r =>
+        match r with | Except.ok a => pure a | Except.error _ => failure)
+    rw [SPMF.support_bind]
+    have hbridge : SetM.run (liftM mx.run : SetM (Except ε α)) =
+        SPMF.support (liftM mx.run : SPMF (Except ε α)) :=
+      EvalDistCompatible.support_eq_SPMF_support mx.run
+    rw [hbridge]
+    ext a
+    simp only [Set.mem_preimage, Set.mem_iUnion, exists_prop]
+    refine ⟨fun h => ⟨Except.ok a, h, by simp [SPMF.support_pure]⟩, ?_⟩
+    rintro ⟨r, hr, ha⟩
+    cases r with
+    | ok b =>
+        rw [SPMF.support_pure, Set.mem_singleton_iff] at ha
+        exact ha ▸ hr
+    | error e =>
+        simp only [SPMF.mem_support_iff, SPMF.failure_apply, ne_eq, not_true_eq_false] at ha
 
 variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
 

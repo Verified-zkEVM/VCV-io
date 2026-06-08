@@ -75,7 +75,7 @@ def sbytelenForLogn? (logn : Nat) : Option Nat :=
 
 /-! ## Retry randomness helpers -/
 
-@[inline] def signLoopCounterBytes (counter : UInt32) : ByteArray :=
+@[inline] private def signLoopCounterBytes (counter : UInt32) : ByteArray :=
   ByteArray.mk #[
     counter.toUInt8,
     (counter >>> 8).toUInt8,
@@ -83,7 +83,7 @@ def sbytelenForLogn? (logn : Nat) : Option Nat :=
     (counter >>> 24).toUInt8
   ]
 
-@[inline] def signLoopRandomBytes (seed : ByteArray) (counter : UInt32) : ByteArray :=
+@[inline] private def signLoopRandomBytes (seed : ByteArray) (counter : UInt32) : ByteArray :=
   FFI.Hashing.shake256 (seed ++ signLoopCounterBytes counter) 96
 
 /-! ## Type conversions -/

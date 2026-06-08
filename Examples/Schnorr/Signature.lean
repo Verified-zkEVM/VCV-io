@@ -184,7 +184,7 @@ Three Schnorr-specific facts feed in:
 
 The result is delivered in the textbook DLog form `dlogExp g reduction` via
 the conversion `hardRelationExp_dlogGenerable_eq_dlogExp`. -/
-theorem signature_euf_cma [Finite G] [Inhabited G] (g : G)
+theorem signature_euf_cma (g : G)
     (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (signature F G g M))
@@ -197,6 +197,7 @@ theorem signature_euf_cma [Finite G] [Inhabited G] (g : G)
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   haveI : Inhabited F := ⟨0⟩
+  haveI : Inhabited G := ⟨(0 : F) • g⟩
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound
     (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
     (Schnorr.sigma_speciallySound F G g)

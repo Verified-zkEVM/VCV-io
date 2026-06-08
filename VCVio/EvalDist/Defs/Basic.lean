@@ -24,8 +24,12 @@ variable {m : Type u → Type v} {α β γ : Type u}
 
 /-! ## `MonadLiftT m SetM` and `MonadLiftT m SPMF`
 
-Every lift exposed to users in this layer is declared as `MonadLiftT`, never
-`MonadLift`. There are two independent reasons.
+The `SetM` / `SPMF` lifts exposed by this layer are declared as `MonadLiftT`,
+not `MonadLift`. Total semantic sources may still expose a plain `MonadLift`
+into `PMF`; the important point here is that support is never obtained by a
+transitive `m → SPMF → SetM` path, and parameterized/typeclass-gated
+probability lifts avoid `MonadLift` instance search. There are two independent
+reasons.
 
 **No transitive `SPMF → SetM` lift.** The `MonadLiftT SPMF SetM` instance below
 exists so `support` and friends work on raw `SPMF α`. Crucially it is declared

@@ -22,7 +22,7 @@ because the environment is read-only and doesn't change during computation.
 
 ## Design notes
 
-We do NOT provide global `MonadLift (ReaderT ρ m) SPMF` instances because there's no
+We do NOT provide global `MonadLiftT (ReaderT ρ m) SPMF` instances because there's no
 canonical choice of environment. Instead, users explicitly provide the environment
 when constructing the evaluation homomorphism.
 

@@ -8,9 +8,9 @@ import VCVio.EvalDist.Monad.Basic
 /-!
 # Lemmas for Probability Over Finite Spaces
 
-This file houses lemmas about `HasEvalDist m` and related classes when a computation `mx : m α`
-is defined via a binding/mapping operation over a finite type.
-In particular `Finset.sum` versions of many `tsum` related lemmas about `HasEvalDist`.
+This file houses lemmas about computations with `MonadLiftT m SPMF` semantics when
+`mx : m α` is defined via a binding/mapping operation over a finite type.
+In particular it provides `Finset.sum` versions of many `tsum` related probability lemmas.
 -/
 
 universe u v w

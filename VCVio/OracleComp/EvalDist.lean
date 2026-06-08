@@ -10,7 +10,7 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 /-!
 # Output Distribution of Computations
 
-This file defines `HasEvalDist` and related instances for `OracleComp`.
+This file defines the `MonadLiftT`-based probability and support semantics for `OracleComp`.
 -/
 
 open OracleSpec Option ENNReal BigOperators
