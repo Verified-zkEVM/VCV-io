@@ -5,12 +5,12 @@ Bridge from [aeneas](https://github.com/AeneasVerif/aeneas)'s Lean backend
 
 ## Status
 
-Scaffolded but **blocked on upstream regressions**. Empirically verified
-on 2026-04-17 against aeneas `main` (`ba600392`): Lake happily resolves
-aeneas with our root Mathlib v4.29.0 and Lean v4.29.0 pins overriding
-aeneas's `v4.28.0-rc1` manifest entries, but aeneas's source has **three
-real regressions** against the v4.29 stack, and one of them is inside the
-single file we need:
+Scaffolded but **blocked on upstream regressions**. The last compatibility
+attempt was run on 2026-04-17 against aeneas `main` (`ba600392`) with our
+then-current Mathlib v4.29.0 and Lean v4.29.0 pins overriding aeneas's
+`v4.28.0-rc1` manifest entries. Aeneas's source had **three real
+regressions** against the v4.29 stack, and one of them is inside the single
+file we need:
 
 1. `Aeneas/Std/Primitives.lean:168:44` — kernel type mismatch in
    `CCPO (Result α) := inferInstanceAs (CCPO (FlatOrder .div))`. The
@@ -28,12 +28,12 @@ Build coverage on the compatibility attempt was 1625/1662 jobs before the
 three failures propagated. The require is therefore **commented out** in
 `lakefile.lean`. Unblock by either:
 
-- Waiting for upstream to bump aeneas to Lean v4.29 (a one-line `require`
+- Waiting for upstream to bump aeneas to Lean v4.30 (a one-line `require`
   flip afterwards); or
 - Maintaining a short patch series on a fork pinning the above three
   files and using that fork as the git source.
 
-## Plan (applies once upstream ships a v4.29 build)
+## Plan (applies once upstream ships a v4.30 build)
 
 ```lean
 import Aeneas.Std.Primitives

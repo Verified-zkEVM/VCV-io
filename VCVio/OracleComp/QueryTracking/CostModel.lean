@@ -165,7 +165,7 @@ theorem expectedCost_le_of_support_bound (oa : OracleComp spec α) (cm : CostMod
       ≤ ∑' z, Pr[= z | costDist oa cm] * c := by
         apply ENNReal.tsum_le_tsum fun z => ?_
         by_cases hz : z ∈ support (costDist oa cm)
-        · exact mul_le_mul_of_nonneg_left (h z hz) (zero_le _)
+        · exact mul_le_mul_of_nonneg_left (h z hz) (zero_le)
         · simp [probOutput_eq_zero_of_not_mem_support hz]
     _ = c := by
         rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]

@@ -79,21 +79,20 @@ into. The actual `MonadLift` instances from hax/aeneas live in `Hax/` and
 `lakefile.lean` carries explicit git pins for both backends. Current state:
 
 ```lean
--- Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0). Enabled.
+-- Hax: Lean 4.29.0-rc1 (compatible with our 4.30.0). Enabled.
 require Hax from git
   "https://github.com/cryspen/hax" @ "492a34e3" / "hax-lib/proof-libs/lean"
 
--- Aeneas: upstream still on Lean 4.28.0-rc1. Disabled; three source
--- regressions against v4.29 (see `Interop/Aeneas/README.md`).
+-- Aeneas: upstream still on Lean 4.28.0-rc1. Disabled; see
+-- `Interop/Aeneas/README.md`.
 -- require aeneas from git
 --   "https://github.com/AeneasVerif/aeneas" @ "ba600392" / "backends/lean"
 ```
 
-Hax was empirically verified on 2026-04-17: `lake build Hax` succeeds (91
+Hax was empirically verified on 2026-06-09: `lake build Hax` succeeds (91
 jobs), and Interop rebuilds incrementally with hax in scope. Aeneas at
-`ba600392` fails three files under Lean/Mathlib v4.29 including the one
-we need (`Aeneas/Std/Primitives.lean`); see `Interop/Aeneas/README.md`
-for exact diagnostics.
+`ba600392` remains disabled; see `Interop/Aeneas/README.md` for the
+historical v4.29 compatibility diagnostics.
 
 ### Require order matters
 

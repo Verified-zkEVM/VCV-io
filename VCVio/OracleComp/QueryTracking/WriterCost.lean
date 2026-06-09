@@ -279,7 +279,7 @@ lemma expectedCost_le_of_support_bound
           refine ENNReal.tsum_le_tsum ?_
           intro w
           by_cases hw : w ∈ support oa.costs
-          · exact mul_le_mul_of_nonneg_left (h w hw) (zero_le _)
+          · exact mul_le_mul_of_nonneg_left (h w hw) (zero_le)
           · have hp : Pr[= w | oa.costs] = 0 := by
               rw [AddWriterT.costs_def]
               exact probOutput_eq_zero_of_not_mem_support
@@ -327,7 +327,7 @@ lemma expectedCost_ge_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Pre
           by_cases hc : c ∈ support oa.costs
           · rw [AddWriterT.costs_def, support_map] at hc
             rcases hc with ⟨z, hz, rfl⟩
-            exact mul_le_mul_of_nonneg_left (hval (h z hz)) (zero_le _)
+            exact mul_le_mul_of_nonneg_left (hval (h z hz)) (zero_le)
           · have hp : Pr[= c | oa.costs] = 0 := by
               rw [AddWriterT.costs_def]
               exact probOutput_eq_zero_of_not_mem_support

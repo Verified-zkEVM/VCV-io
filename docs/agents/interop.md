@@ -76,12 +76,12 @@ oracle-aware Rust target monad for both backends.
 state:
 
 ```lean
--- Enabled (verified compatible against our v4.29.0 stack).
+-- Enabled (verified compatible against our v4.30.0 stack).
 require Hax from git
   "https://github.com/cryspen/hax" @
   "492a34e3" / "hax-lib/proof-libs/lean"
 
--- Disabled (three source regressions under v4.29; see below).
+-- Disabled (upstream still on Lean 4.28; see below).
 -- require aeneas from git
 --   "https://github.com/AeneasVerif/aeneas" @
 --   "ba600392" / "backends/lean"
@@ -101,16 +101,15 @@ takes the *last* `require` of each package, so Mathlib must be last. Wrong
 order produces `mathlib: failed to fetch cache` on `lake update`, with a clear
 warning from Lake.
 
-## Toolchain Status (empirical, as of 2026-04-17)
+## Toolchain Status (empirical, as of 2026-06-09)
 
-- **VCVio**: `leanprover/lean4:v4.29.0` + Mathlib `v4.29.0`.
+- **VCVio**: `leanprover/lean4:v4.30.0` + Mathlib `v4.30.0`.
 - **hax `492a34e3`** (upstream: `v4.29.0-rc1`): `lake build Hax`
   succeeds in 91 jobs. Two harmless `@[reducible]` warnings in
   `Hax/rust_primitives/USize64.lean`; nothing blocks us.
-- **aeneas `ba600392`** (upstream: `v4.28.0-rc1`): `lake update` resolves
-  cleanly under our root Mathlib/Lean pins, but `lake build Aeneas`
-  reaches only 1625/1662 jobs before **three** source-level regressions
-  propagate:
+- **aeneas `ba600392`** (upstream: `v4.28.0-rc1`): disabled. The last
+  compatibility attempt under the v4.29 stack reached only 1625/1662 jobs
+  before **three** source-level regressions propagated:
   - `Aeneas/Std/Primitives.lean:168:44` — kernel type mismatch in
     `CCPO (Result α) := inferInstanceAs (CCPO (FlatOrder .div))`. This is
     inside the one file we need.

@@ -209,7 +209,9 @@ lemma support_def (p : SPMF α) :
 
 @[grind =]
 lemma support_eq_preimage_some (p : SPMF α) :
-    p.support = some ⁻¹' p.toPMF.support := by grind
+    p.support = some ⁻¹' p.toPMF.support := by
+  ext x
+  simp [SPMF.support, PMF.support, SPMF.apply_eq_toPMF_some]
 
 @[simp, grind =]
 lemma mem_support_iff (p : SPMF α) (x : α) : x ∈ p.support ↔ p x ≠ 0 := by aesop

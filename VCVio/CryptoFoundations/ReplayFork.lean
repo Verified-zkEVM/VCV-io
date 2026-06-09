@@ -3594,7 +3594,7 @@ private lemma noGuardReplayComp_le_forkReplay_add_collisionReplay [IsUniformSpec
           rw [hzero]
           split_ifs <;> simp
       rw [hL_eq, hR_eq]
-      exact le_add_of_nonneg_right (zero_le _)
+      exact le_add_of_nonneg_right (zero_le)
   · have hL :
         Pr[= z | do
           let _u ← liftComp ($ᵗ spec.Range i) spec
@@ -3608,7 +3608,7 @@ private lemma noGuardReplayComp_le_forkReplay_add_collisionReplay [IsUniformSpec
       have h1 := (Prod.mk.inj (Option.some.inj hh)).1
       exact hcf_s h1.symm
     rw [hL]
-    exact zero_le _
+    exact zero_le
 
 /-- Pointwise replay lower bound. -/
 private theorem le_probOutput_forkReplay [IsUniformSpec spec]

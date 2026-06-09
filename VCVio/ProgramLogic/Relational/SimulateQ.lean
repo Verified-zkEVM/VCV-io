@@ -1906,7 +1906,7 @@ private theorem ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent
   induction oa using OracleComp.inductionOn generalizing queryBudget p with
   | pure x =>
       simp only [simulateQ_pure, StateT.run_pure, tvDist_self, ENNReal.ofReal_zero]
-      exact zero_le _
+      exact zero_le
   | query_bind t cont ih =>
       rcases p with ⟨s, b⟩
       cases b with

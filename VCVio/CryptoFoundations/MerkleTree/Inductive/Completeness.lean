@@ -52,11 +52,30 @@ theorem functional_completeness {s : Skeleton}
   | ofLeft idxLeft ih =>
       cases leaf_data_tree with
       | internal left right =>
-          grind [Vector.tail_cons, Vector.head_cons]
+          have hih :
+              getPutativeRootWithHash idxLeft (left.get idxLeft)
+                  (generateProof (populateUp left hash) idxLeft) hash =
+                (populateUp left hash).getRootValue := by
+            simpa [buildMerkleTreeWithHash] using ih left
+          change hash
+              (getPutativeRootWithHash idxLeft (left.get idxLeft)
+                (generateProof (populateUp left hash) idxLeft) hash)
+              (populateUp right hash).getRootValue =
+            hash (populateUp left hash).getRootValue (populateUp right hash).getRootValue
+          rw [hih]
   | ofRight idxRight ih =>
       cases leaf_data_tree with
       | internal left right =>
-          grind [Vector.tail_cons, Vector.head_cons]
+          have hih :
+              getPutativeRootWithHash idxRight (right.get idxRight)
+                  (generateProof (populateUp right hash) idxRight) hash =
+                (populateUp right hash).getRootValue := by
+            simpa [buildMerkleTreeWithHash] using ih right
+          change hash (populateUp left hash).getRootValue
+              (getPutativeRootWithHash idxRight (right.get idxRight)
+                (generateProof (populateUp right hash) idxRight) hash) =
+            hash (populateUp left hash).getRootValue (populateUp right hash).getRootValue
+          rw [hih]
 
 
 /--

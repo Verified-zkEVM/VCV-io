@@ -312,7 +312,7 @@ private theorem perPk_extraction_bound
         forkSupportInvariant σ M qH pk x₁ log₁ ∧
         forkSupportInvariant σ M qH pk x₂ log₂
   swap
-  · rw [if_neg hE]; exact zero_le _
+  · rw [if_neg hE]; exact zero_le
   rw [if_pos hE]
   by_cases hsupp : r ∈ support (forkReplay wrappedMain qb (Sum.inr ()) cf)
   swap

@@ -83,7 +83,7 @@ The class takes two per-side exception assertion types `EPred₁` and
 ## Attribution
 
 * Loom2 (`verse-lab/loom2`): the unary `Std.Do'.WP` class this mirrors.
-  Pinned at `quangvdao/loom2#v4.29.0` @ `589fbd5`.
+  Pinned at `quangvdao/loom2#v4.29.0-ci-threads` @ `eccaa1e`.
 * Maillard et al., *The Next 700 Relational Program Logics*, POPL 2020:
   the asynchronous bind shape and the `Anchored` coherence pattern.
 * Avanzini, Barthe, Grégoire, Davoli, *eRHL*, POPL 2025: the

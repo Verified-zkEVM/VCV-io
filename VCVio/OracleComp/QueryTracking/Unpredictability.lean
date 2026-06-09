@@ -124,7 +124,7 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
       subst hz
       obtain ⟨t₀, v, hcache, hnone, _⟩ := h
       simp [hnone] at hcache
-    rw [this]; exact zero_le _
+    rw [this]; exact zero_le
   | query_bind t mx ih =>
     rw [isTotalQueryBound_query_bind_iff] at hbound
     obtain ⟨hpos, hrest⟩ := hbound

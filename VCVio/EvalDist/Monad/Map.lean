@@ -64,6 +64,7 @@ lemma probEvent_bind_pure_comp (q : β → Prop) :
   have := Classical.decPred q
   rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
   simp
+  rfl
 
 variable [LawfulMonad m]
 

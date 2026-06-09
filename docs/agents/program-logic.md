@@ -650,7 +650,7 @@ stage degrade gracefully.
 
 ### Future `mvcgen` bridge (deferred)
 
-Lean v4.29.0 ships `mvcgen` with the classical `Std.Do` handler catalogue
+Lean v4.30.0 ships `mvcgen` with the classical `Std.Do` handler catalogue
 but does *not* expose a `SymM`-level rewriter we can hand a goal to (the
 `mvcgen'` pilot lives on a newer toolchain). The planned shape of that
 bridge, for when the API lands:

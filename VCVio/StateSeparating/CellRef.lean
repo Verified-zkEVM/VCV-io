@@ -406,7 +406,7 @@ theorem prob_changed_eq_zero_of_prob_event_eq_zero
     (hc : SupportPreservesExcept c r event) (h : Heap Ident)
     (hevent : Pr[ fun z => event h z | c.run h] = 0) :
     Pr[ fun z => r.get z.2 ≠ r.get h | c.run h] = 0 := by
-  exact le_antisymm ((prob_changed_le_prob_event hc h).trans (le_of_eq hevent)) (zero_le _)
+  exact le_antisymm ((prob_changed_le_prob_event hc h).trans (le_of_eq hevent)) (zero_le)
 
 theorem prob_changed_le_of_prob_event_le
     (hc : SupportPreservesExcept c r event) (h : Heap Ident) {ε : ENNReal}

@@ -495,7 +495,13 @@ private lemma chainInLog_of_extractor_internal_step_left
   refine ⟨extLeaf, y ::ᵥ extProof, h_extLeaf, ?_, x, List.mem_of_find?_eq_some hf, h_chain⟩
   have h_root_value : (extractor sr log y).getRootValue = some y :=
     optionPopulateDown_getRootValue _ _
-  grind [Nat.succ_eq_add_one, Vector.toList_cons]
+  change ((extractor sr log y).getRootValue ::ᵥ
+      generateProof (extractor sl log x) idxLeft).toList =
+    map some (y ::ᵥ extProof).toList
+  rw [h_root_value]
+  change some y :: (generateProof (extractor sl log x) idxLeft).toList =
+    some y :: map some extProof.toList
+  exact congrArg (fun proof => some y :: proof) h_extProof
 
 /-- Post-IH assembly for the `ofRight` case of `chainInLog_of_extractor_get_ne_none`.
 Symmetric to `chainInLog_of_extractor_internal_step_left`: the recursive witness
@@ -523,7 +529,13 @@ private lemma chainInLog_of_extractor_internal_step_right
   refine ⟨extLeaf, x ::ᵥ extProof, h_extLeaf, ?_, y, List.mem_of_find?_eq_some hf, h_chain⟩
   have h_root_value : (extractor sl log x).getRootValue = some x :=
     optionPopulateDown_getRootValue _ _
-  grind [Nat.succ_eq_add_one, Vector.toList_cons]
+  change ((extractor sl log x).getRootValue ::ᵥ
+      generateProof (extractor sr log y) idxRight).toList =
+    map some (x ::ᵥ extProof).toList
+  rw [h_root_value]
+  change some x :: (generateProof (extractor sr log y) idxRight).toList =
+    some x :: map some extProof.toList
+  exact congrArg (fun proof => some x :: proof) h_extProof
 
 /-- **Extractor recovery to a log chain.** When the extractor's path at `idx`
 is intact (the value there is `≠ none`), the extracted leaf value and proof
@@ -683,7 +695,7 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     refine (probEvent_mono'' (q := fun b : Bool => b = true) ?_).trans
       (probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth h_pos leaf root proof).le
     rintro _ ⟨h_v, _⟩; exact h_v
-  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le _)
+  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le)
     rintro _ _ ⟨_, h⟩; exact h_get h
 
 private theorem extractabilityGame_verified_extractor_none_le_inv_card

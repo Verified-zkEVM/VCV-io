@@ -7,7 +7,7 @@ to VCVio's `RustOracleComp`.
 
 `require Hax` is **active** in `lakefile.lean`, pinned to commit
 `492a34e3` (hax `main` as of 2026-04-16). Hax compiles cleanly against our
-Lean v4.29.0 / Mathlib v4.29.0 stack: `lake build Hax` succeeds in 91 jobs
+Lean v4.30.0 / Mathlib v4.30.0 stack: `lake build Hax` succeeds in 91 jobs
 with 2 harmless `@[reducible]` warnings in hax's own
 `rust_primitives/USize64.lean`.
 
