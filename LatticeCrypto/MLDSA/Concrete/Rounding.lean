@@ -234,22 +234,9 @@ private theorem decomposeCoeff_eq
     simp only [Prod.mk.injEq] at hdecomp <;>
     obtain ⟨rfl, rfl⟩ := hdecomp <;>
     push_cast <;> try exact hdam
-  · calc
-      (alpha : Coeff) * 0 + ((t : Coeff) - 1) = (alpha : Coeff) * q + (t : Coeff) := by
-        rw [hwrap q hs]
-        ring
-      _ = r := hdam
-  · have hq1 := hwrap (q + 1) hs
-    rw [Nat.cast_add, Nat.cast_one, mul_add, mul_one] at hq1
-    calc
-      (alpha : Coeff) * 0 + ((t : Coeff) - (alpha : Coeff) - 1) =
-          (alpha : Coeff) * q + (t : Coeff) := by
-        have hq := eq_sub_of_add_eq hq1
-        rw [hq]
-        ring
-      _ = r := hdam
-  · ring_nf
-    exact hdam
+  · rw [← hdam, hwrap q hs]; ring
+  · rw [← hdam]; ring_nf; rw [← hwrap (q+1) hs]; push_cast; ring_nf
+  · rw [← hdam]; ring
 
 private theorem lowBitsCoeff_bound (r : Coeff) {r1 gamma2 : ℕ} {r0 : ℤ} (hγ : 0 < gamma2)
     (hdec : decomposeCoeff r gamma2 = (r1, r0)) :
