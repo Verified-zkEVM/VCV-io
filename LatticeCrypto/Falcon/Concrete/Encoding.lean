@@ -6,7 +6,6 @@ Authors: Quang Dao
 import Batteries.Data.ByteArray
 import Batteries.Data.Array.Lemmas
 import LatticeCrypto.Falcon.Arithmetic
-import Mathlib.Init
 
 /-!
 # Concrete Falcon Encoding
