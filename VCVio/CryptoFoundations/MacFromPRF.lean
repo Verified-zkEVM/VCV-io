@@ -176,9 +176,7 @@ private theorem prfRealExp_macToPRFReduction_eq_body (prf : PRFScheme K D R)
   refine bind_congr fun k => ?_
   erw [simulateQ_bind, simulateQ_prfReal_macToPRFQueryImpl_run prf k]
   refine bind_congr fun x => ?_
-  erw [simulateQ_bind, simulateQ_spec_query]
-  simp only [prfRealQueryImpl, QueryImpl.add_apply_inr, pure_bind]
-  erw [simulateQ_pure]
+  erw [simulateQ_bind, simulateQ_prfRealQueryImpl_inr, pure_bind, simulateQ_pure]
 
 /-- In the real PRF experiment, the reduction reproduces exactly the UF-CMA game. -/
 theorem prfRealExp_macToPRFReduction_eq_UF_CMA_Exp (prf : PRFScheme K D R)
@@ -209,8 +207,8 @@ private theorem prfIdealExp_macToPRFReduction_eq_ideal_body [SampleableType R]
   refine bind_congr fun ⟨⟨⟨msg, τ⟩, log⟩, cache⟩ => ?_
   erw [simulateQ_bind]
   simp only [prfFuncQuery]
-  erw [simulateQ_spec_query]
-  simp only [prfIdealQueryImpl, QueryImpl.add_apply_inr, StateT.run'_bind']
+  erw [simulateQ_prfIdealQueryImpl_inr]
+  simp only [StateT.run'_bind']
   exact bind_congr fun ⟨t, _⟩ => StateT.run'_pure' _ _
 
 /-- Generalized log-cache invariant for arbitrary initial cache. Every domain point
@@ -293,8 +291,7 @@ private theorem log_cache_invariant_aux [SampleableType R]
         erw [QueryImpl.run_withLogging_apply] at hro
         erw [simulateQ_bind] at hro
         simp only [StateT.run_bind] at hro
-        erw [simulateQ_spec_query] at hro
-        simp only [prfIdealQueryImpl, QueryImpl.add_apply_inr] at hro
+        erw [simulateQ_prfIdealQueryImpl_inr] at hro
         rw [support_bind] at hro
         simp only [Set.mem_iUnion, exists_prop] at hro
         obtain ⟨⟨q_val, q_cache⟩, hro_q, hmem2⟩ := hro

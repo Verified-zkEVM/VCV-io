@@ -17,21 +17,12 @@ variable {α β γ : Type u}
 
 namespace SetM
 
-/-- Enable `support` notation for `SetM` (note the need for the monadic instance and not `Set`). -/
-instance : HasEvalSet SetM where
-  toSet := MonadHom.id SetM
-
 @[simp, grind =]
 lemma support_eq_run (s : SetM α) : support s = s.run := rfl
 
 end SetM
 
 namespace SPMF
-
-/-- Enable probability notation for `SPMF`, using identity as the `SPMF` embedding. -/
-instance : HasEvalSPMF SPMF where
-  toSPMF := MonadHom.id SPMF
-  support_eq _ := rfl
 
 @[simp, grind =]
 protected lemma evalDist_def (p : SPMF α) : evalDist p = p := rfl
@@ -42,18 +33,12 @@ protected lemma support_eq_support (p : SPMF α) : support p = SPMF.support p :=
 @[grind =]
 lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
 
-lemma evalDist_eq_iff {m} [Monad m] [HasEvalSPMF m] (mx : m α) (p : SPMF α) :
+lemma evalDist_eq_iff {m} [Monad m] [MonadLiftT m SPMF] (mx : m α) (p : SPMF α) :
     𝒟[mx] = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
 
 end SPMF
 
 namespace PMF
-
-/-- Enable probability notation for `PMF`, using `liftM` as the `SPMF` embedding. -/
-noncomputable instance : HasEvalPMF PMF where
-  toPMF := MonadHom.id PMF
-  support_eq _ := rfl
-  toSPMF_eq _ := rfl
 
 @[simp] lemma evalDist_eq (p : PMF α) : evalDist p = liftM p := rfl
 
@@ -76,25 +61,28 @@ end PMF
 
 namespace Id
 
-/-- The support of a computation in `Id` is the result being returned. -/
-noncomputable instance : HasEvalPMF Id where
-  toSet := MonadHom.pure SetM
-  toSPMF := MonadHom.pure SPMF
-  toPMF := MonadHom.pure PMF
-  support_eq mx := by
-    simp [support_def, SetM.pure_def, SPMF.support_pure]; rfl
-  toSPMF_eq mx := by aesop
+/-- Lift `Id` into `PMF` (a `pure` of the result), giving `Id` the canonical total denotation. -/
+noncomputable instance : MonadLift Id PMF where
+  monadLift x := pure x.run
+
+noncomputable instance : LawfulMonadLift Id PMF where
+  monadLift_pure _ := rfl
+  monadLift_bind _ _ := by
+    change (PMF.pure _ : PMF _) = (pure _ : PMF _).bind fun x => pure _
+    simp [PMF.monad_pure_eq_pure]
 
 instance : HasEvalFinset Id where
   finSupport x := {x}
   coe_finSupport x := by
     ext y
-    rw [HasEvalSPMF.support_eq]
-    change y ∈ (↑({x.run} : Finset _) : Set _) ↔ y ∈ (MonadHom.pure SPMF x).support
-    simp [MonadHom.pure_apply, SPMF.support_pure]
+    change y ∈ (↑({x.run} : Finset _) : Set _) ↔ y ∈ SetM.run (pure x.run : SetM _)
+    rw [Finset.coe_singleton]
+    rfl
 
 @[simp, grind =]
-lemma support_eq_singleton (x : Id α) : support x = {x.run} := rfl
+lemma support_eq_singleton (x : Id α) : support x = {x.run} := by
+  change SetM.run (pure x.run : SetM α) = _
+  rfl
 
 @[simp, grind =]
 lemma finSupport_eq_singleton [DecidableEq α] (x : Id α) : finSupport x = {x.run} := rfl
@@ -109,8 +97,10 @@ lemma probOutput_eq_ite [DecidableEq α] (x : Id α) (y : α) :
 lemma probEvent_eq_ite (x : Id α) (p : α → Prop) [DecidablePred p] :
     Pr[ p | x] = if p x.run then 1 else 0 := by
   classical
-  simp [probEvent_eq_sum_finSupport_ite]
+  rw [show x = pure x.run from rfl, probEvent_pure]
+  rfl
 
-lemma probFailure_eq_zero (x : Id α) : Pr[⊥ | x] = 0 := by aesop
+lemma probFailure_eq_zero (x : Id α) : Pr[⊥ | x] = 0 := by
+  rw [show x = pure x.run from rfl, probFailure_pure]
 
 end Id

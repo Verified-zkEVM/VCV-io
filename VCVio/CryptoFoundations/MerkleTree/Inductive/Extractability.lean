@@ -66,6 +66,12 @@ open List OracleSpec OracleComp BinaryTree
 
 variable {α : Type}
 
+/-- Local `IsUniformSpec` opt-in for `spec α`: the single Merkle hash oracle samples
+uniformly from `α` whenever `α` is finite and inhabited. Kept `local` so that downstream
+files outside this module do not silently pick up uniform semantics for `spec α`. -/
+noncomputable local instance instIsUniformSpec [Fintype α] [Inhabited α] :
+    IsUniformSpec (spec α) := IsUniformSpec.ofFintypeInhabited _
+
 /-! ## Adversary -/
 
 section Adversary
@@ -621,7 +627,7 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
           fun a => (singleHash a proof.head : OracleComp (spec α) α) from rfl,
       probOutput_bind_eq_tsum]
     simp_rw [fun a => probOutput_singleHash_eq_inv_card a proof.head root,
-      ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+      ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
   | @ofRight sl sr idxRight =>
     rw [show (getPutativeRoot (m := OracleComp (spec α))
               (SkeletonLeafIndex.ofRight idxRight) leaf proof
@@ -630,7 +636,7 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
           fun a => (singleHash proof.head a : OracleComp (spec α) α) from rfl,
       probOutput_bind_eq_tsum]
     simp_rw [fun a => probOutput_singleHash_eq_inv_card proof.head a root,
-      ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+      ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 /--
 The probability that `verifyProof` evaluates to `true` at a positive-depth index

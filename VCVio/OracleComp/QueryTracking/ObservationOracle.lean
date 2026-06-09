@@ -38,8 +38,8 @@ values. The definitions `eraseObs` and `runObs` are parameterized by a base orac
 ## Main Results
 
 * `fst_map_runObs`: erasure theorem — projecting away the trace recovers `eraseObs`.
-* `probFailure_runObs`: observations do not change failure probability (`[HasEvalSPMF m]`).
-* `NeverFail_runObs_iff`: `NeverFail` is preserved by observation (`[HasEvalSPMF m]`).
+* `probFailure_runObs`: observations do not change failure probability (`[MonadLiftT m SPMF]`).
+* `NeverFail_runObs_iff`: `NeverFail` is preserved by observation (`[MonadLiftT m SPMF]`).
 -/
 
 open OracleSpec OracleComp
@@ -154,7 +154,7 @@ theorem fst_map_runObs [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev �
   exact QueryImpl.fst_map_run_withCost (eraseObsImpl base) (obsCostFn encode) oa
 
 /-- Failure preservation: observations do not change the probability of failure. -/
-theorem probFailure_runObs [LawfulMonad m] [HasEvalSPMF m]
+theorem probFailure_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
     Pr[⊥ | runObs base encode oa] = Pr[⊥ | eraseObs base oa] := by
   rw [show Pr[⊥ | runObs base encode oa] =
@@ -162,10 +162,10 @@ theorem probFailure_runObs [LawfulMonad m] [HasEvalSPMF m]
     (probFailure_map _ _).symm, fst_map_runObs]
 
 /-- `NeverFail` is preserved by observation. -/
-theorem NeverFail_runObs_iff [LawfulMonad m] [HasEvalSPMF m]
+theorem NeverFail_runObs_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
     NeverFail (runObs base encode oa) ↔ NeverFail (eraseObs base oa) := by
-  simp only [HasEvalSPMF.neverFail_iff, probFailure_runObs]
+  simp only [neverFail_iff, probFailure_runObs]
 
 /-! ### EvalDist Bridge for `runObs`
 
@@ -173,21 +173,21 @@ These lemmas connect the result-marginal distribution of `runObs` to the distrib
 of `eraseObs`, enabling direct probability-level reasoning about traces without needing
 to manually simplify the traced computation into its concrete form. -/
 
-lemma evalDist_fst_runObs [LawfulMonad m] [HasEvalSPMF m]
+lemma evalDist_fst_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (base : QueryImpl spec m) (encode : Ev → ω)
     (oa : OracleComp (spec + ObsSpec Ev) α) :
     𝒟[(fun z : α × ω => z.1) <$> runObs base encode oa] =
       𝒟[eraseObs base oa] := by
   rw [fst_map_runObs]
 
-lemma probOutput_fst_runObs [LawfulMonad m] [HasEvalSPMF m]
+lemma probOutput_fst_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (base : QueryImpl spec m) (encode : Ev → ω)
     (oa : OracleComp (spec + ObsSpec Ev) α) (x : α) :
     Pr[= x | (fun z : α × ω => z.1) <$> runObs base encode oa] =
       Pr[= x | eraseObs base oa] := by
   rw [fst_map_runObs]
 
-lemma support_fst_runObs [LawfulMonad m] [HasEvalSPMF m]
+lemma support_fst_runObs [LawfulMonad m] [MonadLiftT m SetM]
     (base : QueryImpl spec m) (encode : Ev → ω)
     (oa : OracleComp (spec + ObsSpec Ev) α) :
     support ((fun z : α × ω => z.1) <$> runObs base encode oa) =

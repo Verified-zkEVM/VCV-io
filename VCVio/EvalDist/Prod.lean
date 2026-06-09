@@ -8,15 +8,17 @@ import VCVio.EvalDist.Monad.Seq
 /-!
 # Evaluation Distributions of Computations with `Prod`
 
-Lemmas about `evalDist` and `support` involving `Prod`, ported to generic `[HasEvalSPMF m]`.
+Lemmas about `evalDist` and `support` involving `Prod`, ported to generic `[MonadLiftT m SPMF]`.
 -/
 
 open ENNReal Prod
 
 universe u v
 
-variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalSPMF m] {α β γ δ : Type u}
+variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
+  [LawfulMonadLiftT m SPMF] {α β γ δ : Type u}
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 lemma probOutput_prod_mk_eq_probEvent (mx : m (α × β)) (x : α) (y : β) :
     Pr[= (x, y) | mx] = Pr[ fun z => z.1 = x ∧ z.2 = y | mx] := by
@@ -68,6 +70,7 @@ lemma probOutput_snd_map_eq_probEvent (mx : m (α × β)) (y : β) :
 lemma probEvent_snd_map (mx : m (α × β)) (p : β → Prop) :
     Pr[ p | Prod.snd <$> mx] = Pr[ fun y => p y.2 | mx] := by grind
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 @[simp, grind =]
 lemma probEvent_fst_eq_snd (mx : m (α × α)) :
@@ -87,11 +90,15 @@ lemma probOutput_seq_map_prod_mk_eq_mul (z : α × β) :
     Pr[= z | Prod.mk <$> mx <*> my] = Pr[= z.1 | mx] * Pr[= z.2 | my] :=
   probOutput_seq_map_eq_mul_of_injective2 mx my Prod.mk Prod.mk.injective2 z.1 z.2
 
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
 @[simp high]
-lemma support_seq_map_prod_mk : support (Prod.mk <$> mx <*> my) = support mx ×ˢ support my := by
+lemma support_seq_map_prod_mk [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
+    support (Prod.mk <$> mx <*> my) = support mx ×ˢ support my := by
   simp [Set.ext_iff]
 
-lemma finSupport_seq_map_prod_mk [HasEvalFinset m] [DecidableEq α] [DecidableEq β] :
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
+lemma finSupport_seq_map_prod_mk [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [HasEvalFinset m] [DecidableEq α] [DecidableEq β] :
     finSupport (Prod.mk <$> mx <*> my) = Finset.product (finSupport mx) (finSupport my) := by
   simp
 
@@ -121,12 +128,15 @@ lemma probOutput_bind_map_prod_mk_eq_mul'
   simpa [monad_norm] using
     probOutput_seq_map_prod_mk_map_eq_mul' mx my f g z
 
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
 @[simp high]
-lemma support_seq_map_prod_mk_eq_sprod :
+lemma support_seq_map_prod_mk_eq_sprod [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
     support ((f ·, g ·) <$> mx <*> my) = (f '' support mx) ×ˢ (g '' support my) := by
   simp [Set.ext_iff]; grind
 
-lemma finSupport_seq_map_prod_mk_eq_product [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
+omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
+lemma finSupport_seq_map_prod_mk_eq_product [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
     [DecidableEq γ] [DecidableEq δ] : finSupport ((f ·, g ·) <$> mx <*> my) =
       ((finSupport mx).image f).product ((finSupport my).image g) := by
   simp [Finset.ext_iff]; grind

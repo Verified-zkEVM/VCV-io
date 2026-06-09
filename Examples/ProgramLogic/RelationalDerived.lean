@@ -21,7 +21,7 @@ open scoped OracleComp.ProgramLogic
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β γ : Type}
 
 /-! ## `rel_conseq` / `rel_inline` / `rel_dist` -/

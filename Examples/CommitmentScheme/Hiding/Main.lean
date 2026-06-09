@@ -31,8 +31,10 @@ open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
-  [Fintype M] [Fintype S] [Fintype C]
+  [Fintype M] [Fintype S] [Finite C]
   [Inhabited M] [Inhabited S] [Inhabited C]
+
+attribute [local instance] Fintype.ofFinite
 omit [DecidableEq M] [DecidableEq S] [DecidableEq C] [Fintype M] [Inhabited M] in
 private lemma tvDist_liftComp_hidingAvgSpec {α : Type}
     (oa ob : OracleComp (CMOracle M S C) α) :

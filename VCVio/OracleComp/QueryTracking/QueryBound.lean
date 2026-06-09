@@ -320,7 +320,8 @@ theorem IsQueryBoundP.mono {oa : OracleComp spec α} {n m : ℕ}
 
 /-- `oa >>= ob` is `p`-bounded by `n + m` when `oa` is `p`-bounded by `n` and every reachable
 continuation `ob x` is `p`-bounded by `m`. -/
-lemma isQueryBoundP_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β} {n m : ℕ}
+lemma isQueryBoundP_bind
+    {oa : OracleComp spec α} {ob : α → OracleComp spec β} {n m : ℕ}
     (h : IsQueryBoundP oa p n) (h' : ∀ x ∈ support oa, IsQueryBoundP (ob x) p m) :
     IsQueryBoundP (oa >>= ob) p (n + m) := by
   induction oa using OracleComp.inductionOn generalizing n with
@@ -806,7 +807,7 @@ lemma IsTotalQueryBound.of_bind_query_prefix [spec.Inhabited]
       exact ih u (n := n - 1) hu
 
 theorem IsTotalQueryBound.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSpec ι'}
-    {σ : Type u}
+    [IsUniformSpec spec'] {σ : Type u}
     {impl : QueryImpl spec (StateT σ (OracleComp spec'))}
     {oa : OracleComp spec α} {n : ℕ}
     (h : IsTotalQueryBound oa n)
@@ -834,6 +835,7 @@ target monad is `OracleComp spec'` directly (no `StateT` layer), every per-step 
 applies without an external state argument. Captures the `liftComp` shape, where each
 source query becomes one query in the larger spec. -/
 theorem IsTotalQueryBound.simulateQ_of_step {ι' : Type u} {spec' : OracleSpec ι'}
+    [IsUniformSpec spec']
     {impl : QueryImpl spec (OracleComp spec')}
     {oa : OracleComp spec α} {n : ℕ}
     (h : IsTotalQueryBound oa n)
@@ -855,6 +857,7 @@ theorem IsTotalQueryBound.simulateQ_of_step {ι' : Type u} {spec' : OracleSpec �
 makes at most `step` queries (rather than at most `1`). The bound on the simulation is
 `n * step`, where `n` is the bound on the source. -/
 theorem IsTotalQueryBound.simulateQ_of_step_le {ι' : Type u} {spec' : OracleSpec ι'}
+    [IsUniformSpec spec']
     {impl : QueryImpl spec (OracleComp spec')}
     {oa : OracleComp spec α} {n step : ℕ}
     (h : IsTotalQueryBound oa n)
@@ -892,7 +895,7 @@ When `b_nx = 0` (the trace case), the formula collapses to `n * b_so`, recoverin
 biconditional trace transfer in one direction. -/
 
 theorem isTotalQueryBound_simulateQ_preInsert
-    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec'] {β : Type u}
     {impl : QueryImpl spec (OracleComp spec')}
     {nx : spec.Domain → OracleComp spec' β}
     {oa : OracleComp spec α} {n b_so b_nx : ℕ}
@@ -907,7 +910,7 @@ theorem isTotalQueryBound_simulateQ_preInsert
   exact isTotalQueryBound_bind (h_nx t) (fun _ => h_so t)
 
 theorem isTotalQueryBound_simulateQ_postInsert
-    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec'] {β : Type u}
     {impl : QueryImpl spec (OracleComp spec')}
     {nx : (t : spec.Domain) → spec.Range t → OracleComp spec' β}
     {oa : OracleComp spec α} {n b_so b_nx : ℕ}
@@ -926,7 +929,7 @@ theorem isTotalQueryBound_simulateQ_postInsert
 /-- Predicated version of `simulateQ_of_step_le`: a total bound on the source plus a
 predicated step bound transfers to a predicated bound on the simulation. -/
 theorem IsQueryBoundP.simulateQ_of_step_le_total
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {q : ι' → Prop} [DecidablePred q]
     {impl : QueryImpl spec (OracleComp spec')}
     {oa : OracleComp spec α} {n step : ℕ}
@@ -947,7 +950,7 @@ theorem IsQueryBoundP.simulateQ_of_step_le_total
       · simp [Nat.succ_mul]; ring_nf; rfl
 
 theorem isQueryBoundP_simulateQ_preInsert
-    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec'] {β : Type u}
     {q : ι' → Prop} [DecidablePred q]
     {impl : QueryImpl spec (OracleComp spec')}
     {nx : spec.Domain → OracleComp spec' β}
@@ -963,7 +966,7 @@ theorem isQueryBoundP_simulateQ_preInsert
   exact isQueryBoundP_bind (h_nx t) (fun _ _ => h_so t)
 
 theorem isQueryBoundP_simulateQ_postInsert
-    {ι' : Type u} {spec' : OracleSpec ι'} {β : Type u}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec'] {β : Type u}
     {q : ι' → Prop} [DecidablePred q]
     {impl : QueryImpl spec (OracleComp spec')}
     {nx : (t : spec.Domain) → spec.Range t → OracleComp spec' β}
@@ -982,7 +985,7 @@ theorem isQueryBoundP_simulateQ_postInsert
 
 /-- Sanity check: instrumenting an oracle with a side-querying "monitor" computation
 fired before each query gives a clean multiplicative bound. -/
-example {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
+example {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α β : Type u}
     {impl : QueryImpl spec (OracleComp spec)} {monitor : OracleComp spec β}
     {oa : OracleComp spec α} {n b_so b_mon : ℕ}
     (hoa : IsTotalQueryBound oa n)
@@ -994,7 +997,8 @@ example {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 
 namespace countingOracle
 
-lemma add_single_mem_support_simulate_queryBind [DecidableEq ι] {t : spec.Domain}
+lemma add_single_mem_support_simulate_queryBind [DecidableEq ι]
+    [IsUniformSpec spec] {t : spec.Domain}
     {oa : spec.Range t → OracleComp spec α} {u : spec.Range t}
     {z : α × QueryCount ι}
     (hz : z ∈ support (countingOracle.simulate (spec := spec) (oa := oa u) 0)) :
@@ -1012,9 +1016,8 @@ lemma add_single_mem_support_simulate_queryBind [DecidableEq ι] {t : spec.Domai
 
 section CostSupport
 
-variable [DecidableEq ι] [spec.Fintype] [spec.Inhabited] [Fintype ι]
+variable [DecidableEq ι] [IsUniformSpec spec] [Fintype ι]
 
-omit [spec.Fintype] [spec.Inhabited] in
 lemma exists_mem_support_simulate_of_mem_support_run_simulateQ_le_cost
     {σ : Type u} {impl : QueryImpl spec (StateT σ (OracleComp spec))}
     (cost : σ → ℕ)
@@ -1134,7 +1137,7 @@ omit [Fintype ι] in
 /-- The counting-oracle simulation of any `OracleComp` has non-empty support whenever every
 oracle range is inhabited. Used by the converse direction of
 `isTotalQueryBound_iff_counting_total_le`. -/
-lemma countingOracle.support_simulate_nonempty [spec.Inhabited]
+lemma countingOracle.support_simulate_nonempty [IsUniformSpec spec]
     (oa : OracleComp spec α) :
     (support (countingOracle.simulate oa 0)).Nonempty := by
   induction oa using OracleComp.inductionOn with
@@ -1147,7 +1150,7 @@ lemma countingOracle.support_simulate_nonempty [spec.Inhabited]
 /-- Converse of `IsTotalQueryBound.counting_total_le`: a counting-oracle bound on every
 support path implies the structural total query bound. Together they characterize
 `IsTotalQueryBound` purely in terms of the counting-oracle support. -/
-theorem isTotalQueryBound_iff_counting_total_le [spec.Inhabited]
+theorem isTotalQueryBound_iff_counting_total_le [IsUniformSpec spec]
     {oa : OracleComp spec α} {n : ℕ} :
     IsTotalQueryBound oa n ↔
       ∀ z ∈ support (countingOracle.simulate oa 0), (∑ i, z.2 i) ≤ n := by
@@ -1187,7 +1190,7 @@ point of the simulated prefix leaves the continuation bounded by the residual bu
 by that cost. The cost may under-approximate the true query count, so the resulting residual
 budget is correspondingly weaker but still sound. -/
 theorem IsTotalQueryBound.residual_of_mem_support_run_simulateQ_le_cost
-    [spec.Fintype] [spec.Inhabited] [Finite ι]
+    [IsUniformSpec spec] [Finite ι]
     {σ : Type u} {impl : QueryImpl spec (StateT σ (OracleComp spec))}
     (cost : σ → ℕ)
     (hstep : ∀ t : spec.Domain, ∀ st : σ,
@@ -1214,7 +1217,8 @@ theorem IsTotalQueryBound.residual_of_mem_support_run_simulateQ_le_cost
 end CountingResidual
 
 /-- Per-index bound implies total bound (sum over indices). -/
-theorem IsTotalQueryBound.of_perIndex [DecidableEq ι] [Fintype ι] {oa : OracleComp spec α}
+theorem IsTotalQueryBound.of_perIndex [DecidableEq ι] [Fintype ι]
+    [IsUniformSpec spec] {oa : OracleComp spec α}
     {qb : ι → ℕ}
     (h : IsPerIndexQueryBound oa qb) :
     IsTotalQueryBound oa (∑ i, qb i) := by
@@ -1367,7 +1371,7 @@ theorem IsQueryBoundP.residual_of_mem_support_counting [DecidableEq ι] [Fintype
 /-- Predicate-targeted analogue of `isTotalQueryBound_iff_counting_total_le`: a
 counting-oracle filtered-sum bound characterizes the structural `IsQueryBoundP` bound. -/
 theorem isQueryBoundP_iff_counting_filter_le
-    [DecidableEq ι] [Fintype ι] [spec.Inhabited]
+    [DecidableEq ι] [Fintype ι] [IsUniformSpec spec]
     {oa : OracleComp spec α} {n : ℕ} :
     IsQueryBoundP oa p n ↔
       ∀ z ∈ support (countingOracle.simulate oa 0),
@@ -1428,7 +1432,8 @@ end IsQueryBoundPRelations
 /-- Transfer a predicate-targeted query bound through `simulateQ` into a stateful target
 semantics, provided each simulated source query step is itself `q`-bounded (by `1` on
 `p`-indices, by `0` on `¬ p`-indices). -/
-theorem IsQueryBoundP.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSpec ι'} {σ : Type u}
+theorem IsQueryBoundP.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSpec ι'}
+    [IsUniformSpec spec'] {σ : Type u}
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
     {impl : QueryImpl spec (StateT σ (OracleComp spec'))}
     {oa : OracleComp spec α} {n : ℕ}
@@ -1473,6 +1478,7 @@ monad is `OracleComp spec'` directly (no `StateT` layer), the per-step bounds ap
 an external state argument. Captures the `liftComp` shape, where each `p`-step becomes one
 `q`-query and each `¬ p`-step is `q`-free. -/
 theorem IsQueryBoundP.simulateQ_of_step {ι' : Type u} {spec' : OracleSpec ι'}
+    [IsUniformSpec spec']
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
     {impl : QueryImpl spec (OracleComp spec')}
     {oa : OracleComp spec α} {n : ℕ}
@@ -1506,7 +1512,8 @@ its `.inl` and `.inr` branches, with separate step hypotheses for each impl on i
 sub-predicate. -/
 theorem IsQueryBoundP.simulateQ_run_add_of_step
     {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    {spec' : OracleSpec ι'} {σ : Type u}
+    {spec' : OracleSpec ι'} [IsUniformSpec spec']
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited] {σ : Type u}
     {p : ι₁ ⊕ ι₂ → Prop} [DecidablePred p]
     {q : ι' → Prop} [DecidablePred q]
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
@@ -1532,7 +1539,8 @@ is vacuously false on `.inr _` queries: only `impl₁` interacts with the predic
 `impl₂` only needs a uniform 0-bound step. -/
 theorem IsQueryBoundP.simulateQ_run_add_inl_of_step
     {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    {spec' : OracleSpec ι'} {σ : Type u}
+    {spec' : OracleSpec ι'} [IsUniformSpec spec']
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited] {σ : Type u}
     {p : ι₁ ⊕ ι₂ → Prop} [DecidablePred p]
     {q : ι' → Prop} [DecidablePred q]
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
@@ -1554,7 +1562,8 @@ is vacuously false on `.inl _` queries: only `impl₂` interacts with the predic
 `impl₁` only needs a uniform 0-bound step. -/
 theorem IsQueryBoundP.simulateQ_run_add_inr_of_step
     {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    {spec' : OracleSpec ι'} {σ : Type u}
+    {spec' : OracleSpec ι'} [IsUniformSpec spec']
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited] {σ : Type u}
     {p : ι₁ ⊕ ι₂ → Prop} [DecidablePred p]
     {q : ι' → Prop} [DecidablePred q]
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
@@ -1581,7 +1590,8 @@ either side counts toward the same uniform budget. -/
 
 theorem IsTotalQueryBound.simulateQ_run_add_of_step
     {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    {spec' : OracleSpec ι'} {σ : Type u}
+    {spec' : OracleSpec ι'} [IsUniformSpec spec']
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited] {σ : Type u}
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
     {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp spec'))}
     {oa : OracleComp (spec₁ + spec₂) α} {n : ℕ}
@@ -1599,7 +1609,8 @@ theorem IsTotalQueryBound.simulateQ_run_add_of_step
 interaction: `impl₂` only needs a uniform 0-bound step. -/
 theorem IsTotalQueryBound.simulateQ_run_add_inl_of_step
     {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    {spec' : OracleSpec ι'} {σ : Type u}
+    {spec' : OracleSpec ι'} [IsUniformSpec spec']
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited] {σ : Type u}
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
     {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp spec'))}
     {oa : OracleComp (spec₁ + spec₂) α} {n : ℕ}
@@ -1615,7 +1626,8 @@ theorem IsTotalQueryBound.simulateQ_run_add_inl_of_step
 interaction: `impl₁` only needs a uniform 0-bound step. -/
 theorem IsTotalQueryBound.simulateQ_run_add_inr_of_step
     {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    {spec' : OracleSpec ι'} {σ : Type u}
+    {spec' : OracleSpec ι'} [IsUniformSpec spec']
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited] {σ : Type u}
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
     {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp spec'))}
     {oa : OracleComp (spec₁ + spec₂) α} {n : ℕ}
@@ -1637,6 +1649,7 @@ spec, mirroring the single-spec `simulateQ_run_of_uniform_step`. -/
 theorem IsPerIndexQueryBound.simulateQ_run_add_of_uniform_step
     {ι₁ ι₂ : Type u} [DecidableEq ι₁] [DecidableEq ι₂]
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited]
     {σ : Type u}
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp (spec₁ + spec₂)))}
     {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp (spec₁ + spec₂)))}
@@ -1658,6 +1671,7 @@ interaction: `impl₂` only needs a uniform 0-step. -/
 theorem IsPerIndexQueryBound.simulateQ_run_add_inl_of_uniform_step
     {ι₁ ι₂ : Type u} [DecidableEq ι₁] [DecidableEq ι₂]
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited]
     {σ : Type u}
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp (spec₁ + spec₂)))}
     {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp (spec₁ + spec₂)))}
@@ -1676,6 +1690,7 @@ interaction: `impl₁` only needs a uniform 0-step. -/
 theorem IsPerIndexQueryBound.simulateQ_run_add_inr_of_uniform_step
     {ι₁ ι₂ : Type u} [DecidableEq ι₁] [DecidableEq ι₂]
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [(spec₁ + spec₂).Fintype] [(spec₁ + spec₂).Inhabited]
     {σ : Type u}
     {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp (spec₁ + spec₂)))}
     {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp (spec₁ + spec₂)))}
@@ -1708,7 +1723,8 @@ theorem isTotalQueryBound_run_simulateQ_countingOracle_iff
   isQueryBound_iff_of_map_eq (countingOracle.fst_map_run_simulateQ oa) _ _
 
 theorem isQueryBoundP_run_simulateQ_countingOracle_iff
-    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι} {α : Type}
+    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : ι → Prop) [DecidablePred p] (n : ℕ) :
     IsQueryBoundP ((simulateQ countingOracle oa).run) p n ↔
     IsQueryBoundP oa p n :=
@@ -1716,7 +1732,7 @@ theorem isQueryBoundP_run_simulateQ_countingOracle_iff
 
 theorem isTotalQueryBound_run_simulateQ_withTraceBefore_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec')) (traceFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α) (n : ℕ) :
@@ -1726,7 +1742,7 @@ theorem isTotalQueryBound_run_simulateQ_withTraceBefore_iff
 
 theorem isQueryBoundP_run_simulateQ_withTraceBefore_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec')) (traceFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α)
@@ -1737,7 +1753,7 @@ theorem isQueryBoundP_run_simulateQ_withTraceBefore_iff
 
 theorem isTotalQueryBound_run_simulateQ_withTraceAppend_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [EmptyCollection ω] [Append ω] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
@@ -1748,7 +1764,7 @@ theorem isTotalQueryBound_run_simulateQ_withTraceAppend_iff
 
 theorem isQueryBoundP_run_simulateQ_withTraceAppend_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [EmptyCollection ω] [Append ω] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
@@ -1760,7 +1776,7 @@ theorem isQueryBoundP_run_simulateQ_withTraceAppend_iff
 
 theorem isTotalQueryBound_run_simulateQ_withTrace_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
@@ -1771,7 +1787,7 @@ theorem isTotalQueryBound_run_simulateQ_withTrace_iff
 
 theorem isQueryBoundP_run_simulateQ_withTrace_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
@@ -1783,7 +1799,7 @@ theorem isQueryBoundP_run_simulateQ_withTrace_iff
 
 theorem isTotalQueryBound_run_simulateQ_withTraceAppendBefore_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [EmptyCollection ω] [Append ω] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec')) (traceFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α) (n : ℕ) :
@@ -1794,7 +1810,7 @@ theorem isTotalQueryBound_run_simulateQ_withTraceAppendBefore_iff
 
 theorem isQueryBoundP_run_simulateQ_withTraceAppendBefore_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [EmptyCollection ω] [Append ω] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec')) (traceFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α)
@@ -1806,7 +1822,7 @@ theorem isQueryBoundP_run_simulateQ_withTraceAppendBefore_iff
 
 theorem isTotalQueryBound_run_simulateQ_withCost_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec')) (costFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α) (n : ℕ) :
@@ -1816,7 +1832,7 @@ theorem isTotalQueryBound_run_simulateQ_withCost_iff
 
 theorem isQueryBoundP_run_simulateQ_withCost_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec')) (costFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α)
@@ -1827,7 +1843,7 @@ theorem isQueryBoundP_run_simulateQ_withCost_iff
 
 theorem isTotalQueryBound_run_simulateQ_withCounting_iff
     {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     (so : QueryImpl spec (OracleComp spec'))
     {α : Type u} (mx : OracleComp spec α) (n : ℕ) :
     IsTotalQueryBound ((simulateQ (so.withCounting) mx).run) n ↔
@@ -1836,7 +1852,7 @@ theorem isTotalQueryBound_run_simulateQ_withCounting_iff
 
 theorem isQueryBoundP_run_simulateQ_withCounting_iff
     {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
-    {ι' : Type u} {spec' : OracleSpec ι'}
+    {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec']
     (so : QueryImpl spec (OracleComp spec'))
     {α : Type u} (mx : OracleComp spec α)
     (q : ι' → Prop) [DecidablePred q] (n : ℕ) :
@@ -1847,7 +1863,8 @@ theorem isQueryBoundP_run_simulateQ_withCounting_iff
 /-! ### Per-index analogues -/
 
 theorem isPerIndexQueryBound_run_simulateQ_countingOracle_iff
-    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι} {α : Type}
+    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
+    [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (qb : ι → ℕ) :
     IsPerIndexQueryBound ((simulateQ countingOracle oa).run) qb ↔
     IsPerIndexQueryBound oa qb :=
@@ -1855,7 +1872,7 @@ theorem isPerIndexQueryBound_run_simulateQ_countingOracle_iff
 
 theorem isPerIndexQueryBound_run_simulateQ_withTraceBefore_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'}
+    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec')) (traceFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α) (qb : ι' → ℕ) :
@@ -1865,7 +1882,7 @@ theorem isPerIndexQueryBound_run_simulateQ_withTraceBefore_iff
 
 theorem isPerIndexQueryBound_run_simulateQ_withTrace_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'}
+    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
@@ -1876,7 +1893,7 @@ theorem isPerIndexQueryBound_run_simulateQ_withTrace_iff
 
 theorem isPerIndexQueryBound_run_simulateQ_withTraceAppendBefore_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'}
+    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [EmptyCollection ω] [Append ω] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec')) (traceFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α) (qb : ι' → ℕ) :
@@ -1887,7 +1904,7 @@ theorem isPerIndexQueryBound_run_simulateQ_withTraceAppendBefore_iff
 
 theorem isPerIndexQueryBound_run_simulateQ_withTraceAppend_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'}
+    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [EmptyCollection ω] [Append ω] [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
@@ -1898,7 +1915,7 @@ theorem isPerIndexQueryBound_run_simulateQ_withTraceAppend_iff
 
 theorem isPerIndexQueryBound_run_simulateQ_withCost_iff
     {ι : Type u} {spec : OracleSpec ι}
-    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'}
+    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'} [IsUniformSpec spec']
     {ω : Type u} [Monoid ω]
     (so : QueryImpl spec (OracleComp spec')) (costFn : spec.Domain → ω)
     {α : Type u} (mx : OracleComp spec α) (qb : ι' → ℕ) :
@@ -1908,7 +1925,7 @@ theorem isPerIndexQueryBound_run_simulateQ_withCost_iff
 
 theorem isPerIndexQueryBound_run_simulateQ_withCounting_iff
     {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
-    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'}
+    {ι' : Type u} [DecidableEq ι'] {spec' : OracleSpec ι'} [IsUniformSpec spec']
     (so : QueryImpl spec (OracleComp spec'))
     {α : Type u} (mx : OracleComp spec α) (qb : ι' → ℕ) :
     IsPerIndexQueryBound ((simulateQ (so.withCounting) mx).run) qb ↔

@@ -140,7 +140,7 @@ def withProgramming
 
 /-! ## Bad-flag monotonicity -/
 
-variable [LawfulMonad m] [HasEvalSet m]
+variable [LawfulMonad m] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
 /-- The bad flag of `withProgramming` is monotone: once set, every query keeps it set. -/
 lemma withProgramming_bad_monotone
@@ -204,7 +204,7 @@ def withCachingTrackingPolicy
     (fun (t : spec.Domain) (_ : spec.QueryCache) (bad : Bool) =>
       (fun u => (u, if (policy t).isSome then true else bad)) <$> so t)
 
-omit [LawfulMonad m] [HasEvalSet m] in
+omit [LawfulMonad m] [MonadLiftT m SetM] in
 @[simp] lemma withCachingTrackingPolicy_apply
     (so : QueryImpl spec m) (policy : ProgrammingPolicy spec) (t : spec.Domain) :
     so.withCachingTrackingPolicy policy t =
@@ -256,7 +256,7 @@ end QueryImpl
 
 namespace OracleComp.ProgramLogic.Relational
 
-variable {α : Type}
+variable {α : Type} [IsUniformSpec spec]
 
 /-- Cache-side projection: running `withProgramming so empty` and projecting away the bad flag
 gives the same distribution as running `so.withCaching` directly.
@@ -352,6 +352,7 @@ and makes no underlying queries, so the `withCaching` bounds transfer directly. 
 
 theorem isTotalQueryBound_run_simulateQ_withCachingTrackingPolicy
     {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    [IsUniformSpec spec']
     (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
     {oa : OracleComp spec α} {n : ℕ}
     (h : OracleComp.IsTotalQueryBound oa n)
@@ -366,6 +367,7 @@ theorem isTotalQueryBound_run_simulateQ_withCachingTrackingPolicy
 
 theorem isQueryBoundP_run_simulateQ_withCachingTrackingPolicy
     {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    [IsUniformSpec spec']
     (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
     {oa : OracleComp spec α}
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q] {n : ℕ}
@@ -380,7 +382,7 @@ theorem isQueryBoundP_run_simulateQ_withCachingTrackingPolicy
     (OracleComp.IsQueryBoundP.simulateQ_run_withCaching so h hstep_p hstep_np cache)
 
 theorem isPerIndexQueryBound_run_simulateQ_withCachingTrackingPolicy
-    {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
+    {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} [IsUniformSpec spec]
     (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
     {oa : OracleComp spec α} {qb : ι → ℕ}
     (h : OracleComp.IsPerIndexQueryBound oa qb)
@@ -402,7 +404,9 @@ projection. -/
 section WithProgrammingBounds
 
 variable {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+  [IsUniformSpec spec']
 
+omit [IsUniformSpec spec'] in
 private lemma isTotalQueryBound_run_withProgramming
     (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) {n : ℕ}
@@ -420,6 +424,7 @@ private lemma isTotalQueryBound_run_withProgramming
           exact (OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr
             ((OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr h)
 
+omit [IsUniformSpec spec'] in
 private lemma isQueryBoundP_run_withProgramming
     (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) {q : ι' → Prop} [DecidablePred q] {n : ℕ}
@@ -437,7 +442,7 @@ private lemma isQueryBoundP_run_withProgramming
           exact (OracleComp.isQueryBoundP_map_iff (p := q) _ _ _).mpr
             ((OracleComp.isQueryBoundP_map_iff (p := q) _ _ _).mpr h)
 
-private lemma isPerIndexQueryBound_run_withProgramming
+private lemma isPerIndexQueryBound_run_withProgramming [IsUniformSpec spec]
     (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) {qb : ι → ℕ}
     (h : OracleComp.IsPerIndexQueryBound (so t) qb) (s : spec.QueryCache × Bool) :
@@ -480,7 +485,7 @@ theorem isQueryBoundP_run_simulateQ_withProgramming
     (fun t hnp s => isQueryBoundP_run_withProgramming so policy t (hstep_np t hnp) s)
     (cache, bad)
 
-theorem isPerIndexQueryBound_run_simulateQ_withProgramming
+theorem isPerIndexQueryBound_run_simulateQ_withProgramming [IsUniformSpec spec]
     (so : QueryImpl spec (OracleComp spec)) (policy : ProgrammingPolicy spec)
     {oa : OracleComp spec α} {qb : ι → ℕ}
     (h : OracleComp.IsPerIndexQueryBound oa qb)

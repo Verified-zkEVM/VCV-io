@@ -331,7 +331,7 @@ noncomputable def processSemanticsAsync
 
 /--
 Coin-flip-only specialization of `processSemanticsAsync` (`m = ProbComp`,
-`sem := SPMFSemantics.ofHasEvalSPMF ProbComp`). Companion of
+`sem := SPMFSemantics.ofMonadLift ProbComp`). Companion of
 `processSemanticsProbComp`.
 -/
 noncomputable def processSemanticsAsyncProbComp
@@ -349,7 +349,7 @@ noncomputable def processSemanticsAsyncProbComp
       p.Proc → State → RuntimeTrace Event → ProbComp Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
   processSemanticsAsync Party schedulerSampler
-    (SPMFSemantics.ofHasEvalSPMF ProbComp)
+    (SPMFSemantics.ofMonadLift ProbComp)
     envAction initEnvState
     init envScheduler fuel observe
 

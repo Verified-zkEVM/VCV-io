@@ -137,7 +137,8 @@ theorem signAttempt_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
 /-- The expected weighted query cost of one signing attempt is the expectation of the queried
 commitment cost over the attempt output distribution. -/
 theorem signAttempt_expectedQueryCost_eq_outputExpectation
-    {ω : Type} [AddMonoid ω] [HasEvalSPMF m]
+    {ω : Type} [AddMonoid ω] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) (val : ω → ENNReal) :
     ExpectedQueryCost[
@@ -177,7 +178,7 @@ theorem signAttempt_expectedQueryCost_eq_outputExpectation
 
 section queryBounds
 
-variable [HasEvalSet m]
+variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
 private lemma signAttempt_usesWeightedQueryCostAtMost
     {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
@@ -324,7 +325,8 @@ end queryBounds
 
 section expectedCost
 
-variable [HasEvalSPMF m]
+variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
 section schemeCost
 
@@ -348,7 +350,6 @@ theorem sign_expectedQueries_eq_sum_reachedAttemptProbabilities
             (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ℕ m)] =>
               (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
             runtime] := by
-  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   exact HasQuery.expectedQueries_eq_sum_tail_probs_of_usesAtMostQueries
     (oa := fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ℕ m)] =>
       (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
@@ -357,6 +358,7 @@ theorem sign_expectedQueries_eq_sum_reachedAttemptProbabilities
       (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
       (msg := msg) (maxAttempts := maxAttempts))
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- Expected weighted query cost of signing is bounded by the worst-case `maxAttempts • w`
 budget whenever every query costs at most `w`. -/
 theorem sign_expectedQueryCost_le
@@ -368,13 +370,13 @@ theorem sign_expectedQueryCost_le
     ExpectedQueryCost[
       (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime by costFn via val
     ] ≤ val (maxAttempts • w) := by
-  let _ : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   exact HasQuery.expectedQueryCost_le_of_usesCostAtMost
     (sign_usesWeightedQueryCostAtMost
       (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
       (msg := msg) (costFn := costFn) (w := w) hcost (maxAttempts := maxAttempts))
     hval
 
+omit [LawfulMonadLiftT m SPMF] in
 /-- Unit-cost specialization: the expected number of signing queries is at most `maxAttempts`. -/
 theorem sign_expectedQueries_le
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
@@ -382,7 +384,6 @@ theorem sign_expectedQueries_le
     ExpectedQueries[
       (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
     ] ≤ maxAttempts := by
-  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   exact HasQuery.expectedQueries_le_of_usesAtMostQueries
     (sign_usesAtMostMaxAttemptsQueries
       (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)

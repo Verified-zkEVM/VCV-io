@@ -22,7 +22,7 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-  [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+  [spec.DecidableEq] [IsUniformSpec spec]
 
 /-! ## Per-Pair Collision Bound (Textbook Step 3)
 
@@ -187,7 +187,7 @@ theorem probEvent_log_output_match_le {α : Type}
         · intro h; exact ⟨t, u', by simp, h⟩
       simp_rw [hpred]
       -- Inner Pr is constant: either 1 (if HEq u₀ u') or 0 (otherwise).
-      simp_rw [probEvent_const, HasEvalPMF.probFailure_eq_zero, tsub_zero]
+      simp_rw [probEvent_const, probFailure_of_liftM_PMF, tsub_zero]
       -- Goal: ∑' u', Pr[=u'|query t] * (if HEq u₀ u' then 1 else 0) ≤ 1/|Range default|
       simp_rw [probOutput_query]
       rw [ENNReal.tsum_mul_left]
@@ -559,8 +559,9 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
         (simulateQ cachingOracle (pure x)).run cache₀] = 0 := by
       rw [simulateQ_pure]
       refine probEvent_eq_zero fun z hz h => ?_
-      simp only [StateT.run] at hz
-      obtain ⟨rfl, rfl⟩ := hz
+      change z ∈ support (pure (x, cache₀) : OracleComp _ _) at hz
+      rw [support_pure, Set.mem_singleton_iff] at hz
+      subst hz
       exact hnocoll h
     rw [this]; exact zero_le
   | query_bind t mx ih =>

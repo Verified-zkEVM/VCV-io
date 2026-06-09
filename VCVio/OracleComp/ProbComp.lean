@@ -60,11 +60,12 @@ lemma uniformFin_def (n : ℕ) : $[0..n] = unifSpec.query n := rfl
 
 @[simp]
 lemma support_uniformFin (n : ℕ) :
-    support (do $[0..n]) = Set.univ := by grind
+    support (do $[0..n]) = Set.univ := by simp [uniformFin_def]
 
 @[simp]
 lemma finSupport_uniformFin (n : ℕ) :
-    finSupport (do $[0..n]) = Finset.univ := by grind
+    finSupport (do $[0..n]) = Finset.univ := by
+  rw [finSupport_eq_iff_support_eq_coe, support_uniformFin]; simp
 
 @[grind =]
 lemma probOutput_uniformFin_eq_div (n : ℕ) (m : Fin (n + 1)) :

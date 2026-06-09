@@ -71,7 +71,7 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Boo
 
 section HonestExecution
 
-variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
+variable [SampleableType Chal] [IsUniformSpec unifSpec]
 
 /-- A single honest execution producing an optional transcript `(Commit, Chal, Resp)`.
 Returns `none` if the prover aborts. -/
@@ -87,7 +87,7 @@ end HonestExecution
 
 section Completeness
 
-variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
+variable [SampleableType Chal] [IsUniformSpec unifSpec]
 
 /-- An identification scheme with aborts is complete if: whenever the prover does not abort,
 the verifier always accepts. -/
@@ -124,7 +124,7 @@ end Completeness
 
 section HVZK
 
-variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
+variable [SampleableType Chal] [IsUniformSpec unifSpec]
 
 /-- Approximate honest-verifier zero-knowledge for an identification scheme with aborts:
 the transcript distribution produced by the honest prover is within total variation
@@ -193,7 +193,7 @@ structure ImpAdv (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp r
   commit (s : Stmt) : ProbComp (Commit × AdvSt)
   respond (s : Stmt) (c : Chal) (st : AdvSt) : ProbComp Resp
 
-variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
+variable [SampleableType Chal] [IsUniformSpec unifSpec]
 
 /-- The impersonation experiment: the adversary tries to produce a valid transcript
 without knowing the witness, against a fixed statement `s`. -/

@@ -28,7 +28,7 @@ namespace OracleComp.ProgramLogic.AnchoredExamples
 open ENNReal MAlgRelOrdered MAlgRelOrdered.Anchored
 
 variable {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable [IsUniformSpec spec₁] [IsUniformSpec spec₂]
 
 /-! ## Pure-pure base cases -/
 
