@@ -67,7 +67,7 @@ lemma probEvent_bind_le_add_of_disagree {mx : m α}
         refine add_le_add (add_le_add le_rfl ?_) ?_
         · rw [← probEvent_eq_tsum_ite]; exact hD
         · rw [ENNReal.tsum_mul_right]
-          exact mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one
+          exact mul_le_of_le_one_left (zero_le) tsum_probOutput_le_one
 
 /-- **Three-way disagreement-aware additive bind bound (hop A).** A coupled three-world variant of
 `probEvent_bind_le_add_of_disagree`: the three worlds share the sampling computation `mx`, and at
@@ -111,7 +111,7 @@ lemma probEvent_bind_le_add_bad_of_disagree {mx : m α}
           + (∑' x, Pr[= x | mx] * Pr[r | ob x]) + ε := by
         refine add_le_add le_rfl ?_
         rw [ENNReal.tsum_mul_right]
-        exact mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one
+        exact mul_le_of_le_one_left (zero_le) tsum_probOutput_le_one
 
 /-- **Four-way disagreement-aware additive bind bound (hop A).** A strengthening of
 `probEvent_bind_le_add_bad_of_disagree`: the per-step inductive hypothesis itself carries a
@@ -153,7 +153,7 @@ lemma probEvent_bind_le_add_bad_of_disagree' {mx : m α}
           + (∑' x, Pr[= x | mx] * Pr[r | ob x]) + ε := by
         refine add_le_add le_rfl ?_
         rw [ENNReal.tsum_mul_right]
-        exact mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one
+        exact mul_le_of_le_one_left (zero_le) tsum_probOutput_le_one
 
 /-- **Four-way disagreement+bad additive bind bound.** A merge of
 `probEvent_bind_le_add_of_disagree` with the three-world `probEvent_bind_le_add_bad_of_disagree`:
@@ -187,7 +187,7 @@ lemma probEvent_bind_le_add_bad_disagree {mx : m α}
                       = 0 + 0 + Pr[= x | mx] + 0 := by ring
                     _ ≤ Pr[= x | mx] * Pr[q | oc x] + Pr[= x | mx] * Pr[r | ob x]
                           + Pr[= x | mx] + Pr[= x | mx] * ε₂ := by
-                        gcongr <;> exact zero_le _
+                        gcongr <;> exact zero_le
           · simp only [if_neg hDx, add_zero]
             calc Pr[= x | mx] * Pr[q | my x]
                 ≤ Pr[= x | mx] * (Pr[q | oc x] + Pr[r | ob x] + ε₂) :=
@@ -204,4 +204,4 @@ lemma probEvent_bind_le_add_bad_disagree {mx : m α}
         refine add_le_add (add_le_add le_rfl ?_) ?_
         · rw [← probEvent_eq_tsum_ite]; exact hD
         · rw [ENNReal.tsum_mul_right]
-          exact mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one
+          exact mul_le_of_le_one_left (zero_le) tsum_probOutput_le_one

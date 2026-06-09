@@ -138,16 +138,16 @@ lemma isClosed_couplings_set (p : SPMF α) (q : SPMF β) :
     have : {c : Option (α × β) → ℝ | ∀ a, ∑ b, c (some (a, b)) = (p a).toReal} =
       ⋂ a, {c | ∑ b, c (some (a, b)) = (p a).toReal} := by ext; simp
     rw [this]
-    exact isClosed_iInter fun a => isClosed_eq (continuous_finset_sum _
+    exact isClosed_iInter fun a => isClosed_eq (continuous_finsetSum _
       (fun b _ => continuous_apply _)) continuous_const
   have h4 : IsClosed {c : Option (α × β) → ℝ | ∀ b, ∑ a, c (some (a, b)) = (q b).toReal} := by
     have : {c : Option (α × β) → ℝ | ∀ b, ∑ a, c (some (a, b)) = (q b).toReal} =
       ⋂ b, {c | ∑ a, c (some (a, b)) = (q b).toReal} := by ext; simp
     rw [this]
-    exact isClosed_iInter fun b => isClosed_eq (continuous_finset_sum _
+    exact isClosed_iInter fun b => isClosed_eq (continuous_finsetSum _
       (fun a _ => continuous_apply _)) continuous_const
   have h5 : IsClosed {c : Option (α × β) → ℝ | c none = 1 - (∑ z, c (some z))} :=
-    isClosed_eq (continuous_apply _) (continuous_const.sub (continuous_finset_sum _
+    isClosed_eq (continuous_apply _) (continuous_const.sub (continuous_finsetSum _
       (fun z _ => continuous_apply _)))
   exact (((h1.inter h2).inter h3).inter h4).inter h5
 
@@ -325,7 +325,7 @@ lemma SPMF.exists_max_coupling {p : SPMF α} {q : SPMF β}
   letI := Fintype.ofFinite α
   letI := Fintype.ofFinite β
   let F : (Option (α × β) → ℝ) → ℝ := fun c => ∑ z, c z * (f z).toReal
-  have hF_cont : Continuous F := continuous_finset_sum _
+  have hF_cont : Continuous F := continuous_finsetSum _
     (fun z _ => (continuous_apply z).mul continuous_const)
   -- Show set is nonempty
   obtain ⟨c0⟩ := h_nonempty

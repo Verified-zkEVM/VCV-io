@@ -815,7 +815,7 @@ theorem eRelWP_bind_rule
   have hstep : pre ≤ eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post) :=
     eRelWP_conseq le_rfl (fun a b => hfg a b) hxy
   refine le_trans hstep ?_
-  show eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post) ≤
+  change eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post) ≤
     eRelWP (oa >>= fa) (ob >>= fb) post
   unfold eRelWP
   refine iSup_le fun c => ?_

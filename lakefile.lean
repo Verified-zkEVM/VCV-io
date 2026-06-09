@@ -18,7 +18,7 @@ Interop backends — pinned to explicit git revisions so reproducible builds are
 guaranteed and bumping a pin is a deliberate, reviewed change. The current
 branch keeps **Hax enabled by default** because `Interop.lean` imports the
 Hax-backed bridge and examples; Aeneas stays commented out until upstream
-ships a Lean v4.29-compatible release. The CI TCB-isolation check
+ships a Lean v4.30-compatible release. The CI TCB-isolation check
 (`scripts/check-interop-isolation.sh`) still protects against accidental
 cross-imports regardless of which backend requires are active.
 
@@ -26,7 +26,7 @@ Important: `require mathlib` must come **after** any Interop backend `require`s
 so Mathlib's transitive pins (in particular `Qq`) win over the backends'. Lake
 warns and `lake exe cache get` fails otherwise.
 
-Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0). Latest `main` as of
+Hax: Lean 4.29.0-rc1 (compatible with our 4.30.0). Latest `main` as of
 2026-04-16. Subdirectory: `hax-lib/proof-libs/lean`.
 -/
 require Hax from git
@@ -40,10 +40,10 @@ upstream PR https://github.com/leanprover/lean4/pull/12965 in the
 `Std.Internal.Do.{WPMonad,PredTrans,Triple,Assertion,ExceptPost}` namespace
 (temporarily prefixed `Std.Do'` in Loom2 to avoid clashing once it merges).
 
-Pinned to our `quangvdao/loom2` fork on branch `v4.29.0`, which patches only
-the toolchain (4 config-only commits over upstream `verse-lab/loom2`). When
-upstream Lean ships these foundations in a stable release, drop this require
-and re-import from `Std.Do.…` directly.
+Pinned to our `quangvdao/loom2` fork on branch `v4.29.0-ci-threads`, which
+patches only the toolchain / build configuration over upstream
+`verse-lab/loom2`. When upstream Lean ships these foundations in a stable
+release, drop this require and re-import from `Std.Do.…` directly.
 -/
 require loom2 from git
   "https://github.com/quangvdao/loom2" @
@@ -51,9 +51,9 @@ require loom2 from git
 
 /-
 Aeneas: upstream pins Lean 4.28.0-rc1. Lake happily resolves aeneas against
-our root Mathlib v4.29.0 and Lean v4.29.0, but aeneas's source has three
+our root Mathlib v4.30.0 and Lean v4.30.0, but aeneas's source has three
 real regressions under that stack — see `Interop/Aeneas/README.md` for the
-exact diagnostics. Leave this commented until upstream ships a v4.29 build
+exact diagnostics. Leave this commented until upstream ships a v4.30 build
 (or pin to a patched fork). Latest upstream `main` as of 2026-04-17 is
 `ba600392`; subdirectory `backends/lean`.
 -/
@@ -61,11 +61,11 @@ exact diagnostics. Leave this commented until upstream ships a v4.29 build
 --   "https://github.com/AeneasVerif/aeneas" @
 --   "ba600392" / "backends/lean"
 
-require "leanprover-community" / "mathlib" @ git "v4.29.0"
+require "leanprover-community" / "mathlib" @ git "v4.30.0"
 
 require PolyFun from git
   "https://github.com/Verified-zkEVM/PolyFun.git" @
-  "cf8b35c0caa10c7f484d207abe07f2d496b852af"
+  "5d3a160ed751b9227af90adb9da41d0eae2e0238"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio

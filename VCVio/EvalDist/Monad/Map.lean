@@ -63,7 +63,8 @@ lemma probEvent_bind_pure_comp (q : β → Prop) :
     Pr[ q | mx >>= pure ∘ f] = Pr[ q ∘ f | mx] := by
   have := Classical.decPred q
   rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
-  simp
+  simp only [Function.comp_apply, probEvent_pure, mul_ite, mul_one, mul_zero]
+  exact tsum_congr fun _ => by congr 1
 
 variable [LawfulMonad m]
 

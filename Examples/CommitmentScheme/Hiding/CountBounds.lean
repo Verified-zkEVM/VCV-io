@@ -5,6 +5,10 @@ Authors: James Waters
 -/
 import Examples.CommitmentScheme.Hiding.Defs
 
+/-!
+# Count bounds for commitment-scheme hiding
+-/
+
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}

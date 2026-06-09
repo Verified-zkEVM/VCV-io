@@ -333,49 +333,9 @@ instance (n : ℕ) [NeZero n] : FinEnum (ZMod n) where
   card := n
   equiv := (ZMod.finEquiv n).symm.toEquiv
 
-instance (n : ℕ) : FinEnum (BitVec n) where
-  card := 2 ^ n
-  equiv := ⟨BitVec.toFin, BitVec.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt8 where
-  card := 2 ^ 8
-  equiv := ⟨UInt8.toFin, UInt8.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt16 where
-  card := 2 ^ 16
-  equiv := ⟨UInt16.toFin, UInt16.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt32 where
-  card := 2 ^ 32
-  equiv := ⟨UInt32.toFin, UInt32.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt64 where
-  card := 2 ^ 64
-  equiv := ⟨UInt64.toFin, UInt64.ofFin, fun x => by simp, fun x => by simp⟩
-
 instance : FinEnum USize where
   card := 2 ^ System.Platform.numBits
   equiv := ⟨USize.toFin, USize.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int8 where
-  card := 2 ^ 8
-  equiv := ⟨BitVec.toFin ∘ Int8.toBitVec, Int8.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int16 where
-  card := 2 ^ 16
-  equiv := ⟨BitVec.toFin ∘ Int16.toBitVec, Int16.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int32 where
-  card := 2 ^ 32
-  equiv := ⟨BitVec.toFin ∘ Int32.toBitVec, Int32.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int64 where
-  card := 2 ^ 64
-  equiv := ⟨BitVec.toFin ∘ Int64.toBitVec, Int64.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
 
 instance : FinEnum ISize where
   card := 2 ^ System.Platform.numBits

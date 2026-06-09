@@ -1162,7 +1162,7 @@ private lemma simulateQ_unlinkBad_prob_le
   | pure b =>
     simp only [simulateQ_pure, StateT.run_pure, probEvent_pure, hbad, Bool.false_eq_true,
       ite_false]
-    exact zero_le _
+    exact zero_le
   | query_bind t oa ih =>
     simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind, monadLift_self]
     cases t with
