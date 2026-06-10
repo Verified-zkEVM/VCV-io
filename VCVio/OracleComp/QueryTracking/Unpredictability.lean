@@ -37,13 +37,13 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-  [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+  [spec.DecidableEq] [IsUniformSpec spec]
 
 /-! ## Unpredictability -/
 
 section Unpredictability
 
-variable {spec' : OracleSpec.{0, 0} ι} [spec'.DecidableEq] [spec'.Fintype] [spec'.Inhabited]
+variable {spec' : OracleSpec.{0, 0} ι} [spec'.DecidableEq] [IsUniformSpec spec']
 
 omit [spec'.DecidableEq] in
 /-- **Fresh query uniformity**: querying `cachingOracle` at an uncached point
@@ -53,11 +53,14 @@ theorem probOutput_fresh_cachingOracle_query
     (cache₀ : QueryCache spec') (hfresh : cache₀ t = none) :
     Pr[= (u, cache₀.cacheQuery t u) | (cachingOracle t).run cache₀] =
       (Fintype.card (spec'.Range t) : ℝ≥0∞)⁻¹ := by
-  simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind, hfresh]
-  simp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift, StateT.run_lift, monad_norm]
-  simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
-    StateT.modifyGet, StateT.run]
-  erw [probOutput_map_injective _ (fun a b hab => by exact Prod.ext_iff.mp hab |>.1)]
+  rw [show (cachingOracle t).run cache₀ =
+    (fun u' => (u', cache₀.cacheQuery t u')) <$> (liftM (query t) : OracleComp spec' _) by
+      simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind, hfresh]
+      simp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift, StateT.run_lift, monad_norm]
+      simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
+        StateT.modifyGet, StateT.run]
+      rfl]
+  rw [probOutput_map_injective _ (fun a b hab => Prod.ext_iff.mp hab |>.1)]
   exact probOutput_query t u
 
 omit [spec'.DecidableEq] in
@@ -116,10 +119,12 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
         (simulateQ cachingOracle (pure x)).run cache₀] = 0 := by
       rw [simulateQ_pure]
       refine probEvent_eq_zero fun z hz h => ?_
-      simp only [StateT.run] at hz; obtain ⟨_, rfl⟩ := hz
+      change z ∈ support (pure (x, cache₀) : OracleComp _ _) at hz
+      rw [support_pure, Set.mem_singleton_iff] at hz
+      subst hz
       obtain ⟨t₀, v, hcache, hnone, _⟩ := h
       simp [hnone] at hcache
-    rw [this]; exact zero_le _
+    rw [this]; exact zero_le
   | query_bind t mx ih =>
     rw [isTotalQueryBound_query_bind_iff] at hbound
     obtain ⟨hpos, hrest⟩ := hbound

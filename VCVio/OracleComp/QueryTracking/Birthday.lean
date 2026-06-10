@@ -22,7 +22,7 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-  [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+  [spec.DecidableEq] [IsUniformSpec spec]
 
 /-! ## Per-Pair Collision Bound (Textbook Step 3)
 
@@ -108,7 +108,7 @@ theorem probEvent_log_entry_eq_le {α : Type}
               (simulateQ loggingOracle (mx u)).run] = 0 :=
           fun u => probEvent_eq_zero fun _ _ => hne u
         simp only [hzero, mul_zero, tsum_zero]
-        exact zero_le _
+        exact zero_le
     | succ k' =>
       -- k > 0: decompose with probEvent_bind_eq_tsum, use ih.
       rw [probEvent_bind_eq_tsum]
@@ -162,7 +162,7 @@ theorem probEvent_log_output_match_le {α : Type}
   induction oa using OracleComp.inductionOn generalizing k with
   | pure _ =>
     simp only [simulateQ_pure]
-    refine le_of_eq_of_le (probEvent_eq_zero fun z hmem h => ?_) (zero_le _)
+    refine le_of_eq_of_le (probEvent_eq_zero fun z hmem h => ?_) (zero_le)
     simp only [WriterT.run_pure', List.empty_eq, support_pure,
       Set.mem_singleton_iff] at hmem; obtain ⟨_, rfl⟩ := hmem
     obtain ⟨s, v, hlog, _⟩ := h; simp at hlog
@@ -187,7 +187,7 @@ theorem probEvent_log_output_match_le {α : Type}
         · intro h; exact ⟨t, u', by simp, h⟩
       simp_rw [hpred]
       -- Inner Pr is constant: either 1 (if HEq u₀ u') or 0 (otherwise).
-      simp_rw [probEvent_const, HasEvalPMF.probFailure_eq_zero, tsub_zero]
+      simp_rw [probEvent_const, probFailure_of_liftM_PMF, tsub_zero]
       -- Goal: ∑' u', Pr[=u'|query t] * (if HEq u₀ u' then 1 else 0) ≤ 1/|Range default|
       simp_rw [probOutput_query]
       rw [ENNReal.tsum_mul_left]
@@ -559,10 +559,11 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
         (simulateQ cachingOracle (pure x)).run cache₀] = 0 := by
       rw [simulateQ_pure]
       refine probEvent_eq_zero fun z hz h => ?_
-      simp only [StateT.run] at hz
-      obtain ⟨rfl, rfl⟩ := hz
+      change z ∈ support (pure (x, cache₀) : OracleComp _ _) at hz
+      rw [support_pure, Set.mem_singleton_iff] at hz
+      subst hz
       exact hnocoll h
-    rw [this]; exact zero_le _
+    rw [this]; exact zero_le
   | query_bind t mx ih =>
     intro m k hm cache₀ hnocoll hbnd
     rw [isTotalQueryBound_query_bind_iff] at hm

@@ -24,7 +24,7 @@ variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
 
 /-- Perfect distributional equivalence of two stateful handlers from explicit
 initial states. -/
-def DistEquiv [I.Fintype] [I.Inhabited] {σ₀ σ₁ : Type}
+def DistEquiv [IsUniformSpec I] {σ₀ σ₁ : Type}
     (h₀ : QueryImpl.Stateful I E σ₀) (s₀ : σ₀)
     (h₁ : QueryImpl.Stateful I E σ₁) (s₁ : σ₁) : Prop :=
   ∀ {α : Type} (A : OracleComp E α),
@@ -35,7 +35,7 @@ scoped notation:50 "(" h₀ ", " s₀ ")" " ≡ᵈ " "(" h₁ ", " s₁ ")" =>
   QueryImpl.Stateful.DistEquiv h₀ s₀ h₁ s₁
 
 /-- Perfect distributional equivalence from default initial states. -/
-def DistEquiv₀ [I.Fintype] [I.Inhabited] {σ₀ σ₁ : Type}
+def DistEquiv₀ [IsUniformSpec I] {σ₀ σ₁ : Type}
     [Inhabited σ₀] [Inhabited σ₁]
     (h₀ : QueryImpl.Stateful I E σ₀) (h₁ : QueryImpl.Stateful I E σ₁) : Prop :=
   QueryImpl.Stateful.DistEquiv h₀ default h₁ default
@@ -46,7 +46,7 @@ scoped infix:50 " ≡ᵈ₀ " => QueryImpl.Stateful.DistEquiv₀
 namespace DistEquiv
 
 variable {σ σ₀ σ₁ σ₂ : Type}
-variable [I.Fintype] [I.Inhabited]
+variable [IsUniformSpec I]
 
 private lemma simulateQ_StateT_evalDist_congr_import {α : Type}
     {h₀ h₁ : QueryImpl E (StateT σ (OracleComp I))}
@@ -204,7 +204,7 @@ section ParCongr
 
 variable {ιᵢ₁ : Type uₘ} {ιᵢ₂ : Type uₘ}
   {I₁ : OracleSpec.{uₘ, 0} ιᵢ₁} {I₂ : OracleSpec.{uₘ, 0} ιᵢ₂}
-  [I₁.Fintype] [I₁.Inhabited] [I₂.Fintype] [I₂.Inhabited]
+  [IsUniformSpec I₁] [IsUniformSpec I₂]
   {ιₑ₁ : Type uₑ} {ιₑ₂ : Type uₑ}
   {E₁ : OracleSpec.{uₑ, 0} ιₑ₁} {E₂ : OracleSpec.{uₑ, 0} ιₑ₂}
   {σ₁ σ₂ : Type}

@@ -46,7 +46,7 @@ then the full simulation also preserves the invariant and output equality. -/
 theorem relTriple_simulateQ_run
     {ι₁ : Type u} {ι₂ : Type u}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {σ₁ σ₂ : Type}
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
@@ -76,7 +76,7 @@ theorem relTriple_simulateQ_run
 theorem relTriple_simulateQ_run'
     {ι₁ : Type u} {ι₂ : Type u}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {σ₁ σ₂ : Type}
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
@@ -108,7 +108,7 @@ invariant" into a single theorem. -/
 theorem relTriple_simulateQ_run'_of_impl_evalDist_eq
     {ι₁ : Type u} {ι₂ : Type u}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {σ : Type}
     (impl₁ : QueryImpl spec (StateT σ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ (OracleComp spec₂)))
@@ -140,7 +140,7 @@ requirement for whole-program accumulation. -/
 theorem relTriple_simulateQ_run_writerT
     {ι₁ : Type u} {ι₂ : Type u}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
     (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
@@ -187,7 +187,7 @@ hypothesis is a plain equality rather than an invariant-gated
 implication. The postcondition is strict equality on `α × ω`. -/
 theorem relTriple_simulateQ_run_writerT_of_impl_eq
     {ι₁ : Type u}
-    {spec₁ : OracleSpec ι₁} [spec₁.Fintype] [spec₁.Inhabited]
+    {spec₁ : OracleSpec ι₁} [IsUniformSpec spec₁]
     {ω : Type} [Monoid ω]
     (impl₁ impl₂ : QueryImpl spec (WriterT ω (OracleComp spec₁)))
     (himpl_eq : ∀ (t : spec.Domain), (impl₁ t).run = (impl₂ t).run)
@@ -228,7 +228,7 @@ pointwise-equal `.run` yield identical `(output, accumulator)` probability
 distributions. -/
 theorem probOutput_simulateQ_run_writerT_eq_of_impl_eq
     {ι₁ : Type u}
-    {spec₁ : OracleSpec ι₁} [spec₁.Fintype] [spec₁.Inhabited]
+    {spec₁ : OracleSpec ι₁} [IsUniformSpec spec₁]
     {ω : Type} [Monoid ω]
     (impl₁ impl₂ : QueryImpl spec (WriterT ω (OracleComp spec₁)))
     (himpl_eq : ∀ (t : spec.Domain), (impl₁ t).run = (impl₂ t).run)
@@ -242,7 +242,7 @@ theorem probOutput_simulateQ_run_writerT_eq_of_impl_eq
 `relTriple_simulateQ_run_writerT_of_impl_eq`. -/
 theorem evalDist_simulateQ_run_writerT_eq_of_impl_eq
     {ι₁ : Type u}
-    {spec₁ : OracleSpec ι₁} [spec₁.Fintype] [spec₁.Inhabited]
+    {spec₁ : OracleSpec ι₁} [IsUniformSpec spec₁]
     {ω : Type} [Monoid ω]
     (impl₁ impl₂ : QueryImpl spec (WriterT ω (OracleComp spec₁)))
     (himpl_eq : ∀ (t : spec.Domain), (impl₁ t).run = (impl₂ t).run)
@@ -256,7 +256,7 @@ theorem evalDist_simulateQ_run_writerT_eq_of_impl_eq
 theorem relTriple_simulateQ_run_writerT'
     {ι₁ : Type u} {ι₂ : Type u}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
     (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
@@ -432,10 +432,10 @@ theorem relTriple_simulateQ_run'_of_query_map_eq
 
 /-! ## "Identical until bad" fundamental lemma -/
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 private lemma probOutput_simulateQ_run_eq_zero_of_bad
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl : QueryImpl spec (StateT σ (OracleComp spec)))
     (bad : σ → Prop)
     (h_mono : ∀ (t : spec.Domain) (s : σ), bad s →
@@ -460,7 +460,7 @@ private lemma probOutput_simulateQ_run_eq_zero_of_bad
     exact ih u s' (h_mono t s₀ h_bad (u, s') h_mem)
 
 private lemma probOutput_simulateQ_run_eq_of_not_bad
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec))) (bad : σ → Prop)
     (h_agree : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       (impl₁ t).run s = (impl₂ t).run s)
@@ -487,7 +487,7 @@ private lemma probOutput_simulateQ_run_eq_of_not_bad
       exact tsum_congr (fun ⟨u, s'⟩ => by congr 1; exact ih u s')
 
 private lemma probEvent_not_bad_eq
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
     (bad : σ → Prop)
     (h_agree : ∀ (t : spec.Domain) (s : σ), ¬bad s →
@@ -508,7 +508,7 @@ private lemma probEvent_not_bad_eq
       a s h
 
 private lemma probEvent_bad_eq
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
     (bad : σ → Prop)
     (h_agree : ∀ (t : spec.Domain) (s : σ), ¬bad s →
@@ -595,7 +595,7 @@ output probabilities. -/
 
 open scoped Classical in
 private lemma probOutput_simulateQ_run_eq_of_not_bad_dist
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
     (bad : σ → Prop)
     (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
@@ -635,7 +635,7 @@ private lemma probOutput_simulateQ_run_eq_of_not_bad_dist
 
 open scoped Classical in
 private lemma probEvent_not_bad_eq_dist
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
     (bad : σ → Prop)
     (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
@@ -656,7 +656,7 @@ private lemma probEvent_not_bad_eq_dist
 
 open scoped Classical in
 private lemma probEvent_bad_eq_dist
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
     (bad : σ → Prop)
     (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
@@ -737,7 +737,7 @@ steps) and the `programming_collision_bound` argument that builds on it. -/
 
 open scoped Classical in
 private lemma probOutput_simulateQ_run_eq_of_not_output_bad
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
     (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
       Pr[= (u, (s', false)) | (impl₁ t).run (s, false)] =
@@ -772,7 +772,7 @@ private lemma probOutput_simulateQ_run_eq_of_not_output_bad
 
 open scoped Classical in
 private lemma probEvent_output_bad_eq
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
     (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
       Pr[= (u, (s', false)) | (impl₁ t).run (s, false)] =
@@ -823,7 +823,7 @@ from non-bad input states. They may disagree arbitrarily on the very step that f
 Both implementations must satisfy bad-input monotonicity: once `b = true` in the input state of
 a step, every reachable output also has `b = true`. -/
 theorem tvDist_simulateQ_le_probEvent_output_bad
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
     (oa : OracleComp spec α) (s₀ : σ)
     (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
@@ -870,7 +870,7 @@ This is the exact shape consumed by the `QueryImpl.withProgramming` collision-bo
 the impls agree on `(s, false)` input *modulo* the rare programming-fired step, and the bound
 is the probability of any policy hit during the run. -/
 theorem identical_until_bad_with_flag
-    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec]
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
     (oa : OracleComp spec α) (s₀ : σ)
     (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
@@ -903,10 +903,10 @@ entries). The total reduction loss is `qS·ε + Pr[collision]`. -/
 section IdenticalUntilBadEpsilon
 
 variable {ι : Type} {spec : OracleSpec ι}
-variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
+variable {ι' : Type} {spec' : OracleSpec ι'} [IsUniformSpec spec']
 variable {α : Type} {σ : Type}
 
-omit [spec'.Fintype] [spec'.Inhabited] in
+omit [IsUniformSpec spec'] in
 /-- "Bad propagation": starting from a bad state, every output of the simulation has the
 bad flag set. This generalizes the per-step `h_mono` hypothesis to the full simulation. -/
 private lemma mem_support_simulateQ_run_of_bad
@@ -931,7 +931,8 @@ private lemma mem_support_simulateQ_run_of_bad
       exact ih u p' hp' z h_z
 
 /-- Under bad-monotonicity, a simulation started from a bad state has bad output probability
-exactly `1` (using `OracleComp.HasEvalPMF` to ensure no failure mass). -/
+exactly `1` (using the canonical `MonadLiftT (OracleComp spec) PMF` to ensure no failure
+mass). -/
 private lemma probEvent_simulateQ_run_bad_eq_one_of_bad
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (h_mono : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
@@ -1019,7 +1020,7 @@ private theorem tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
         (ENNReal.tsum_toReal_eq fun z => by
           have h := probOutput_le_one (mx := mx) (x := z)
           exact ne_top_of_le_ne_top one_ne_top h).symm]
-      rw [HasEvalPMF.tsum_probOutput_eq_one]
+      rw [tsum_probOutput_of_liftM_PMF]
       simp
     rw [h_one, one_mul]
   have h_second_sum :
@@ -1230,7 +1231,7 @@ give `(qS + qH) · ε`, but for tight bounds we want `q · ε`. -/
 section IdenticalUntilBadEpsilonSelective
 
 variable {ι : Type} {spec : OracleSpec ι}
-variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
+variable {ι' : Type} {spec' : OracleSpec ι'} [IsUniformSpec spec']
 variable {α : Type} {σ : Type}
 
 /-- The `query_bind` step for a "free" query (impls pointwise equal on the no-bad branch).
@@ -1438,7 +1439,7 @@ bridge lemma is stated in `ℝ≥0∞` via `ENNReal.ofReal (tvDist …)`. -/
 section IdenticalUntilBadEpsilonStateDep
 
 variable {ι : Type} {spec : OracleSpec ι}
-variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
+variable {ι' : Type} {spec' : OracleSpec ι'} [IsUniformSpec spec']
 variable {α : Type} {σ : Type}
 
 /-- Per-`query_bind` step of `expectedQuerySlack`. Given the impl, the charged-query
@@ -1905,7 +1906,7 @@ private theorem ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent
   induction oa using OracleComp.inductionOn generalizing queryBudget p with
   | pure x =>
       simp only [simulateQ_pure, StateT.run_pure, tvDist_self, ENNReal.ofReal_zero]
-      exact zero_le _
+      exact zero_le
   | query_bind t cont ih =>
       rcases p with ⟨s, b⟩
       cases b with
@@ -2262,10 +2263,8 @@ section HeterogeneousBadSlack
 
 variable {ι : Type} {spec : OracleSpec ι}
 variable {ι₁ ι₂ : Type} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
 variable {σ₁ σ₂ : Type}
 
-omit [spec₁.Fintype] [spec₁.Inhabited] in
 /-- Bad propagation for a general (non-flag) bad predicate: starting the simulation from a
 bad state, every output state stays bad. The heterogeneous-state analogue of
 `mem_support_simulateQ_run_of_bad`. -/
@@ -2292,7 +2291,7 @@ private lemma mem_support_simulateQ_run_of_bad_general
 
 /-- A simulation started from a bad state has bad probability exactly `1`. The
 heterogeneous-state analogue of `probEvent_simulateQ_run_bad_eq_one_of_bad`. -/
-private lemma probEvent_bad_simulateQ_run_eq_one_of_bad
+private lemma probEvent_bad_simulateQ_run_eq_one_of_bad [IsUniformSpec spec₁]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (bad : σ₁ → Prop)
     (hmono : ∀ (t : spec.Domain) (s₁ : σ₁), bad s₁ →
@@ -2307,6 +2306,7 @@ private lemma probEvent_bad_simulateQ_run_eq_one_of_bad
 /-- Inductive core of `probOutput_simulateQ_run'_le_add_bad_add_slack`, stated on the
 joint `run` distribution with the event `fun z => z.1 = true`. -/
 private theorem probEvent_fst_simulateQ_run_le_add_bad_add_slack
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R : σ₁ → σ₂ → Prop)
@@ -2417,6 +2417,7 @@ the obligation a concrete cross-domain reduction must discharge for its oracle p
 Only `impl₁` requires bad monotonicity (`hmono`), since the bound is one-directional and
 mentions `Pr[bad]` only on side `1`. -/
 theorem probOutput_simulateQ_run'_le_add_bad_add_slack
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R : σ₁ → σ₂ → Prop)

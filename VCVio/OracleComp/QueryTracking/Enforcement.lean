@@ -44,7 +44,7 @@ def OracleSpec.enforceOracle [DecidableEq ι] [spec.Inhabited] :
 
 namespace enforceOracle
 
-variable [DecidableEq ι] [spec.Inhabited]
+variable [DecidableEq ι] [IsUniformSpec spec]
 
 @[simp]
 lemma run_apply (t : ι) (budget : ι → ℕ) :
@@ -75,8 +75,6 @@ theorem fst_map_run_simulateQ
     exact ih u (hcont u)
 
 section Probability
-
-variable [spec.Fintype]
 
 /-- For a computation that is structurally within budget, the budget check in the
 counting semantics is redundant on the support. -/

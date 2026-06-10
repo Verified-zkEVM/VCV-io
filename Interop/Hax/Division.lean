@@ -87,7 +87,7 @@ precondition preserved. The `errorOfHax` rebrand inside
 `triple_liftRustM` is again invisible at the Triple level because the
 precondition rules out the panic branch; the equality-level lemma
 below is the one that actually witnesses the rebrand. -/
-theorem checkedDivLifted_triple [spec.Fintype] [spec.Inhabited]
+theorem checkedDivLifted_triple [IsUniformSpec spec]
     (x y : u32) (h : y ≠ 0) :
     ⦃⌜True⌝⦄
     (checkedDivLifted (spec := spec) x y)
@@ -178,7 +178,7 @@ branch is triggered by the uniform draw `b = 0`, and it panics with
 theorem randomDiv_panic_prob (x : u32) :
     Pr[= some (Except.error Interop.Rust.Error.divisionByZero) |
         (randomDiv x).run.run] = 2⁻¹ := by
-  rw [randomDiv_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype]
+  rw [randomDiv_run_run, probOutput_bind_eq_sum_fintype]
   -- ∑ b : Fin 2, Pr[= b | $[0..1]] * Pr[= some (.error .divisionByZero) | pure _].
   -- Each factor of `Pr[= · | $[0..1]]` is `(1 + 1)⁻¹`; only `b = 0` gives a
   -- nonzero second factor (coefficient `1`), so the sum is `(1 + 1)⁻¹ = 2⁻¹`.

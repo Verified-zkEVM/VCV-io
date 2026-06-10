@@ -58,7 +58,7 @@ open Std.Do
 namespace OracleComp.ProgramLogic.Relational
 
 variable {ι₁ ι₂ : Type} {spec₁ : OracleSpec.{0, 0} ι₁} {spec₂ : OracleSpec.{0, 0} ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable [IsUniformSpec spec₁] [IsUniformSpec spec₂]
 variable {σ₁ σ₂ α β : Type}
 
 /-! ### Per-call lifts (one transformer layer) -/
@@ -178,7 +178,7 @@ extracts output equality and the state-relation invariant from a paired
 instance of the two unary postconditions, which is exactly the bridge
 needed by `relTriple_simulateQ_run`. -/
 theorem relTriple_simulateQ_run_of_triples
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R_state : σ₁ → σ₂ → Prop)
@@ -229,7 +229,7 @@ are evaluated at the resulting step writer. Typical instantiations are
 `countingOracle_triple` and `costOracle_triple` with `qc₀ = 0` /
 `s₀ = 1`. -/
 theorem relTriple_simulateQ_run_writerT_of_triples
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
     {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
     (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
@@ -272,7 +272,7 @@ theorem relTriple_simulateQ_run_writerT_of_triples
 
 Drops the writer component, leaving only `EqRel α` on outputs. -/
 theorem relTriple_simulateQ_run_writerT'_of_triples
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
     {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
     (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
@@ -311,7 +311,7 @@ on the return values. This is the canonical shape needed for probability
 transport (via `probOutput_eq_of_relTriple_eqRel`), matching
 `relTriple_simulateQ_run'` at the handler-triple layer. -/
 theorem relTriple_simulateQ_run'_of_triples
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
     (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
     (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R_state : σ₁ → σ₂ → Prop)
@@ -361,7 +361,7 @@ The `mvcgen` proof style produces invariant-preservation specs as
 relational infrastructure is phrased in terms of `support`. This lemma
 is the direct translator, lifting over `triple_stateT_iff_forall_support`. -/
 theorem support_preservesInv_of_triple
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
     {σ : Type}
     (impl : QueryImpl spec (StateT σ (OracleComp spec₁)))
     (Inv : σ → Prop)
@@ -386,7 +386,7 @@ Use this whenever a writer-invariant-preservation proof is available as
 an `mvcgen`-style `Std.Do.Triple`, and the downstream consumer is a
 `support`-based whole-program lemma. -/
 theorem writerPreservesInv_of_triple
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
     {ω : Type} [Monoid ω]
     (impl : QueryImpl spec (WriterT ω (OracleComp spec)))
     (Inv : ω → Prop)
@@ -407,7 +407,7 @@ an invariant `Inv` and the target handler preserves `Inv`. This is the
 hypothesis is supplied via `mvcgen`-style `Std.Do.Triple`s rather than a
 `support`-based quantifier. -/
 theorem relTriple_simulateQ_run_of_impl_eq_triple
-    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
     {σ : Type}
     (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
     (Inv : σ → Prop)
@@ -432,7 +432,7 @@ theorem relTriple_simulateQ_run_of_impl_eq_triple
 
 section SmokeTests
 
-variable {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+variable {ι : Type} {spec : OracleSpec.{0, 0} ι} [IsUniformSpec spec]
 variable [DecidableEq ι]
 
 /-- Smoke test: independent product coupling for two `cachingOracle` runs

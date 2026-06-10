@@ -16,6 +16,7 @@ import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
 import Examples.ElGamal.ReductionCost
 import Examples.ElGamal.SSP
+import Examples.EvalDistCompatible.Basic
 import Examples.FrankingProtocol
 import Examples.OneTimePad.Basic
 import Examples.OneTimePad.HeapBasic

@@ -233,11 +233,10 @@ private theorem decomposeCoeff_eq
   split_ifs at hdecomp with h hs hs <;>
     simp only [Prod.mk.injEq] at hdecomp <;>
     obtain ⟨rfl, rfl⟩ := hdecomp <;>
-    push_cast <;> ring_nf
-  · rw [← hwrap q hs]; exact hdam
-  · exact hdam
-  · rw [← hwrap (q+1) hs]; push_cast; ring_nf; exact hdam
-  · exact hdam
+    push_cast <;> try exact hdam
+  · rw [← hdam, hwrap q hs]; ring
+  · rw [← hdam]; ring_nf; rw [← hwrap (q+1) hs]; push_cast; ring_nf
+  · rw [← hdam]; ring
 
 private theorem lowBitsCoeff_bound (r : Coeff) {r1 gamma2 : ℕ} {r0 : ℤ} (hγ : 0 < gamma2)
     (hdec : decomposeCoeff r gamma2 = (r1, r0)) :

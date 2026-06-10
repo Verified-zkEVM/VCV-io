@@ -110,7 +110,7 @@ The postcondition shape on the `RustOracleComp` side matches the hax
 side exactly; the `errorOfHax` rebrand inside `triple_liftRustM` is
 invisible because the precondition rules out the `fail` branch and
 the success component of the postcondition does not mention errors. -/
-theorem computationLifted_triple [spec.Fintype] [spec.Inhabited] (x : u32) :
+theorem computationLifted_triple [IsUniformSpec spec] (x : u32) :
     ⦃⌜2 * x.toNat + 1 < 2 ^ 32⌝⦄
     (computationLifted (spec := spec) x)
     ⦃⇓ r => ⌜r.toNat = 2 * x.toNat + 1⌝⦄ := by

@@ -60,11 +60,12 @@ lemma uniformFin_def (n : ℕ) : $[0..n] = unifSpec.query n := rfl
 
 @[simp]
 lemma support_uniformFin (n : ℕ) :
-    support (do $[0..n]) = Set.univ := by grind
+    support (do $[0..n]) = Set.univ := by simp [uniformFin_def]
 
 @[simp]
 lemma finSupport_uniformFin (n : ℕ) :
-    finSupport (do $[0..n]) = Finset.univ := by grind
+    finSupport (do $[0..n]) = Finset.univ := by
+  rw [finSupport_eq_iff_support_eq_coe, support_uniformFin]; simp
 
 @[grind =]
 lemma probOutput_uniformFin_eq_div (n : ℕ) (m : Fin (n + 1)) :
@@ -281,7 +282,6 @@ lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
   | y :: ys => by
     rw [List.count, ← List.countP_eq_sum_fin_ite]
     simp [uniformSelectList_cons, probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, @eq_comm _ x]
-    rfl
 
 @[simp, grind =] lemma probFailure_uniformSelectList (xs : List α) :
     Pr[⊥ | $ xs] = if xs.isEmpty then 1 else 0 := match xs with

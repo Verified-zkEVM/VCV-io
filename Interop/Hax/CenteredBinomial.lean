@@ -276,7 +276,7 @@ branches against the zero target, and closes the resulting `4⁻¹ + 4⁻¹
 synthesizing large decidable equality instances for `i32` outputs. -/
 theorem sampleRandomCbd1_prob_zero :
     Pr[= some (Except.ok (0 : i32)) | sampleRandomCbd1.run.run] = 2⁻¹ := by
-  rw [sampleRandomCbd1_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype,
+  rw [sampleRandomCbd1_run_run, probOutput_bind_eq_sum_fintype,
     Fin.sum_univ_four]
   change _ * Pr[= cbdOutputZero | (pure cbdOutputZero : OracleComp unifSpec _)] +
       _ * Pr[= cbdOutputZero | (pure cbdOutputPosOne : OracleComp unifSpec _)] +
@@ -292,7 +292,7 @@ contributes (bit pattern `01`, `a = 1`, `c = 0`), one of four
 equiprobable draws. -/
 theorem sampleRandomCbd1_prob_pos_one :
     Pr[= some (Except.ok (1 : i32)) | sampleRandomCbd1.run.run] = 4⁻¹ := by
-  rw [sampleRandomCbd1_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype,
+  rw [sampleRandomCbd1_run_run, probOutput_bind_eq_sum_fintype,
     Fin.sum_univ_four]
   change _ * Pr[= cbdOutputPosOne | (pure cbdOutputZero : OracleComp unifSpec _)] +
       _ * Pr[= cbdOutputPosOne | (pure cbdOutputPosOne : OracleComp unifSpec _)] +
@@ -307,7 +307,7 @@ contributes (bit pattern `10`, `a = 0`, `c = 1`), one of four
 equiprobable draws. -/
 theorem sampleRandomCbd1_prob_neg_one :
     Pr[= some (Except.ok (-1 : i32)) | sampleRandomCbd1.run.run] = 4⁻¹ := by
-  rw [sampleRandomCbd1_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype,
+  rw [sampleRandomCbd1_run_run, probOutput_bind_eq_sum_fintype,
     Fin.sum_univ_four]
   change _ * Pr[= cbdOutputNegOne | (pure cbdOutputZero : OracleComp unifSpec _)] +
       _ * Pr[= cbdOutputNegOne | (pure cbdOutputPosOne : OracleComp unifSpec _)] +

@@ -114,7 +114,7 @@ lemma multipleBadStep_bad_le
           intro r
           simp [probEvent_pure, multipleBadAdvance, hbad, hcached]
         simp_rw [hkey, mul_one]
-        exact HasEvalPMF.tsum_probOutput_eq_one _
+        exact tsum_probOutput_eq_one' (by simp)
       · have hcached' : (sB.responses (tag, x)).isSome = false := Bool.eq_false_iff.mpr hcached
         rw [if_neg (by simp [hcached'])]
         have hkey : ∀ r : Digest × ((TagId × Nonce) →ₒ Digest).QueryCache,
@@ -164,7 +164,7 @@ lemma multipleBadStep_bad_le
         pure (r.1, (r.2.1, r.2.2), multipleBadAdvance tag sB r.1))
         (fun z : _ × _ × UnlinkBadState TagId Nonce Digest => z.2.2.bad = true)) = 0 := by
       simp [multipleBadAdvance, hbad]
-    exact h0 ▸ zero_le _
+    exact h0 ▸ zero_le
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- Bad-bit invariant: in any reachable state of `multipleBadQueryImpl`, the bad-world component's
@@ -295,7 +295,7 @@ lemma simulateQ_multipleBad_prob_le
   | pure b =>
     simp only [simulateQ_pure, StateT.run_pure, probEvent_pure, hbad, Bool.false_eq_true,
       ite_false]
-    exact zero_le _
+    exact zero_le
   | query_bind t oa ih =>
     rw [multipleBad_run_query_bind' t (fun r => oa r) ((s, c), sB)]
     -- Per-query bound (depends on the query case)

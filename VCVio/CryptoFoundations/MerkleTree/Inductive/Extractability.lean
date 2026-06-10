@@ -66,6 +66,12 @@ open List OracleSpec OracleComp BinaryTree
 
 variable {α : Type}
 
+/-- Local `IsUniformSpec` opt-in for `spec α`: the single Merkle hash oracle samples
+uniformly from `α` whenever `α` is finite and inhabited. Kept `local` so that downstream
+files outside this module do not silently pick up uniform semantics for `spec α`. -/
+noncomputable local instance instIsUniformSpec [Fintype α] [Inhabited α] :
+    IsUniformSpec (spec α) := IsUniformSpec.ofFintypeInhabited _
+
 /-! ## Adversary -/
 
 section Adversary
@@ -489,7 +495,7 @@ private lemma chainInLog_of_extractor_internal_step_left
   refine ⟨extLeaf, y ::ᵥ extProof, h_extLeaf, ?_, x, List.mem_of_find?_eq_some hf, h_chain⟩
   have h_root_value : (extractor sr log y).getRootValue = some y :=
     optionPopulateDown_getRootValue _ _
-  grind [Nat.succ_eq_add_one, Vector.toList_cons]
+  grind [Nat.succ_eq_add_one, List.Vector.toList_cons, SkeletonLeafIndex.depth]
 
 /-- Post-IH assembly for the `ofRight` case of `chainInLog_of_extractor_get_ne_none`.
 Symmetric to `chainInLog_of_extractor_internal_step_left`: the recursive witness
@@ -517,7 +523,7 @@ private lemma chainInLog_of_extractor_internal_step_right
   refine ⟨extLeaf, x ::ᵥ extProof, h_extLeaf, ?_, y, List.mem_of_find?_eq_some hf, h_chain⟩
   have h_root_value : (extractor sl log x).getRootValue = some x :=
     optionPopulateDown_getRootValue _ _
-  grind [Nat.succ_eq_add_one, Vector.toList_cons]
+  grind [Nat.succ_eq_add_one, List.Vector.toList_cons, SkeletonLeafIndex.depth]
 
 /-- **Extractor recovery to a log chain.** When the extractor's path at `idx`
 is intact (the value there is `≠ none`), the extracted leaf value and proof
@@ -621,7 +627,7 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
           fun a => (singleHash a proof.head : OracleComp (spec α) α) from rfl,
       probOutput_bind_eq_tsum]
     simp_rw [fun a => probOutput_singleHash_eq_inv_card a proof.head root,
-      ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+      ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
   | @ofRight sl sr idxRight =>
     rw [show (getPutativeRoot (m := OracleComp (spec α))
               (SkeletonLeafIndex.ofRight idxRight) leaf proof
@@ -630,7 +636,7 @@ private lemma probOutput_getPutativeRoot_eq_inv_card_of_pos_depth
           fun a => (singleHash proof.head a : OracleComp (spec α) α) from rfl,
       probOutput_bind_eq_tsum]
     simp_rw [fun a => probOutput_singleHash_eq_inv_card proof.head a root,
-      ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+      ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 /--
 The probability that `verifyProof` evaluates to `true` at a positive-depth index
@@ -677,7 +683,7 @@ private lemma probEvent_verifyProof_extractor_none_le_inv_card
     refine (probEvent_mono'' (q := fun b : Bool => b = true) ?_).trans
       (probEvent_verifyProof_eq_true_eq_inv_card_of_pos_depth h_pos leaf root proof).le
     rintro _ ⟨h_v, _⟩; exact h_v
-  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le _)
+  · refine probEvent_eq_zero ?_ |>.le.trans (zero_le)
     rintro _ _ ⟨_, h⟩; exact h_get h
 
 private theorem extractabilityGame_verified_extractor_none_le_inv_card

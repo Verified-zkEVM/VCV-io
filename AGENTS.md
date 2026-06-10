@@ -7,7 +7,8 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 1. Run `lake exe cache get && lake build`.
 2. Read `Examples/OneTimePad/Basic.lean` for a compact modern proof (correctness and privacy).
 3. Choose the work area by task: use `VCVio/` for oracle/probability/program-logic work, `LatticeCrypto/` for lattice schemes and reductions, and `LatticeCryptoTest/` for vectors or differential tests.
-4. If probability lemmas fail unexpectedly, first check for `[spec.Fintype]` and `[spec.Inhabited]`.
+4. If probability lemmas fail unexpectedly, first check for `[IsProbabilitySpec spec]`
+   or `[IsUniformSpec spec]` as appropriate.
 
 `AGENTS.md` is the canonical guide. `CLAUDE.md` is a symlink to this file.
 
@@ -25,7 +26,7 @@ Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution 
 
 ## What This Project Is
 
-VCVio is a framework for formal cryptographic proofs built around `OracleComp spec α`, the free monad on the polynomial functor induced by an oracle signature `OracleSpec ι := ι → Type`. Its universal fold `simulateQ impl : OracleComp spec α → r α` is the unique monad morphism extending any `impl : QueryImpl spec r` to the free monad, and the distribution semantics `evalDist` (with `support`, `probOutput`, `Pr[…]`) are *definitionally* `simulateQ` into `PMF` / `SetM` / … with queries interpreted as uniform sampling. `ProbComp α := OracleComp unifSpec α` specializes to computations whose only oracle is uniform selection.
+VCVio is a framework for formal cryptographic proofs built around `OracleComp spec α`, the free monad on the polynomial functor induced by an oracle signature `OracleSpec ι := ι → Type`. Its universal fold `simulateQ impl : OracleComp spec α → r α` is the unique monad morphism extending any `impl : QueryImpl spec r` to the free monad. For `OracleComp`, `support` is definitionally `simulateQ` into `SetM` with queries interpreted by `Set.univ`; `evalDist` / `probOutput` / `Pr[…]` are definitionally `simulateQ` into `PMF` using the per-query distributions supplied by `[IsProbabilitySpec spec]`. Uniform cardinality lemmas and the `support`/probability bridge use `[IsUniformSpec spec]`, which bundles `[spec.Fintype]`, `[spec.Inhabited]`, and uniform sampling. `ProbComp α := OracleComp unifSpec α` specializes to computations whose only oracle is uniform selection.
 
 The repo also includes a first-class lattice cryptography library under `LatticeCrypto/`, built on top of the `VCVio` framework. That layer contains generic lattice algebra plus ML-DSA, ML-KEM, and Falcon specifications, security statements, concrete implementations, FFI bridges, and tests.
 
@@ -81,9 +82,9 @@ or `VCVioTest/`. This contract is enforced by
 
 ## Critical Gotchas
 
-1. **`[spec.Fintype]` and `[spec.Inhabited]`** are required for probability reasoning (`evalDist`, `Pr[...]`).
+1. **Probability assumptions are explicit.** `support` on `OracleComp spec` works for arbitrary specs. `evalDist` / `Pr[...]` need `[IsProbabilitySpec spec]`; uniform/cardinality lemmas and `support ↔ Pr[= _] ≠ 0` need `[IsUniformSpec spec]`. Use `IsUniformSpec.ofFintypeInhabited` when you have `[spec.Fintype] [spec.Inhabited]` and intend uniform semantics.
 2. **`autoImplicit = false` is set globally in `lakefile.lean`**. Do not add `set_option autoImplicit false` in individual files. Every variable must be explicitly declared.
-3. **`evalDist` IS `simulateQ`** with uniform distributions. This is definitional (`rfl`).
+3. **`evalDist` IS `simulateQ`** with `IsProbabilitySpec.toPMF`; under `[IsUniformSpec spec]` this is uniform. This is definitional (`rfl`).
 4. **`++ₒ` is dead** — use `+` for combining oracle specs.
 5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad/Basic.lean` as canonical reference.
 6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.

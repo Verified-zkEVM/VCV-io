@@ -69,7 +69,7 @@ lemma probEvent_idealCacheMapM_mem_le {D : Type} [DecidableEq D] [Fintype Digest
     obtain ⟨hdnd, hndtail⟩ := hnd
     rw [idealCacheMapM]
     by_cases hcd : c d = some v
-    · refine le_of_eq_of_le (probEvent_eq_zero (fun rs _ => ?_)) (zero_le _)
+    · refine le_of_eq_of_le (probEvent_eq_zero (fun rs _ => ?_)) zero_le
       rintro ⟨_, hfresh⟩
       exact hfresh d (List.mem_cons_self ..) hcd
     · have hcons_len : ((d :: ds).length : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞)

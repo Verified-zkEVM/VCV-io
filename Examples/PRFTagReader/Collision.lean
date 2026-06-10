@@ -370,9 +370,9 @@ private lemma authRFLookup_mapM_miss_bound
               rw [hpp]
               simp [hdv]
             rw [hz, mul_zero]
-            exact zero_le _
+            exact zero_le
         · rw [probOutput_eq_zero _ q hsupp, zero_mul]
-          exact zero_le _
+          exact zero_le
       rw [hnone0, mul_zero, add_zero]
       exact le_trans hsome_le hlook.1
     · -- Head lookup is at a tag `≠ t₀.1`: the point `(hd, t₀.2) ≠ t₀`, so `t₀` stays `none`.
@@ -865,7 +865,7 @@ private lemma probEvent_authRFQueryImpl_responses_eq_le
             · rw [hzero p hp, mul_zero]
             · rw [probOutput_eq_zero_of_not_mem_support hp, zero_mul]
           rw [hsum0]
-          exact zero_le _
+          exact zero_le
   have hfinal : stbound st = maxDigestProb := by
     simp only [hstbound, hnone]
     simp
@@ -1040,7 +1040,7 @@ private lemma authRFReaderStep_forge_le
     by_cases hcached : ∃ d, st.responses (tag, transcript.nonce) = some d
     · -- Cached column cell: a match would land in `honestOutputs`, so it is never forged.
       obtain ⟨d, hd⟩ := hcached
-      refine le_trans (le_of_eq ?_) (zero_le _)
+      refine le_trans (le_of_eq ?_) zero_le
       rw [probEvent_eq_zero_iff]
       intro mp hmp hmem
       simp only [hnewForged, List.mem_toFinset, List.mem_map, List.mem_filter,
@@ -1326,7 +1326,7 @@ private lemma simulateQ_authRF_forge_le
     -- No queries: the forgery log is still empty.
     simp only [simulateQ_pure, StateT.run_pure, probEvent_pure, hinv.1, ne_eq, not_true_eq_false,
       ite_false]
-    exact zero_le _
+    exact zero_le
   | query_bind t oa ih =>
     simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind, monadLift_self]
     cases t with

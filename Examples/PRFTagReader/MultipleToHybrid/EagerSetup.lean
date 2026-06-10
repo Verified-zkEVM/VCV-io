@@ -439,7 +439,7 @@ lemma probEvent_cacheBadReader_uniformSample_le [Fintype Nonce] [Fintype Digest]
       rw [decide_eq_true_eq] at hcb
       obtain ⟨tag, sid, _, hg⟩ := hcb
       exact ⟨(tag, sid), Finset.mem_univ _, hg⟩
-    · rw [if_neg hcb, mul_zero]; exact zero_le _
+    · rw [if_neg hcb, mul_zero]; exact zero_le
   refine hmono.trans ?_
   -- Step 2: union bound over the slot set.
   have hsum :

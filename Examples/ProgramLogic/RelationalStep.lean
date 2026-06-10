@@ -22,7 +22,7 @@ open scoped OracleComp.ProgramLogic
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β γ δ : Type}
 
 /-! ## Basic relational stepping -/

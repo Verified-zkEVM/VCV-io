@@ -222,7 +222,7 @@ theorem sigma_simCommitPredictability (g : G)
         probOutput_map_bijective_uniform_cross F (f := fun z : F => z • g - c • pk) (hbij_c c),
         probOutput_uniformSample (α := G)]
     simp_rw [h_inner_const]
-    rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul,
+    rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul,
       probOutput_uniformSample (α := G)]
   have h_eq : probOutput (Prod.fst <$> simTranscript F G g pk) c₀ =
       (Fintype.card F : ℝ≥0∞)⁻¹ := by
