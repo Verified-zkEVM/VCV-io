@@ -25,11 +25,11 @@ Pr[multipleIdealQueryImpl true] ≤
   Pr[singleIdealQueryImpl true] + Pr[bad]
     + qReader·|TagId| / |Digest| + qReader·qTag / |Nonce|
     + qReader·|TagId|·sessionsPerTag / |Digest|
-    + qTag·|TagId|·sessionsPerTag / |Digest| + qTag·sessionsPerTag / |Digest|
+    + qTag·|TagId|·sessionsPerTag / |Digest|
 ```
 
-for every adversary, with no distinctness hypothesis on its reader nonces. The bound carries two
-tag-side slack terms (the last two above) on top of the reader and nonce-aliasing slacks.
+for every adversary, with no distinctness hypothesis on its reader nonces. The bound carries one
+tag-side slack term (the last above) on top of the reader and nonce-aliasing slacks.
 
 The direct coupling identifies the multiple-session world's RO cell `(tag, n)` with the
 single-session world's reference-slot cell `((tag, 0), n)` via `slotZeroEmbed` /
@@ -333,10 +333,9 @@ single-ideal handler (`probOutput_singleIdeal_run'_eq_tableSample`). -/
 namespace UnlinkReduction
 
 /-- **Multi-to-single via direct M-S coupling.** Bounds the multiple-session ideal world by the
-single-session ideal world plus the multiple-bad collision probability and five unconditional
-slack terms, for every adversary and with no distinctness hypothesis on its reader nonces. Two of
-the slacks are tag-side, `qTag·|TagId|·sessionsPerTag / |Digest|` and `qTag·sessionsPerTag /
-|Digest|`.
+single-session ideal world plus the multiple-bad collision probability and four unconditional
+slack terms, for every adversary and with no distinctness hypothesis on its reader nonces. One of
+the slacks is tag-side, `qTag·|TagId|·sessionsPerTag / |Digest|`.
 
 The direct M-S coupling via `slotZeroSubTable` works
 unconditionally on the adversary (no nonce-distinctness assumption) because the per-step
@@ -364,8 +363,6 @@ theorem multipleIdeal_le_singleIdeal_add_bad_DC [Fintype Nonce] [Fintype Digest]
       ((qReader * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
         (Fintype.card Digest : ℝ≥0∞) +
       ((qTag * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-        (Fintype.card Digest : ℝ≥0∞) +
-      ((qTag * sessionsPerTag : ℕ) : ℝ≥0∞) /
         (Fintype.card Digest : ℝ≥0∞) := by
   classical
   -- **Step 1.** Replace the multiple-ideal LHS by the multiple-bad LHS (same `Pr[= true]`).
@@ -677,9 +674,8 @@ theorem multipleIdeal_le_singleIdeal_add_bad_DC [Fintype Nonce] [Fintype Digest]
     (∅ : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) UnlinkBadState.init ∅
     hqReader hqTag (by simp) (fun _ _ _ _ => rfl) (fun _ _ _ h => absurd rfl h)
   simp only [OracleComp.tableExtending_empty] at haux
-  -- The aux bound is term-by-term ≤ the headline RHS; the extra outermost
-  -- `qTag * sessionsPerTag / |Digest|` slack is unused headroom, dropped via `le_self_add`.
-  exact haux.trans le_self_add
+  -- The aux bound is term-by-term equal to the headline RHS: the four eager slacks match exactly.
+  exact haux
 
 end UnlinkReduction
 
