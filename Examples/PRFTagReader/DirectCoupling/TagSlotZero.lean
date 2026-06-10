@@ -811,7 +811,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
         have hsb_unchanged : (multipleBadAdvance tag sB
             (some (⟨n, u⟩ : TagTranscript Nonce Digest))).responses (tag', n') =
             sB.responses (tag', n') := by
-          show (sB.responses.cacheQuery (tag, n)
+          change (sB.responses.cacheQuery (tag, n)
             (u :: Option.getD (sB.responses (tag, n)) [])) (tag', n') =
             sB.responses (tag', n')
           simp [OracleSpec.QueryCache.cacheQuery_of_ne, htagn]
@@ -829,7 +829,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
     have hcell : ∀ gS : (TagId × Fin sessionsPerTag) × Nonce → Digest,
         OracleComp.tableExtending c gS ((tag, (0 : Fin sessionsPerTag)), n) = u₀ :=
       fun gS => by
-        show (c ((tag, (0 : Fin sessionsPerTag)), n)).getD
+        change (c ((tag, (0 : Fin sessionsPerTag)), n)).getD
             (gS ((tag, (0 : Fin sessionsPerTag)), n)) = u₀
         rw [hc]; rfl
     simp_rw [hcell]
@@ -848,7 +848,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
       · have hsb_unchanged : (multipleBadAdvance tag sB
             (some (⟨n, u₀⟩ : TagTranscript Nonce Digest))).responses (tag', n') =
             sB.responses (tag', n') := by
-          show (sB.responses.cacheQuery (tag, n)
+          change (sB.responses.cacheQuery (tag, n)
             (u₀ :: Option.getD (sB.responses (tag, n)) [])) (tag', n') =
             sB.responses (tag', n')
           simp [OracleSpec.QueryCache.cacheQuery_of_ne, htagn]

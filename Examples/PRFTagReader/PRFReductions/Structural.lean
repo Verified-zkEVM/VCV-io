@@ -227,6 +227,8 @@ multiple-vs-single coupling would face. -/
 def HasDistinctUnlinkReaderNonces (adversary : UnlinkAdversary TagId Nonce Digest) : Prop :=
   ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pReaderNonce n) 1
 
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] in
 /-- `HasDistinctUnlinkReaderNonces` unfolds definitionally to a per-nonce reader-query bound: it
 holds exactly when, for every nonce `n`, at most one reader query carries `n`. -/
 lemma hasDistinctUnlinkReaderNonces_iff (adversary : UnlinkAdversary TagId Nonce Digest) :
@@ -234,8 +236,8 @@ lemma hasDistinctUnlinkReaderNonces_iff (adversary : UnlinkAdversary TagId Nonce
       ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pReaderNonce n) 1 :=
   Iff.rfl
 
-omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest]
-  [NeZero sessionsPerTag] in
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- Every `pReaderNonce n`-query is a reader query: `pReaderNonce n` is false on tag (`Sum.inl`)
 queries and, on reader (`Sum.inr`) queries, refines `Sum.isRight`. -/
 lemma pReaderNonce_imp_isRight (n : Nonce)
@@ -245,8 +247,8 @@ lemma pReaderNonce_imp_isRight (n : Nonce)
   | inl x => exact fun h => (h : (False : Prop)).elim
   | inr tr => exact fun _ => rfl
 
-omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [SampleableType Digest]
-  [NeZero sessionsPerTag] in
+omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
+  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- An adversary making at most one reader query has pairwise-distinct reader nonces: a single
 reader query cannot collide with itself. Adversaries with no reader queries also qualify. -/
 theorem hasDistinctUnlinkReaderNonces_of_readerBound

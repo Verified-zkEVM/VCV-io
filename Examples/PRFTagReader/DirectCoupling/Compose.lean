@@ -339,6 +339,7 @@ single-ideal handler (`probOutput_singleIdeal_run'_eq_tableSample`). -/
 
 namespace UnlinkReduction
 
+omit [Nonempty TagId] in
 /-- **Multi-to-single via direct M-S coupling.** Bounds the multiple-session ideal world by the
 single-session ideal world plus the multiple-bad collision probability and three unconditional
 slack terms, for every adversary and with no distinctness hypothesis on its reader nonces. None of

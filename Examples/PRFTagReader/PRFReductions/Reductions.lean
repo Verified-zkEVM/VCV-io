@@ -283,6 +283,7 @@ theorem simulateQ_prfReal_unlinkToMultiplePRFQueryImpl_run
       · exact simulateQ_prfReal_unlinkToMultiplePRFReaderImpl_run prfs k transcript s')
     adversary s
 
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] in
 /-- PRF-real faithfulness, multiple-session world: under the real PRF, each oracle query at
 `(tag, nonce)` returns `prfs.evalMultiple k tag nonce`, so the reduction runs exactly the
 multiple-session unlinkability game. -/
@@ -416,7 +417,7 @@ lemma simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run
   rw [hAccept]
   rfl
 
-omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] in
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- Inductive helper, single-session world: simulating the unlinkability adversary through the
 reduction's query implementation and then through the real PRF query implementation is the same,
 state-by-state, as simulating it directly through the real single-session query implementation
@@ -442,6 +443,7 @@ theorem simulateQ_prfReal_unlinkToSinglePRFQueryImpl_run
       · exact simulateQ_prfReal_unlinkToSinglePRFReaderImpl_run prfs k transcript s')
     adversary s
 
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] [NeZero sessionsPerTag] in
 /-- PRF-real faithfulness, single-session world: under the real PRF, each oracle query at
 `((tag, sid), nonce)` returns `prfs.evalSingle k tag sid nonce`, so the reduction runs exactly the
 single-session unlinkability game. -/

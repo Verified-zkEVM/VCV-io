@@ -47,6 +47,7 @@ variable {TagId Nonce Digest K : Type}
 
 /-! ## Main reduction theorem -/
 
+omit [Nonempty TagId] in
 /-- Unlinkability reduction: the multiple-vs-single advantage is bounded by one PRF advantage for
 the multiple-session world, one PRF advantage for the single-session world, the bad-event
 probability from the intermediate nonce-collision world, and three unconditional slack terms. The
@@ -116,6 +117,7 @@ theorem unlinkabilityAdvantage_le_two_prf_plus_collision [Fintype Nonce] [Fintyp
 
 /-! ## Explicit session-collision bounds -/
 
+omit [Nonempty TagId] in
 /-- Final unlinkability bound: two PRF advantages, an explicit closed-form bound for the
 `multipleBadQueryImpl` collision term, and the chained reader/tag slack terms.
 
@@ -151,6 +153,7 @@ theorem unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound
   refine ⟨multiAdv, singleAdv, hSum.trans ?_⟩
   linarith
 
+omit [Nonempty TagId] in
 /-- Tightest unlinkability bound: when nonces are sampled uniformly (as enforced by
 `SampleableType`), the session-collision term is exactly `sessionsPerTag² · |TagId| / |Nonce|`,
 plus the three unconditional reader-cell and nonce-aliasing slack terms. -/

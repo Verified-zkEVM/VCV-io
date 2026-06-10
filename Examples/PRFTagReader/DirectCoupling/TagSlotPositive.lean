@@ -853,7 +853,7 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
         have hsb_unchanged : (multipleBadAdvance tag sB
             (some (⟨n, u⟩ : TagTranscript Nonce Digest))).responses (tag', n') =
             sB.responses (tag', n') := by
-          show (sB.responses.cacheQuery (tag, n)
+          change (sB.responses.cacheQuery (tag, n)
             (u :: Option.getD (sB.responses (tag, n)) [])) (tag', n') =
             sB.responses (tag', n')
           simp [OracleSpec.QueryCache.cacheQuery_of_ne, htagn]
@@ -869,10 +869,10 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
     -- because advM = (s with sessionsUsed tag ↦ s.sessionsUsed tag + 1)
     -- = slotK.val + 1 > slotK.val.
     have hAdv_advM : slotK.val < advM.sessionsUsed tag := by
-      show slotK.val <
+      change slotK.val <
         (Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1)) tag
       rw [Function.update_self]
-      show s.sessionsUsed tag < s.sessionsUsed tag + 1
+      change s.sessionsUsed tag < s.sessionsUsed tag + 1
       omega
     have hbridge :=
       singleTableHandler_cache_swap_eq (TagId := TagId) (Nonce := Nonce)
@@ -906,7 +906,7 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
     have hcell : ∀ gS : (TagId × Fin sessionsPerTag) × Nonce → Digest,
         OracleComp.tableExtending c gS ((tag, (0 : Fin sessionsPerTag)), n) = u₀ :=
       fun gS => by
-        show (c ((tag, (0 : Fin sessionsPerTag)), n)).getD
+        change (c ((tag, (0 : Fin sessionsPerTag)), n)).getD
             (gS ((tag, (0 : Fin sessionsPerTag)), n)) = u₀
         rw [hc0]; rfl
     simp_rw [hcell]
@@ -915,7 +915,7 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
       hRespInv tag n hnD (by rw [hc0]; exact Option.some_ne_none _)
     have hbad_init : (multipleBadAdvance tag sB
         (some (⟨n, u₀⟩ : TagTranscript Nonce Digest))).bad = true := by
-      show (sB.bad || (sB.responses (tag, n)).isSome) = true
+      change (sB.bad || (sB.responses (tag, n)).isSome) = true
       rw [Option.isSome_iff_ne_none.mpr hresp_some]
       simp
     -- Step 3: By preserves_bad, every reachable output has z.2.2.bad = true.

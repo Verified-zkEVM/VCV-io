@@ -109,7 +109,7 @@ post-composing with `cellSwap a b` (which is a bijection on the domain) yields t
 distribution as drawing `gS` directly. The key measure-preserving step underlying the
 swap-bridge: averaging any continuation `F` over a uniform `gS` is invariant under
 `gS ↦ gS ∘ cellSwap a b`. -/
-lemma evalDist_uniformSample_comp_cellSwap [Fintype Nonce] [Fintype Digest]
+lemma evalDist_uniformSample_comp_cellSwap [Fintype Nonce]
     (a b : (TagId × Fin sessionsPerTag) × Nonce) :
     𝒟[(fun gS : (TagId × Fin sessionsPerTag) × Nonce → Digest =>
         gS ∘ cellSwap a b) <$> ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest))] =
@@ -139,7 +139,7 @@ omit [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest] [NeZero sessio
 `F : (table) → ProbComp α`, drawing a uniform `gS` and applying `F` to `gS` has the same
 distribution as drawing a uniform `gS` and applying `F` to `gS ∘ cellSwap a b`. Direct
 consequence of `evalDist_uniformSample_comp_cellSwap` combined with `map_bind`. -/
-lemma evalDist_uniformSample_bind_cellSwap [Fintype Nonce] [Fintype Digest]
+lemma evalDist_uniformSample_bind_cellSwap [Fintype Nonce]
     {α : Type} (a b : (TagId × Fin sessionsPerTag) × Nonce)
     (F : ((TagId × Fin sessionsPerTag) × Nonce → Digest) → ProbComp α) :
     𝒟[(do let gS ← $ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest); F gS)] =
@@ -169,8 +169,8 @@ the `singleTableHandler` simulateQ outputs are IDENTICAL (not just distributiona
   at two positions doesn't change the set of values present, so the existential value (mass
   bound by `V`) is the same on both sides. -/
 
-omit [Nonempty TagId] [SampleableType Digest] in
-private lemma singleTableHandler_simulateQ_swap_invariant [Fintype Nonce] [Fintype Digest]
+omit [Nonempty TagId] [DecidableEq Nonce] [SampleableType Digest] in
+private lemma singleTableHandler_simulateQ_swap_invariant
     (tag : TagId) (slotK : Fin sessionsPerTag) (hslotK : slotK ≠ 0)
     (n : Nonce)
     (oa : OracleComp (UnlinkOracleSpec TagId Nonce Digest) Bool)
@@ -243,7 +243,7 @@ private lemma singleTableHandler_simulateQ_swap_invariant [Fintype Nonce] [Finty
           exact heq _ (hcell_ne nonce).1 (hcell_ne nonce).2
         -- The bind structure is `(do { let p ← do { ... }; cont p })`. Flatten via bind_assoc
         -- with explicit OracleComp namespace, then bind_congr on the outer `$ᵗ Nonce`.
-        show ($ᵗ Nonce >>= fun nonce => pure _) >>= _ =
+        change ($ᵗ Nonce >>= fun nonce => pure _) >>= _ =
              ($ᵗ Nonce >>= fun nonce => pure _) >>= _
         rw [bind_assoc, bind_assoc]
         refine bind_congr fun nonce => ?_
@@ -253,10 +253,10 @@ private lemma singleTableHandler_simulateQ_swap_invariant [Fintype Nonce] [Finty
         -- increased by 1 (T = tag); in either case ≥ s.sessionsUsed tag > slotK.
         by_cases hT : T = tag
         · subst hT
-          show (slotK : ℕ) < (Function.update s.sessionsUsed T (s.sessionsUsed T + 1)) T
+          change (slotK : ℕ) < (Function.update s.sessionsUsed T (s.sessionsUsed T + 1)) T
           simp
           omega
-        · show (slotK : ℕ) < (Function.update s.sessionsUsed T (s.sessionsUsed T + 1)) tag
+        · change (slotK : ℕ) < (Function.update s.sessionsUsed T (s.sessionsUsed T + 1)) tag
           rw [Function.update_of_ne (Ne.symm hT)]
           exact hAdv
       · -- Slot exhausted: both sides return `pure (none, s)`. IH on `k none` at state `s` closes.
@@ -376,7 +376,7 @@ POINTWISE equality between the rewritten LHS body and the RHS body, because:
 * `((tag, 0), n)`: both tables cache `u`.
 * `((tag, slotK), n)`: T_L(gS ∘ φ) exposes `gS((tag, 0), n)` (φ swaps these); T_R(gS) exposes
   `gS((tag, 0), n)` (uncached by `hc0`). -/
-lemma singleTableHandler_cache_swap_eq [Fintype Nonce] [Fintype Digest]
+lemma singleTableHandler_cache_swap_eq [Fintype Nonce]
     (s : UnlinkState TagId)
     (c : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache)
     (tag : TagId) (slotK : Fin sessionsPerTag) (hslotK : slotK ≠ 0)
@@ -416,12 +416,13 @@ lemma singleTableHandler_cache_swap_eq [Fintype Nonce] [Fintype Digest]
     -- T_R(gS) at x = tableExtending (cacheQuery c slot-K u) gS at x.
     rw [OracleComp.tableExtending_cacheQuery, OracleComp.tableExtending_cacheQuery,
         Function.update_of_ne hx0, Function.update_of_ne hxK]
-    -- Both reduce to tableExtending c (·) at x; `gS` and `gS ∘ φ` agree at x since x not in swap pair.
-    show OracleComp.tableExtending c (gS ∘ φ) x = OracleComp.tableExtending c gS x
+    -- Both reduce to tableExtending c (·) at x; `gS` and `gS ∘ φ` agree at x since x not in the
+    -- swap pair.
+    change OracleComp.tableExtending c (gS ∘ φ) x = OracleComp.tableExtending c gS x
     unfold OracleComp.tableExtending
     have hφx : φ x = x := by
       rw [hφ]; exact cellSwap_of_ne _ _ hx0 hxK
-    show (c x).getD ((gS ∘ φ) x) = (c x).getD (gS x)
+    change (c x).getD ((gS ∘ φ) x) = (c x).getD (gS x)
     rw [Function.comp_apply, hφx]
   · -- hswap_0: T_L(gS ∘ φ) at ((tag, 0), n) = u = T_R(gS) at ((tag, slotK), n).
     rw [OracleComp.tableExtending_cacheQuery, OracleComp.tableExtending_cacheQuery,
@@ -438,7 +439,7 @@ lemma singleTableHandler_cache_swap_eq [Fintype Nonce] [Fintype Digest]
     unfold OracleComp.tableExtending
     -- c at ((tag, slotK), n) = none by hcInv; c at ((tag, 0), n) = none by hc0.
     rw [hcInv tag slotK hslotK n, hc0]
-    show gS (φ ((tag, slotK), n)) = gS ((tag, (0 : Fin sessionsPerTag)), n)
+    change gS (φ ((tag, slotK), n)) = gS ((tag, (0 : Fin sessionsPerTag)), n)
     have : φ ((tag, slotK), n) = ((tag, (0 : Fin sessionsPerTag)), n) := by
       rw [hφ, cellSwap_right]
     rw [this]

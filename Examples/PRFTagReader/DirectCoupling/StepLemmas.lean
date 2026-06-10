@@ -147,8 +147,10 @@ lemma evalDist_simulateQ_multipleBadTableHandlerFine_cacheBad_irrelevant
       = 𝒟[(fun z => (z.1, z.2.1, {z.2.2 with cacheBad := cb})) <$>
         (simulateQ (multipleBadTableHandlerFine (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
           (sessionsPerTag := sessionsPerTag) g gFine) oa).run (s, sB')] := by
-  rw [evalDist_simulateQ_multipleBadTableHandlerFine_forget_cacheBad_pointwise_eq g gFine oa (s, sB),
-      evalDist_simulateQ_multipleBadTableHandlerFine_forget_cacheBad_pointwise_eq g gFine oa (s, sB')]
+  rw [evalDist_simulateQ_multipleBadTableHandlerFine_forget_cacheBad_pointwise_eq
+        g gFine oa (s, sB),
+      evalDist_simulateQ_multipleBadTableHandlerFine_forget_cacheBad_pointwise_eq
+        g gFine oa (s, sB')]
   exact evalDist_simulateQ_multipleBadTableHandler_cacheBad_irrelevant g oa s sB sB' cb hSU hR hB
 
 end UnlinkReduction

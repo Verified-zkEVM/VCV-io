@@ -474,6 +474,7 @@ lemma probOutput_unlinkBadExp_eq
   refine tsum_congr fun z => ?_
   by_cases hz : z.2.bad <;> simp [hz]
 
+omit [Nonempty TagId] in
 /-- Coupling bound for the two random-function worlds (the ideal-PRF experiments of the multiple-
 and single-session reductions): the gap is bounded by the within-tag nonce-collision probability
 (carried by the instrumented `multipleBadQueryImpl`'s `bad` flag) plus three additive slack terms.

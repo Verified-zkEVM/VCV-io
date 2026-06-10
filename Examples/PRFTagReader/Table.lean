@@ -564,7 +564,9 @@ lemma evalDist_simulateQ_multipleIdealQueryImpl_run'_eq_tableExtending
       by_cases hslot : s.sessionsUsed tag < sessionsPerTag
       · -- tag query, slot available
         rw [multipleIdealQueryImpl_tag_run_of_lt tag s c hslot]
-        set adv := ({ s with sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } : UnlinkState TagId) with hadv
+        set adv :=
+          ({ s with sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } :
+            UnlinkState TagId) with hadv
         have hlhs_reassoc :
             ((($ᵗ Nonce) >>= fun nonce => idealCacheStep c (tag, nonce) >>= fun r =>
                 pure (some (⟨nonce, r.1⟩ : TagTranscript Nonce Digest), adv, r.2)) >>= fun p =>
@@ -818,7 +820,9 @@ lemma evalDist_simulateQ_singleIdealQueryImpl_run'_eq_tableExtending
     | inl tag =>
       by_cases hslot : s.sessionsUsed tag < sessionsPerTag
       · rw [singleIdealQueryImpl_tag_run_of_lt tag s c hslot]
-        set adv := ({ s with sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } : UnlinkState TagId) with hadv
+        set adv :=
+          ({ s with sessionsUsed := Function.update s.sessionsUsed tag (s.sessionsUsed tag + 1) } :
+            UnlinkState TagId) with hadv
         set sid := (⟨s.sessionsUsed tag, hslot⟩ : Fin sessionsPerTag) with hsid
         have hlhs_reassoc :
             ((($ᵗ Nonce) >>= fun nonce => idealCacheStep c ((tag, sid), nonce) >>= fun r =>
