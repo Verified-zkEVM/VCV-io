@@ -49,7 +49,7 @@ abbrev polyKernel : LatticeCrypto.PolyKernel Coeff polyBackend :=
 
 /-- The proof-facing semantic interpretation of the bundled ML-KEM ring. -/
 noncomputable abbrev coeffSemantics : LatticeCrypto.NegacyclicRingSemantics coeffRing :=
-  LatticeCrypto.vectorNegacyclicSemantics Coeff ringDegree
+  LatticeCrypto.vectorNegacyclicSemantics Coeff (by norm_num [ringDegree])
 
 /-- The proof-facing quotient `Z_q[X] / (X^256 + 1)`. -/
 abbrev Quotient := LatticeCrypto.NegacyclicRingSemantics.Quotient coeffSemantics

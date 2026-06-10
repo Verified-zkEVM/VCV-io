@@ -86,6 +86,16 @@ instance : Neg (TransformPoly ring) :=
 instance : GetElem (TransformPoly ring) Nat Coeff (fun _ i => i < ring.degree) where
   getElem fHat i hi := ring.backend.coeff fHat.coeffs ⟨i, hi⟩
 
+instance : AddCommGroup (TransformPoly ring) where
+  add_assoc a b c   := TransformPoly.ext (add_assoc a.coeffs b.coeffs c.coeffs)
+  zero_add a        := TransformPoly.ext (zero_add a.coeffs)
+  add_zero a        := TransformPoly.ext (add_zero a.coeffs)
+  neg_add_cancel a  := TransformPoly.ext (neg_add_cancel a.coeffs)
+  add_comm a b      := TransformPoly.ext (add_comm a.coeffs b.coeffs)
+  sub_eq_add_neg a b := TransformPoly.ext (sub_eq_add_neg a.coeffs b.coeffs)
+  nsmul             := nsmulRec
+  zsmul             := zsmulRec
+
 @[simp] theorem getElem_eq_coeffs_getElem
     (fHat : TransformPoly ring) {i : Nat} (hi : i < ring.degree) :
     fHat[i] = ring.backend.coeff fHat.coeffs ⟨i, hi⟩ :=
@@ -96,21 +106,20 @@ end TransformPoly
 /-- Transform-domain acceleration interface for a bundled negacyclic ring.
 
 Bundles the forward and inverse transforms (`toHat` / `fromHat`) together with
-pointwise transform-domain arithmetic (`zeroHat`, `addHat`, `subHat`, `mulHat`).
+pointwise transform-domain multiplication (`mulHat`); addition and zero on `Hat`
+are provided by the `[AddCommGroup Hat]` constraint.
 Concrete NTT modules provide executable instances; `TransformOps.Laws` certifies
 that the transform is a ring isomorphism. -/
-structure TransformOps {Coeff : Type u} [CommRing Coeff]
-    (ring : NegacyclicRing Coeff) (Hat : Type v) where
+class TransformOps {Coeff : Type u} [CommRing Coeff]
+    (ring : NegacyclicRing Coeff) (Hat : outParam (Type v)) [AddCommGroup Hat] where
   toHat : ring.Poly → Hat
   fromHat : Hat → ring.Poly
-  zeroHat : Hat
-  addHat : Hat → Hat → Hat
-  subHat : Hat → Hat → Hat
   mulHat : Hat → Hat → Hat
 
 namespace TransformOps
 
 variable {Coeff : Type u} [CommRing Coeff] {ring : NegacyclicRing Coeff} {Hat α : Type v}
+  [AddCommGroup Hat]
 
 /-- Backwards-compatible projection name for transform conversion. -/
 abbrev ntt (ops : TransformOps ring Hat) : ring.Poly → Hat :=
@@ -158,7 +167,7 @@ def coeffScalarVecMul {k : Nat} (c : ring.Poly) (v : PolyVec ring.Poly k) :
 
 /-- Dot product in the transform domain. -/
 def dot {k : Nat} (u v : PolyVec Hat k) : Hat :=
-  (Vector.zipWith ops.mulHat u v).foldl ops.addHat ops.zeroHat
+  (Vector.zipWith ops.mulHat u v).foldl (· + ·) (0 : Hat)
 
 /-- Matrix-vector multiplication in the transform domain. -/
 def matVecMul {rows cols : Nat} (A : PolyMatrix Hat rows cols) (v : PolyVec Hat cols) :
@@ -191,21 +200,40 @@ def coeffMatTransposeVecMul {rows cols : Nat}
     (ops.unhatVec v).get i = ops.fromHat (v.get i) :=
   Vector.get_map v ops.fromHat i
 
+/-! ### Notation Instances -/
+
+/-- Coefficient-domain scalar-vector multiplication as `HSMul`, enabling `c • v` syntax.
+
+Requires a `TransformOps` instance in scope (e.g., `[nttOps : NTTRingOps]`). -/
+scoped instance instHSMulCoeffScalar [inst : TransformOps ring Hat] {k : Nat} :
+    HSMul ring.Poly (PolyVec ring.Poly k) (PolyVec ring.Poly k) where
+  hSMul := inst.coeffScalarVecMul
+
+/-- Coefficient-domain matrix-vector multiplication as `HMul`, enabling `A * v` syntax.
+
+Requires a `TransformOps` instance in scope (e.g., `[nttOps : NTTRingOps]`). -/
+scoped instance instHMulCoeffMatVec [inst : TransformOps ring Hat] {rows cols : Nat} :
+    HMul (PolyMatrix Hat rows cols) (PolyVec ring.Poly cols) (PolyVec ring.Poly rows) where
+  hMul := inst.coeffMatVecMul
+
 /-- Algebraic laws asserting that a `TransformOps` instance is a ring isomorphism.
 
-States that `toHat` / `fromHat` are mutual inverses and that `toHat` preserves
-zero, addition, subtraction, and multiplication. Scheme-specific concrete NTTs
-discharge these obligations (typically via matrix certification). -/
-structure Laws (ops : TransformOps ring Hat) : Prop where
+States that `toHat` / `fromHat` are mutual inverses, that `toHat` preserves
+zero, addition, subtraction, and multiplication, and that `mulHat` is itself a
+commutative, associative operation that distributes over addition and subtraction.
+Scheme-specific concrete NTTs discharge these obligations (typically via matrix
+certification). -/
+class Laws (ops : TransformOps ring Hat) : Prop where
   fromHat_toHat : ∀ f : ring.Poly, ops.fromHat (ops.toHat f) = f
   toHat_fromHat : ∀ fHat : Hat, ops.toHat (ops.fromHat fHat) = fHat
-  toHat_zero : ops.toHat ring.zero = ops.zeroHat
-  toHat_mul : ∀ f g : ring.Poly,
-    ops.toHat (ring.mul f g) = ops.mulHat (ops.toHat f) (ops.toHat g)
-  toHat_add : ∀ f g : ring.Poly,
-    ops.toHat (ring.add f g) = ops.addHat (ops.toHat f) (ops.toHat g)
-  toHat_sub : ∀ f g : ring.Poly,
-    ops.toHat (ring.sub f g) = ops.subHat (ops.toHat f) (ops.toHat g)
+  toHat_zero : ops.toHat 0 = (0 : Hat)
+  toHat_mul : ∀ f g : ring.Poly, ops.toHat (f * g) = ops.mulHat (ops.toHat f) (ops.toHat g)
+  toHat_add : ∀ f g : ring.Poly, ops.toHat (f + g) = ops.toHat f + ops.toHat g
+  toHat_sub : ∀ f g : ring.Poly, ops.toHat (f - g) = ops.toHat f - ops.toHat g
+  mul_add : ∀ a b c : Hat, ops.mulHat a (b + c) = ops.mulHat a b + ops.mulHat a c
+  mul_sub : ∀ a b c : Hat, ops.mulHat a (b - c) = ops.mulHat a b - ops.mulHat a c
+  mul_comm : ∀ a b : Hat, ops.mulHat a b = ops.mulHat b a
+  mul_assoc : ∀ a b c : Hat, ops.mulHat (ops.mulHat a b) c = ops.mulHat a (ops.mulHat b c)
 
 end TransformOps
 
