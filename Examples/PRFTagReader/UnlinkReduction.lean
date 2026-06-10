@@ -24,10 +24,14 @@ The reduction telescopes three bounds:
   `unlinkToSinglePRFReduction`.
 
 The headline `unlinkabilityAdvantage_le_two_prf_plus_collision` bounds the advantage by two PRF
-advantages plus `Pr[unlinkBadExp]`. Chaining `unlinkBadExp_le_sessionCollisionBound` then yields
-the explicit session-collision bounds in
+advantages plus the `multipleBadQueryImpl` bad-flag probability (the within-tag nonce-collision
+mass) and four unconditional slack terms. Chaining `multipleBad_bad_le_sessionCollisionBound` then
+yields the explicit session-collision bounds in
 `unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound` and its uniform-Nonce specialization.
--/
+
+The two existential PRF-adversary witnesses are concrete: they are the explicit reductions
+`unlinkToMultiplePRFReduction` and `unlinkToSinglePRFReduction` applied to the unlinkability
+adversary, so the bounds carry honest reduction content rather than mere existence claims. -/
 
 open OracleComp OracleSpec ENNReal
 
@@ -47,6 +51,11 @@ variable {TagId Nonce Digest K : Type}
 the multiple-session world, one PRF advantage for the single-session world, the bad-event
 probability from the intermediate nonce-collision world, and four unconditional slack terms. The
 bound holds for every adversary.
+
+`unlinkabilityAdvantage` is the signed one-sided gap `Pr[Multiple] − Pr[Single]`. The symmetric
+bound on `|Pr[Multiple] − Pr[Single]|` follows by applying this theorem to the output-negated
+adversary `oa >>= fun b => pure (!b)`, which has the same query bounds; the two directions then
+combine into the absolute value.
 
 The proof telescopes the three bridge lemmas:
 `Pr[Multiple] − Pr[Single]` splits as `(Pr[Multiple] − Pr[MultRF]) + (Pr[MultRF] − Pr[SingleRF])

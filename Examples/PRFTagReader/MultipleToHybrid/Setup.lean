@@ -346,9 +346,10 @@ a cell was written by a tag draw or by a reader query, and a collision is histor
 instrumented handler `multipleBadQueryImpl` carries, beside the multiple-ideal state, a full
 bad-world `UnlinkBadState` whose `bad` flag fires exactly on a tag-written cell collision. Its
 *output bit* is identical to `multipleIdealQueryImpl`'s — the instrumentation only threads an extra
-state component — so `Pr[= true]` is unchanged (`probOutput_multipleBad_run'_eq_multipleIdeal`),
-while `Pr[bad]` is exactly the bad-world collision probability
-(`probEvent_multipleBad_bad_eq_unlinkBad`). -/
+state component — so `Pr[= true]` is unchanged (`probOutput_multipleBad_run'_eq_multipleIdeal`).
+The `bad` flag of `multipleBadAdvance` fires exactly when a tag query repeats a within-tag
+`(tag, nonce)` pair (the `responses` cell for that pair is already populated), so its probability
+records the within-tag nonce-collision mass. -/
 
 /-- Joint handler state for the instrumented multiple-session world: the multiple-ideal state
 (session counters + lazy random-oracle cache over `TagId × Nonce`) paired with a full bad-world
