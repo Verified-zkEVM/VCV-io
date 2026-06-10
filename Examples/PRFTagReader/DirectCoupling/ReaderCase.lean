@@ -99,8 +99,6 @@ lemma dcAux_reader_step [Fintype Nonce] [Fintype Digest]
           ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
           ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
           ((qR * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-            (Fintype.card Digest : ℝ≥0∞) +
-          ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
             (Fintype.card Digest : ℝ≥0∞))
     (hqR : OracleComp.IsQueryBoundP (liftM (OracleSpec.query (Sum.inr transcript)) >>= k)
       (·.isRight) qR)
@@ -133,8 +131,6 @@ lemma dcAux_reader_step [Fintype Nonce] [Fintype Digest]
       ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
       ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
       ((qR * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-        (Fintype.card Digest : ℝ≥0∞) +
-      ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
         (Fintype.card Digest : ℝ≥0∞) := by
   classical
   -- Reader case: the asymmetric-discard argument. Slot-0 column lazification
@@ -382,11 +378,11 @@ lemma dcAux_reader_step [Fintype Nonce] [Fintype Digest]
   -- **Per-rs coupling.** All three terms now share the `idealCacheMapM cells c` head; couple
   -- them via the empty-`D` disagreement bound (mirroring the tag cases' `$ᵗ Nonce` coupling).
   -- The slacks are charged entirely in the per-rs obligation (closed in C2/C3); here `ε₁ = 0`,
-  -- `ε₂ = slack₁ + slack₂ + slack₃ + slack₄`.
+  -- `ε₂ = slack₁ + slack₂ + slack₃`.
   simp only [← probEvent_eq_eq_probOutput]
-  -- Regroup the RHS so the four slacks become a single trailing `ε₂` and insert `ε₁ = 0`.
-  rw [show ∀ a b c d e f : ℝ≥0∞, a + b + c + d + e + f = a + b + 0 + (c + d + e + f) from
-        fun a b c d e f => by ring]
+  -- Regroup the RHS so the three slacks become a single trailing `ε₂` and insert `ε₁ = 0`.
+  rw [show ∀ a b c d e : ℝ≥0∞, a + b + c + d + e = a + b + 0 + (c + d + e) from
+        fun a b c d e => by ring]
   refine probEvent_bind_le_add_bad_disagree
     (mx := idealCacheMapM (Digest := Digest) cells c)
     (D := fun _ => False) (by simp) ?_
@@ -603,8 +599,8 @@ lemma dcAux_reader_step [Fintype Nonce] [Fintype Digest]
     rw [hLHS_irr, hBAD_irr, probEvent_eq_eq_probOutput, probEvent_eq_eq_probOutput]
     refine (ih (ReaderReply.ofBool true) qR' qT s c₀ sB R'
       (hqRk _) (hqTk _) hqRle' hc₀Inv hRespInv').trans ?_
-    rw [show ∀ a b c d e : ℝ≥0∞, a + (b + c + d + e) = a + b + c + d + e from
-          fun a b c d e => by ring]
+    rw [show ∀ a b c d : ℝ≥0∞, a + (b + c + d) = a + b + c + d from
+          fun a b c d => by ring]
     gcongr <;> exact Nat.le_succ _
   · -- **Case m = false.** M rejects (slot-0 miss). The S reader bit `sAcc gS` is exactly the
     -- slot-positive collision indicator `cacheBadReader gS transcript` (the slot-0 disjunct is
@@ -854,18 +850,16 @@ lemma dcAux_reader_step [Fintype Nonce] [Fintype Digest]
     set B : ℝ≥0∞ := ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) with hB
     set C : ℝ≥0∞ := ((qR' * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
       (Fintype.card Digest : ℝ≥0∞) with hC
-    set Dt : ℝ≥0∞ := ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-      (Fintype.card Digest : ℝ≥0∞) with hDt
-    -- Goal: `S0 + BADt + A + B + C + Dt ≤ Scb + BADt + (A + Td) + B + (C + Tsp) + Dt`.
-    calc S0 + BADt + A + B + C + Dt
-        ≤ (Scb + Tsp) + BADt + A + B + C + Dt := by gcongr
-      _ ≤ Scb + BADt + (A + Td) + B + (C + Tsp) + Dt := by
-          rw [show (Scb + Tsp) + BADt + A + B + C + Dt
-                = Scb + BADt + A + B + (C + Tsp) + Dt from by ring,
-              show Scb + BADt + (A + Td) + B + (C + Tsp) + Dt
-                = (Scb + BADt + A + B + (C + Tsp) + Dt) + Td from by ring]
+    -- Goal: `S0 + BADt + A + B + C ≤ Scb + BADt + (A + Td) + B + (C + Tsp)`.
+    calc S0 + BADt + A + B + C
+        ≤ (Scb + Tsp) + BADt + A + B + C := by gcongr
+      _ ≤ Scb + BADt + (A + Td) + B + (C + Tsp) := by
+          rw [show (Scb + Tsp) + BADt + A + B + C
+                = Scb + BADt + A + B + (C + Tsp) from by ring,
+              show Scb + BADt + (A + Td) + B + (C + Tsp)
+                = (Scb + BADt + A + B + (C + Tsp)) + Td from by ring]
           exact le_self_add
-      _ = Scb + BADt + (A + Td + B + (C + Tsp) + Dt) := by ring
+      _ = Scb + BADt + (A + Td + B + (C + Tsp)) := by ring
 
 end UnlinkReduction
 

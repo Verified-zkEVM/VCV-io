@@ -21,8 +21,10 @@ Each side marginalizes its own cell via the single-cell helper
 `evalDist_uniformSample_bind_update_map`, giving the induction hypothesis a fresh slot-0 draw on
 the M side; the resulting slot-0 → slot-`K` cache extension is then bridged on the S side by the
 permutation lemma `singleTableHandler_cache_swap_eq`. Cell-pair independence gives per-nonce
-equality off the multiple-bad flag, so the per-step `|TagId| · sessionsPerTag / |Digest|` unit
-carved out of the `qT`-based slack is dropped via `le_self_add`.
+equality off the multiple-bad flag, so the tag step charges no tag-side slack: the per-step
+nonce-aliasing unit `qRInit / |Nonce|` carved out of the `qRInit·qT / |Nonce|` slack absorbs the
+reader-touched-set mass `R.card / |Nonce|`, and no `|TagId| · sessionsPerTag / |Digest|` charge is
+incurred.
 
 ## Main results
 
@@ -100,8 +102,6 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
           ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
           ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
           ((qR * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-            (Fintype.card Digest : ℝ≥0∞) +
-          ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
             (Fintype.card Digest : ℝ≥0∞))
     (hqR : OracleComp.IsQueryBoundP (liftM (OracleSpec.query (Sum.inl tag)) >>= k)
       (·.isRight) qR)
@@ -136,8 +136,6 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
       ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
       ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
       ((qR * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-        (Fintype.card Digest : ℝ≥0∞) +
-      ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
         (Fintype.card Digest : ℝ≥0∞) := by
   classical
   -- Slot-positive tag case (1 ≤ k < sp). M reads slot-0 cell, S reads slot-K cell (K ≠ 0).
@@ -146,9 +144,9 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
   -- single-cell helper (`evalDist_uniformSample_bind_update_map`), giving the IH a fresh
   -- slot-0 draw on the M side; the resulting slot-0 → slot-K cache extension is then
   -- bridged on the S side by the permutation lemma `singleTableHandler_cache_swap_eq`.
-  -- No per-step `cacheBadReader` charge is needed at this site: the per-step
-  -- `|TagId| · sp / |Digest|` unit carved out of the `qT`-based slack is dropped via
-  -- `le_self_add` (cell-pair independence gives per-`n` equality).
+  -- No per-step `cacheBadReader` charge is needed at this site: cell-pair independence gives
+  -- per-`n` equality off the bad flag, so the tag step incurs no `|TagId| · sp / |Digest|` charge
+  -- (the headline carries no tag-side slack).
   have hqRk : ∀ u, OracleComp.IsQueryBoundP (k u) (·.isRight) qR := by
     have := hqR
     rw [OracleComp.isQueryBoundP_query_bind_iff] at this
@@ -587,10 +585,10 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
   rw [probOutput_congr rfl hLHS_comm,
       probOutput_congr rfl hRHS_comm,
       probEvent_congr' (fun _ _ => Iff.rfl) hBAD_comm]
-  -- Phase C: split `qR * (qT' + 1) / |Nonce|` into `qR / |Nonce| + qR * qT' / |Nonce|`
-  -- and `(qT' + 1) * |TagId| * sp / |Digest|` into `|TagId| * sp / |Digest| +
-  -- qT' * |TagId| * sp / |Digest|`. Reassoc + drop the trailing slack via `le_self_add`
-  -- (cell-pair independence provides equality at per-`n`, so no extra charge needed).
+  -- Phase C: split `qRInit * (qT' + 1) / |Nonce|` into `qRInit / |Nonce| + qRInit * qT' / |Nonce|`
+  -- and reassociate so the per-`n` obligation carries the reader-cell, nonce-remainder, and
+  -- reader-slot slacks. No tag-side slack is charged here: cell-pair independence provides per-`n`
+  -- equality off the bad flag.
   classical
   simp only [← probEvent_eq_eq_probOutput]
   have hSplit : ((qRInit * (qT' + 1) : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞)
@@ -598,21 +596,10 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
         ((qRInit * qT' : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) := by
     rw [show qRInit * (qT' + 1) = qRInit + qRInit * qT' from by ring,
       Nat.cast_add, ENNReal.add_div]
-  have hSplit_s4 :
-      (((qT' + 1) * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞)
-        / (Fintype.card Digest : ℝ≥0∞)
-      = ((Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞)
-          / (Fintype.card Digest : ℝ≥0∞) +
-        ((qT' * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞)
-          / (Fintype.card Digest : ℝ≥0∞) := by
-    rw [show (qT' + 1) * Fintype.card TagId * sessionsPerTag
-          = Fintype.card TagId * sessionsPerTag + qT' * Fintype.card TagId * sessionsPerTag
-          from by ring, Nat.cast_add, ENNReal.add_div]
-  rw [hSplit, hSplit_s4]
-  rw [show ∀ a b c d e f g h : ℝ≥0∞,
-        a + b + c + (d + e) + f + (g + h) = a + b + d + (c + e + f + h) + g from
-        fun a b c d e f g h => by ring]
-  refine (?_ : _ ≤ _).trans le_self_add
+  rw [hSplit]
+  rw [show ∀ a b c d e f : ℝ≥0∞,
+        a + b + c + (d + e) + f = a + b + d + (c + e + f) from
+        fun a b c d e f => by ring]
   refine probEvent_bind_le_add_bad_disagree
     (D := fun n : Nonce => n ∈ R)
     ?_ ?_
@@ -912,7 +899,7 @@ lemma dcAux_tag_slotPositive [Fintype Nonce] [Fintype Digest]
       probOutput_congr rfl hbridge
     rw [hS_eq] at hihB
     rw [probEvent_eq_eq_probOutput, probEvent_eq_eq_probOutput,
-        ← add_assoc, ← add_assoc, ← add_assoc]
+        ← add_assoc, ← add_assoc]
     exact hihB
   · -- Case M-hit: c slot-0 = some u₀.
     -- Step 1: M's transcript becomes constant ⟨n, u₀⟩.

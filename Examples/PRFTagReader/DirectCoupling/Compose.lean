@@ -25,11 +25,12 @@ Pr[multipleIdealQueryImpl true] ≤
   Pr[singleIdealQueryImpl true] + Pr[bad]
     + qReader·|TagId| / |Digest| + qReader·qTag / |Nonce|
     + qReader·|TagId|·sessionsPerTag / |Digest|
-    + qTag·|TagId|·sessionsPerTag / |Digest|
 ```
 
-for every adversary, with no distinctness hypothesis on its reader nonces. The bound carries one
-tag-side slack term (the last above) on top of the reader and nonce-aliasing slacks.
+for every adversary, with no distinctness hypothesis on its reader nonces. The bound carries no
+tag-side slack term: removing the reader-nonce distinctness hypothesis costs zero extra slack
+compared with the conditional version, because the tag-side cell-count gap is absorbed by
+`le_self_add` at every tag step.
 
 The direct coupling identifies the multiple-session world's RO cell `(tag, n)` with the
 single-session world's reference-slot cell `((tag, 0), n)` via `slotZeroEmbed` /
@@ -103,9 +104,18 @@ omit [Nonempty TagId] in
 /-- **Direct M-S coupling aux (eager).** Under a shared `$ᵗ gS` sample, the eager-form fine handler
 `multipleBadTableHandlerFine (slotZeroSubTable (tableExtending c gS))` (with `UnlinkBadState`
 instrumentation) success probability is bounded by the eager-form `singleTableHandler
-(tableExtending c gS)` success probability, plus the multiple-bad `bad`-probability, plus four
-additive slacks: `qR·|TagId|/|Digest|`, `qRInit·qT/|Nonce|`, `qR·|TagId|·sessionsPerTag/|Digest|`,
-and `qT·|TagId|·sessionsPerTag/|Digest|`.
+(tableExtending c gS)` success probability, plus the multiple-bad `bad`-probability, plus three
+additive slacks: `qR·|TagId|/|Digest|`, `qRInit·qT/|Nonce|`, and
+`qR·|TagId|·sessionsPerTag/|Digest|`.
+
+The tag-side cell-count gap costs zero extra slack: at every tag step (slot 0 and slot positive)
+the per-step `|TagId|·sessionsPerTag/|Digest|` carve is dropped via `le_self_add` (cell-pair
+independence provides per-`n` equality off the bad flag), so removing the reader-nonce distinctness
+hypothesis is free on the tag side. The genuinely charged slacks are: `qRInit·qT/|Nonce|`, charged
+at slot-positive tag steps via the reader-touched-set membership event `R.card/|Nonce|`
+(`probEvent_bind_le_add_bad_disagree` with `D = (· ∈ R)`); and `qR·|TagId|·sessionsPerTag/|Digest|`,
+charged at the asymmetric-discard reader step via `probEvent_cacheBadReader_uniformSample_le`. The
+reader-cell slack `qR·|TagId|/|Digest|` is carried as headroom for the per-query reader split.
 
 The coupling is hypothesis- and invariant-free at the eager level: no reader-nonce distinctness
 hypothesis, no cache-coupling invariant, and no collision-freshness predicate. The bound is
@@ -173,8 +183,6 @@ lemma multipleBadEager_le_singleEager_DC_aux [Fintype Nonce] [Fintype Digest]
       ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
       ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
       ((qR * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-        (Fintype.card Digest : ℝ≥0∞) +
-      ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
         (Fintype.card Digest : ℝ≥0∞) := by
   -- Induction cases: pure / tag slot-zero / tag slot-positive / tag slot-exhausted / reader.
   classical
@@ -184,11 +192,11 @@ lemma multipleBadEager_le_singleEager_DC_aux [Fintype Nonce] [Fintype Digest]
     -- becomes `do gS ← $ᵗ; gFine ← $ᵗ; pure b` (`bind_const` shape since `pure b` ignores
     -- `gFine`). Collapse the inner `gFine ← $ᵗ; pure b` via `probOutput_bind_const` and the
     -- uniform `Pr[⊥ | $ᵗ ·] = 0` identity (`probFailure_uniformSample`) so the inner factor
-    -- becomes `1 * Pr[= true | (fun _ => b) <$> $ᵗ ·]`. Bad + 4 slacks are nonnegative, dropped
+    -- becomes `1 * Pr[= true | (fun _ => b) <$> $ᵗ ·]`. Bad + 3 slacks are nonnegative, dropped
     -- via `le_add_right`.
     simp only [simulateQ_pure, StateT.run_pure, StateT.run'_eq, map_pure, bind_pure_comp,
       probOutput_bind_const, probFailure_uniformSample, tsub_zero, one_mul]
-    refine le_add_right (le_add_right (le_add_right (le_add_right (le_add_right ?_))))
+    refine le_add_right (le_add_right (le_add_right (le_add_right ?_)))
     rfl
   | query_bind t k ih =>
     cases t with
@@ -208,7 +216,7 @@ lemma multipleBadEager_le_singleEager_DC_aux [Fintype Nonce] [Fintype Digest]
         -- consumed by the tag branch). The head step unfolds to `pure none` on both sides; the
         -- inner `gFine ← $ᵗ` binder is consumed via `bind_const` shape. After splitting
         -- `qT = qT' + 1`, the IH at `qT'` applies directly with unchanged state `(s, sB)`; the
-        -- two `qT`-bearing slacks (qR*qT/|Nonce|, qT*|TagId|*sp/|D|) weaken back via `gcongr`.
+        -- `qT`-bearing nonce-aliasing slack (qRInit*qT/|Nonce|) weakens back via `gcongr`.
         have hqRk : ∀ u, OracleComp.IsQueryBoundP (k u) (·.isRight) qR := by
           have := hqR
           rw [OracleComp.isQueryBoundP_query_bind_iff] at this
@@ -310,11 +318,10 @@ lemma multipleBadEager_le_singleEager_DC_aux [Fintype Nonce] [Fintype Digest]
             probOutput_congr rfl (congrArg evalDist hRHS_eq),
             probEvent_congr' (fun _ _ => Iff.rfl) (congrArg evalDist hBAD_eq)]
         -- Now LHS / RHS / BAD all evaluate `k none` at the unchanged state `(s, sB)`. Apply IH at
-        -- `qT'`; the two `qT`-bearing slacks weaken back via `gcongr` + `Nat.le_succ`.
+        -- `qT'`; the `qT`-bearing nonce-aliasing slack weakens back via `gcongr` + `Nat.le_succ`.
         refine (ih none qR qT' s c sB R (hqRk none) (hqTk none) hqRle hcInv hRespInv).trans ?_
         gcongr
-        · exact Nat.le_succ _
-        · exact Nat.le_succ _
+        exact Nat.le_succ _
     | inr transcript =>
       -- Reader case: the asymmetric-discard step. Delegated to `dcAux_reader_step`, which takes
       -- the induction hypothesis `ih` as an explicit premise.
@@ -333,9 +340,10 @@ single-ideal handler (`probOutput_singleIdeal_run'_eq_tableSample`). -/
 namespace UnlinkReduction
 
 /-- **Multi-to-single via direct M-S coupling.** Bounds the multiple-session ideal world by the
-single-session ideal world plus the multiple-bad collision probability and four unconditional
-slack terms, for every adversary and with no distinctness hypothesis on its reader nonces. One of
-the slacks is tag-side, `qTag·|TagId|·sessionsPerTag / |Digest|`.
+single-session ideal world plus the multiple-bad collision probability and three unconditional
+slack terms, for every adversary and with no distinctness hypothesis on its reader nonces. None of
+the slacks is tag-side: the tag-side cell-count gap is absorbed by `le_self_add` at every tag step,
+so removing the reader-nonce distinctness hypothesis costs zero extra slack.
 
 The direct M-S coupling via `slotZeroSubTable` works
 unconditionally on the adversary (no nonce-distinctness assumption) because the per-step
@@ -361,8 +369,6 @@ theorem multipleIdeal_le_singleIdeal_add_bad_DC [Fintype Nonce] [Fintype Digest]
       ((qReader * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
       ((qReader * qTag : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
       ((qReader * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-        (Fintype.card Digest : ℝ≥0∞) +
-      ((qTag * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
         (Fintype.card Digest : ℝ≥0∞) := by
   classical
   -- **Step 1.** Replace the multiple-ideal LHS by the multiple-bad LHS (same `Pr[= true]`).
@@ -674,7 +680,7 @@ theorem multipleIdeal_le_singleIdeal_add_bad_DC [Fintype Nonce] [Fintype Digest]
     (∅ : (((TagId × Fin sessionsPerTag) × Nonce) →ₒ Digest).QueryCache) UnlinkBadState.init ∅
     hqReader hqTag (by simp) (fun _ _ _ _ => rfl) (fun _ _ _ h => absurd rfl h)
   simp only [OracleComp.tableExtending_empty] at haux
-  -- The aux bound is term-by-term equal to the headline RHS: the four eager slacks match exactly.
+  -- The aux bound is term-by-term equal to the headline RHS: the three eager slacks match exactly.
   exact haux
 
 end UnlinkReduction

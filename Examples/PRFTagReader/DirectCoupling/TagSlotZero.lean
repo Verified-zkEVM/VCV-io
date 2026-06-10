@@ -99,8 +99,6 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
           ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
           ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
           ((qR * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-            (Fintype.card Digest : ℝ≥0∞) +
-          ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
             (Fintype.card Digest : ℝ≥0∞))
     (hqR : OracleComp.IsQueryBoundP (liftM (OracleSpec.query (Sum.inl tag)) >>= k)
       (·.isRight) qR)
@@ -135,8 +133,6 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
       ((qR * Fintype.card TagId : ℕ) : ℝ≥0∞) / (Fintype.card Digest : ℝ≥0∞) +
       ((qRInit * qT : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) +
       ((qR * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
-        (Fintype.card Digest : ℝ≥0∞) +
-      ((qT * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞) /
         (Fintype.card Digest : ℝ≥0∞) := by
   classical
   -- Slot-zero tag case (k = 0 fresh): the `Sum.inl tag` branch of `multipleBadTableHandlerFine`
@@ -602,10 +598,10 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
   rw [probOutput_congr rfl hLHS_comm,
       probOutput_congr rfl hRHS_comm,
       probEvent_congr' (fun _ _ => Iff.rfl) hBAD_comm]
-  -- Phase C. Split `qR * (qT' + 1) / |Nonce|` into `qR / |Nonce| + qR * qT' / |Nonce|` and
-  -- analogously for the `qT * |TagId| * sp / |Digest|` slack. Reassociate and apply the
-  -- disagree lemma with empty `D` on the inner `$ᵗ Nonce` (since under hzero, M and S do
-  -- the same step — there is no per-step disagreement to charge).
+  -- Phase C. Split `qRInit * (qT' + 1) / |Nonce|` into `qRInit / |Nonce| + qRInit * qT' / |Nonce|`
+  -- and reassociate. Apply the disagree lemma with empty `D` on the inner `$ᵗ Nonce` (since under
+  -- hzero, M and S do the same step — there is no per-step disagreement to charge, and no tag-side
+  -- slack is incurred).
   classical
   simp only [← probEvent_eq_eq_probOutput]
   have hSplit : ((qRInit * (qT' + 1) : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞)
@@ -613,21 +609,10 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
         ((qRInit * qT' : ℕ) : ℝ≥0∞) / (Fintype.card Nonce : ℝ≥0∞) := by
     rw [show qRInit * (qT' + 1) = qRInit + qRInit * qT' from by ring,
       Nat.cast_add, ENNReal.add_div]
-  have hSplit_s4 :
-      (((qT' + 1) * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞)
-        / (Fintype.card Digest : ℝ≥0∞)
-      = ((Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞)
-          / (Fintype.card Digest : ℝ≥0∞) +
-        ((qT' * Fintype.card TagId * sessionsPerTag : ℕ) : ℝ≥0∞)
-          / (Fintype.card Digest : ℝ≥0∞) := by
-    rw [show (qT' + 1) * Fintype.card TagId * sessionsPerTag
-          = Fintype.card TagId * sessionsPerTag + qT' * Fintype.card TagId * sessionsPerTag
-          from by ring, Nat.cast_add, ENNReal.add_div]
-  rw [hSplit, hSplit_s4]
-  rw [show ∀ a b c d e f g h : ℝ≥0∞,
-        a + b + c + (d + e) + f + (g + h) = a + b + d + (c + e + f + h) + g from
-        fun a b c d e f g h => by ring]
-  refine (?_ : _ ≤ _).trans le_self_add
+  rw [hSplit]
+  rw [show ∀ a b c d e f : ℝ≥0∞,
+        a + b + c + (d + e) + f = a + b + d + (c + e + f) from
+        fun a b c d e f => by ring]
   refine probEvent_bind_le_add_bad_disagree
     (D := fun _ : Nonce => False)
     ?_ ?_
@@ -837,7 +822,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
       (multipleBadAdvance tag sB (some (⟨n, u⟩ : TagTranscript Nonce Digest))) R
       (hqRk _) (hqTk _) hqRle hcInv' hRespInv'
     rw [probEvent_eq_eq_probOutput, probEvent_eq_eq_probOutput,
-        ← add_assoc, ← add_assoc, ← add_assoc]
+        ← add_assoc, ← add_assoc]
     exact hihB
   · -- Case A: cache hit `u₀`. Cell read is `u₀` regardless of `gS`. Apply IH at unchanged
     -- cache `c`.
@@ -874,7 +859,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
       (multipleBadAdvance tag sB (some (⟨n, u₀⟩ : TagTranscript Nonce Digest))) R
       (hqRk _) (hqTk _) hqRle hcInv hRespInv''
     rw [probEvent_eq_eq_probOutput, probEvent_eq_eq_probOutput,
-        ← add_assoc, ← add_assoc, ← add_assoc]
+        ← add_assoc, ← add_assoc]
     exact hihA
 
 end UnlinkReduction
