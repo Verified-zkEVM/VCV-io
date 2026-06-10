@@ -7,12 +7,11 @@ Authors: Quang Dao
 import Examples.PRFTagReader.PRFReductions.IdealHandlers
 
 /-!
-# PRF Tag/Reader Protocol — Structural `query_bind` Reductions and Distinct Reader Nonces
+# PRF Tag/Reader Protocol — Structural `query_bind` Reductions
 
 Structural `query_bind`-decomposition lemmas for the composed ideal handlers (turning the
-coupling induction into a sequence of `bind`-decomposition steps), per-query reductions and `bad`
-monotonicity for `unlinkBadQueryImpl`, and the `HasDistinctUnlinkReaderNonces` predicate together
-with its single-reader-query corollary `hasDistinctUnlinkReaderNonces_of_readerBound`.
+coupling induction into a sequence of `bind`-decomposition steps), together with per-query
+reductions and `bad` monotonicity for `unlinkBadQueryImpl`.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -194,68 +193,6 @@ lemma probEvent_unlinkBad_bad_eq_one_of_bad
           (Digest := Digest) (sessionsPerTag := sessionsPerTag)) adv).run sB] = 1 := by
   rw [probEvent_eq_one_iff]
   exact ⟨by simp, fun z hz => simulateQ_unlinkBad_preserves_bad adv sB hbad z hz⟩
-
-/-! ### Pairwise-distinct reader nonces
-
-The reader-slack half of the coupling is sound only when the adversary's reader queries carry
-pairwise-distinct nonces: a reader query at nonce `n` programs an entire column of the random
-oracle, and the coupling between the multiple- and single-session worlds can charge that column
-only once. `HasDistinctUnlinkReaderNonces` is the unlinkability analogue of
-`PRFTagReader.HasDistinctReaderNonces` from the authentication collision proof: it bounds, for
-every nonce `n`, the number of reader queries carrying `n` by `1`. -/
-
-/-- Per-nonce reader-query predicate on the unlinkability oracle interface. `pReaderNonce n` holds
-of a reader query exactly when its transcript carries the nonce `n`, and never holds of a tag
-query. Bounding the number of `pReaderNonce n`-queries by `1` for every `n` expresses that the
-adversary's reader queries use pairwise-distinct nonces. -/
-def pReaderNonce (n : Nonce) : (UnlinkOracleSpec TagId Nonce Digest).Domain → Prop :=
-  fun i => match i with
-    | Sum.inr tr => tr.nonce = n
-    | Sum.inl _ => False
-
-instance pReaderNonceDecidable (n : Nonce) :
-    DecidablePred (pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest) n) := by
-  intro i
-  cases i with
-  | inr tr => exact (inferInstance : Decidable (tr.nonce = n))
-  | inl _ => exact (inferInstance : Decidable False)
-
-/-- The adversary's reader queries use pairwise-distinct nonces: every nonce `n` is carried by at
-most one reader query. This is the public hypothesis under which the reader-slack half of the
-unlinkability coupling is sound; it rules out the shared-column obstruction that an unrestricted
-multiple-vs-single coupling would face. -/
-def HasDistinctUnlinkReaderNonces (adversary : UnlinkAdversary TagId Nonce Digest) : Prop :=
-  ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pReaderNonce n) 1
-
-omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
-  [DecidableEq Digest] [SampleableType Digest] in
-/-- `HasDistinctUnlinkReaderNonces` unfolds definitionally to a per-nonce reader-query bound: it
-holds exactly when, for every nonce `n`, at most one reader query carries `n`. -/
-lemma hasDistinctUnlinkReaderNonces_iff (adversary : UnlinkAdversary TagId Nonce Digest) :
-    HasDistinctUnlinkReaderNonces adversary ↔
-      ∀ n : Nonce, OracleComp.IsQueryBoundP adversary (pReaderNonce n) 1 :=
-  Iff.rfl
-
-omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [DecidableEq Nonce] [SampleableType Nonce]
-  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- Every `pReaderNonce n`-query is a reader query: `pReaderNonce n` is false on tag (`Sum.inl`)
-queries and, on reader (`Sum.inr`) queries, refines `Sum.isRight`. -/
-lemma pReaderNonce_imp_isRight (n : Nonce)
-    (t : (UnlinkOracleSpec TagId Nonce Digest).Domain) :
-    pReaderNonce (TagId := TagId) (Nonce := Nonce) (Digest := Digest) n t → t.isRight := by
-  cases t with
-  | inl x => exact fun h => (h : (False : Prop)).elim
-  | inr tr => exact fun _ => rfl
-
-omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
-  [DecidableEq Digest] [SampleableType Digest] [NeZero sessionsPerTag] in
-/-- An adversary making at most one reader query has pairwise-distinct reader nonces: a single
-reader query cannot collide with itself. Adversaries with no reader queries also qualify. -/
-theorem hasDistinctUnlinkReaderNonces_of_readerBound
-    (adversary : UnlinkAdversary TagId Nonce Digest)
-    (hq : OracleComp.IsQueryBoundP adversary (fun i => i.isRight) 1) :
-    HasDistinctUnlinkReaderNonces adversary := fun n =>
-  OracleComp.IsQueryBoundP.of_imp (pReaderNonce_imp_isRight n) hq
 
 end UnlinkReduction
 

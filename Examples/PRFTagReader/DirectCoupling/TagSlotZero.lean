@@ -7,6 +7,7 @@ Authors: Quang Dao
 import Examples.PRFTagReader.DirectCoupling
 import Examples.PRFTagReader.DirectCoupling.StepLemmas
 import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
+import VCVio.EvalDist.Monad.Disagreement
 
 /-!
 # PRF Tag/Reader Protocol — Direct Coupling, Slot-Zero Tag Step

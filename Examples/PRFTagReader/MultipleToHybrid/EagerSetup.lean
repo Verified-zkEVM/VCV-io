@@ -149,9 +149,9 @@ lemma multipleBadReaderAdvance_cacheBad_eq_false_iff
 
 /-! ### Multiple-to-hybrid: the eager-table instrumented multiple handler
 
-The `MultipleHybridCoupling`-`inductionOn` route for the coupling bound is a proven dead end: a
-`Prop`-valued state coupling cannot encode the run-determined session index that a later tag query
-reads back. The eager route fixes this by sampling the random-oracle table up front.
+A lazy `Prop`-valued state-coupling induction cannot encode the run-determined session index that
+a later tag query reads back, so the coupling bound is established on the eager route instead, by
+sampling the random-oracle table up front.
 
 `multipleBadTableHandler g` is the deterministic-table instrumented multiple handler: it runs the
 deterministic real handler `multipleTableHandler g` on the multiple-ideal component and threads the

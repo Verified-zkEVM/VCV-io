@@ -8,6 +8,7 @@ import Examples.PRFTagReader.DirectCoupling
 import Examples.PRFTagReader.DirectCoupling.StepLemmas
 import Examples.PRFTagReader.DirectCoupling.Swap
 import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
+import VCVio.EvalDist.Monad.Disagreement
 
 /-!
 # PRF Tag/Reader Protocol — Direct Coupling, Slot-Positive Tag Step

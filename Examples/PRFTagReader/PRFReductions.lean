@@ -13,15 +13,12 @@ import Examples.PRFTagReader.PRFReductions.Structural
 
 The PRF reductions for the multiple-session and single-session unlinkability worlds, together
 with the composed ideal-world handlers (`multipleIdealQueryImpl`, `singleIdealQueryImpl`,
-`unlinkBadQueryImpl`), per-query reduction lemmas, structural `query_bind` reductions, and the
-pairwise-distinct-reader-nonce predicate `HasDistinctUnlinkReaderNonces`.
+`unlinkBadQueryImpl`), per-query reduction lemmas, and structural `query_bind` reductions.
 
 This is the first module of the unlinkability reduction split; downstream modules
-(`Table`, `Hybrid`, `HybridToSingle`, `MultipleToHybrid.Setup`,
-`MultipleToHybrid.EagerSetup`, `MultipleToHybrid.EagerReader`, `MultipleToHybrid.Eager`,
-`MultipleBadCollision`) extend this
-infrastructure to the eager-table coupling chain culminating in
-`unlinkabilityAdvantage_le_two_prf_plus_collision`.
+(`Table`, `MultipleToHybrid.Setup`, `MultipleToHybrid.EagerSetup`, the `DirectCoupling/` chain,
+`MultipleBadCollision`) extend this infrastructure to the eager-table coupling chain culminating
+in `unlinkabilityAdvantage_le_two_prf_plus_collision`.
 
 This file is a thin umbrella re-exporting the three sub-modules
 [`PRFReductions.Reductions`], [`PRFReductions.IdealHandlers`], and
