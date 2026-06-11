@@ -2513,7 +2513,7 @@ theorem knowledgeSoundness
   refine le_trans (knowledgeSoundness_badEvent_le σ hr ρ b S M hss hur adv Q hρ hQ x msg) ?_
   rw [knowledgeSoundnessError]
   -- Monotonicity: replace the small-sum count by its stars-and-bars upper bound.
-  refine ENNReal.div_le_div_right (mul_le_mul_left' ?_ _) _
+  gcongr
   exact_mod_cast smallSumCount_le ρ b S
 
 /-! ### EUF-CMA Security
