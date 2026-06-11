@@ -1468,19 +1468,54 @@ private lemma fischlinSearch_run_preserves_offrep (pk : Stmt) (sk : Wit) (sc : P
         · simp only [hx, if_false] at hmem
           exact ih _ _ hmem
 
-/-- **Cross-repetition cache threading (residual).** Given a key pair `(pk, sk)` and a vector of
-commitments `commits`, simulating the `ρ` per-repetition searches of `sign` followed by the `ρ`
-verifier re-queries under the lazy random-oracle on the empty cache produces the same `Bool`
-distribution as `modelGame`'s combinatorial verdict computed from `fischlinUnifSearch`.
+/-- The transcript a repetition contributes to the Fischlin signature, reconstructed from a
+`fischlinUnifSearch` outcome: the kept `(ω, resp)` on `some`, the dummy `default` pair on `none`. -/
+private def sigOfBest (commits : Fin ρ → Commit × PrvState) (i : Fin ρ)
+    (o : Option (Chal × Resp × Fin (2 ^ b))) : Commit × Chal × Resp :=
+  match o with
+  | some (ω, resp, _) => ((commits i).1, ω, resp)
+  | none => ((commits i).1, default, default)
 
-This is the one remaining step of the completeness surgery. Its content is:
-* the `ρ` searches of `Fin.mOfFn` thread the cache, and since repetition `i`'s records all carry
-  `rep = i`, they never collide across repetitions, so `searchFresh` holds at each step
-  (`fischlinSearch_run_cache_eq` is then the per-repetition bridge); this is the residual obligation
-  and additionally needs that each search leaves records of other repetitions untouched;
-* each verifier re-query `⟨pk, msg, comList, i, ωᵢ, respᵢ⟩` is then a cache hit returning the kept
-  hash `(bests i).2.2`, matching `modelGame`'s direct read (`run_mOfFn_query_hit`);
-* the `allVerified`/`hashSum` fold is computed identically in both games. -/
+/-- **Search-vector cache bridge (residual).** Running the `ρ` per-repetition searches of `sign`
+under the lazy random-oracle on the empty cache, the joint distribution of the produced transcript
+vector together with the final cache's value at each repetition's chosen record equals
+`Fin.mOfFn ρ fischlinUnifSearch`'s transcripts paired with their kept hashes.
+
+This is the cross-repetition threading: repetition `i`'s queries all carry `rep = i`, so by
+`fischlinSearch_run_cache_eq` (each search caches its own chosen record with its hash) and
+`fischlinSearch_run_preserves_offrep` (each search leaves other repetitions' records untouched),
+after all `ρ` searches the final cache stores every chosen record with its kept hash. Proved by a
+`Fin.mOfFn` induction; `comList = List.ofFn (commits ·.1)` is fixed across repetitions. -/
+private lemma searchVec_run_cache_eq (pk : Stmt) (sk : Wit) (msg : M)
+    (commits : Fin ρ → Commit × PrvState) :
+    𝒟[(fun p : (Fin ρ → Commit × Chal × Resp) ×
+            (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache =>
+          (p.1, fun i => p.2 (⟨pk, msg, List.ofFn (fun j => (commits j).1), i,
+            (p.1 i).2.1, (p.1 i).2.2⟩ : FischlinROInput Stmt Commit Chal Resp ρ M))) <$>
+        (simulateQ (fischlinImpl ρ b M)
+          (Fin.mOfFn ρ fun i =>
+            (fischlinSearchAux σ pk sk (commits i).2 msg
+                (List.ofFn (fun j => (commits j).1)) i (FinEnum.toList Chal)
+                (none : Option (Chal × Resp × Fin (2 ^ b))) >>= fun result =>
+              pure (sigOfBest ρ b commits i
+                (result.map fun t => (t.1, t.2, (default : Fin (2 ^ b)))))))).run ∅]
+      = 𝒟[(fun bests : Fin ρ → Option (Chal × Resp × Fin (2 ^ b)) =>
+            (fun i => sigOfBest ρ b commits i (bests i),
+            fun i => (bests i).map (fun t => t.2.2))) <$>
+          Fin.mOfFn ρ fun i =>
+            fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal)
+              (none : Option (Chal × Resp × Fin (2 ^ b)))] := by
+  sorry
+
+/-- **Cross-repetition cache threading.** Given a key pair `(pk, sk)` and a vector of commitments
+`commits`, simulating the `ρ` per-repetition searches of `sign` followed by the `ρ` verifier
+re-queries under the lazy random-oracle on the empty cache produces the same `Bool` distribution as
+`modelGame`'s combinatorial verdict computed from `fischlinUnifSearch`.
+
+The searches thread the cache (`searchVec_run_cache_eq`): repetition `i`'s records carry `rep = i`,
+so they never collide across repetitions and the final cache stores every chosen record with its
+kept hash. Each verifier re-query is then a cache hit returning that hash (`run_mOfFn_query_hit`),
+matching `modelGame`'s direct read, and the `allVerified`/`hashSum` fold is identical. -/
 private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
     (commits : Fin ρ → Commit × PrvState) :
     𝒟[(simulateQ (fischlinImpl ρ b M)
