@@ -6,6 +6,8 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
 import VCVio.EvalDist.TVDist
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
+import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
 
 /-!
 # PRG from PRF
@@ -168,6 +170,125 @@ theorem prgRealExp_eq_prfRealExp
   simp only [monad_norm, Function.comp_def]
   rw [evalDist_bind, evalDist_bind, hkey]
 
+/-- Running a state-lifted computation that begins by lifting a stateless computation `oa`
+and then continues with `rest` is the same as sampling `oa` first and continuing each branch
+with the discarded-state run of `rest`. -/
+private lemma run'_liftM_bind {σ β γ : Type} (oa : ProbComp β)
+    (rest : β → StateT σ ProbComp γ) (s : σ) :
+    ((liftM oa : StateT σ ProbComp β) >>= rest).run' s = oa >>= fun x => (rest x).run' s := by
+  rw [StateT.run'_eq, StateT.run_bind, liftM_run_StateT, bind_assoc]
+  simp only [pure_bind, map_bind]
+  rfl
+
+/-- Running a state-lifted computation that ends by lifting a stateless continuation `f`
+discards the threaded state exactly as `run'` followed by `f`. -/
+private lemma run'_bind_liftM {σ β γ : Type} (N : StateT σ ProbComp β)
+    (f : β → ProbComp γ) (s : σ) :
+    (N >>= fun a => (liftM (f a) : StateT σ ProbComp γ)).run' s = N.run' s >>= f := by
+  rw [StateT.run'_eq, StateT.run_bind, StateT.run'_eq, map_bind, bind_map_left]
+  refine bind_congr fun p => ?_
+  rw [liftM_run_StateT, map_bind]
+  simp only [map_pure]
+  rw [bind_pure]
+
+/-- The output distribution that the ideal PRF reduction feeds to the PRG adversary:
+sample an initial seed, then read `n` output blocks off the lazy random oracle chain. -/
+noncomputable def idealOutputs (n : ℕ) : ProbComp (List.Vector O n) := do
+  let seed ← $ᵗ S
+  (simulateQ (prfIdealQueryImpl (D := S) (R := S × O)) (oracleOutputs n seed)).run' ∅
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq S] [Inhabited O] [Fintype O]
+  [DecidableEq O] in
+/-- The ideal PRG experiment for the stream adversary is exactly: sample a uniform output
+vector and run the adversary on it. -/
+lemma prgIdealExp_eq_bind (adv : PRGAdversary (List.Vector O n)) :
+    PRGScheme.prgIdealExp adv = (($ᵗ (List.Vector O n)) >>= adv) :=
+  rfl
+
+omit [DecidableEq O] in
+/-- The ideal PRF experiment, applied to the stream reduction, factors as sampling the
+adversary's input via the lazy-random-oracle chain (`idealOutputs`) and then running the
+adversary. -/
+lemma prfIdealExp_prfReduction_eq (adv : PRGAdversary (List.Vector O n)) :
+    PRFScheme.prfIdealExp (prfReduction (S := S) (O := O) n adv) =
+      (idealOutputs (S := S) (O := O) n >>= adv) := by
+  unfold PRFScheme.prfIdealExp prfReduction idealOutputs
+  rw [simulateQ_bind, simulateQ_prfIdealQueryImpl_liftComp, run'_liftM_bind, bind_assoc]
+  refine bind_congr fun seed => ?_
+  rw [simulateQ_bind]
+  simp only [simulateQ_prfIdealQueryImpl_liftComp]
+  rw [run'_bind_liftM]
+
+/-- The per-seed output distribution: run the lazy random oracle chain for `n` rounds from a
+fixed initial state `seed`, collecting the output blocks. Averaging over `seed ← $ᵗ S` gives
+`idealOutputs`. -/
+noncomputable def seedOutputs (n : ℕ) (seed : S) : ProbComp (List.Vector O n) :=
+  (simulateQ (prfIdealQueryImpl (D := S) (R := S × O)) (oracleOutputs n seed)).run' ∅
+
+/-- The per-seed collision experiment: run the lazy random oracle chain for `n` rounds from a
+fixed initial state `seed`, and test whether any queried state repeats. Averaging over
+`seed ← $ᵗ S` gives `idealCollisionExp`. -/
+noncomputable def seedCollisionExp (n : ℕ) (seed : S) : ProbComp Bool := do
+  let states ←
+    (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+      (oracleVisitedStates n seed)).run' ∅
+  return decide (¬ states.toList.Nodup)
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- `idealOutputs` averages the per-seed chain outputs over a uniform initial state. -/
+lemma idealOutputs_eq_bind :
+    idealOutputs (S := S) (O := O) n = (($ᵗ S) >>= seedOutputs (S := S) (O := O) n) := rfl
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- `idealCollisionExp` averages the per-seed collision test over a uniform initial state. -/
+lemma idealCollisionExp_eq_bind :
+    idealCollisionExp (S := S) (O := O) n = (($ᵗ S) >>= seedCollisionExp (S := S) (O := O) n) :=
+  rfl
+
+omit [DecidableEq O] in
+/-- **Per-seed core coupling.** For a fixed initial state, the total variation distance between
+the lazy-random-oracle output chain and a uniformly random output vector is bounded by the
+probability that the state chain revisits a state. This is the fundamental "identical until
+bad" step: until the chain repeats, the lazy random oracle returns independent uniform blocks. -/
+lemma tvDist_seedOutputs_le_collision (seed : S) :
+    tvDist (seedOutputs n seed) ($ᵗ (List.Vector O n)) ≤
+      (Pr[= true | seedCollisionExp (O := O) n seed]).toReal := by
+  sorry
+
+omit [DecidableEq O] in
+/-- **Core coupling.** The total variation distance between the lazy-random-oracle output
+chain and a uniformly random output vector is bounded by the state-collision probability.
+This is the fundamental "identical until bad" step: until the state chain repeats, the lazy
+random oracle returns independent uniform blocks, matching the ideal PRG distribution.
+
+Obtained by averaging the per-seed bound `tvDist_seedOutputs_le_collision` over the uniform
+initial state. -/
+lemma tvDist_idealOutputs_le_collisionProb :
+    tvDist (idealOutputs (S := S) (O := O) n) ($ᵗ (List.Vector O n)) ≤
+      collisionProb (S := S) (O := O) n := by
+  rw [collisionProb, idealCollisionExp_eq_bind, idealOutputs_eq_bind]
+  -- Replace the constant right-hand side by a (lossless) bind over the same seed.
+  have h_const : tvDist (($ᵗ S) >>= seedOutputs n) ($ᵗ (List.Vector O n)) =
+      tvDist (($ᵗ S) >>= seedOutputs n) (($ᵗ S) >>= fun _ => $ᵗ (List.Vector O n)) := by
+    simp only [tvDist]
+    congr 1
+    refine evalDist_ext fun y => ?_
+    rw [probOutput_bind_const]
+    simp
+  rw [h_const]
+  refine le_trans (tvDist_bind_left_le _ _ _) ?_
+  -- Bound each per-seed TV distance by the per-seed collision probability, then reassemble.
+  rw [probOutput_bind_eq_tsum]
+  rw [ENNReal.tsum_toReal_eq (fun seed => ENNReal.mul_ne_top probOutput_ne_top probOutput_ne_top)]
+  refine Summable.tsum_le_tsum (fun seed => ?_) ?_ ?_
+  · rw [ENNReal.toReal_mul]
+    exact mul_le_mul_of_nonneg_left (tvDist_seedOutputs_le_collision seed) ENNReal.toReal_nonneg
+  · exact Summable.of_nonneg_of_le
+      (fun seed => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _))
+      (fun seed => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _))
+      (ENNReal.summable_toReal tsum_probOutput_ne_top)
+  · exact ENNReal.summable_toReal (by rw [← probOutput_bind_eq_tsum]; exact probOutput_ne_top)
+
 omit [DecidableEq O] in
 /-- The gap between the ideal PRF and ideal PRG experiments is bounded by the
 collision probability. This follows from the fundamental lemma of game playing:
@@ -192,7 +313,13 @@ theorem prfIdealGap_le_collisionProb (adv : PRGAdversary (List.Vector O n)) :
     |(Pr[= true | PRFScheme.prfIdealExp (prfReduction (S := S) (O := O) n adv)]).toReal -
       (Pr[= true | PRGScheme.prgIdealExp adv]).toReal| ≤
       collisionProb (S := S) (O := O) n := by
-  sorry
+  rw [prfIdealExp_prfReduction_eq adv, prgIdealExp_eq_bind adv]
+  calc |(Pr[= true | idealOutputs n >>= adv]).toReal -
+          (Pr[= true | ($ᵗ (List.Vector O n)) >>= adv]).toReal|
+      ≤ tvDist (idealOutputs n >>= adv) (($ᵗ (List.Vector O n)) >>= adv) :=
+        abs_probOutput_toReal_sub_le_tvDist _ _
+    _ ≤ tvDist (idealOutputs n) ($ᵗ (List.Vector O n)) := tvDist_bind_right_le _ _ _
+    _ ≤ collisionProb (S := S) (O := O) n := tvDist_idealOutputs_le_collisionProb
 
 omit [DecidableEq O] in
 /-- Security of the stream PRG obtained from a PRF: PRG distinguishing advantage is
