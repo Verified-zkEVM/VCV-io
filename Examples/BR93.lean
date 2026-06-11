@@ -116,6 +116,73 @@ private def roQueryImpl :
 private def liftProbComp {α : Type} (px : ProbComp α) : OracleComp (RO_Spec Rand M) α :=
   px
 
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
+  [AddCommGroup M] in
+/-- The BR93 random-oracle handler is transparent on a computation lifted in from `unifSpec`,
+threading the cache unchanged: simulating such a computation just lifts it into the cache state
+monad. -/
+private lemma simulateQ_roQueryImpl_liftProbComp {β : Type} (ob : ProbComp β) :
+    simulateQ (roQueryImpl (Rand := Rand) (M := M)) (liftProbComp ob)
+      = (liftM ob : StateT ((Rand →ₒ M).QueryCache) ProbComp β) := by
+  have h : liftProbComp ob = OracleComp.liftComp ob (RO_Spec Rand M) := by
+    induction ob using OracleComp.inductionOn with
+    | pure x => rfl
+    | query_bind t k ih =>
+      simp only [liftProbComp, liftComp_bind] at *
+      simp [ih, monad_norm]
+      rfl
+  rw [h]
+  unfold roQueryImpl
+  rw [QueryImpl.simulateQ_add_liftComp_left, HasQuery.toQueryImpl_eq_id',
+      simulateQ_liftTarget, simulateQ_id']
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
+  [AddCommGroup M] in
+/-- A lifted `ProbComp` sample never touches the cache, so it commutes to the front of a run. -/
+private lemma run'_liftProbComp_bind {β γ : Type} (p : ProbComp β)
+    (k : β → OracleComp (RO_Spec Rand M) γ) (s : (Rand →ₒ M).QueryCache) :
+    (simulateQ roQueryImpl (liftProbComp p >>= k)).run' s
+      = p >>= fun a => (simulateQ roQueryImpl (k a)).run' s := by
+  rw [simulateQ_bind, simulateQ_roQueryImpl_liftProbComp]
+  simp [StateT.run'_eq, StateT.run_bind, StateT.run_monadLift]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] in
+/-- Running a lifted `ProbComp` sample returns the sample paired with the unchanged cache. -/
+private lemma run_liftProbComp {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache) :
+    (simulateQ roQueryImpl (liftProbComp p)).run s = p >>= fun a => pure (a, s) := by
+  rw [simulateQ_roQueryImpl_liftProbComp]
+  simp [StateT.run_monadLift]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited Rand]
+  [Inhabited M] [AddCommGroup M] in
+/-- Splitting the random-oracle run at a bind: the first computation threads the cache forward. -/
+private lemma run'_simulateQ_bind {β γ : Type} (mx : OracleComp (RO_Spec Rand M) β)
+    (k : β → OracleComp (RO_Spec Rand M) γ) (s : (Rand →ₒ M).QueryCache) :
+    (simulateQ roQueryImpl (mx >>= k)).run' s
+      = (simulateQ roQueryImpl mx).run s >>=
+          fun p => (simulateQ roQueryImpl (k p.1)).run' p.2 := by
+  rw [simulateQ_bind]
+  simp [StateT.run'_eq, StateT.run_bind]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited Rand]
+  [Inhabited M] [AddCommGroup M] in
+/-- A final `pure` of a state-free value can be pulled out of the run. -/
+private lemma run'_simulateQ_bind_pure {β γ : Type} (mx : OracleComp (RO_Spec Rand M) β)
+    (f : β → γ) (s : (Rand →ₒ M).QueryCache) :
+    (simulateQ roQueryImpl (mx >>= fun b => pure (f b))).run' s
+      = (simulateQ roQueryImpl mx).run' s >>= fun b => pure (f b) := by
+  rw [simulateQ_bind]
+  simp [StateT.run'_eq, Functor.map_map]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited Rand]
+  [Inhabited M] in
+/-- Right-translating a uniform challenge mask by a constant preserves the output distribution. -/
+private lemma evalDist_bind_add_right_uniform {γ : Type} (m : M) (f : M → ProbComp γ) :
+    𝒟[(do let h ← $ᵗ M; f (h + m))] = 𝒟[(do let h ← $ᵗ M; f h)] := by
+  refine evalDist_ext fun z => ?_
+  exact probOutput_bind_add_right_uniform (α := M) m f z
+
 /-- Real one-time CPA game in the random-oracle model. -/
 def cpaGame (tdp : TrapdoorPermutation PK SK Rand)
     (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) : ProbComp Bool :=
@@ -220,12 +287,32 @@ theorem cpaGame_gap_le_badEvent (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M
       badEventProb tdp adv := by
   sorry
 
-omit [Fintype Rand] [Fintype M] [DecidableEq M] in
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] in
 /-- Uniform masking step: once the challenge hash output is replaced by a fresh uniform mask,
 adding either challenge message yields the same ciphertext distribution. -/
 theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     𝒟[game1 tdp adv] = 𝒟[game2 tdp adv] := by
-  sorry
+  have congr_bind : ∀ {γ δ : Type} (oa : ProbComp γ) (f g : γ → ProbComp δ),
+      (∀ a, 𝒟[f a] = 𝒟[g a]) → 𝒟[oa >>= f] = 𝒟[oa >>= g] := by
+    intro γ δ oa f g hfg
+    rw [evalDist_bind, evalDist_bind]
+    congr 1
+    funext a
+    exact hfg a
+  rw [game1, game2]
+  -- Push the random-oracle simulation through both games: lifted samples become plain
+  -- `ProbComp` binds, the adversary's `choose`/`guess` thread the cache, and the trailing
+  -- `pure` collapses, leaving identical computations save for the challenge mask.
+  simp only [run'_simulateQ_bind, run_liftProbComp, simulateQ_pure, bind_assoc, pure_bind]
+  simp only [StateT.run'_eq, StateT.run_pure, map_eq_bind_pure_comp, Function.comp,
+    bind_assoc, pure_bind]
+  refine congr_bind _ _ _ fun b => ?_
+  refine congr_bind _ _ _ fun ks => ?_
+  refine congr_bind _ _ _ fun mmst => ?_
+  refine congr_bind _ _ _ fun r => ?_
+  exact evalDist_bind_add_right_uniform (if b = true then mmst.1.1 else mmst.1.2.1)
+    (fun x => (simulateQ roQueryImpl (adv.guess mmst.1.2.2 (tdp.forward ks.1 r, x))).run mmst.2 >>=
+      fun p => pure (b == p.1))
 
 omit [Fintype Rand] [Inhabited M] [Fintype M] [DecidableEq M] [AddCommGroup M] in
 /-- In the all-random game, the challenge ciphertext is independent of the hidden bit, so the
