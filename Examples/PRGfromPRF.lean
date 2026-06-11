@@ -603,6 +603,233 @@ theorem security
     _ ≤ |a - b| + |b - c| := abs_add_le _ _
     _ ≤ |a - b| + collisionProb (S := S) (O := O) n := by linarith
 
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [SampleableType S]
+  [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O] in
+/-- Caching a fresh (previously absent) key increases the live-entry count by exactly one. -/
+private lemma enncard_cacheQuery_of_none (c : (S →ₒ S × O).QueryCache) (s : S) (u : S × O)
+    (hc : c s = none) :
+    QueryCache.enncard (c.cacheQuery s u) = QueryCache.enncard c + 1 := by
+  unfold QueryCache.enncard
+  have hset : (c.cacheQuery s u).toSet = insert ⟨s, u⟩ c.toSet := by
+    ext ⟨t', u'⟩
+    by_cases ht : t' = s
+    · subst ht
+      simp only [QueryCache.mem_toSet, QueryCache.cacheQuery_self, Set.mem_insert_iff,
+        Sigma.mk.injEq, heq_eq_eq, true_and]
+      constructor
+      · intro h
+        exact Or.inl (Option.some.inj h).symm
+      · rintro (rfl | h)
+        · rfl
+        · rw [hc] at h; exact absurd h (by simp)
+    · rw [QueryCache.mem_toSet, QueryCache.cacheQuery_of_ne c u ht]
+      simp [Set.mem_insert_iff, ht, QueryCache.mem_toSet]
+  rw [hset]
+  have hnotmem : (⟨s, u⟩ : (t : S) × S × O) ∉ c.toSet := by
+    rw [QueryCache.mem_toSet, hc]; simp
+  rw [Set.encard_insert_of_notMem hnotmem]
+  push_cast
+  ring
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [DecidableEq S] [SampleableType S]
+  [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O] in
+/-- For a finite state space, the live-entry count of a cache is the number of cached states. -/
+private lemma enncard_eq_sum_isCached (c : (S →ₒ S × O).QueryCache) :
+    QueryCache.enncard c = ∑ s : S, (if c.isCached s then (1 : ℝ≥0∞) else 0) := by
+  classical
+  unfold QueryCache.enncard
+  have himg : Sigma.fst '' c.toSet = {s : S | c.isCached s = true} := by
+    ext s
+    simp only [Set.mem_image, Set.mem_setOf_eq]
+    constructor
+    · rintro ⟨⟨t, u⟩, ht, rfl⟩
+      rw [QueryCache.mem_toSet] at ht
+      simp [QueryCache.isCached, ht]
+    · intro hs
+      rw [QueryCache.isCached, Option.isSome_iff_exists] at hs
+      obtain ⟨u, hu⟩ := hs
+      exact ⟨⟨s, u⟩, hu, rfl⟩
+  have hinj : Set.InjOn Sigma.fst c.toSet := by
+    rintro ⟨t₁, u₁⟩ h₁ ⟨t₂, u₂⟩ h₂ (rfl : t₁ = t₂)
+    rw [QueryCache.mem_toSet] at h₁ h₂
+    rw [h₁] at h₂
+    obtain rfl := Option.some.inj h₂
+    rfl
+  have hencard : c.toSet.encard = {s : S | c.isCached s = true}.encard := by
+    rw [← himg, hinj.encard_image]
+  rw [hencard, Set.encard_eq_coe_toFinset_card, Finset.sum_ite, Finset.sum_const, Finset.sum_const]
+  simp only [mul_one, mul_zero, add_zero, nsmul_eq_mul]
+  rw [Set.toFinset_setOf]
+  norm_cast
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- **Domain-invariance of the collision probability.** The generalized collision experiment reads
+the starting cache only through its domain (`isCached`): on the good path cached values are never
+inspected, and on a hit the bad event has already fired. Hence two caches with the same domain give
+the same collision probability. -/
+private lemma probOutput_genCollisionExp_eq_of_isCached_agree (N : ℕ) (s : S)
+    (c c' : (S →ₒ S × O).QueryCache) (h : ∀ x, c.isCached x = c'.isCached x) :
+    Pr[= true | genCollisionExp N s c] = Pr[= true | genCollisionExp N s c'] := by
+  induction N generalizing s c c' with
+  | zero => simp [genCollisionExp]
+  | succ N ih =>
+    cases hc : c.isCached s with
+    | true =>
+      rw [probOutput_genCollisionExp_succ_of_isCached N s c hc,
+        probOutput_genCollisionExp_succ_of_isCached N s c' (by rw [← h s]; exact hc)]
+    | false =>
+      have hc' : c'.isCached s = false := by rw [← h s]; exact hc
+      have hcnone : c s = none := by simpa [QueryCache.isCached] using hc
+      have hc'none : c' s = none := by simpa [QueryCache.isCached] using hc'
+      rw [genCollisionExp_succ_of_none N s c hcnone,
+        genCollisionExp_succ_of_none N s c' hc'none,
+        probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+      refine tsum_congr fun p => ?_
+      congr 1
+      refine ih p.1 (c.cacheQuery s p) (c'.cacheQuery s p) fun x => ?_
+      by_cases hx : x = s
+      · subst hx; simp
+      · rw [QueryCache.isCached_cacheQuery_of_ne c p hx,
+          QueryCache.isCached_cacheQuery_of_ne c' p hx]
+        exact h x
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq S] [DecidableEq O] in
+/-- Sampling a pair uniformly and discarding the second coordinate is the same as sampling the
+first coordinate uniformly. -/
+private lemma probOutput_bind_uniformSample_prod_fst (f : S → ProbComp Bool) (b : Bool) :
+    Pr[= b | (do let p ← $ᵗ (S × O); f p.1)] = Pr[= b | (do let s' ← $ᵗ S; f s')] := by
+  have heq : (do let p ← $ᵗ (S × O); f p.1) = (do let a ← $ᵗ S; let _ ← $ᵗ O; f a) := by
+    rw [uniformSample_prod_eq_bind]
+    simp only [bind_assoc, pure_bind]
+  rw [heq, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  refine tsum_congr fun a => ?_
+  congr 1
+  rw [probOutput_bind_const, probFailure_uniformSample, tsub_zero, one_mul]
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- **Generalized averaged birthday bound.** Averaging over the uniform initial state, the
+generalized collision probability of the length-`N` chain starting from cache `c` is bounded by
+`∑_{j < N} (|c| + j) / |S|`. Proved by induction on `N` (generalizing `c`): a cache miss draws a
+fresh uniform state, growing the cache by one and shifting the bound; the union over already-cached
+states contributes the leading `|c| / |S|` term. -/
+private lemma probOutput_genCollisionExp_bind_le (N : ℕ) (c : (S →ₒ S × O).QueryCache) :
+    Pr[= true | (do let s ← $ᵗ S; genCollisionExp N s c)] ≤
+      ∑ j ∈ Finset.range N, (QueryCache.enncard c + (j : ℝ≥0∞)) * (Fintype.card S : ℝ≥0∞)⁻¹ := by
+  induction N generalizing c with
+  | zero =>
+    simp only [Finset.range_zero, Finset.sum_empty, nonpos_iff_eq_zero]
+    rw [probOutput_bind_eq_tsum]
+    simp [genCollisionExp]
+  | succ N ih =>
+    set C : ℝ≥0∞ := (Fintype.card S : ℝ≥0∞) with hC
+    have hCne : C ≠ 0 := by
+      rw [hC]; exact Nat.cast_ne_zero.mpr Fintype.card_ne_zero
+    have hCtop : C ≠ ⊤ := by rw [hC]; exact ENNReal.natCast_ne_top _
+    have hCcancel : C * C⁻¹ = 1 := ENNReal.mul_inv_cancel hCne hCtop
+    set B : ℝ≥0∞ := ∑ j ∈ Finset.range N, (QueryCache.enncard c + 1 + (j : ℝ≥0∞)) * C⁻¹ with hB
+    -- Termwise bound on the per-state collision probability.
+    have hterm : ∀ s : S, Pr[= true | genCollisionExp (N + 1) s c] ≤
+        (if c.isCached s then (1 : ℝ≥0∞) else 0) + B := by
+      intro s
+      cases hcs : c.isCached s with
+      | true =>
+        rw [probOutput_genCollisionExp_succ_of_isCached N s c hcs, if_pos rfl]
+        exact le_self_add
+      | false =>
+        rw [if_neg (by simp), zero_add]
+        have hcnone : c s = none := by simpa [QueryCache.isCached] using hcs
+        rw [genCollisionExp_succ_of_none N s c hcnone]
+        -- Replace each fresh cache value by a fixed one (domain invariance), then drop the
+        -- unused output coordinate.
+        have hdom :
+            Pr[= true | (($ᵗ (S × O)) >>= fun p => genCollisionExp N p.1 (c.cacheQuery s p))]
+              = Pr[= true | (($ᵗ (S × O)) >>= fun p =>
+                  genCollisionExp N p.1 (c.cacheQuery s (default, default)))] := by
+          rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+          refine tsum_congr fun p => ?_
+          congr 1
+          refine probOutput_genCollisionExp_eq_of_isCached_agree N p.1 _ _ fun x => ?_
+          by_cases hx : x = s
+          · subst hx; simp
+          · rw [QueryCache.isCached_cacheQuery_of_ne c p hx,
+              QueryCache.isCached_cacheQuery_of_ne c (default, default) hx]
+        rw [hdom, probOutput_bind_uniformSample_prod_fst
+          (fun s' => genCollisionExp N s' (c.cacheQuery s (default, default))) true]
+        refine le_trans (ih (c.cacheQuery s (default, default))) (le_of_eq ?_)
+        rw [hB]
+        refine Finset.sum_congr rfl fun j _ => ?_
+        rw [enncard_cacheQuery_of_none c s (default, default) hcnone]
+    calc Pr[= true | (do let s ← $ᵗ S; genCollisionExp (N + 1) s c)]
+        = ∑ s : S, Pr[= s | ($ᵗ S)] * Pr[= true | genCollisionExp (N + 1) s c] :=
+          probOutput_bind_eq_sum_fintype _ _ true
+      _ ≤ ∑ s : S, Pr[= s | ($ᵗ S)] * ((if c.isCached s then (1 : ℝ≥0∞) else 0) + B) := by
+          refine Finset.sum_le_sum fun s _ => ?_
+          exact mul_le_mul_of_nonneg_left (hterm s) (by simp)
+      _ = QueryCache.enncard c * C⁻¹ + B := by
+          simp_rw [mul_add, Finset.sum_add_distrib]
+          congr 1
+          · rw [enncard_eq_sum_isCached, Finset.sum_mul]
+            refine Finset.sum_congr rfl fun s _ => ?_
+            rw [probOutput_uniformSample, ← hC, mul_comm]
+          · simp_rw [probOutput_uniformSample, ← hC, ← Finset.sum_mul]
+            rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, ← hC, hCcancel, one_mul]
+      _ = ∑ j ∈ Finset.range (N + 1), (QueryCache.enncard c + (j : ℝ≥0∞)) * C⁻¹ := by
+          rw [Finset.sum_range_succ', hB]
+          rw [Nat.cast_zero, add_zero]
+          rw [add_comm]
+          congr 1
+          refine Finset.sum_congr rfl fun j _ => ?_
+          push_cast
+          ring_nf
+
+omit [DecidableEq O] in
+/-- **Birthday bound for the state-collision probability.** Over `n` rounds of the lazy random
+oracle chain, each freshly sampled state is uniform over `S`, so the probability that the chain
+revisits a state is at most `n·(n-1) / (2·|S|)` by a union bound over the at most `C(n,2)` pairs. -/
+theorem collisionProb_le_birthday (n : ℕ) :
+    collisionProb (S := S) (O := O) n ≤ ((n * (n - 1) : ℕ) : ℝ) / (2 * Fintype.card S) := by
+  -- The collision probability equals the empty-cache averaged collision probability.
+  have hseed : ∀ seed : S,
+      genCollisionExp (O := O) n seed ∅ = seedCollisionExp (O := O) n seed := by
+    intro seed
+    unfold genCollisionExp seedCollisionExp
+    refine bind_congr fun states => ?_
+    simp [QueryCache.isCached_empty]
+  have hcomp : ((do let s ← $ᵗ S; genCollisionExp (O := O) n s ∅) : ProbComp Bool) =
+      idealCollisionExp (S := S) (O := O) n := by
+    rw [idealCollisionExp_eq_bind]
+    exact bind_congr hseed
+  -- Bound the ENNReal collision probability by the Gauss sum, then collapse it.
+  have hbound : Pr[= true | idealCollisionExp (S := S) (O := O) n] ≤
+      ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * (Fintype.card S : ℝ≥0∞)) := by
+    rw [← hcomp]
+    refine le_trans (probOutput_genCollisionExp_bind_le n ∅) (le_of_eq ?_)
+    simp only [QueryCache.enncard_empty, zero_add]
+    exact ENNReal.gauss_sum_inv_eq n (Fintype.card S : ℝ≥0∞)
+  -- Convert the ENNReal bound to a real bound.
+  have hden : (2 * (Fintype.card S : ℝ≥0∞)) ≠ 0 :=
+    mul_ne_zero (by norm_num) (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)
+  rw [collisionProb]
+  refine le_trans (ENNReal.toReal_mono
+    (ENNReal.div_ne_top (ENNReal.natCast_ne_top _) hden) hbound) (le_of_eq ?_)
+  rw [ENNReal.toReal_div, ENNReal.toReal_mul, ENNReal.toReal_natCast,
+    ENNReal.toReal_natCast]
+  norm_num
+
+omit [DecidableEq O] in
+/-- **Concrete security of the stream PRG.** The PRG distinguishing advantage is bounded by the
+PRF advantage of the reduction plus the birthday term `n·(n-1) / (2·|S|)`, obtained by combining
+`security` with `collisionProb_le_birthday`. -/
+theorem security_birthday
+    (hkey : 𝒟[prf.keygen] = 𝒟[$ᵗ K])
+    (adv : PRGAdversary (List.Vector O n)) :
+    PRGScheme.prgAdvantage (streamPRG prf n) adv ≤
+      PRFScheme.prfAdvantage prf (prfReduction (S := S) (O := O) n adv) +
+      ((n * (n - 1) : ℕ) : ℝ) / (2 * Fintype.card S) := by
+  refine (security hkey adv).trans ?_
+  have := collisionProb_le_birthday (S := S) (O := O) n
+  linarith
+
 end streamPRG
 
 end PRGfromPRF
