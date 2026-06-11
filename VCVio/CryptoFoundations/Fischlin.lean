@@ -1349,8 +1349,34 @@ private lemma model_reject_le (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : 
       decide_eq_false_iff_not, not_le] at hfalse
     rw [foldl_add_finRange_eq_sum (minH bs)] at hfalse
     exact hfalse
-  · -- Pigeonhole + union bound over the `ρ` repetitions.
-    sorry
+  · -- Pigeonhole: a sum exceeding `S` forces some coordinate to exceed `⌊S/ρ⌋`.
+    refine le_trans (probEvent_mono (q := fun bs => ∃ i ∈ Finset.univ, S / ρ < minH bs i)
+      (fun bs _ hsum => ?_)) ?_
+    · obtain ⟨i, hi⟩ := exists_div_lt_of_sum_lt (minH bs) S hsum
+      exact ⟨i, Finset.mem_univ i, hi⟩
+    -- Union bound over repetitions, then marginalize each coordinate.
+    refine le_trans (probEvent_exists_finset_le_sum _ _ _) ?_
+    have hlen : (FinEnum.toList Chal).length = FinEnum.card Chal := by
+      simp [FinEnum.toList]
+    have hterm : ∀ i : Fin ρ,
+        (probEvent bestsComp fun bs => S / ρ < minH bs i)
+          ≤ ((↑(2 ^ b - (S / ρ + 1)) : ℝ≥0∞) / ↑(2 ^ b)) ^ FinEnum.card Chal := by
+      intro i
+      -- Marginalize coordinate `i` of the independent product.
+      refine le_trans (probEvent_mOfFn_coord_le ρ _ i (fun o => S / ρ < minH (fun _ => o) i)) ?_
+      -- Reading the projected hash dominates the search-result hash event.
+      refine le_trans (probEvent_mono'' (q := fun o => minGt (S / ρ) (o.map (fun t => t.2.2)))
+        (fun o ho => ?_)) ?_
+      · -- `S/ρ < (match o ...)` implies `minGt (S/ρ) (o.map ·)` (true also on `none`).
+        rcases o with _ | ⟨ω, resp, h⟩
+        · simp [minGt]
+        · simpa [minGt, minH, Option.map] using ho
+      · refine le_trans (fischlinUnifSearch_probEvent_minGt_le σ pk sk (commits i).2 (S / ρ)
+          (FinEnum.toList Chal) none) ?_
+        rw [Option.map_none, minUnifAux_probEvent_gt_none, hlen]
+    refine le_trans (Finset.sum_le_sum (fun i _ => hterm i)) ?_
+    rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, completenessError]
+    rw [nsmul_eq_mul]
 
 /-- Almost completeness of the Fischlin transform: if the underlying Σ-protocol is
 perfectly complete, then the signature scheme verifies with probability at least
