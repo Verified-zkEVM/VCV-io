@@ -2410,6 +2410,46 @@ noncomputable def knowledgeSoundnessExp
     let extracted ← onlineExtract σ ρ b M x π roLog
     return (verified && !(match extracted with | some w => rel x w | none => false))
 
+/-- The number of hash-value tuples `v : Fin ρ → Fin (2^b)` whose entries sum to at most `S`.
+
+This counts the "small-sum" verifier-accepting hash assignments: a Fischlin proof is accepted only
+when `∑ᵢ H(…,ωᵢ,respᵢ) ≤ S`, so this finite set is the target the prover's fresh random-oracle
+answers must hit. It is bounded by `(S+1)·C(S+ρ-1, ρ-1)` (stars-and-bars). -/
+def smallSumCount (ρ b S : ℕ) : ℕ :=
+  (Finset.univ.filter (fun v : Fin ρ → Fin (2 ^ b) => ∑ i, (v i).val ≤ S)).card
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Stars-and-bars bound.** The number of hash-value tuples summing to at most `S` is at most
+`(S+1)·C(S+ρ-1, ρ-1)`.
+
+Each `Fin (2^b)`-valued tuple injects into a `Fin ρ → ℕ` tuple with the same (bounded) sum; the
+number of such natural tuples with sum exactly `s` is `C(s+ρ-1, ρ-1)`, which is monotone in `s`, so
+summing over the `S+1` values `s = 0, …, S` gives the stated bound. -/
+private lemma smallSumCount_le : smallSumCount ρ b S ≤ (S + 1) * Nat.choose (S + ρ - 1) (ρ - 1) := by
+  sorry
+
+omit [SampleableType Chal] in
+/-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin knowledge-soundness
+bad event — the verifier accepts the cheating prover's proof yet the online extractor recovers no
+valid witness — occurs with probability at most `(Q+1)` (one slot per logged hash query, plus the
+trivial slot) times the chance that a fresh tuple of `ρ` independent random-oracle answers lands in
+the small-sum target set, namely `smallSumCount ρ b S / (2^b)^ρ`.
+
+Argument sketch: special soundness with unique responses (`hss`, `hur`) implies that whenever the
+extractor fails, every repetition's accepting transcript is pinned to a single logged query, so the
+prover must have hit a small-sum assignment of `ρ` *fresh* uniform hash values without a second
+accepting query at a different challenge. Union-bounding over the `≤ Q` logged queries and the
+small-sum target set, and using independence of the `ρ` fresh answers, gives the denominator
+`(2^b)^ρ`. -/
+private lemma knowledgeSoundness_badEvent_le
+    (hss : σ.SpeciallySound) (hur : σ.UniqueResponses)
+    (adv : KnowledgeSoundnessAdv ρ b M) (Q : ℕ) (hρ : 0 < ρ)
+    (hQ : ∀ x msg, ROQueryBound ρ b M (adv.run x msg) Q) (x : Stmt) (msg : M) :
+    Pr[= true | knowledgeSoundnessExp σ hr ρ b S M adv.run x msg]
+      ≤ (↑(Q + 1) : ℝ≥0∞) * ↑(smallSumCount ρ b S) / ((↑(2 ^ b) : ℝ≥0∞) ^ ρ) := by
+  sorry
+
 /-- Knowledge soundness of the Fischlin transform via online (straight-line) extraction
 (Fischlin 2005, Theorem 2).
 
@@ -2427,7 +2467,12 @@ theorem knowledgeSoundness
     (hQ : ∀ x msg, ROQueryBound ρ b M (adv.run x msg) Q)
     (x : Stmt) (msg : M) :
     Pr[= true | knowledgeSoundnessExp σ hr ρ b S M adv.run x msg]
-      ≤ knowledgeSoundnessError Q ρ b S := by sorry
+      ≤ knowledgeSoundnessError Q ρ b S := by
+  refine le_trans (knowledgeSoundness_badEvent_le σ hr ρ b S M hss hur adv Q hρ hQ x msg) ?_
+  rw [knowledgeSoundnessError]
+  -- Monotonicity: replace the small-sum count by its stars-and-bars upper bound.
+  refine ENNReal.div_le_div_right (mul_le_mul_left' ?_ _) _
+  exact_mod_cast smallSumCount_le ρ b S
 
 /-! ### EUF-CMA Security
 
