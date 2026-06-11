@@ -984,6 +984,91 @@ The intended regime is `0 < ρ`; theorem statements below make that explicit. -/
 noncomputable def completenessError (ρ b S t : ℕ) : ℝ≥0∞ :=
   (ρ : ℝ≥0∞) * ((↑(2 ^ b - (S / ρ + 1)) : ℝ≥0∞) / ↑(2 ^ b)) ^ t
 
+/-! ### Model game `G` for the completeness analysis
+
+The random-oracle game is analysed via an equivalent *pure-probability* model `G`. In `G`,
+each random-oracle query of the prover's search is replaced by a fresh uniform draw from
+`Fin (2^b)` (justified because every query in `sign` is at a distinct fresh input, hence a
+cache miss), and the verifier reads the kept hash value directly from the search result rather
+than re-querying (a cache hit returning the same value). -/
+
+/-- Pure-probability copy of `fischlinSearchAux`: each random-oracle query is replaced by a fresh
+uniform draw from `Fin (2^b)`, and the full best triple `(challenge, response, hash)` is kept
+(on early exit at hash `0`, the current `(ω, resp, h)` is returned). -/
+private def fischlinUnifSearch {Stmt Wit Commit PrvState Chal Resp : Type}
+    {rel : Stmt → Wit → Bool} {b : ℕ}
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (pk : Stmt) (sk : Wit) (sc : PrvState) :
+    List Chal → Option (Chal × Resp × Fin (2 ^ b)) →
+      ProbComp (Option (Chal × Resp × Fin (2 ^ b)))
+  | [], best => pure best
+  | ω :: rest, best => do
+    let resp ← σ.respond pk sk sc ω
+    let h ← $ᵗ (Fin (2 ^ b))
+    if h.val = 0 then pure (some (ω, resp, h))
+    else
+      let newBest := match best with
+        | none => some (ω, resp, h)
+        | some (ω', resp', h') =>
+          if h.val < h'.val then some (ω, resp, h) else some (ω', resp', h')
+      fischlinUnifSearch σ pk sk sc rest newBest
+
+/-- The pure-probability model game `G` for Fischlin completeness.
+
+Mirrors `keygen >>= sign >>= verify`, but the prover's per-repetition search uses
+`fischlinUnifSearch` (fresh uniform draws) and the verifier reads the kept hash value
+directly from the search result instead of re-querying the random oracle. Returns the verdict
+`allVerified && (hashSum ≤ S)`. -/
+private noncomputable def modelGame : ProbComp Bool := do
+  let (pk, sk) ← hr.gen
+  let commits : Fin ρ → Commit × PrvState ← Fin.mOfFn ρ fun _ => σ.commit pk sk
+  let comVec : Fin ρ → Commit := fun i => (commits i).1
+  let bests : Fin ρ → Option (Chal × Resp × Fin (2 ^ b)) ←
+    Fin.mOfFn ρ fun i =>
+      fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal)
+        (none : Option (Chal × Resp × Fin (2 ^ b)))
+  let allVerified := (List.finRange ρ).all fun i =>
+    match bests i with
+    | some (ω, resp, _) => σ.verify pk (comVec i) ω resp
+    | none => σ.verify pk (comVec i) default default
+  let hashSum := (List.finRange ρ).foldl
+    (fun acc i => acc + (match bests i with | some (_, _, h) => h.val | none => 0)) 0
+  pure (allVerified && decide (hashSum ≤ S))
+
+/-- **B1 (random-oracle surgery).** The Fischlin random-oracle completeness game has the same
+probability of accepting as the pure-probability model game `modelGame`.
+
+Every random-oracle query made during `sign` is at a distinct, fresh `FischlinROInput` (the
+challenge field ranges over the duplicate-free `FinEnum.toList Chal`, and the repetition index
+field separates repetitions), so each is a cache miss whose answer is a fresh uniform sample —
+matching `fischlinUnifSearch`. The chosen transcript's hash was cached during `sign`, so the
+verifier's re-query is a cache hit returning that same value, matching the model's direct read. -/
+private lemma fischlin_game_eq_model (msg : M) :
+    Pr[= true | (runtime ρ b M).evalDist do
+      let (pk, sk) ←
+        (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          σ hr ρ b S M).keygen
+      let sig ←
+        (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          σ hr ρ b S M).sign pk sk msg
+      (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+        σ hr ρ b S M).verify pk msg sig]
+      = Pr[= true | modelGame σ hr ρ b S] := by
+  sorry
+
+/-- **B2 (probability bound).** The model game rejects with probability at most
+`completenessError ρ b S (FinEnum.card Chal)`.
+
+When the relation holds (guaranteed by `hr.gen_sound`) and the Σ-protocol is perfectly complete,
+every honest transcript verifies, so rejection happens exactly when the sum of per-repetition
+minimum hashes exceeds `S`. By pigeonhole some repetition's minimum exceeds `⌊S/ρ⌋`, and a union
+bound over the `ρ` repetitions together with the per-repetition tail bound
+`minUnifAux_probEvent_gt_none` yields the result. -/
+private lemma model_reject_le (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
+    1 - Pr[= true | modelGame σ hr ρ b S]
+      ≤ completenessError ρ b S (FinEnum.card Chal) := by
+  sorry
+
 /-- Almost completeness of the Fischlin transform: if the underlying Σ-protocol is
 perfectly complete, then the signature scheme verifies with probability at least
 `1 - completenessError ρ b S t` where `t = FinEnum.card Chal` is the challenge space size.
@@ -1001,7 +1086,14 @@ theorem almostComplete (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
           σ hr ρ b S M).sign pk sk msg
       (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
         σ hr ρ b S M).verify pk msg sig]
-    ≥ 1 - completenessError ρ b S (FinEnum.card Chal) := by sorry
+    ≥ 1 - completenessError ρ b S (FinEnum.card Chal) := by
+  rw [ge_iff_le, fischlin_game_eq_model σ hr ρ b S M msg]
+  have hbound := model_reject_le σ hr ρ b S M hρ hc msg
+  set P : ℝ≥0∞ := Pr[= true | modelGame σ hr ρ b S] with hP
+  -- From `1 - P ≤ e` and `P ≤ 1` conclude `1 - e ≤ P`.
+  have hP1 : P ≤ 1 := probOutput_le_one
+  rw [tsub_le_iff_right] at hbound ⊢
+  rwa [add_comm] at hbound
 
 /-! ### Online Extraction / Knowledge Soundness -/
 
