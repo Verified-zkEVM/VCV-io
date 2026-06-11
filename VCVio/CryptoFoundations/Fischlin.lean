@@ -1231,6 +1231,18 @@ private lemma verify_of_perfectlyComplete
     exact ⟨resp, hresp, by simp⟩
   exact h1 _ hmem
 
+/-- The accumulating `foldl` used for the hash-sum in `modelGame` is the `Finset.univ` sum of the
+per-repetition contributions. -/
+private lemma foldl_add_finRange_eq_sum {ρ : ℕ} (g : Fin ρ → ℕ) :
+    (List.finRange ρ).foldl (fun acc i => acc + g i) 0 = ∑ i : Fin ρ, g i := by
+  have h : ∀ (l : List (Fin ρ)) (c : ℕ),
+      l.foldl (fun acc i => acc + g i) c = c + (l.map g).sum := by
+    intro l
+    induction l with
+    | nil => intro c; simp
+    | cons a t ih => intro c; rw [List.foldl_cons, ih, List.map_cons, List.sum_cons]; ring
+  rw [h, Nat.zero_add, Fin.sum_univ_def]
+
 /-- On a valid, perfectly-complete instance, the per-repetition verifier branch always accepts:
 the search over a non-empty challenge list returns `some (ω, resp, _)` whose response verifies
 (perfect completeness applied to the chosen transcript). The `none` branch never arises. -/
