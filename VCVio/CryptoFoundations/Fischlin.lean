@@ -1468,6 +1468,35 @@ private lemma fischlinSearch_run_preserves_offrep (pk : Stmt) (sk : Wit) (sc : P
         · simp only [hx, if_false] at hmem
           exact ih _ _ hmem
 
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- `fischlinUnifSearch` keeps a `some` best whenever it starts from one or the challenge list is
+non-empty: in support, every outcome of a search seeded with a `some` best, or run over a non-empty
+list, is itself `some`. -/
+private lemma fischlinUnifSearch_isSome (pk : Stmt) (sk : Wit) (sc : PrvState) :
+    ∀ (cs : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))),
+      (best.isSome = true ∨ cs ≠ []) →
+      ∀ o ∈ support (fischlinUnifSearch σ pk sk sc cs best), o.isSome = true := by
+  intro cs
+  induction cs with
+  | nil =>
+      intro best hb o ho
+      simp only [fischlinUnifSearch, support_pure, Set.mem_singleton_iff] at ho
+      rcases hb with hb | hb
+      · rw [ho]; exact hb
+      · exact absurd rfl hb
+  | cons ω rest ih =>
+      intro best _ o ho
+      simp only [fischlinUnifSearch, mem_support_bind_iff] at ho
+      obtain ⟨resp, _, h, _, ho⟩ := ho
+      by_cases hh : h.val = 0
+      · simp only [hh, if_true, support_pure, Set.mem_singleton_iff] at ho
+        rw [ho]; rfl
+      · simp only [hh, if_false] at ho
+        refine ih _ (Or.inl ?_) o ho
+        cases best with
+        | none => rfl
+        | some t => obtain ⟨ω', resp', h'⟩ := t; by_cases hlt : h.val < h'.val <;> simp [hlt]
+
 /-- The verifier's `run'`, on a cache that stores every re-queried record, is the deterministic
 verdict computed from the stored hashes. A direct corollary of `run_mOfFn_query_hit`. -/
 private lemma verify_run'_of_hits (pk : Stmt) (msg : M)
