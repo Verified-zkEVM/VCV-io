@@ -1422,9 +1422,10 @@ distribution as `modelGame`'s combinatorial verdict computed from `fischlinUnifS
 This is the one remaining step of the completeness surgery. Its content is:
 * the `ρ` searches of `Fin.mOfFn` thread the cache, and since repetition `i`'s records all carry
   `rep = i`, they never collide across repetitions, so `searchFresh` holds at each step
-  (`fischlinSearch_run_cache_eq` is then the per-repetition bridge);
-* each verifier re-query `⟨pk, msg, comList, i, ωᵢ, respᵢ⟩` is a cache hit returning the kept hash
-  `(bests i).2.2`, matching `modelGame`'s direct read;
+  (`fischlinSearch_run_cache_eq` is then the per-repetition bridge); this is the residual obligation
+  and additionally needs that each search leaves records of other repetitions untouched;
+* each verifier re-query `⟨pk, msg, comList, i, ωᵢ, respᵢ⟩` is then a cache hit returning the kept
+  hash `(bests i).2.2`, matching `modelGame`'s direct read (`run_mOfFn_query_hit`);
 * the `allVerified`/`hashSum` fold is computed identically in both games. -/
 private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
     (commits : Fin ρ → Commit × PrvState) :
