@@ -1495,10 +1495,13 @@ private lemma verify_run'_of_hits (pk : Stmt) (msg : M)
 re-queries under the lazy random-oracle on the empty cache produces the same `Bool` distribution as
 `modelGame`'s combinatorial verdict computed from `fischlinUnifSearch`.
 
-The searches thread the cache (`searchVec_run_cache_eq`): repetition `i`'s records carry `rep = i`,
-so they never collide across repetitions and the final cache stores every chosen record with its
-kept hash. Each verifier re-query is then a cache hit returning that hash (`run_mOfFn_query_hit`),
-matching `modelGame`'s direct read, and the `allVerified`/`hashSum` fold is identical. -/
+The searches thread the cache: repetition `i`'s records carry `rep = i`, so they never collide
+across repetitions (`fischlinSearch_run_preserves_offrep`), and each search caches its own chosen
+record with its kept hash (`fischlinSearch_run_cache_eq`); hence after all `ρ` searches the final
+cache stores every chosen record. Each verifier re-query is then a cache hit returning that hash
+(`verify_run'_of_hits`, built on `run_mOfFn_query_hit`), matching `modelGame`'s direct read, and the
+`allVerified`/`hashSum` fold is identical. The residual is the `Fin.mOfFn`-vector coupling of the
+per-repetition bridge with off-repetition preservation. -/
 private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
     (commits : Fin ρ → Commit × PrvState) :
     𝒟[(simulateQ (fischlinImpl ρ b M)
