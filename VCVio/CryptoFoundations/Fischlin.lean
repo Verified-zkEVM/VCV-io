@@ -1507,6 +1507,28 @@ private lemma searchVec_run_cache_eq (pk : Stmt) (sk : Wit) (msg : M)
               (none : Option (Chal × Resp × Fin (2 ^ b)))] := by
   sorry
 
+/-- The verifier's `run'`, on a cache that stores every re-queried record, is the deterministic
+verdict computed from the stored hashes. A direct corollary of `run_mOfFn_query_hit`. -/
+private lemma verify_run'_of_hits (pk : Stmt) (msg : M)
+    (sig : Fin ρ → Commit × Chal × Resp)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hash : Fin ρ → Fin (2 ^ b))
+    (hhit : ∀ i, cache (⟨pk, msg, List.ofFn (fun j => (sig j).1), i, (sig i).2.1, (sig i).2.2⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M) = some (hash i)) :
+    (simulateQ (fischlinImpl ρ b M)
+      ((Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+        σ hr ρ b S M).verify pk msg sig)).run' cache
+      = pure ((List.finRange ρ).all (fun i => σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2) &&
+          decide ((List.finRange ρ).foldl (fun acc i => acc + (hash i).val) 0 ≤ S)) := by
+  simp only [Fischlin]
+  rw [simulateQ_bind, StateT.run'_bind',
+    run_mOfFn_query_hit (n := ρ)
+      (records := fun i => ⟨pk, msg, List.ofFn (fun j => (sig j).1), i, (sig i).2.1, (sig i).2.2⟩)
+      (hash := hash)
+      (f := fun i h => (σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2, h.val))
+      (cache := cache) (hhit := hhit)]
+  simp only [pure_bind, simulateQ_pure, StateT.run'_pure']
+
 /-- **Cross-repetition cache threading.** Given a key pair `(pk, sk)` and a vector of commitments
 `commits`, simulating the `ρ` per-repetition searches of `sign` followed by the `ρ` verifier
 re-queries under the lazy random-oracle on the empty cache produces the same `Bool` distribution as
@@ -1544,6 +1566,8 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
           let hashSum := (List.finRange ρ).foldl
             (fun acc i => acc + (match bests i with | some (_, _, h) => h.val | none => 0)) 0
           pure (allVerified && decide (hashSum ≤ S))] := by
+  simp only [Fischlin]
+  rw [simulateQ_bind, StateT.run'_bind']
   sorry
 
 /-- **Residual: full-game distribution surgery.** After collapsing the random-oracle runtime to a
