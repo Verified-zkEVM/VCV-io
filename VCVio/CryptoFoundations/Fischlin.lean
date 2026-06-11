@@ -1382,6 +1382,38 @@ private lemma run_mOfFn_liftM {α : Type} (n : ℕ) (g : Fin n → ProbComp α)
       refine bind_congr (fun rest => ?_)
       rw [simulateQ_pure, StateT.run_pure, map_pure]
 
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- Simulating the verifier's `Fin.mOfFn` of random-oracle re-queries on a cache that already
+stores every re-queried record is deterministic: each query is a cache hit returning the stored
+value, leaving the cache untouched. The result is the pure product of the per-repetition outputs
+`f i (hash i)`, where `hash i` is the value cached at record `i`. -/
+private lemma run_mOfFn_query_hit {β : Type} (n : ℕ)
+    (records : Fin n → (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain)
+    (hash : Fin n → Fin (2 ^ b)) (f : Fin n → Fin (2 ^ b) → β)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hhit : ∀ i, cache (records i) = some (hash i)) :
+    (simulateQ (fischlinImpl ρ b M)
+        (Fin.mOfFn n fun i => do
+          let h ← HasQuery.query (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M) (records i)
+          pure (f i h))).run cache
+      = pure ((fun i => f i (hash i)), cache) := by
+  induction n with
+  | zero => simp [Fin.mOfFn, StateT.run_pure]; ext i; exact i.elim0
+  | succ n ih =>
+      rw [Fin.mOfFn, simulateQ_bind, StateT.run_bind, simulateQ_bind,
+        roSim.simulateQ_HasQuery_query, StateT.run_bind,
+        QueryImpl.withCaching_run_some (so := uniformSampleImpl) (hhit 0),
+        pure_bind, simulateQ_pure, StateT.run_pure, pure_bind,
+        simulateQ_bind, StateT.run_bind,
+        ih (fun j => records j.succ) (fun j => hash j.succ) (fun j => f j.succ)
+          (fun j => hhit j.succ), pure_bind, simulateQ_pure, StateT.run_pure]
+      congr 1
+      refine Prod.ext ?_ rfl
+      funext j
+      refine Fin.cases ?_ (fun k => ?_) j
+      · simp [Fin.cons_zero]
+      · simp [Fin.cons_succ]
+
 /-- **Cross-repetition cache threading (residual).** Given a key pair `(pk, sk)` and a vector of
 commitments `commits`, simulating the `ρ` per-repetition searches of `sign` followed by the `ρ`
 verifier re-queries under the lazy random-oracle on the empty cache produces the same `Bool`
