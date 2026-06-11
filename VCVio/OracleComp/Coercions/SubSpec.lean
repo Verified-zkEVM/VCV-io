@@ -387,6 +387,26 @@ instance (priority := low) [MonadLift (OracleQuery spec) (OracleQuery superSpec)
 lemma liftComp_eq_liftM [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
     (mx : OracleComp spec α) : liftComp mx superSpec = (liftM mx : OracleComp superSpec α) := rfl
 
+/-- Peel the outermost step off a *chained* `OracleComp`-level lift: a `liftM` whose
+`MonadLiftT (OracleComp spec) (OracleComp spec₃)` instance is the transitive composition of
+the query-keyed `MonadLift (OracleComp superSpec) (OracleComp spec₃)` step with a remaining
+chain `MonadLiftT (OracleComp spec) (OracleComp superSpec)` is the `liftComp` of the
+remaining lift. Typeclass resolution builds exactly this shape (via
+`instMonadLiftTOfMonadLift`) when lifting across two or more `OracleSpec.add` layers, e.g.
+`OracleComp spec₂ → OracleComp (spec + (spec₁ + spec₂))` through the intermediate
+`spec + spec₂`. None of the single-step lemmas (`liftComp_eq_liftM`, `liftComp_query`, …)
+can engage such a chain directly, since their statements bake in the one-step instance.
+
+Not `@[simp]`: with `spec = superSpec` the remaining chain can be `MonadLiftT.refl`, and the
+right-hand side would then re-match the left-hand side. Use via explicit `rw`, then rewrite
+the inner lift with `← liftComp_eq_liftM` and proceed with the `liftComp` API. -/
+lemma liftM_eq_liftComp_liftM {κ : Type*} {spec₃ : OracleSpec κ}
+    [MonadLift (OracleQuery superSpec) (OracleQuery spec₃)]
+    [MonadLiftT (OracleComp spec) (OracleComp superSpec)]
+    (mx : OracleComp spec α) :
+    (liftM mx : OracleComp spec₃ α) =
+      liftComp (liftM mx : OracleComp superSpec α) spec₃ := rfl
+
 instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     LawfulMonadLift (OracleComp spec) (OracleComp superSpec) where
   monadLift_pure x := liftComp_pure superSpec x

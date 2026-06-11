@@ -160,6 +160,62 @@ lemma simulateQ_optionT_mapM_pure {k : ℕ}
     · exact congrArg some (Vector.toArray_inj.mp hxy)
   exact (map_inj_right h_inj).mp h_sim
 
+/-! ## `forIn` over `OptionT`
+
+The `List` companions to `simulateQ_optionT_bind`/`_lift` for an `OptionT`-monadic loop. -/
+
+/-- `simulateQ` distributes over an `OptionT`-monadic `forIn` on a list: the `OptionT`-loop
+sibling of `simulateQ_list_forIn`. The body lives in `OptionT (OracleComp spec)`, so the loop is
+decomposed via `simulateQ_optionT_bind` (rather than the `OracleComp`-level `simulateQ_bind` that
+`simulateQ_list_forIn` uses). Needed to push `simulateQ` past a verifier's spot-check
+`for j in List.finRange t do …` when that loop is `OptionT`-monadic. -/
+lemma simulateQ_optionT_list_forIn (xs : List α) (init : β)
+    (body : α → β → OptionT (OracleComp spec) (ForInStep β)) :
+    simulateQ impl ((forIn xs init body : OptionT (OracleComp spec) β) :
+        OracleComp spec (Option β))
+      = ((forIn xs init (fun a b => simulateQ impl (body a b)) : OptionT n β) :
+        n (Option β)) := by
+  induction xs generalizing init with
+  | nil =>
+      rw [List.forIn_nil, List.forIn_nil]
+      exact simulateQ_pure impl (some init)
+  | cons x rest ih =>
+      rw [List.forIn_cons, List.forIn_cons, simulateQ_optionT_bind]
+      refine bind_congr fun step => ?_
+      cases step with
+      | done b =>
+          show simulateQ impl ((pure b : OptionT (OracleComp spec) β) :
+            OracleComp spec (Option β)) = _
+          exact simulateQ_pure impl (some b)
+      | yield b => exact ih b
+
+/-- If under `simulateQ` every loop body resolves to `pure (some (ForInStep.yield init))` (yields
+the accumulator unchanged at the initial value), the whole `OptionT`-monadic `forIn` resolves to
+`pure (some init)`. Discharges a verifier spot-check loop whose body is a sequence of oracle reads
+followed by an always-passing `guard` (under the relevant accept hypothesis). The constant-yield
+`OptionT` companion to `simulateQ_list_forIn`. -/
+lemma simulateQ_optionT_forIn_yield_pure_some (xs : List α) (init : β)
+    (body : α → β → OptionT (OracleComp spec) (ForInStep β))
+    (hbody : ∀ a, simulateQ impl ((body a init : OptionT (OracleComp spec) (ForInStep β)) :
+        OracleComp spec (Option (ForInStep β)))
+      = (pure (some (ForInStep.yield init)) : n (Option (ForInStep β)))) :
+    simulateQ impl ((forIn xs init body : OptionT (OracleComp spec) β) :
+        OracleComp spec (Option β))
+      = (pure (some init) : n (Option β)) := by
+  rw [simulateQ_optionT_list_forIn]
+  induction xs with
+  | nil => rw [List.forIn_nil]; rfl
+  | cons x rest ih =>
+      rw [List.forIn_cons]
+      change ((simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
+          OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β)) >>= _ :
+          OptionT n β) = _
+      rw [show (simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
+          OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β))
+          = (pure (ForInStep.yield init) : OptionT n (ForInStep β)) from hbody x]
+      rw [pure_bind]
+      exact ih
+
 -- section OptionT
 
 -- omit [LawfulMonad n] in
