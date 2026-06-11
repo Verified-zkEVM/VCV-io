@@ -834,6 +834,17 @@ end costAccounting
 
 /-! ### Completeness -/
 
+/-- Pigeonhole over repetitions: if the total of `ρ` per-repetition values exceeds `S`, then at
+least one value exceeds `⌊S/ρ⌋`. Vacuous when `ρ = 0` (the empty sum is `0`, so `S < 0` is
+impossible). This is the combinatorial heart of the Fischlin completeness union bound. -/
+private lemma exists_div_lt_of_sum_lt {ρ : ℕ} (f : Fin ρ → ℕ) (S : ℕ)
+    (h : S < ∑ i, f i) : ∃ i, S / ρ < f i := by
+  by_contra hcon
+  simp only [not_exists, not_lt] at hcon
+  have hsum : ∑ i, f i ≤ ∑ _i : Fin ρ, S / ρ := Finset.sum_le_sum fun i _ => hcon i
+  rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, smul_eq_mul] at hsum
+  exact absurd (lt_of_lt_of_le h hsum) (not_lt.mpr (Nat.mul_div_le S ρ))
+
 section security
 
 variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
