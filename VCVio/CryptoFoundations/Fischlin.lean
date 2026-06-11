@@ -1414,6 +1414,60 @@ private lemma run_mOfFn_query_hit {β : Type} (n : ℕ)
       · simp [Fin.cons_zero]
       · simp [Fin.cons_succ]
 
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- **Off-repetition cache preservation.** Running repetition `i`'s search under the lazy
+random-oracle simulation only ever caches records whose `rep` field equals `i` (every query is at
+`⟨pk, msg, comList, i, ω, resp⟩`). Hence for every outcome in the support, the final cache agrees
+with the starting cache on all records of other repetitions. Proved by induction on the challenge
+list; each step caches one `rep = i` record (`cacheQuery_of_ne`), and the `liftM (respond)` step
+never touches the cache. -/
+private lemma fischlinSearch_run_preserves_offrep (pk : Stmt) (sk : Wit) (sc : PrvState)
+    (msg : M) (comList : List Commit) (i : Fin ρ) (cs : List Chal)
+    (best : Option (Chal × Resp × Fin (2 ^ b)))
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (a : Option (Chal × Resp))
+    (cache' : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hmem : (a, cache') ∈ support
+      ((simulateQ (fischlinImpl ρ b M)
+        (fischlinSearchAux σ pk sk sc msg comList i cs best)).run cache))
+    (r : FischlinROInput Stmt Commit Chal Resp ρ M) (hr : r.rep ≠ i) :
+    cache' r = cache r := by
+  induction cs generalizing best cache with
+  | nil =>
+      simp only [fischlinSearchAux, simulateQ_pure, StateT.run_pure, support_pure,
+        Set.mem_singleton_iff, Prod.mk.injEq] at hmem
+      rw [hmem.2]
+  | cons ω rest ih =>
+      rw [fischlinSearchAux, simulateQ_bind, StateT.run_bind,
+        roSim.run_liftM (ro := randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)),
+        bind_map_left, support_bind] at hmem
+      simp only [Set.mem_iUnion] at hmem
+      obtain ⟨resp, hresp, hmem⟩ := hmem
+      rw [simulateQ_bind, roSim.simulateQ_HasQuery_query, StateT.run_bind] at hmem
+      have hne : r ≠ (⟨pk, msg, comList, i, ω, resp⟩ :
+          FischlinROInput Stmt Commit Chal Resp ρ M) := by
+        intro hEq; exact hr (congrArg FischlinROInput.rep hEq)
+      by_cases hc : cache (⟨pk, msg, comList, i, ω, resp⟩ :
+          FischlinROInput Stmt Commit Chal Resp ρ M) = none
+      · rw [QueryImpl.withCaching_run_none (so := uniformSampleImpl) hc] at hmem
+        simp only [uniformSampleImpl, map_bind, bind_map_left, support_bind,
+          support_uniformSample, Set.mem_univ, Set.iUnion_true, Set.mem_iUnion] at hmem
+        obtain ⟨x, hxmem⟩ := hmem
+        by_cases hx : x.val = 0
+        · simp only [hx, if_true, simulateQ_pure, StateT.run_pure, support_pure,
+            Set.mem_singleton_iff, Prod.mk.injEq] at hxmem
+          rw [hxmem.2, QueryCache.cacheQuery_of_ne cache x hne]
+        · simp only [hx, if_false] at hxmem
+          rw [ih _ _ hxmem, QueryCache.cacheQuery_of_ne cache x hne]
+      · obtain ⟨u, hu⟩ := Option.ne_none_iff_exists'.mp hc
+        rw [QueryImpl.withCaching_run_some (so := uniformSampleImpl) hu, pure_bind] at hmem
+        by_cases hx : u.val = 0
+        · simp only [hx, if_true, simulateQ_pure, StateT.run_pure, support_pure,
+            Set.mem_singleton_iff, Prod.mk.injEq] at hmem
+          rw [hmem.2]
+        · simp only [hx, if_false] at hmem
+          exact ih _ _ hmem
+
 /-- **Cross-repetition cache threading (residual).** Given a key pair `(pk, sk)` and a vector of
 commitments `commits`, simulating the `ρ` per-repetition searches of `sign` followed by the `ρ`
 verifier re-queries under the lazy random-oracle on the empty cache produces the same `Bool`
