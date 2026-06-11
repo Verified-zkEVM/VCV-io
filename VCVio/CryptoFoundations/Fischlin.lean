@@ -1563,6 +1563,16 @@ private lemma searchVec_run_preserves_offrep (n : ℕ) (e : Fin n → Fin ρ)
       change cFinal r = cache r
       rw [htail_pres, hhead_pres]
 
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Distributional bind congruence: continuations with equal output distributions on the support of
+`mx` yield bound computations with equal output distributions. -/
+private lemma evalDist_bind_congr_dist {α β : Type} (mx : ProbComp α)
+    {f g : α → ProbComp β} (h : ∀ x ∈ support mx, 𝒟[f x] = 𝒟[g x]) :
+    𝒟[mx >>= f] = 𝒟[mx >>= g] := by
+  refine evalDist_ext fun y => ?_
+  exact probOutput_bind_congr fun x hx => by rw [probOutput_def, probOutput_def, h x hx]
+
 /-- **Search-vector cache coupling — generalized over an injective rep-index map.** This is the
 inductive engine behind `searchVec_run_cache_eq`: the `Fin.mOfFn` of searches indexed by an
 injective `e : Fin n → Fin ρ`, run on a cache fresh for every `e`-indexed record, couples the
