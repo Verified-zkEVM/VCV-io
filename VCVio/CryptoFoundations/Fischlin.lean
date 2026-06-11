@@ -1140,6 +1140,52 @@ private lemma probEvent_mOfFn_coord_le {α : Type} (n : ℕ) (g : Fin n → Prob
                 exact le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl)
                   (le_of_eq (one_mul _))
 
+/-- Support membership for the pure-probability search: any kept triple `(ω, resp, h)` has its
+challenge drawn from the search list `cs` (or from the seed `best`), and its response in the
+support of `σ.respond pk sk sc ω`. This lets perfect completeness apply to the chosen transcript. -/
+private lemma fischlinUnifSearch_mem_support {Stmt Wit Commit PrvState Chal Resp : Type}
+    {rel : Stmt → Wit → Bool} {b : ℕ}
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (pk : Stmt) (sk : Wit) (sc : PrvState) :
+    ∀ (cs : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
+      (ω : Chal) (resp : Resp) (h : Fin (2 ^ b)),
+      (∀ ω' resp' h', some (ω', resp', h') = best →
+        resp' ∈ support (σ.respond pk sk sc ω')) →
+      some (ω, resp, h) ∈ support (fischlinUnifSearch σ pk sk sc cs best) →
+      resp ∈ support (σ.respond pk sk sc ω) := by
+  intro cs
+  induction cs with
+  | nil =>
+      intro best ω resp h hbest hmem
+      simp only [fischlinUnifSearch, support_pure, Set.mem_singleton_iff] at hmem
+      exact hbest ω resp h hmem
+  | cons ω₀ rest ih =>
+      intro best ω resp h hbest hmem
+      simp only [fischlinUnifSearch, mem_support_bind_iff] at hmem
+      obtain ⟨resp₀, hresp₀, h₀, _, hmem⟩ := hmem
+      by_cases hh : h₀.val = 0
+      · simp only [hh, if_true, support_pure, Set.mem_singleton_iff] at hmem
+        obtain ⟨rfl, rfl, rfl⟩ := hmem
+        exact hresp₀
+      · simp only [hh, if_false] at hmem
+        refine ih _ ω resp h (fun ω' resp' h' heq => ?_) hmem
+        cases hb : best with
+        | none =>
+            rw [hb] at heq
+            simp only [Option.some.injEq, Prod.mk.injEq] at heq
+            obtain ⟨rfl, rfl, rfl⟩ := heq
+            exact hresp₀
+        | some t =>
+            obtain ⟨ωt, respt, ht⟩ := t
+            rw [hb] at heq
+            by_cases hlt : h₀.val < ht.val
+            · simp only [hlt, if_true, Option.some.injEq, Prod.mk.injEq] at heq
+              obtain ⟨rfl, rfl, rfl⟩ := heq
+              exact hresp₀
+            · simp only [hlt, if_false, Option.some.injEq, Prod.mk.injEq] at heq
+              obtain ⟨rfl, rfl, rfl⟩ := heq
+              exact hbest _ _ _ hb.symm
+
 /-- **B2 (probability bound).** The model game rejects with probability at most
 `completenessError ρ b S (FinEnum.card Chal)`.
 
