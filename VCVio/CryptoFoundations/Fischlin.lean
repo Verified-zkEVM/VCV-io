@@ -1121,6 +1121,7 @@ private def searchFresh
   ∀ ω ∈ cs, ∀ resp : Resp,
     cache (⟨pk, msg, comList, i, ω, resp⟩ : FischlinROInput Stmt Commit Chal Resp ρ M) = none
 
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
 /-- **Per-repetition search bridge — output distribution.**
 
 Running Fischlin's inner search `fischlinSearchAux` under the lazy random-oracle simulation
@@ -1142,7 +1143,72 @@ private lemma fischlinSearch_run'_eq (pk : Stmt) (sk : Wit) (sc : PrvState)
         (fischlinSearchAux σ pk sk sc msg comList i cs best)).run' cache]
       = 𝒟[(fun r => r.map fun (ω, resp, _) => (ω, resp)) <$>
           fischlinUnifSearch σ pk sk sc cs best] := by
-  sorry
+  induction cs generalizing best cache with
+  | nil =>
+      simp only [fischlinSearchAux, fischlinUnifSearch, simulateQ_pure, StateT.run']
+      rfl
+  | cons ω rest ih =>
+      rw [fischlinSearchAux, fischlinUnifSearch, simulateQ_bind,
+        roSim.run'_liftM_bind
+          (ro := randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)),
+        map_bind]
+      rw [evalDist_bind, evalDist_bind]
+      refine congrArg (𝒟[σ.respond pk sk sc ω] >>= ·) (funext fun resp => ?_)
+      rw [simulateQ_bind, roSim.simulateQ_HasQuery_query]
+      -- Cache miss at the fresh record `⟨pk,msg,comList,i,ω,resp⟩`.
+      have hmiss :
+          (randomOracle
+              (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)
+              ⟨pk, msg, comList, i, ω, resp⟩ >>= fun x =>
+              simulateQ (fischlinImpl ρ b M)
+                (if x.val = 0 then pure (some (ω, resp))
+                else
+                  fischlinSearchAux σ pk sk sc msg comList i rest
+                    (match best with
+                    | none => some (ω, resp, x)
+                    | some (ω', resp', h') =>
+                        if x.val < h'.val then some (ω, resp, x)
+                        else some (ω', resp', h')))).run' cache
+            = ($ᵗ Fin (2 ^ b)) >>= fun x =>
+                (simulateQ (fischlinImpl ρ b M)
+                  (if x.val = 0 then pure (some (ω, resp))
+                  else
+                    fischlinSearchAux σ pk sk sc msg comList i rest
+                      (match best with
+                      | none => some (ω, resp, x)
+                      | some (ω', resp', h') =>
+                          if x.val < h'.val then some (ω, resp, x)
+                          else some (ω', resp', h')))).run'
+                  (cache.cacheQuery ⟨pk, msg, comList, i, ω, resp⟩ x) := by
+        have hc : cache (⟨pk, msg, comList, i, ω, resp⟩ :
+            FischlinROInput Stmt Commit Chal Resp ρ M) = none :=
+          hfresh ω (by simp) resp
+        change Prod.fst <$>
+            ((randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)
+                ⟨pk, msg, comList, i, ω, resp⟩ >>= _).run cache) = _
+        rw [StateT.run_bind,
+          QueryImpl.withCaching_run_none (so := uniformSampleImpl) hc]
+        simp only [uniformSampleImpl, map_bind, bind_map_left, StateT.run']
+        rfl
+      rw [hmiss, map_bind, evalDist_bind, evalDist_bind]
+      refine congrArg (𝒟[$ᵗ Fin (2 ^ b)] >>= ·) (funext fun x => ?_)
+      by_cases hx : x.val = 0
+      · simp only [hx, if_true, simulateQ_pure, StateT.run', map_pure, Option.map_some]
+        rfl
+      · simp only [hx, if_false]
+        -- Recurse: freshness is preserved for `rest` after caching the `ω` record.
+        have hfresh' : searchFresh ρ b M pk msg comList i rest
+            (cache.cacheQuery ⟨pk, msg, comList, i, ω, resp⟩ x) := by
+          intro ω' hω' r
+          have hne : (⟨pk, msg, comList, i, ω', r⟩ :
+              FischlinROInput Stmt Commit Chal Resp ρ M)
+              ≠ ⟨pk, msg, comList, i, ω, resp⟩ := by
+            intro hEq
+            have : ω' = ω := congrArg FischlinROInput.chal hEq
+            exact (List.nodup_cons.mp hcs).1 (this ▸ hω')
+          exact (QueryCache.cacheQuery_of_ne cache x hne).trans
+            (hfresh ω' (List.mem_cons_of_mem _ hω') r)
+        exact ih (List.nodup_cons.mp hcs).2 _ _ hfresh'
 
 /-- **B1 (random-oracle surgery).** The Fischlin random-oracle completeness game has the same
 probability of accepting as the pure-probability model game `modelGame`.
