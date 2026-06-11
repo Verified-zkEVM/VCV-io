@@ -15,6 +15,7 @@ import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.StateT.BundledSemantics
 import Mathlib.Data.FinEnum
 import Mathlib.Data.Nat.Choose.Basic
+import Mathlib.Order.Interval.Finset.Fin
 
 /-!
 # Fischlin Transform
@@ -844,6 +845,30 @@ private lemma exists_div_lt_of_sum_lt {ρ : ℕ} (f : Fin ρ → ℕ) (S : ℕ)
   have hsum : ∑ i, f i ≤ ∑ _i : Fin ρ, S / ρ := Finset.sum_le_sum fun i _ => hcon i
   rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, smul_eq_mul] at hsum
   exact absurd (lt_of_lt_of_le h hsum) (not_lt.mpr (Nat.mul_div_le S ρ))
+
+/-- Single-sample tail probability for the Fischlin random oracle: a uniform `Fin (2^b)` draw
+exceeds threshold `k` with probability `(2^b - (k+1)) / 2^b`. The count of values exceeding `k`
+is `2^b - (k+1)` (truncating to `0` once `k+1 > 2^b`), out of `2^b` total. -/
+private lemma probEvent_val_gt_uniformSample (b k : ℕ) :
+    Pr[fun (x : Fin (2 ^ b)) => k < x.val | ($ᵗ (Fin (2 ^ b)))]
+      = (↑(2 ^ b - (k + 1)) : ℝ≥0∞) / ↑(2 ^ b) := by
+  haveI : NeZero (2 ^ b) := ⟨Nat.two_pow_pos b |>.ne'⟩
+  rw [probEvent_uniformSample]
+  simp only [Fintype.card_fin]
+  norm_cast
+  congr 1
+  set n := 2 ^ b with hn
+  have hn_pos : 0 < n := Nat.two_pow_pos b
+  set kFin : Fin n := ⟨min k (n - 1), by omega⟩
+  have hconv : (Finset.univ.filter (fun x : Fin n => k < x.val)) = Finset.Ioi kFin := by
+    rw [← Finset.filter_lt_eq_Ioi]
+    ext ⟨x, hx⟩
+    simp [Fin.lt_def, kFin]
+    omega
+  rw [hconv, Fin.card_Ioi]
+  congr 1
+  simp only [kFin]
+  omega
 
 section security
 
