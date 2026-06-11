@@ -1186,6 +1186,25 @@ private lemma fischlinUnifSearch_mem_support {Stmt Wit Commit PrvState Chal Resp
               obtain ⟨rfl, rfl, rfl⟩ := heq
               exact hbest _ _ _ hb.symm
 
+/-- Coordinatewise support membership for an independent product `Fin.mOfFn n g`: every value
+in its support has each component in the support of the corresponding factor. -/
+private lemma mem_support_mOfFn {α : Type} (n : ℕ) (g : Fin n → ProbComp α)
+    (v : Fin n → α) (hv : v ∈ support (Fin.mOfFn n g)) (i : Fin n) :
+    v i ∈ support (g i) := by
+  induction n with
+  | zero => exact i.elim0
+  | succ n ih =>
+      rw [Fin.mOfFn, mem_support_bind_iff] at hv
+      obtain ⟨a, ha, hv⟩ := hv
+      rw [mem_support_bind_iff] at hv
+      obtain ⟨rest, hrest, hv⟩ := hv
+      simp only [support_pure, Set.mem_singleton_iff] at hv
+      subst hv
+      refine Fin.cases ?_ (fun j => ?_) i
+      · simpa using ha
+      · rw [Fin.cons_succ]
+        exact ih (fun j => g j.succ) rest hrest j
+
 /-- Pointwise corollary of perfect completeness: on a valid `(pk, sk)` pair, for any commitment
 `(pc, sc)` in the support of `σ.commit`, any challenge `ω`, and any response `resp` in the support
 of `σ.respond _ _ sc ω`, the verifier accepts. Extracted from the `Pr[= true | …] = 1` statement
@@ -1223,7 +1242,18 @@ bound over the `ρ` repetitions together with the per-repetition tail bound
 private lemma model_reject_le (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
     1 - Pr[= true | modelGame σ hr ρ b S]
       ≤ completenessError ρ b S (FinEnum.card Chal) := by
-  have hgen : Pr[⊥ | hr.gen] = 0 := probFailure_eq_zero' inferInstance
+  -- Every `ProbComp` is `NeverFail`, so `1 - Pr[= true]` is exactly `Pr[= false]`.
+  have hfalse : 1 - Pr[= true | modelGame σ hr ρ b S]
+      = Pr[= false | modelGame σ hr ρ b S] := by
+    rw [probOutput_false_eq_sub, probFailure_eq_zero' inferInstance, tsub_zero]
+  rw [hfalse, ← probEvent_not_eq_probOutput]
+  rw [modelGame]
+  -- Peel the key-generation and commitment phases; on the support `rel pk sk` holds.
+  refine probEvent_bind_le_of_forall_le (fun pksk hpksk => ?_)
+  obtain ⟨pk, sk⟩ := pksk
+  have hrel : rel pk sk = true := hr.gen_sound pk sk hpksk
+  simp only
+  refine probEvent_bind_le_of_forall_le (fun commits hcommits => ?_)
   sorry
 
 /-- Almost completeness of the Fischlin transform: if the underlying Σ-protocol is
