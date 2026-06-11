@@ -1563,6 +1563,44 @@ private lemma searchVec_run_preserves_offrep (n : ℕ) (e : Fin n → Fin ρ)
       change cFinal r = cache r
       rw [htail_pres, hhead_pres]
 
+/-- **Search-vector cache coupling — generalized over an injective rep-index map.** This is the
+inductive engine behind `searchVec_run_cache_eq`: the `Fin.mOfFn` of searches indexed by an
+injective `e : Fin n → Fin ρ`, run on a cache fresh for every `e`-indexed record, couples the
+transcript vector together with the final cache's value at each chosen record to the pure-uniform
+`fischlinUnifSearch` vector paired with its kept hashes. Induction on `n`: the head search caches
+its own record (`fischlinSearch_run_cache_eq`); the tail's records carry distinct reps (`e`
+injective) so they stay fresh and never disturb the head's cached record
+(`searchVec_run_preserves_offrep`), making the tail distribution independent of the head's cache. -/
+private lemma searchVec_run_cache_eq_aux (n : ℕ) (e : Fin n → Fin ρ) (he : Function.Injective e)
+    (pk : Stmt) (sk : Wit) (msg : M) (sc : Fin n → PrvState) (comList : List Commit)
+    (toSig : Fin n → Option (Chal × Resp) → Commit × Chal × Resp)
+    (htoSig : ∀ j o, (toSig j o).2.1 = (o.getD default).1 ∧ (toSig j o).2.2 = (o.getD default).2)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hfresh : ∀ j ω resp, cache (⟨pk, msg, comList, e j, ω, resp⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M) = none) :
+    𝒟[(fun p : (Fin n → Commit × Chal × Resp) ×
+            (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache =>
+          (p.1, fun j => p.2 (⟨pk, msg, comList, e j, (p.1 j).2.1, (p.1 j).2.2⟩ :
+            FischlinROInput Stmt Commit Chal Resp ρ M))) <$>
+        (simulateQ (fischlinImpl ρ b M)
+          (Fin.mOfFn n fun j =>
+            fischlinSearchAux σ pk sk (sc j) msg comList (e j) (FinEnum.toList Chal)
+                (none : Option (Chal × Resp × Fin (2 ^ b))) >>= fun result =>
+              pure (toSig j result))).run cache]
+      = 𝒟[(fun bests : Fin n → Option (Chal × Resp × Fin (2 ^ b)) =>
+            (fun j => toSig j ((bests j).map fun t => (t.1, t.2.1)),
+            fun j => (bests j).map (fun t => t.2.2))) <$>
+          Fin.mOfFn n fun j =>
+            fischlinUnifSearch σ pk sk (sc j) (FinEnum.toList Chal)
+              (none : Option (Chal × Resp × Fin (2 ^ b)))] := by
+  induction n generalizing cache with
+  | zero =>
+      simp only [Fin.mOfFn, simulateQ_pure, StateT.run_pure, map_pure]
+      congr 1
+      congr 1
+      exact Subsingleton.elim _ _
+  | succ n ih => sorry
+
 /-- **Search-vector cache coupling.** Running the `ρ` per-repetition searches (each packaged into a
 transcript by `toSig`) under the lazy random-oracle on a cache that is fresh for every record,
 the joint distribution of the transcript vector together with the final cache's value at each
@@ -1596,7 +1634,8 @@ private lemma searchVec_run_cache_eq (pk : Stmt) (sk : Wit) (msg : M)
           Fin.mOfFn ρ fun i =>
             fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal)
               (none : Option (Chal × Resp × Fin (2 ^ b)))] := by
-  sorry
+  exact searchVec_run_cache_eq_aux σ ρ b M ρ id Function.injective_id pk sk msg
+    (fun i => (commits i).2) comList toSig htoSig cache hfresh
 
 /-- The verifier's `run'`, on a cache that stores every re-queried record, is the deterministic
 verdict computed from the stored hashes. A direct corollary of `run_mOfFn_query_hit`. -/
