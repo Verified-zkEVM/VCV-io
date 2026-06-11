@@ -1255,9 +1255,8 @@ private lemma fischlinUnifSearch_match_verify
     (cs : List Chal) (hcs : cs ≠ [])
     (o : Option (Chal × Resp × Fin (2 ^ b)))
     (ho : o ∈ support (fischlinUnifSearch σ pk sk sc cs none)) :
-    (match o with
-      | some (ω, resp, _) => σ.verify pk pc ω resp
-      | none => σ.verify pk pc default default) = true := by
+    o.isSome = true ∧
+      ∀ ω resp h, o = some (ω, resp, h) → σ.verify pk pc ω resp = true := by
   -- A search over a non-empty list with seed `none` keeps a `some` triple.
   have hsome : ∀ (cs : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))),
       cs ≠ [] → ∀ o ∈ support (fischlinUnifSearch σ pk sk sc cs best), o.isSome := by
@@ -1282,14 +1281,12 @@ private lemma fischlinUnifSearch_match_verify
                 by_cases hlt : h₀.val < h'.val <;> simp [hlt]
           · exact ih _ (by simp) o ho
   have hisSome := hsome cs none hcs o ho
-  cases o with
-  | none => exact absurd hisSome (by simp)
-  | some t =>
-      obtain ⟨ω, resp, h⟩ := t
-      have hresp : resp ∈ support (σ.respond pk sk sc ω) :=
-        fischlinUnifSearch_mem_support σ pk sk sc cs none ω resp h
-          (fun ω' resp' h' heq => by simp at heq) ho
-      exact verify_of_perfectlyComplete σ hc pk sk hrel pc sc hpc ω resp hresp
+  refine ⟨hisSome, fun ω resp h heq => ?_⟩
+  subst heq
+  have hresp : resp ∈ support (σ.respond pk sk sc ω) :=
+    fischlinUnifSearch_mem_support σ pk sk sc cs none ω resp h
+      (fun ω' resp' h' heq => by simp at heq) ho
+  exact verify_of_perfectlyComplete σ hc pk sk hrel pc sc hpc ω resp hresp
 
 /-- **B2 (probability bound).** The model game rejects with probability at most
 `completenessError ρ b S (FinEnum.card Chal)`.
@@ -1314,7 +1311,46 @@ private lemma model_reject_le (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : 
   have hrel : rel pk sk = true := hr.gen_sound pk sk hpksk
   simp only
   refine probEvent_bind_le_of_forall_le (fun commits hcommits => ?_)
-  sorry
+  -- Each commitment lies in the support of `σ.commit pk sk`.
+  have hci : ∀ i, (commits i) ∈ support (σ.commit pk sk) :=
+    fun i => mem_support_mOfFn ρ _ commits hcommits i
+  -- The challenge list is non-empty, so the search always returns a verified triple.
+  have hcs : (FinEnum.toList Chal) ≠ [] := by
+    have : (default : Chal) ∈ FinEnum.toList Chal := FinEnum.mem_toList _
+    intro h; rw [h] at this; exact absurd this (by simp)
+  -- Per-coordinate minimum-hash contribution.
+  set minH : (Fin ρ → Option (Chal × Resp × Fin (2 ^ b))) → Fin ρ → ℕ :=
+    fun bs i => match bs i with | some (_, _, h) => h.val | none => 0 with hminH
+  -- Reduce the rejection event to "the hash sum exceeds `S`".
+  rw [bind_pure_comp, probEvent_map]
+  set bestsComp := Fin.mOfFn ρ
+    fun i => fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal) none with hbestsComp
+  refine le_trans (probEvent_mono (q := fun bs => S < ∑ i, minH bs i)
+    (fun bs hbs hfalse => ?_)) ?_
+  · -- On the support, `allVerified = true`, so a `false` verdict means `S < hashSum`.
+    have hbsi : ∀ i, (bs i) ∈
+        support (fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal) none) :=
+      fun i => mem_support_mOfFn ρ _ bs hbs i
+    have hall : ((List.finRange ρ).all fun i =>
+        match bs i with
+        | some (ω, resp, _) => σ.verify pk (commits i).1 ω resp
+        | none => σ.verify pk (commits i).1 default default) = true := by
+      rw [List.all_eq_true]
+      intro i _
+      obtain ⟨hsome, hver⟩ := fischlinUnifSearch_match_verify σ hc pk sk hrel (commits i).1
+        (commits i).2 (hci i) (FinEnum.toList Chal) hcs (bs i) (hbsi i)
+      cases hbi : bs i with
+      | none => rw [hbi] at hsome; simp at hsome
+      | some t =>
+          obtain ⟨ω, resp, h⟩ := t
+          simpa using hver ω resp h hbi
+    -- The verdict is `false`, and `allVerified = true`, hence the hash sum exceeds `S`.
+    simp only [Function.comp_apply, hall, Bool.true_and,
+      decide_eq_false_iff_not, not_le] at hfalse
+    rw [foldl_add_finRange_eq_sum (minH bs)] at hfalse
+    exact hfalse
+  · -- Pigeonhole + union bound over the `ρ` repetitions.
+    sorry
 
 /-- Almost completeness of the Fischlin transform: if the underlying Σ-protocol is
 perfectly complete, then the signature scheme verifies with probability at least
