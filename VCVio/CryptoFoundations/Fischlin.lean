@@ -1231,6 +1231,54 @@ private lemma verify_of_perfectlyComplete
     exact ⟨resp, hresp, by simp⟩
   exact h1 _ hmem
 
+/-- On a valid, perfectly-complete instance, the per-repetition verifier branch always accepts:
+the search over a non-empty challenge list returns `some (ω, resp, _)` whose response verifies
+(perfect completeness applied to the chosen transcript). The `none` branch never arises. -/
+private lemma fischlinUnifSearch_match_verify
+    {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool} {b : ℕ}
+    [SampleableType Chal] [Inhabited Chal] [Inhabited Resp]
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hc : σ.PerfectlyComplete) (pk : Stmt) (sk : Wit) (hrel : rel pk sk = true)
+    (pc : Commit) (sc : PrvState) (hpc : (pc, sc) ∈ support (σ.commit pk sk))
+    (cs : List Chal) (hcs : cs ≠ [])
+    (o : Option (Chal × Resp × Fin (2 ^ b)))
+    (ho : o ∈ support (fischlinUnifSearch σ pk sk sc cs none)) :
+    (match o with
+      | some (ω, resp, _) => σ.verify pk pc ω resp
+      | none => σ.verify pk pc default default) = true := by
+  -- A search over a non-empty list with seed `none` keeps a `some` triple.
+  have hsome : ∀ (cs : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))),
+      cs ≠ [] → ∀ o ∈ support (fischlinUnifSearch σ pk sk sc cs best), o.isSome := by
+    intro cs
+    induction cs with
+    | nil => intro best hcs; exact absurd rfl hcs
+    | cons ω₀ rest ih =>
+        intro best _ o ho
+        simp only [fischlinUnifSearch, mem_support_bind_iff] at ho
+        obtain ⟨resp₀, _, h₀, _, ho⟩ := ho
+        by_cases hh : h₀.val = 0
+        · simp only [hh, if_true, support_pure, Set.mem_singleton_iff] at ho
+          subst ho; rfl
+        · simp only [hh, if_false] at ho
+          rcases rest with _ | ⟨ω₁, rest'⟩
+          · simp only [fischlinUnifSearch, support_pure, Set.mem_singleton_iff] at ho
+            subst ho
+            cases best with
+            | none => rfl
+            | some t =>
+                obtain ⟨ω', resp', h'⟩ := t
+                by_cases hlt : h₀.val < h'.val <;> simp [hlt]
+          · exact ih _ (by simp) o ho
+  have hisSome := hsome cs none hcs o ho
+  cases o with
+  | none => exact absurd hisSome (by simp)
+  | some t =>
+      obtain ⟨ω, resp, h⟩ := t
+      have hresp : resp ∈ support (σ.respond pk sk sc ω) :=
+        fischlinUnifSearch_mem_support σ pk sk sc cs none ω resp h
+          (fun ω' resp' h' heq => by simp at heq) ho
+      exact verify_of_perfectlyComplete σ hc pk sk hrel pc sc hpc ω resp hresp
+
 /-- **B2 (probability bound).** The model game rejects with probability at most
 `completenessError ρ b S (FinEnum.card Chal)`.
 
