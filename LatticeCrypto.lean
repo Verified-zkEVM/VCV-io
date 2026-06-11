@@ -38,6 +38,7 @@ import LatticeCrypto.MLDSA.Params
 import LatticeCrypto.MLDSA.Primitives
 import LatticeCrypto.MLDSA.Scheme
 import LatticeCrypto.MLDSA.Security
+import LatticeCrypto.MLDSA.SecurityNMA
 import LatticeCrypto.MLDSA.Signature
 import LatticeCrypto.MLKEM.Arithmetic
 import LatticeCrypto.MLKEM.Concrete.CBD
