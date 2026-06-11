@@ -17,6 +17,8 @@ import VCVio.OracleComp.SimSemantics.StateT.BundledSemantics
 import Mathlib.Data.FinEnum
 import Mathlib.Data.Nat.Choose.Basic
 import Mathlib.Order.Interval.Finset.Fin
+import Mathlib.Data.Sym.Card
+import Mathlib.Algebra.Order.Antidiag.Pi
 
 /-!
 # Fischlin Transform
@@ -2427,7 +2429,46 @@ Each `Fin (2^b)`-valued tuple injects into a `Fin ρ → ℕ` tuple with the sam
 number of such natural tuples with sum exactly `s` is `C(s+ρ-1, ρ-1)`, which is monotone in `s`, so
 summing over the `S+1` values `s = 0, …, S` gives the stated bound. -/
 private lemma smallSumCount_le : smallSumCount ρ b S ≤ (S + 1) * Nat.choose (S + ρ - 1) (ρ - 1) := by
-  sorry
+  classical
+  -- Per-fiber count: tuples `Fin ρ → ℕ` summing to exactly `s` number `C(ρ+s-1, s)`.
+  have hfiber : ∀ s : ℕ, (Finset.univ.piAntidiag s : Finset (Fin ρ → ℕ)).card
+      = (ρ + s - 1).choose s := by
+    intro s
+    rw [← Finset.map_sym_eq_piAntidiag, Finset.card_map, Finset.sym_univ, Finset.card_univ,
+      Sym.card_sym_eq_choose, Fintype.card_fin]
+  -- The `Fin.val` image of a small-sum hash tuple lands in the union of exact-sum natural tuples.
+  set T : Finset (Fin ρ → ℕ) :=
+    (Finset.range (S + 1)).biUnion (fun s => Finset.univ.piAntidiag s) with hT
+  have hmap : (Finset.univ.filter (fun v : Fin ρ → Fin (2 ^ b) => ∑ i, (v i).val ≤ S)).image
+      (fun v i => (v i).val) ⊆ T := by
+    intro g hg
+    simp only [Finset.mem_image, Finset.mem_filter, Finset.mem_univ, true_and] at hg
+    obtain ⟨v, hv, rfl⟩ := hg
+    simp only [hT, Finset.mem_biUnion, Finset.mem_range, Finset.mem_piAntidiag,
+      Finset.mem_univ, true_and, implies_true, and_true]
+    exact ⟨∑ i, (v i).val, by omega, rfl⟩
+  -- The image has the same cardinality (the map `v ↦ Fin.val ∘ v` is injective).
+  have hinj : Set.InjOn (fun v : Fin ρ → Fin (2 ^ b) => fun i => (v i).val)
+      ↑(Finset.univ.filter (fun v : Fin ρ → Fin (2 ^ b) => ∑ i, (v i).val ≤ S)) := by
+    intro v₁ _ v₂ _ h
+    funext i
+    exact Fin.val_injective (congrFun h i)
+  rw [smallSumCount, ← Finset.card_image_of_injOn hinj]
+  refine le_trans (Finset.card_le_card hmap) ?_
+  refine le_trans (Finset.card_biUnion_le) ?_
+  rw [Finset.sum_congr rfl (fun s _ => hfiber s)]
+  -- Each fiber count is at most `C(S+ρ-1, ρ-1)`; there are `S+1` of them.
+  refine le_trans (Finset.sum_le_card_nsmul _ _ ((S + ρ - 1).choose (ρ - 1)) (fun s hs => ?_)) ?_
+  · rw [Finset.mem_range] at hs
+    rcases Nat.eq_zero_or_pos ρ with hρ0 | hρpos
+    · subst hρ0
+      rcases Nat.eq_zero_or_pos s with rfl | hspos
+      · simp
+      · rw [Nat.choose_eq_zero_of_lt (by omega : 0 + s - 1 < s)]; exact Nat.zero_le _
+    · have h1 : (ρ + s - 1).choose s = (ρ + s - 1).choose (ρ - 1) := by
+        rw [← Nat.choose_symm (by omega)]; congr 1; omega
+      rw [h1]; exact Nat.choose_le_choose _ (by omega)
+  · rw [Finset.card_range, smul_eq_mul]
 
 omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin knowledge-soundness
