@@ -184,7 +184,7 @@ lemma simulateQ_optionT_list_forIn (xs : List α) (init : β)
       refine bind_congr fun step => ?_
       cases step with
       | done b =>
-          show simulateQ impl ((pure b : OptionT (OracleComp spec) β) :
+          change simulateQ impl ((pure b : OptionT (OracleComp spec) β) :
             OracleComp spec (Option β)) = _
           exact simulateQ_pure impl (some b)
       | yield b => exact ih b
