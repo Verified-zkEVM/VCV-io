@@ -1573,6 +1573,19 @@ private lemma evalDist_bind_congr_dist {α β : Type} (mx : ProbComp α)
   refine evalDist_ext fun y => ?_
   exact probOutput_bind_congr fun x hx => by rw [probOutput_def, probOutput_def, h x hx]
 
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- Running a search packaged with a pure post-processing `f` under the lazy random-oracle
+simulation factors the post-processing out of the cache: it acts only on the output component,
+leaving the threaded cache untouched. -/
+private lemma simulateQ_run_map_pure {α β : Type}
+    (s : OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M) α) (f : α → β)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache) :
+    (simulateQ (fischlinImpl ρ b M) (s >>= fun r => pure (f r))).run cache
+      = (fun p => (f p.1, p.2)) <$> (simulateQ (fischlinImpl ρ b M) s).run cache := by
+  rw [simulateQ_bind, StateT.run_bind, map_eq_bind_pure_comp]
+  refine bind_congr fun p => ?_
+  rw [simulateQ_pure, StateT.run_pure]; rfl
+
 /-- **Search-vector cache coupling — generalized over an injective rep-index map.** This is the
 inductive engine behind `searchVec_run_cache_eq`: the `Fin.mOfFn` of searches indexed by an
 injective `e : Fin n → Fin ρ`, run on a cache fresh for every `e`-indexed record, couples the
@@ -1609,7 +1622,12 @@ private lemma searchVec_run_cache_eq_aux (n : ℕ) (e : Fin n → Fin ρ) (he : 
       congr 1
       congr 1
       exact Subsingleton.elim _ _
-  | succ n ih => sorry
+  | succ n ih =>
+      rw [Fin.mOfFn, Fin.mOfFn, simulateQ_bind, StateT.run_bind, simulateQ_run_map_pure,
+        bind_map_left]
+      simp only [map_bind, simulateQ_bind, StateT.run_bind, simulateQ_pure, StateT.run_pure,
+        map_pure, bind_map_left]
+      sorry
 
 /-- **Search-vector cache coupling.** Running the `ρ` per-repetition searches (each packaged into a
 transcript by `toSig`) under the lazy random-oracle on a cache that is fresh for every record,
