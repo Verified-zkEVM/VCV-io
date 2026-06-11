@@ -245,15 +245,56 @@ lemma idealCollisionExp_eq_bind :
     idealCollisionExp (S := S) (O := O) n = (($ᵗ S) >>= seedCollisionExp (S := S) (O := O) n) :=
   rfl
 
+/-- Generalized collision experiment for an arbitrary starting cache `c`. Running the lazy
+random oracle chain for `N` rounds from state `s`, the bad event is that the chain repeats a
+state (`¬ Nodup`) or revisits a state already present in `c`. For `c = ∅` this reduces to
+`seedCollisionExp`. The generalized cache is the induction vehicle: each fresh step extends
+`c` by the just-visited state. -/
+noncomputable def genCollisionExp (N : ℕ) (s : S) (c : (S →ₒ S × O).QueryCache) :
+    ProbComp Bool := do
+  let states ←
+    (simulateQ (prfIdealQueryImpl (D := S) (R := S × O)) (oracleVisitedStates N s)).run' c
+  return decide (¬ states.toList.Nodup ∨ ∃ x ∈ states.toList, c.isCached x = true)
+
+omit [DecidableEq O] in
+/-- **Generalized per-seed core coupling.** For an arbitrary starting cache `c`, the total
+variation distance between the lazy-random-oracle output chain (run from cache `c`) and a
+uniformly random output vector is bounded by the generalized collision probability. Proved by
+induction on the number of rounds: a fresh query produces an independent uniform block and the
+cache grows by exactly the just-visited state, so the collision recursion closes; a repeated
+query has already triggered the bad event, where the bound is trivially `1`. -/
+lemma tvDist_seedOutputs_le_collision_gen (N : ℕ) (s : S)
+    (c : (S →ₒ S × O).QueryCache) :
+    tvDist ((simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+          (oracleOutputs N s)).run' c) ($ᵗ (List.Vector O N)) ≤
+      (Pr[= true | genCollisionExp N s c]).toReal := by
+  induction N generalizing s c with
+  | zero =>
+    refine le_trans (le_of_eq ?_) ENNReal.toReal_nonneg
+    rw [tvDist_eq_zero_iff]
+    simp only [oracleOutputs, simulateQ_pure, StateT.run'_eq, StateT.run_pure, map_pure]
+    refine evalDist_ext fun y => ?_
+    simp
+  | succ N ih =>
+    sorry
+
 omit [DecidableEq O] in
 /-- **Per-seed core coupling.** For a fixed initial state, the total variation distance between
 the lazy-random-oracle output chain and a uniformly random output vector is bounded by the
 probability that the state chain revisits a state. This is the fundamental "identical until
-bad" step: until the chain repeats, the lazy random oracle returns independent uniform blocks. -/
+bad" step: until the chain repeats, the lazy random oracle returns independent uniform blocks.
+
+The empty-cache specialization of `tvDist_seedOutputs_le_collision_gen`. -/
 lemma tvDist_seedOutputs_le_collision (seed : S) :
     tvDist (seedOutputs n seed) ($ᵗ (List.Vector O n)) ≤
       (Pr[= true | seedCollisionExp (O := O) n seed]).toReal := by
-  sorry
+  have heq : genCollisionExp (O := O) n seed ∅ = seedCollisionExp (O := O) n seed := by
+    unfold genCollisionExp seedCollisionExp
+    refine bind_congr fun states => ?_
+    simp [QueryCache.isCached_empty]
+  have h := tvDist_seedOutputs_le_collision_gen (O := O) n seed ∅
+  rw [heq] at h
+  exact h
 
 omit [DecidableEq O] in
 /-- **Core coupling.** The total variation distance between the lazy-random-oracle output
