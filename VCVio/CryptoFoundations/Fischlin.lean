@@ -1210,6 +1210,32 @@ private lemma fischlinSearch_run'_eq (pk : Stmt) (sk : Wit) (sc : PrvState)
             (hfresh ω' (List.mem_cons_of_mem _ hω') r)
         exact ih (List.nodup_cons.mp hcs).2 _ _ hfresh'
 
+/-- **Residual: full-game distribution surgery.** After collapsing the random-oracle runtime to a
+`StateT`-simulation on the empty cache (`runtime_evalDist_eq`), the entire Fischlin game
+`keygen >>= sign >>= verify`, observed as a `ProbComp Bool` via `StateT.run'`, has the same
+distribution as `modelGame`.
+
+This is the assembly step on top of the proven per-repetition output bridge
+`fischlinSearch_run'_eq`. It additionally requires threading the lazy cache across the `ρ`
+repetitions of `Fin.mOfFn` (each repetition's queries carry the repetition index in their
+`FischlinROInput.rep` field, so they never collide across repetitions, preserving freshness) and
+the verifier cache-hit step (the chosen transcript's hash was cached during `sign`, so each
+verifier re-query returns the recorded value, matching `modelGame`'s direct read of `(bests i).2.2`).
+These two cache-coupling steps require a cache-carrying refinement of `fischlinSearch_run'_eq`. -/
+private lemma fischlin_game_run'_eq_modelGame (msg : M) :
+    𝒟[StateT.run' (simulateQ (fischlinImpl ρ b M)
+        (do
+          let (pk, sk) ←
+            (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+              σ hr ρ b S M).keygen
+          let sig ←
+            (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+              σ hr ρ b S M).sign pk sk msg
+          (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+            σ hr ρ b S M).verify pk msg sig)) ∅]
+      = 𝒟[modelGame σ hr ρ b S] := by
+  sorry
+
 /-- **B1 (random-oracle surgery).** The Fischlin random-oracle completeness game has the same
 probability of accepting as the pure-probability model game `modelGame`.
 
@@ -1229,7 +1255,9 @@ private lemma fischlin_game_eq_model (msg : M) :
       (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
         σ hr ρ b S M).verify pk msg sig]
       = Pr[= true | modelGame σ hr ρ b S] := by
-  sorry
+  rw [runtime_evalDist_eq]
+  change Pr[= true | StateT.run' (simulateQ (fischlinImpl ρ b M) _) ∅] = _
+  rw [probOutput_def, probOutput_def, fischlin_game_run'_eq_modelGame σ hr ρ b S M msg]
 
 /-- Marginalizing a single coordinate `i` out of an independent product `Fin.mOfFn n g`:
 the probability that the `i`-th component satisfies `p` is at most the probability that the
