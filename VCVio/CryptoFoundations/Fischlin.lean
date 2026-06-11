@@ -1468,45 +1468,6 @@ private lemma fischlinSearch_run_preserves_offrep (pk : Stmt) (sk : Wit) (sc : P
         · simp only [hx, if_false] at hmem
           exact ih _ _ hmem
 
-/-- The transcript a repetition contributes to the Fischlin signature, reconstructed from a
-`fischlinUnifSearch` outcome: the kept `(ω, resp)` on `some`, the dummy `default` pair on `none`. -/
-private def sigOfBest (commits : Fin ρ → Commit × PrvState) (i : Fin ρ)
-    (o : Option (Chal × Resp × Fin (2 ^ b))) : Commit × Chal × Resp :=
-  match o with
-  | some (ω, resp, _) => ((commits i).1, ω, resp)
-  | none => ((commits i).1, default, default)
-
-/-- **Search-vector cache bridge (residual).** Running the `ρ` per-repetition searches of `sign`
-under the lazy random-oracle on the empty cache, the joint distribution of the produced transcript
-vector together with the final cache's value at each repetition's chosen record equals
-`Fin.mOfFn ρ fischlinUnifSearch`'s transcripts paired with their kept hashes.
-
-This is the cross-repetition threading: repetition `i`'s queries all carry `rep = i`, so by
-`fischlinSearch_run_cache_eq` (each search caches its own chosen record with its hash) and
-`fischlinSearch_run_preserves_offrep` (each search leaves other repetitions' records untouched),
-after all `ρ` searches the final cache stores every chosen record with its kept hash. Proved by a
-`Fin.mOfFn` induction; `comList = List.ofFn (commits ·.1)` is fixed across repetitions. -/
-private lemma searchVec_run_cache_eq (pk : Stmt) (sk : Wit) (msg : M)
-    (commits : Fin ρ → Commit × PrvState) :
-    𝒟[(fun p : (Fin ρ → Commit × Chal × Resp) ×
-            (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache =>
-          (p.1, fun i => p.2 (⟨pk, msg, List.ofFn (fun j => (commits j).1), i,
-            (p.1 i).2.1, (p.1 i).2.2⟩ : FischlinROInput Stmt Commit Chal Resp ρ M))) <$>
-        (simulateQ (fischlinImpl ρ b M)
-          (Fin.mOfFn ρ fun i =>
-            (fischlinSearchAux σ pk sk (commits i).2 msg
-                (List.ofFn (fun j => (commits j).1)) i (FinEnum.toList Chal)
-                (none : Option (Chal × Resp × Fin (2 ^ b))) >>= fun result =>
-              pure (sigOfBest ρ b commits i
-                (result.map fun t => (t.1, t.2, (default : Fin (2 ^ b)))))))).run ∅]
-      = 𝒟[(fun bests : Fin ρ → Option (Chal × Resp × Fin (2 ^ b)) =>
-            (fun i => sigOfBest ρ b commits i (bests i),
-            fun i => (bests i).map (fun t => t.2.2))) <$>
-          Fin.mOfFn ρ fun i =>
-            fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal)
-              (none : Option (Chal × Resp × Fin (2 ^ b)))] := by
-  sorry
-
 /-- The verifier's `run'`, on a cache that stores every re-queried record, is the deterministic
 verdict computed from the stored hashes. A direct corollary of `run_mOfFn_query_hit`. -/
 private lemma verify_run'_of_hits (pk : Stmt) (msg : M)
@@ -1566,8 +1527,6 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
           let hashSum := (List.finRange ρ).foldl
             (fun acc i => acc + (match bests i with | some (_, _, h) => h.val | none => 0)) 0
           pure (allVerified && decide (hashSum ≤ S))] := by
-  simp only [Fischlin]
-  rw [simulateQ_bind, StateT.run'_bind']
   sorry
 
 /-- **Residual: full-game distribution surgery.** After collapsing the random-oracle runtime to a
