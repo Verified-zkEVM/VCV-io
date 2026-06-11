@@ -447,6 +447,17 @@ noncomputable instance instSampleableTypeEmbedding {β α : Type}
     SampleableType (β ↪ α) :=
   SampleableType.ofFintype _
 
+/-- A function from a finite type `D` with decidable equality to a `SampleableType` is itself
+`SampleableType`: transport the `Fin (Fintype.card D) → α` instance across the canonical
+equivalence `(D → α) ≃ (Fin (Fintype.card D) → α)`. This is the general Pi instance over an
+arbitrary finite domain presented by `Fintype` + `DecidableEq`, complementing the `FinEnum`-domain
+instance `instSampleableTypeFunc`. -/
+noncomputable instance instSampleableTypePiFintype {D : Type} [Fintype D] [DecidableEq D]
+    {α : Type} [SampleableType α] : SampleableType (D → α) :=
+  SampleableType.ofEquiv
+    (α := Fin (Fintype.card D) → α)
+    (Equiv.arrowCongr (Fintype.equivFin D).symm (Equiv.refl α))
+
 end instances
 
 section Marginalization
