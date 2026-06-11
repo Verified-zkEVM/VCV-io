@@ -1626,8 +1626,101 @@ private lemma searchVec_run_cache_eq_aux (n : ℕ) (e : Fin n → Fin ρ) (he : 
       rw [Fin.mOfFn, Fin.mOfFn, simulateQ_bind, StateT.run_bind, simulateQ_run_map_pure,
         bind_map_left]
       simp only [map_bind, simulateQ_bind, StateT.run_bind, simulateQ_pure, StateT.run_pure,
-        map_pure, bind_map_left]
-      sorry
+        map_pure]
+      -- The reusable record identity: the record the verifier reads for `toSig 0 o` is exactly
+      -- `searchRecord (e 0) o`.
+      have hrec : ∀ o : Option (Chal × Resp),
+          (⟨pk, msg, comList, e 0, (toSig 0 o).2.1, (toSig 0 o).2.2⟩ :
+            FischlinROInput Stmt Commit Chal Resp ρ M)
+            = searchRecord ρ M pk msg comList (e 0) o := by
+        intro o
+        obtain ⟨h1, h2⟩ := htoSig 0 o
+        cases o with
+        | none => rw [h1, h2]; rfl
+        | some t => obtain ⟨ω, resp⟩ := t; rw [h1, h2]; rfl
+      -- The tail's pure-uniform product and the shared continuation `G`.
+      set Utail := Fin.mOfFn n fun i =>
+          fischlinUnifSearch σ pk sk (sc i.succ) (FinEnum.toList Chal)
+            (none : Option (Chal × Resp × Fin (2 ^ b))) with hUtail
+      set G : Option (Chal × Resp) × Option (Fin (2 ^ b)) →
+          ProbComp ((Fin (n + 1) → Commit × Chal × Resp) × (Fin (n + 1) → Option (Fin (2 ^ b)))) :=
+        fun q => Utail >>= fun tb => pure
+          (Fin.cons (toSig 0 q.1) (fun k => toSig k.succ ((tb k).map fun t => (t.1, t.2.1))),
+            Fin.cons q.2 (fun k => (tb k).map fun t => t.2.2)) with hG
+      -- Step 1: reduce the tail under each head outcome to `G` evaluated at the head's read.
+      refine Eq.trans (evalDist_bind_congr_dist _ (fun a ha => ?_))
+        (b := 𝒟[(simulateQ (fischlinImpl ρ b M)
+            (fischlinSearchAux σ pk sk (sc 0) msg comList (e 0)
+              (FinEnum.toList Chal) none)).run cache
+          >>= fun a => G (a.1, a.2 (searchRecord ρ M pk msg comList (e 0) a.1))]) ?head
+      · -- Inner equality at a fixed head outcome `a = (out0, c1)`.
+        -- The head's output cache `a.2` is fresh on every tail record (its `rep` lies in
+        -- `image (e ∘ succ)`, which avoids `e 0` by injectivity; the head only caches rep-`e 0`).
+        have ha2fresh : ∀ (k : Fin n) (ω : Chal) (resp : Resp),
+            a.2 (⟨pk, msg, comList, e k.succ, ω, resp⟩ :
+              FischlinROInput Stmt Commit Chal Resp ρ M) = none := by
+          intro k ω resp
+          rw [fischlinSearch_run_preserves_offrep σ ρ b M pk sk (sc 0) msg comList (e 0)
+            (FinEnum.toList Chal) none cache a.1 a.2 (by simpa using ha) _
+            (fun h => Fin.succ_ne_zero k (he (by simpa using h.symm)).symm)]
+          exact hfresh k.succ ω resp
+        rw [hG]
+        refine Eq.trans (evalDist_bind_congr_dist _ (fun a_1 ha_1 => ?_))
+          (b := 𝒟[(simulateQ (fischlinImpl ρ b M)
+                (Fin.mOfFn n fun i =>
+                  fischlinSearchAux σ pk sk (sc i.succ) msg comList (e i.succ)
+                      (FinEnum.toList Chal) none >>= fun result =>
+                    pure (toSig i.succ result))).run a.2
+              >>= fun a_1 => pure
+                (Fin.cons (toSig 0 a.1) a_1.1,
+                  Fin.cons (a.2 (searchRecord ρ M pk msg comList (e 0) a.1))
+                    (fun k => a_1.2 (⟨pk, msg, comList, e k.succ, (a_1.1 k).2.1, (a_1.1 k).2.2⟩ :
+                      FischlinROInput Stmt Commit Chal Resp ρ M)))]) ?tailmap
+        · -- The per-`a_1` `pure` equality: split the read-vector and discharge the head read.
+          refine congrArg evalDist (congrArg pure (Prod.ext rfl (funext fun j => ?_)))
+          refine Fin.cases ?_ (fun k => ?_) j
+          · exact (@Fin.cons_zero n (fun _ => Commit × Chal × Resp) (toSig 0 a.1) a_1.1) ▸
+              hrec a.1 ▸
+              searchVec_run_preserves_offrep σ ρ b M n (fun i => e i.succ) pk sk msg
+                (fun i => sc i.succ) comList (fun i => toSig i.succ) a.2 a_1 ha_1
+                (searchRecord ρ M pk msg comList (e 0) a.1)
+                (fun j => by
+                  rcases a.1 with _ | ⟨ω, resp⟩ <;>
+                    exact fun h => Fin.succ_ne_zero j (he (by simpa [searchRecord] using h)).symm)
+          · rfl
+        case tailmap =>
+          have hih := ih (fun i => e i.succ)
+            (fun x y hxy => Fin.succ_injective n (he hxy))
+            (fun i => sc i.succ) (fun i => toSig i.succ)
+            (fun j o => htoSig j.succ o) a.2 ha2fresh
+          -- The shared outer reconstruction map: prepend the head transcript and read.
+          have key := evalDist_map_eq_of_evalDist_eq hih
+            (fun p : (Fin n → Commit × Chal × Resp) × (Fin n → Option (Fin (2 ^ b))) =>
+              ((Fin.cons (toSig 0 a.1) p.1 : Fin (n + 1) → Commit × Chal × Resp),
+                (Fin.cons (a.2 (searchRecord ρ M pk msg comList (e 0) a.1)) p.2 :
+                  Fin (n + 1) → Option (Fin (2 ^ b)))))
+          simp only [Functor.map_map, map_eq_bind_pure_comp, bind_assoc, pure_bind,
+            Function.comp] at key ⊢
+          exact key
+      case head =>
+        -- Couple the head search to the pure-uniform search via the per-repetition bridge, then
+        -- recombine with the cache-independent continuation `G`.
+        rw [← bind_map_left
+          (f := fun a : Option (Chal × Resp) ×
+              (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache =>
+            (a.1, a.2 (searchRecord ρ M pk msg comList (e 0) a.1)))
+          (g := G)]
+        rw [evalDist_bind, evalDist_bind,
+          fischlinSearch_run_cache_eq σ ρ b M pk sk (sc 0) msg comList (e 0)
+            (FinEnum.toList Chal) FinEnum.nodup_toList none cache
+            (fun ω _ resp => hfresh 0 ω resp) (fun _ => hfresh 0 default default)
+            (fun ω resp h hb => absurd hb (by simp))]
+        rw [← evalDist_bind, ← evalDist_bind, bind_map_left]
+        refine congrArg evalDist (bind_congr (fun best0 => bind_congr (fun tb => ?_)))
+        congr 1
+        refine Prod.ext (funext fun j => ?_) (funext fun j => ?_)
+        · refine Fin.cases ?_ (fun k => ?_) j <;> simp [Fin.cons_zero, Fin.cons_succ]
+        · refine Fin.cases ?_ (fun k => ?_) j <;> simp [Fin.cons_zero, Fin.cons_succ]
 
 /-- **Search-vector cache coupling.** Running the `ρ` per-repetition searches (each packaged into a
 transcript by `toSig`) under the lazy random-oracle on a cache that is fresh for every record,
