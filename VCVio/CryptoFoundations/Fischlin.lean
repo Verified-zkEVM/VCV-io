@@ -9,6 +9,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.Coercions.Add
@@ -1050,6 +1051,41 @@ private lemma fischlinUnifSearch_probEvent_minGt_le
         | some t =>
             obtain ⟨ω', resp', h'⟩ := t
             by_cases hlt : h.val < h'.val <;> simp [Option.map, hlt]
+
+/-- The full simulation implementation (`unifFwdImpl + randomOracle`) interpreting the Fischlin
+random-oracle world into `StateT QueryCache ProbComp`. This is definitionally the implementation
+used by the bundled `withStateOracle` runtime. -/
+@[reducible] private noncomputable def fischlinImpl :
+    QueryImpl (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)
+      (StateT (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache ProbComp) :=
+  unifFwdImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+    + randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)
+
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- The Fischlin runtime denotes a surface computation by simulating it with `fischlinImpl`
+starting from the empty cache and discarding the final cache. -/
+private lemma runtime_evalDist_eq
+    {α : Type} (mx : OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M) α) :
+    (runtime ρ b M).evalDist mx = 𝒟[(simulateQ (fischlinImpl ρ b M) mx).run' ∅] := by
+  unfold runtime ProbCompRuntime.evalDist SPMFSemantics.evalDist SemanticsVia.denote
+  simp only [SPMFSemantics.withStateOracle]
+  rfl
+
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- The Fischlin runtime commutes with binding a lifted `ProbComp` prefix. -/
+private lemma runtime_evalDist_bind_liftComp
+    {α β : Type} (oa : ProbComp α)
+    (rest : α → OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M) β) :
+    (runtime ρ b M).evalDist (liftM oa >>= rest) =
+      𝒟[oa] >>= fun x => (runtime ρ b M).evalDist (rest x) := by
+  classical
+  rw [runtime_evalDist_eq]
+  simp_rw [runtime_evalDist_eq]
+  rw [simulateQ_bind,
+    roSim.run'_liftM_bind
+      (ro := randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)) (oa := oa)
+      (rest := fun x => simulateQ (fischlinImpl ρ b M) (rest x)) (s := ∅)]
+  rw [evalDist_bind]
 
 /-- The pure-probability model game `G` for Fischlin completeness.
 
