@@ -184,5 +184,26 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
   sampleInBall_smul_bound : ∀ (cTilde : CommitHashBytes p) {k : ℕ} (s : RqVec k),
     polyVecBounded s p.eta →
     polyVecNorm (nttOps.coeffScalarVecMul (prims.sampleInBall cTilde) s) ≤ p.beta
+  /-- **Honest sampling of the secret vectors (random-oracle modeling of `ExpandS`/`ExpandSeed`).**
+  Over a uniform `seed`, the derived secrets `(s₁, s₂) = ExpandS((ExpandSeed seed).2.1)` are jointly
+  uniform on `RqVec p.l × RqVec p.k` and independent of the public seed `ρ = (ExpandSeed seed).1`.
+  Concretely, for every continuation `f` taking `(ρ, s₁, s₂)`, sampling the secrets through
+  `ExpandS` produces the same distribution as drawing `s₁`, `s₂` independently and uniformly while
+  keeping the same `ρ`. This is the standard ROM idealization of the `ExpandSeed`/`ExpandS` XOFs and
+  is not derivable from the deterministic `prims`; it is what the MLWE key-swap hop `(H0)` residue
+  requires (see `MLDSA.NMA.nma_keyswap_hop`). -/
+  expandS_honest_sampling : ∀ {γ : Type}
+    [SampleableType (RqVec p.l)] [SampleableType (RqVec p.k)] [IsUniformSpec unifSpec]
+    (f : Bytes 32 → RqVec p.l → RqVec p.k → ProbComp γ),
+    evalDist (do
+        let seed ← $ᵗ (Bytes 32)
+        f (prims.expandSeed seed).1
+          (prims.expandS (prims.expandSeed seed).2.1).1
+          (prims.expandS (prims.expandSeed seed).2.1).2) =
+      evalDist (do
+        let seed ← $ᵗ (Bytes 32)
+        let s₁ ← $ᵗ (RqVec p.l)
+        let s₂ ← $ᵗ (RqVec p.k)
+        f (prims.expandSeed seed).1 s₁ s₂)
 
 end MLDSA

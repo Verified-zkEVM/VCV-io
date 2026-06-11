@@ -256,52 +256,12 @@ theorem idsWithAbort_commitment_recoverable :
 
 end Properties
 
-/-! ### EUF-NMA Security (Lemma 7) -/
+/-! ### EUF-NMA Security (Lemma 7)
 
-section NMASecurity
-
-variable {M : Type}
-  [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [IsUniformSpec unifSpec]
-
-open scoped Classical in
-/-- **NMA Security (Lemma 7, CRYPTO 2023).**
-
-For every EUF-NMA adversary `A` against the ML-DSA scheme (instantiated via
-`FiatShamirWithAbort`), there exist:
-- An MLWE adversary `B` (against `MLWE_{k,l,Sη}`)
-- A SelfTargetMSIS adversary `C` (against `SelfTargetMSIS_{G,k,l+1,ζ}`)
-
-such that:
-
-  `Adv^{EF-NMA}(A) ≤ Adv^{MLWE}_{k,l,Sη}(B) + Adv^{SelfTargetMSIS}_{G,k,l+1,ζ}(C)`
-
-The proof sketch from the paper:
-1. Replace `keygen` with `keygen1` (uniform `t`): the gap is exactly `Adv^{MLWE}(B)`.
-2. Define `H₁(w₁, m) := G(shift_α(w₁), m)` — no loss since `shift_α` is injective.
-3. Extract a SelfTargetMSIS solution from any forgery: the gap is `Adv^{SelfTargetMSIS}(C)`.
-
-where `ζ = max(γ₁ - β, 2γ₂ + 1 + τ · 2^{d-1})` and `Time(A) ≈ Time(B) ≈ Time(C)`. -/
-theorem nma_security
-    (mlwe : LearningWithErrors.Problem (TqMatrix p.k p.l) (RqVec p.l) (RqVec p.k))
-    (stmsis : SelfTargetMSIS.Problem
-      (TqMatrix p.k p.l) (Response p prims)
-      (PublicKey p prims) (M × Commitment p prims) (CommitHashBytes p))
-    (maxAttempts : ℕ)
-    (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
-      (validKeyPair p prims)) :
-    ∀ (adv : SignatureAlg.eufNmaAdv
-      (FiatShamirWithAbort (identificationScheme p prims) hr M maxAttempts)),
-    ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
-      (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
-      adv.advantage
-          (FiatShamirWithAbort.runtime
-            (Commit := Commitment p prims) (Chal := CommitHashBytes p) M) ≤
-        ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
-        SelfTargetMSIS.advantage stmsisReduction := by
-  sorry
-
-end NMASecurity
+The EUF-NMA security theorem `MLDSA.nma_security` is assembled downstream in
+`LatticeCrypto.MLDSA.SecurityNMA`, where the concrete MLWE key-swap distinguisher and the
+SelfTargetMSIS extractor are defined. It composes the MLWE key-swap hop with the SelfTargetMSIS
+extraction bound; see that file for the statement and proof. -/
 
 /-! ### CMA-to-NMA Statistical Loss (Theorem 4) -/
 
