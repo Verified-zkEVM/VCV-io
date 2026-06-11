@@ -275,6 +275,154 @@ private lemma simulateQ_oracleOutputs_succ_run' (N : ℕ) (s : S)
   simp only [simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure, map_bind, map_pure,
     bind_map_left]
 
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- One lazy-random-oracle step of the visited-state chain: sample/recall the answer at `s`, then
+recurse on the returned next-state with the updated cache, prepending the just-visited state `s`. -/
+private lemma simulateQ_oracleVisitedStates_succ_run' (N : ℕ) (s : S)
+    (c : (S →ₒ S × O).QueryCache) :
+    (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+        (oracleVisitedStates (N + 1) s)).run' c =
+      (do
+        let p ← ((S →ₒ S × O).randomOracle s).run c
+        let rest ← (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+          (oracleVisitedStates N p.1.1)).run' p.2
+        pure (s ::ᵥ rest)) := by
+  rw [oracleVisitedStates]
+  simp only [simulateQ_bind, simulateQ_prfIdealQueryImpl_inr, StateT.run'_eq, StateT.run_bind,
+    map_bind]
+  refine bind_congr fun a => ?_
+  obtain ⟨⟨s', out⟩, c'⟩ := a
+  simp only [simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure, map_bind, map_pure,
+    bind_map_left]
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- Cache-miss form of the lazy random oracle on input `s`: a fresh uniform draw `u : S × O`,
+returned together with the cache extended by `s ↦ u`. -/
+private lemma randomOracle_run_of_none (s : S) (c : (S →ₒ S × O).QueryCache) (hc : c s = none) :
+    ((S →ₒ S × O).randomOracle s).run c
+      = (fun u => (u, c.cacheQuery s u)) <$> ($ᵗ (S × O)) := by
+  rw [OracleSpec.randomOracle, QueryImpl.withCaching_run_none _ hc]; rfl
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq S] [DecidableEq O] in
+/-- Sampling a pair uniformly is the same as sampling each coordinate independently. -/
+private lemma uniformSample_prod_eq_bind :
+    ($ᵗ (S × O)) = (do let a ← $ᵗ S; let b ← $ᵗ O; pure (a, b)) := by
+  rw [uniformSample]
+  change ((·, ·) <$> ($ᵗ S) <*> ($ᵗ O)) = _
+  simp [seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [DecidableEq S]
+  [SampleableType S] [Fintype O] [DecidableEq O] in
+/-- A uniform output vector of length `N + 1` decomposes as a uniform head block prepended to a
+uniform vector of length `N`. -/
+private lemma evalDist_uniformSample_vector_succ (N : ℕ) :
+    𝒟[($ᵗ (List.Vector O (N + 1)))] =
+      𝒟[(do let out ← $ᵗ O; let rest ← $ᵗ (List.Vector O N); pure (out ::ᵥ rest))] := by
+  classical
+  haveI : Fintype O := Fintype.ofFinite O
+  refine evalDist_ext fun v => ?_
+  obtain ⟨out, rest, rfl⟩ : ∃ out rest, v = out ::ᵥ rest :=
+    ⟨v.head, v.tail, (List.Vector.cons_head_tail v).symm⟩
+  have hR :
+      Pr[= (out ::ᵥ rest) | (do let o ← $ᵗ O; let r ← $ᵗ (List.Vector O N); pure (o ::ᵥ r))]
+        = Pr[= out | ($ᵗ O)] * Pr[= rest | ($ᵗ (List.Vector O N))] := by
+    rw [probOutput_bind_eq_tsum, tsum_eq_single out]
+    · rw [probOutput_bind_eq_tsum, tsum_eq_single rest]
+      · simp
+      · intro b hb
+        rw [probOutput_pure, if_neg (by simp [List.Vector.eq_cons_iff, Ne.symm hb]), mul_zero]
+    · intro b hb
+      rw [probOutput_bind_eq_tsum, ENNReal.tsum_eq_zero.2 (fun r => by
+        rw [probOutput_pure, if_neg (by simp [List.Vector.eq_cons_iff, Ne.symm hb]),
+          mul_zero]), mul_zero]
+  have hL :
+      Pr[= (out ::ᵥ rest) | ($ᵗ (List.Vector O (N + 1)))]
+        = Pr[= out | ($ᵗ O)] * Pr[= rest | ($ᵗ (List.Vector O N))] := by
+    rw [probOutput_uniformSample, probOutput_uniformSample, probOutput_uniformSample,
+      ← ENNReal.mul_inv (by simp) (by simp)]
+    congr 1
+    rw [← Nat.cast_mul]
+    congr 1
+    simp [card_vector, pow_succ, Nat.mul_comm]
+  rw [hL, hR]
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq S] [DecidableEq O] in
+/-- The reference uniform output vector of length `N + 1`, written as a bind over a uniformly
+sampled pair `p : S × O` whose first coordinate is discarded and whose second coordinate is the
+prepended head block. This is the shared-base form used for the identical-until-bad coupling. -/
+private lemma evalDist_uniformSample_vector_succ_pair (N : ℕ) :
+    𝒟[($ᵗ (List.Vector O (N + 1)))] =
+      𝒟[(do let p ← $ᵗ (S × O); let rest ← $ᵗ (List.Vector O N); pure (p.2 ::ᵥ rest))] := by
+  rw [evalDist_uniformSample_vector_succ, uniformSample_prod_eq_bind]
+  simp only [bind_assoc, pure_bind]
+  refine (evalDist_ext fun v => ?_).symm
+  rw [probOutput_bind_const, probFailure_uniformSample, tsub_zero, one_mul]
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- Cache-miss recursion for the generalized collision experiment. When `s` is uncached, the bad
+event on the length-`N + 1` visited chain splits into the fresh draw at `s` (extending the cache by
+`s`) followed by the bad event on the length-`N` sub-chain run against the extended cache. The
+just-visited state `s` is folded into the cache, so the two bad events match pointwise. -/
+private lemma genCollisionExp_succ_of_none (N : ℕ) (s : S) (c : (S →ₒ S × O).QueryCache)
+    (hc : c s = none) :
+    genCollisionExp (N + 1) s c =
+      (do let p ← $ᵗ (S × O); genCollisionExp N p.1 (c.cacheQuery s p)) := by
+  rw [genCollisionExp, simulateQ_oracleVisitedStates_succ_run', randomOracle_run_of_none s c hc]
+  simp only [map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp]
+  rw [uniformSample_prod_eq_bind]
+  simp only [bind_assoc, pure_bind]
+  refine bind_congr fun a => bind_congr fun b => ?_
+  rw [genCollisionExp]
+  refine bind_congr fun rest => ?_
+  congr 1
+  rw [decide_eq_decide, List.Vector.toList_cons]
+  -- pointwise equivalence of the two bad events, using `c s = none`.
+  have hkey : ∀ x : S,
+      (c.cacheQuery s (a, b)).isCached x = true ↔ (x = s ∨ c.isCached x = true) := by
+    intro x
+    by_cases hx : x = s
+    · subst hx; simp
+    · rw [QueryCache.isCached_cacheQuery_of_ne c (a, b) hx]; simp [hx]
+  have hcs : c.isCached s = false := by simp [QueryCache.isCached, hc]
+  have hrest : (∃ x ∈ rest.toList, (c.cacheQuery s (a, b)).isCached x = true)
+      ↔ (s ∈ rest.toList ∨ ∃ x ∈ rest.toList, c.isCached x = true) := by
+    constructor
+    · rintro ⟨x, hx, hxc⟩
+      rcases (hkey x).1 hxc with rfl | hc'
+      · exact Or.inl hx
+      · exact Or.inr ⟨x, hx, hc'⟩
+    · rintro (hs | ⟨x, hx, hxc⟩)
+      · exact ⟨s, hs, (hkey s).2 (Or.inl rfl)⟩
+      · exact ⟨x, hx, (hkey x).2 (Or.inr hxc)⟩
+  have hhead : (∃ x ∈ (s :: rest.toList), c.isCached x = true)
+      ↔ (∃ x ∈ rest.toList, c.isCached x = true) := by
+    constructor
+    · rintro ⟨x, hx, hxc⟩
+      rw [List.mem_cons] at hx
+      rcases hx with rfl | hx
+      · rw [hcs] at hxc; exact absurd hxc (by simp)
+      · exact ⟨x, hx, hxc⟩
+    · rintro ⟨x, hx, hxc⟩; exact ⟨x, List.mem_cons_of_mem _ hx, hxc⟩
+  rw [hrest, List.nodup_cons, hhead]
+  tauto
+
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- Cache-hit determinism for the generalized collision experiment. When `s` is already cached, the
+visited chain of length `N + 1` starts at `s`, which lies in the chain and is cached, so the bad
+event always fires and the experiment returns `true` with probability one. -/
+private lemma probOutput_genCollisionExp_succ_of_isCached (N : ℕ) (s : S)
+    (c : (S →ₒ S × O).QueryCache) (hc : c.isCached s = true) :
+    Pr[= true | genCollisionExp (N + 1) s c] = 1 := by
+  refine probOutput_eq_one_of_support_subset_singleton ?_ ?_
+  · simp [genCollisionExp]
+  · intro x hx
+    rw [genCollisionExp, simulateQ_oracleVisitedStates_succ_run'] at hx
+    simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff,
+      exists_prop] at hx
+    obtain ⟨p, ⟨_, -, rest, -, hpeq⟩, rfl⟩ := hx
+    subst hpeq
+    rw [List.Vector.toList_cons, decide_eq_true (Or.inr ⟨s, List.mem_cons_self, hc⟩)]
+
 omit [DecidableEq O] in
 /-- **Generalized per-seed core coupling.** For an arbitrary starting cache `c`, the total
 variation distance between the lazy-random-oracle output chain (run from cache `c`) and a
@@ -295,7 +443,57 @@ lemma tvDist_seedOutputs_le_collision_gen (N : ℕ) (s : S)
     refine evalDist_ext fun y => ?_
     simp
   | succ N ih =>
-    sorry
+    cases hc : c.isCached s with
+    | false =>
+      -- Cache miss: identical-until-bad coupling.
+      have hcnone : c s = none := by
+        simpa [QueryCache.isCached] using hc
+      -- Both computations are binds over a freshly sampled pair `p : S × O`, sharing the head
+      -- block `p.2` and differing only in the recursive tail.
+      have hLHS :
+          (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+              (oracleOutputs (N + 1) s)).run' c =
+            (do let p ← $ᵗ (S × O);
+                (fun v => p.2 ::ᵥ v) <$> (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+                  (oracleOutputs N p.1)).run' (c.cacheQuery s p)) := by
+        rw [simulateQ_oracleOutputs_succ_run', randomOracle_run_of_none s c hcnone, bind_map_left]
+        simp only [map_eq_bind_pure_comp, bind_pure_comp]
+      have hRHS :
+          𝒟[($ᵗ (List.Vector O (N + 1)))] =
+            𝒟[(do let p ← $ᵗ (S × O); (fun v => p.2 ::ᵥ v) <$> ($ᵗ (List.Vector O N)))] := by
+        rw [evalDist_uniformSample_vector_succ_pair (S := S) N]
+        rfl
+      -- Rewrite the goal as a TV distance between two binds over the shared pair `p : S × O`.
+      rw [hLHS]
+      rw [show tvDist
+          (($ᵗ (S × O)) >>= fun p =>
+              (fun v => p.2 ::ᵥ v) <$> (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+                (oracleOutputs N p.1)).run' (c.cacheQuery s p))
+          ($ᵗ (List.Vector O (N + 1))) =
+          tvDist
+            (($ᵗ (S × O)) >>= fun p =>
+                (fun v => p.2 ::ᵥ v) <$> (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+                  (oracleOutputs N p.1)).run' (c.cacheQuery s p))
+            (($ᵗ (S × O)) >>= fun p => (fun v => p.2 ::ᵥ v) <$> ($ᵗ (List.Vector O N))) from by
+        unfold tvDist; rw [hRHS]]
+      refine le_trans (tvDist_bind_left_le _ _ _) ?_
+      -- Bound each per-pair TV distance by the per-pair generalized collision probability.
+      rw [genCollisionExp_succ_of_none N s c hcnone, probOutput_bind_eq_tsum,
+        ENNReal.tsum_toReal_eq (fun p => ENNReal.mul_ne_top probOutput_ne_top probOutput_ne_top)]
+      refine Summable.tsum_le_tsum (fun p => ?_) ?_ ?_
+      · rw [ENNReal.toReal_mul]
+        refine mul_le_mul_of_nonneg_left ?_ ENNReal.toReal_nonneg
+        exact le_trans (tvDist_map_le (fun v => p.2 ::ᵥ v) _ _) (ih p.1 (c.cacheQuery s p))
+      · refine Summable.of_nonneg_of_le
+          (fun p => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _))
+          (fun p => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _))
+          (ENNReal.summable_toReal tsum_probOutput_ne_top)
+      · exact ENNReal.summable_toReal
+          (by rw [← probOutput_bind_eq_tsum]; exact probOutput_ne_top)
+    | true =>
+      -- Cache hit: the bad event already fired, so the bound is trivially `1`.
+      rw [probOutput_genCollisionExp_succ_of_isCached N s c hc, ENNReal.toReal_one]
+      exact tvDist_le_one _ _
 
 omit [DecidableEq O] in
 /-- **Per-seed core coupling.** For a fixed initial state, the total variation distance between
