@@ -1469,6 +1469,26 @@ private lemma fischlinSearch_run_preserves_offrep (pk : Stmt) (sk : Wit) (sc : P
           exact ih _ _ hmem
 
 omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- Coordinatewise support membership for an independent product `Fin.mOfFn n g`: every value
+in its support has each component in the support of the corresponding factor. -/
+private lemma mem_support_mOfFn {α : Type} (n : ℕ) (g : Fin n → ProbComp α)
+    (v : Fin n → α) (hv : v ∈ support (Fin.mOfFn n g)) (i : Fin n) :
+    v i ∈ support (g i) := by
+  induction n with
+  | zero => exact i.elim0
+  | succ n ih =>
+      rw [Fin.mOfFn, mem_support_bind_iff] at hv
+      obtain ⟨a, ha, hv⟩ := hv
+      rw [mem_support_bind_iff] at hv
+      obtain ⟨rest, hrest, hv⟩ := hv
+      simp only [support_pure, Set.mem_singleton_iff] at hv
+      subst hv
+      refine Fin.cases ?_ (fun j => ?_) i
+      · simpa using ha
+      · rw [Fin.cons_succ]
+        exact ih (fun j => g j.succ) rest hrest j
+
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
 /-- `fischlinUnifSearch` keeps a `some` best whenever it starts from one or the challenge list is
 non-empty: in support, every outcome of a search seeded with a `some` best, or run over a non-empty
 list, is itself `some`. -/
@@ -1746,25 +1766,6 @@ private lemma fischlinUnifSearch_mem_support {Stmt Wit Commit PrvState Chal Resp
             · simp only [hlt, if_false, Option.some.injEq, Prod.mk.injEq] at heq
               obtain ⟨rfl, rfl, rfl⟩ := heq
               exact hbest _ _ _ hb.symm
-
-/-- Coordinatewise support membership for an independent product `Fin.mOfFn n g`: every value
-in its support has each component in the support of the corresponding factor. -/
-private lemma mem_support_mOfFn {α : Type} (n : ℕ) (g : Fin n → ProbComp α)
-    (v : Fin n → α) (hv : v ∈ support (Fin.mOfFn n g)) (i : Fin n) :
-    v i ∈ support (g i) := by
-  induction n with
-  | zero => exact i.elim0
-  | succ n ih =>
-      rw [Fin.mOfFn, mem_support_bind_iff] at hv
-      obtain ⟨a, ha, hv⟩ := hv
-      rw [mem_support_bind_iff] at hv
-      obtain ⟨rest, hrest, hv⟩ := hv
-      simp only [support_pure, Set.mem_singleton_iff] at hv
-      subst hv
-      refine Fin.cases ?_ (fun j => ?_) i
-      · simpa using ha
-      · rw [Fin.cons_succ]
-        exact ih (fun j => g j.succ) rest hrest j
 
 /-- Pointwise corollary of perfect completeness: on a valid `(pk, sk)` pair, for any commitment
 `(pc, sc)` in the support of `σ.commit`, any challenge `ω`, and any response `resp` in the support
