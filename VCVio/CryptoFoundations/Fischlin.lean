@@ -1361,6 +1361,69 @@ private lemma fischlinSearch_run_cache_eq (pk : Stmt) (sk : Wit) (sc : PrvState)
                 · rw [QueryCache.cacheQuery_of_ne cache x heq, hbe]
         exact ih (List.nodup_cons.mp hcs).2 _ _ hfresh' hdef' hbest'
 
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- Simulating a `Fin.mOfFn` of lifted `ProbComp` computations leaves the cache untouched: the
+result is the pure-probability product paired with the unchanged cache. Lifted queries are
+forwarded by `unifFwdImpl` without consulting or modifying the random-oracle cache. -/
+private lemma run_mOfFn_liftM {α : Type} (n : ℕ) (g : Fin n → ProbComp α)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache) :
+    (simulateQ (fischlinImpl ρ b M)
+        (Fin.mOfFn n fun i => (liftM (g i) :
+          OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M) α))).run cache
+      = (fun v => (v, cache)) <$> Fin.mOfFn n g := by
+  induction n generalizing cache with
+  | zero => simp [Fin.mOfFn, StateT.run_pure]
+  | succ n ih =>
+      rw [Fin.mOfFn, Fin.mOfFn, simulateQ_bind, StateT.run_bind,
+        roSim.run_liftM (ro := randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)),
+        map_bind, bind_map_left]
+      refine bind_congr (fun a => ?_)
+      rw [simulateQ_bind, StateT.run_bind, ih, map_bind, bind_map_left]
+      refine bind_congr (fun rest => ?_)
+      rw [simulateQ_pure, StateT.run_pure, map_pure]
+
+/-- **Cross-repetition cache threading (residual).** Given a key pair `(pk, sk)` and a vector of
+commitments `commits`, simulating the `ρ` per-repetition searches of `sign` followed by the `ρ`
+verifier re-queries under the lazy random-oracle on the empty cache produces the same `Bool`
+distribution as `modelGame`'s combinatorial verdict computed from `fischlinUnifSearch`.
+
+This is the one remaining step of the completeness surgery. Its content is:
+* the `ρ` searches of `Fin.mOfFn` thread the cache, and since repetition `i`'s records all carry
+  `rep = i`, they never collide across repetitions, so `searchFresh` holds at each step
+  (`fischlinSearch_run_cache_eq` is then the per-repetition bridge);
+* each verifier re-query `⟨pk, msg, comList, i, ωᵢ, respᵢ⟩` is a cache hit returning the kept hash
+  `(bests i).2.2`, matching `modelGame`'s direct read;
+* the `allVerified`/`hashSum` fold is computed identically in both games. -/
+private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
+    (commits : Fin ρ → Commit × PrvState) :
+    𝒟[(simulateQ (fischlinImpl ρ b M)
+        (do
+          let comVec : Fin ρ → Commit := fun i => (commits i).1
+          let comList := List.ofFn comVec
+          let sig ← Fin.mOfFn ρ fun i => do
+            let result ←
+              fischlinSearchAux σ pk sk (commits i).2 msg comList i (FinEnum.toList Chal)
+                (none : Option (Chal × Resp × Fin (2 ^ b)))
+            match result with
+            | some (ω, resp) => pure ((comVec i, ω, resp) : Commit × Chal × Resp)
+            | none => pure (comVec i, default, default)
+          (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+            σ hr ρ b S M).verify pk msg sig)).run' ∅]
+      = 𝒟[do
+          let comVec : Fin ρ → Commit := fun i => (commits i).1
+          let bests : Fin ρ → Option (Chal × Resp × Fin (2 ^ b)) ←
+            Fin.mOfFn ρ fun i =>
+              fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal)
+                (none : Option (Chal × Resp × Fin (2 ^ b)))
+          let allVerified := (List.finRange ρ).all fun i =>
+            match bests i with
+            | some (ω, resp, _) => σ.verify pk (comVec i) ω resp
+            | none => σ.verify pk (comVec i) default default
+          let hashSum := (List.finRange ρ).foldl
+            (fun acc i => acc + (match bests i with | some (_, _, h) => h.val | none => 0)) 0
+          pure (allVerified && decide (hashSum ≤ S))] := by
+  sorry
+
 /-- **Residual: full-game distribution surgery.** After collapsing the random-oracle runtime to a
 `StateT`-simulation on the empty cache (`runtime_evalDist_eq`), the entire Fischlin game
 `keygen >>= sign >>= verify`, observed as a `ProbComp Bool` via `StateT.run'`, has the same
@@ -1385,7 +1448,17 @@ private lemma fischlin_game_run'_eq_modelGame (msg : M) :
           (Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
             σ hr ρ b S M).verify pk msg sig)) ∅]
       = 𝒟[modelGame σ hr ρ b S] := by
-  sorry
+  simp only [Fischlin, fischlinImpl, bind_assoc]
+  rw [simulateQ_bind, roSim.run'_liftM_bind
+    (ro := randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M))]
+  rw [modelGame, evalDist_bind, evalDist_bind]
+  refine bind_congr (fun pksk => ?_)
+  obtain ⟨pk, sk⟩ := pksk
+  simp only []
+  rw [simulateQ_bind, StateT.run'_bind', run_mOfFn_liftM, bind_map_left, evalDist_bind,
+    evalDist_bind]
+  refine bind_congr (fun commits => ?_)
+  exact sign_verify_run_eq σ hr ρ b S M pk sk msg commits
 
 /-- **B1 (random-oracle surgery).** The Fischlin random-oracle completeness game has the same
 probability of accepting as the pure-probability model game `modelGame`.
