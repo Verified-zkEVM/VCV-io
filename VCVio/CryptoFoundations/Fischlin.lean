@@ -1094,6 +1094,52 @@ private lemma fischlin_game_eq_model (msg : M) :
       = Pr[= true | modelGame σ hr ρ b S] := by
   sorry
 
+/-- Marginalizing a single coordinate `i` out of an independent product `Fin.mOfFn n g`:
+the probability that the `i`-th component satisfies `p` is at most the probability that the
+single computation `g i` satisfies `p`. The other coordinates integrate out to mass `≤ 1`,
+so the inequality may be strict when those computations can fail. -/
+private lemma probEvent_mOfFn_coord_le {α : Type} (n : ℕ) (g : Fin n → ProbComp α)
+    (i : Fin n) (p : α → Prop) :
+    Pr[fun v => p (v i) | Fin.mOfFn n g] ≤ Pr[fun x => p x | g i] := by
+  classical
+  induction n with
+  | zero => exact i.elim0
+  | succ n ih =>
+      rw [Fin.mOfFn]
+      refine Fin.cases ?_ (fun j => ?_) i
+      · -- coordinate `0`: the head `a ← g 0` determines `v 0`; the tail integrates to `≤ 1`.
+        rw [probEvent_bind_eq_tsum]
+        calc ∑' a, Pr[= a | g 0]
+                * Pr[fun v => p (v 0) | Fin.mOfFn n (fun j => g j.succ) >>=
+                    fun rest => (pure (Fin.cons a rest) : ProbComp (Fin (n+1) → α))]
+            ≤ ∑' a, Pr[= a | g 0] * (if p a then (1 : ℝ≥0∞) else 0) := by
+                refine ENNReal.tsum_le_tsum (fun a => mul_le_mul' le_rfl ?_)
+                refine probEvent_bind_le_of_forall_le (fun rest _ => ?_)
+                rw [probEvent_pure_eq_indicator]
+                by_cases hp : p a <;>
+                  simp [Set.indicator, Set.mem_setOf_eq, Fin.cons_zero, hp]
+          _ = Pr[fun x => p x | g 0] := by
+                rw [probEvent_eq_tsum_ite]
+                refine tsum_congr (fun a => ?_)
+                split <;> simp_all
+      · -- coordinate `j+1`: `v (j+1) = rest j`; peel the head and recurse on the tail.
+        rw [probEvent_bind_eq_tsum]
+        calc ∑' a, Pr[= a | g 0]
+                * Pr[fun v => p (v j.succ) | Fin.mOfFn n (fun j => g j.succ) >>=
+                    fun rest => (pure (Fin.cons a rest) : ProbComp (Fin (n+1) → α))]
+            ≤ ∑' a, Pr[= a | g 0] * Pr[fun x => p x | g j.succ] := by
+                refine ENNReal.tsum_le_tsum (fun a => mul_le_mul' le_rfl ?_)
+                refine le_trans (le_of_eq ?_) (ih (fun j => g j.succ) j)
+                rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
+                refine tsum_congr (fun rest => ?_)
+                rw [probEvent_pure_eq_indicator]
+                by_cases hp : p (rest j) <;>
+                  simp [Set.indicator, Set.mem_setOf_eq, Fin.cons_succ, hp]
+          _ ≤ Pr[fun x => p x | g j.succ] := by
+                rw [ENNReal.tsum_mul_right]
+                exact le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl)
+                  (le_of_eq (one_mul _))
+
 /-- **B2 (probability bound).** The model game rejects with probability at most
 `completenessError ρ b S (FinEnum.card Chal)`.
 
