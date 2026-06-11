@@ -1013,6 +1013,44 @@ private def fischlinUnifSearch {Stmt Wit Commit PrvState Chal Resp : Type}
           if h.val < h'.val then some (ω, resp, h) else some (ω', resp', h')
       fischlinUnifSearch σ pk sk sc rest newBest
 
+/-- **Per-repetition tail bound.** The probability that `fischlinUnifSearch`'s kept hash exceeds
+`k` is at most the corresponding `minUnifAux` tail probability. The `σ.respond` draws are
+discarded by the hash projection, and they can only lose probability mass through failure, so the
+hash-only model `minUnifAux` dominates. Proved by induction on the challenge list. -/
+private lemma fischlinUnifSearch_probEvent_minGt_le
+    {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool} {b : ℕ}
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (pk : Stmt) (sk : Wit) (sc : PrvState) (k : ℕ)
+    (cs : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
+    Pr[fun o => minGt k (o.map (fun t => t.2.2)) | fischlinUnifSearch σ pk sk sc cs best]
+      ≤ Pr[fun o => minGt k o | minUnifAux b cs.length (best.map (fun t => t.2.2))] := by
+  induction cs generalizing best with
+  | nil =>
+      simp only [fischlinUnifSearch, minUnifAux]
+      rw [probEvent_pure_eq_indicator, probEvent_pure_eq_indicator]
+      refine le_of_eq ?_
+      by_cases h : minGt k (Option.map (fun t => t.2.2) best) <;>
+        simp [Set.indicator, Set.mem_setOf_eq, h]
+  | cons ω rest ih =>
+      simp only [fischlinUnifSearch, minUnifAux]
+      refine probEvent_bind_le_of_forall_le (fun resp _ => ?_)
+      rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
+      refine ENNReal.tsum_le_tsum (fun h => ?_)
+      refine mul_le_mul' le_rfl ?_
+      by_cases hh : h.val = 0
+      · simp only [hh, if_true]
+        rw [probEvent_pure_eq_indicator, probEvent_pure_eq_indicator]
+        refine le_of_eq ?_
+        simp [Set.indicator, Set.mem_setOf_eq, minGt]
+      · simp only [hh, if_false]
+        refine le_trans (ih _) (le_of_eq ?_)
+        congr 1
+        cases best with
+        | none => simp [Option.map]
+        | some t =>
+            obtain ⟨ω', resp', h'⟩ := t
+            by_cases hlt : h.val < h'.val <;> simp [Option.map, hlt]
+
 /-- The pure-probability model game `G` for Fischlin completeness.
 
 Mirrors `keygen >>= sign >>= verify`, but the prover's per-repetition search uses
