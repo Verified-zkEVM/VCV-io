@@ -2445,7 +2445,7 @@ private lemma smallSumCount_le : smallSumCount ρ b S ≤ (S + 1) * Nat.choose (
     simp only [Finset.mem_image, Finset.mem_filter, Finset.mem_univ, true_and] at hg
     obtain ⟨v, hv, rfl⟩ := hg
     simp only [hT, Finset.mem_biUnion, Finset.mem_range, Finset.mem_piAntidiag,
-      Finset.mem_univ, true_and, implies_true, and_true]
+      Finset.mem_univ, implies_true, and_true]
     exact ⟨∑ i, (v i).val, by omega, rfl⟩
   -- The image has the same cardinality (the map `v ↦ Fin.val ∘ v` is injective).
   have hinj : Set.InjOn (fun v : Fin ρ → Fin (2 ^ b) => fun i => (v i).val)
@@ -2491,6 +2491,7 @@ private lemma knowledgeSoundness_badEvent_le
       ≤ (↑(Q + 1) : ℝ≥0∞) * ↑(smallSumCount ρ b S) / ((↑(2 ^ b) : ℝ≥0∞) ^ ρ) := by
   sorry
 
+omit [SampleableType Chal] in
 /-- Knowledge soundness of the Fischlin transform via online (straight-line) extraction
 (Fischlin 2005, Theorem 2).
 
