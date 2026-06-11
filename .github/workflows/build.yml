@@ -39,6 +39,9 @@ jobs:
       - name: Check for all imports in LatticeCrypto
         run: lake exe mk_all --lib LatticeCrypto --check
 
+      - name: Check for all imports in HashSig
+        run: lake exe mk_all --lib HashSig --check
+
       - name: Check for all imports in Examples
         run: lake exe mk_all --lib Examples --check
 
@@ -73,8 +76,8 @@ jobs:
           echo "BUILD_TIMING_SOURCE_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_SOURCE_BRANCH=${{ github.head_ref || github.ref_name }}" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_BASE_REF=" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio FFI LatticeCrypto Examples VCVioWidgets Interop" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio FFI LatticeCrypto Examples VCVioWidgets Interop" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio FFI LatticeCrypto HashSig Examples VCVioWidgets Interop" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio FFI LatticeCrypto HashSig Examples VCVioWidgets Interop" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_NAME=Smoke test" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_COMMAND=lake env lean VCVioTest/Smoke.lean" >> "$GITHUB_ENV"
           {
@@ -116,6 +119,7 @@ jobs:
             --path-prefix VCVio/ \
             --path-prefix FFI/ \
             --path-prefix LatticeCrypto/ \
+            --path-prefix HashSig/ \
             --path-prefix Examples/ \
             --path-prefix VCVioWidgets/ \
             --path-prefix Interop/ \
@@ -123,6 +127,7 @@ jobs:
             --path-prefix VCVio.lean \
             --path-prefix FFI.lean \
             --path-prefix LatticeCrypto.lean \
+            --path-prefix HashSig.lean \
             --path-prefix Examples.lean \
             --path-prefix VCVioWidgets.lean \
             --path-prefix Interop.lean \
@@ -136,6 +141,10 @@ jobs:
         run: |
           bash scripts/build_timing_report.sh run test_path "$BUILD_TIMING_RESULTS" -- \
             bash -eo pipefail -c 'lake env lean VCVioTest/Smoke.lean'
+      - name: Run SLH-DSA-SHA2-128-24 differential KAT
+        run: lake exe slhdsa_kat
+      - name: Run SLH-DSA-C13 differential KAT
+        run: lake exe slhdsa_c13_kat
       # - name: Run ML-KEM tests
       #   run: |
       #     .lake/build/bin/mlkem_test
