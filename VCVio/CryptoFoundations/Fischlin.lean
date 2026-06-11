@@ -1210,6 +1210,157 @@ private lemma fischlinSearch_run'_eq (pk : Stmt) (sk : Wit) (sc : PrvState)
             (hfresh ω' (List.mem_cons_of_mem _ hω') r)
         exact ih (List.nodup_cons.mp hcs).2 _ _ hfresh'
 
+/-- The random-oracle record that the Fischlin verifier re-queries for the transcript projected
+from a search result `p : Option (Chal × Resp)`. On `none` (an unreachable branch when the
+challenge list is nonempty, since the search always keeps a best) we return a dummy `default`
+record; it is never consulted in the games below. -/
+private def searchRecord (pk : Stmt) (msg : M) (comList : List Commit) (i : Fin ρ)
+    [Inhabited Chal] [Inhabited Resp]
+    (p : Option (Chal × Resp)) : FischlinROInput Stmt Commit Chal Resp ρ M :=
+  match p with
+  | some (ω, resp) => ⟨pk, msg, comList, i, ω, resp⟩
+  | none => ⟨pk, msg, comList, i, default, default⟩
+
+omit [FinEnum Chal] [SampleableType Chal] in
+/-- Reading the final cache at the record of a kept best `o` returns `o`'s hash, provided the
+cache already stores that hash for the corresponding record. A `none` best maps to a `none` read
+under the dummy default record (this branch is unreachable for nonempty challenge lists). -/
+private lemma searchRecord_cache_eq
+    (pk : Stmt) (msg : M) (comList : List Commit) (i : Fin ρ)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (o : Option (Chal × Resp × Fin (2 ^ b)))
+    (hdef : o = none → cache (⟨pk, msg, comList, i, default, default⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M) = none)
+    (ho : ∀ ω resp h, o = some (ω, resp, h) →
+      cache (⟨pk, msg, comList, i, ω, resp⟩ : FischlinROInput Stmt Commit Chal Resp ρ M)
+        = some h) :
+    cache (searchRecord ρ M pk msg comList i (o.map fun t => (t.1, t.2.1)))
+      = o.map fun t => t.2.2 := by
+  cases o with
+  | none =>
+      simp only [Option.map_none, searchRecord]
+      exact hdef rfl
+  | some t =>
+      obtain ⟨ω, resp, h⟩ := t
+      simp only [Option.map_some, searchRecord]
+      exact ho ω resp h rfl
+
+omit [FinEnum Chal] [SampleableType Chal] in
+/-- **Per-repetition search bridge — joint output and cached hash.**
+Cache-carrying refinement of `fischlinSearch_run'_eq`: running the search under the lazy
+random-oracle simulation, the joint distribution of the projected transcript together with the
+final cache's value at that transcript's record equals the pure-uniform search's transcript paired
+with its kept hash (wrapped in `some`).
+
+The proof mirrors `fischlinSearch_run'_eq`. The extra content is the cache value at the chosen
+record: on early exit the record was just cached with the returned hash (`cacheQuery_self`); on the
+recursive branch the chosen record lies in `rest`, was cached deeper, and the freshly cached `ω`
+record is distinct, so `cacheQuery_of_ne` preserves the deeper value. -/
+private lemma fischlinSearch_run_cache_eq (pk : Stmt) (sk : Wit) (sc : PrvState)
+    (msg : M) (comList : List Commit) (i : Fin ρ) (cs : List Chal)
+    (hcs : cs.Nodup)
+    (best : Option (Chal × Resp × Fin (2 ^ b)))
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hfresh : searchFresh ρ b M pk msg comList i cs cache)
+    (hdef : best = none → cache (⟨pk, msg, comList, i, default, default⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M) = none)
+    (hbest : ∀ ω resp h, best = some (ω, resp, h) →
+      cache (⟨pk, msg, comList, i, ω, resp⟩ : FischlinROInput Stmt Commit Chal Resp ρ M)
+        = some h) :
+    𝒟[(fun p => (p.1, p.2 (searchRecord ρ M pk msg comList i p.1))) <$>
+        (simulateQ (fischlinImpl ρ b M)
+          (fischlinSearchAux σ pk sk sc msg comList i cs best)).run cache]
+      = 𝒟[(fun r => (r.map (fun (ω, resp, _) => (ω, resp)),
+            r.map (fun (ω, resp, h) => h))) <$>
+          fischlinUnifSearch σ pk sk sc cs best] := by
+  induction cs generalizing best cache with
+  | nil =>
+      simp only [fischlinSearchAux, fischlinUnifSearch, simulateQ_pure, StateT.run_pure,
+        map_pure, map_pure]
+      rw [searchRecord_cache_eq ρ b M pk msg comList i cache best hdef hbest]
+  | cons ω rest ih =>
+      rw [fischlinSearchAux, fischlinUnifSearch, simulateQ_bind, StateT.run_bind,
+        roSim.run_liftM
+          (ro := randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)),
+        bind_map_left, map_bind, map_bind]
+      rw [evalDist_bind, evalDist_bind]
+      refine congrArg (𝒟[σ.respond pk sk sc ω] >>= ·) (funext fun resp => ?_)
+      rw [simulateQ_bind, roSim.simulateQ_HasQuery_query, StateT.run_bind]
+      -- Cache miss at the fresh record `⟨pk,msg,comList,i,ω,resp⟩`.
+      have hc : cache (⟨pk, msg, comList, i, ω, resp⟩ :
+          FischlinROInput Stmt Commit Chal Resp ρ M) = none :=
+        hfresh ω (by simp) resp
+      rw [QueryImpl.withCaching_run_none (so := uniformSampleImpl) hc]
+      simp only [uniformSampleImpl, map_bind, bind_map_left]
+      rw [evalDist_bind, evalDist_bind]
+      refine congrArg (𝒟[$ᵗ Fin (2 ^ b)] >>= ·) (funext fun x => ?_)
+      by_cases hx : x.val = 0
+      · simp only [hx, if_true, simulateQ_pure, StateT.run_pure, map_pure, map_pure,
+          Option.map_some, searchRecord, QueryCache.cacheQuery_self]
+      · simp only [hx, if_false]
+        -- Recurse: freshness preserved and the new best's record is now cached at `x`.
+        have hfresh' : searchFresh ρ b M pk msg comList i rest
+            (cache.cacheQuery ⟨pk, msg, comList, i, ω, resp⟩ x) := by
+          intro ω' hω' r
+          have hne : (⟨pk, msg, comList, i, ω', r⟩ :
+              FischlinROInput Stmt Commit Chal Resp ρ M)
+              ≠ ⟨pk, msg, comList, i, ω, resp⟩ := by
+            intro hEq
+            have : ω' = ω := congrArg FischlinROInput.chal hEq
+            exact (List.nodup_cons.mp hcs).1 (this ▸ hω')
+          exact (QueryCache.cacheQuery_of_ne cache x hne).trans
+            (hfresh ω' (List.mem_cons_of_mem _ hω') r)
+        -- The updated best is always `some`, so the `none`-case obligation is vacuous.
+        have hdef' : (match best with
+              | none => some (ω, resp, x)
+              | some (ω', resp', h') =>
+                  if x.val < h'.val then some (ω, resp, x) else some (ω', resp', h')) = none →
+            (cache.cacheQuery ⟨pk, msg, comList, i, ω, resp⟩ x)
+              (⟨pk, msg, comList, i, default, default⟩ :
+                FischlinROInput Stmt Commit Chal Resp ρ M) = none := by
+          intro hnone
+          cases best with
+          | none => exact absurd hnone (by simp)
+          | some t =>
+              obtain ⟨ω', resp', h'⟩ := t
+              by_cases hlt : x.val < h'.val
+              · simp only [hlt, if_true] at hnone; exact absurd hnone (by simp)
+              · simp only [hlt, if_false] at hnone; exact absurd hnone (by simp)
+        -- Per-element cache fact for the updated best `newBest`.
+        have hbest' : ∀ a r hh,
+            (match best with
+              | none => some (ω, resp, x)
+              | some (ω', resp', h') =>
+                  if x.val < h'.val then some (ω, resp, x) else some (ω', resp', h'))
+              = some (a, r, hh) →
+            (cache.cacheQuery ⟨pk, msg, comList, i, ω, resp⟩ x)
+              (⟨pk, msg, comList, i, a, r⟩ :
+                FischlinROInput Stmt Commit Chal Resp ρ M) = some hh := by
+          intro a r hh hmatch
+          cases best with
+          | none =>
+              simp only [Option.some.injEq, Prod.mk.injEq] at hmatch
+              obtain ⟨rfl, rfl, rfl⟩ := hmatch
+              exact QueryCache.cacheQuery_self _ _ _
+          | some t =>
+              obtain ⟨ω', resp', h'⟩ := t
+              have hbe : cache (⟨pk, msg, comList, i, ω', resp'⟩ :
+                  FischlinROInput Stmt Commit Chal Resp ρ M) = some h' :=
+                hbest ω' resp' h' rfl
+              by_cases hlt : x.val < h'.val
+              · simp only [hlt, if_true, Option.some.injEq, Prod.mk.injEq] at hmatch
+                obtain ⟨rfl, rfl, rfl⟩ := hmatch
+                exact QueryCache.cacheQuery_self _ _ _
+              · simp only [hlt, if_false, Option.some.injEq, Prod.mk.injEq] at hmatch
+                obtain ⟨rfl, rfl, rfl⟩ := hmatch
+                by_cases heq : (⟨pk, msg, comList, i, ω', resp'⟩ :
+                    FischlinROInput Stmt Commit Chal Resp ρ M)
+                    = ⟨pk, msg, comList, i, ω, resp⟩
+                · rw [heq, hc] at hbe
+                  exact absurd hbe (by simp)
+                · rw [QueryCache.cacheQuery_of_ne cache x heq, hbe]
+        exact ih (List.nodup_cons.mp hcs).2 _ _ hfresh' hdef' hbest'
+
 /-- **Residual: full-game distribution surgery.** After collapsing the random-oracle runtime to a
 `StateT`-simulation on the empty cache (`runtime_evalDist_eq`), the entire Fischlin game
 `keygen >>= sign >>= verify`, observed as a `ProbComp Bool` via `StateT.run'`, has the same
