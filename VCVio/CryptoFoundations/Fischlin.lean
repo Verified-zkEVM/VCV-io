@@ -1820,7 +1820,134 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
           let hashSum := (List.finRange ρ).foldl
             (fun acc i => acc + (match bests i with | some (_, _, h) => h.val | none => 0)) 0
           pure (allVerified && decide (hashSum ≤ S))] := by
-  sorry
+  -- `toSig` packaging the search result into a transcript with the fixed commitment.
+  set comVec : Fin ρ → Commit := fun i => (commits i).1 with hcomVec
+  set toSig : Fin ρ → Option (Chal × Resp) → Commit × Chal × Resp :=
+    fun i o => match o with
+      | some (ω, resp) => (comVec i, ω, resp)
+      | none => (comVec i, default, default) with htoSigDef
+  have htoSig : ∀ i o, (toSig i o).2.1 = (o.getD default).1 ∧ (toSig i o).2.2 = (o.getD default).2 := by
+    intro i o; cases o with
+    | none => exact ⟨rfl, rfl⟩
+    | some t => obtain ⟨ω, resp⟩ := t; exact ⟨rfl, rfl⟩
+  -- Recognize each search body's `match` as `pure ∘ toSig`.
+  have hbody : ∀ (i : Fin ρ) (result : Option (Chal × Resp)),
+      (match result with
+        | some (ω, resp) => pure ((comVec i, ω, resp) : Commit × Chal × Resp)
+        | none => pure (comVec i, default, default) :
+        OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)
+          (Commit × Chal × Resp))
+      = pure (toSig i result) := by
+    intro i result
+    cases result with
+    | none => rfl
+    | some t => obtain ⟨ω, resp⟩ := t; rfl
+  simp only [hbody]
+  rw [simulateQ_bind, StateT.run'_bind']
+  -- The empty cache is fresh for every record.
+  have hfreshEmpty : ∀ i ω resp, (∅ : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+      (⟨pk, msg, List.ofFn comVec, i, ω, resp⟩ :
+        FischlinROInput Stmt Commit Chal Resp ρ M) = none := fun _ _ _ => rfl
+  -- The search-vector cache coupling, specialized to this `toSig`/`comList`/empty cache.
+  have hcouple := searchVec_run_cache_eq σ ρ b M pk sk msg commits (List.ofFn comVec) toSig htoSig
+    ∅ hfreshEmpty
+  -- Support extraction: each `sign` outcome is the `toSig`-image of some `bests` in the model's
+  -- support, and its final cache reads off exactly that `bests`'s kept hashes.
+  have hsupp : ∀ p ∈ support ((simulateQ (fischlinImpl ρ b M)
+        (Fin.mOfFn ρ fun i => fischlinSearchAux σ pk sk (commits i).2 msg (List.ofFn comVec) i
+          (FinEnum.toList Chal) (none : Option (Chal × Resp × Fin (2 ^ b))) >>= fun result =>
+            pure (toSig i result))).run ∅),
+      ∃ bests ∈ support (Fin.mOfFn ρ fun i =>
+          fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal)
+            (none : Option (Chal × Resp × Fin (2 ^ b)))),
+        (p.1 = fun i => toSig i ((bests i).map fun t => (t.1, t.2.1))) ∧
+        ∀ i, p.2 (⟨pk, msg, List.ofFn comVec, i, (p.1 i).2.1, (p.1 i).2.2⟩ :
+          FischlinROInput Stmt Commit Chal Resp ρ M) = (bests i).map fun t => t.2.2 := by
+    intro p hp
+    have hmem := (mem_support_iff_of_evalDist_eq hcouple
+      ((fun p => (p.1, fun i => p.2 (⟨pk, msg, List.ofFn comVec, i, (p.1 i).2.1, (p.1 i).2.2⟩ :
+        FischlinROInput Stmt Commit Chal Resp ρ M))) p)).mp
+      (by rw [support_map]; exact Set.mem_image_of_mem _ hp)
+    rw [support_map, Set.mem_image] at hmem
+    obtain ⟨bests, hbests, hbeq⟩ := hmem
+    refine ⟨bests, hbests, ?_, ?_⟩
+    · exact (Prod.ext_iff.mp hbeq).1.symm
+    · intro i; exact congrFun (Prod.ext_iff.mp hbeq).2.symm i
+  -- The verdict as a function of the transcript vector and the read-off hashes.
+  set V : (Fin ρ → Commit × Chal × Resp) × (Fin ρ → Option (Fin (2 ^ b))) → Bool :=
+    fun q => ((List.finRange ρ).all fun i => σ.verify pk (q.1 i).1 (q.1 i).2.1 (q.1 i).2.2) &&
+      decide ((List.finRange ρ).foldl (fun acc i => acc + ((q.2 i).getD 0).val) 0 ≤ S) with hV
+  -- Step 1: collapse the verifier to the deterministic verdict `V` read off the threaded cache.
+  refine Eq.trans (evalDist_bind_congr_dist _ (fun p hp => ?step1))
+    (b := 𝒟[(simulateQ (fischlinImpl ρ b M)
+          (Fin.mOfFn ρ fun i => fischlinSearchAux σ pk sk (commits i).2 msg (List.ofFn comVec) i
+            (FinEnum.toList Chal) (none : Option (Chal × Resp × Fin (2 ^ b))) >>= fun result =>
+              pure (toSig i result))).run ∅
+        >>= fun p => pure (V (p.1, fun i => p.2 (⟨pk, msg, List.ofFn comVec, i, (p.1 i).2.1,
+          (p.1 i).2.2⟩ : FischlinROInput Stmt Commit Chal Resp ρ M)))]) ?step2
+  case step2 =>
+    rw [bind_pure_comp,
+      ← Functor.map_map (g := V)
+        (m := fun p : (Fin ρ → Commit × Chal × Resp) ×
+            (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache =>
+          (p.1, fun i => p.2 (⟨pk, msg, List.ofFn comVec, i, (p.1 i).2.1, (p.1 i).2.2⟩ :
+            FischlinROInput Stmt Commit Chal Resp ρ M))),
+      evalDist_map_eq_of_evalDist_eq hcouple V, map_eq_bind_pure_comp, bind_map_left]
+    refine congrArg evalDist (bind_congr fun bests => ?_)
+    simp only [Function.comp]
+    refine congrArg pure ?_
+    rw [hV]
+    refine congr_arg₂ (· && ·) ?_ ?_
+    · refine congrArg (fun f => (List.finRange ρ).all f) (funext fun i => ?_)
+      simp only [Function.comp]
+      cases h : bests i with
+      | none => simp only [Option.map_none]; rfl
+      | some t => obtain ⟨ω, resp, hh⟩ := t; simp only [Option.map_some]; rfl
+    · refine congrArg (fun n => decide (n ≤ S))
+        (congrArg (fun g => List.foldl g 0 (List.finRange ρ)) (funext fun acc => funext fun i => ?_))
+      simp only [Function.comp]
+      cases h : bests i with
+      | none => simp only [Option.map_none, Option.getD_none]; rfl
+      | some t => obtain ⟨ω, resp, hh⟩ := t; simp only [Option.map_some, Option.getD_some]
+  case step1 =>
+    obtain ⟨bests, hbests, hp1, hreads⟩ := hsupp p hp
+    -- The list of challenges is nonempty (`Chal` is inhabited).
+    have hcsne : (FinEnum.toList Chal) ≠ [] := List.ne_nil_of_mem (FinEnum.mem_toList default)
+    -- Each model best is `some` (the challenge list is nonempty), so the read is a genuine hit.
+    have hbest_some : ∀ i, (bests i).isSome = true := fun i =>
+      fischlinUnifSearch_isSome σ b pk sk (commits i).2 (FinEnum.toList Chal) none
+        (Or.inr hcsne) (bests i) (mem_support_mOfFn ρ _ bests hbests i)
+    -- `toSig`'s commitment field is always `comVec`.
+    have htoSig1 : ∀ i o, (toSig i o).1 = comVec i := by
+      intro i o; rw [htoSigDef]; cases o with
+      | none => rfl
+      | some t => obtain ⟨ω, resp⟩ := t; rfl
+    -- The verifier re-queries exactly the cached records.
+    have hcom : (fun j => (p.1 j).1) = comVec := by
+      funext j; rw [hp1]; exact htoSig1 j _
+    -- The hash read off the cache at each repetition's chosen record.
+    set hash : Fin ρ → Fin (2 ^ b) := fun i => (bests i).get (hbest_some i) |>.2.2 with hhashDef
+    have hhit : ∀ i, p.2 (⟨pk, msg, List.ofFn (fun j => (p.1 j).1), i, (p.1 i).2.1,
+        (p.1 i).2.2⟩ : FischlinROInput Stmt Commit Chal Resp ρ M) = some (hash i) := by
+      intro i
+      rw [hcom, hreads i, hhashDef]
+      rw [Option.eq_some_iff_get_eq.mpr ⟨hbest_some i, rfl⟩]
+      rfl
+    show 𝒟[(simulateQ (fischlinImpl ρ b M)
+        ((Fischlin σ hr ρ b S M).verify pk msg p.1)).run' p.2] = _
+    rw [verify_run'_of_hits σ hr ρ b S M pk msg p.1 p.2 hash hhit]
+    refine congrArg (𝒟[pure ·]) ?_
+    rw [hV]
+    refine congr_arg₂ (· && ·) rfl ?_
+    refine congrArg (fun n => decide (n ≤ S))
+      (congrArg (fun g => List.foldl g 0 (List.finRange ρ)) (funext fun acc => funext fun i => ?_))
+    refine congrArg (acc + ·) ?_
+    rw [hreads i, hhashDef]
+    cases h : bests i with
+    | none => exact absurd (h ▸ hbest_some i) (by simp)
+    | some t =>
+        obtain ⟨ω, resp, hh⟩ := t
+        simp only [h, Option.get_some, Option.map_some, Option.getD_some]
 
 /-- **Residual: full-game distribution surgery.** After collapsing the random-oracle runtime to a
 `StateT`-simulation on the empty cache (`runtime_evalDist_eq`), the entire Fischlin game
