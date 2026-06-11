@@ -870,6 +870,96 @@ private lemma probEvent_val_gt_uniformSample (b k : ℕ) :
   simp only [kFin]
   omega
 
+/-- Min-tracking search over `t` fresh uniform `Fin (2^b)` samples, with early-exit when a
+sample hits `0`. This is the pure-probability model of the Fischlin prover's per-repetition
+hash minimisation: the random oracle, queried at `t` fresh distinct inputs, behaves as `t`
+independent uniform draws. -/
+private def minUnifAux (b : ℕ) : ℕ → Option (Fin (2 ^ b)) → ProbComp (Option (Fin (2 ^ b)))
+  | 0,     best => pure best
+  | n + 1, best => do
+      let h ← $ᵗ (Fin (2 ^ b))
+      if h.val = 0 then pure (some h)
+      else minUnifAux b n (some (match best with
+        | none    => h
+        | some h' => if h.val < h'.val then h else h'))
+
+/-- The running minimum (as an `Option`) exceeds the threshold `k`. -/
+private def minGt (k : ℕ) {b : ℕ} : Option (Fin (2 ^ b)) → Prop
+  | none   => True
+  | some m => k < m.val
+
+/-- Tail bound for the min-tracking search from an arbitrary starting `best`: the running
+minimum exceeds `k` with probability `q^t` (scaled by whether the seed `best` already exceeds
+`k`), where `q = (2^b - (k+1)) / 2^b`. Proved by induction on the sample count `t`. -/
+private lemma minUnifAux_probEvent_gt (b k t : ℕ) (best : Option (Fin (2 ^ b))) :
+    Pr[fun o => minGt k o | minUnifAux b t best]
+      = (if (∀ m, best = some m → k < m.val) then (1 : ℝ≥0∞) else 0)
+        * ((↑(2 ^ b - (k + 1)) : ℝ≥0∞) / ↑(2 ^ b)) ^ t := by
+  induction t generalizing best with
+  | zero =>
+      cases best with
+      | none =>
+          simp [minUnifAux, minGt, probEvent_pure_eq_indicator, Set.indicator]
+      | some m =>
+          simp [minUnifAux, minGt, probEvent_pure_eq_indicator, Set.indicator]
+  | succ n ih =>
+      rw [minUnifAux, probEvent_bind_eq_tsum]
+      set q : ℝ≥0∞ := (↑(2 ^ b - (k + 1)) : ℝ≥0∞) / ↑(2 ^ b) with hq
+      have hbody : ∀ x : Fin (2 ^ b),
+          probEvent
+            (if (x : ℕ) = 0 then pure (some x)
+            else minUnifAux b n (some (match best with
+              | none => x | some h' => if (x : ℕ) < (h' : ℕ) then x else h')))
+            (fun o => minGt k o)
+          = (if (x : ℕ) = 0 then (0 : ℝ≥0∞)
+             else if k < (match best with
+              | none => x | some h' => if (x : ℕ) < (h' : ℕ) then x else h').val then 1 else 0)
+            * q ^ n := by
+        intro x
+        by_cases hx : (x : ℕ) = 0
+        · simp only [hx, if_true]
+          rw [probEvent_pure_eq_indicator]
+          simp only [minGt, Set.indicator, Set.mem_setOf_eq, hx]
+          simp
+        · simp only [hx, if_false]
+          rw [ih]
+          congr 1
+          simp only [Option.some.injEq, forall_eq']
+      rw [tsum_congr (fun x => by rw [hbody x, ← mul_assoc])]
+      rw [ENNReal.tsum_mul_right]
+      rw [pow_succ]
+      rw [mul_comm (q ^ n) q, ← mul_assoc]
+      congr 1
+      rcases best with _ | b0
+      · rw [if_pos (by simp), one_mul, hq, ← probEvent_val_gt_uniformSample b k,
+          probEvent_eq_tsum_ite]
+        refine tsum_congr fun i => ?_
+        by_cases hi : (i : ℕ) = 0 <;> by_cases hk : k < (i : ℕ) <;> simp [hi, hk]
+      · simp only [Option.some.injEq, forall_eq']
+        by_cases hb : k < (b0 : ℕ)
+        · rw [if_pos hb, one_mul, hq, ← probEvent_val_gt_uniformSample b k,
+            probEvent_eq_tsum_ite]
+          refine tsum_congr fun i => ?_
+          by_cases hi : (i : ℕ) = 0 <;> by_cases hk : k < (i : ℕ) <;>
+            by_cases hib : (i : ℕ) < (b0 : ℕ) <;> simp [hi, hk, hib] <;> omega
+        · rw [if_neg hb, zero_mul]
+          rw [show (∑' (i : Fin (2 ^ b)), Pr[= i | $ᵗ Fin (2 ^ b)] *
+              if (i : ℕ) = 0 then (0 : ℝ≥0∞)
+              else if k < ((if (i : ℕ) < (b0 : ℕ) then i else b0) : Fin (2 ^ b)).val then 1 else 0)
+              = ∑' (_ : Fin (2 ^ b)), (0 : ℝ≥0∞) from ?_]
+          · simp
+          · refine tsum_congr fun i => ?_
+            by_cases hi : (i : ℕ) = 0 <;> by_cases hib : (i : ℕ) < (b0 : ℕ) <;>
+              simp [hi, hib] <;> omega
+
+/-- Tail bound for the min-tracking search started fresh (`best = none`): the running minimum
+exceeds `k` with probability exactly `q^t`. This is the per-repetition factor in the Fischlin
+completeness union bound. -/
+private lemma minUnifAux_probEvent_gt_none (b k t : ℕ) :
+    Pr[fun o => minGt k o | minUnifAux b t none]
+      = ((↑(2 ^ b - (k + 1)) : ℝ≥0∞) / ↑(2 ^ b)) ^ t := by
+  rw [minUnifAux_probEvent_gt, if_pos (by simp), one_mul]
+
 section security
 
 variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
