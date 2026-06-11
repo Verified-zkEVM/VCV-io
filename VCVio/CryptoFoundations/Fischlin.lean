@@ -1497,6 +1497,41 @@ private lemma fischlinUnifSearch_isSome (pk : Stmt) (sk : Wit) (sc : PrvState) :
         | none => rfl
         | some t => obtain ⟨ω', resp', h'⟩ := t; by_cases hlt : h.val < h'.val <;> simp [hlt]
 
+/-- **Search-vector cache coupling.** Running the `ρ` per-repetition searches (each packaged into a
+transcript by `toSig`) under the lazy random-oracle on a cache that is fresh for every record,
+the joint distribution of the transcript vector together with the final cache's value at each
+repetition's chosen record equals `Fin.mOfFn ρ fischlinUnifSearch`'s transcripts paired with their
+kept hashes.
+
+`comList` is a fixed parameter (the verifier and prover agree on `List.ofFn (commits ·.1)`). The
+proof is a `Fin.mOfFn` induction: at each repetition the per-repetition bridge
+`fischlinSearch_run_cache_eq` applies (the records are fresh, carrying this repetition's index), and
+`fischlinSearch_run_preserves_offrep` shows the remaining repetitions never disturb the record just
+cached. -/
+private lemma searchVec_run_cache_eq (pk : Stmt) (sk : Wit) (msg : M)
+    (commits : Fin ρ → Commit × PrvState)
+    (comList : List Commit) (toSig : Fin ρ → Option (Chal × Resp) → Commit × Chal × Resp)
+    (htoSig : ∀ i o, (toSig i o).2.1 = (o.getD default).1 ∧ (toSig i o).2.2 = (o.getD default).2)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hfresh : ∀ i ω resp, cache (⟨pk, msg, comList, i, ω, resp⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M) = none) :
+    𝒟[(fun p : (Fin ρ → Commit × Chal × Resp) ×
+            (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache =>
+          (p.1, fun i => p.2 (⟨pk, msg, comList, i, (p.1 i).2.1, (p.1 i).2.2⟩ :
+            FischlinROInput Stmt Commit Chal Resp ρ M))) <$>
+        (simulateQ (fischlinImpl ρ b M)
+          (Fin.mOfFn ρ fun i =>
+            fischlinSearchAux σ pk sk (commits i).2 msg comList i (FinEnum.toList Chal)
+                (none : Option (Chal × Resp × Fin (2 ^ b))) >>= fun result =>
+              pure (toSig i result))).run cache]
+      = 𝒟[(fun bests : Fin ρ → Option (Chal × Resp × Fin (2 ^ b)) =>
+            (fun i => toSig i ((bests i).map fun t => (t.1, t.2.1)),
+            fun i => (bests i).map (fun t => t.2.2))) <$>
+          Fin.mOfFn ρ fun i =>
+            fischlinUnifSearch σ pk sk (commits i).2 (FinEnum.toList Chal)
+              (none : Option (Chal × Resp × Fin (2 ^ b)))] := by
+  sorry
+
 /-- The verifier's `run'`, on a cache that stores every re-queried record, is the deterministic
 verdict computed from the stored hashes. A direct corollary of `run_mOfFn_query_hit`. -/
 private lemma verify_run'_of_hits (pk : Stmt) (msg : M)
