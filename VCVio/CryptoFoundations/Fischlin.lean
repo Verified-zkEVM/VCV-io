@@ -1699,7 +1699,7 @@ private lemma searchVec_run_cache_eq_aux (n : ℕ) (e : Fin n → Fin ρ) (he : 
               ((Fin.cons (toSig 0 a.1) p.1 : Fin (n + 1) → Commit × Chal × Resp),
                 (Fin.cons (a.2 (searchRecord ρ M pk msg comList (e 0) a.1)) p.2 :
                   Fin (n + 1) → Option (Fin (2 ^ b)))))
-          simp only [Functor.map_map, map_eq_bind_pure_comp, bind_assoc, pure_bind,
+          simp only [map_eq_bind_pure_comp, bind_assoc, pure_bind,
             Function.comp] at key ⊢
           exact key
       case head =>
