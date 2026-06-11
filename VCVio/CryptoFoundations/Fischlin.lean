@@ -1221,7 +1221,8 @@ private def searchRecord (pk : Stmt) (msg : M) (comList : List Commit) (i : Fin 
   | some (ω, resp) => ⟨pk, msg, comList, i, ω, resp⟩
   | none => ⟨pk, msg, comList, i, default, default⟩
 
-omit [FinEnum Chal] [SampleableType Chal] in
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp] [DecidableEq M]
+  [FinEnum Chal] [SampleableType Chal] in
 /-- Reading the final cache at the record of a kept best `o` returns `o`'s hash, provided the
 cache already stores that hash for the corresponding record. A `none` best maps to a `none` read
 under the dummy default record (this branch is unreachable for nonempty challenge lists). -/
@@ -1271,7 +1272,7 @@ private lemma fischlinSearch_run_cache_eq (pk : Stmt) (sk : Wit) (sc : PrvState)
         (simulateQ (fischlinImpl ρ b M)
           (fischlinSearchAux σ pk sk sc msg comList i cs best)).run cache]
       = 𝒟[(fun r => (r.map (fun (ω, resp, _) => (ω, resp)),
-            r.map (fun (ω, resp, h) => h))) <$>
+            r.map (fun (_, _, h) => h))) <$>
           fischlinUnifSearch σ pk sk sc cs best] := by
   induction cs generalizing best cache with
   | nil =>
@@ -1450,7 +1451,7 @@ private lemma fischlinSearch_run_preserves_offrep (pk : Stmt) (sk : Wit) (sc : P
       by_cases hc : cache (⟨pk, msg, comList, i, ω, resp⟩ :
           FischlinROInput Stmt Commit Chal Resp ρ M) = none
       · rw [QueryImpl.withCaching_run_none (so := uniformSampleImpl) hc] at hmem
-        simp only [uniformSampleImpl, map_bind, bind_map_left, support_bind,
+        simp only [uniformSampleImpl, bind_map_left, support_bind,
           support_uniformSample, Set.mem_univ, Set.iUnion_true, Set.mem_iUnion] at hmem
         obtain ⟨x, hxmem⟩ := hmem
         by_cases hx : x.val = 0
@@ -1488,7 +1489,8 @@ private lemma mem_support_mOfFn {α : Type} (n : ℕ) (g : Fin n → ProbComp α
       · rw [Fin.cons_succ]
         exact ih (fun j => g j.succ) rest hrest j
 
-omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
 /-- `fischlinUnifSearch` keeps a `some` best whenever it starts from one or the challenge list is
 non-empty: in support, every outcome of a search seeded with a `some` best, or run over a non-empty
 list, is itself `some`. -/
@@ -1586,6 +1588,7 @@ private lemma simulateQ_run_map_pure {α β : Type}
   refine bind_congr fun p => ?_
   rw [simulateQ_pure, StateT.run_pure]; rfl
 
+omit [SampleableType Chal] in
 /-- **Search-vector cache coupling — generalized over an injective rep-index map.** This is the
 inductive engine behind `searchVec_run_cache_eq`: the `Fin.mOfFn` of searches indexed by an
 injective `e : Fin n → Fin ρ`, run on a cache fresh for every `e`-indexed record, couples the
@@ -1722,6 +1725,7 @@ private lemma searchVec_run_cache_eq_aux (n : ℕ) (e : Fin n → Fin ρ) (he : 
         · refine Fin.cases ?_ (fun k => ?_) j <;> simp [Fin.cons_zero, Fin.cons_succ]
         · refine Fin.cases ?_ (fun k => ?_) j <;> simp [Fin.cons_zero, Fin.cons_succ]
 
+omit [SampleableType Chal] in
 /-- **Search-vector cache coupling.** Running the `ρ` per-repetition searches (each packaged into a
 transcript by `toSig`) under the lazy random-oracle on a cache that is fresh for every record,
 the joint distribution of the transcript vector together with the final cache's value at each
@@ -1758,6 +1762,7 @@ private lemma searchVec_run_cache_eq (pk : Stmt) (sk : Wit) (msg : M)
   exact searchVec_run_cache_eq_aux σ ρ b M ρ id Function.injective_id pk sk msg
     (fun i => (commits i).2) comList toSig htoSig cache hfresh
 
+omit [SampleableType Chal] in
 /-- The verifier's `run'`, on a cache that stores every re-queried record, is the deterministic
 verdict computed from the stored hashes. A direct corollary of `run_mOfFn_query_hit`. -/
 private lemma verify_run'_of_hits (pk : Stmt) (msg : M)
@@ -1780,6 +1785,7 @@ private lemma verify_run'_of_hits (pk : Stmt) (msg : M)
       (cache := cache) (hhit := hhit)]
   simp only [pure_bind, simulateQ_pure, StateT.run'_pure']
 
+omit [SampleableType Chal] in
 /-- **Cross-repetition cache threading.** Given a key pair `(pk, sk)` and a vector of commitments
 `commits`, simulating the `ρ` per-repetition searches of `sign` followed by the `ρ` verifier
 re-queries under the lazy random-oracle on the empty cache produces the same `Bool` distribution as
@@ -1899,13 +1905,13 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
     rw [hV]
     refine congr_arg₂ (· && ·) ?_ ?_
     · refine congrArg (fun f => (List.finRange ρ).all f) (funext fun i => ?_)
-      simp only [Function.comp]
+      dsimp only
       cases h : bests i with
       | none => simp only [Option.map_none]; rfl
       | some t => obtain ⟨ω, resp, hh⟩ := t; simp only [Option.map_some]; rfl
     · refine congrArg (fun n => decide (n ≤ S))
         (congrArg (fun g => List.foldl g 0 (List.finRange ρ)) (funext fun acc => funext fun i => ?_))
-      simp only [Function.comp]
+      dsimp only
       cases h : bests i with
       | none => simp only [Option.map_none, Option.getD_none]; rfl
       | some t => obtain ⟨ω, resp, hh⟩ := t; simp only [Option.map_some, Option.getD_some]
@@ -1949,6 +1955,7 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
         obtain ⟨ω, resp, hh⟩ := t
         simp only [h, Option.get_some, Option.map_some, Option.getD_some]
 
+omit [SampleableType Chal] in
 /-- **Residual: full-game distribution surgery.** After collapsing the random-oracle runtime to a
 `StateT`-simulation on the empty cache (`runtime_evalDist_eq`), the entire Fischlin game
 `keygen >>= sign >>= verify`, observed as a `ProbComp Bool` via `StateT.run'`, has the same
@@ -1985,6 +1992,7 @@ private lemma fischlin_game_run'_eq_modelGame (msg : M) :
   refine bind_congr (fun commits => ?_)
   exact sign_verify_run_eq σ hr ρ b S M pk sk msg commits
 
+omit [SampleableType Chal] in
 /-- **B1 (random-oracle surgery).** The Fischlin random-oracle completeness game has the same
 probability of accepting as the pure-probability model game `modelGame`.
 
@@ -2183,6 +2191,7 @@ private lemma fischlinUnifSearch_match_verify
       (fun ω' resp' h' heq => by simp at heq) ho
   exact verify_of_perfectlyComplete σ hc pk sk hrel pc sc hpc ω resp hresp
 
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp] [DecidableEq M] in
 /-- **B2 (probability bound).** The model game rejects with probability at most
 `completenessError ρ b S (FinEnum.card Chal)`.
 
@@ -2191,7 +2200,7 @@ every honest transcript verifies, so rejection happens exactly when the sum of p
 minimum hashes exceeds `S`. By pigeonhole some repetition's minimum exceeds `⌊S/ρ⌋`, and a union
 bound over the `ρ` repetitions together with the per-repetition tail bound
 `minUnifAux_probEvent_gt_none` yields the result. -/
-private lemma model_reject_le (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
+private lemma model_reject_le (_hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (_msg : M) :
     1 - Pr[= true | modelGame σ hr ρ b S]
       ≤ completenessError ρ b S (FinEnum.card Chal) := by
   -- Every `ProbComp` is `NeverFail`, so `1 - Pr[= true]` is exactly `Pr[= false]`.
