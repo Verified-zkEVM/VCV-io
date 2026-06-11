@@ -1109,6 +1109,41 @@ private noncomputable def modelGame : ProbComp Bool := do
     (fun acc i => acc + (match bests i with | some (_, _, h) => h.val | none => 0)) 0
   pure (allVerified && decide (hashSum ≤ S))
 
+/-- Freshness predicate: every random-oracle input record for repetition `i` whose challenge
+field lies in the challenge list `cs` is absent from `cache`. This is the invariant carried
+through the per-repetition search bridge: as the search queries successive challenges, each query
+is a cache miss, and the freshly cached record (whose challenge is the current loop variable) does
+not collide with the still-to-be-queried challenges because `FinEnum.toList Chal` is duplicate-free
+and the repetition index `i` separates repetitions. -/
+private def searchFresh
+    (pk : Stmt) (msg : M) (comList : List Commit) (i : Fin ρ) (cs : List Chal)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache) : Prop :=
+  ∀ ω ∈ cs, ∀ resp : Resp,
+    cache (⟨pk, msg, comList, i, ω, resp⟩ : FischlinROInput Stmt Commit Chal Resp ρ M) = none
+
+/-- **Per-repetition search bridge — output distribution.**
+
+Running Fischlin's inner search `fischlinSearchAux` under the lazy random-oracle simulation
+`simulateQ fischlinImpl` on a `cache` in which every record of repetition `i` with a challenge
+from `cs` is fresh, has the same *output* distribution (discarding the final cache via `run'`) as
+the pure-uniform search `fischlinUnifSearch`, projected to `Option (Chal × Resp)`.
+
+Each random-oracle query is a cache miss, so it samples a fresh uniform `Fin (2^b)` — exactly the
+`$ᵗ` draw of `fischlinUnifSearch`. Freshness is preserved across the recursion: after querying the
+current challenge `ω`, the only new cache entry has challenge field `ω`, which differs from every
+challenge still in `rest` because `FinEnum.toList Chal` is duplicate-free. -/
+private lemma fischlinSearch_run'_eq (pk : Stmt) (sk : Wit) (sc : PrvState)
+    (msg : M) (comList : List Commit) (i : Fin ρ) (cs : List Chal)
+    (hcs : cs.Nodup)
+    (best : Option (Chal × Resp × Fin (2 ^ b)))
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hfresh : searchFresh ρ b M pk msg comList i cs cache) :
+    𝒟[(simulateQ (fischlinImpl ρ b M)
+        (fischlinSearchAux σ pk sk sc msg comList i cs best)).run' cache]
+      = 𝒟[(fun r => r.map fun (ω, resp, _) => (ω, resp)) <$>
+          fischlinUnifSearch σ pk sk sc cs best] := by
+  sorry
+
 /-- **B1 (random-oracle surgery).** The Fischlin random-oracle completeness game has the same
 probability of accepting as the pure-probability model game `modelGame`.
 
