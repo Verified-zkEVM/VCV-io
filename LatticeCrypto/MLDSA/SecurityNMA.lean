@@ -8,18 +8,23 @@ import LatticeCrypto.MLDSA.Security
 /-!
 # ML-DSA EUF-NMA Security: the MLWE key-swap hop (Lemma 7, Step 1)
 
-This file is **Phase 1 scaffolding** for the ML-DSA EUF-NMA security theorem
-`MLDSA.nma_security` (issue #227, the real Dilithium Lemma 7). It isolates the **first of
-the three proof steps** of the paper:
+This file builds the reduction infrastructure for the ML-DSA EUF-NMA security theorem
+`MLDSA.nma_security` (issue #227, the real Dilithium Lemma 7), covering the **MLWE key-swap hop**
+and the **SelfTargetMSIS extractor**:
 
-1. *(this file)* replace the honest key generation, where the public key vector is
-   `t = Â · s₁ + s₂`, with a variant `keygen1` that samples `t` uniformly. The probability
-   gap between the two EUF-NMA games is bounded by the decisional MLWE advantage of an
-   explicit distinguisher `B`.
-2. reprogram `H₁(w₁, m) := G(shift_α(w₁), m)` — no loss because `shift_α` is injective.
-3. extract a SelfTargetMSIS solution from a forgery — gap `Adv^STMSIS(C)`.
+1. **MLWE key-swap (`nma_keyswap_hop`).** Replace the honest key generation, where the public key
+   vector is `t = Â · s₁ + s₂`, with a variant `keygen1` that samples `t` uniformly. The gap
+   between the two EUF-NMA games equals the decisional MLWE advantage of the (seed-based)
+   distinguisher `B = distinguisherB`. The `(Hadv)` and uniform-branch `(H1)` parts are fully
+   proven; the real-branch `(H0)` reduces to a precise honest-sampling residue (`sorry`).
+2. **SelfTargetMSIS extraction (`nmaAdvantage_keygen1_le_stmsis`).** Once `t` is uniform the key
+   carries no secret, so a forgery is a short vector satisfying the SelfTargetMSIS relation; the
+   extractor `extractorC` reads `(z, c̃)` out of the forged signature. The structural definitions
+   are in place; the RO read-back identity is a precise `sorry`.
 
-Steps 2 and 3 are **out of scope**; `MLDSA.nma_security` itself keeps its existing `sorry`.
+The `H₁` reprogramming step of the paper folds into the random-oracle modeling and is not separated
+out here. `MLDSA.nma_security` itself keeps its existing `sorry` (the abstract-problem bridge is a
+statement change flagged for owner negotiation; see the closing note).
 
 ## What is defined here
 
@@ -30,14 +35,17 @@ sample. We package both as `ProbComp` key generators, lift each to an EUF-NMA ga
 arbitrary forging adversary `main`, and exhibit the MLWE distinguisher `B` that interpolates
 between them: `B (Â, t)` reconstructs the public key from `(ρ, t)` and runs the adversary.
 
-## Modeling note (the `ρ ↔ Â` bridge)
+## Modeling note (seeds, not matrices)
 
 The verifier recomputes `Â = ExpandA(pk.ρ)` from the seed stored in the public key, so the MLWE
-challenge matrix `Â` must be presented to the adversary *through* a seed `ρ`. We therefore work
-with an `MlweEmbedding` record that carries both a seed `ρ` and the witness that
-`ExpandA(ρ) = Â`. In the standard ROM modeling of Dilithium, `ExpandA` is a random oracle and
-this embedding is exactly the MLWE-with-`ExpandA` instance; making that precise is one of the
-remaining obligations recorded below.
+challenge matrix `Â` must be presented to the adversary *through* a seed `ρ`. Rather than carrying
+an embedding witness `ExpandA(ρ) = Â` (which need not exist, since `ExpandA` is not surjective), we
+**re-seed-base** the MLWE problem: the public challenge of `mldsaMLWE` is the *seed* `ρ` itself, and
+the matrix is *defined* as `Â := ExpandA(ρ)` wherever it is used, so that
+`noiseless s₁ ρ = ExpandA(ρ)·s₁`.
+This is the standard ROM modeling of Dilithium with `ExpandA` a random oracle, and it makes the
+distinguisher `B` total: it consumes `(ρ, t)` and forms `pk = (ρ, Power2Round(t).1)` directly with
+no embedding. The `MlweEmbedding` record is therefore gone.
 -/
 
 open OracleComp OracleSpec ENNReal
@@ -169,55 +177,54 @@ noncomputable def simulateToProbComp {α : Type}
     ProbComp α :=
   StateT.run' (simulateQ (roImpl p prims (M := M)) mx) ∅
 
-/-- An embedding of an MLWE challenge matrix `Â` into an ML-DSA public seed: a seed `ρ` together
-with the proof that `ExpandA(ρ) = Â`. The MLWE distinguisher needs such an embedding to present
-the challenge matrix to the NMA adversary, because the public key only carries the seed `ρ` and
-the verifier recomputes `Â = ExpandA(ρ)`.
+/-- The concrete MLWE problem embedded by ML-DSA key generation, **seed-based**: the public
+challenge is the public matrix seed `ρ = (ExpandSeed(seed)).1` for a uniform `seed`, the secret is
+`s₁`, and the output is `t`. The matrix is recovered on demand as `Â := ExpandA(ρ)`, so
+`noiseless s₁ ρ = ExpandA(ρ) · s₁`; the secret and error/uniform distributions are uniform.
 
-In the ROM modeling of Dilithium `ExpandA` is a random oracle, so the MLWE instance is naturally
-phrased over seeds and this embedding is the identity. Supplying it generically is one of the
-deferred obligations (see the `## Remaining obligations` note at the end of the file). -/
-structure MlweEmbedding (aHat : TqMatrix p.k p.l) where
-  /-- A public seed reproducing the challenge matrix. -/
-  rho : Bytes 32
-  /-- The expansion identity `ExpandA(ρ) = Â`. -/
-  expandA_rho : prims.expandA rho = aHat
+Sampling `ρ` through `ExpandSeed` (rather than uniformly) makes the `ρ` marginal line up *exactly*
+with `keygen0` / `keygen1`, so the uniform-branch identity `(H1)` against `keygen1` is a clean
+monad-rewriting fact (no distributional assumption: `keygen1` discards the secret, and its `ρ` is
+this same `(ExpandSeed seed).1`). What it does **not** reconcile is the *joint* law of `(ρ, s₁, s₂)`
+in `keygen0`, where `(s₁, s₂) = ExpandS((ExpandSeed seed).2)` are derived from the *same* seed as
+`ρ`, whereas the MLWE problem samples `s₁`/error independently of `ρ`; that joint independence is
+the residual honest-sampling gap `(H0)` recorded below and folded into the ROM by the paper.
 
-/-- The concrete MLWE problem embedded by ML-DSA key generation: the public matrix `Â`, secret
-`s₁`, output `t`, with `noiseless s₁ Â = Â · s₁` and uniform challenge/secret/error/uniform
-distributions matching `keygen0` / `keygen1`. The `nma_security` statement quantifies over an
-*abstract* `mlwe` problem; relating that abstract problem to this concrete one is one of the
-deferred obligations. -/
-noncomputable def mldsaMLWE (p : Params)
-    [SampleableType (RqVec p.l)] [SampleableType (RqVec p.k)]
-    [SampleableType (TqMatrix p.k p.l)] :
-    LearningWithErrors.Problem (TqMatrix p.k p.l) (RqVec p.l) (RqVec p.k) where
-  sampleChallenge := $ᵗ (TqMatrix p.k p.l)
+The matrix never appears as a free challenge: phrasing the MLWE instance over seeds is exactly the
+ROM modeling of Dilithium with `ExpandA` a random oracle, and it makes the distinguisher `B` total
+(no `ExpandA`-surjectivity assumption). The `nma_security` statement quantifies over an *abstract*
+`mlwe` problem; relating that abstract problem to this concrete seed-based one is a deferred
+statement-level obligation. -/
+noncomputable def mldsaMLWE (p : Params) (prims : Primitives p)
+    [SampleableType (RqVec p.l)] [SampleableType (RqVec p.k)] :
+    LearningWithErrors.Problem (Bytes 32) (RqVec p.l) (RqVec p.k) where
+  sampleChallenge := do
+    let seed ← $ᵗ (Bytes 32)
+    return (prims.expandSeed seed).1
   sampleSecret := $ᵗ (RqVec p.l)
   sampleError := $ᵗ (RqVec p.k)
-  noiseless := fun s1 aHat => aHat * s1
+  noiseless := fun s1 rho => prims.expandA rho * s1
   sampleUniform := $ᵗ (RqVec p.k)
 
-/-- **The MLWE distinguisher `B`.** Given an MLWE challenge `(Â, t)` (real `Â·s₁ + s₂` vs uniform
-`t`) and an embedding of every matrix `Â` into a public seed `ρ`, `B` forms the ML-DSA public key
-`pk = (ρ, Power2Round(t).1)`, runs the NMA forging strategy `main` on `pk`, simulates the random
-oracle to verify the returned forgery, and outputs the validity bit as its decision.
+/-- **The MLWE distinguisher `B`.** Given a seed-based MLWE challenge `(ρ, t)` (real
+`ExpandA(ρ)·s₁ + s₂` vs uniform `t`), `B` forms the ML-DSA public key `pk = (ρ, Power2Round(t).1)`
+directly from the seed, runs the NMA forging strategy `main` on `pk`, simulates the random oracle
+to verify the returned forgery, and outputs the validity bit as its decision.
 
-When `(Â, t)` is real, `B` reproduces `nmaGame … keygen0`; when `t` is uniform, it reproduces
-`nmaGame … keygen1` (up to the `ρ ↔ Â` embedding). Thus `B`'s distinguishing advantage is exactly
-the NMA-game gap (the content of `nma_keyswap_hop`). -/
+When `(ρ, t)` is real, `B` reproduces `nmaGame … keygen0`; when `t` is uniform, it reproduces
+`nmaGame … keygen1`. Thus `B`'s distinguishing advantage is exactly the NMA-game gap (the content
+of `nma_keyswap_hop`). The seed-based phrasing means `B` needs no matrix-to-seed embedding. -/
 noncomputable def distinguisherB
     (hr : GenerableRelation (PublicKey p prims) (SecretKey p) (validKeyPair p prims))
     (maxAttempts : ℕ)
     (main : PublicKey p prims →
       OracleComp (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p))
-        (M × Option (Commitment p prims × Response p prims)))
-    (embed : (aHat : TqMatrix p.k p.l) → MlweEmbedding p prims aHat) :
-    LearningWithErrors.Adversary (mldsaMLWE p) :=
-  fun (challenge : TqMatrix p.k p.l × RqVec p.k) =>
-    let aHat := challenge.1
+        (M × Option (Commitment p prims × Response p prims))) :
+    LearningWithErrors.Adversary (mldsaMLWE p prims) :=
+  fun (challenge : Bytes 32 × RqVec p.k) =>
+    let rho := challenge.1
     let t := challenge.2
-    let pk : PublicKey p prims := ⟨(embed aHat).rho, (prims.power2RoundVec t).1⟩
+    let pk : PublicKey p prims := ⟨rho, (prims.power2RoundVec t).1⟩
     simulateToProbComp p prims (M := M) do
       let (msg, σ) ← main pk
       (FiatShamirWithAbort (identificationScheme p prims) hr M maxAttempts).verify pk msg σ
@@ -226,14 +233,96 @@ end Distinguisher
 
 section Hop
 
+omit nttOps [DecidableEq prims.High] in
+/-- **(Hadv) bias domination, in equality form.** For *any* LWE-style problem and decisional
+adversary, the MLWE distinguishing advantage is exactly the Boolean distinguishing advantage between
+the two single-branch games `game0` (real distribution) and `game1` (uniform distribution).
+
+This unfolds `LearningWithErrors.experiment` — `b ← coin; sample ← if b then distr else uniform;
+b' ← adv sample; return (b == b')` — into the hidden-bit guessing form
+`z ← if b then (distr >>= adv) else (uniform >>= adv); pure (b == z)` and applies
+`ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch`. It is fully generic and
+discharges the (Hadv) obligation once the NMA games are identified with `game0`/`game1`. -/
+theorem advantage_eq_game_boolDistAdvantage
+    {Sample Secret Output : Type} [Add Output]
+    (problem : LearningWithErrors.Problem Sample Secret Output)
+    (adv : LearningWithErrors.Adversary problem) :
+    LearningWithErrors.advantage problem adv =
+      (LearningWithErrors.game0 problem adv).boolDistAdvantage
+        (LearningWithErrors.game1 problem adv) := by
+  rw [LearningWithErrors.advantage]
+  rw [show (LearningWithErrors.experiment problem adv) =
+      (do
+        let b ← ($ᵗ Bool)
+        let z ← if b then LearningWithErrors.game0 problem adv
+                      else LearningWithErrors.game1 problem adv
+        pure (b == z)) by
+    simp only [LearningWithErrors.experiment, LearningWithErrors.game0,
+      LearningWithErrors.game1, bind_assoc]]
+  exact ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch _ _
+
 variable {M : Type} [DecidableEq M] [DecidableEq (Commitment p prims)]
   [SampleableType (RqVec p.l)] [SampleableType (RqVec p.k)]
-  [SampleableType (TqMatrix p.k p.l)]
-  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec]
+  [SampleableType (CommitHashBytes p)]
 
-/-- **The MLWE key-swap hop (Lemma 7, Step 1).** For every NMA forging strategy `main` and every
-matrix-to-seed embedding `embed`, the gap between the real-`t` and uniform-`t` EUF-NMA games is
-bounded by the decisional MLWE advantage of the distinguisher `B`.
+omit [SampleableType (RqVec p.k)] in
+/-- **NMA-game / distinguisher plumbing.** Pushing the `keygen` sampling out of the
+Fiat-Shamir-with-aborts runtime: the `Pr[= true]` of `nmaGame … keygen` equals the `Pr[= true]` of
+first sampling `(pk, _) ← keygen` (in plain `ProbComp`) and then running the forge-and-verify tail
+through `simulateToProbComp` — which is exactly the body of `distinguisherB` evaluated at `pk`.
+
+This is the bundled-semantics fact `runtime.evalDist (liftM oa >>= rest) = 𝒟[oa] >>= …`
+(`SPMFSemantics.withStateOracle` interpret/observe with `roSim.run'_liftM_bind`), specialised to
+the ML-DSA NMA game; it reduces both (H0) and (H1) to comparing the *key distribution* against
+`mldsaMLWE`'s `distr` / `uniformDistr`, with all the runtime plumbing already discharged. -/
+theorem nmaGame_eq_keygen_bind
+    (hr : GenerableRelation (PublicKey p prims) (SecretKey p) (validKeyPair p prims))
+    (maxAttempts : ℕ)
+    (keygen : ProbComp (PublicKey p prims × SecretKey p))
+    (main : PublicKey p prims →
+      OracleComp (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p))
+        (M × Option (Commitment p prims × Response p prims))) :
+    nmaGame p prims hr maxAttempts keygen main =
+      𝒟[(do
+        let (pk, _) ← keygen
+        simulateToProbComp p prims (M := M) (do
+          let (msg, σ) ← main pk
+          (FiatShamirWithAbort (identificationScheme p prims) hr M maxAttempts).verify
+            pk msg σ))] := by
+  classical
+  let ro : QueryImpl (M × Commitment p prims →ₒ CommitHashBytes p)
+      (StateT ((M × Commitment p prims →ₒ CommitHashBytes p).QueryCache) ProbComp) := randomOracle
+  let impl : QueryImpl (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p))
+      (StateT ((M × Commitment p prims →ₒ CommitHashBytes p).QueryCache) ProbComp) :=
+    unifFwdImpl (M × Commitment p prims →ₒ CommitHashBytes p) + ro
+  let rest : PublicKey p prims →
+      OracleComp (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p)) Bool := fun pk => do
+    let (msg, σ) ← main pk
+    (FiatShamirWithAbort (identificationScheme p prims) hr M maxAttempts).verify pk msg σ
+  unfold nmaGame FiatShamirWithAbort.runtime ProbCompRuntime.evalDist
+    ProbCompRuntime.liftProbComp SPMFSemantics.evalDist SemanticsVia.denote
+  change 𝒟[(simulateQ impl (liftM keygen >>= fun pk => rest pk.1)).run' ∅] =
+    𝒟[keygen >>= fun pk => simulateToProbComp p prims (rest pk.1)]
+  rw [simulateQ_bind,
+    roSim.run'_liftM_bind (ro := ro) (oa := keygen)
+      (rest := fun pk => simulateQ impl (rest pk.1)) (s := ∅)]
+  rw [evalDist_bind, evalDist_bind]
+  simp only [simulateToProbComp, roImpl]
+  rfl
+
+/-- **The MLWE key-swap hop (Lemma 7, Step 1).** For every NMA forging strategy `main`, the gap
+between the real-`t` and uniform-`t` EUF-NMA games is bounded by (in fact equal to) the decisional
+MLWE advantage of the seed-based distinguisher `B`.
+
+The proof factors through three facts:
+- **(Hadv)** the MLWE advantage equals `(game0 B).boolDistAdvantage (game1 B)`
+  (`advantage_eq_game_boolDistAdvantage`, fully proven and generic);
+- **(H1)** `nmaGame … keygen1` and `game1 (mldsaMLWE) B` have equal `Pr[= true]`
+  (proven below: both are the uniform-`t` game, and the `ρ` marginals coincide because
+  `mldsaMLWE` samples `ρ` through the *same* `ExpandSeed` that `keygen1` uses, and `keygen1`'s
+  secret is discarded);
+- **(H0)** `nmaGame … keygen0` and `game0 (mldsaMLWE) B` have equal `Pr[= true]` — the residual
+  honest-sampling assumption (the only `sorry`), see the inline comment for exactly what it needs.
 
 This is the first of the three steps of `nma_security`; steps 2 and 3 (the `H₁` reprogramming and
 the SelfTargetMSIS extraction) are handled elsewhere. The bound is stated on `toReal` because the
@@ -243,70 +332,202 @@ theorem nma_keyswap_hop
     (maxAttempts : ℕ)
     (main : PublicKey p prims →
       OracleComp (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p))
-        (M × Option (Commitment p prims × Response p prims)))
-    (embed : (aHat : TqMatrix p.k p.l) → MlweEmbedding p prims aHat) :
+        (M × Option (Commitment p prims × Response p prims))) :
     |(nmaAdvantage p prims hr maxAttempts (keygen0 p prims) main).toReal -
         (nmaAdvantage p prims hr maxAttempts (keygen1 p prims) main).toReal| ≤
-      LearningWithErrors.advantage (mldsaMLWE p)
-        (distinguisherB p prims hr maxAttempts main embed) := by
-  -- The proof factors into three distributional equalities, each isolated as a `sorry` below:
-  --  (H0) `nmaGame … keygen0` equals `game0 (mldsaMLWE) B` (real branch of the MLWE experiment),
-  --  (H1) `nmaGame … keygen1` equals `game1 (mldsaMLWE) B` (uniform branch),
-  --  (Hadv) `boolBiasAdvantage` of the MLWE experiment dominates `|game0.true − game1.true|`.
-  -- Each requires nontrivial monad-rewriting plumbing that the abstract `embed`/`hr` make
-  -- subtle; see the file-level `## Remaining obligations` note.
-  sorry
+      LearningWithErrors.advantage (mldsaMLWE p prims)
+        (distinguisherB p prims hr maxAttempts main) := by
+  set B := distinguisherB p prims hr maxAttempts main (M := M) with hB
+  -- (Hadv): the MLWE advantage is exactly the gap between the two single-branch games.
+  apply le_of_eq
+  rw [advantage_eq_game_boolDistAdvantage (mldsaMLWE p prims) B,
+    ProbComp.boolDistAdvantage, nmaAdvantage, nmaAdvantage]
+  -- It now suffices to identify `Pr[= true]` of each NMA game with the matching MLWE game.
+  -- (H0) real branch and (H1) uniform branch.
+  have hH1 : Pr[= true | nmaGame p prims hr maxAttempts (keygen1 p prims) main] =
+      Pr[= true | LearningWithErrors.game1 (mldsaMLWE p prims) B] := by
+    -- (H1) uniform-branch identity. Both games sample `t` uniformly and discard `keygen1`'s
+    -- secret `(s₁, s₂)`; the public key reduces to `⟨(ExpandSeed seed).1, Power2Round(t).1⟩`,
+    -- which is exactly what `game1 = uniformDistr >>= B` builds (its challenge `ρ` is sampled
+    -- through the *same* `ExpandSeed seed`, see `mldsaMLWE.sampleChallenge`). This is a pure
+    -- monad-rewriting identity once `nmaGame`/`liftProbComp` and `simulateToProbComp` are
+    -- recognised as the same `withStateOracle` semantics; no distributional assumption.
+    rw [nmaGame_eq_keygen_bind]
+    simp only [LearningWithErrors.game1, LearningWithErrors.uniformDistr, hB, distinguisherB,
+      mldsaMLWE, keygen1, keyFromMaterial, bind_assoc, pure_bind]
+    rw [probOutput_def, probOutput_def, SPMF.evalDist_def]
+  have hH0 : Pr[= true | nmaGame p prims hr maxAttempts (keygen0 p prims) main] =
+      Pr[= true | LearningWithErrors.game0 (mldsaMLWE p prims) B] := by
+    -- (H0) real-branch identity — THE residual honest-sampling assumption.
+    -- `nmaGame … keygen0` samples one `seed ← $ᵗ Bytes 32`, derives `ρ := (ExpandSeed seed).1`,
+    -- `(s₁, s₂) := ExpandS (ExpandSeed seed).2`, and sets `t := ExpandA(ρ)·s₁ + s₂`.
+    -- `game0 = distr >>= B` instead samples `ρ` through `ExpandSeed` but `s₁ ← $ᵗ RqVec l`,
+    -- `s₂ ← $ᵗ RqVec k` *independently* of `ρ` and of each other, with `t := ExpandA(ρ)·s₁ + s₂`.
+    -- These agree on `Pr[= true]` iff the joint law of `(ρ, s₁, s₂)` produced by
+    -- `ExpandSeed`/`ExpandS` from one uniform `seed` equals the product law
+    -- `((ExpandSeed (·)).1 of uniform seed) ⊗ Uniform(RqVec l) ⊗ Uniform(RqVec k)`.
+    -- This is the ML-DSA *honest sampling assumption* (`ExpandSeed`/`ExpandS` modeled as
+    -- independent uniform samplers in the ROM); it is NOT derivable from the deterministic
+    -- `prims` and must enter as an added hypothesis on `prims` (or be supplied by the ROM
+    -- modeling of `ExpandSeed`/`ExpandA`). See obligation (1) in the closing note.
+    rw [nmaGame_eq_keygen_bind]
+    simp only [LearningWithErrors.game0, LearningWithErrors.distr, hB, distinguisherB,
+      mldsaMLWE, keygen0, keyFromMaterial, bind_assoc, pure_bind]
+    rw [probOutput_def, probOutput_def, SPMF.evalDist_def]
+    -- After the runtime plumbing the goal is purely about the *key distribution*:
+    --   LHS: `seed ← $ᵗ; t := ExpandA((ExpandSeed seed).1)·(ExpandS (ExpandSeed seed).2).1
+    --           + (ExpandS (ExpandSeed seed).2).2; run B-tail on pk(seed, t)`
+    --   RHS: `seed ← $ᵗ; s₁ ← $ᵗ; s₂ ← $ᵗ; t := ExpandA((ExpandSeed seed).1)·s₁ + s₂;
+    --           run B-tail on pk(seed, t)`.
+    -- These coincide exactly when `(s₁, s₂) = ExpandS (ExpandSeed seed).2` is, jointly over a
+    -- uniform `seed`, distributed as an *independent* `Uniform(RqVec l) × Uniform(RqVec k)`
+    -- (and independent of `(ExpandSeed seed).1`). That is the ML-DSA honest-sampling assumption
+    -- on `ExpandSeed`/`ExpandS`, not derivable from the deterministic `prims`; see obligation (1).
+    sorry
+  -- The hop is in fact an *equality* modulo (H0)/(H1): after rewriting both NMA games into the
+  -- matching MLWE games the bound becomes `|x - y| = |x - y|`, closed by reflexivity.
+  rw [hH0, hH1]
 
 end Hop
 
+section Extractor
+
+variable {M : Type} [DecidableEq M] [DecidableEq (Commitment p prims)]
+  [SampleableType (RqVec p.l)] [SampleableType (RqVec p.k)]
+  [SampleableType (CommitHashBytes p)]
+
+/-- The concrete SelfTargetMSIS problem embedded by ML-DSA verification (Lemma 7, Step 3).
+
+After the key has uniform `t` (`keygen1`), a forgery `(msg, some (w', (z, h)))` accepted by
+`verify` is, via the random oracle answer `c̃ = H(msg, w')`, a SelfTargetMSIS solution: the matrix
+`Â = ExpandA(ρ)` is the challenge, the public key `pk` is the target, the hash input is `(msg, w')`,
+and the response is `(z, h)`. Validity recomputes the commitment from `(pk, c̃, (z, h))` via
+`UseHint ∘ computeWApprox` (commitment recoverability) and runs the identification-scheme verifier;
+this is precisely the equation `verify` checks, so an accepted forgery maps to a valid STMSIS
+solution.
+
+The `sampleParams` draws the same seed-based key as `keygen1`/`mldsaMLWE`: it samples `ρ` through
+`ExpandSeed`, a uniform `t`, and publishes `(ExpandA(ρ), pk)` with `pk = ⟨ρ, Power2Round(t).1⟩`. -/
+noncomputable def mldsaSTMSIS (M : Type) :
+    SelfTargetMSIS.Problem (TqMatrix p.k p.l) (Response p prims) (PublicKey p prims)
+      (M × Commitment p prims) (CommitHashBytes p) where
+  sampleParams := do
+    let (pk, _) ← keygen1 p prims
+    return (prims.expandA pk.rho, pk)
+  isValid := fun aHat pk cTilde (z, h) =>
+    -- Recover the commitment `w'` from `(pk, c̃, (z, h))` and run the identification verifier.
+    let w' := prims.useHintVec h (computeWApprox p prims aHat (prims.sampleInBall cTilde) z pk.t1)
+    (identificationScheme p prims).verify pk w' cTilde (z, h)
+
+/-- **The SelfTargetMSIS extractor `C` (Lemma 7, Step 3).**
+
+`C` runs the NMA forger `main` on the public key `pk` (the STMSIS target). The forger interacts with
+the random oracle `H : (M × Commitment) →ₒ CommitHashBytes`. On a forgery `(msg, some (w', (z, h)))`
+`C` outputs the STMSIS preimage `(msg, w')` together with the response `(z, h)`. An aborting forgery
+`(msg, none)` is mapped to a dummy preimage with a zeroed response, which the STMSIS RO-consistency
+check rejects. The matrix in `params.1` is ignored by `C` (it equals `ExpandA(params.2.ρ)`).
+
+The STMSIS experiment then looks up `c̃ = H(msg, w')` in the oracle cache and checks
+`mldsaSTMSIS.isValid Â pk c̃ (z, h)`, which recomputes `w'` from `(pk, c̃, (z, h))` and runs the
+identification verifier — exactly what the NMA `verify` does after querying `H(msg, w')`. -/
+noncomputable def extractorC [Inhabited (Commitment p prims)] [Inhabited (Response p prims)]
+    (main : PublicKey p prims →
+      OracleComp (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p))
+        (M × Option (Commitment p prims × Response p prims))) :
+    SelfTargetMSIS.Adversary (mldsaSTMSIS p prims M) where
+  run := fun (params : TqMatrix p.k p.l × PublicKey p prims) => do
+    let pk := params.2
+    let (msg, σ) ← main pk
+    match σ with
+    | some (w', (z, h)) =>
+      -- Force the RO answer `H(msg, w')` to be cached (the STMSIS experiment reads it back), then
+      -- return the SelfTargetMSIS preimage/response.
+      let _c ← HasQuery.query (spec := (M × Commitment p prims →ₒ CommitHashBytes p)) (msg, w')
+      return ((msg, w'), (z, h))
+    | none =>
+      -- Aborting forgery: no valid preimage. Emit a dummy that fails RO consistency / `isValid`.
+      return ((msg, default), default)
+
+/-- **The SelfTargetMSIS extraction bound (Lemma 7, Step 3).** The uniform-`t` EUF-NMA advantage is
+bounded by the SelfTargetMSIS advantage of the extractor `C`.
+
+A forgery accepted by the NMA game (after the `H(msg, w')` query inside `verify`) is exactly a valid
+SelfTargetMSIS solution for `mldsaSTMSIS`: `C` reproduces the forger's oracle trace, the
+experiment's RO-consistency lookup recovers the same `c̃ = H(msg, w')`, `isValid` recovers `w'` and
+runs the identical verifier. The remaining `sorry` is the distributional identity between the two
+RO-threaded experiments (the same `withStateOracle` plumbing as `nmaGame_eq_keygen_bind`, now with a
+cache read-back), plus the bookkeeping that an accepted NMA forgery is necessarily non-aborting and
+hence routed to the `some` branch of `C`. -/
+theorem nmaAdvantage_keygen1_le_stmsis
+    [Inhabited (Commitment p prims)] [Inhabited (Response p prims)]
+    (hr : GenerableRelation (PublicKey p prims) (SecretKey p) (validKeyPair p prims))
+    (maxAttempts : ℕ)
+    (main : PublicKey p prims →
+      OracleComp (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p))
+        (M × Option (Commitment p prims × Response p prims))) :
+    nmaAdvantage p prims hr maxAttempts (keygen1 p prims) main ≤
+      SelfTargetMSIS.advantage (extractorC p prims main) := by
+  -- Both `Pr[= true]`s reduce, through the shared `withStateOracle` random-oracle semantics, to:
+  --   sample the uniform-`t` key `(pk, _)`; run `main pk` against the RO; on `some (w', (z,h))`
+  --   read `c̃ = H(msg, w')` from the cache and accept iff `ids.verify pk w' c̃ (z,h)`.
+  -- The NMA game performs exactly this (its `verify` queries `H(msg, w')` then runs `ids.verify`);
+  -- the STMSIS experiment performs exactly this (its RO-consistency lookup yields `c̃`, and
+  -- `mldsaSTMSIS.isValid` recovers `w'` from `(pk, c̃, (z,h))` and runs `ids.verify`).  Equating
+  -- the two requires the bundled-semantics rewrite plus commitment-recoverability of `w'`; both
+  -- ingredients exist (`roSim.run'_liftM_bind`, `idsWithAbort_commitment_recoverable`) but the
+  -- read-back-of-the-cached-answer step is not yet packaged as a lemma.  Left as a precise sorry.
+  sorry
+
+end Extractor
+
 end NMA
 
-/-! ## Remaining obligations (Phase 1)
+/-! ## Remaining obligations (Phase 2)
 
-The scaffold above is `sorry`-free except for the single distributional `sorry` inside
-`NMA.nma_keyswap_hop`. Closing it — and wiring the result into `nma_security` — requires:
+**Re-seed-base done (Phase 2A).** `MlweEmbedding` is gone: `mldsaMLWE` is now phrased over the
+public *seed* `ρ` (sampled through `ExpandSeed`), with the matrix defined on demand as
+`ExpandA(ρ)`; `distinguisherB` consumes `(ρ, t)` directly and is total. **`(Hadv)` and `(H1)` are
+fully proven**, axiom-clean (`advantage_eq_game_boolDistAdvantage`, the `hH1` branch of
+`nma_keyswap_hop`, via the runtime-plumbing lemma `nmaGame_eq_keygen_bind`). Two precise `sorry`s
+and one statement-level bridge remain:
 
-1. **`(H0)` real-branch identity.** `nmaGame … (keygen0)` equals
-   `LearningWithErrors.game0 (mldsaMLWE) B` for `B = distinguisherB … embed`. This is a
-   monad-rewriting fact: unfold `keygen0` (seed → `(ρ, s₁, s₂)`, `t = Â·s₁+s₂`), recognise
-   `Â = ExpandA(ρ)` via `embed`, and match it against `mldsaMLWE.distr` followed by `B`. The
-   `embed`/`expandSeed` plumbing makes the matrix and the secrets jointly sampled in `keygen0`
-   but independently in `distr`; reconciling the two distributions is the crux. **Difficulty:
-   high** (multi-day): needs a precise characterisation of how `ExpandS ∘ expandSeed` and
-   `ExpandA ∘ (expandSeed).1` sample `(Â, s₁, s₂)`, i.e. the *honest sampling assumption* that
-   the paper folds into the ROM. It almost certainly needs an added hypothesis (see item 4).
+1. **`(H0)` real-branch identity (`nma_keyswap_hop`, one `sorry`).** After the runtime plumbing and
+   `simp` the goal is the *pure key-distribution identity*
+   `𝒟[seed ← $ᵗ; run B-tail on pk(seed, ExpandA(ρ)·(ExpandS ρ').1 + (ExpandS ρ').2)] =
+    𝒟[seed ← $ᵗ; s₁ ← $ᵗ; s₂ ← $ᵗ; run B-tail on pk(seed, ExpandA(ρ)·s₁ + s₂)]`
+   (with `ρ = (ExpandSeed seed).1`, `ρ' = (ExpandSeed seed).2`). It holds iff
+   `(s₁, s₂) = ExpandS (ExpandSeed seed).2` is, over a uniform `seed`, jointly distributed as
+   `Uniform(RqVec l) × Uniform(RqVec k)` independently of `ρ`. This is the ML-DSA **honest-sampling
+   assumption**; it is NOT derivable from the deterministic `prims` and must enter as an added
+   hypothesis on `prims` (or be supplied by modeling `ExpandSeed`/`ExpandS`/`ExpandA` as random
+   oracles). **Difficulty: requires a statement-level hypothesis; the Lean residue is then short.**
 
-2. **`(H1)` uniform-branch identity.** `nmaGame … (keygen1)` equals
-   `LearningWithErrors.game1 (mldsaMLWE) B`. Easier than `(H0)` because both sample `t`
-   uniformly and independently of `(Â, s₁, s₂)`; still needs the `embed` reconciliation for the
-   matrix. **Difficulty: medium.**
+2. **STMSIS extraction identity (`nmaAdvantage_keygen1_le_stmsis`, one `sorry`).** Both
+   `Pr[= true]`s reduce, through the shared `withStateOracle` semantics, to: sample the uniform-`t`
+   key, run `main` against the RO, and on `some (w', (z,h))` read `c̃ = H(msg, w')` from the cache
+   and accept iff `ids.verify pk w' c̃ (z,h)`. The NMA `verify` does exactly this; the STMSIS
+   experiment does exactly this (`mldsaSTMSIS.isValid` recovers `w'` from `(pk, c̃, (z,h))` via
+   commitment recoverability — see `MLDSA.idsWithAbort_commitment_recoverable` — and runs the same
+   verifier). The residue needs (a) the cache-read-back analogue of `nmaGame_eq_keygen_bind`
+   (package the `withStateOracle` rewrite when the experiment *reads* the final cache, cf.
+   `SelfTargetMSIS.experiment`), and (b) the bookkeeping that an accepted NMA forgery is
+   non-aborting (routed to the `some` branch of `extractorC`). **Difficulty: medium-high**, all
+   ingredients exist but the read-back plumbing is not yet a lemma.
 
-3. **`(Hadv)` bias domination.** From `(H0)`/`(H1)`,
-   `|game0.true − game1.true| ≤ experiment.boolBiasAdvantage`. Use
-   `SPMF.boolBiasAdvantage_eq_boolDistAdvantage_coin_branch` (or its `ProbComp` analogue) plus
-   `ProbComp.boolDistAdvantage_*`. **Difficulty: low–medium**, mostly mechanical once the games
-   are identified as the two branches of `experiment`.
+3. **Bridge to the abstract `mlwe`/`stmsis`/`hr` of `nma_security` (statement-level, NOT made
+   here).** `nma_security` quantifies over an *abstract* `mlwe`, an *abstract* `stmsis`, and an
+   *abstract* `hr : GenerableRelation …` whose `gen` need not be ML-DSA keygen. The work here is
+   against the *concrete* `mldsaMLWE` / `mldsaSTMSIS` and `keygen0/1`. Wiring requires added
+   hypotheses to `nma_security`: at least `hr.gen = keygen0 p prims` (the FS scheme is instantiated
+   with the real ML-DSA keygen), `mlwe = mldsaMLWE p prims` (or an advantage inequality), and
+   `stmsis = mldsaSTMSIS p prims M` (or an advantage inequality). These are **statement changes to
+   `nma_security` flagged for owner negotiation in Phase 3** — they are not made in this file, and
+   `nma_security` keeps its `sorry`.
 
-4. **`mldsaMLWE` ↔ the abstract `mlwe` of `nma_security`.** `nma_security` quantifies over an
-   *abstract* `mlwe : LearningWithErrors.Problem …` and an *abstract*
-   `hr : GenerableRelation …` whose `gen` need not be `keyGenFromSeed`. The hop here is proven
-   against the *concrete* `mldsaMLWE` and `keygen0 = keyGenFromSeed`. Bridging requires either
-   (a) a hypothesis `hr.gen = keygen0` (the FS scheme is instantiated with the ML-DSA keygen),
-   and (b) a hypothesis relating `mldsaMLWE` to `mlwe` (e.g. `mlwe = mldsaMLWE`, or an advantage
-   inequality). **These are statement-level facts not currently available**; `nma_security`'s
-   hypotheses are *insufficient* to connect its abstract `mlwe`/`hr` to ML-DSA keygen without an
-   added bridge hypothesis. This is flagged, not silently patched.
-
-5. **`MlweEmbedding` existence.** `distinguisherB` consumes a total `embed` producing, for every
-   `Â`, a seed `ρ` with `ExpandA(ρ) = Â`. `ExpandA` is not surjective in general, so such an
-   `embed` does *not* exist for the deterministic `expandA`. The honest fix is the ROM modeling:
-   state MLWE over seeds with `ExpandA` a random oracle, making the matrix *defined as*
-   `ExpandA(ρ)` for the sampled `ρ`. Phase 2 should reshape `mldsaMLWE`/`distinguisherB` to
-   sample `ρ` (not `Â`) and set `Â := ExpandA(ρ)`, eliminating `MlweEmbedding` entirely.
-
-The concrete next step is item 5 (re-seed-base the MLWE problem), which then makes items 1–2
-tractable, followed by item 4 as an explicit added hypothesis to `nma_security` (a statement
-change to negotiate with the maintainers).
+**Phase 3 plan.** (i) Negotiate the item-3 bridge hypotheses with the owner; (ii) discharge (H0)
+under the honest-sampling hypothesis from item 1; (iii) finish the STMSIS read-back lemma for
+item 2; (iv) assemble `nma_security` as `keyswap_hop` (MLWE) + `keygen1_le_stmsis` (STMSIS) via the
+triangle/`probOutput_true_le_add_ofReal_boolDistAdvantage` bound.
 -/
 
 end MLDSA
