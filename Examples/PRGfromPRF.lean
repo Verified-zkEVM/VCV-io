@@ -256,6 +256,25 @@ noncomputable def genCollisionExp (N : ℕ) (s : S) (c : (S →ₒ S × O).Query
     (simulateQ (prfIdealQueryImpl (D := S) (R := S × O)) (oracleVisitedStates N s)).run' c
   return decide (¬ states.toList.Nodup ∨ ∃ x ∈ states.toList, c.isCached x = true)
 
+omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+/-- One lazy-random-oracle step of the output chain: sample/recall the answer at `s`, then
+recurse on the returned next-state with the updated cache, prepending the output block. -/
+private lemma simulateQ_oracleOutputs_succ_run' (N : ℕ) (s : S)
+    (c : (S →ₒ S × O).QueryCache) :
+    (simulateQ (prfIdealQueryImpl (D := S) (R := S × O)) (oracleOutputs (N + 1) s)).run' c =
+      (do
+        let p ← ((S →ₒ S × O).randomOracle s).run c
+        let rest ← (simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
+          (oracleOutputs N p.1.1)).run' p.2
+        pure (p.1.2 ::ᵥ rest)) := by
+  rw [oracleOutputs]
+  simp only [simulateQ_bind, simulateQ_prfIdealQueryImpl_inr, StateT.run'_eq, StateT.run_bind,
+    map_bind]
+  refine bind_congr fun a => ?_
+  obtain ⟨⟨s', out⟩, c'⟩ := a
+  simp only [simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure, map_bind, map_pure,
+    bind_map_left]
+
 omit [DecidableEq O] in
 /-- **Generalized per-seed core coupling.** For an arbitrary starting cache `c`, the total
 variation distance between the lazy-random-oracle output chain (run from cache `c`) and a
