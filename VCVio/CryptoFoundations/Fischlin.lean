@@ -1517,6 +1517,52 @@ private lemma fischlinUnifSearch_isSome (pk : Stmt) (sk : Wit) (sc : PrvState) :
         | none => rfl
         | some t => obtain ⟨ω', resp', h'⟩ := t; by_cases hlt : h.val < h'.val <;> simp [hlt]
 
+omit [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- **Vector off-repetition cache preservation.** Running a `Fin.mOfFn` family of searches indexed
+by `e : Fin n → Fin ρ`, every support outcome's final cache agrees with the starting cache on all
+records whose `rep` field is not in the image of `e`. Induction on `n`, combining the single-search
+`fischlinSearch_run_preserves_offrep` for the head with the inductive hypothesis for the tail. -/
+private lemma searchVec_run_preserves_offrep (n : ℕ) (e : Fin n → Fin ρ)
+    (pk : Stmt) (sk : Wit) (msg : M) (sc : Fin n → PrvState) (comList : List Commit)
+    (toSig : Fin n → Option (Chal × Resp) → Commit × Chal × Resp)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache) :
+    ∀ p ∈ support ((simulateQ (fischlinImpl ρ b M)
+        (Fin.mOfFn n fun j =>
+          fischlinSearchAux σ pk sk (sc j) msg comList (e j) (FinEnum.toList Chal)
+            (none : Option (Chal × Resp × Fin (2 ^ b))) >>= fun result =>
+              pure (toSig j result))).run cache),
+      ∀ (r : FischlinROInput Stmt Commit Chal Resp ρ M), (∀ j, r.rep ≠ e j) → p.2 r = cache r := by
+  induction n generalizing cache with
+  | zero =>
+      intro p hp r _
+      simp only [Fin.mOfFn, simulateQ_pure, StateT.run_pure, support_pure,
+        Set.mem_singleton_iff] at hp
+      rw [hp]
+  | succ n ih =>
+      intro p hp r hr
+      rw [Fin.mOfFn, simulateQ_bind, StateT.run_bind, support_bind] at hp
+      simp only [Set.mem_iUnion, exists_prop] at hp
+      obtain ⟨⟨out0, c1⟩, hhead, hp⟩ := hp
+      rw [simulateQ_bind, StateT.run_bind, support_bind] at hhead
+      simp only [Set.mem_iUnion, exists_prop] at hhead
+      obtain ⟨⟨res0, c1'⟩, hsearch0, hpure0⟩ := hhead
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff,
+        Prod.mk.injEq] at hpure0
+      obtain ⟨_, rfl⟩ := hpure0
+      have hhead_pres : c1 r = cache r :=
+        fischlinSearch_run_preserves_offrep σ ρ b M pk sk (sc 0) msg comList (e 0)
+          (FinEnum.toList Chal) none cache res0 c1 hsearch0 r (hr 0)
+      rw [simulateQ_bind, StateT.run_bind, support_bind] at hp
+      simp only [Set.mem_iUnion, exists_prop] at hp
+      obtain ⟨⟨outRest, cFinal⟩, htail, hcons⟩ := hp
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hcons
+      obtain ⟨_, rfl⟩ := hcons
+      have htail_pres : cFinal r = c1 r :=
+        ih (fun j => e j.succ) (fun j => sc j.succ) (fun j => toSig j.succ) c1
+          (outRest, cFinal) htail r (fun j => hr j.succ)
+      change cFinal r = cache r
+      rw [htail_pres, hhead_pres]
+
 /-- **Search-vector cache coupling.** Running the `ρ` per-repetition searches (each packaged into a
 transcript by `toSig`) under the lazy random-oracle on a cache that is fresh for every record,
 the joint distribution of the transcript vector together with the final cache's value at each
