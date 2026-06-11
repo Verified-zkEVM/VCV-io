@@ -111,15 +111,18 @@ def keyGenFromSeed (seed : Bytes 32) : PublicKey p prims × SecretKey p :=
   let sk : SecretKey p := ⟨rho, key, tr, s1, s2, t0⟩
   (pk, sk)
 
-/-- A key pair is valid when the public and secret keys are consistently derived:
-the public seed matches, and `tr` is the hash of the encoded public key. -/
-def validKeyPair (pk : PublicKey p prims) (sk : SecretKey p) : Bool :=
-  decide (pk.rho = sk.rho ∧ sk.tr = prims.hashPublicKey pk.rho pk.t1)
+open Classical in
+/-- A key pair is valid when it is honestly generated: there is a seed `ξ` such that
+`keyGenFromSeed ξ = (pk, sk)`. This captures the full key-generation relationship
+(`t = A·s₁ + s₂`, `(t₁, t₀) = Power2Round(t)`, `s₁, s₂` bounded by `η`), which is what the
+completeness and signing-correctness proofs require. The predicate is decidable because the
+seed space `Bytes 32` is finite. -/
+noncomputable def validKeyPair (pk : PublicKey p prims) (sk : SecretKey p) : Bool :=
+  decide (∃ seed : Bytes 32, keyGenFromSeed p prims seed = (pk, sk))
 
-omit nttOps in
 @[simp] theorem validKeyPair_eq_true_iff (pk : PublicKey p prims) (sk : SecretKey p) :
     validKeyPair p prims pk sk = true ↔
-      pk.rho = sk.rho ∧ sk.tr = prims.hashPublicKey pk.rho pk.t1 := by
+      ∃ seed : Bytes 32, keyGenFromSeed p prims seed = (pk, sk) := by
   simp [validKeyPair]
 
 /-! ### Identification Scheme -/
@@ -178,7 +181,8 @@ def identificationScheme
 theorem keyGenFromSeed_validKeyPair (seed : Bytes 32) :
     let (pk, sk) := keyGenFromSeed p prims seed
     validKeyPair p prims pk sk = true := by
-  simp [keyGenFromSeed, validKeyPair]
+  simp only [validKeyPair_eq_true_iff]
+  exact ⟨seed, rfl⟩
 
 /-- The key generation algebraic identity: `A·z - c·(t₁·2^d) = A·y - c·s₂ + c·t₀`
 when `z = y + c·s₁` and the key pair comes from `keyGenFromSeed`.

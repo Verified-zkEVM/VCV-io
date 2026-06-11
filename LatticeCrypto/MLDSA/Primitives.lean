@@ -178,5 +178,11 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
     polyNorm (prims.power2Round r).2 ≤ 2 ^ (droppedBits - 1)
   /-- `w1Encode` is injective: distinct commitments encode to distinct byte strings. -/
   w1Encode_injective : Function.Injective prims.w1Encode
+  /-- The challenge-secret product `c · s` has infinity norm at most `β = τ·η` whenever the
+  vector `s` is bounded by `η`. This reflects that `SampleInBall(c̃)` has exactly `τ` nonzero
+  coefficients, each in `{-1, +1}`, so `‖c · sⱼ‖∞ ≤ τ·η = β`. -/
+  sampleInBall_smul_bound : ∀ (cTilde : CommitHashBytes p) {k : ℕ} (s : RqVec k),
+    polyVecBounded s p.eta →
+    polyVecNorm (nttOps.coeffScalarVecMul (prims.sampleInBall cTilde) s) ≤ p.beta
 
 end MLDSA

@@ -47,6 +47,7 @@ The proof follows the structure:
 
 
 open OracleComp OracleSpec ENNReal
+open LatticeCrypto TransformOps
 
 namespace MLDSA
 
@@ -103,6 +104,50 @@ theorem idsWithAbort_complete' :
       exact hRespondVerify pk sk hvalid w1 st cTilde hw1st _ hoz
 
 omit hRespondVerify
+
+omit nttOps [DecidableEq prims.High] [SampleableType (RqVec p.l)]
+  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+private lemma neg_rq_get (f : Rq) (i : Fin ringDegree) : (-f).get i = -(f.get i) := by
+  change (coeffRing.neg f).get i = _
+  simp [LatticeCrypto.vectorNegacyclicRing]
+
+omit nttOps [DecidableEq prims.High] [SampleableType (RqVec p.l)]
+  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+private lemma polyNorm_neg (f : Rq) : polyNorm (-f) = polyNorm f := by
+  unfold polyNorm normOps
+  simp only [LatticeCrypto.zmodPolyNormOps, LatticeCrypto.normOpsOfCenteredView]
+  unfold LatticeCrypto.cInfNormOf
+  apply Finset.sup_congr rfl
+  intro i _
+  simp only [LatticeCrypto.zmodCenteredCoeffView, polyBackend,
+    LatticeCrypto.vectorNegacyclicRing, LatticeCrypto.vectorBackend]
+  rw [neg_rq_get]
+  exact LatticeCrypto.centeredRepr_natAbs_neg _
+
+omit [DecidableEq prims.High] [SampleableType (RqVec p.l)]
+  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+/-- Vector form of `useHint_makeHint`: `UseHint(MakeHint(z, r), r) = HighBits(r + z)`
+componentwise, when each component of `z` is bounded by `γ₂`. -/
+theorem useHintVec_makeHintVec (h_laws : Primitives.Laws prims nttOps) {k : ℕ}
+    (z r : RqVec k) (hz : ∀ j : Fin k, polyNorm (z.get j) ≤ p.gamma2) :
+    prims.useHintVec (prims.makeHintVec z r) r = prims.highBitsVec (r + z) := by
+  apply Vector.ext; intro i hi
+  simp only [Primitives.useHintVec, Primitives.makeHintVec, Primitives.highBitsVec,
+    Vector.getElem_zipWith, Vector.getElem_map, Vector.getElem_add]
+  exact h_laws.useHint_makeHint z[i] r[i] (by simpa using hz ⟨i, hi⟩)
+
+omit [DecidableEq prims.High] [SampleableType (RqVec p.l)]
+  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+/-- Vector form of `hide_low`: a small additive perturbation does not change the high bits. -/
+theorem hide_lowVec (h_laws : Primitives.Laws prims nttOps) {k : ℕ}
+    (r s : RqVec k) (b : ℕ)
+    (hs : ∀ j : Fin k, polyNorm (s.get j) ≤ b)
+    (hr : ∀ j : Fin k, polyNorm (prims.lowBits (r.get j)) + b < p.gamma2) :
+    prims.highBitsVec (r + s) = prims.highBitsVec r := by
+  apply Vector.ext; intro i hi
+  simp only [Primitives.highBitsVec, Vector.getElem_map, Vector.getElem_add]
+  exact h_laws.hide_low r[i] s[i] b (by simpa using hs ⟨i, hi⟩) (by simpa using hr ⟨i, hi⟩)
+
 /-- The ML-DSA identification scheme is complete: whenever the honest prover does not abort,
 the verifier always accepts. This follows from the correctness of the rounding operations
 and the norm bounds satisfied by honest responses.
@@ -112,7 +157,66 @@ see `idsWithAbort_complete'` for the conditional version. -/
 theorem idsWithAbort_complete (h_laws : Primitives.Laws prims nttOps) :
     (identificationScheme p prims).Complete := by
   classical
-  sorry
+  refine idsWithAbort_complete' p prims ?_
+  intro pk sk hvalid w1 st cTilde hw1st zh hzh
+  obtain ⟨seed, hkeygen⟩ := (validKeyPair_eq_true_iff p prims pk sk).mp hvalid
+  simp only [identificationScheme, support_bind, support_pure, Set.mem_iUnion,
+    Set.mem_singleton_iff, Prod.mk.injEq] at hw1st
+  simp only [identificationScheme] at hzh
+  obtain ⟨y, -, hw1, hst⟩ := hw1st
+  subst hst hw1
+  split_ifs at hzh with hc1 hc2
+  · rw [support_pure, Set.mem_singleton_iff, Option.some.injEq] at hzh
+    subst hzh
+    dsimp only at hc1 hc2 ⊢
+    obtain ⟨hz_norm, hr0_norm⟩ := hc1
+    obtain ⟨hct0_norm, hweight⟩ := hc2
+    -- Honest secret vectors are `η`-bounded, so the challenge product is `β`-bounded.
+    have hs2_bound : polyVecBounded sk.s2 p.eta := by
+      have h := congrArg Prod.snd hkeygen
+      simp only [keyGenFromSeed] at h
+      rw [← h]
+      exact (h_laws.expandS_bound _).2
+    have hcs2_norm : polyVecNorm (prims.sampleInBall cTilde • sk.s2) ≤ p.beta :=
+      h_laws.sampleInBall_smul_bound cTilde sk.s2 hs2_bound
+    -- Abbreviations matching the goal.
+    set c := prims.sampleInBall cTilde with hc_def
+    set aHat := prims.expandA pk.rho with haHat_def
+    -- The challenge-times-`t₀` hint argument is `γ₂`-bounded (after negation).
+    have hcond_t0 : ∀ j : Fin p.k, polyNorm ((-(c • sk.t0)).get j) ≤ p.gamma2 := by
+      intro j
+      rw [Vector.get_eq_getElem, Vector.getElem_neg, polyNorm_neg]
+      exact le_of_lt (lt_of_le_of_lt
+        (LatticeCrypto.PolyVec.component_cInfNorm_le normOps (c • sk.t0) j) hct0_norm)
+    -- Vector cancellations.
+    have harith1 : aHat * y - c • sk.s2 + c • sk.t0 + -(c • sk.t0) = aHat * y - c • sk.s2 := by
+      apply Vector.ext; intro i hi
+      simp only [Vector.getElem_add, Vector.getElem_sub, Vector.getElem_neg]; abel
+    have harith2 : aHat * y - c • sk.s2 + c • sk.s2 = aHat * y := by
+      apply Vector.ext; intro i hi
+      simp only [Vector.getElem_add, Vector.getElem_sub]; abel
+    -- The high bits are unchanged by subtracting `c·s₂`.
+    have hhide : prims.highBitsVec (aHat * y - c • sk.s2) = prims.highBitsVec (aHat * y) := by
+      have h := hide_lowVec p prims h_laws (aHat * y - c • sk.s2) (c • sk.s2) p.beta
+        (fun j => le_trans
+          (LatticeCrypto.PolyVec.component_cInfNorm_le normOps (c • sk.s2) j) hcs2_norm)
+        (fun j => by
+          have hj := lt_of_le_of_lt
+            (LatticeCrypto.PolyVec.component_cInfNorm_le normOps
+              (prims.lowBitsVec (aHat * y - c • sk.s2)) j) hr0_norm
+          simp only [Primitives.lowBitsVec, Vector.get_eq_getElem, Vector.getElem_map,
+            polyNorm] at hj ⊢
+          omega)
+      rw [harith2] at h
+      exact h.symm
+    -- The key-generation identity for `wApprox`.
+    have hwa := keyGenFromSeed_wApprox_eq p prims h_laws seed hkeygen c y
+    -- Discharge `verify`.
+    simp only [identificationScheme, Bool.and_eq_true, decide_eq_true_eq]
+    refine ⟨⟨hz_norm, ?_⟩, hweight⟩
+    rw [hwa, useHintVec_makeHintVec p prims h_laws (-(c • sk.t0))
+        (aHat * y - c • sk.s2 + c • sk.t0) hcond_t0, harith1, hhide]
+  all_goals (rw [support_pure, Set.mem_singleton_iff] at hzh; exact absurd hzh (by simp))
 
 /-- Placeholder quantitative HVZK theorem surface for the ML-DSA identification scheme.
 
