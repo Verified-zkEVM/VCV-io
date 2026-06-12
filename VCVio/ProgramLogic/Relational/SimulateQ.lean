@@ -1417,6 +1417,112 @@ theorem tvDist_simulateQ_le_queryBound_mul_slack_plus_probEvent_bad
         ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false)))
   exact le_trans h_map h_joint
 
+/-! #### Query-bounded TV budget without a bad event
+
+When the two implementations agree exactly off the charged queries and no bad event is
+tracked, the selective bound simplifies to a pure per-query budget `qS * ε` on the joint
+output-and-state distribution, with no bad-flag plumbing in the state. -/
+
+/-- Bound the weighted TV sum from `tvDist_bind_left_le` by a uniform pointwise constant:
+the output weights sum to at most one, so the weighted average of per-continuation TV
+distances is at most any uniform bound on them. -/
+private lemma tsum_probOutput_mul_tvDist_le_const
+    {β γ : Type} (mx : OracleComp spec' β) (f₁ f₂ : β → OracleComp spec' γ)
+    {c : ℝ} (hc : 0 ≤ c) (h_le : ∀ z : β, tvDist (f₁ z) (f₂ z) ≤ c) :
+    (∑' z : β, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z)) ≤ c := by
+  have h_p_sum_le_one : (∑' z : β, Pr[= z | mx]) ≤ 1 := tsum_probOutput_le_one
+  have h_p_summable : Summable (fun z : β => Pr[= z | mx].toReal) :=
+    ENNReal.summable_toReal (ne_top_of_le_ne_top one_ne_top h_p_sum_le_one)
+  have h_nonneg : ∀ z : β, 0 ≤ Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
+    fun z => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
+  have h_le' : ∀ z : β,
+      Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤ Pr[= z | mx].toReal * c :=
+    fun z => mul_le_mul_of_nonneg_left (h_le z) ENNReal.toReal_nonneg
+  have h_sum_toReal_le_one : (∑' z : β, Pr[= z | mx].toReal) ≤ 1 := by
+    have h := ENNReal.toReal_mono one_ne_top h_p_sum_le_one
+    rwa [ENNReal.toReal_one, ENNReal.tsum_toReal_eq
+      (fun z => ne_top_of_le_ne_top one_ne_top probOutput_le_one)] at h
+  calc (∑' z : β, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z))
+      ≤ ∑' z : β, Pr[= z | mx].toReal * c :=
+        Summable.tsum_le_tsum h_le'
+          (Summable.of_nonneg_of_le h_nonneg h_le' (h_p_summable.mul_right c))
+          (h_p_summable.mul_right c)
+    _ = (∑' z : β, Pr[= z | mx].toReal) * c := tsum_mul_right
+    _ ≤ 1 * c := mul_le_mul_of_nonneg_right h_sum_toReal_le_one hc
+    _ = c := one_mul c
+
+/-- **Query-bounded total-variation budget for `simulateQ`.**
+
+If two stateful oracle implementations agree exactly on every query outside a designated
+set `S`, and on `S`-queries are within total-variation distance `ε` on the joint
+answer-and-state distribution — uniformly in the carried state — then simulating any
+computation making at most `qS` queries to `S` keeps the joint output-and-state
+distributions within `qS * ε`, from any shared starting state.
+
+This is the bad-event-free counterpart of
+`tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad`: the per-query budgets
+telescope across the simulation by the triangle inequality, the hybrid for the `i`-th
+charged query swapping which implementation answers it. Typical use: a signing oracle
+whose real and simulated bodies are within `ε` from every shared random-oracle cache,
+with all remaining oracles handled identically on both sides. -/
+theorem tvDist_simulateQ_run_le_queryBoundP_mul
+    (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec')))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (S : ι → Prop) [DecidablePred S]
+    (h_step_tv_S : ∀ (t : ι), S t → ∀ (s : σ),
+      tvDist ((impl₁ t).run s) ((impl₂ t).run s) ≤ ε)
+    (h_step_eq_nS : ∀ (t : ι), ¬ S t → ∀ (s : σ),
+      (impl₁ t).run s = (impl₂ t).run s)
+    (oa : OracleComp spec α) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBoundP oa S qS) (s₀ : σ) :
+    tvDist ((simulateQ impl₁ oa).run s₀) ((simulateQ impl₂ oa).run s₀) ≤ qS * ε := by
+  induction oa using OracleComp.inductionOn generalizing qS s₀ with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, tvDist_self]
+      exact mul_nonneg (Nat.cast_nonneg _) hε
+  | query_bind t cont ih =>
+      rw [isQueryBoundP_query_bind_iff] at h_qb
+      obtain ⟨h_can, h_cont⟩ := h_qb
+      set f₁ : spec.Range t × σ → OracleComp spec' (α × σ) :=
+        fun z => (simulateQ impl₁ (cont z.1)).run z.2 with hf₁_def
+      set f₂ : spec.Range t × σ → OracleComp spec' (α × σ) :=
+        fun z => (simulateQ impl₂ (cont z.1)).run z.2 with hf₂_def
+      have hsim₁_eq : (simulateQ impl₁ (query t >>= cont)).run s₀ =
+          (impl₁ t).run s₀ >>= f₁ := by
+        simp [hf₁_def, simulateQ_bind, simulateQ_query,
+          OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+      have hsim₂_eq : (simulateQ impl₂ (query t >>= cont)).run s₀ =
+          (impl₂ t).run s₀ >>= f₂ := by
+        simp [hf₂_def, simulateQ_bind, simulateQ_query,
+          OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+      rw [hsim₁_eq, hsim₂_eq]
+      by_cases hSt : S t
+      · -- Charged query: swap the step (cost `ε`), then recurse with budget `qS - 1`.
+        simp only [if_pos hSt] at h_cont
+        have hqS_pos : 0 < qS := h_can.resolve_left (not_not_intro hSt)
+        have h_first : tvDist ((impl₁ t).run s₀ >>= f₁) ((impl₁ t).run s₀ >>= f₂)
+            ≤ ↑(qS - 1) * ε :=
+          le_trans (tvDist_bind_left_le _ _ _)
+            (tsum_probOutput_mul_tvDist_le_const _ f₁ f₂
+              (mul_nonneg (Nat.cast_nonneg _) hε) (fun z => ih z.1 (h_cont z.1) z.2))
+        have h_second : tvDist ((impl₁ t).run s₀ >>= f₂) ((impl₂ t).run s₀ >>= f₂) ≤ ε :=
+          le_trans (tvDist_bind_right_le _ _ _) (h_step_tv_S t hSt s₀)
+        have hq_arith : (↑(qS - 1) + 1 : ℝ) = (qS : ℝ) := by
+          exact_mod_cast congrArg Nat.cast (Nat.sub_add_cancel hqS_pos)
+        calc tvDist ((impl₁ t).run s₀ >>= f₁) ((impl₂ t).run s₀ >>= f₂)
+            ≤ tvDist ((impl₁ t).run s₀ >>= f₁) ((impl₁ t).run s₀ >>= f₂) +
+                tvDist ((impl₁ t).run s₀ >>= f₂) ((impl₂ t).run s₀ >>= f₂) :=
+              tvDist_triangle _ _ _
+          _ ≤ ↑(qS - 1) * ε + ε := add_le_add h_first h_second
+          _ = (↑(qS - 1) + 1) * ε := by ring
+          _ = ↑qS * ε := by rw [hq_arith]
+      · -- Free query: the step is shared; recurse with the budget intact.
+        simp only [if_neg hSt] at h_cont
+        rw [← h_step_eq_nS t hSt s₀]
+        exact le_trans (tvDist_bind_left_le _ _ _)
+          (tsum_probOutput_mul_tvDist_le_const _ f₁ f₂
+            (mul_nonneg (Nat.cast_nonneg _) hε) (fun z => ih z.1 (h_cont z.1) z.2))
+
 end IdenticalUntilBadEpsilonSelective
 
 /-! ### State-dep ε-perturbed identical-until-bad

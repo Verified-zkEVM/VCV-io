@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
+import VCVio.ProgramLogic.Relational.SimulateQ
 
 /-!
 # EUF-CMA security of Fiat-Shamir with aborts
@@ -412,20 +413,21 @@ lemma probOutput_hybridExpAtKey_prog_le_trans
         ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
   sorry
 
+omit [SampleableType Stmt] in
 /-- Hop G₂ → G₃ (Trans → Sim) at a fixed key: replacing the private honest-execution
 loop by the per-attempt HVZK simulator loop costs at most `qS·ζ_zk/(1-p)`.
 
 Distributional content: per signing query, `transSignBody` and `simSignBody` differ only
 in the optional sampler driving `firstSome`; `tvDist_firstSome_le_geometric` bounds the
 per-query gap by `ζ_zk · (1 + p + ⋯) ≤ ζ_zk/(1-p)` using `ids.HVZK sim ζ_zk` (`hhvzk`)
-and the simulator abort bound (`hAbortSim`). The remaining step is accumulating this
-per-query total-variation budget across the at-most-`qS` signing queries of the
-adversary run: a `simulateQ`-level analogue of `tvDist_bind_left_le` for two
-implementations that differ only on one oracle component, with a per-call TV budget and
-an `IsQueryBoundP` bound on that component. -/
+and the simulator abort bound (`hAbortSim`), uniformly in the shared starting cache
+(`tvDist_run_transSignBody_simSignBody_le`). The per-query total-variation budget is
+accumulated across the at-most-`qS` signing queries of the adversary run by
+`tvDist_simulateQ_run_le_queryBoundP_mul`, the two hybrid handlers agreeing exactly on
+the base (uniform and random-oracle) component. -/
 lemma probOutput_hybridExpAtKey_trans_le_sim
     (ζ_zk : ℝ) (hζ : 0 ≤ ζ_zk) (hhvzk : ids.HVZK sim ζ_zk)
-    (qS qH : ℕ) (p_abort : ℝ) (hp : p_abort < 1)
+    (qS qH : ℕ) (p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1)
     (hQ : ∀ pk, FiatShamir.signHashQueryBound M
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
     (pk : Stmt) (sk : Wit) (hrel : rel pk sk = true)
@@ -435,7 +437,94 @@ lemma probOutput_hybridExpAtKey_trans_le_sim
       Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
           (simSignBody M maxAttempts sim pk sk) pk] +
         ENNReal.ofReal (qS * ζ_zk / (1 - p_abort)) := by
-  sorry
+  set ε : ℝ := ζ_zk * ∑ j ∈ Finset.range maxAttempts, p_abort ^ j with hε_def
+  have hε_nonneg : 0 ≤ ε :=
+    mul_nonneg hζ (Finset.sum_nonneg fun j _ => pow_nonneg hp₀ j)
+  have h1p : (0 : ℝ) < 1 - p_abort := by linarith
+  -- The simulator abort bound, in real form.
+  have hq_toReal : Pr[= none | sim pk].toReal ≤ p_abort := by
+    have h := ENNReal.toReal_mono ENNReal.ofReal_ne_top hAbortSim
+    rwa [ENNReal.toReal_ofReal hp₀] at h
+  -- Per-signing-query step bound, uniform over the hybrid state.
+  have h_step : ∀ (msg : M) (s : (M × Commit →ₒ Chal).QueryCache × List M),
+      tvDist ((hybridSignImpl M (transSignBody ids M maxAttempts pk sk) msg).run s)
+        ((hybridSignImpl M (simSignBody M maxAttempts sim pk sk) msg).run s) ≤ ε := by
+    intro msg s
+    have hrun : ∀ (body : M → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
+        (Option (Commit × Resp))),
+        (hybridSignImpl M body msg).run s =
+          (fun (ac : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache) =>
+            (ac.1, (ac.2, msg :: s.2))) <$> (body msg).run s.1 := by
+      intro body
+      rfl
+    rw [hrun, hrun]
+    exact le_trans (tvDist_map_le _ _ _)
+      (tvDist_run_transSignBody_simSignBody_le ids M maxAttempts sim pk sk hrel msg
+        hhvzk hq_toReal hp₀ s.1)
+  -- Accumulate the per-query budget across the `qS` signing queries of the run.
+  have h_run : tvDist
+      (StateT.run (simulateQ
+        (hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+          hybridSignImpl M (transSignBody ids M maxAttempts pk sk)) (adv.main pk)) (∅, []))
+      (StateT.run (simulateQ
+        (hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+          hybridSignImpl M (simSignBody M maxAttempts sim pk sk)) (adv.main pk)) (∅, []))
+        ≤ qS * ε := by
+    refine OracleComp.ProgramLogic.Relational.tvDist_simulateQ_run_le_queryBoundP_mul
+      _ _ hε_nonneg
+      (· matches .inr _) ?_ ?_ (adv.main pk) (hQ pk).1 (∅, [])
+    · rintro (t | msg) hSt s
+      · simp at hSt
+      · simpa only [QueryImpl.add_apply_inr] using h_step msg s
+    · rintro (t | msg) hSt s
+      · simp only [QueryImpl.add_apply_inl]
+      · simp at hSt
+  -- The verification continuation is shared, so the games inherit the run-level bound.
+  have h_tv_games : tvDist
+      (hybridExpAtKey ids hr M maxAttempts adv (transSignBody ids M maxAttempts pk sk) pk)
+      (hybridExpAtKey ids hr M maxAttempts adv (simSignBody M maxAttempts sim pk sk) pk)
+        ≤ qS * ε := by
+    refine le_trans ?_ h_run
+    simp only [hybridExpAtKey]
+    exact tvDist_bind_right_le _ _ _
+  -- Close the finite geometric sum: `∑_{j<n} p^j ≤ 1/(1-p)`.
+  have hsum_le : ∑ j ∈ Finset.range maxAttempts, p_abort ^ j ≤ 1 / (1 - p_abort) := by
+    rw [le_div_iff₀ h1p]
+    have hmul := geom_sum_mul p_abort maxAttempts
+    nlinarith [pow_nonneg hp₀ maxAttempts]
+  have h_bound : (qS : ℝ) * ε ≤ qS * ζ_zk / (1 - p_abort) := by
+    rw [hε_def, div_eq_mul_inv, ← one_div]
+    calc (qS : ℝ) * (ζ_zk * ∑ j ∈ Finset.range maxAttempts, p_abort ^ j)
+        ≤ (qS : ℝ) * (ζ_zk * (1 / (1 - p_abort))) := by
+          refine mul_le_mul_of_nonneg_left ?_ (Nat.cast_nonneg _)
+          exact mul_le_mul_of_nonneg_left hsum_le hζ
+      _ = (qS : ℝ) * ζ_zk * (1 / (1 - p_abort)) := by ring
+  have h_loss_nonneg : (0 : ℝ) ≤ qS * ζ_zk / (1 - p_abort) :=
+    div_nonneg (mul_nonneg (Nat.cast_nonneg _) hζ) h1p.le
+  -- Convert the real TV bound into the `ℝ≥0∞` output-probability bound.
+  have h_real : Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+        (transSignBody ids M maxAttempts pk sk) pk].toReal ≤
+      Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+        (simSignBody M maxAttempts sim pk sk) pk].toReal +
+        qS * ζ_zk / (1 - p_abort) := by
+    have habs := abs_probOutput_toReal_sub_le_tvDist
+      (hybridExpAtKey ids hr M maxAttempts adv (transSignBody ids M maxAttempts pk sk) pk)
+      (hybridExpAtKey ids hr M maxAttempts adv (simSignBody M maxAttempts sim pk sk) pk)
+    have h_le := (abs_le.mp habs).2
+    linarith [h_tv_games, h_bound]
+  calc Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+        (transSignBody ids M maxAttempts pk sk) pk]
+      = ENNReal.ofReal (Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (transSignBody ids M maxAttempts pk sk) pk].toReal) :=
+        (ENNReal.ofReal_toReal probOutput_ne_top).symm
+    _ ≤ ENNReal.ofReal (Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (simSignBody M maxAttempts sim pk sk) pk].toReal +
+          qS * ζ_zk / (1 - p_abort)) := ENNReal.ofReal_le_ofReal h_real
+    _ = Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (simSignBody M maxAttempts sim pk sk) pk] +
+          ENNReal.ofReal (qS * ζ_zk / (1 - p_abort)) := by
+        rw [ENNReal.ofReal_add ENNReal.toReal_nonneg h_loss_nonneg,
+          ENNReal.ofReal_toReal probOutput_ne_top]
 
 /-! ## The NMA reduction -/
 
@@ -528,6 +617,7 @@ theorem euf_cma_to_nma
   -- `SignatureAlg.probOutput_bind_ge_of_forall_support`.
   sorry
 
+omit [SampleableType Stmt] [SampleableType Chal] in
 /-- Cache-invariant companion to `simulatedNmaAdv`: the reduction issues at most `qH`
 live hash queries (the signing simulation samples transcripts using only uniform
 queries and programs the managed cache). Mirrors
@@ -539,7 +629,124 @@ lemma simulatedNmaAdv_nmaHashQueryBound
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH) :
     ∀ pk, FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := (simulatedNmaAdv ids hr M maxAttempts sim adv).main pk) qH := by
-  sorry
+  haveI : Fintype Chal := Fintype.ofFinite Chal
+  letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
+  intro pk
+  let spec := unifSpec + (M × Commit →ₒ Chal)
+  let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
+  let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
+    fun n => fwd (.inl n)
+  let roSim : QueryImpl (M × Commit →ₒ Chal)
+      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
+    let cache ← get
+    match cache (.inr mc) with
+    | some v => pure v
+    | none => do
+        let v ← fwd (.inr mc)
+        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+  let sigSim : QueryImpl (M →ₒ Option (Commit × Resp))
+      (StateT spec.QueryCache (OracleComp spec)) := fun msg => do
+    let r ← simulateQ unifSim (firstSome (sim pk) maxAttempts)
+    match r with
+    | some (w, c, z) =>
+        modifyGet fun cache => (some (w, z), cache.cacheQuery (.inr (msg, w)) c)
+    | none => pure none
+  -- Step bound for `fwd`: 0 live hash queries on `.inl`, exactly 1 on `.inr`.
+  have hfwd :
+      ∀ (t : spec.Domain) (s : spec.QueryCache),
+        FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (fwd t).run s) (match t with
+            | .inl _ => 0
+            | .inr _ => 1) := by
+    intro t s
+    cases t with
+    | inl n =>
+        simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
+          OracleComp.liftM_run_StateT] using
+          (FiatShamir.nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+            (show FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+              (oa := liftM (spec.query (.inl n))) 0 by
+                exact (FiatShamir.nmaHashQueryBound_query_iff (M := M) (Commit := Commit)
+                  (Chal := Chal) (.inl n) 0).2 trivial)
+            (fun u =>
+              show FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := pure (u, s)) 0 by
+                  trivial))
+    | inr mc =>
+        simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
+          OracleComp.liftM_run_StateT] using
+          (FiatShamir.nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+            (show FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+              (oa := liftM (spec.query (.inr mc))) 1 by
+                exact (FiatShamir.nmaHashQueryBound_query_iff (M := M) (Commit := Commit)
+                  (Chal := Chal) (.inr mc) 1).2 (Nat.succ_pos 0))
+            (fun u =>
+              show FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := pure (u, s)) 0 by
+                  trivial))
+  -- Step bound for `roSim`: a cache hit issues no live query, a miss issues exactly one.
+  have hro :
+      ∀ (mc : M × Commit) (s : spec.QueryCache),
+        FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (roSim mc).run s) 1 := by
+    intro mc s
+    cases hs : s (.inr mc) with
+    | some v =>
+        simp [roSim, hs, FiatShamir.nmaHashQueryBound]
+    | none =>
+        simp only [FiatShamir.nmaHashQueryBound, Sum.forall, Prod.forall, StateT.run_bind,
+          StateT.run_get, pure_bind, hs, StateT.run_modifyGet, bind_pure_comp,
+          isQueryBoundP_map_iff, roSim] at ⊢ hfwd
+        exact hfwd.2 mc.1 mc.2 s
+  -- Step bound for `sigSim`: the simulator loop samples under `unifSim` (uniform-only)
+  -- and then programs the managed cache, issuing no live hash query.
+  have hsig :
+      ∀ (msg : M) (s : spec.QueryCache),
+        FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (sigSim msg).run s) 0 := by
+    intro msg s
+    have htranscript :
+        FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (simulateQ unifSim (firstSome (sim pk) maxAttempts)).run s) 0 := by
+      unfold FiatShamir.nmaHashQueryBound
+      refine OracleComp.IsQueryBoundP.simulateQ_run_of_step
+        (p := fun _ : ℕ => False) (impl := unifSim)
+        (oa := firstSome (sim pk) maxAttempts)
+        (OracleComp.isQueryBoundP_false _ _)
+        (fun _ h _ => h.elim)
+        ?_ s
+      intro n _ s'
+      have h := hfwd (.inl n) s'
+      simpa [unifSim, FiatShamir.nmaHashQueryBound] using h
+    have hcont : ∀ (rs : Option (Commit × Chal × Resp) × spec.QueryCache),
+        FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := StateT.run
+            (match rs.1 with
+              | some (w, c, z) => modifyGet fun cache =>
+                  (some (w, z), cache.cacheQuery (.inr (msg, w)) c)
+              | none =>
+                  (pure none : StateT spec.QueryCache (OracleComp spec)
+                    (Option (Commit × Resp)))) rs.2) 0 := by
+      rintro ⟨(_ | ⟨w, c, z⟩), cache⟩ <;>
+        simp [FiatShamir.nmaHashQueryBound, StateT.run_modifyGet]
+    have hbind := FiatShamir.nmaHashQueryBound_bind (M := M) (Commit := Commit)
+      (Chal := Chal) htranscript (fun rs => hcont rs)
+    simpa [sigSim, StateT.run_bind] using hbind
+  change FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+    (oa := (simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅) qH
+  unfold FiatShamir.nmaHashQueryBound
+  refine OracleComp.IsQueryBoundP.simulateQ_run_of_step (hQ pk).2 ?_ ?_ ∅
+  · rintro ((n | mc) | msg) hp s'
+    · simp at hp
+    · simpa only [QueryImpl.add_apply_inl, QueryImpl.add_apply_inr] using hro mc s'
+    · simp at hp
+  · rintro ((n | mc) | msg) hnp s'
+    · have h := hfwd (.inl n) s'
+      simpa only [QueryImpl.add_apply_inl, FiatShamir.nmaHashQueryBound] using h
+    · simp at hnp
+    · simpa only [QueryImpl.add_apply_inr] using hsig msg s'
 
 end scaffold
 
