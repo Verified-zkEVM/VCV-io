@@ -2428,7 +2428,8 @@ omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Res
 Each `Fin (2^b)`-valued tuple injects into a `Fin ρ → ℕ` tuple with the same (bounded) sum; the
 number of such natural tuples with sum exactly `s` is `C(s+ρ-1, ρ-1)`, which is monotone in `s`, so
 summing over the `S+1` values `s = 0, …, S` gives the stated bound. -/
-private lemma smallSumCount_le : smallSumCount ρ b S ≤ (S + 1) * Nat.choose (S + ρ - 1) (ρ - 1) := by
+private lemma smallSumCount_le :
+    smallSumCount ρ b S ≤ (S + 1) * Nat.choose (S + ρ - 1) (ρ - 1) := by
   classical
   -- Per-fiber count: tuples `Fin ρ → ℕ` summing to exactly `s` number `C(ρ+s-1, s)`.
   have hfiber : ∀ s : ℕ, (Finset.univ.piAntidiag s : Finset (Fin ρ → ℕ)).card
@@ -2470,9 +2471,75 @@ private lemma smallSumCount_le : smallSumCount ρ b S ≤ (S + 1) * Nat.choose (
       rw [h1]; exact Nat.choose_le_choose _ (by omega)
   · rw [Finset.card_range, smul_eq_mul]
 
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Each output tuple of `n` IID uniform draws is equally likely, with probability
+`(Fintype.card α)⁻¹ ^ n`. -/
+private lemma probOutput_mOfFn_uniformSample {α : Type} [SampleableType α] [Fintype α]
+    (n : ℕ) (w : Fin n → α) :
+    Pr[= w | Fin.mOfFn n (fun _ => ($ᵗ α : ProbComp α))]
+      = (Fintype.card α : ℝ≥0∞)⁻¹ ^ n := by
+  letI : DecidableEq α := Classical.decEq α
+  induction n with
+  | zero =>
+    have hw : w = Fin.elim0 := funext fun i => i.elim0
+    simp [Fin.mOfFn, hw]
+  | succ n ih =>
+    have hcond : ∀ (a : α) (r : Fin n → α),
+        w = Fin.cons a r ↔ r = Fin.tail w ∧ a = w 0 := by
+      intro a r
+      constructor
+      · rintro rfl
+        simp
+      · rintro ⟨rfl, rfl⟩
+        exact (Fin.cons_self_tail w).symm
+    rw [Fin.mOfFn]
+    simp only [probOutput_bind_eq_tsum, probOutput_pure, ih, probOutput_uniformSample,
+      hcond, ite_and, mul_ite, mul_one, mul_zero, tsum_ite_eq]
+    rw [pow_succ']
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- The probability that `n` IID uniform draws land in a (decidable) target set is exactly the
+size of the target set over `(Fintype.card α) ^ n`. -/
+private lemma probEvent_mOfFn_uniformSample {α : Type} [SampleableType α] [Fintype α]
+    (n : ℕ) (p : (Fin n → α) → Prop) [DecidablePred p] :
+    Pr[p | Fin.mOfFn n (fun _ => ($ᵗ α : ProbComp α))]
+      = ((Finset.univ.filter p).card : ℝ≥0∞) / (Fintype.card α : ℝ≥0∞) ^ n := by
+  rw [probEvent_eq_sum_filter_univ]
+  simp only [probOutput_mOfFn_uniformSample, Finset.sum_const, nsmul_eq_mul]
+  rw [div_eq_mul_inv, ENNReal.inv_pow]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Untouched slot completes with probability exactly `μ`.** The probability that `ρ` fresh
+uniform `Fin (2^b)` draws sum to at most `S` is exactly `smallSumCount ρ b S / (2^b)^ρ`. -/
+private lemma probEvent_sum_le_mOfFn_uniform :
+    Pr[fun v => ∑ i, (v i).val ≤ S | Fin.mOfFn ρ (fun _ => $ᵗ (Fin (2 ^ b)))]
+      = (smallSumCount ρ b S : ℝ≥0∞) / ((2 ^ b : ℕ) : ℝ≥0∞) ^ ρ := by
+  rw [probEvent_mOfFn_uniformSample, Fintype.card_fin, smallSumCount]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Conditional tail.** Given a revealed partial sum `T ≤ S`, the probability that `k` fresh
+uniform draws bring the total to at most `S` is exactly `smallSumCount k b (S - T) / (2^b)^k`.
+This is the per-slot completion probability with some coordinates already revealed, used by the
+potential-function step of the knowledge-soundness bound. -/
+private lemma probEvent_add_sum_le_mOfFn_uniform (k T : ℕ) (hT : T ≤ S) :
+    Pr[fun v => T + ∑ i, (v i).val ≤ S | Fin.mOfFn k (fun _ => $ᵗ (Fin (2 ^ b)))]
+      = (smallSumCount k b (S - T) : ℝ≥0∞) / ((2 ^ b : ℕ) : ℝ≥0∞) ^ k := by
+  have hfilter :
+      (Finset.univ.filter (fun v : Fin k → Fin (2 ^ b) => T + ∑ i, (v i).val ≤ S))
+        = (Finset.univ.filter (fun v : Fin k → Fin (2 ^ b) => ∑ i, (v i).val ≤ S - T)) :=
+    Finset.filter_congr fun v _ => by omega
+  rw [probEvent_mOfFn_uniformSample k
+      (fun v : Fin k → Fin (2 ^ b) => T + ∑ i, (v i).val ≤ S),
+    Fintype.card_fin, smallSumCount, hfilter]
+
 omit [SampleableType Chal] in
-/-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin knowledge-soundness
-bad event — the verifier accepts the cheating prover's proof yet the online extractor recovers no
+/-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
+knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
+extractor recovers no
 valid witness — occurs with probability at most `(Q+1)` (one slot per logged hash query, plus the
 trivial slot) times the chance that a fresh tuple of `ρ` independent random-oracle answers lands in
 the small-sum target set, namely `smallSumCount ρ b S / (2^b)^ρ`.
