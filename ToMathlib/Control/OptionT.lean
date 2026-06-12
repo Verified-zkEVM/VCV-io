@@ -98,4 +98,30 @@ lemma liftM_elimM {m} [Monad m] {α β}
   simp only [Option.elimM, liftM_bind]
   refine bind_congr fun x => by cases x <;> simp
 
+/-- Rewrite a mapped `OptionT.mk`'d bind through a pointwise `Option.map` relation between two
+bodies: if `Option.map f <$> body₁ a` agrees with `Option.map (post a) <$> body₂ a` for every
+sample `a`, then mapping `f` over `OptionT.mk (sample >>= body₁)` equals `OptionT.mk` of binding
+`body₂` and post-processing with `post`. Useful for re-expressing a mapped `OptionT` computation
+through an alternative body with sample-dependent post-processing. -/
+lemma map_mk_bind_eq_of_body {m : Type u → Type v} [Monad m] [LawfulMonad m]
+    {α β γ δ : Type u}
+    (sample : m α) (body₁ : α → m (Option β)) (body₂ : α → m (Option γ))
+    (f : β → δ) (post : α → γ → δ)
+    (hBody : ∀ a, Option.map f <$> body₁ a = Option.map (post a) <$> body₂ a) :
+    f <$> OptionT.mk (do
+      let a ← sample
+      body₁ a)
+    =
+    OptionT.mk (do
+      let a ← sample
+      let r ← body₂ a
+      pure (Option.map (post a) r)) := by
+  apply OptionT.ext
+  rw [OptionT.run_map]
+  simp only [OptionT.run_mk, map_eq_bind_pure_comp, bind_assoc]
+  congr 1
+  funext a
+  rw [← map_eq_bind_pure_comp, hBody a, map_eq_bind_pure_comp]
+  rfl
+
 end OptionT

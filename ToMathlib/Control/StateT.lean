@@ -82,6 +82,15 @@ lemma run'_lift' (x : m α) (s : σ) :
     (StateT.lift x : StateT σ m α).run' s = x := by
   simp [StateT.run'_eq, map_eq_bind_pure_comp, bind_assoc]
 
+/-- If two `StateT` computations agree after mapping into a common result type, then they
+still agree after projecting away the final state with `run'` from any initial state. -/
+lemma map_run'_eq_of_map_eq {γ : Type u} (f : α → γ) (g : β → γ)
+    (mx : StateT σ m α) (my : StateT σ m β) (s : σ)
+    (h : f <$> mx = g <$> my) :
+    f <$> mx.run' s = g <$> my.run' s := by
+  rw [← StateT.run'_map', ← StateT.run'_map']
+  exact congrArg (fun mx : StateT σ m γ => mx.run' s) h
+
 end run'
 
 end StateT

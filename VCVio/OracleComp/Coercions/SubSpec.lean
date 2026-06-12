@@ -252,6 +252,30 @@ lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
     liftComp (f <$> mx) superSpec = f <$> liftComp mx superSpec := by
   simp [liftComp]
 
+/-- `bind`-`pure` form of `liftComp_map`, matching the term shape produced by `do`-notation
+(`do let a ← oa; pure (f a)`) before any `bind_pure_comp` normalization. -/
+lemma liftComp_bind_pure (oa : OracleComp spec α) (f : α → β) :
+    OracleComp.liftComp (do let a ← oa; pure (f a)) superSpec =
+      f <$> OracleComp.liftComp oa superSpec := by
+  change (f <$> oa).liftComp superSpec = f <$> oa.liftComp superSpec
+  exact liftComp_map superSpec oa f
+
+/-- One-directional, assumption-light variant of `mem_support_liftComp_iff`: under just a
+query-level lift (no `SubSpec` or lawfulness assumptions), the support of a lifted computation
+is bounded by the support of the original. The reverse inclusion can fail without lawfulness,
+since an arbitrary embedding need not reach all responses of the original oracles. -/
+lemma mem_support_of_mem_support_liftComp (oa : OracleComp spec α) (x : α) :
+    x ∈ support (oa.liftComp superSpec) → x ∈ support oa := by
+  intro hx
+  induction oa using OracleComp.inductionOn generalizing x with
+  | pure y =>
+      simpa using hx
+  | query_bind q oa ih =>
+      rw [OracleComp.liftComp_bind, mem_support_bind_iff] at hx
+      rw [mem_support_bind_iff]
+      obtain ⟨u, _hu, hx⟩ := hx
+      exact ⟨u, OracleComp.mem_support_query q u, ih u x hx⟩
+
 @[simp]
 lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
     liftComp (og <*> mx) superSpec = liftComp og superSpec <*> liftComp mx superSpec := by

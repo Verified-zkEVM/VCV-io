@@ -216,6 +216,59 @@ lemma simulateQ_optionT_forIn_yield_pure_some (xs : List α) (init : β)
       rw [pure_bind]
       exact ih
 
+omit [LawfulMonad n] in
+/-- `simulateQ` maps an `OptionT` `failure` (whose run is the underlying `pure none`) to
+`failure`: the `failure` companion of `simulateQ_pure` for `OptionT`-monadic computations.
+Both sides are definitionally `pure none`, but the `failure` spelling is what a failed
+`guard` rewrites to in a simulated verifier body. -/
+lemma simulateQ_optionT_failure :
+    simulateQ impl ((failure : OptionT (OracleComp spec) α) : OracleComp spec (Option α))
+      = (failure : OptionT n α) :=
+  simulateQ_pure impl none
+
+/-- Failing companion to `simulateQ_optionT_forIn_yield_pure_some`: if each loop body, under
+`simulateQ`, resolves to `pure (some (ForInStep.yield init))` when its per-element condition
+`cond a` holds and to `pure none` otherwise, and *some* element of the list fails its
+condition, then the whole `OptionT`-monadic `forIn` resolves to `pure none` (the failure
+propagates through the remaining `OptionT` binds). Together the two lemmas characterize a
+guarded spot-check loop: `pure (some init)` iff every condition holds, `pure none`
+otherwise. -/
+lemma simulateQ_optionT_forIn_yield_pure_none (xs : List α) (init : β)
+    (body : α → β → OptionT (OracleComp spec) (ForInStep β))
+    (cond : α → Prop) [DecidablePred cond]
+    (hbody : ∀ a, simulateQ impl ((body a init : OptionT (OracleComp spec) (ForInStep β)) :
+        OracleComp spec (Option (ForInStep β)))
+      = (pure (if cond a then some (ForInStep.yield init) else none) :
+          n (Option (ForInStep β))))
+    (hfail : ¬ ∀ a ∈ xs, cond a) :
+    simulateQ impl ((forIn xs init body : OptionT (OracleComp spec) β) :
+        OracleComp spec (Option β))
+      = (pure none : n (Option β)) := by
+  rw [simulateQ_optionT_list_forIn]
+  induction xs with
+  | nil => exact absurd (List.forall_mem_nil _) hfail
+  | cons x rest ih =>
+      rw [List.forIn_cons]
+      by_cases hx : cond x
+      · change ((simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
+            OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β)) >>= _ :
+            OptionT n β) = _
+        rw [show (simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
+            OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β))
+            = (pure (ForInStep.yield init) : OptionT n (ForInStep β)) from by
+          rw [hbody x, if_pos hx]; rfl]
+        rw [pure_bind]
+        exact ih (fun hall ↦ hfail (List.forall_mem_cons.mpr ⟨hx, hall⟩))
+      · change ((simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
+            OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β)) >>= _ :
+            OptionT n β) = _
+        rw [show (simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
+            OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β))
+            = (failure : OptionT n (ForInStep β)) from by
+          rw [hbody x, if_neg hx]; rfl]
+        rw [failure_bind]
+        rfl
+
 -- section OptionT
 
 -- omit [LawfulMonad n] in

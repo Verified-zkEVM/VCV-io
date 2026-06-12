@@ -139,6 +139,21 @@ theorem evalWithAnswerFn_map {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
   change simulateQ f (g <$> mx) = g (simulateQ f mx)
   rw [simulateQ_map]; rfl
 
+/-- Two `simulateQ`'d binds whose bodies agree up to a pure post-map `f` agree up to mapping
+`f` over the whole simulation. Companion to `simulateQ_bind` for establishing map-relations
+between two simulations without unfolding the shared leading computation `oa`. -/
+lemma simulateQ_bind_map_eq_of_body [LawfulMonad r]
+    (oa : OracleComp spec α) (body₁ : α → OracleComp spec β)
+    (body₂ : α → OracleComp spec γ) (f : γ → β)
+    (hBody : ∀ a, simulateQ impl (body₁ a) = f <$> simulateQ impl (body₂ a)) :
+    simulateQ impl (oa >>= body₁) = f <$> simulateQ impl (oa >>= body₂) := by
+  rw [← simulateQ_map]
+  simp only [map_eq_bind_pure_comp, simulateQ_bind, simulateQ_pure, bind_assoc,
+    Function.comp]
+  congr 1
+  funext a
+  exact (hBody a).trans (map_eq_bind_pure_comp _ _ _)
+
 @[simp]
 lemma simulateQ_seq [LawfulMonad r] (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
     simulateQ impl (og <*> mx) = simulateQ impl og <*> simulateQ impl mx := by
