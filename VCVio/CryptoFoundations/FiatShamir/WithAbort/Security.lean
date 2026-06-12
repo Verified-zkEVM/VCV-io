@@ -279,6 +279,291 @@ lemma tvDist_run_transSignBody_simSignBody_le
   rw [transSignBody, simSignBody, hrw, hrw]
   exact le_trans (tvDist_bind_right_le _ _ _) hcore
 
+/-! ## Ghost-layer presentation of the reprogramming bodies
+
+The Prog → Trans hop (`probOutput_hybridExpAtKey_prog_le_trans`) compares two signing
+bodies whose caches genuinely differ throughout the run: `progSignBody` programs every
+attempt, while `transSignBody` programs only the accepted transcript. The bridge is a
+two-layer presentation of the cache: a *real* layer holding the entries both games agree
+on, and a *ghost* layer holding the rejected-attempt programmings that only
+`progSignBody` performs. `ghostSignBody` acts on the layered state, writing the accepted
+transcript to the real layer and each rejected attempt to the ghost layer.
+
+Two projection lemmas make the deferred-sampling step of the hop precise:
+
+* overlaying the ghost layer onto the real layer recovers `progSignBody`
+  (`run_ghostSignBody_overlay`), and
+* forgetting the ghost layer recovers the accepted-only programming loop of
+  `transSignBody` (`run_ghostSignBody_fst`) — a programmed point that is never
+  subsequently read is distributionally removable. -/
+
+/-- Overlay a ghost cache onto a real cache; ghost entries shadow real ones. -/
+def overlayCache (re gh : (M × Commit →ₒ Chal).QueryCache) :
+    (M × Commit →ₒ Chal).QueryCache :=
+  fun q => (gh q).or (re q)
+
+/-- Remove a single point from a query cache. -/
+def uncacheQuery (cache : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) :
+    (M × Commit →ₒ Chal).QueryCache :=
+  fun q' => if q' = q then none else cache q'
+
+omit [SampleableType Chal] in
+lemma overlayCache_cacheQuery_uncacheQuery
+    (re gh : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) (c : Chal) :
+    overlayCache M (re.cacheQuery q c) (uncacheQuery M gh q) =
+      (overlayCache M re gh).cacheQuery q c := by
+  funext q'
+  by_cases hq : q' = q
+  · subst hq
+    simp [overlayCache, uncacheQuery]
+  · simp [overlayCache, uncacheQuery, hq]
+
+omit [SampleableType Chal] in
+lemma overlayCache_cacheQuery_ghost
+    (re gh : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) (c : Chal) :
+    overlayCache M re (gh.cacheQuery q c) = (overlayCache M re gh).cacheQuery q c := by
+  funext q'
+  by_cases hq : q' = q
+  · subst hq
+    simp [overlayCache]
+  · simp [overlayCache, hq]
+
+omit [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+lemma overlayCache_apply_ghost_some
+    {gh : (M × Commit →ₒ Chal).QueryCache} {q : M × Commit} {v : Chal}
+    (re : (M × Commit →ₒ Chal).QueryCache) (h : gh q = some v) :
+    overlayCache M re gh q = some v := by
+  simp [overlayCache, h]
+
+omit [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+lemma overlayCache_apply_ghost_none
+    {gh : (M × Commit →ₒ Chal).QueryCache} {q : M × Commit}
+    (re : (M × Commit →ₒ Chal).QueryCache) (h : gh q = none) :
+    overlayCache M re gh q = re q := by
+  simp [overlayCache, h]
+
+omit [SampleableType Chal] in
+lemma overlayCache_cacheQuery_real_of_ghost_none
+    (re : (M × Commit →ₒ Chal).QueryCache) {gh : (M × Commit →ₒ Chal).QueryCache}
+    {q : M × Commit} (h : gh q = none) (c : Chal) :
+    overlayCache M (re.cacheQuery q c) gh = (overlayCache M re gh).cacheQuery q c := by
+  funext q'
+  by_cases hq : q' = q
+  · subst hq
+    simp [overlayCache, h]
+  · simp [overlayCache, hq]
+
+/-- Signing body on the layered cache: run the abort loop privately, recording each
+rejected attempt's would-be programming in the ghost layer and programming the accepted
+transcript into the real layer (clearing any stale ghost entry at that point). -/
+noncomputable def ghostSignBody (pk : Stmt) (sk : Wit) (msg : M) :
+    ℕ → StateT ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache)
+      ProbComp (Option (Commit × Resp))
+  | 0 => pure none
+  | n + 1 => do
+    let (w, st) ← liftM (ids.commit pk sk)
+    let c ← (liftM (uniformSample Chal) :
+      StateT ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache)
+        ProbComp Chal)
+    let oz ← liftM (ids.respond pk sk st c)
+    match oz with
+    | some z =>
+        modify fun s => (s.1.cacheQuery (msg, w) c, uncacheQuery M s.2 (msg, w))
+        pure (some (w, z))
+    | none =>
+        modify fun s => (s.1, s.2.cacheQuery (msg, w) c)
+        ghostSignBody pk sk msg n
+
+omit [SampleableType Stmt] in
+/-- Overlay projection: `ghostSignBody` with the ghost layer overlaid onto the real
+layer is exactly `progSignBody` on the overlaid cache. Rejected-attempt programmings
+(ghost writes) and accepted programmings (real writes) both surface as ordinary cache
+programmings under the overlay. -/
+lemma run_ghostSignBody_overlay (pk : Stmt) (sk : Wit) (msg : M) :
+    ∀ (n : ℕ) (re gh : (M × Commit →ₒ Chal).QueryCache),
+      (fun zs : Option (Commit × Resp) ×
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) =>
+          (zs.1, overlayCache M zs.2.1 zs.2.2)) <$>
+        (ghostSignBody ids M pk sk msg n).run (re, gh) =
+      (progSignBody ids M pk sk msg n).run (overlayCache M re gh)
+  | 0, re, gh => by
+    simp [ghostSignBody, progSignBody]
+  | (n + 1), re, gh => by
+    simp only [ghostSignBody, progSignBody, progSignAttempt, bind_assoc, StateT.run_bind,
+      OracleComp.liftM_run_StateT, map_bind, pure_bind, StateT.run_modify]
+    refine congrArg (ids.commit pk sk >>= ·) (funext fun wst => ?_)
+    obtain ⟨w, st⟩ := wst
+    refine congrArg (uniformSample Chal >>= ·) (funext fun c => ?_)
+    refine congrArg (ids.respond pk sk st c >>= ·) (funext fun oz => ?_)
+    cases oz with
+    | some z =>
+        simp only [StateT.run_bind, StateT.run_modify, pure_bind, StateT.run_pure,
+          map_pure, overlayCache_cacheQuery_uncacheQuery]
+    | none =>
+        simp only [StateT.run_bind, StateT.run_modify, pure_bind,
+          run_ghostSignBody_overlay pk sk msg n re (gh.cacheQuery (msg, w) c),
+          overlayCache_cacheQuery_ghost]
+
+omit [SampleableType Stmt] in
+/-- Ghost-forgetting projection (deferred sampling): dropping the ghost layer from
+`ghostSignBody` yields the accepted-only programming loop of `transSignBody`. The
+programming of a rejected attempt lives only in the ghost layer, so removing it does not
+change the joint distribution of the signing output and the real cache. -/
+lemma run_ghostSignBody_fst (pk : Stmt) (sk : Wit) (msg : M) :
+    ∀ (n : ℕ) (re gh : (M × Commit →ₒ Chal).QueryCache),
+      (fun zs : Option (Commit × Resp) ×
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) => (zs.1, zs.2.1)) <$>
+        (ghostSignBody ids M pk sk msg n).run (re, gh) =
+      (liftM (firstSome (ids.honestExecution pk sk) n) >>= signProgramCont M msg).run re
+  | 0, re, gh => by
+    simp [ghostSignBody, firstSome, signProgramCont]
+  | (n + 1), re, gh => by
+    simp only [ghostSignBody, firstSome_succ, IdenSchemeWithAbort.honestExecution,
+      bind_assoc, StateT.run_bind, OracleComp.liftM_run_StateT, map_bind, pure_bind]
+    refine congrArg (ids.commit pk sk >>= ·) (funext fun wst => ?_)
+    obtain ⟨w, st⟩ := wst
+    refine congrArg (uniformSample Chal >>= ·) (funext fun c => ?_)
+    refine congrArg (ids.respond pk sk st c >>= ·) (funext fun oz => ?_)
+    cases oz with
+    | some z =>
+        simp only [Option.map_some, StateT.run_bind, StateT.run_modify, pure_bind,
+          StateT.run_pure, map_pure, signProgramCont]
+    | none =>
+        simp only [Option.map_none, StateT.run_bind, StateT.run_modify, pure_bind]
+        rw [run_ghostSignBody_fst pk sk msg n re (gh.cacheQuery (msg, w) c)]
+        simp only [IdenSchemeWithAbort.honestExecution, StateT.run_bind,
+          OracleComp.liftM_run_StateT, bind_assoc, pure_bind]
+
+omit [SampleableType Stmt] in
+/-- `run_ghostSignBody_fst` at the attempt budget of the scheme: forgetting the ghost
+layer of `ghostSignBody` recovers `transSignBody` on the real layer. -/
+lemma run_ghostSignBody_fst_eq_transSignBody (pk : Stmt) (sk : Wit) (msg : M)
+    (re gh : (M × Commit →ₒ Chal).QueryCache) :
+    (fun zs : Option (Commit × Resp) ×
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) => (zs.1, zs.2.1)) <$>
+        (ghostSignBody ids M pk sk msg maxAttempts).run (re, gh) =
+      (transSignBody ids M maxAttempts pk sk msg).run re :=
+  run_ghostSignBody_fst ids M pk sk msg maxAttempts re gh
+
+/-! ## Ghost-instrumented hybrid handlers
+
+Run-level counterpart of the ghost-layer presentation: handlers for the adversary's
+oracles over the layered cache, a signed-message list, and a monotone bad flag that
+fires exactly when the adversary's random-oracle query hits a point of the ghost layer.
+The Prog-side handler (`ghostHybridImpl … true`) answers such a query from the ghost
+layer (matching `progSignBody`'s overlaid cache), while the Trans-side handler
+(`ghostHybridImpl … false`) answers it from the real layer (matching `transSignBody`'s
+cache). On every other query the two handlers are literally identical, which is the
+identical-until-bad shape of `tvDist_simulateQ_run_le_probEvent_output_bad`. -/
+
+/-- One caching random-oracle step on a bare cache, as a `ProbComp`. Agrees with
+`(randomOracle mc).run re` (see `randomOracle_run_eq_roStep`). -/
+noncomputable def roStep (re : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
+    ProbComp (Chal × (M × Commit →ₒ Chal).QueryCache) :=
+  match re mc with
+  | some v => pure (v, re)
+  | none => do
+    let c ← uniformSample Chal
+    pure (c, re.cacheQuery mc c)
+
+omit [SampleableType Stmt] in
+lemma randomOracle_run_eq_roStep (re : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
+    ((randomOracle : QueryImpl (M × Commit →ₒ Chal)
+        (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) mc).run re =
+      roStep M re mc := by
+  rw [randomOracle.apply_eq]
+  cases hre : re mc with
+  | some v => simp [roStep, hre]
+  | none => simp [roStep, hre, StateT.run_bind]
+
+/-- The state of the ghost-instrumented hybrid run: layered cache, signed-message list,
+and the bad flag for adversarial reads of the ghost layer. -/
+abbrev GhostState (M Commit Chal : Type) : Type :=
+  (((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M) × Bool
+
+/-- Instrumented handler for the adversary's oracles over the layered cache.
+`progSide` selects the answer at a ghost hit: the ghost value (Prog side) or a fresh
+caching read of the real layer (Trans side). The bad flag fires on ghost hits and is
+otherwise preserved; signing queries run `ghostSignBody` on the cache layers. -/
+noncomputable def ghostHybridImpl (progSide : Bool) (pk : Stmt) (sk : Wit) :
+    QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (StateT (GhostState M Commit Chal) ProbComp) :=
+  fun t => match t with
+  | .inl (.inl n) => StateT.mk fun s =>
+      (fun u => (u, s)) <$> (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n
+  | .inl (.inr mc) => StateT.mk fun s =>
+      match s.1.1.2 mc with
+      | some v =>
+          if progSide then pure (v, (s.1, true))
+          else (fun cu => (cu.1, (((cu.2, s.1.1.2), s.1.2), true))) <$> roStep M s.1.1.1 mc
+      | none =>
+          (fun cu => (cu.1, (((cu.2, s.1.1.2), s.1.2), s.2))) <$> roStep M s.1.1.1 mc
+  | .inr msg => StateT.mk fun s =>
+      (fun alc => (alc.1, ((alc.2, msg :: s.1.2), s.2))) <$>
+        (ghostSignBody ids M pk sk msg maxAttempts).run s.1.1
+
+omit [SampleableType Stmt] in
+/-- The two ghost-instrumented handlers agree on all transitions that leave the bad flag
+unset: they differ only in the answer at a ghost hit, which fires the flag on both
+sides. -/
+lemma ghostHybridImpl_agree_good (pk : Stmt) (sk : Wit)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (s : ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M)
+    (u : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Range t)
+    (s' : ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M) :
+    Pr[= (u, (s', false)) |
+        (ghostHybridImpl ids M maxAttempts true pk sk t).run (s, false)] =
+      Pr[= (u, (s', false)) |
+        (ghostHybridImpl ids M maxAttempts false pk sk t).run (s, false)] := by
+  rcases t with (n | mc) | msg
+  · rfl
+  · simp only [ghostHybridImpl, StateT.run_mk]
+    cases hgh : s.1.2 mc with
+    | some v =>
+        simp only [↓reduceIte]
+        rw [probOutput_eq_zero_of_not_mem_support (by
+            intro h
+            rw [support_pure] at h
+            simpa using congrArg (fun z : _ × GhostState M Commit Chal => z.2.2) h),
+          probOutput_eq_zero_of_not_mem_support (by
+            intro h
+            rw [if_neg Bool.false_ne_true, support_map] at h
+            obtain ⟨cu, -, hcu⟩ := h
+            simpa using congrArg (fun z : _ × GhostState M Commit Chal => z.2.2) hcu)]
+    | none => rfl
+  · rfl
+
+omit [SampleableType Stmt] in
+/-- The ghost-instrumented handlers never unset the bad flag. -/
+lemma ghostHybridImpl_bad_mono (progSide : Bool) (pk : Stmt) (sk : Wit)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (p : GhostState M Commit Chal) (hp : p.2 = true) :
+    ∀ z ∈ support ((ghostHybridImpl ids M maxAttempts progSide pk sk t).run p),
+      z.2.2 = true := by
+  intro z hz
+  rcases t with (n | mc) | msg
+  · simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨_, _, rfl⟩ := hz
+    exact hp
+  · simp only [ghostHybridImpl, StateT.run_mk] at hz
+    rcases hgh : p.1.1.2 mc with _ | v
+    · simp only [hgh, support_map] at hz
+      obtain ⟨_, _, rfl⟩ := hz
+      exact hp
+    · simp only [hgh] at hz
+      cases progSide with
+      | true =>
+          simp only [↓reduceIte, support_pure, Set.mem_singleton_iff] at hz
+          subst hz
+          rfl
+      | false =>
+          rw [if_neg Bool.false_ne_true, support_map] at hz
+          obtain ⟨_, _, rfl⟩ := hz
+          rfl
+  · simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨_, _, rfl⟩ := hz
+    exact hp
+
 /-! ## The hybrid experiment -/
 
 /-- Run a cache-level action inside the hybrid state (random-oracle cache plus the list
@@ -334,6 +619,376 @@ noncomputable def hybridExpAtKey
         ids hr M maxAttempts).verify pk msg σ)) cache
   pure (decide (msg ∉ signed) && ok)
 
+/-! ## Projections of the ghost-instrumented run
+
+The ghost-instrumented run projects onto the Prog hybrid by overlaying the ghost layer
+onto the real one, and onto the Trans hybrid by forgetting the ghost layer. Both are
+per-step state projections in the sense of `OracleComp.map_run_simulateQ_eq_of_query_map_eq`. -/
+
+omit [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+lemma onCache_run {α : Type}
+    (action : StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp α)
+    (s : (M × Commit →ₒ Chal).QueryCache × List M) :
+    (onCache M action).run s = (fun ac : α × (M × Commit →ₒ Chal).QueryCache =>
+      (ac.1, (ac.2, s.2))) <$> action.run s.1 := rfl
+
+omit [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+lemma hybridSignImpl_run
+    (signBody : M → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
+      (Option (Commit × Resp)))
+    (msg : M) (c : (M × Commit →ₒ Chal).QueryCache) (l : List M) :
+    (hybridSignImpl M signBody msg).run (c, l) =
+      (fun ac : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+        (ac.1, (ac.2, msg :: l))) <$> (signBody msg).run c := rfl
+
+omit [SampleableType Stmt] in
+lemma roStep_of_some {re : (M × Commit →ₒ Chal).QueryCache} {mc : M × Commit} {v : Chal}
+    (h : re mc = some v) : roStep M re mc = pure (v, re) := by
+  unfold roStep
+  rw [h]
+
+omit [SampleableType Stmt] in
+lemma roStep_of_none {re : (M × Commit →ₒ Chal).QueryCache} {mc : M × Commit}
+    (h : re mc = none) :
+    roStep M re mc = uniformSample Chal >>= fun c => pure (c, re.cacheQuery mc c) := by
+  unfold roStep
+  rw [h]
+
+omit [SampleableType Stmt] in
+lemma hybridBaseImpl_run_ro (mc : M × Commit)
+    (c : (M × Commit →ₒ Chal).QueryCache) (l : List M) :
+    (hybridBaseImpl (Commit := Commit) (Chal := Chal) M (.inr mc)).run (c, l) =
+      (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+        (cu.1, (cu.2, l))) <$> roStep M c mc := by
+  have h : (onCache M ((unifFwdImpl (M × Commit →ₒ Chal) +
+      (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+        (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp))) (.inr mc))).run (c, l) =
+        (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+          (cu.1, (cu.2, l))) <$> roStep M c mc := by
+    rw [QueryImpl.add_apply_inr, onCache_run]
+    exact congrArg (fun x => (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+      (cu.1, (cu.2, l))) <$> x) (randomOracle_run_eq_roStep M c mc)
+  exact h
+
+omit [SampleableType Stmt] in
+lemma ghostHybridImpl_run_ro_ghost_some (progSide : Bool) (pk : Stmt) (sk : Wit)
+    {mc : M × Commit} {s : GhostState M Commit Chal} {v : Chal}
+    (h : s.1.1.2 mc = some v) :
+    (ghostHybridImpl ids M maxAttempts progSide pk sk (.inl (.inr mc))).run s =
+      if progSide then pure (v, (s.1, true))
+      else (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+        (cu.1, (((cu.2, s.1.1.2), s.1.2), true))) <$> roStep M s.1.1.1 mc := by
+  change (match s.1.1.2 mc with
+    | some v => if progSide then pure (v, (s.1, true))
+        else (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+          (cu.1, (((cu.2, s.1.1.2), s.1.2), true))) <$> roStep M s.1.1.1 mc
+    | none => (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+        (cu.1, (((cu.2, s.1.1.2), s.1.2), s.2))) <$> roStep M s.1.1.1 mc) = _
+  rw [h]
+
+omit [SampleableType Stmt] in
+lemma ghostHybridImpl_run_ro_ghost_none (progSide : Bool) (pk : Stmt) (sk : Wit)
+    {mc : M × Commit} {s : GhostState M Commit Chal}
+    (h : s.1.1.2 mc = none) :
+    (ghostHybridImpl ids M maxAttempts progSide pk sk (.inl (.inr mc))).run s =
+      (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+        (cu.1, (((cu.2, s.1.1.2), s.1.2), s.2))) <$> roStep M s.1.1.1 mc := by
+  change (match s.1.1.2 mc with
+    | some v => if progSide then pure (v, (s.1, true))
+        else (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+          (cu.1, (((cu.2, s.1.1.2), s.1.2), true))) <$> roStep M s.1.1.1 mc
+    | none => (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+        (cu.1, (((cu.2, s.1.1.2), s.1.2), s.2))) <$> roStep M s.1.1.1 mc) = _
+  rw [h]
+
+omit [SampleableType Stmt] in
+lemma ghostHybridImpl_run_sign (progSide : Bool) (pk : Stmt) (sk : Wit)
+    (msg : M) (s : GhostState M Commit Chal) :
+    (ghostHybridImpl ids M maxAttempts progSide pk sk (.inr msg)).run s =
+      (fun alc : Option (Commit × Resp) ×
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) =>
+        (alc.1, ((alc.2, msg :: s.1.2), s.2))) <$>
+        (ghostSignBody ids M pk sk msg maxAttempts).run s.1.1 := rfl
+
+omit [SampleableType Stmt] in
+/-- Per-step overlay projection: each step of the Prog-side ghost-instrumented handler
+projects onto the corresponding step of the Prog hybrid handler. -/
+lemma ghostHybridImpl_proj_prog (pk : Stmt) (sk : Wit)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (s : GhostState M Commit Chal) :
+    Prod.map id (fun g : GhostState M Commit Chal =>
+        (overlayCache M g.1.1.1 g.1.1.2, g.1.2)) <$>
+        (ghostHybridImpl ids M maxAttempts true pk sk t).run s =
+      ((hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+          hybridSignImpl M (progSignBody ids M pk sk · maxAttempts)) t).run
+        (overlayCache M s.1.1.1 s.1.1.2, s.1.2) := by
+  rcases t with (n | mc) | msg
+  · simp only [ghostHybridImpl, StateT.run_mk, QueryImpl.add_apply_inl, hybridBaseImpl,
+      unifFwdImpl, QueryImpl.liftTarget_apply, Functor.map_map]
+    rfl
+  · refine Eq.trans ?_
+      (hybridBaseImpl_run_ro M mc (overlayCache M s.1.1.1 s.1.1.2) s.1.2).symm
+    cases hgh : s.1.1.2 mc with
+    | some v =>
+        rw [ghostHybridImpl_run_ro_ghost_some ids M maxAttempts true pk sk hgh,
+          if_pos rfl,
+          roStep_of_some M (overlayCache_apply_ghost_some (M := M) s.1.1.1 hgh)]
+        simp
+    | none =>
+        rw [ghostHybridImpl_run_ro_ghost_none ids M maxAttempts true pk sk hgh]
+        cases hre : s.1.1.1 mc with
+        | some v =>
+            rw [roStep_of_some M hre, roStep_of_some M (show overlayCache M
+              s.1.1.1 s.1.1.2 mc = some v by
+                rw [overlayCache_apply_ghost_none (M := M) s.1.1.1 hgh, hre])]
+            simp
+        | none =>
+            rw [roStep_of_none M hre, roStep_of_none M (show overlayCache M
+              s.1.1.1 s.1.1.2 mc = none by
+                rw [overlayCache_apply_ghost_none (M := M) s.1.1.1 hgh, hre])]
+            simp [overlayCache_cacheQuery_real_of_ghost_none (M := M) s.1.1.1 hgh]
+  · refine Eq.trans (b := (fun ac : Option (Commit × Resp) ×
+        (M × Commit →ₒ Chal).QueryCache => (ac.1, (ac.2, msg :: s.1.2))) <$>
+        (progSignBody ids M pk sk msg maxAttempts).run
+          (overlayCache M s.1.1.1 s.1.1.2)) ?_ ?_
+    · rw [ghostHybridImpl_run_sign ids M maxAttempts true pk sk msg s,
+        ← run_ghostSignBody_overlay ids M pk sk msg maxAttempts s.1.1.1 s.1.1.2]
+      refine (Functor.map_map _ _ _).trans (Eq.symm ?_)
+      exact (Functor.map_map _ _ _).trans rfl
+    · exact (hybridSignImpl_run M (progSignBody ids M pk sk · maxAttempts) msg
+        (overlayCache M s.1.1.1 s.1.1.2) s.1.2).symm
+
+omit [SampleableType Stmt] in
+/-- Per-step ghost-forgetting projection: each step of the Trans-side ghost-instrumented
+handler projects onto the corresponding step of the Trans hybrid handler. -/
+lemma ghostHybridImpl_proj_trans (pk : Stmt) (sk : Wit)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (s : GhostState M Commit Chal) :
+    Prod.map id (fun g : GhostState M Commit Chal => (g.1.1.1, g.1.2)) <$>
+        (ghostHybridImpl ids M maxAttempts false pk sk t).run s =
+      ((hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+          hybridSignImpl M (transSignBody ids M maxAttempts pk sk)) t).run
+        (s.1.1.1, s.1.2) := by
+  rcases t with (n | mc) | msg
+  · simp only [ghostHybridImpl, StateT.run_mk, QueryImpl.add_apply_inl, hybridBaseImpl,
+      unifFwdImpl, QueryImpl.liftTarget_apply, Functor.map_map]
+    rfl
+  · refine Eq.trans ?_ (hybridBaseImpl_run_ro M mc s.1.1.1 s.1.2).symm
+    cases hgh : s.1.1.2 mc with
+    | some v =>
+        rw [ghostHybridImpl_run_ro_ghost_some ids M maxAttempts false pk sk hgh,
+          if_neg Bool.false_ne_true]
+        exact (Functor.map_map _ _ _).trans rfl
+    | none =>
+        rw [ghostHybridImpl_run_ro_ghost_none ids M maxAttempts false pk sk hgh]
+        exact (Functor.map_map _ _ _).trans rfl
+  · refine Eq.trans (b := (fun ac : Option (Commit × Resp) ×
+        (M × Commit →ₒ Chal).QueryCache => (ac.1, (ac.2, msg :: s.1.2))) <$>
+        (transSignBody ids M maxAttempts pk sk msg).run s.1.1.1) ?_ ?_
+    · rw [ghostHybridImpl_run_sign ids M maxAttempts false pk sk msg s,
+        ← run_ghostSignBody_fst_eq_transSignBody ids M maxAttempts pk sk msg
+          s.1.1.1 s.1.1.2]
+      refine (Functor.map_map _ _ _).trans (Eq.symm ?_)
+      exact (Functor.map_map _ _ _).trans rfl
+    · exact (hybridSignImpl_run M (transSignBody ids M maxAttempts pk sk) msg
+        s.1.1.1 s.1.2).symm
+
+/-! ## Verification tail and ghost-domain invariant -/
+
+omit [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+lemma overlayCache_empty (re : (M × Commit →ₒ Chal).QueryCache) :
+    overlayCache M re ∅ = re := by
+  funext q
+  simp [overlayCache]
+
+/-- Verification-and-freshness continuation of `hybridExpAtKey`, as a function of the
+adversary's forgery and the final hybrid state. -/
+noncomputable def hybridVerifyCont (pk : Stmt)
+    (z : (M × Option (Commit × Resp)) × ((M × Commit →ₒ Chal).QueryCache × List M)) :
+    ProbComp Bool := do
+  let ok ← StateT.run'
+    (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
+        (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+      ((FiatShamirWithAbort
+        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+        ids hr M maxAttempts).verify pk z.1.1 z.1.2)) z.2.1
+  pure (decide (z.1.1 ∉ z.2.2) && ok)
+
+omit [SampleableType Stmt] in
+lemma hybridExpAtKey_eq_run_bind
+    (signBody : M → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
+      (Option (Commit × Resp)))
+    (pk : Stmt) :
+    hybridExpAtKey ids hr M maxAttempts adv signBody pk =
+      (simulateQ
+          (hybridBaseImpl (Commit := Commit) (Chal := Chal) M + hybridSignImpl M signBody)
+          (adv.main pk)).run (∅, []) >>=
+        hybridVerifyCont ids hr M maxAttempts pk := by
+  refine bind_congr fun z => ?_
+  rcases z with ⟨⟨msg, σ⟩, cache, signed⟩
+  rfl
+
+omit [SampleableType Stmt] in
+/-- The verification continuation only reads the cache at the forged message's points,
+so it is insensitive to cache changes away from them. -/
+lemma hybridVerifyCont_cache_congr (pk : Stmt) (ms : M × Option (Commit × Resp))
+    (c₁ c₂ : (M × Commit →ₒ Chal).QueryCache) (l : List M)
+    (h : ∀ w : Commit, c₁ (ms.1, w) = c₂ (ms.1, w)) :
+    hybridVerifyCont ids hr M maxAttempts pk (ms, (c₁, l)) =
+      hybridVerifyCont ids hr M maxAttempts pk (ms, (c₂, l)) := by
+  rcases ms with ⟨msg, _ | ⟨w, zr⟩⟩
+  · rfl
+  · refine congrArg (· >>= fun ok => pure (decide (msg ∉ l) && ok)) ?_
+    have hside : ∀ c : (M × Commit →ₒ Chal).QueryCache,
+        (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
+            (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+              (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+          ((FiatShamirWithAbort
+            (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+            ids hr M maxAttempts).verify pk msg (some (w, zr)))).run' c =
+          (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+            ids.verify pk w cu.1 zr) <$> roStep M c (msg, w) := by
+      intro c
+      simp only [FiatShamirWithAbort, simulateQ_bind, roSim.simulateQ_HasQuery_query,
+        simulateQ_pure]
+      change Prod.fst <$> (((randomOracle : QueryImpl (M × Commit →ₒ Chal)
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) (msg, w) >>=
+            fun cc => pure (ids.verify pk w cc zr)).run c) = _
+      rw [StateT.run_bind]
+      rw [show ((randomOracle : QueryImpl (M × Commit →ₒ Chal)
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) (msg, w)).run c =
+        roStep M c (msg, w) from randomOracle_run_eq_roStep M c (msg, w)]
+      simp
+    rw [hside c₁, hside c₂]
+    cases hc : c₁ (msg, w) with
+    | some v =>
+        rw [roStep_of_some M hc,
+          roStep_of_some M (show c₂ (msg, w) = some v from (h w).symm.trans hc)]
+        simp
+    | none =>
+        rw [roStep_of_none M hc,
+          roStep_of_none M (show c₂ (msg, w) = none from (h w).symm.trans hc)]
+        simp
+
+omit [SampleableType Stmt] in
+/-- When the forged message has already been signed, the freshness conjunct forces the
+game output to `false`, so the success probability vanishes regardless of the cache. -/
+lemma probOutput_true_hybridVerifyCont_of_mem (pk : Stmt)
+    (ms : M × Option (Commit × Resp))
+    (c : (M × Commit →ₒ Chal).QueryCache) (l : List M) (hmem : ms.1 ∈ l) :
+    Pr[= true | hybridVerifyCont ids hr M maxAttempts pk (ms, (c, l))] = 0 := by
+  rw [hybridVerifyCont, probOutput_bind_eq_tsum]
+  refine ENNReal.tsum_eq_zero.mpr fun ok => ?_
+  rw [probOutput_pure, if_neg (by simp [hmem]), mul_zero]
+
+omit [SampleableType Stmt] in
+/-- Support bound for the ghost writes of `ghostSignBody`: every ghost entry of an
+output state was either already present or lies at the signed message `msg`. -/
+lemma ghostSignBody_support_ghost (pk : Stmt) (sk : Wit) (msg : M) :
+    ∀ (n : ℕ) (re gh : (M × Commit →ₒ Chal).QueryCache)
+      (z : Option (Commit × Resp) ×
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache)),
+      z ∈ support ((ghostSignBody ids M pk sk msg n).run (re, gh)) →
+      ∀ q : M × Commit, z.2.2 q ≠ none → gh q ≠ none ∨ q.1 = msg
+  | 0, re, gh, z, hz, q, hq => by
+    simp only [ghostSignBody, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+    subst hz
+    exact Or.inl hq
+  | (n + 1), re, gh, z, hz, q, hq => by
+    simp only [ghostSignBody, StateT.run_bind, OracleComp.liftM_run_StateT, bind_assoc,
+      pure_bind, support_bind, Set.mem_iUnion, exists_prop] at hz
+    obtain ⟨⟨w, st⟩, -, hz⟩ := hz
+    obtain ⟨c, -, hz⟩ := hz
+    obtain ⟨oz, -, hz⟩ := hz
+    rcases oz with - | zr
+    · simp only [StateT.run_bind, StateT.run_modify, pure_bind] at hz
+      rcases ghostSignBody_support_ghost pk sk msg n re (gh.cacheQuery (msg, w) c)
+          z hz q hq with hgh | hmsg
+      · by_cases hqw : q = (msg, w)
+        · exact Or.inr (by simp [hqw])
+        · exact Or.inl (by rwa [QueryCache.cacheQuery_of_ne _ _ hqw] at hgh)
+      · exact Or.inr hmsg
+    · simp only [StateT.run_bind, StateT.run_modify, pure_bind, StateT.run_pure,
+        support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      simp only [uncacheQuery, ne_eq, ite_eq_left_iff, not_forall] at hq
+      exact Or.inl hq.2
+
+omit [SampleableType Stmt] in
+/-- Ghost-domain invariant: along any run of the ghost-instrumented handlers, every
+ghost entry's message component has been recorded in the signed list. -/
+lemma ghostHybridImpl_preserves_signed_inv (progSide : Bool) (pk : Stmt) (sk : Wit)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (s : GhostState M Commit Chal)
+    (hs : ∀ q : M × Commit, s.1.1.2 q ≠ none → q.1 ∈ s.1.2) :
+    ∀ z ∈ support ((ghostHybridImpl ids M maxAttempts progSide pk sk t).run s),
+      ∀ q : M × Commit, z.2.1.1.2 q ≠ none → q.1 ∈ z.2.1.2 := by
+  intro z hz
+  rcases t with (n | mc) | msg
+  · simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨u, -, rfl⟩ := hz
+    exact hs
+  · simp only [ghostHybridImpl, StateT.run_mk] at hz
+    rcases hgh : s.1.1.2 mc with - | v
+    · simp only [hgh, support_map] at hz
+      obtain ⟨cu, -, rfl⟩ := hz
+      exact hs
+    · simp only [hgh] at hz
+      cases progSide with
+      | true =>
+          simp only [↓reduceIte, support_pure, Set.mem_singleton_iff] at hz
+          subst hz
+          exact hs
+      | false =>
+          rw [if_neg Bool.false_ne_true, support_map] at hz
+          obtain ⟨cu, -, rfl⟩ := hz
+          exact hs
+  · simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨alc, halc, rfl⟩ := hz
+    intro q hq
+    rcases ghostSignBody_support_ghost ids M pk sk msg maxAttempts s.1.1.1 s.1.1.2
+        alc halc q hq with hgh | hmsg
+    · exact List.mem_cons_of_mem _ (hs q hgh)
+    · exact hmsg ▸ List.mem_cons_self
+
+/-! ## The ghost-read collision charge (open) -/
+
+omit [SampleableType Stmt] in
+/-- **Ghost-read collision bound** for the Prog → Trans hop: the probability that the
+adversary ever queries the random oracle at a ghost point (a rejected signing attempt's
+programmed point) is at most `qS·(qH+1)·ε/(1-p)`.
+
+Probabilistic content (deferred sampling): a rejected attempt's commitment `w` enters
+the ghost layer with the joint law of `(w, c)` conditioned on rejection, and influences
+the run only through the ghost-domain membership tests of later adversarial queries.
+Per (rejected attempt `j`, adversarial query `k`) pair, the conditional independence of
+the post-rejection run from `w` given the rejection event yields
+`Pr[query k hits attempt j] ≤ Pr[attempt j runs] · ε` (the `1/Pr[reject]` skew of the
+conditioned commitment law cancels against the rejection probability of the attempt).
+Summing the expected number of attempts (`≤ 1/(1-p)` per signing query by `hAbort`)
+against the `qH` adversarial queries (`hQ`) gives the bound; the budget `qH + 1` leaves
+one unit of slack for a verification read, which the freshness check already rules out
+(see `ghostHybridImpl_preserves_signed_inv`). Note that for `p_abort < 0` the
+hypothesis `hAbort` forces rejection-free signing, so the ghost layer stays empty and
+the left-hand side vanishes. -/
+lemma probEvent_ghostRead_bad_le
+    (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abort < 1)
+    (hQ : ∀ pk, FiatShamir.signHashQueryBound M
+      (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
+    (pk : Stmt) (sk : Wit)
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort) :
+    Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+        (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
+          ((((∅, ∅), []) :
+            ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+              List M), false)]
+      ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
+  sorry
+
+
 /-! ## Hop lemmas
 
 Each hop is stated per key pair, under pointwise hypotheses at that key; the good-key
@@ -368,9 +1023,14 @@ expected number of attempts per signing query is at most `1/(1-p)` (`hAbort`, vi
 `sign_expectedQueries_le_geometric`). Intended vehicle:
 `tvDist_simulateQ_le_probEvent_bad` (the fundamental lemma in
 `ProgramLogic/Relational/SimulateQ.lean`) with the bad event tracked on the hybrid
-state, plus the expected-attempt-count machinery of `WithAbort/ExpectedCost.lean`. -/
+state, plus the expected-attempt-count machinery of `WithAbort/ExpectedCost.lean`.
+
+The nonnegativity hypothesis `hp₀` is necessary: for `p_abort < 0` the claimed loss
+shrinks below the genuine adversarial-collision gap `qS·qH·ε` of an abort-free scheme
+(the `1/(1-p)` factors fall below `1`), so the statement would be false. The
+corresponding bound is available at every call site from the good-key event. -/
 lemma probOutput_hybridExpAtKey_real_le_prog
-    (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abort < 1)
+    (qS qH : ℕ) (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1)
     (hQ : ∀ pk, FiatShamir.signHashQueryBound M
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
     (pk : Stmt) (sk : Wit)
@@ -385,19 +1045,21 @@ lemma probOutput_hybridExpAtKey_real_le_prog
           qS * (qH + 1) * ε / (1 - p_abort)) := by
   sorry
 
+omit [SampleableType Stmt] in
 /-- Hop G₁ → G₂ (Prog → Trans) at a fixed key: dropping the reprogramming of rejected
 attempts (keeping only the accepted transcript's programming) costs at most
 `qS·(qH+1)·ε/(1-p)`.
 
-Distributional content (identical-until-bad): the games differ only on cache points
-`(msg, w)` of rejected attempts, which in G₁ hold fresh uniform values and in G₂ are
-absent (so a later adversary query samples them fresh — same distribution). The bad
-event is the adversary querying such a point that an earlier of its `qH + 1` hash
-queries had already fixed; each rejected attempt's commitment is `ε`-guessable, and the
-expected number of rejected attempts per query is at most `1/(1-p)`. The deferred-
-sampling step ("a never-again-touched programmed point is distributionally equal to an
-unprogrammed point") is the part that needs a new framework lemma; see the lazy-vs-eager
-sampling analysis in `OracleComp/QueryTracking/RandomOracle/`. -/
+Proof structure: both games are presented as projections of a single ghost-instrumented
+run (`ghostHybridImpl`) over the two-layer cache, with rejected-attempt programmings
+routed to the ghost layer. Overlaying the ghost layer recovers the Prog game
+(`ghostHybridImpl_proj_prog`) and forgetting it recovers the Trans game
+(`ghostHybridImpl_proj_trans`) — the deferred-sampling step. The two instrumented
+handlers agree until the adversary reads a ghost point
+(`tvDist_simulateQ_run_le_probEvent_output_bad`), the verification tail agrees by the
+freshness check and the ghost-domain invariant
+(`ghostHybridImpl_preserves_signed_inv`), and the firing probability is bounded by the
+ghost-read collision charge `probEvent_ghostRead_bad_le`. -/
 lemma probOutput_hybridExpAtKey_prog_le_trans
     (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abort < 1)
     (hQ : ∀ pk, FiatShamir.signHashQueryBound M
@@ -411,7 +1073,128 @@ lemma probOutput_hybridExpAtKey_prog_le_trans
       Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
           (transSignBody ids M maxAttempts pk sk) pk] +
         ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
-  sorry
+  classical
+  set s₀ : ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+      List M := ((∅, ∅), []) with hs₀
+  set runP := (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk)
+    (adv.main pk)).run (s₀, false) with hrunP
+  set runT := (simulateQ (ghostHybridImpl ids M maxAttempts false pk sk)
+    (adv.main pk)).run (s₀, false) with hrunT
+  set gP : (M × Option (Commit × Resp)) × GhostState M Commit Chal → ProbComp Bool :=
+    fun z => hybridVerifyCont ids hr M maxAttempts pk
+      (z.1, (overlayCache M z.2.1.1.1 z.2.1.1.2, z.2.1.2)) with hgP
+  set gT : (M × Option (Commit × Resp)) × GhostState M Commit Chal → ProbComp Bool :=
+    fun z => hybridVerifyCont ids hr M maxAttempts pk
+      (z.1, (z.2.1.1.1, z.2.1.2)) with hgT
+  -- Overlay projection of the instrumented run gives the Prog game.
+  have hGP : hybridExpAtKey ids hr M maxAttempts adv
+      (progSignBody ids M pk sk · maxAttempts) pk = runP >>= gP := by
+    rw [hybridExpAtKey_eq_run_bind]
+    have hproj := OracleComp.map_run_simulateQ_eq_of_query_map_eq
+      (ghostHybridImpl ids M maxAttempts true pk sk)
+      (hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+        hybridSignImpl M (progSignBody ids M pk sk · maxAttempts))
+      (fun g : GhostState M Commit Chal => (overlayCache M g.1.1.1 g.1.1.2, g.1.2))
+      (ghostHybridImpl_proj_prog ids M maxAttempts pk sk)
+      (adv.main pk) (s₀, false)
+    have hinit : (overlayCache M ((s₀, false) : GhostState M Commit Chal).1.1.1
+          (s₀, false).1.1.2, ((s₀, false) : GhostState M Commit Chal).1.2) =
+        ((∅, []) : (M × Commit →ₒ Chal).QueryCache × List M) := by
+      simp [hs₀, overlayCache_empty]
+    rw [hinit] at hproj
+    rw [← hproj, bind_map_left]
+    exact bind_congr fun z => rfl
+  -- Ghost-forgetting projection of the instrumented run gives the Trans game.
+  have hGT : hybridExpAtKey ids hr M maxAttempts adv
+      (transSignBody ids M maxAttempts pk sk) pk = runT >>= gT := by
+    rw [hybridExpAtKey_eq_run_bind]
+    have hproj := OracleComp.map_run_simulateQ_eq_of_query_map_eq
+      (ghostHybridImpl ids M maxAttempts false pk sk)
+      (hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+        hybridSignImpl M (transSignBody ids M maxAttempts pk sk))
+      (fun g : GhostState M Commit Chal => (g.1.1.1, g.1.2))
+      (ghostHybridImpl_proj_trans ids M maxAttempts pk sk)
+      (adv.main pk) (s₀, false)
+    have hinit : ((((s₀, false) : GhostState M Commit Chal).1.1.1,
+          ((s₀, false) : GhostState M Commit Chal).1.2)) =
+        ((∅, []) : (M × Commit →ₒ Chal).QueryCache × List M) := by
+      simp [hs₀]
+    rw [hinit] at hproj
+    rw [← hproj, bind_map_left]
+    exact bind_congr fun z => rfl
+  -- Identical-until-bad on the instrumented runs.
+  have h_bad :=
+    OracleComp.ProgramLogic.Relational.tvDist_simulateQ_run_le_probEvent_output_bad
+      (ghostHybridImpl ids M maxAttempts true pk sk)
+      (ghostHybridImpl ids M maxAttempts false pk sk)
+      (adv.main pk) s₀
+      (ghostHybridImpl_agree_good ids M maxAttempts pk sk)
+      (ghostHybridImpl_bad_mono ids M maxAttempts true pk sk)
+      (ghostHybridImpl_bad_mono ids M maxAttempts false pk sk)
+  set Pbad := Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
+    z.2.2 = true | runP] with hPbad
+  -- Ghost-domain invariant along the Trans-side run.
+  have h_inv : ∀ z ∈ support runT,
+      ∀ q : M × Commit, z.2.1.1.2 q ≠ none → q.1 ∈ z.2.1.2 := by
+    intro z hz
+    exact OracleComp.simulateQ_run_preserves_inv_of_query
+      (ghostHybridImpl ids M maxAttempts false pk sk)
+      (fun g : GhostState M Commit Chal =>
+        ∀ q : M × Commit, g.1.1.2 q ≠ none → q.1 ∈ g.1.2)
+      (fun t s hs =>
+        ghostHybridImpl_preserves_signed_inv ids M maxAttempts false pk sk t s hs)
+      (adv.main pk) (s₀, false) (fun q hq => by simp [hs₀] at hq)
+      z hz
+  -- The two verification continuations agree on the Trans-side support.
+  have h_eqT : Pr[= true | runT >>= gP] = Pr[= true | runT >>= gT] := by
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr fun z => ?_
+    by_cases hz : z ∈ support runT
+    · congr 1
+      by_cases hmem : z.1.1 ∈ z.2.1.2
+      · rw [hgP, hgT]
+        rw [probOutput_true_hybridVerifyCont_of_mem ids hr M maxAttempts pk
+            z.1 _ z.2.1.2 hmem,
+          probOutput_true_hybridVerifyCont_of_mem ids hr M maxAttempts pk
+            z.1 _ z.2.1.2 hmem]
+      · have hagree : ∀ w : Commit,
+            overlayCache M z.2.1.1.1 z.2.1.1.2 (z.1.1, w) = z.2.1.1.1 (z.1.1, w) := by
+          intro w
+          refine overlayCache_apply_ghost_none (M := M) _ ?_
+          by_contra hne
+          exact hmem (h_inv z hz (z.1.1, w) hne)
+        rw [hgP, hgT]
+        exact congrArg (fun x => Pr[= true | x])
+          (hybridVerifyCont_cache_congr ids hr M maxAttempts pk z.1 _ _ z.2.1.2 hagree)
+    · simp [probOutput_eq_zero_of_not_mem_support hz]
+  -- Combine: TV budget plus the (open) collision charge.
+  have h_tv : tvDist (runP >>= gP) (runT >>= gP) ≤ Pbad.toReal :=
+    le_trans (tvDist_bind_right_le gP runP runT) h_bad
+  have h_badBound : Pbad ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) :=
+    probEvent_ghostRead_bad_le ids hr M maxAttempts adv qS qH ε p_abort hp hQ pk sk
+      hGuess hAbort
+  have h_real : Pr[= true | runP >>= gP].toReal ≤
+      Pr[= true | runT >>= gT].toReal + Pbad.toReal := by
+    have habs := abs_probOutput_toReal_sub_le_tvDist (runP >>= gP) (runT >>= gP)
+    have h2 := (abs_le.mp habs).2
+    rw [h_eqT] at h2
+    linarith [h_tv]
+  have hPbad_ne_top : Pbad ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top probEvent_le_one
+  calc Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+        (progSignBody ids M pk sk · maxAttempts) pk]
+      = Pr[= true | runP >>= gP] := by rw [hGP]
+    _ = ENNReal.ofReal (Pr[= true | runP >>= gP].toReal) :=
+        (ENNReal.ofReal_toReal probOutput_ne_top).symm
+    _ ≤ ENNReal.ofReal (Pr[= true | runT >>= gT].toReal + Pbad.toReal) :=
+        ENNReal.ofReal_le_ofReal h_real
+    _ = Pr[= true | runT >>= gT] + Pbad := by
+        rw [ENNReal.ofReal_add ENNReal.toReal_nonneg ENNReal.toReal_nonneg,
+          ENNReal.ofReal_toReal probOutput_ne_top, ENNReal.ofReal_toReal hPbad_ne_top]
+    _ ≤ Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (transSignBody ids M maxAttempts pk sk) pk] +
+        ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
+        rw [hGT]
+        exact add_le_add le_rfl h_badBound
 
 omit [SampleableType Stmt] in
 /-- Hop G₂ → G₃ (Trans → Sim) at a fixed key: replacing the private honest-execution
