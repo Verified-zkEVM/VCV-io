@@ -278,9 +278,10 @@ lemma useHintVec_makeHintVec_eq_highBitsVec
       LatticeCrypto.cInfNorm] using h_cs2_bound jj
 
 /-- Correctness of FIPS ML-DSA, conditional on the algebraic key identity (`h_wApprox_eq`)
-and the product norm bound (`h_cs2_bound`). These conditions follow from the key generation
-relationship `t = A·s₁ + s₂`, `(t₁,t₀) = Power2Round(t)`, and the weight/norm structure
-of challenge polynomials and secret keys. -/
+and the challenge-product norm bound (`h_cs2_bound`, for the challenge `c = SampleInBall(c̃)`).
+These conditions follow from the key generation relationship `t = A·s₁ + s₂`,
+`(t₁,t₀) = Power2Round(t)`, and the weight/norm structure of challenge polynomials and
+secret keys. -/
 theorem fipsSign_fipsVerify_correct'
     (pk : PublicKey p prims) (sk : SecretKey p)
     (msg : List Byte) (sig : FIPSSignature p prims)
@@ -297,13 +298,58 @@ theorem fipsSign_fipsVerify_correct'
       computeWApprox p prims (prims.expandA pk.rho) c
         (y + c • sk.s1) pk.t1 =
       (prims.expandA pk.rho) * y - c • sk.s2 + c • sk.t0)
-    (h_cs2_bound : ∀ (c : Rq) (j : Fin p.k),
-      LatticeCrypto.cInfNorm ((c • sk.s2).get j) ≤ p.beta)
+    (h_cs2_bound : ∀ (j : Fin p.k),
+      LatticeCrypto.cInfNorm ((prims.sampleInBall sig.cTilde • sk.s2).get j) ≤ p.beta)
     (h_sign : fipsSignLoop p prims sk
       (prims.expandA pk.rho) (prims.hashMessage sk.tr msg)
       rhoDoublePrime maxAttempts = some sig) :
     fipsVerify p prims pk msg sig = true := by
-  sorry
+  classical
+  -- Recover the honest seed so the public-key / secret-key fields line up.
+  obtain ⟨seed, hkeygen⟩ := (validKeyPair_eq_true_iff p prims pk sk).mp h_valid
+  -- The transcript hash `tr` stored in `sk` equals `H(pk.ρ, pk.t₁)` used by `verify`.
+  have h_tr : sk.tr = prims.hashPublicKey pk.rho pk.t1 := by
+    simp only [keyGenFromSeed, Prod.mk.injEq] at hkeygen
+    obtain ⟨hpk, hsk⟩ := hkeygen
+    subst hpk hsk; rfl
+  -- Extract the successful signing attempt and all its structural data and bounds.
+  obtain ⟨i, -, h_attempt⟩ := fipsSignLoop_exists p prims sk _ _ _ _ _ h_sign
+  obtain ⟨h_cTilde, h_z, h_h, h_zNorm, h_r0Norm, h_ct0Norm, h_weight⟩ :=
+    fipsSignAttempt_spec p prims sk _ _ _ _ _ h_attempt
+  -- Names for the attempt-local quantities.
+  set y := prims.expandMask rhoDoublePrime (i * p.l) with hy_def
+  set aHat := prims.expandA pk.rho with haHat_def
+  set w := aHat * y with hw_def
+  set c := prims.sampleInBall sig.cTilde with hc_def
+  -- The challenge in `verify` is `sampleInBall sig.cTilde`; fold it through the spec data,
+  -- whose hypotheses were generated with the unfolded commitment-hash form.
+  rw [h_cTilde] at hc_def
+  rw [← hc_def] at h_z h_h h_ct0Norm h_r0Norm h_zNorm
+  -- Unfold `verify` and discharge its three Boolean checks.  Verify recomputes
+  -- `tr = H(pk.ρ, pk.t₁)`, which equals the `sk.tr` used during signing.
+  unfold fipsVerify
+  simp only [← h_tr, Bool.and_eq_true, decide_eq_true_eq]
+  refine ⟨⟨?_, ?_⟩, ?_⟩
+  · -- `‖z‖∞ < γ₁ - β`.
+    rw [h_z]; exact h_zNorm
+  · -- RO consistency: the recomputed commitment hash equals `sig.cTilde`.
+    -- `wApprox = A·y - c·s₂ + c·t₀` via the key identity (with `z = y + c·s₁`).
+    have hwa : computeWApprox p prims aHat c sig.z pk.t1
+        = aHat * y - c • sk.s2 + c • sk.t0 := by
+      rw [h_z]
+      exact h_wApprox_eq c y
+    rw [hwa]
+    -- `sig.h = makeHintVec (-c·t₀) (w - c·s₂ + c·t₀)`, so UseHint recovers `HighBits(w)`.
+    have h_recover : prims.useHintVec sig.h (aHat * y - c • sk.s2 + c • sk.t0)
+        = prims.highBitsVec w := by
+      rw [h_h]
+      exact useHintVec_makeHintVec_eq_highBitsVec p prims h_useHint_makeHint h_hide_low
+        w (c • sk.s2) (c • sk.t0) h_ct0Norm h_r0Norm (fun j => h_cs2_bound j)
+    rw [h_recover]
+    -- The recomputed commitment hash now matches the one recorded during signing.
+    rw [h_cTilde]
+  · -- Hint weight `≤ ω`.
+    exact h_weight
 
 /-- Correctness of FIPS ML-DSA: if a key pair was generated honestly and signing succeeds,
 then verification accepts the resulting signature.
@@ -321,6 +367,26 @@ theorem fipsSign_fipsVerify_correct
       (prims.expandA pk.rho) (prims.hashMessage sk.tr msg)
       rhoDoublePrime maxAttempts = some sig) :
     fipsVerify p prims pk msg sig = true := by
-  sorry
+  classical
+  obtain ⟨seed, hkeygen⟩ := (validKeyPair_eq_true_iff p prims pk sk).mp h_valid
+  -- Honest secret vector `s₂` is `η`-bounded, so the challenge product is `β`-bounded.
+  have hs2_bound : polyVecBounded sk.s2 p.eta := by
+    have h := congrArg Prod.snd hkeygen
+    simp only [keyGenFromSeed] at h
+    rw [← h]
+    exact (h_laws.expandS_bound _).2
+  have hcs2_norm : polyVecNorm (prims.sampleInBall sig.cTilde • sk.s2) ≤ p.beta :=
+    h_laws.sampleInBall_smul_bound sig.cTilde sk.s2 hs2_bound
+  refine fipsSign_fipsVerify_correct' p prims pk sk msg sig rhoDoublePrime maxAttempts
+    h_valid h_laws.useHint_makeHint h_laws.hide_low
+    (keyGenFromSeed_wApprox_eq p prims h_laws seed hkeygen) ?_ h_sign
+  -- Componentwise: each component of `c·s₂` is bounded by the vector norm bound `β`.
+  intro j
+  have hj : polyNorm ((prims.sampleInBall sig.cTilde • sk.s2).get j) ≤ p.beta :=
+    le_trans (LatticeCrypto.PolyVec.component_cInfNorm_le normOps
+      (prims.sampleInBall sig.cTilde • sk.s2) j) hcs2_norm
+  unfold polyNorm normOps at hj
+  simpa [LatticeCrypto.zmodPolyNormOps, LatticeCrypto.normOpsOfCenteredView,
+    LatticeCrypto.cInfNorm] using hj
 
 end MLDSA
