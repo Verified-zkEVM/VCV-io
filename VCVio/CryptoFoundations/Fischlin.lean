@@ -4560,6 +4560,109 @@ private lemma ksRelevant_verify_at (x : Stmt) (msg : M)
   exact hv
 
 omit [SampleableType Chal] in
+/-- Leaf payoff of the knowledge-soundness induction: the acceptance probability of the
+Fischlin verifier on the final cache, gated by the cache-side pinning predicate
+`CachePinned` (the event that the extractor's log scan misses). -/
+private noncomputable def ksLeaf (x : Stmt) (msg : M)
+    (π : FischlinProof Commit Chal Resp ρ)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache) : ℝ≥0∞ :=
+  letI : Decidable (CachePinned σ ρ b M x π cache) := Classical.propDecidable _
+  (if CachePinned σ ρ b M x π cache then 1 else 0) *
+    Pr[= true | (simulateQ (fischlinImpl ρ b M)
+      ((Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+        σ hr ρ b S M).verify x msg π)).run' cache]
+
+omit [SampleableType Chal] in
+/-- **Per-leaf bound.** Under the weakened coupling invariant `INV'` for the Fischlin
+classifiers, the leaf payoff is at most the live multi-slot potential plus one fresh slot
+potential: when the scan misses (`CachePinned`), the verifier's acceptance probability is
+*exactly* the slot potential of the proof's commitment-list key, which is either a live
+summand of `Phi` or (if untouched) exactly `μ`. -/
+private lemma fischlin_leaf_le (hur : σ.UniqueResponses) (x : Stmt) (msg : M)
+    (π : FischlinProof Commit Chal Resp ρ)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (keys : Finset (List Commit))
+    (st : List Commit → Fin ρ → Option (Fin (2 ^ b)))
+    [DecidablePred (ksDead σ ρ b M x msg cache)]
+    (hINV : INV' ρ b (ksRelevant σ ρ M x msg) (fun t => t.comList) (fun t => t.rep)
+      (ksDead σ ρ b M x msg cache) cache keys st) :
+    ksLeaf σ hr ρ b S M x msg π cache
+      ≤ Phi ρ b S keys st (ksDead σ ρ b M x msg cache)
+        + slotPsi ρ b S (fun _ => none) := by
+  unfold ksLeaf
+  by_cases hpin : CachePinned σ ρ b M x π cache
+  case neg =>
+    rw [if_neg hpin, zero_mul]
+    exact zero_le'
+  rw [if_pos hpin, one_mul]
+  by_cases hver : ∀ i, σ.verify x (π i).1 (π i).2.1 (π i).2.2 = true
+  case neg =>
+    -- Some repetition fails σ-verification: acceptance probability is zero.
+    have hall :
+        ((List.finRange ρ).all fun i => σ.verify x (π i).1 (π i).2.1 (π i).2.2) ≠ true :=
+      fun hAll => hver fun i => List.all_eq_true.mp hAll i (List.mem_finRange i)
+    rw [verify_probOutput_true_mixed σ hr ρ b S M x msg π cache
+      (fun j => cache ⟨x, msg, List.ofFn fun k => (π k).1, j, (π j).2.1, (π j).2.2⟩)
+      (fun j => rfl), if_neg hall, zero_mul, ENNReal.zero_div]
+    exact zero_le'
+  set k₀ : List Commit := List.ofFn fun j => (π j).1 with hk₀
+  -- The proof's key is live: deadness would give two distinct pinned challenges in a cell.
+  have hlive : ¬ ksDead σ ρ b M x msg cache k₀ := by
+    rintro ⟨t, t', u, u', hrel, hrel', hck, hck', hrep, hchal, hct, hct'⟩
+    have hpt : t.chal = (π t.rep).2.1 :=
+      hpin t u hct hrel.1 hck (ksRelevant_verify_at σ ρ M x msg π t hrel hck)
+    have hpt' : t'.chal = (π t'.rep).2.1 :=
+      hpin t' u' hct' hrel'.1 hck' (ksRelevant_verify_at σ ρ M x msg π t' hrel' hck')
+    exact hchal (by rw [hpt, hpt', hrep])
+  -- Hits correspondence: the cache at the proof's records is exactly the ghost slot state.
+  have hcache : ∀ i : Fin ρ,
+      cache ⟨x, msg, k₀, i, (π i).2.1, (π i).2.2⟩ = st k₀ i := by
+    intro i
+    cases hc : cache ⟨x, msg, k₀, i, (π i).2.1, (π i).2.2⟩ with
+    | some u =>
+        exact (hINV.cached_imp _ u (ksRelevant_record σ ρ M x msg π i (hver i)) hlive hc).symm
+    | none =>
+        cases hst : st k₀ i with
+        | none => rfl
+        | some u =>
+            exfalso
+            obtain ⟨t, htrel, htk, hti, htc⟩ := hINV.revealed_has_record k₀ i u hlive hst
+            have hchal : t.chal = (π t.rep).2.1 :=
+              hpin t u htc htrel.1 htk (ksRelevant_verify_at σ ρ M x msg π t htrel htk)
+            have hresp : t.resp = (π t.rep).2.2 :=
+              hur x (π t.rep).1 (π t.rep).2.1 t.resp (π t.rep).2.2
+                (hchal ▸ ksRelevant_verify_at σ ρ M x msg π t htrel htk) (hver t.rep)
+            obtain ⟨hts, htm, -⟩ := htrel
+            have ht : t = ⟨x, msg, k₀, i, (π i).2.1, (π i).2.2⟩ := by
+              obtain ⟨ts, tm, tcl, tr, tch, trp⟩ := t
+              dsimp only at hts htm htk hti hchal hresp
+              subst hts htm htk hti
+              rw [hchal, hresp]
+            rw [ht, hc] at htc
+            exact Option.some_ne_none u htc.symm
+  -- Exact leaf value: the slot potential of the proof's key.
+  have hall :
+      ((List.finRange ρ).all fun i => σ.verify x (π i).1 (π i).2.1 (π i).2.2) = true :=
+    List.all_eq_true.mpr fun i _ => hver i
+  rw [verify_probOutput_true_mixed σ hr ρ b S M x msg π cache (st k₀) hcache, if_pos hall,
+    one_mul]
+  change slotPsi ρ b S (st k₀) ≤ _
+  by_cases hk : k₀ ∈ keys
+  · -- Touched live key: its slot potential is a summand of `Phi`.
+    refine le_trans ?_ le_self_add
+    rw [Phi]
+    calc slotPsi ρ b S (st k₀)
+        = if ksDead σ ρ b M x msg cache k₀ then 0 else slotPsi ρ b S (st k₀) :=
+          (if_neg hlive).symm
+      _ ≤ ∑ k ∈ keys, if ksDead σ ρ b M x msg cache k then 0 else slotPsi ρ b S (st k) :=
+          Finset.single_le_sum
+            (f := fun k => if ksDead σ ρ b M x msg cache k then 0 else slotPsi ρ b S (st k))
+            (fun k _ => zero_le') hk
+  · -- Untouched key: its slot state is all-`none`, contributing exactly `μ`.
+    rw [hINV.untouched k₀ hk]
+    exact le_add_self
+
+omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
 extractor recovers no
