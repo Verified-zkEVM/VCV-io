@@ -126,7 +126,7 @@ private lemma simulateQ_prfReal_oracleOutputs (k : K) (n : ℕ) (s : S) :
         rw [simulateQ_bind, ih']
         simp [h, so]
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [Fintype S] [DecidableEq S]
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [DecidableEq S]
   [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O] in
 /-- Applying the real PRF query implementation to the full reduction body simplifies to
 sampling a seed and running the adversary on deterministic output. -/
