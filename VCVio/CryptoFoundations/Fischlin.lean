@@ -3368,6 +3368,277 @@ private lemma knowledgeSoundnessExp_bad_le_misses' (hss : σ.SpeciallySound)
   knowledgeSoundnessExp_bad_le_misses σ hr ρ b S M hss prover x msg
     (fun π cache c' h => ksVerify_true_support_allVerified σ hr ρ b S M x msg π cache c' h)
 
+/-- Number of unrevealed coordinates of a partial hash assignment. -/
+private def missCard {ρ b : ℕ} (g : Fin ρ → Option (Fin (2 ^ b))) : ℕ :=
+  (Finset.univ.filter fun i => g i = none).card
+
+/-- Per-slot potential: the current conditional completion probability of a slot given the
+revealed coordinates `g`. An untouched slot has potential exactly
+`μ = smallSumCount ρ b S / (2^b)^ρ` (`slotPsi_none`), and revealing one fresh uniform
+coordinate is a martingale step (`slotPsi_tower`). -/
+private noncomputable def slotPsi (ρ b S : ℕ) (g : Fin ρ → Option (Fin (2 ^ b))) : ℝ≥0∞ :=
+  (partialSmallSumCount ρ b g S : ℝ≥0∞) / ((2 ^ b : ℕ) : ℝ≥0∞) ^ (missCard g)
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Fiberwise decomposition: summing the extension counts over the possible values of a fresh
+coordinate recovers the count for the unextended assignment (tower property at the level of
+counting). -/
+private lemma sum_partialSmallSumCount_update (g : Fin ρ → Option (Fin (2 ^ b))) (i : Fin ρ)
+    (hi : g i = none) :
+    ∑ u : Fin (2 ^ b), partialSmallSumCount ρ b (Function.update g i (some u)) S
+      = partialSmallSumCount ρ b g S := by
+  classical
+  rw [partialSmallSumCount, Finset.card_eq_sum_card_fiberwise
+    (f := fun v : Fin ρ → Fin (2 ^ b) => v i) (t := Finset.univ)
+    (fun v _ => Finset.mem_univ _)]
+  refine (Finset.sum_congr rfl fun u _ => ?_).symm
+  rw [partialSmallSumCount, Finset.filter_filter]
+  congr 1
+  refine Finset.filter_congr fun v _ => ?_
+  constructor
+  · rintro ⟨⟨hext, hsum⟩, hvi⟩
+    refine ⟨fun j h hj => ?_, hsum⟩
+    by_cases hji : j = i
+    · subst hji
+      rw [Function.update_self] at hj
+      cases hj
+      exact hvi
+    · rw [Function.update_of_ne hji] at hj
+      exact hext j h hj
+  · rintro ⟨hext, hsum⟩
+    have hvi : v i = u := hext i u (by rw [Function.update_self])
+    refine ⟨⟨fun j h hj => ?_, hsum⟩, hvi⟩
+    by_cases hji : j = i
+    · subst hji; rw [hi] at hj; cases hj
+    · exact hext j h (by rw [Function.update_of_ne hji]; exact hj)
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Revealing a fresh coordinate decreases the miss count by exactly one. -/
+private lemma missCard_update {ρ' b' : ℕ} (g : Fin ρ' → Option (Fin (2 ^ b'))) (i : Fin ρ')
+    (u : Fin (2 ^ b')) (hi : g i = none) :
+    missCard g = missCard (Function.update g i (some u)) + 1 := by
+  classical
+  unfold missCard
+  have hset : (Finset.univ.filter fun j : Fin ρ' => Function.update g i (some u) j = none)
+      = (Finset.univ.filter fun j : Fin ρ' => g j = none).erase i := by
+    ext j
+    simp only [Finset.mem_filter, Finset.mem_erase, Finset.mem_univ, true_and]
+    by_cases hji : j = i
+    · subst hji; simp [Function.update_self]
+    · simp [hji]
+  have hmem : i ∈ Finset.univ.filter fun j : Fin ρ' => g j = none :=
+    Finset.mem_filter.mpr ⟨Finset.mem_univ i, hi⟩
+  rw [hset, Finset.card_erase_of_mem hmem]
+  have hpos : 0 < (Finset.univ.filter fun j : Fin ρ' => g j = none).card :=
+    Finset.card_pos.mpr ⟨i, hmem⟩
+  omega
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Fresh slot = μ.** The potential of an untouched slot is exactly
+`smallSumCount ρ b S / (2^b)^ρ`. -/
+private lemma slotPsi_none :
+    slotPsi ρ b S (fun _ => none)
+      = (smallSumCount ρ b S : ℝ≥0∞) / ((2 ^ b : ℕ) : ℝ≥0∞) ^ ρ := by
+  unfold slotPsi
+  rw [partialSmallSumCount_none ρ b S]
+  congr 1
+  simp [missCard]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Tower identity.** Averaging the slot potential over a uniformly revealed fresh
+coordinate recovers the current slot potential: the per-slot potential is a martingale under
+revealing one coordinate. With `g = fun _ => none` this is the open-step identity. -/
+private lemma slotPsi_tower (g : Fin ρ → Option (Fin (2 ^ b))) (i : Fin ρ) (hi : g i = none) :
+    (∑ u : Fin (2 ^ b), slotPsi ρ b S (Function.update g i (some u)))
+        / ((2 ^ b : ℕ) : ℝ≥0∞)
+      = slotPsi ρ b S g := by
+  classical
+  have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
+    Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
+  have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+  have hmem : i ∈ Finset.univ.filter fun j : Fin ρ => g j = none :=
+    Finset.mem_filter.mpr ⟨Finset.mem_univ i, hi⟩
+  have h1 : 1 ≤ missCard g := Finset.card_pos.mpr ⟨i, hmem⟩
+  have hmiss : ∀ u : Fin (2 ^ b),
+      missCard (Function.update g i (some u)) = missCard g - 1 := by
+    intro u
+    have := missCard_update g i u hi
+    omega
+  have hm : missCard g - 1 + 1 = missCard g := by omega
+  unfold slotPsi
+  simp only [hmiss, div_eq_mul_inv]
+  rw [← Finset.sum_mul, ← Nat.cast_sum, sum_partialSmallSumCount_update ρ b S g i hi,
+    mul_assoc,
+    ← ENNReal.mul_inv (Or.inl (pow_ne_zero _ hD0)) (Or.inl (ENNReal.pow_ne_top hDtop)),
+    ← pow_succ, hm]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Each extending tuple is determined by its values on the unrevealed coordinates, so the
+partial count is at most `(2^b)^missCard g`. -/
+private lemma partialSmallSumCount_le_pow (g : Fin ρ → Option (Fin (2 ^ b))) :
+    partialSmallSumCount ρ b g S ≤ (2 ^ b) ^ missCard g := by
+  classical
+  have hle : partialSmallSumCount ρ b g S
+      ≤ Fintype.card
+          ({j // j ∈ Finset.univ.filter fun j : Fin ρ => g j = none} → Fin (2 ^ b)) := by
+    rw [partialSmallSumCount, ← Finset.card_univ]
+    refine Finset.card_le_card_of_injOn
+      (fun v j => v j.1) (fun v _ => Finset.mem_univ _) ?_
+    intro v hv w hw hvw
+    simp only [Finset.coe_filter, Finset.mem_univ, true_and, Set.mem_setOf_eq] at hv hw
+    funext j
+    by_cases hj : g j = none
+    · exact congrFun hvw ⟨j, Finset.mem_filter.mpr ⟨Finset.mem_univ j, hj⟩⟩
+    · obtain ⟨h, hh⟩ := Option.ne_none_iff_exists'.mp hj
+      rw [hv.1 j h hh, hw.1 j h hh]
+  refine hle.trans (le_of_eq ?_)
+  rw [Fintype.card_fun, Fintype.card_fin, Fintype.card_coe, missCard]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- The slot potential is a probability: `slotPsi ρ b S g ≤ 1`. -/
+private lemma slotPsi_le_one (g : Fin ρ → Option (Fin (2 ^ b))) : slotPsi ρ b S g ≤ 1 := by
+  unfold slotPsi
+  refine ENNReal.div_le_of_le_mul ?_
+  rw [one_mul]
+  calc (partialSmallSumCount ρ b g S : ℝ≥0∞)
+      ≤ (((2 ^ b) ^ missCard g : ℕ) : ℝ≥0∞) :=
+        Nat.cast_le.mpr (partialSmallSumCount_le_pow ρ b S g)
+    _ = ((2 ^ b : ℕ) : ℝ≥0∞) ^ missCard g := by push_cast; rfl
+
+/-- Update one coordinate of one slot of a multi-slot state. -/
+private def updateSlot {ρ' b' : ℕ} {K : Type} [DecidableEq K]
+    (st : K → Fin ρ' → Option (Fin (2 ^ b'))) (k₀ : K) (i₀ : Fin ρ')
+    (u : Fin (2 ^ b')) : K → Fin ρ' → Option (Fin (2 ^ b')) :=
+  Function.update st k₀ (Function.update (st k₀) i₀ (some u))
+
+/-- Multi-slot potential: the sum of the live slots' potentials over the touched keys. -/
+private noncomputable def Phi (ρ b S : ℕ) {K : Type} (keys : Finset K)
+    (st : K → Fin ρ → Option (Fin (2 ^ b))) (dead : K → Prop) [DecidablePred dead] : ℝ≥0∞ :=
+  ∑ k ∈ keys, if dead k then 0 else slotPsi ρ b S (st k)
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+private lemma updateSlot_apply_ne {ρ' b' : ℕ} {K : Type} [DecidableEq K]
+    (st : K → Fin ρ' → Option (Fin (2 ^ b'))) (k₀ : K) (i₀ : Fin ρ')
+    (u : Fin (2 ^ b')) {k : K} (hk : k ≠ k₀) : updateSlot st k₀ i₀ u k = st k :=
+  Function.update_of_ne hk _ _
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+private lemma updateSlot_apply_self {ρ' b' : ℕ} {K : Type} [DecidableEq K]
+    (st : K → Fin ρ' → Option (Fin (2 ^ b'))) (k₀ : K) (i₀ : Fin ρ')
+    (u : Fin (2 ^ b')) : updateSlot st k₀ i₀ u k₀ = Function.update (st k₀) i₀ (some u) :=
+  Function.update_self _ _ _
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Extend = martingale.** Querying a fresh coordinate of a live, already-open slot leaves
+the expected potential unchanged. -/
+private lemma Phi_extend {K : Type} [DecidableEq K] (keys : Finset K)
+    (st : K → Fin ρ → Option (Fin (2 ^ b)))
+    (dead : K → Prop) [DecidablePred dead] (k₀ : K) (i₀ : Fin ρ)
+    (hk : k₀ ∈ keys) (hdead : ¬dead k₀) (hi : st k₀ i₀ = none) :
+    (∑ u : Fin (2 ^ b), Phi ρ b S keys (updateSlot st k₀ i₀ u) dead)
+        / ((2 ^ b : ℕ) : ℝ≥0∞)
+      = Phi ρ b S keys st dead := by
+  classical
+  have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
+    Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
+  have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+  have hsplit : ∀ u : Fin (2 ^ b),
+      Phi ρ b S keys (updateSlot st k₀ i₀ u) dead
+        = slotPsi ρ b S (Function.update (st k₀) i₀ (some u))
+          + ∑ k ∈ keys.erase k₀, if dead k then 0 else slotPsi ρ b S (st k) := by
+    intro u
+    rw [Phi, ← Finset.add_sum_erase _ _ hk, if_neg hdead, updateSlot_apply_self]
+    congr 1
+    refine Finset.sum_congr rfl fun k hk' => ?_
+    rw [updateSlot_apply_ne st k₀ i₀ u (Finset.ne_of_mem_erase hk')]
+  simp only [hsplit]
+  rw [Finset.sum_add_distrib, ENNReal.add_div, slotPsi_tower ρ b S (st k₀) i₀ hi,
+    Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_comm,
+    ENNReal.mul_div_cancel_right hD0 hDtop, Phi, ← Finset.add_sum_erase _ _ hk,
+    if_neg hdead]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Open, live case (equality).** Opening a fresh slot at a live key adds exactly
+`μ = slotPsi ρ b S (fun _ => none)` to the expected potential. Requires the slot's state to be
+untouched (`hfresh`) — exactly the invariant that untouched keys carry all-`none` states. -/
+private lemma Phi_open_eq {K : Type} [DecidableEq K] (keys : Finset K)
+    (st : K → Fin ρ → Option (Fin (2 ^ b)))
+    (dead : K → Prop) [DecidablePred dead] (k₀ : K) (i₀ : Fin ρ)
+    (hk : k₀ ∉ keys) (hdead : ¬dead k₀) (hfresh : st k₀ = fun _ => none) :
+    (∑ u : Fin (2 ^ b), Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) dead)
+        / ((2 ^ b : ℕ) : ℝ≥0∞)
+      = Phi ρ b S keys st dead + slotPsi ρ b S (fun _ => none) := by
+  classical
+  have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
+    Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
+  have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+  have hsplit : ∀ u : Fin (2 ^ b),
+      Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) dead
+        = slotPsi ρ b S (Function.update (st k₀) i₀ (some u)) + Phi ρ b S keys st dead := by
+    intro u
+    rw [Phi, Finset.sum_insert hk, if_neg hdead, updateSlot_apply_self]
+    congr 1
+    refine Finset.sum_congr rfl fun k hk' => ?_
+    rw [updateSlot_apply_ne st k₀ i₀ u (fun h => hk (h ▸ hk'))]
+  simp only [hsplit]
+  rw [Finset.sum_add_distrib, ENNReal.add_div,
+    slotPsi_tower ρ b S (st k₀) i₀ (by rw [hfresh]), hfresh,
+    Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_comm,
+    ENNReal.mul_div_cancel_right hD0 hDtop, add_comm]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Open, general case (inequality).** Opening a fresh slot adds at most `μ` to the
+expected potential (a dead key contributes nothing). -/
+private lemma Phi_open_le {K : Type} [DecidableEq K] (keys : Finset K)
+    (st : K → Fin ρ → Option (Fin (2 ^ b)))
+    (dead : K → Prop) [DecidablePred dead] (k₀ : K) (i₀ : Fin ρ)
+    (hk : k₀ ∉ keys) (hfresh : st k₀ = fun _ => none) :
+    (∑ u : Fin (2 ^ b), Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) dead)
+        / ((2 ^ b : ℕ) : ℝ≥0∞)
+      ≤ Phi ρ b S keys st dead + slotPsi ρ b S (fun _ => none) := by
+  classical
+  by_cases hdead : dead k₀
+  · have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
+      Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
+    have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+    have hsplit : ∀ u : Fin (2 ^ b),
+        Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) dead
+          = Phi ρ b S keys st dead := by
+      intro u
+      rw [Phi, Finset.sum_insert hk, if_pos hdead, zero_add]
+      refine Finset.sum_congr rfl fun k hk' => ?_
+      rw [updateSlot_apply_ne st k₀ i₀ u (fun h => hk (h ▸ hk'))]
+    simp only [hsplit]
+    rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_comm,
+      ENNReal.mul_div_cancel_right hD0 hDtop]
+    exact le_self_add
+  · exact le_of_eq (Phi_open_eq ρ b S keys st dead k₀ i₀ hk hdead hfresh)
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Kill.** Any step that only grows the dead set (state and keys unchanged) can only
+decrease the potential. -/
+private lemma Phi_mono_dead {K : Type} (keys : Finset K)
+    (st : K → Fin ρ → Option (Fin (2 ^ b)))
+    (dead dead' : K → Prop) [DecidablePred dead] [DecidablePred dead']
+    (h : ∀ k, dead k → dead' k) :
+    Phi ρ b S keys st dead' ≤ Phi ρ b S keys st dead := by
+  refine Finset.sum_le_sum fun k _ => ?_
+  by_cases hk : dead' k
+  · simp [hk]
+  · rw [if_neg hk, if_neg fun hd => hk (h k hd)]
+
 omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
