@@ -1399,7 +1399,11 @@ private lemma run_mOfFn_query_hit {β : Type} (n : ℕ)
           pure (f i h))).run cache
       = pure ((fun i => f i (hash i)), cache) := by
   induction n with
-  | zero => simp [Fin.mOfFn, StateT.run_pure]; ext i; exact i.elim0
+  | zero =>
+      simp only [Fin.mOfFn, simulateQ_pure, StateT.run_pure]
+      congr 1
+      congr 1
+      exact Subsingleton.elim _ _
   | succ n ih =>
       rw [Fin.mOfFn, simulateQ_bind, StateT.run_bind, simulateQ_bind,
         roSim.simulateQ_HasQuery_query, StateT.run_bind,
@@ -1832,7 +1836,8 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
     fun i o => match o with
       | some (ω, resp) => (comVec i, ω, resp)
       | none => (comVec i, default, default) with htoSigDef
-  have htoSig : ∀ i o, (toSig i o).2.1 = (o.getD default).1 ∧ (toSig i o).2.2 = (o.getD default).2 := by
+  have htoSig : ∀ i o, (toSig i o).2.1 = (o.getD default).1 ∧
+      (toSig i o).2.2 = (o.getD default).2 := by
     intro i o; cases o with
     | none => exact ⟨rfl, rfl⟩
     | some t => obtain ⟨ω, resp⟩ := t; exact ⟨rfl, rfl⟩
@@ -1910,7 +1915,8 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
       | none => simp only [Option.map_none]; rfl
       | some t => obtain ⟨ω, resp, hh⟩ := t; simp only [Option.map_some]; rfl
     · refine congrArg (fun n => decide (n ≤ S))
-        (congrArg (fun g => List.foldl g 0 (List.finRange ρ)) (funext fun acc => funext fun i => ?_))
+        (congrArg (fun g => List.foldl g 0 (List.finRange ρ))
+          (funext fun acc => funext fun i => ?_))
       dsimp only
       cases h : bests i with
       | none => simp only [Option.map_none, Option.getD_none]; rfl
@@ -1939,7 +1945,7 @@ private lemma sign_verify_run_eq (pk : Stmt) (sk : Wit) (msg : M)
       rw [hcom, hreads i, hhashDef]
       rw [Option.eq_some_iff_get_eq.mpr ⟨hbest_some i, rfl⟩]
       rfl
-    show 𝒟[(simulateQ (fischlinImpl ρ b M)
+    change 𝒟[(simulateQ (fischlinImpl ρ b M)
         ((Fischlin σ hr ρ b S M).verify pk msg p.1)).run' p.2] = _
     rw [verify_run'_of_hits σ hr ρ b S M pk msg p.1 p.2 hash hhit]
     refine congrArg (𝒟[pure ·]) ?_
@@ -1966,7 +1972,8 @@ This is the assembly step on top of the proven per-repetition output bridge
 repetitions of `Fin.mOfFn` (each repetition's queries carry the repetition index in their
 `FischlinROInput.rep` field, so they never collide across repetitions, preserving freshness) and
 the verifier cache-hit step (the chosen transcript's hash was cached during `sign`, so each
-verifier re-query returns the recorded value, matching `modelGame`'s direct read of `(bests i).2.2`).
+verifier re-query returns the recorded value, matching `modelGame`'s direct read of
+`(bests i).2.2`).
 These two cache-coupling steps require a cache-carrying refinement of `fischlinSearch_run'_eq`. -/
 private lemma fischlin_game_run'_eq_modelGame (msg : M) :
     𝒟[StateT.run' (simulateQ (fischlinImpl ρ b M)
@@ -2191,7 +2198,8 @@ private lemma fischlinUnifSearch_match_verify
       (fun ω' resp' h' heq => by simp at heq) ho
   exact verify_of_perfectlyComplete σ hc pk sk hrel pc sc hpc ω resp hresp
 
-omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp] [DecidableEq M] in
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [DecidableEq M] in
 /-- **B2 (probability bound).** The model game rejects with probability at most
 `completenessError ρ b S (FinEnum.card Chal)`.
 
