@@ -3793,7 +3793,7 @@ of hash queries.
   slot, paying `+μ` once per query (`Phi_open_le`) — telescoping into the `q·μ` term.
 * The final `+μ` pays for the one extra slot the consumer's leaf may inspect (the proof's
   own `comList` slot, possibly never queried). -/
-private theorem main_induction {T K : Type} [DecidableEq T] [DecidableEq K]
+private theorem main_induction {T K : Type} [DecidableEq T]
     (key : T → K) (coord : T → Fin ρ)
     (hinj : ∀ t₁ t₂, key t₁ = key t₂ → coord t₁ = coord t₂ → t₁ = t₂)
     (dead : (T →ₒ Fin (2 ^ b)).QueryCache → K → Prop)
@@ -3808,6 +3808,7 @@ private theorem main_induction {T K : Type} [DecidableEq T] [DecidableEq K]
     EP ((simulateQ (roImpl b T) oa).run cache) (fun z => leaf z.1 z.2)
       ≤ (q : ℝ≥0∞) * slotPsi ρ b S (fun _ => none)
         + Phi ρ b S keys st (dead cache) + slotPsi ρ b S (fun _ => none) := by
+  classical
   induction oa using OracleComp.inductionOn with
   | pure x =>
       intro q _ cache keys st hINV
@@ -3945,7 +3946,7 @@ omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Res
 the expected leaf payoff telescopes to exactly `(q + 1) · μ` — the
 `(Q + 1) · smallSumCount / (2^b)^ρ` headline constant of `knowledgeSoundness_badEvent_le`
 (via `slotPsi_none`). -/
-private theorem main_induction_init {T K : Type} [DecidableEq T] [DecidableEq K]
+private theorem main_induction_init {T K : Type} [DecidableEq T]
     (key : T → K) (coord : T → Fin ρ)
     (hinj : ∀ t₁ t₂, key t₁ = key t₂ → coord t₁ = coord t₂ → t₁ = t₂)
     (dead : (T →ₒ Fin (2 ^ b)).QueryCache → K → Prop)
@@ -3958,6 +3959,7 @@ private theorem main_induction_init {T K : Type} [DecidableEq T] [DecidableEq K]
     (q : ℕ) (hq : IsQueryBoundP oa (· matches .inr _) q) :
     EP ((simulateQ (roImpl b T) oa).run ∅) (fun z => leaf z.1 z.2)
       ≤ ((q + 1 : ℕ) : ℝ≥0∞) * slotPsi ρ b S (fun _ => none) := by
+  classical
   have hINV : INV ρ b key coord ∅ (∅ : Finset K) (fun _ _ => none) :=
     ⟨fun t u => by rw [QueryCache.empty_apply], fun _ _ => rfl⟩
   refine (main_induction ρ b S key coord hinj dead hdead_mono leaf hleaf oa q hq
