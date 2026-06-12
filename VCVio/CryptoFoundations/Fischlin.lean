@@ -3094,6 +3094,49 @@ private lemma verify_probOutput_true_mixed (pk : Stmt) (msg : M)
       ENNReal.zero_div]
 
 omit [SampleableType Chal] in
+/-- **Accepting verify runs Σ-verify every repetition.** Any `(true, _)` outcome in the support
+of the simulated Fischlin verifier implies the per-repetition Σ-protocol checks of the proof:
+the Σ-verification bits inside `verify` are deterministic and independent of the oracle
+answers, so a `false` bit forces acceptance probability zero. Discharges the `hverSupp`
+hypothesis of `knowledgeSoundnessExp_bad_le_misses`. -/
+private lemma ksVerify_true_support_allVerified (x : Stmt) (msg : M)
+    (π : FischlinProof Commit Chal Resp ρ)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (c' : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (h : (true, c') ∈ support (ksVerify σ hr ρ b S M x msg π cache)) :
+    ∀ i, σ.verify x (π i).1 (π i).2.1 (π i).2.2 = true := by
+  intro i
+  by_contra hne
+  have hall : ((List.finRange ρ).all fun j => σ.verify x (π j).1 (π j).2.1 (π j).2.2) ≠ true :=
+    fun hAll => hne (List.all_eq_true.mp hAll i (List.mem_finRange i))
+  have hmem : true ∈ support ((simulateQ (fischlinImpl ρ b M)
+      ((Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+        σ hr ρ b S M).verify x msg π)).run' cache) := by
+    rw [StateT.run', support_map]
+    exact ⟨(true, c'), h, rfl⟩
+  have hpos := probOutput_pos _ _ hmem
+  rw [verify_probOutput_true_mixed σ hr ρ b S M x msg π cache
+    (fun j => cache (⟨x, msg, List.ofFn (fun k => (π k).1), j, (π j).2.1, (π j).2.2⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M)) (fun j => rfl),
+    if_neg hall, zero_mul, ENNReal.zero_div] at hpos
+  exact lt_irrefl 0 hpos
+
+omit [SampleableType Chal] in
+/-- `knowledgeSoundnessExp_bad_le_misses` with the verifier-determinism hypothesis discharged:
+the knowledge-soundness bad event is bounded by the probability that the verifier accepts
+while the extractor's scan misses. -/
+private lemma knowledgeSoundnessExp_bad_le_misses' (hss : σ.SpeciallySound)
+    (prover : Stmt → M →
+      OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)
+        (FischlinProof Commit Chal Resp ρ))
+    (x : Stmt) (msg : M) :
+    Pr[= true | knowledgeSoundnessExp σ hr ρ b S M prover x msg] ≤
+      Pr[fun out => out.2 = true ∧ fischlinFindWitness σ ρ b M x out.1.1 out.1.2 = none
+        | ksSample σ hr ρ b S M prover x msg] :=
+  knowledgeSoundnessExp_bad_le_misses σ hr ρ b S M hss prover x msg
+    (fun π cache c' h => ksVerify_true_support_allVerified σ hr ρ b S M x msg π cache c' h)
+
+omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
 extractor recovers no
