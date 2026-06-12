@@ -4296,6 +4296,161 @@ private theorem main_induction_gen_init {T K C : Type} [DecidableEq T]
     hdead_kill leaf hleaf oa q hq ∅ ∅ (fun _ _ => none) hINV).trans (le_of_eq ?_)
   rw [Phi, Finset.sum_empty, add_zero, Nat.cast_add, Nat.cast_one, add_mul, one_mul]
 
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Left query on the logged stack: forwarded, no log, cache unchanged. Stated with the
+mapped function's domain at the sum-spec `Range` type so keyed rewriting fires after
+`simulateQ_bind`. -/
+private lemma loggedImpl_run_run_inl {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    (i : unifSpec.Domain) (c : hashSpec.QueryCache) :
+    (((idImplW hashSpec + loggedROW hashSpec) (Sum.inl i)).run).run c =
+      (fun (u : (unifSpec + hashSpec).Range (Sum.inl i)) =>
+          ((u, (∅ : QueryLog hashSpec)), c)) <$>
+        (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) i) := by
+  rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Right query on the logged stack, cache hit: cached value, logged, cache unchanged. -/
+private lemma loggedImpl_run_run_inr_some {ι : Type} {hashSpec : OracleSpec ι}
+    [DecidableEq ι] [hashSpec.DecidableEq]
+    [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {j : hashSpec.Domain} {c : hashSpec.QueryCache}
+    {u : hashSpec.Range j} (h : c j = some u) :
+    (((idImplW hashSpec + loggedROW hashSpec) (Sum.inr j)).run).run c =
+      pure (((u, ([⟨j, u⟩] : QueryLog hashSpec)), c) :
+        ((unifSpec + hashSpec).Range (Sum.inr j) × QueryLog hashSpec) ×
+          hashSpec.QueryCache) := by
+  change ((loggedROW hashSpec j).run).run c = _
+  rw [loggedROW, QueryImpl.run_withLogging_apply, StateT.run_bind,
+    show hashSpec.randomOracle = QueryImpl.withCaching uniformSampleImpl from rfl,
+    QueryImpl.withCaching_run_some _ h, pure_bind]
+  rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Right query on the logged stack, cache miss: sample, log, cache the value. -/
+private lemma loggedImpl_run_run_inr_none {ι : Type} {hashSpec : OracleSpec ι}
+    [DecidableEq ι] [hashSpec.DecidableEq]
+    [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {j : hashSpec.Domain} {c : hashSpec.QueryCache} (h : c j = none) :
+    (((idImplW hashSpec + loggedROW hashSpec) (Sum.inr j)).run).run c =
+      (fun (u : (unifSpec + hashSpec).Range (Sum.inr j)) =>
+          ((u, ([⟨j, u⟩] : QueryLog hashSpec)), c.cacheQuery j u)) <$>
+        ($ᵗ hashSpec.Range j) := by
+  change ((loggedROW hashSpec j).run).run c = _
+  rw [loggedROW, QueryImpl.run_withLogging_apply, StateT.run_bind,
+    show hashSpec.randomOracle = QueryImpl.withCaching uniformSampleImpl from rfl,
+    QueryImpl.withCaching_run_none _ h]
+  rw [show uniformSampleImpl (spec := hashSpec) j = ($ᵗ hashSpec.Range j) from rfl]
+  rw [map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp_apply, pure_bind, map_eq_bind_pure_comp]
+  rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Left query on the unlogged stack: forwarded, cache unchanged. -/
+private lemma unloggedImpl_run_inl {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    (i : unifSpec.Domain) (c : hashSpec.QueryCache) :
+    ((unifFwdImpl hashSpec + hashSpec.randomOracle) (Sum.inl i)).run c =
+      (fun (u : (unifSpec + hashSpec).Range (Sum.inl i)) => (u, c)) <$>
+        (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) i) := by
+  change (unifFwdImpl hashSpec i).run c = _
+  simp [unifFwdImpl, StateT.run_monadLift, bind_pure_comp]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Right query on the unlogged stack, cache hit. -/
+private lemma unloggedImpl_run_inr_some {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {j : hashSpec.Domain} {c : hashSpec.QueryCache}
+    {u : hashSpec.Range j} (h : c j = some u) :
+    ((unifFwdImpl hashSpec + hashSpec.randomOracle) (Sum.inr j)).run c =
+      pure ((u, c) : (unifSpec + hashSpec).Range (Sum.inr j) × hashSpec.QueryCache) :=
+  QueryImpl.withCaching_run_some (so := uniformSampleImpl) h
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Right query on the unlogged stack, cache miss. -/
+private lemma unloggedImpl_run_inr_none {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {j : hashSpec.Domain} {c : hashSpec.QueryCache} (h : c j = none) :
+    ((unifFwdImpl hashSpec + hashSpec.randomOracle) (Sum.inr j)).run c =
+      (fun (u : (unifSpec + hashSpec).Range (Sum.inr j)) =>
+        (u, c.cacheQuery j u)) <$> ($ᵗ hashSpec.Range j) :=
+  QueryImpl.withCaching_run_none (so := uniformSampleImpl) h
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Dropping the log.** Projecting away the query log from the logged run yields, as a
+plain `ProbComp` term equality, the unlogged run. -/
+private theorem dropLog_run_eq {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {α : Type} (oa : OracleComp (unifSpec + hashSpec) α) (cache : hashSpec.QueryCache) :
+    (fun z => (z.1.1, z.2)) <$>
+        ((simulateQ (idImplW hashSpec + loggedROW hashSpec) oa).run).run cache
+      = (simulateQ (unifFwdImpl hashSpec + hashSpec.randomOracle) oa).run cache := by
+  induction oa using OracleComp.inductionOn generalizing cache with
+  | pure a =>
+      simp only [simulateQ_pure, WriterT.run_pure', StateT.run_pure, map_pure]
+  | query_bind t k ih =>
+      simp only [simulateQ_bind, simulateQ_spec_query, WriterT.run_bind', StateT.run_bind,
+        StateT.run_map, map_bind]
+      cases t with
+      | inl i =>
+          rw [loggedImpl_run_run_inl, unloggedImpl_run_inl]
+          simp only [bind_map_left, Functor.map_map, Prod.map_fst, id_eq]
+          exact bind_congr fun u => ih u cache
+      | inr j =>
+          cases hc : cache j with
+          | some u =>
+              rw [loggedImpl_run_run_inr_some hc, unloggedImpl_run_inr_some hc]
+              simp only [pure_bind, Functor.map_map, Prod.map_fst, id_eq]
+              exact ih u cache
+          | none =>
+              rw [loggedImpl_run_run_inr_none hc, unloggedImpl_run_inr_none hc]
+              simp only [bind_map_left, Functor.map_map, Prod.map_fst, id_eq]
+              exact bind_congr fun u => ih u (cache.cacheQuery j u)
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Reindexing an expected payoff along a `map`. -/
+private lemma EP_map {α β : Type} (mx : ProbComp α) (g : α → β) (f : β → ℝ≥0∞) :
+    EP (g <$> mx) f = EP mx (f ∘ g) := by
+  rw [map_eq_bind_pure_comp, EP_bind]
+  exact tsum_congr fun x => by rw [Function.comp_apply, EP_pure, Function.comp_apply]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Expected payoffs that ignore the log coincide between the logged and unlogged runs. -/
+private theorem dropLog_EP {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {α : Type} (oa : OracleComp (unifSpec + hashSpec) α) (cache : hashSpec.QueryCache)
+    (f : α → hashSpec.QueryCache → ℝ≥0∞) :
+    EP (((simulateQ (idImplW hashSpec + loggedROW hashSpec) oa).run).run cache)
+        (fun z => f z.1.1 z.2)
+      = EP ((simulateQ (unifFwdImpl hashSpec + hashSpec.randomOracle) oa).run cache)
+        (fun w => f w.1 w.2) := by
+  rw [← dropLog_run_eq oa cache, EP_map]
+  rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Probabilities of events depending only on the value and the final cache agree between
+the logged and the unlogged run. -/
+private theorem dropLog_probEvent {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {α : Type} (oa : OracleComp (unifSpec + hashSpec) α) (cache : hashSpec.QueryCache)
+    (p : α → hashSpec.QueryCache → Prop) :
+    Pr[fun z => p z.1.1 z.2 |
+        ((simulateQ (idImplW hashSpec + loggedROW hashSpec) oa).run).run cache]
+      = Pr[fun w => p w.1 w.2 |
+        (simulateQ (unifFwdImpl hashSpec + hashSpec.randomOracle) oa).run cache] := by
+  rw [← dropLog_run_eq oa cache, probEvent_map]
+  rfl
+
 omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
