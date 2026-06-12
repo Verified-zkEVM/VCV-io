@@ -2855,7 +2855,7 @@ private theorem fischlinFindWitness_eq_none_iff_cachePinned
     (hT1 : ∀ e ∈ log, cache e.1 = some e.2)
     (hT2 : ∀ (t : FischlinROInput Stmt Commit Chal Resp ρ M) (u : Fin (2 ^ b)),
       cache t = some u →
-        (⟨t, u⟩ : (s : FischlinROInput Stmt Commit Chal Resp ρ M) × Fin (2 ^ b)) ∈ log) :
+        (⟨t, u⟩ : (_s : FischlinROInput Stmt Commit Chal Resp ρ M) × Fin (2 ^ b)) ∈ log) :
     fischlinFindWitness σ ρ b M x π log = none ↔ CachePinned σ ρ b M x π cache := by
   constructor
   · -- scan-none → cache predicate, via cached ⇒ logged ⇒ pinning.
