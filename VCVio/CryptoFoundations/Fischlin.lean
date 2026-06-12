@@ -3966,6 +3966,336 @@ private theorem main_induction_init {T K : Type} [DecidableEq T]
     ∅ ∅ (fun _ _ => none) hINV).trans (le_of_eq ?_)
   rw [Phi, Finset.sum_empty, add_zero, Nat.cast_add, Nat.cast_one, add_mul, one_mul]
 
+/-- Weakened coupling invariant for the multi-record setting, relative to the deadness
+predicate `dd` of the current cache. Unlike `INV`, the cache→state direction is restricted
+to relevant records at live slots, and the state→cache direction only requires *some*
+relevant record witnessing each revealed cell. -/
+private structure INV' (ρ' b' : ℕ) {T K : Type} (relevant : T → Prop) (key : T → K)
+    (coord : T → Fin ρ') (dd : K → Prop)
+    (cache : (T →ₒ Fin (2 ^ b')).QueryCache) (keys : Finset K)
+    (st : K → Fin ρ' → Option (Fin (2 ^ b'))) : Prop where
+  cached_imp : ∀ (t : T) (u : Fin (2 ^ b')), relevant t → ¬ dd (key t) →
+    cache t = some u → st (key t) (coord t) = some u
+  revealed_has_record : ∀ (k : K) (i : Fin ρ') (u : Fin (2 ^ b')), ¬ dd k →
+    st k i = some u → ∃ t, relevant t ∧ key t = k ∧ coord t = i ∧ cache t = some u
+  untouched : ∀ k ∉ keys, st k = fun _ => none
+
+namespace INV'
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Inert step.** Caching a record that is irrelevant, or whose slot is (or becomes)
+dead, preserves `INV'` with the ghost state unchanged. Covers the irrelevant, already-dead,
+and kill cases of the generalized induction. -/
+private lemma cacheQuery_inert {ρ' b' : ℕ} {T K : Type} [DecidableEq T]
+    {relevant : T → Prop} {key : T → K} {coord : T → Fin ρ'} {dd dd' : K → Prop}
+    {cache : (T →ₒ Fin (2 ^ b')).QueryCache} {keys : Finset K}
+    {st : K → Fin ρ' → Option (Fin (2 ^ b'))}
+    (hINV : INV' ρ' b' relevant key coord dd cache keys st)
+    (hmono : ∀ k, dd k → dd' k)
+    (s : T) (hs : cache s = none) (u : Fin (2 ^ b'))
+    (hinert : relevant s → dd' (key s)) :
+    INV' ρ' b' relevant key coord dd' (cache.cacheQuery s u) keys st := by
+  constructor
+  · intro t u₀ hrel hlive hcache
+    by_cases hts : t = s
+    · subst hts
+      exact absurd (hinert hrel) hlive
+    · rw [QueryCache.cacheQuery_of_ne _ _ hts] at hcache
+      exact hINV.cached_imp t u₀ hrel (fun hd => hlive (hmono _ hd)) hcache
+  · intro k i u₀ hlive hst
+    obtain ⟨t, htrel, htk, hti, htc⟩ :=
+      hINV.revealed_has_record k i u₀ (fun hd => hlive (hmono _ hd)) hst
+    have hts : t ≠ s := fun h => by rw [h, hs] at htc; simp at htc
+    exact ⟨t, htrel, htk, hti, by
+      rw [QueryCache.cacheQuery_of_ne _ _ hts]; exact htc⟩
+  · exact hINV.untouched
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Reveal step.** Caching a relevant record at a fresh cell updates the ghost state by
+writing the sampled value into the cell and marking the key as touched, preserving `INV'`. -/
+private lemma cacheQuery_reveal {ρ' b' : ℕ} {T K : Type} [DecidableEq T] [DecidableEq K]
+    {relevant : T → Prop} {key : T → K} {coord : T → Fin ρ'} {dd dd' : K → Prop}
+    {cache : (T →ₒ Fin (2 ^ b')).QueryCache} {keys : Finset K}
+    {st : K → Fin ρ' → Option (Fin (2 ^ b'))}
+    (hINV : INV' ρ' b' relevant key coord dd cache keys st)
+    (hmono : ∀ k, dd k → dd' k)
+    (s : T) (hs : cache s = none) (hrel : relevant s)
+    (hstn : st (key s) (coord s) = none) (u : Fin (2 ^ b')) :
+    INV' ρ' b' relevant key coord dd' (cache.cacheQuery s u) (insert (key s) keys)
+      (updateSlot st (key s) (coord s) u) := by
+  constructor
+  · intro t u₀ htrel hlive hcache
+    by_cases hts : t = s
+    · subst hts
+      rw [QueryCache.cacheQuery_self] at hcache
+      rw [updateSlot_apply_self, Function.update_self]
+      exact hcache
+    · rw [QueryCache.cacheQuery_of_ne _ _ hts] at hcache
+      have hold := hINV.cached_imp t u₀ htrel (fun hd => hlive (hmono _ hd)) hcache
+      by_cases hkey : key t = key s
+      · by_cases hcoord : coord t = coord s
+        · exfalso
+          rw [hkey, hcoord, hstn] at hold
+          simp at hold
+        · rw [hkey, updateSlot_apply_self, Function.update_of_ne hcoord, ← hkey]
+          exact hold
+      · rw [updateSlot_apply_ne st _ _ u hkey]
+        exact hold
+  · intro k i u₀ hlive hst
+    by_cases hk : k = key s
+    · subst hk
+      by_cases hi : i = coord s
+      · subst hi
+        rw [updateSlot_apply_self, Function.update_self] at hst
+        refine ⟨s, hrel, rfl, rfl, ?_⟩
+        rw [QueryCache.cacheQuery_self]
+        exact hst
+      · rw [updateSlot_apply_self, Function.update_of_ne hi] at hst
+        obtain ⟨t, htrel, htk, hti, htc⟩ :=
+          hINV.revealed_has_record (key s) i u₀ (fun hd => hlive (hmono _ hd)) hst
+        have hts : t ≠ s := fun h => hi (by rw [← hti, h])
+        exact ⟨t, htrel, htk, hti, by
+          rw [QueryCache.cacheQuery_of_ne _ _ hts]; exact htc⟩
+    · rw [updateSlot_apply_ne st _ _ u hk] at hst
+      obtain ⟨t, htrel, htk, hti, htc⟩ :=
+        hINV.revealed_has_record k i u₀ (fun hd => hlive (hmono _ hd)) hst
+      have hts : t ≠ s := fun h => hk (by rw [← htk, h])
+      exact ⟨t, htrel, htk, hti, by
+        rw [QueryCache.cacheQuery_of_ne _ _ hts]; exact htc⟩
+  · intro k hk
+    have hk1 : k ≠ key s := fun h => hk (h ▸ Finset.mem_insert_self _ _)
+    have hk2 : k ∉ keys := fun h => hk (Finset.mem_insert_of_mem h)
+    rw [updateSlot_apply_ne st _ _ u hk1]
+    exact hINV.untouched k hk2
+
+end INV'
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **The generalized supermartingale induction (multi-record cells).** As
+`main_induction`, but instead of joint injectivity of `(key, coord)`, only the *relevant*
+records matter, and within a cell relevant records are separated by an abstract challenge
+tag `chalOf` (`hcell`). Caching a second relevant record at an already-revealed cell kills
+the slot (`hdead_kill`); all other relevant/live cache misses are martingale reveal steps;
+irrelevant and dead-slot misses leave the potential unchanged. The bound is unchanged:
+`q·μ + Φ + μ`. -/
+private theorem main_induction_gen {T K C : Type} [DecidableEq T]
+    (relevant : T → Prop)
+    (key : T → K) (coord : T → Fin ρ) (chalOf : T → C)
+    (hcell : ∀ t₁ t₂, relevant t₁ → relevant t₂ → key t₁ = key t₂ → coord t₁ = coord t₂ →
+      chalOf t₁ = chalOf t₂ → t₁ = t₂)
+    (dead : (T →ₒ Fin (2 ^ b)).QueryCache → K → Prop)
+    [∀ c, DecidablePred (dead c)]
+    (hdead_mono : ∀ c (t : T) (u : Fin (2 ^ b)) k, dead c k → dead (c.cacheQuery t u) k)
+    (hdead_kill : ∀ (cache : (T →ₒ Fin (2 ^ b)).QueryCache) (t t' : T) (u u' : Fin (2 ^ b)),
+      relevant t → relevant t' → key t = key t' → coord t = coord t' →
+      chalOf t ≠ chalOf t' → cache t' = some u' → dead (cache.cacheQuery t u) (key t))
+    {α : Type} (leaf : α → (T →ₒ Fin (2 ^ b)).QueryCache → ℝ≥0∞)
+    (hleaf : ∀ (a : α) cache keys st,
+      INV' ρ b relevant key coord (dead cache) cache keys st →
+      leaf a cache ≤ Phi ρ b S keys st (dead cache) + slotPsi ρ b S (fun _ => none))
+    (oa : OracleComp (unifSpec + (T →ₒ Fin (2 ^ b))) α) :
+    ∀ (q : ℕ), IsQueryBoundP oa (· matches .inr _) q →
+    ∀ cache keys st, INV' ρ b relevant key coord (dead cache) cache keys st →
+    EP ((simulateQ (roImpl b T) oa).run cache) (fun z => leaf z.1 z.2)
+      ≤ (q : ℝ≥0∞) * slotPsi ρ b S (fun _ => none)
+        + Phi ρ b S keys st (dead cache) + slotPsi ρ b S (fun _ => none) := by
+  classical
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro q _ cache keys st hINV
+      rw [simulateQ_pure, StateT.run_pure, EP_pure]
+      exact (hleaf x cache keys st hINV).trans (add_le_add le_add_self le_rfl)
+  | query_bind t mx ih =>
+      intro q hq cache keys st hINV
+      rw [isQueryBoundP_query_bind_iff] at hq
+      obtain ⟨hcan, hrest⟩ := hq
+      rw [simulateQ_query_bind, StateT.run_bind]
+      simp only [OracleQuery.input_query, monadLift_self]
+      rcases t with n | s
+      · -- unifSpec query: forwarded, cache unchanged, budget unchanged
+        have hbud : (if (Sum.inl n : ℕ ⊕ T) matches Sum.inr _ then q - 1 else q) = q :=
+          if_neg (by simp)
+        rw [hbud] at hrest
+        change EP ((unifFwdImpl (T →ₒ Fin (2 ^ b)) n).run cache >>=
+            fun p : unifSpec.Range n × (T →ₒ Fin (2 ^ b)).QueryCache =>
+              (simulateQ (roImpl b T) (mx p.1)).run p.2) (fun z => leaf z.1 z.2) ≤ _
+        have hrun : ((unifFwdImpl (T →ₒ Fin (2 ^ b)) n).run cache >>=
+            fun p : unifSpec.Range n × (T →ₒ Fin (2 ^ b)).QueryCache =>
+              (simulateQ (roImpl b T) (mx p.1)).run p.2)
+            = (HasQuery.query (spec := unifSpec) (m := ProbComp) n) >>=
+              fun a => (simulateQ (roImpl b T) (mx a)).run cache := by
+          simp only [unifFwdImpl, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply]
+          rw [OracleComp.liftM_run_StateT, bind_assoc]
+          simp only [pure_bind]
+        rw [hrun]
+        exact EP_bind_le_const fun a => ih a q (hrest a) cache keys st hINV
+      · -- hash query
+        have hp : ((Sum.inr s : ℕ ⊕ T) matches Sum.inr _) := rfl
+        have hq0 : 0 < q := hcan.resolve_left (by simp)
+        have hbud : (if (Sum.inr s : ℕ ⊕ T) matches Sum.inr _ then q - 1 else q) = q - 1 :=
+          if_pos hp
+        rw [hbud] at hrest
+        have hμ : ((q - 1 : ℕ) : ℝ≥0∞) * slotPsi ρ b S (fun _ => none)
+            + slotPsi ρ b S (fun _ => none)
+            = (q : ℝ≥0∞) * slotPsi ρ b S (fun _ => none) := by
+          have hcast : ((q - 1 : ℕ) : ℝ≥0∞) + 1 = (q : ℝ≥0∞) := by
+            exact_mod_cast Nat.succ_pred_eq_of_pos hq0
+          rw [← hcast, add_mul, one_mul]
+        change EP ((randomOracle (spec := T →ₒ Fin (2 ^ b)) s).run cache >>=
+            fun p : Fin (2 ^ b) × (T →ₒ Fin (2 ^ b)).QueryCache =>
+              (simulateQ (roImpl b T) (mx p.1)).run p.2) (fun z => leaf z.1 z.2) ≤ _
+        rcases hc : cache s with _ | u
+        · -- cache miss: fresh uniform sample
+          have hrun : ((randomOracle (spec := T →ₒ Fin (2 ^ b)) s).run cache >>=
+              fun p : Fin (2 ^ b) × (T →ₒ Fin (2 ^ b)).QueryCache =>
+                (simulateQ (roImpl b T) (mx p.1)).run p.2)
+              = ($ᵗ Fin (2 ^ b)) >>= fun u =>
+                  (simulateQ (roImpl b T) (mx u)).run (cache.cacheQuery s u) := by
+            rw [QueryImpl.withCaching_run_none uniformSampleImpl hc, bind_map_left]
+            rfl
+          rw [hrun]
+          by_cases hlive : relevant s ∧ ¬ dead cache (key s) ∧ st (key s) (coord s) = none
+          · -- REVEAL: relevant record at a fresh cell of a live slot — martingale step
+            obtain ⟨hrel, hdd, hstn⟩ := hlive
+            set μ := slotPsi ρ b S (fun _ => none) with hμdef
+            set k₀ := key s with hk₀
+            set i₀ := coord s with hi₀
+            have hIH : ∀ u : Fin (2 ^ b),
+                EP ((simulateQ (roImpl b T) (mx u)).run (cache.cacheQuery s u))
+                    (fun z => leaf z.1 z.2)
+                  ≤ ((q - 1 : ℕ) : ℝ≥0∞) * μ
+                    + Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache) + μ := by
+              intro u
+              refine (ih u (q - 1) (hrest u) (cache.cacheQuery s u) (insert k₀ keys)
+                (updateSlot st k₀ i₀ u)
+                (hINV.cacheQuery_reveal (hdead_mono cache s u) s hc hrel hstn u)).trans ?_
+              exact add_le_add (add_le_add le_rfl
+                (Phi_mono_dead ρ b S _ _ _ _ (hdead_mono cache s u))) le_rfl
+            have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
+              Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
+            have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+            rw [EP_bind]
+            calc ∑' u, Pr[= u | $ᵗ Fin (2 ^ b)]
+                    * EP ((simulateQ (roImpl b T) (mx u)).run (cache.cacheQuery s u))
+                        (fun z => leaf z.1 z.2)
+                ≤ ∑' u, Pr[= u | $ᵗ Fin (2 ^ b)]
+                    * (((q - 1 : ℕ) : ℝ≥0∞) * μ
+                      + Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache) + μ) :=
+                  ENNReal.tsum_le_tsum fun u => mul_le_mul' le_rfl (hIH u)
+              _ = ∑ u : Fin (2 ^ b), ((2 ^ b : ℕ) : ℝ≥0∞)⁻¹
+                    * (((q - 1 : ℕ) : ℝ≥0∞) * μ + μ
+                      + Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache)) := by
+                  rw [tsum_fintype]
+                  refine Finset.sum_congr rfl fun u _ => ?_
+                  rw [probOutput_uniformSample, Fintype.card_fin, add_right_comm]
+              _ = ((2 ^ b : ℕ) : ℝ≥0∞)⁻¹
+                    * ((2 ^ b) • (((q - 1 : ℕ) : ℝ≥0∞) * μ + μ)
+                      + ∑ u : Fin (2 ^ b),
+                          Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache)) := by
+                  rw [← Finset.mul_sum, Finset.sum_add_distrib, Finset.sum_const,
+                    Finset.card_univ, Fintype.card_fin]
+              _ = (((q - 1 : ℕ) : ℝ≥0∞) * μ + μ)
+                    + (∑ u : Fin (2 ^ b),
+                        Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache))
+                      / ((2 ^ b : ℕ) : ℝ≥0∞) := by
+                  rw [mul_add, nsmul_eq_mul, ← mul_assoc,
+                    ENNReal.inv_mul_cancel hD0 hDtop, one_mul, mul_comm
+                      (((2 ^ b : ℕ) : ℝ≥0∞))⁻¹, ← div_eq_mul_inv]
+              _ ≤ (q : ℝ≥0∞) * μ + Phi ρ b S keys st (dead cache) + μ := ?_
+            rw [hμ]
+            by_cases hkmem : k₀ ∈ keys
+            · -- extend an already-open slot: martingale step
+              rw [show insert k₀ keys = keys from Finset.insert_eq_self.mpr hkmem]
+              have hstep := Phi_extend_le ρ b S keys st (dead cache) k₀ i₀ hkmem hstn
+              calc (q : ℝ≥0∞) * μ + (∑ u : Fin (2 ^ b),
+                      Phi ρ b S keys (updateSlot st k₀ i₀ u) (dead cache))
+                      / ((2 ^ b : ℕ) : ℝ≥0∞)
+                  ≤ (q : ℝ≥0∞) * μ + Phi ρ b S keys st (dead cache) :=
+                    add_le_add le_rfl hstep
+                _ ≤ (q : ℝ≥0∞) * μ + Phi ρ b S keys st (dead cache) + μ := le_self_add
+            · -- open a fresh slot: pay one μ
+              have hstep := Phi_open_le ρ b S keys st (dead cache) k₀ i₀ hkmem
+                (hINV.untouched k₀ hkmem)
+              calc (q : ℝ≥0∞) * μ + (∑ u : Fin (2 ^ b),
+                      Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache))
+                      / ((2 ^ b : ℕ) : ℝ≥0∞)
+                  ≤ (q : ℝ≥0∞) * μ + (Phi ρ b S keys st (dead cache) + μ) :=
+                    add_le_add le_rfl hstep
+                _ = (q : ℝ≥0∞) * μ + Phi ρ b S keys st (dead cache) + μ := by
+                    rw [add_assoc]
+          · -- INERT: irrelevant record, dead slot, or kill — ghost state unchanged,
+            -- potential non-increasing, average over the sampled value is trivial.
+            have hinert : ∀ u : Fin (2 ^ b),
+                relevant s → dead (cache.cacheQuery s u) (key s) := by
+              intro u hrel
+              by_cases hdd : dead cache (key s)
+              · exact hdead_mono cache s u _ hdd
+              · rcases hcv : st (key s) (coord s) with _ | u'
+                · exact absurd ⟨hrel, hdd, hcv⟩ hlive
+                · -- KILL: the cell was revealed by an earlier relevant record `t'`;
+                  -- by `hcell` its challenge tag differs, so `hdead_kill` applies.
+                  obtain ⟨t', ht'rel, ht'k, ht'i, ht'c⟩ :=
+                    hINV.revealed_has_record (key s) (coord s) u' hdd hcv
+                  have hts : t' ≠ s := fun h => by
+                    rw [h, hc] at ht'c; simp at ht'c
+                  have hchal : chalOf s ≠ chalOf t' := fun h =>
+                    hts.symm (hcell s t' hrel ht'rel ht'k.symm ht'i.symm h)
+                  exact hdead_kill cache s t' u u' hrel ht'rel ht'k.symm ht'i.symm
+                    hchal ht'c
+            refine EP_bind_le_const fun u => ?_
+            refine (ih u (q - 1) (hrest u) (cache.cacheQuery s u) keys st
+              (hINV.cacheQuery_inert (hdead_mono cache s u) s hc u (hinert u))).trans ?_
+            exact add_le_add (add_le_add
+              (mul_le_mul' (Nat.cast_le.mpr (Nat.sub_le q 1)) le_rfl)
+              (Phi_mono_dead ρ b S _ _ _ _ (hdead_mono cache s u))) le_rfl
+        · -- cache hit: no sampling, state unchanged, budget decremented
+          have hrun : ((randomOracle (spec := T →ₒ Fin (2 ^ b)) s).run cache >>=
+              fun p : Fin (2 ^ b) × (T →ₒ Fin (2 ^ b)).QueryCache =>
+                (simulateQ (roImpl b T) (mx p.1)).run p.2)
+              = (simulateQ (roImpl b T) (mx u)).run cache := by
+            rw [QueryImpl.withCaching_run_some uniformSampleImpl hc, pure_bind]
+          rw [hrun]
+          refine (ih u (q - 1) (hrest u) cache keys st hINV).trans ?_
+          exact add_le_add (add_le_add (mul_le_mul'
+            (Nat.cast_le.mpr (Nat.sub_le q 1)) le_rfl) le_rfl) le_rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Initial-state specialization of `main_induction_gen`: from the empty cache the
+expected leaf payoff is at most `(q + 1)·μ`. -/
+private theorem main_induction_gen_init {T K C : Type} [DecidableEq T]
+    (relevant : T → Prop)
+    (key : T → K) (coord : T → Fin ρ) (chalOf : T → C)
+    (hcell : ∀ t₁ t₂, relevant t₁ → relevant t₂ → key t₁ = key t₂ → coord t₁ = coord t₂ →
+      chalOf t₁ = chalOf t₂ → t₁ = t₂)
+    (dead : (T →ₒ Fin (2 ^ b)).QueryCache → K → Prop)
+    [∀ c, DecidablePred (dead c)]
+    (hdead_mono : ∀ c (t : T) (u : Fin (2 ^ b)) k, dead c k → dead (c.cacheQuery t u) k)
+    (hdead_kill : ∀ (cache : (T →ₒ Fin (2 ^ b)).QueryCache) (t t' : T) (u u' : Fin (2 ^ b)),
+      relevant t → relevant t' → key t = key t' → coord t = coord t' →
+      chalOf t ≠ chalOf t' → cache t' = some u' → dead (cache.cacheQuery t u) (key t))
+    {α : Type} (leaf : α → (T →ₒ Fin (2 ^ b)).QueryCache → ℝ≥0∞)
+    (hleaf : ∀ (a : α) cache keys st,
+      INV' ρ b relevant key coord (dead cache) cache keys st →
+      leaf a cache ≤ Phi ρ b S keys st (dead cache) + slotPsi ρ b S (fun _ => none))
+    (oa : OracleComp (unifSpec + (T →ₒ Fin (2 ^ b))) α)
+    (q : ℕ) (hq : IsQueryBoundP oa (· matches .inr _) q) :
+    EP ((simulateQ (roImpl b T) oa).run ∅) (fun z => leaf z.1 z.2)
+      ≤ ((q + 1 : ℕ) : ℝ≥0∞) * slotPsi ρ b S (fun _ => none) := by
+  classical
+  have hINV : INV' ρ b relevant key coord (dead ∅) ∅ (∅ : Finset K)
+      (fun _ _ => none) := by
+    refine ⟨fun t u _ _ hcc => ?_, fun k i u _ hst => ?_, fun _ _ => rfl⟩
+    · rw [QueryCache.empty_apply] at hcc
+      simp at hcc
+    · simp at hst
+  refine (main_induction_gen ρ b S relevant key coord chalOf hcell dead hdead_mono
+    hdead_kill leaf hleaf oa q hq ∅ ∅ (fun _ _ => none) hINV).trans (le_of_eq ?_)
+  rw [Phi, Finset.sum_empty, add_zero, Nat.cast_add, Nat.cast_one, add_mul, one_mul]
+
 omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
