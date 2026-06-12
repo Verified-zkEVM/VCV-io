@@ -2647,6 +2647,238 @@ private lemma knowledgeSoundnessExp_bad_le_misses
       have hzero := probOutput_onlineExtract_bad_eq_zero σ ρ b M hss hver hfw
       exact le_trans (le_of_eq hzero) zero_le'
 
+/-- The lifted `unifSpec` forwarder on the logging stack, exactly as in
+`knowledgeSoundnessExp`. -/
+private noncomputable def idImplW {ι : Type} (hashSpec : OracleSpec ι) :
+    QueryImpl unifSpec (WriterT (QueryLog hashSpec) (StateT hashSpec.QueryCache ProbComp)) :=
+  (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
+    (WriterT (QueryLog hashSpec) (StateT hashSpec.QueryCache ProbComp))
+
+/-- The logged random oracle, exactly as in `knowledgeSoundnessExp`. -/
+private noncomputable def loggedROW {ι : Type} (hashSpec : OracleSpec ι) [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)] :
+    QueryImpl hashSpec (WriterT (QueryLog hashSpec) (StateT hashSpec.QueryCache ProbComp)) :=
+  (hashSpec.randomOracle).withLogging
+
+/-- The combined logging implementation, exactly the `idImpl + loggedRO` of
+`knowledgeSoundnessExp` and `ksSample`. -/
+private noncomputable def compositeW {ι : Type} (hashSpec : OracleSpec ι) [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)] :
+    QueryImpl (unifSpec + hashSpec)
+      (WriterT (QueryLog hashSpec) (StateT hashSpec.QueryCache ProbComp)) :=
+  idImplW hashSpec + loggedROW hashSpec
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- The lifted unifSpec forwarder neither logs nor touches the cache. -/
+private lemma idImplW_run_run {ι : Type} (hashSpec : OracleSpec ι)
+    (i : unifSpec.Domain) (c : hashSpec.QueryCache) :
+    ((idImplW hashSpec i).run).run c =
+      (fun u => ((u, (∅ : QueryLog hashSpec)), c)) <$>
+        (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp) i) := by
+  rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Cache hit: the logged random oracle returns the cached value, logs it, leaves the cache. -/
+private lemma loggedROW_run_run_some {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {t : hashSpec.Domain} {c : hashSpec.QueryCache} {u : hashSpec.Range t}
+    (h : c t = some u) :
+    ((loggedROW hashSpec t).run).run c = pure ((u, ([⟨t, u⟩] : QueryLog hashSpec)), c) := by
+  rw [loggedROW, QueryImpl.run_withLogging_apply, StateT.run_bind,
+    show hashSpec.randomOracle = QueryImpl.withCaching uniformSampleImpl from rfl,
+    QueryImpl.withCaching_run_some _ h, pure_bind]
+  rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Cache miss: the logged random oracle samples, caches the value, and logs it. -/
+private lemma loggedROW_run_run_none {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {t : hashSpec.Domain} {c : hashSpec.QueryCache} (h : c t = none) :
+    ((loggedROW hashSpec t).run).run c =
+      (fun u => ((u, ([⟨t, u⟩] : QueryLog hashSpec)), c.cacheQuery t u)) <$>
+        ($ᵗ hashSpec.Range t) := by
+  rw [loggedROW, QueryImpl.run_withLogging_apply, StateT.run_bind,
+    show hashSpec.randomOracle = QueryImpl.withCaching uniformSampleImpl from rfl,
+    QueryImpl.withCaching_run_none _ h]
+  rw [show uniformSampleImpl (spec := hashSpec) t = ($ᵗ hashSpec.Range t) from rfl]
+  rw [map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp_apply, pure_bind, map_eq_bind_pure_comp]
+  rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Master log↔cache correspondence.** For any run of the Fischlin-style logging composite
+from cache `cache₀` (and an empty ambient log), every support outcome `((a, log), cache')`
+satisfies: the cache only grows, every logged entry is in the final cache with the same value,
+and every final cache entry was either logged or already present in `cache₀`. -/
+private theorem mem_support_run_correspondence {ι : Type} {hashSpec : OracleSpec ι}
+    [DecidableEq ι] [hashSpec.DecidableEq]
+    [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)] {α : Type}
+    (oa : OracleComp (unifSpec + hashSpec) α)
+    (cache₀ : hashSpec.QueryCache)
+    (z : (α × QueryLog hashSpec) × hashSpec.QueryCache)
+    (hz : z ∈ support (((simulateQ (compositeW hashSpec) oa).run).run cache₀)) :
+    cache₀ ≤ z.2 ∧
+      (∀ e ∈ z.1.2, z.2 e.1 = some e.2) ∧
+      (∀ (t : hashSpec.Domain) (u : hashSpec.Range t), z.2 t = some u →
+        (⟨t, u⟩ : (s : hashSpec.Domain) × hashSpec.Range s) ∈ z.1.2 ∨ cache₀ t = some u) := by
+  induction oa using OracleComp.inductionOn generalizing cache₀ z with
+  | pure a =>
+      simp only [simulateQ_pure, WriterT.run_pure', StateT.run_pure, support_pure,
+        Set.mem_singleton_iff] at hz
+      subst hz
+      refine ⟨le_rfl, fun e he => ?_, fun t u hu => Or.inr hu⟩
+      simp only [List.empty_eq, List.not_mem_nil] at he
+  | query_bind t k ih =>
+      simp only [simulateQ_query_bind, OracleQuery.input_query,
+        WriterT.run_bind', StateT.run_bind] at hz
+      rw [mem_support_bind_iff] at hz
+      obtain ⟨⟨⟨u, w₁⟩, c₁⟩, hp, hrest⟩ := hz
+      rw [StateT.run_map, support_map] at hrest
+      obtain ⟨⟨⟨a₂, w₂⟩, c₂⟩, hmem₂, hzeq⟩ := hrest
+      subst hzeq
+      obtain ⟨hmono, hT1, hT2⟩ := ih _ c₁ _ hmem₂
+      cases t with
+      | inl i =>
+          change ((u, w₁), c₁) ∈ support (((idImplW hashSpec i).run).run cache₀) at hp
+          rw [idImplW_run_run, support_map] at hp
+          obtain ⟨v, hv, hpe⟩ := hp
+          obtain ⟨⟨rfl, rfl⟩, rfl⟩ := hpe
+          refine ⟨hmono, ?_, ?_⟩
+          · intro e he
+            simp only [Prod.map, id, List.empty_eq, List.nil_append] at he ⊢
+            exact hT1 e he
+          · intro t' u' hu'
+            simp only [Prod.map, id, List.empty_eq, List.nil_append]
+            exact hT2 t' u' hu'
+      | inr j =>
+          change ((u, w₁), c₁) ∈ support (((loggedROW hashSpec j).run).run cache₀) at hp
+          cases hc : cache₀ j with
+          | some u₀ =>
+              rw [loggedROW_run_run_some hc, support_pure] at hp
+              have hp' : ((u, w₁), c₁) = ((u₀, [⟨j, u₀⟩]), cache₀) := hp
+              obtain ⟨⟨rfl, rfl⟩, rfl⟩ := hp'
+              refine ⟨hmono, ?_, ?_⟩
+              · intro e he
+                simp only [Prod.map, id, List.cons_append, List.nil_append,
+                  List.mem_cons] at he ⊢
+                rcases he with rfl | he
+                · exact hmono hc
+                · exact hT1 e he
+              · intro t' u' hu'
+                simp only [Prod.map, id, List.cons_append, List.nil_append, List.mem_cons]
+                rcases hT2 t' u' hu' with h | h
+                · exact Or.inl (Or.inr h)
+                · exact Or.inr h
+          | none =>
+              rw [loggedROW_run_run_none hc, support_map] at hp
+              obtain ⟨v, hv, hpe⟩ := hp
+              obtain ⟨⟨rfl, rfl⟩, rfl⟩ := hpe
+              refine ⟨le_trans (QueryCache.le_cacheQuery _ hc) hmono, ?_, ?_⟩
+              · intro e he
+                simp only [Prod.map, id, List.cons_append, List.nil_append,
+                  List.mem_cons] at he ⊢
+                rcases he with rfl | he
+                · exact hmono (QueryCache.cacheQuery_self cache₀ j u)
+                · exact hT1 e he
+              · intro t' u' hu'
+                simp only [Prod.map, id, List.cons_append, List.nil_append, List.mem_cons]
+                rcases hT2 t' u' hu' with h | h
+                · exact Or.inl (Or.inr h)
+                · by_cases ht : t' = j
+                  · subst ht
+                    rw [QueryCache.cacheQuery_self] at h
+                    exact Or.inl (Or.inl (by rw [Option.some.injEq] at h; rw [h]))
+                  · rw [QueryCache.cacheQuery_of_ne _ _ ht] at h
+                    exact Or.inr h
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Every logged entry is in the final cache with the same value (run from `∅`). -/
+private theorem log_subset_cache {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {α : Type} (oa : OracleComp (unifSpec + hashSpec) α)
+    {z : (α × QueryLog hashSpec) × hashSpec.QueryCache}
+    (hz : z ∈ support (((simulateQ (compositeW hashSpec) oa).run).run ∅)) :
+    ∀ e ∈ z.1.2, z.2 e.1 = some e.2 :=
+  (mem_support_run_correspondence oa ∅ z hz).2.1
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Every final cache entry was logged (run from `∅`). -/
+private theorem cache_subset_log {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {α : Type} (oa : OracleComp (unifSpec + hashSpec) α)
+    {z : (α × QueryLog hashSpec) × hashSpec.QueryCache}
+    (hz : z ∈ support (((simulateQ (compositeW hashSpec) oa).run).run ∅)) :
+    ∀ (t : hashSpec.Domain) (u : hashSpec.Range t), z.2 t = some u →
+      (⟨t, u⟩ : (s : hashSpec.Domain) × hashSpec.Range s) ∈ z.1.2 := fun t u hu =>
+  ((mem_support_run_correspondence oa ∅ z hz).2.2 t u hu).resolve_right (by simp)
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Each domain point has a unique logged value (run from `∅`). -/
+private theorem log_unique {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+    [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
+    {α : Type} (oa : OracleComp (unifSpec + hashSpec) α)
+    {z : (α × QueryLog hashSpec) × hashSpec.QueryCache}
+    (hz : z ∈ support (((simulateQ (compositeW hashSpec) oa).run).run ∅)) :
+    ∀ (t : hashSpec.Domain) (u₁ u₂ : hashSpec.Range t),
+      (⟨t, u₁⟩ : (s : hashSpec.Domain) × hashSpec.Range s) ∈ z.1.2 →
+      (⟨t, u₂⟩ : (s : hashSpec.Domain) × hashSpec.Range s) ∈ z.1.2 → u₁ = u₂ := by
+  intro t u₁ u₂ h₁ h₂
+  have e₁ := log_subset_cache oa hz ⟨t, u₁⟩ h₁
+  have e₂ := log_subset_cache oa hz ⟨t, u₂⟩ h₂
+  exact Option.some.inj (e₁.symm.trans e₂)
+
+/-- The cache-side pinning predicate: every cached record carrying the proof's
+statement/commitment-list tags whose challenge–response pair verifies (at its own repetition
+index) carries exactly the proof's challenge at that repetition. The `msg` field of the record
+is not inspected, mirroring the extractor's log scan. -/
+private def CachePinned (x : Stmt) (π : FischlinProof Commit Chal Resp ρ)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache) : Prop :=
+  ∀ (r : FischlinROInput Stmt Commit Chal Resp ρ M) (u : Fin (2 ^ b)),
+    cache r = some u → r.stmt = x → r.comList = (List.ofFn fun j => (π j).1) →
+    σ.verify x (π r.rep).1 r.chal r.resp = true → r.chal = (π r.rep).2.1
+
+omit [DecidableEq Resp] [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal]
+  [DecidableEq M] in
+/-- **Log↔cache transfer.** Under the log↔cache correspondence, the extractor's scan misses
+iff the cache-side pinning predicate holds. -/
+private theorem fischlinFindWitness_eq_none_iff_cachePinned
+    (x : Stmt) (π : FischlinProof Commit Chal Resp ρ)
+    {log : QueryLog (fischlinROSpec Stmt Commit Chal Resp ρ b M)}
+    {cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache}
+    (hT1 : ∀ e ∈ log, cache e.1 = some e.2)
+    (hT2 : ∀ (t : FischlinROInput Stmt Commit Chal Resp ρ M) (u : Fin (2 ^ b)),
+      cache t = some u →
+        (⟨t, u⟩ : (s : FischlinROInput Stmt Commit Chal Resp ρ M) × Fin (2 ^ b)) ∈ log) :
+    fischlinFindWitness σ ρ b M x π log = none ↔ CachePinned σ ρ b M x π cache := by
+  constructor
+  · -- scan-none → cache predicate, via cached ⇒ logged ⇒ pinning.
+    intro hnone r u hru hstmt hcom hver
+    exact chal_pinned_of_findWitness_none σ ρ b M hnone r.rep ⟨r, u⟩ (hT2 r u hru)
+      hstmt hcom rfl hver
+  · -- cache predicate → scan-none, via logged ⇒ cached ⇒ predicate applies.
+    intro hpin
+    rw [fischlinFindWitness, List.findSome?_eq_none_iff]
+    intro i _hi
+    rw [List.findSome?_eq_none_iff]
+    intro e he
+    dsimp only
+    split
+    · rename_i hcond
+      exfalso
+      simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hcond
+      obtain ⟨⟨⟨⟨hstmt, hcom⟩, hrep⟩, hver⟩, hne⟩ := hcond
+      apply hne
+      have hpinned := hpin e.1 e.2 (hT1 e he) hstmt hcom (by rw [hrep]; exact hver)
+      rw [hpinned, hrep]
+    · rfl
+
 /-- The number of hash-value tuples `v : Fin ρ → Fin (2^b)` whose entries sum to at most `S`.
 
 This counts the "small-sum" verifier-accepting hash assignments: a Fischlin proof is accepted only
