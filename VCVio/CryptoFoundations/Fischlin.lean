@@ -4451,6 +4451,114 @@ private theorem dropLog_probEvent {ι : Type} {hashSpec : OracleSpec ι} [Decida
   rw [← dropLog_run_eq oa cache, probEvent_map]
   rfl
 
+/-! ### Knowledge-Soundness Assembly: Classifier Instantiation
+
+The supermartingale induction `main_induction_gen_init` is instantiated on the Fischlin
+random-oracle records: a record is *relevant* (`ksRelevant`) when it carries the proof's
+statement/message tags and σ-verifies against the commitment stored at its repetition
+index in its own commitment list; cells are indexed by `(comList, rep)`; and a
+commitment-list key dies (`ksDead`) once the cache holds two relevant records in the same
+cell with distinct challenges — exactly the event in which the online extractor succeeds. -/
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Relevance classifier for the supermartingale induction: the record carries the proof's
+statement and message tags, and its challenge–response pair σ-verifies against the
+commitment stored at its repetition index of its own commitment list. -/
+private def ksRelevant (x : Stmt) (msg : M)
+    (t : FischlinROInput Stmt Commit Chal Resp ρ M) : Prop :=
+  t.stmt = x ∧ t.msg = msg ∧
+    ∃ c, t.comList[(t.rep : ℕ)]? = some c ∧ σ.verify x c t.chal t.resp = true
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Deadness classifier: a commitment-list key is dead once the cache holds two relevant
+records at the same repetition with distinct challenges (the extractor's success event). -/
+private def ksDead (x : Stmt) (msg : M)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (k : List Commit) : Prop :=
+  ∃ t t' : FischlinROInput Stmt Commit Chal Resp ρ M, ∃ u u' : Fin (2 ^ b),
+    ksRelevant σ ρ M x msg t ∧ ksRelevant σ ρ M x msg t' ∧
+      t.comList = k ∧ t'.comList = k ∧ t.rep = t'.rep ∧ t.chal ≠ t'.chal ∧
+      cache t = some u ∧ cache t' = some u'
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- **Cell injectivity.** Under unique responses, two relevant records in the same cell
+(same commitment list and repetition) with the same challenge are equal: the commitment is
+determined by the cell, and the response by unique responses. -/
+private lemma ksRelevant_cell_inj (hur : σ.UniqueResponses) (x : Stmt) (msg : M)
+    (t₁ t₂ : FischlinROInput Stmt Commit Chal Resp ρ M)
+    (h₁ : ksRelevant σ ρ M x msg t₁) (h₂ : ksRelevant σ ρ M x msg t₂)
+    (hk : t₁.comList = t₂.comList) (hi : t₁.rep = t₂.rep) (hc : t₁.chal = t₂.chal) :
+    t₁ = t₂ := by
+  obtain ⟨s₁, m₁, cl₁, r₁, ch₁, rp₁⟩ := t₁
+  obtain ⟨s₂, m₂, cl₂, r₂, ch₂, rp₂⟩ := t₂
+  obtain ⟨hs₁, hm₁, c₁, hc₁, hv₁⟩ := h₁
+  obtain ⟨hs₂, hm₂, c₂, hc₂, hv₂⟩ := h₂
+  dsimp only at hs₁ hm₁ hc₁ hv₁ hs₂ hm₂ hc₂ hv₂ hk hi hc
+  subst hs₁ hm₁ hs₂ hm₂ hk hi hc
+  cases Option.some.inj (hc₁.symm.trans hc₂)
+  exact congrArg (FischlinROInput.mk _ _ _ _ _) (hur _ c₁ _ rp₁ rp₂ hv₁ hv₂)
+
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- **Deadness is monotone** under caching: a cache update never erases an entry. -/
+private lemma ksDead_mono (x : Stmt) (msg : M)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (s : FischlinROInput Stmt Commit Chal Resp ρ M) (v : Fin (2 ^ b)) (k : List Commit)
+    (h : ksDead σ ρ b M x msg cache k) :
+    ksDead σ ρ b M x msg (cache.cacheQuery s v) k := by
+  obtain ⟨t, t', u, u', h₁, h₂, h₃, h₄, h₅, h₆, hct, hct'⟩ := h
+  have hsome : ∀ (r : FischlinROInput Stmt Commit Chal Resp ρ M) (w : Fin (2 ^ b)),
+      cache r = some w → ∃ w', (cache.cacheQuery s v) r = some w' := by
+    intro r w hw
+    by_cases hrs : r = s
+    · subst hrs
+      exact ⟨v, QueryCache.cacheQuery_self cache r v⟩
+    · exact ⟨w, by rw [QueryCache.cacheQuery_of_ne _ _ hrs]; exact hw⟩
+  obtain ⟨w, hw⟩ := hsome t u hct
+  obtain ⟨w', hw'⟩ := hsome t' u' hct'
+  exact ⟨t, t', w, w', h₁, h₂, h₃, h₄, h₅, h₆, hw, hw'⟩
+
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- **Kill step.** Caching a relevant record on top of a cached relevant record in the same
+cell with a different challenge makes the key dead. -/
+private lemma ksDead_kill (x : Stmt) (msg : M)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (t t' : FischlinROInput Stmt Commit Chal Resp ρ M) (u u' : Fin (2 ^ b))
+    (hrel : ksRelevant σ ρ M x msg t) (hrel' : ksRelevant σ ρ M x msg t')
+    (hk : t.comList = t'.comList) (hi : t.rep = t'.rep) (hch : t.chal ≠ t'.chal)
+    (hc' : cache t' = some u') :
+    ksDead σ ρ b M x msg (cache.cacheQuery t u) t.comList := by
+  have hne : t' ≠ t := fun h => hch (by rw [h])
+  exact ⟨t, t', u, u', hrel, hrel', rfl, hk.symm, hi, hch,
+    QueryCache.cacheQuery_self cache t u,
+    by rw [QueryCache.cacheQuery_of_ne _ _ hne]; exact hc'⟩
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Each per-repetition verification record of a σ-verifying proof is relevant. -/
+private lemma ksRelevant_record (x : Stmt) (msg : M) (π : FischlinProof Commit Chal Resp ρ)
+    (i : Fin ρ) (hver : σ.verify x (π i).1 (π i).2.1 (π i).2.2 = true) :
+    ksRelevant σ ρ M x msg
+      ⟨x, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩ := by
+  refine ⟨rfl, rfl, (π i).1, ?_, hver⟩
+  rw [List.getElem?_ofFn, dif_pos i.isLt]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- A relevant record at the proof's commitment list σ-verifies against the proof's
+commitment at the record's repetition. -/
+private lemma ksRelevant_verify_at (x : Stmt) (msg : M)
+    (π : FischlinProof Commit Chal Resp ρ) (t : FischlinROInput Stmt Commit Chal Resp ρ M)
+    (h : ksRelevant σ ρ M x msg t)
+    (hcom : t.comList = List.ofFn fun j => (π j).1) :
+    σ.verify x (π t.rep).1 t.chal t.resp = true := by
+  obtain ⟨_, _, c, hc, hv⟩ := h
+  rw [hcom, List.getElem?_ofFn, dif_pos t.rep.isLt] at hc
+  cases Option.some.inj hc
+  exact hv
+
 omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
