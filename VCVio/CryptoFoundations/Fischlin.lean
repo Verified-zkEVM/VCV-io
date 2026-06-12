@@ -2771,6 +2771,328 @@ private lemma probEvent_add_sum_le_mOfFn_uniform (k T : ℕ) (hT : T ≤ S) :
       (fun v : Fin k → Fin (2 ^ b) => T + ∑ i, (v i).val ≤ S),
     Fintype.card_fin, smallSumCount, hfilter]
 
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- **Mixed-cache query vector.** Simulating a `Fin.mOfFn` of random-oracle re-queries at
+pairwise distinct records on a cache that stores exactly the `hits`-marked records: each hit
+reads its cached value deterministically; each miss draws a fresh uniform `Fin (2^b)` (and
+caches it, which never collides with the remaining records by injectivity). The output
+distribution is the independent per-index product `pure (hit value) / $ᵗ Fin (2^b)`. The
+all-hit special case is `run_mOfFn_query_hit`. -/
+private lemma run'_mOfFn_query_mixed {β : Type} (n : ℕ)
+    (records : Fin n → (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain)
+    (hinj : Function.Injective records)
+    (hits : Fin n → Option (Fin (2 ^ b)))
+    (f : Fin n → Fin (2 ^ b) → β)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hcache : ∀ i, cache (records i) = hits i) :
+    𝒟[(simulateQ (fischlinImpl ρ b M)
+        (Fin.mOfFn n fun i => do
+          let h ← HasQuery.query (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M) (records i)
+          pure (f i h))).run' cache]
+      = 𝒟[(fun u => fun i => f i (u i)) <$>
+          Fin.mOfFn n fun i =>
+            match hits i with
+            | some h => (pure h : ProbComp (Fin (2 ^ b)))
+            | none => $ᵗ Fin (2 ^ b)] := by
+  induction n generalizing cache with
+  | zero =>
+      simp only [Fin.mOfFn, simulateQ_pure, StateT.run'_pure', map_pure]
+      exact congrArg (fun z => 𝒟[(pure z : ProbComp (Fin 0 → β))]) (funext fun i => i.elim0)
+  | succ n ih =>
+      -- Tail step, shared by both branches: with head answer `x` and any cache `c` storing
+      -- `hits ∘ Fin.succ` at the tail records, the tail simulation matches the model tail.
+      have hstep : ∀ (x : Fin (2 ^ b))
+          (c : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache),
+          (∀ j : Fin n, c (records j.succ) = hits j.succ) →
+          𝒟[(simulateQ (fischlinImpl ρ b M)
+              (Fin.mOfFn n (fun j => do
+                let h ← HasQuery.query (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)
+                  (records j.succ)
+                pure (f j.succ h)) >>= fun rest => pure (Fin.cons (f 0 x) rest))).run' c]
+            = 𝒟[(fun u : Fin n → Fin (2 ^ b) => fun i : Fin (n + 1) =>
+                  f i ((Fin.cons x u : Fin (n + 1) → Fin (2 ^ b)) i)) <$>
+                Fin.mOfFn n fun j =>
+                  match hits j.succ with
+                  | some h => (pure h : ProbComp (Fin (2 ^ b)))
+                  | none => $ᵗ Fin (2 ^ b)] := by
+        intro x c hc
+        rw [bind_pure_comp, simulateQ_map, StateT.run'_map']
+        refine (evalDist_map_eq_of_evalDist_eq
+          (ih (fun j => records j.succ)
+            (fun j₁ j₂ hj => Fin.succ_injective n (hinj hj))
+            (fun j => hits j.succ) (fun j => f j.succ) c hc)
+          (Fin.cons (α := fun _ => β) (f 0 x))).trans ?_
+        rw [Functor.map_map]
+        refine congrArg evalDist (congrArg (· <$> _) ?_)
+        funext u i
+        refine Fin.cases ?_ (fun k => ?_) i
+        · simp [Fin.cons_zero]
+        · simp [Fin.cons_succ]
+      -- Freshness of tail records is preserved by caching the head record (distinct records).
+      have hcache' : ∀ (x : Fin (2 ^ b)) (j : Fin n),
+          (cache.cacheQuery (records 0) x) (records j.succ) = hits j.succ := by
+        intro x j
+        have hne : records j.succ ≠ records 0 := fun hEq => Fin.succ_ne_zero j (hinj hEq)
+        exact (QueryCache.cacheQuery_of_ne cache x hne).trans (hcache j.succ)
+      cases hh : hits 0 with
+      | some h0 =>
+          have hc0 : cache (records 0) = some h0 := by rw [hcache 0, hh]
+          simp only [Fin.mOfFn]
+          rw [simulateQ_bind, StateT.run'_bind', simulateQ_bind,
+            roSim.simulateQ_HasQuery_query, StateT.run_bind,
+            QueryImpl.withCaching_run_some (so := uniformSampleImpl) hc0]
+          simp only [pure_bind, simulateQ_pure, StateT.run_pure]
+          rw [hstep h0 cache (fun j => hcache j.succ)]
+          simp only [hh, pure_bind, bind_pure_comp, Functor.map_map]
+      | none =>
+          have hc0 : cache (records 0) = none := by rw [hcache 0, hh]
+          simp only [Fin.mOfFn]
+          rw [simulateQ_bind, StateT.run'_bind', simulateQ_bind,
+            roSim.simulateQ_HasQuery_query, StateT.run_bind,
+            QueryImpl.withCaching_run_none (so := uniformSampleImpl) hc0]
+          simp only [uniformSampleImpl, bind_map_left, pure_bind, simulateQ_pure,
+            StateT.run_pure, bind_assoc]
+          simp only [hh, map_bind]
+          rw [evalDist_bind, evalDist_bind]
+          refine congrArg (𝒟[$ᵗ Fin (2 ^ b)] >>= ·) (funext fun x => ?_)
+          rw [hstep x (cache.cacheQuery (records 0) x) (hcache' x)]
+          simp only [map_pure, bind_pure_comp]
+
+omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
+/-- Same as `run'_mOfFn_query_mixed`, packaged with a pure verdict post-processing `V` of the
+per-repetition results, matching the shape of `Fischlin`'s verifier. -/
+private lemma run'_mOfFn_query_mixed_bind {β γ : Type} (n : ℕ)
+    (records : Fin n → (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain)
+    (hinj : Function.Injective records)
+    (hits : Fin n → Option (Fin (2 ^ b)))
+    (f : Fin n → Fin (2 ^ b) → β) (V : (Fin n → β) → γ)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hcache : ∀ i, cache (records i) = hits i) :
+    𝒟[(simulateQ (fischlinImpl ρ b M)
+        ((Fin.mOfFn n fun i => do
+          let h ← HasQuery.query (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M) (records i)
+          pure (f i h)) >>= fun results => pure (V results))).run' cache]
+      = 𝒟[(Fin.mOfFn n fun i =>
+            match hits i with
+            | some h => (pure h : ProbComp (Fin (2 ^ b)))
+            | none => $ᵗ Fin (2 ^ b)) >>= fun u => pure (V fun i => f i (u i))] := by
+  rw [bind_pure_comp V, simulateQ_map, StateT.run'_map']
+  refine (evalDist_map_eq_of_evalDist_eq
+    (run'_mOfFn_query_mixed ρ b M n records hinj hits f cache hcache) V).trans ?_
+  rw [Functor.map_map, bind_pure_comp]
+
+omit [SampleableType Chal] in
+/-- **Mixed-cache verify run.** The Fischlin verifier's `run'` on a cache storing exactly the
+`hits`-marked records: re-queries at hit records read the cached hash; misses sample fresh
+uniforms. The `ρ` records are pairwise distinct (their `rep` field is the repetition index),
+so within one verify run each record is queried exactly once. -/
+private lemma verify_run'_mixed (pk : Stmt) (msg : M)
+    (sig : Fin ρ → Commit × Chal × Resp)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hits : Fin ρ → Option (Fin (2 ^ b)))
+    (hcache : ∀ i, cache (⟨pk, msg, List.ofFn (fun j => (sig j).1), i, (sig i).2.1, (sig i).2.2⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M) = hits i) :
+    𝒟[(simulateQ (fischlinImpl ρ b M)
+        ((Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          σ hr ρ b S M).verify pk msg sig)).run' cache]
+      = 𝒟[(Fin.mOfFn ρ fun i =>
+            match hits i with
+            | some h => (pure h : ProbComp (Fin (2 ^ b)))
+            | none => $ᵗ Fin (2 ^ b)) >>= fun u =>
+          pure (((List.finRange ρ).all fun i => σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2) &&
+            decide ((List.finRange ρ).foldl (fun acc i => acc + (u i).val) 0 ≤ S))] := by
+  refine (run'_mOfFn_query_mixed_bind ρ b M ρ
+    (records := fun i =>
+      ⟨pk, msg, List.ofFn (fun j => (sig j).1), i, (sig i).2.1, (sig i).2.2⟩)
+    (hinj := fun i j h => congrArg FischlinROInput.rep h)
+    (hits := hits)
+    (f := fun i h => (σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2, h.val))
+    (V := fun results => ((List.finRange ρ).all fun i => (results i).1) &&
+      decide ((List.finRange ρ).foldl (fun acc i => acc + (results i).2) 0 ≤ S))
+    cache hcache).trans ?_
+  rfl
+
+/-- The number of hash-value tuples extending the cached `hits` with total sum at most `S`.
+
+Counts full tuples `v : Fin ρ → Fin (2^b)` that agree with every cached hit and have small sum;
+each such tuple corresponds to exactly one assignment of the miss positions. For
+`hits = fun _ => none` this is `smallSumCount ρ b S` (see `partialSmallSumCount_none`). -/
+private def partialSmallSumCount (ρ b : ℕ) (hits : Fin ρ → Option (Fin (2 ^ b))) (S : ℕ) : ℕ :=
+  (Finset.univ.filter fun v : Fin ρ → Fin (2 ^ b) =>
+    (∀ i h, hits i = some h → v i = h) ∧ ∑ i, (v i).val ≤ S).card
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- With no cached hits, the partial small-sum count is the full small-sum count. -/
+private lemma partialSmallSumCount_none :
+    partialSmallSumCount ρ b (fun _ => none) S = smallSumCount ρ b S := by
+  unfold partialSmallSumCount smallSumCount
+  congr 1
+  refine Finset.filter_congr fun v _ => ?_
+  simp
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Output probabilities of an independent product `Fin.mOfFn` multiply coordinatewise. -/
+private lemma probOutput_mOfFn {α : Type} [Finite α] (n : ℕ)
+    (g : Fin n → ProbComp α) (v : Fin n → α) :
+    Pr[= v | Fin.mOfFn n g] = ∏ i, Pr[= v i | g i] := by
+  letI : Fintype α := Fintype.ofFinite α
+  letI : DecidableEq α := Classical.decEq α
+  induction n with
+  | zero =>
+      have hv : v = Fin.elim0 := funext fun i => i.elim0
+      subst hv
+      simp [Fin.mOfFn, probOutput_pure]
+  | succ n ih =>
+      simp only [Fin.mOfFn]
+      rw [probOutput_bind_eq_sum_fintype]
+      have hinner : ∀ a : α,
+          Pr[= v | Fin.mOfFn n (fun i => g i.succ) >>= fun rest => pure (Fin.cons a rest)]
+            = if a = v 0 then Pr[= Fin.tail v | Fin.mOfFn n fun i => g i.succ] else 0 := by
+        intro a
+        rw [probOutput_bind_eq_sum_fintype]
+        have hiff : ∀ rest : Fin n → α,
+            (v = Fin.cons a rest) ↔ (a = v 0 ∧ rest = Fin.tail v) := by
+          intro rest
+          constructor
+          · intro hEq
+            refine ⟨by rw [hEq, Fin.cons_zero], funext fun k => ?_⟩
+            have := congrFun hEq k.succ
+            rw [Fin.cons_succ] at this
+            exact this.symm
+          · rintro ⟨rfl, rfl⟩
+            exact (Fin.cons_self_tail v).symm
+        by_cases ha : a = v 0
+        · rw [if_pos ha]
+          subst ha
+          simp only [probOutput_pure, hiff, true_and]
+          simp [mul_ite]
+        · rw [if_neg ha]
+          refine Finset.sum_eq_zero fun rest _ => ?_
+          rw [probOutput_pure, if_neg (fun hEq => ha ((hiff rest).mp hEq).1), mul_zero]
+      simp only [hinner, mul_ite, mul_zero]
+      rw [Finset.sum_ite_eq' Finset.univ (v 0)
+        (fun a => Pr[= a | g 0] * Pr[= Fin.tail v | Fin.mOfFn n fun i => g i.succ]),
+        if_pos (Finset.mem_univ _), ih, Fin.prod_univ_succ]
+      rfl
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- Sum the per-repetition fold into a `Finset.sum`. -/
+private lemma foldl_add_eq_sum (u : Fin ρ → Fin (2 ^ b)) :
+    (List.finRange ρ).foldl (fun acc i => acc + (u i).val) 0 = ∑ i, (u i).val := by
+  have hgen : ∀ (l : List (Fin ρ)) (init : ℕ),
+      l.foldl (fun acc i => acc + (u i).val) init = init + (l.map fun i => (u i).val).sum := by
+    intro l
+    induction l with
+    | nil => intro init; simp
+    | cons a l ihl => intro init; simp [ihl, Nat.add_assoc]
+  rw [hgen, Nat.zero_add, ← List.ofFn_eq_map, List.sum_ofFn]
+
+omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
+/-- The product of per-coordinate hit/miss probabilities: zero unless `u` extends the hits,
+in which case it is `(2^b)⁻¹` per miss. -/
+private lemma prob_extend_hits (hits : Fin ρ → Option (Fin (2 ^ b))) (u : Fin ρ → Fin (2 ^ b)) :
+    Pr[= u | Fin.mOfFn ρ fun i =>
+        match hits i with
+        | some h => (pure h : ProbComp (Fin (2 ^ b)))
+        | none => $ᵗ Fin (2 ^ b)]
+      = if ∀ i h, hits i = some h → u i = h
+          then (((2 ^ b : ℕ) : ℝ≥0∞))⁻¹ ^ (Finset.univ.filter fun i : Fin ρ => hits i = none).card
+          else 0 := by
+  rw [probOutput_mOfFn]
+  by_cases hcomp : ∀ i h, hits i = some h → u i = h
+  · rw [if_pos hcomp]
+    have hfactor : ∀ i : Fin ρ,
+        Pr[= u i | (match hits i with
+          | some h => (pure h : ProbComp (Fin (2 ^ b)))
+          | none => $ᵗ Fin (2 ^ b))]
+          = if hits i = none then (((2 ^ b : ℕ) : ℝ≥0∞))⁻¹ else 1 := by
+      intro i
+      cases hh : hits i with
+      | none =>
+          simp only [if_true]
+          rw [probOutput_uniformSample, Fintype.card_fin]
+      | some h =>
+          have hu : u i = h := hcomp i h hh
+          rw [probOutput_pure, if_pos hu, if_neg (Option.some_ne_none h)]
+    rw [Finset.prod_congr rfl fun i _ => hfactor i, Finset.prod_ite, Finset.prod_const,
+      Finset.prod_const_one, mul_one]
+  · rw [if_neg hcomp]
+    push Not at hcomp
+    obtain ⟨i, h, hh, hne⟩ := hcomp
+    refine Finset.prod_eq_zero (Finset.mem_univ i) ?_
+    simp only [hh]
+    rw [probOutput_pure, if_neg hne]
+
+omit [SampleableType Chal] in
+/-- **The ψ leaf (exact).** The probability that the Fischlin verifier accepts on a cache
+storing exactly the `hits`-marked records is EXACTLY the σ-verification indicator times the
+number of hit-compatible small-sum hash tuples over the miss-space volume `(2^b)^#misses`.
+
+For `hits = fun _ => none` (the all-fresh case) the bound specializes to
+`smallSumCount ρ b S / (2^b)^ρ` via `partialSmallSumCount_none`. -/
+private lemma verify_probOutput_true_mixed (pk : Stmt) (msg : M)
+    (sig : Fin ρ → Commit × Chal × Resp)
+    (cache : (fischlinROSpec Stmt Commit Chal Resp ρ b M).QueryCache)
+    (hits : Fin ρ → Option (Fin (2 ^ b)))
+    (hcache : ∀ i, cache (⟨pk, msg, List.ofFn (fun j => (sig j).1), i, (sig i).2.1, (sig i).2.2⟩ :
+      FischlinROInput Stmt Commit Chal Resp ρ M) = hits i) :
+    Pr[= true | (simulateQ (fischlinImpl ρ b M)
+        ((Fischlin (m := OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          σ hr ρ b S M).verify pk msg sig)).run' cache]
+      = (if ((List.finRange ρ).all fun i => σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2) = true
+          then 1 else 0) *
+        (partialSmallSumCount ρ b hits S : ℝ≥0∞) /
+          (((2 ^ b : ℕ) : ℝ≥0∞)) ^ (Finset.univ.filter fun i : Fin ρ => hits i = none).card := by
+  rw [probOutput_def, verify_run'_mixed σ hr ρ b S M pk msg sig cache hits hcache,
+    ← probOutput_def, probOutput_bind_eq_sum_fintype]
+  by_cases haV :
+      ((List.finRange ρ).all fun i => σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2) = true
+  · -- σ-verification accepted: the verdict is exactly the small-sum event.
+    have hterm : ∀ u : Fin ρ → Fin (2 ^ b),
+        Pr[= u | Fin.mOfFn ρ fun i =>
+            match hits i with
+            | some h => (pure h : ProbComp (Fin (2 ^ b)))
+            | none => $ᵗ Fin (2 ^ b)] *
+          Pr[= true | (pure
+            (((List.finRange ρ).all fun i => σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2) &&
+              decide ((List.finRange ρ).foldl (fun acc i => acc + (u i).val) 0 ≤ S)) :
+            ProbComp Bool)]
+          = if (∀ i h, hits i = some h → u i = h) ∧ ∑ i, (u i).val ≤ S
+              then (((2 ^ b : ℕ) : ℝ≥0∞))⁻¹ ^
+                (Finset.univ.filter fun i : Fin ρ => hits i = none).card
+              else 0 := by
+      intro u
+      rw [prob_extend_hits ρ b hits u, probOutput_pure, foldl_add_eq_sum ρ b u, haV]
+      by_cases h3 : ∀ i h, hits i = some h → u i = h <;>
+        by_cases h2 : (∑ i, (u i).val) ≤ S <;>
+        simp [h3, h2]
+    rw [Finset.sum_congr rfl fun u _ => hterm u, ← Finset.sum_filter, Finset.sum_const,
+      nsmul_eq_mul, if_pos haV, one_mul, div_eq_mul_inv, ← ENNReal.inv_pow]
+    rfl
+  · -- σ-verification rejected: the verdict is constantly `false`.
+    have haV' :
+        ((List.finRange ρ).all fun i => σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2) = false :=
+      Bool.eq_false_iff.mpr haV
+    have hterm0 : ∀ u : Fin ρ → Fin (2 ^ b),
+        Pr[= u | Fin.mOfFn ρ fun i =>
+            match hits i with
+            | some h => (pure h : ProbComp (Fin (2 ^ b)))
+            | none => $ᵗ Fin (2 ^ b)] *
+          Pr[= true | (pure
+            (((List.finRange ρ).all fun i => σ.verify pk (sig i).1 (sig i).2.1 (sig i).2.2) &&
+              decide ((List.finRange ρ).foldl (fun acc i => acc + (u i).val) 0 ≤ S)) :
+            ProbComp Bool)]
+          = 0 := by
+      intro u
+      rw [haV', probOutput_pure]
+      simp
+    rw [Finset.sum_congr rfl fun u _ => hterm0 u, Finset.sum_const_zero, if_neg haV, zero_mul,
+      ENNReal.zero_div]
+
 omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
