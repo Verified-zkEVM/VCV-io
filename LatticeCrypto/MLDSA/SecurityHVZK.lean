@@ -692,6 +692,16 @@ theorem idsWithAbort_hvzk_real (h_laws : Primitives.Laws prims nttOps) :
       (keyGenFromSeed p prims s).1 (keyGenFromSeed p prims s).2) seed
     rwa [hkeygen] at h
 
+/-- Honest-verifier zero-knowledge for the ML-DSA identification scheme, existential form:
+some simulator achieves some nonnegative total-variation bound. Witnessed by the concrete
+simulator `hvzkSimulatorReal` with the extra-rejection-mass bound `hvzkBoundReal`
+(`idsWithAbort_hvzk_real`); the bound is nonnegative as the real projection of a probability
+mass. -/
+theorem idsWithAbort_hvzk (h_laws : Primitives.Laws prims nttOps) :
+    ∃ sim ζ_zk, 0 ≤ ζ_zk ∧ (identificationScheme p prims).HVZK sim ζ_zk :=
+  ⟨hvzkSimulatorReal p prims, hvzkBoundReal p prims, ENNReal.toReal_nonneg,
+    idsWithAbort_hvzk_real p prims h_laws⟩
+
 end RealHVZK
 
 end MLDSA

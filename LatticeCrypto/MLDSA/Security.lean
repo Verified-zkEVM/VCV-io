@@ -218,23 +218,14 @@ theorem idsWithAbort_complete (h_laws : Primitives.Laws prims nttOps) :
         (aHat * y - c • sk.s2 + c • sk.t0) hcond_t0, harith1, hhide]
   all_goals (rw [support_pure, Set.mem_singleton_iff] at hzh; exact absurd hzh (by simp))
 
-/-- Placeholder quantitative HVZK theorem surface for the ML-DSA identification scheme.
+/-! ### Honest-Verifier Zero-Knowledge
 
-THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT BOUND TO STATE.
-
-The simulator produces transcripts by:
-1. Sampling `z` uniformly from the response space (with appropriate norm bound)
-2. Sampling `c̃` uniformly
-3. Computing `w₁ = UseHint(h, Az - ct₁·2^d)` (the commitment recovery equation)
-
-When the response rejection probability is sufficiently close to uniform, the simulated
-transcript distribution is within an explicit total-variation bound `ζ_zk` of the honest
-transcript distribution. The bound is nonnegative by definition of total variation
-distance. -/
-theorem idsWithAbort_hvzk :
-    ∃ sim ζ_zk, 0 ≤ ζ_zk ∧ (identificationScheme p prims).HVZK sim ζ_zk := by
-  classical
-  sorry
+The HVZK theorem `MLDSA.idsWithAbort_hvzk` is proven downstream in
+`LatticeCrypto.MLDSA.SecurityHVZK`, where the concrete simulator `hvzkSimulatorReal` and the
+extra-rejection-mass bound `hvzkBoundReal` are defined. The simulator reproduces the honest
+transcript pointwise on the accept event, so the total-variation distance is bounded by the
+honest prover's extra-rejection mass; see that file for the quantitative statement
+`idsWithAbort_hvzk_real` and the existential form `idsWithAbort_hvzk`. -/
 
 omit [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec]
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
