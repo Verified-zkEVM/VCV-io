@@ -4712,6 +4712,42 @@ private lemma ksSample_probEvent_eq_EP
     rw [probEvent_pure, if_neg (fun h => hfw h.2), mul_zero]
 
 omit [SampleableType Chal] in
+/-- **Support transfer.** On the support of the logged run, the extractor's scan-miss
+indicator coincides with the cache-side pinning predicate (`CachePinned`), turning the
+factored payoff into the log-free leaf `ksLeaf`. -/
+private lemma EP_scanMiss_eq_EP_ksLeaf
+    (prover : Stmt → M →
+      OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)
+        (FischlinProof Commit Chal Resp ρ))
+    (x : Stmt) (msg : M) :
+    EP (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+            + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          (prover x msg)).run).run ∅)
+        (fun z =>
+          (if fischlinFindWitness σ ρ b M x z.1.1 z.1.2 = none then 1 else 0) *
+            Pr[= true | (simulateQ (fischlinImpl ρ b M)
+              ((Fischlin (m := OracleComp (unifSpec
+                  + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+                σ hr ρ b S M).verify x msg z.1.1)).run' z.2])
+      = EP (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+            + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          (prover x msg)).run).run ∅)
+        (fun z => ksLeaf σ hr ρ b S M x msg z.1.1 z.2) := by
+  classical
+  rw [EP, EP]
+  refine tsum_congr fun z => ?_
+  by_cases hz : z ∈ support (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+      + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M)) (prover x msg)).run).run ∅)
+  · congr 1
+    unfold ksLeaf
+    have hiff := fischlinFindWitness_eq_none_iff_cachePinned σ ρ b M x z.1.1
+      (log_subset_cache (prover x msg) hz) (cache_subset_log (prover x msg) hz)
+    by_cases hfw : fischlinFindWitness σ ρ b M x z.1.1 z.1.2 = none
+    · rw [if_pos hfw, if_pos (hiff.mp hfw)]
+    · rw [if_neg hfw, if_neg fun hp => hfw (hiff.mpr hp)]
+  · rw [probOutput_eq_zero_of_not_mem_support hz, zero_mul, zero_mul]
+
+omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
 extractor recovers no
