@@ -4663,6 +4663,55 @@ private lemma fischlin_leaf_le (hur : σ.UniqueResponses) (x : Stmt) (msg : M)
     exact le_add_self
 
 omit [SampleableType Chal] in
+/-- **Factoring the miss event through the logged run.** The probability that the verifier
+accepts while the extractor's scan misses equals the expected value, over the logged prover
+run, of the scan-miss indicator times the verifier's acceptance probability on the final
+cache. -/
+private lemma ksSample_probEvent_eq_EP
+    (prover : Stmt → M →
+      OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)
+        (FischlinProof Commit Chal Resp ρ))
+    (x : Stmt) (msg : M) :
+    Pr[fun out => out.2 = true ∧ fischlinFindWitness σ ρ b M x out.1.1 out.1.2 = none
+        | ksSample σ hr ρ b S M prover x msg]
+      = EP (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+            + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          (prover x msg)).run).run ∅)
+        (fun z =>
+          (if fischlinFindWitness σ ρ b M x z.1.1 z.1.2 = none then 1 else 0) *
+            Pr[= true | (simulateQ (fischlinImpl ρ b M)
+              ((Fischlin (m := OracleComp (unifSpec
+                  + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+                σ hr ρ b S M).verify x msg z.1.1)).run' z.2]) := by
+  classical
+  have hks : ksSample σ hr ρ b S M prover x msg
+      = ((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+            + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M))
+          (prover x msg)).run).run ∅ >>= fun z =>
+            (simulateQ (fischlinImpl ρ b M)
+              ((Fischlin (m := OracleComp (unifSpec
+                  + fischlinROSpec Stmt Commit Chal Resp ρ b M))
+                σ hr ρ b S M).verify x msg z.1.1)).run z.2 >>= fun vc =>
+              pure ((z.1.1, z.1.2), vc.1) := rfl
+  rw [hks, probEvent_bind_eq_tsum, EP]
+  refine tsum_congr fun z => ?_
+  congr 1
+  rw [probEvent_bind_eq_tsum]
+  by_cases hfw : fischlinFindWitness σ ρ b M x z.1.1 z.1.2 = none
+  · rw [if_pos hfw, one_mul, StateT.run', ← probEvent_eq_eq_probOutput, probEvent_map,
+      probEvent_eq_tsum_ite]
+    refine tsum_congr fun vc => ?_
+    rw [probEvent_pure]
+    by_cases hv : vc.1 = true
+    · rw [if_pos ⟨hv, hfw⟩, mul_one]
+      exact (if_pos hv).symm
+    · rw [if_neg (fun h => hv h.1), mul_zero]
+      exact (if_neg hv).symm
+  · rw [if_neg hfw, zero_mul]
+    refine ENNReal.tsum_eq_zero.mpr fun vc => ?_
+    rw [probEvent_pure, if_neg (fun h => hfw h.2), mul_zero]
+
+omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
 knowledge-soundness bad event — the verifier accepts the cheating prover's proof yet the online
 extractor recovers no
