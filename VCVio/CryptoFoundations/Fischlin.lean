@@ -4763,11 +4763,34 @@ small-sum target set, and using independence of the `ρ` fresh answers, gives th
 `(2^b)^ρ`. -/
 private lemma knowledgeSoundness_badEvent_le
     (hss : σ.SpeciallySound) (hur : σ.UniqueResponses)
-    (adv : KnowledgeSoundnessAdv ρ b M) (Q : ℕ) (hρ : 0 < ρ)
+    (adv : KnowledgeSoundnessAdv ρ b M) (Q : ℕ) (_hρ : 0 < ρ)
     (hQ : ∀ x msg, ROQueryBound ρ b M (adv.run x msg) Q) (x : Stmt) (msg : M) :
     Pr[= true | knowledgeSoundnessExp σ hr ρ b S M adv.run x msg]
       ≤ (↑(Q + 1) : ℝ≥0∞) * ↑(smallSumCount ρ b S) / ((↑(2 ^ b) : ℝ≥0∞) ^ ρ) := by
-  sorry
+  classical
+  letI : ∀ c, DecidablePred (ksDead σ ρ b M x msg c) := fun _ => Classical.decPred _
+  -- Step 1: bound the bad event by the verifier-accepts-while-scan-misses event.
+  refine le_trans (knowledgeSoundnessExp_bad_le_misses' σ hr ρ b S M hss adv.run x msg) ?_
+  -- Step 2: factor the miss event through the logged prover run as an expected payoff.
+  rw [ksSample_probEvent_eq_EP σ hr ρ b S M adv.run x msg,
+    -- Step 3: on the support, swap the scan-miss indicator for the pinning predicate.
+    EP_scanMiss_eq_EP_ksLeaf σ hr ρ b S M adv.run x msg,
+    -- Step 4: drop the log, moving to the unlogged lazy-random-oracle run.
+    dropLog_EP (adv.run x msg) ∅ (fun π cache => ksLeaf σ hr ρ b S M x msg π cache)]
+  -- Step 5: run the supermartingale induction from the empty cache.
+  refine le_trans (main_induction_gen_init ρ b S
+    (ksRelevant σ ρ M x msg) (fun t => t.comList) (fun t => t.rep) (fun t => t.chal)
+    (fun t₁ t₂ h₁ h₂ hk hi hc => ksRelevant_cell_inj σ ρ M hur x msg t₁ t₂ h₁ h₂ hk hi hc)
+    (ksDead σ ρ b M x msg)
+    (fun c t u k h => ksDead_mono σ ρ b M x msg c t u k h)
+    (fun cache t t' u u' hrel hrel' hk hi hch hc' =>
+      ksDead_kill σ ρ b M x msg cache t t' u u' hrel hrel' hk hi hch hc')
+    (fun π cache => ksLeaf σ hr ρ b S M x msg π cache)
+    (fun a cache keys st hINV => fischlin_leaf_le σ hr ρ b S M hur x msg a cache keys st hINV)
+    (adv.run x msg) Q ((OracleComp.isQueryBoundP_congr_pred
+      fun t => by cases t <;> exact Iff.rfl).mp (hQ x msg))) (le_of_eq ?_)
+  -- Step 6: evaluate the fresh slot potential `μ = smallSumCount / (2^b)^ρ`.
+  rw [slotPsi_none, ← mul_div_assoc, Nat.cast_pow, Nat.cast_ofNat]
 
 omit [SampleableType Chal] in
 /-- Knowledge soundness of the Fischlin transform via online (straight-line) extraction
