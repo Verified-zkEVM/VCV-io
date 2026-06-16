@@ -78,6 +78,60 @@ lemma evalDist_uniformSample_bind_update_map {α : Type} (t : D) (ψ : (D → R)
     simp [bind_pure_comp]
   rw [hL, hR, evalDist_map, evalDist_map, evalDist_uniformSample_bind_update t]
 
+/-- **Two-cell marginalization, post-composed.** For any continuation `ψ : (D → R) → α` and any
+two distinct coordinates `t₁ ≠ t₂`, drawing fresh independent uniforms `u₁, u₂`, then a full
+uniform table `g`, and evaluating `ψ` on the table with both coordinates overwritten yields the
+same distribution as evaluating `ψ` on a directly drawn uniform table.
+
+This is the joint marginal independence at the coordinate pair `(t₁, t₂)`: those two coordinates
+are jointly uniform and independent of the rest, so replacing them with fresh independent uniforms
+leaves the joint distribution unchanged. Two-cell analogue of
+`evalDist_uniformSample_bind_update_map`.
+
+Used at the slot-positive case of the DC unlinkability reduction to marginalize the two cells
+`((tag, 0), n)` (read by M) and `((tag, slotK), n)` (read by S, with `slotK ≠ 0`) as independent
+uniforms, enabling the IH-rename closure without any per-step cacheBadReader charge. -/
+lemma evalDist_uniformSample_bind_update_two_map {α : Type} {t₁ t₂ : D} (hne : t₁ ≠ t₂)
+    (ψ : (D → R) → α) :
+    𝒟[do let u₁ ← $ᵗ R; let u₂ ← $ᵗ R; let g ← $ᵗ (D → R);
+         pure (ψ (Function.update (Function.update g t₁ u₁) t₂ u₂))] =
+      𝒟[do let g ← $ᵗ (D → R); pure (ψ g)] := by
+  -- Commute the two updates (distinct coords) so `t₂` is the OUTER update; the inner shape then
+  -- matches `evalDist_uniformSample_bind_update_map` at `t₂` for each fixed `u₁`.
+  have hcomm : (do let u₁ ← $ᵗ R; let u₂ ← $ᵗ R; let g ← $ᵗ (D → R);
+                   pure (ψ (Function.update (Function.update g t₁ u₁) t₂ u₂)))
+      = (do let u₁ ← $ᵗ R; let u₂ ← $ᵗ R; let g ← $ᵗ (D → R);
+            pure (ψ (Function.update (Function.update g t₂ u₂) t₁ u₁))) := by
+    refine bind_congr fun u₁ => bind_congr fun u₂ => bind_congr fun g => ?_
+    rw [Function.update_comm hne]
+  rw [hcomm]
+  -- Inner collapse: for each `u₁`, the `u₂; g; pure (ψ (update (update g t₂ u₂) t₁ u₁))` binder
+  -- chain collapses to `g; pure (ψ (update g t₁ u₁))` by single-cell marginalization at `t₂`.
+  have hInner : ∀ u₁ : R,
+      𝒟[(do let u₂ ← $ᵗ R; let g ← $ᵗ (D → R);
+            pure (ψ (Function.update (Function.update g t₂ u₂) t₁ u₁)))]
+        = 𝒟[(do let g ← $ᵗ (D → R); pure (ψ (Function.update g t₁ u₁)))] := fun u₁ =>
+    evalDist_uniformSample_bind_update_map t₂ (fun h => ψ (Function.update h t₁ u₁))
+  -- Outer rewrite: `evalDist_bind` exposes the inner under PMF.bind; pointwise apply `hInner`.
+  -- Express the LHS and the single-cell-collapsed midpoint as monadic binds so `evalDist_bind`
+  -- + `congrArg` + `funext` can apply `hInner` pointwise in `u₁`.
+  have hOuter :
+      𝒟[($ᵗ R) >>= fun u₁ =>
+            (do let u₂ ← $ᵗ R; let g ← $ᵗ (D → R);
+                pure (ψ (Function.update (Function.update g t₂ u₂) t₁ u₁)))]
+        = 𝒟[($ᵗ R) >>= fun u₁ =>
+            (do let g ← $ᵗ (D → R); pure (ψ (Function.update g t₁ u₁)))] := by
+    rw [evalDist_bind, evalDist_bind]
+    refine congrArg _ (funext fun u₁ => ?_)
+    exact hInner u₁
+  -- The LHS of `hOuter` is definitionally the same as `(u₁;u₂;g; …)`.
+  change 𝒟[($ᵗ R) >>= fun u₁ =>
+            (do let u₂ ← $ᵗ R; let g ← $ᵗ (D → R);
+                pure (ψ (Function.update (Function.update g t₂ u₂) t₁ u₁)))] = _
+  rw [hOuter]
+  -- Outer-`t₁` single-cell collapse: `u₁; g; pure (ψ (update g t₁ u₁))` → `g; pure (ψ g)`.
+  exact evalDist_uniformSample_bind_update_map t₁ ψ
+
 /-- **Lazy random oracle equals eager full-table sampling — cache-parametrized form.**
 
 Running `oa` under the lazy random oracle starting from cache `c` yields the same output
