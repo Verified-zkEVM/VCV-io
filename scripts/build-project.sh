@@ -30,4 +30,8 @@ if [[ "$run_ffi" == true ]]; then
 fi
 
 echo "# Linting Files"
-lake exe lint-style && echo "All files okay"
+# `lake exe lint-style` resolves to Mathlib's text-based linter; pass the project
+# libraries explicitly so it lints all of them (the default would be only the
+# `@[default_target]` `VCVio` lib).
+lake exe lint-style ToMathlib VCVio FFI LatticeCrypto Examples VCVioWidgets Interop \
+  && echo "All files okay"
