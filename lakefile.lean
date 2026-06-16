@@ -10,7 +10,11 @@ package VCVio where
     ⟨`relaxedAutoImplicit, false⟩,
     ⟨`weak.linter.mathlibStandardSet, true⟩,
     ⟨`weak.linter.modulesUpperCamelCase, true⟩,
-    ⟨`weak.linter.style.whitespace, true⟩
+    ⟨`weak.linter.style.whitespace, true⟩,
+    -- Disable the unicode allowlist linter: VCVio docstrings legitimately use
+    -- FIPS-204 math notation (combining tilde `c̃`) and cited author names with
+    -- diacritics (e.g. `Cătălin Hriţcu`).
+    ⟨`weak.linter.unicodeLinter, false⟩
   ]
 
 /-
@@ -180,6 +184,10 @@ private def mldsaCFlagsForSet (pkg : NPackage __name__) (paramSet : Nat) :
     "-I", mldsaDir.toString,
     "-I", (mldsaDir / "src").toString,
     s!"-DMLD_CONFIG_PARAMETER_SET={paramSet}",
+    -- Exclude the randomized signing API (mirrors mlkem's `MLK_CONFIG_NO_RANDOMIZED_API`):
+    -- it pulls in an undefined `randombytes` symbol that fails to link on Linux, and the
+    -- FFI tests only exercise the internal deterministic API.
+    "-DMLD_CONFIG_NO_RANDOMIZED_API",
     "-std=c99", "-O2"]
   return (weakArgs, #["-fPIC"])
 
@@ -240,7 +248,10 @@ private def falconCFlags (pkg : NPackage __name__) :
   let weakArgs := #[
     "-I", (← getLeanIncludeDir).toString,
     "-I", fndsaDir.toString,
-    "-std=c99", "-O2"]
+    -- `_GNU_SOURCE` is required on glibc: under `-std=c99` it otherwise hides
+    -- `getentropy` / `O_CLOEXEC`, which `third_party/c-fn-dsa/sysrng.c` uses, so
+    -- the Falcon RNG fails to compile on Linux (macOS exposes them regardless).
+    "-D_GNU_SOURCE", "-std=c99", "-O2"]
   return (weakArgs, #["-fPIC"])
 
 target fndsa.o pkg : System.FilePath := do
