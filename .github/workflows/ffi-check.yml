@@ -8,9 +8,6 @@ name: FFI Nightly Check
 # FFI glue or bumping a third_party submodule pin.
 
 on:
-  # TEMPORARY (revert before merge): also run on pull requests so this PR can
-  # verify the FFI build/test on the Linux CI runner.
-  pull_request:
   schedule:
     - cron: '0 7 * * *'   # daily 07:00 UTC
   workflow_dispatch:
