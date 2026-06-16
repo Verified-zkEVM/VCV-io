@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Quang Dao. All rights reserved.
+Copyright (c) 2026 Oleksandr Vovkotrub. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao
+Authors: Oleksandr Vovkotrub
 -/
 
 import Examples.PRFTagReader.PRFReductions.Reductions
@@ -185,11 +185,8 @@ lemma simulateQ_prfIdeal_liftComp {D : Type} [DecidableEq D] {α : Type}
     (simulateQ (PRFScheme.prfIdealQueryImpl (D := D) (R := Digest))
         (OracleComp.liftComp oa (unifSpec + (D →ₒ Digest)))).run c =
       oa >>= fun a => pure (a, c) := by
-  have h := QueryImpl.simulateQ_add_liftComp_left
-    ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
-      (StateT (D →ₒ Digest).QueryCache ProbComp)) randomOracle oa
-  exact (congrArg (StateT.run · c) (h.trans ((simulateQ_liftTarget _ oa).trans
-    (congrArg liftM (simulateQ_ofLift_eq_self oa))))).trans (StateT.run_monadLift oa c)
+  simp [PRFScheme.prfIdealQueryImpl, QueryImpl.simulateQ_add_liftM_left,
+    QueryImpl.simulateQ_toQueryImpl, StateT.run_monadLift]
 
 omit [DecidableEq TagId] [Fintype TagId] [Nonempty TagId] [SampleableType Nonce]
   [DecidableEq Digest] [NeZero sessionsPerTag] in

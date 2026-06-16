@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Quang Dao. All rights reserved.
+Copyright (c) 2026 Oleksandr Vovkotrub. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao
+Authors: Oleksandr Vovkotrub
 -/
 
 import Examples.PRFTagReader.Defs
@@ -132,11 +132,7 @@ private lemma simulateQ_prfReal_authToPRFTagImpl_run
   have hleft : ∀ {α : Type} (oa : ProbComp α),
       simulateQ impl (liftComp oa (unifSpec + ((TagId × Nonce) →ₒ Digest))) = oa := by
     intro α oa
-    trans simulateQ (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) oa
-    · exact QueryImpl.simulateQ_add_liftComp_left
-        (impl₁' := HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp))
-        (impl₂' := so) oa
-    · exact simulateQ_ofLift_eq_self _
+    simp [impl, QueryImpl.simulateQ_add_liftM_left, QueryImpl.simulateQ_toQueryImpl]
   unfold authToPRFTagImpl authTagQueryImpl authPRFQuery
   simp only [StateT.run_bind, StateT.run_get, StateT.run_monadLift,
     bind_pure_comp, pure_bind]
@@ -451,15 +447,7 @@ private lemma simulateQ_prfIdeal_authToPRFTagImpl_run
       simulateQ impl (liftComp oa (unifSpec + ((TagId × Nonce) →ₒ Digest))) =
         (liftM oa : StateT ((TagId × Nonce) →ₒ Digest).QueryCache ProbComp α) := by
     intro α oa
-    trans simulateQ ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
-        (StateT ((TagId × Nonce) →ₒ Digest).QueryCache ProbComp)) oa
-    · exact QueryImpl.simulateQ_add_liftComp_left
-        (impl₁' := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
-          (StateT ((TagId × Nonce) →ₒ Digest).QueryCache ProbComp))
-        (impl₂' := ((TagId × Nonce) →ₒ Digest).randomOracle) oa
-    · rw [simulateQ_liftTarget]
-      congr 1
-      exact simulateQ_ofLift_eq_self _
+    simp [impl, QueryImpl.simulateQ_add_liftM_left, QueryImpl.simulateQ_toQueryImpl]
   have hquery : ∀ (d : TagId × Nonce),
       simulateQ impl
         (liftM ((unifSpec + ((TagId × Nonce) →ₒ Digest)).query (Sum.inr d)) :
