@@ -51,7 +51,7 @@ namespace OracleComp.Rel.Probabilistic
 
 variable {ι₁ ι₂ : Type u}
 variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable [IsUniformSpec spec₁] [IsUniformSpec spec₂]
 variable {α β γ δ : Type}
 
 /-! ## Bound: `eRelWP` on a `Prob`-valued post is always `≤ 1`

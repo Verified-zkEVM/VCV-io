@@ -80,8 +80,12 @@ theorem correct (hcorrect : tdp.Correct) :
     obtain ⟨c, hc, hy⟩ := hy
     rw [mem_support_bind_iff] at hc
     obtain ⟨r, _, hc⟩ := hc
-    simp only [support_pure, Set.mem_singleton_iff] at hc hy
-    subst hc; subst hy
+    rw [mem_support_bind_iff] at hy
+    obtain ⟨msg', hmsg', hy⟩ := hy
+    simp only [support_pure, Set.mem_singleton_iff] at hc hmsg' hy
+    obtain rfl := hc
+    obtain rfl := hmsg'
+    obtain rfl := hy
     simp [hcorrect pk sk hpksk r]
   change Pr[= true | mx] = 1
   exact probOutput_eq_one_of_support_subset_singleton
@@ -223,7 +227,8 @@ theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     𝒟[game1 tdp adv] = 𝒟[game2 tdp adv] := by
   sorry
 
-omit [Fintype Rand] [Inhabited M] [Fintype M] [DecidableEq M] [AddCommGroup M] in
+omit [Inhabited Rand] [Fintype Rand] [Inhabited M] [Fintype M] [DecidableEq M]
+  [AddCommGroup M] in
 /-- In the all-random game, the challenge ciphertext is independent of the hidden bit, so the
 adversary succeeds with probability exactly `1/2`. -/
 theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :

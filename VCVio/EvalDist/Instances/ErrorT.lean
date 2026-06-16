@@ -10,27 +10,25 @@ import Mathlib.Control.Lawful
 # Evaluation Semantics for ExceptT (ErrorT)
 
 This file provides evaluation semantics for `ExceptT ε m` computations, lifting
-`HasEvalPMF m` to `HasEvalSPMF (ExceptT ε m)`.
+`MonadLiftT m PMF` to `MonadLiftT (ExceptT ε m) SPMF`.
 
 `ExceptT ε m α` represents computations that can fail with an error of type `ε`
 or succeed with a value of type `α`. The underlying type is `m (Except ε α)`.
 
 ## Main definitions
 
-* `ExceptT.toSPMF`: Monad homomorphism `ExceptT ε m →ᵐ SPMF` when `m` has `HasEvalPMF`
-* Instance `HasEvalSPMF (ExceptT ε m)` when `[HasEvalPMF m]`
+* `ExceptT.toSPMF'`: Monad homomorphism `ExceptT ε m →ᵐ SPMF` when `m` lifts into `PMF`
+* Instance `MonadLiftT (ExceptT ε m) SPMF` when `[MonadLiftT m PMF] [LawfulMonadLiftT m PMF]`
 
 ## Design notes
 
-Similar to `OptionT`, we lift `HasEvalPMF m` to `HasEvalSPMF (ExceptT ε m)` because
+Similar to `OptionT`, we lift `MonadLiftT m PMF` to `MonadLiftT (ExceptT ε m) SPMF` because
 error cases contribute failure mass. We map:
 - `Except.ok x` → probability mass at `some x`
 - `Except.error e` → failure mass (mapped to `none`)
 
 This means we only support one layer of failure. If you need nested error handling,
 you'll need to work with the underlying `m (Except ε α)` type directly.
-
-NOTE: this should be a high priority to add for more complex proofs
 -/
 
 universe u v
@@ -39,21 +37,28 @@ variable {ε : Type u} {m : Type u → Type v} [Monad m] {α β γ : Type u}
 
 namespace ExceptT
 
-section HasEvalSet
+section EvalSet
 
-/-- Standalone `HasEvalSet (ExceptT ε m)` instance under the weaker `[HasEvalSet m]` assumption.
+/-- Standalone `MonadLiftT (ExceptT ε m) SetM` instance under the weaker `[MonadLiftT m SetM]`
+assumption. Keeping this standalone means `support` on `ExceptT ε m` works without requiring a
+full `MonadLiftT m SPMF` lift — only `MonadLiftT m SetM` is needed. -/
+noncomputable instance instMonadLiftTSetM (ε : Type u) (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SetM] : MonadLiftT (ExceptT ε m) SetM where
+  monadLift mx := Except.ok ⁻¹' (support mx.run)
 
-This is deliberately kept separate from the `HasEvalSPMF (ExceptT ε m)` instance below, which
-re-exports the same `toSet` to make the resulting typeclass diamond definitionally equal.
-Keeping this standalone instance means `support` on `ExceptT ε m` works without requiring a
-full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM`). -/
-noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalSet m] :
-    HasEvalSet (ExceptT ε m) where
-  toSet.toFun α mx := Except.ok ⁻¹' (support mx.run)
-  toSet.toFun_pure' x := Set.ext fun y => by
+noncomputable instance instLawfulMonadLiftTSetM (ε : Type u) (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] :
+    LawfulMonadLiftT (ExceptT ε m) SetM where
+  monadLift_pure x := by
+    change Except.ok ⁻¹' (support (pure (Except.ok x) : m _)) = pure x
+    ext y
     change Except.ok y ∈ support (pure (Except.ok x) : m _) ↔ y = x
     simp
-  toSet.toFun_bind' mx f := Set.ext fun x => by
+  monadLift_bind mx f := by
+    change (Except.ok ⁻¹' (support (mx >>= f : ExceptT ε m _).run) : SetM _) =
+      (Except.ok ⁻¹' (support mx.run) >>=
+        fun a => Except.ok ⁻¹' support (f a).run : SetM _)
+    ext x
     simp only [Set.mem_preimage]
     change Except.ok x ∈ support (mx.run >>= ExceptT.bindCont f) ↔ _
     rw [mem_support_bind_iff]
@@ -69,7 +74,11 @@ noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalS
       obtain ⟨a, ha, hx⟩ := Set.mem_iUnion₂.mp h
       exact ⟨.ok a, ha, hx⟩
 
-variable [HasEvalSet m]
+@[simp]
+lemma run_liftM_eq_map_ok (mx : m α) :
+    (liftM mx : ExceptT ε m α).run = Except.ok <$> mx := rfl
+
+variable [MonadLiftT m SetM]
 
 @[aesop unsafe norm, grind =]
 lemma support_def (mx : ExceptT ε m α) :
@@ -79,10 +88,7 @@ lemma support_def (mx : ExceptT ε m α) :
 lemma mem_support_iff (mx : ExceptT ε m α) (x : α) :
     x ∈ support mx ↔ Except.ok x ∈ support mx.run := Iff.rfl
 
-omit [HasEvalSet m] in
-@[simp]
-lemma run_liftM_eq_map_ok (mx : m α) :
-    (liftM mx : ExceptT ε m α).run = Except.ok <$> mx := rfl
+variable [LawfulMonadLiftT m SetM]
 
 @[simp]
 lemma support_liftM [LawfulMonad m] (mx : m α) :
@@ -93,9 +99,9 @@ lemma support_liftM [LawfulMonad m] (mx : m α) :
   · rintro ⟨a, ha, h⟩; cases h; exact ha
   · exact fun h => ⟨x, h, rfl⟩
 
-end HasEvalSet
+end EvalSet
 
-section HasEvalFinset
+section EvalFinset
 
 private instance instDecidableEqExcept [DecidableEq ε] [DecidableEq α] :
     DecidableEq (Except ε α) := fun a b => match a, b with
@@ -107,14 +113,16 @@ private instance instDecidableEqExcept [DecidableEq ε] [DecidableEq α] :
   | .error _, .ok _ => isFalse (by intro h; cases h)
 
 noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m]
-    [DecidableEq ε] [HasEvalSet m] [HasEvalFinset m] :
+    [DecidableEq ε] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m] :
     HasEvalFinset (ExceptT ε m) where
   finSupport mx := (finSupport mx.run).preimage Except.ok
     (by intro a b; simp [Except.ok.injEq])
   coe_finSupport mx := by
-    ext x; simp
+    ext x; change x ∈ ((finSupport mx.run).preimage Except.ok _ : Set _) ↔
+      x ∈ Except.ok ⁻¹' support mx.run
+    simp
 
-variable [DecidableEq ε] [HasEvalSet m] [HasEvalFinset m]
+variable [DecidableEq ε] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
 
 @[aesop unsafe norm, grind =]
 lemma finSupport_def [DecidableEq α] (mx : ExceptT ε m α) :
@@ -129,37 +137,41 @@ lemma mem_finSupport_iff' [DecidableEq α] (mx : ExceptT ε m α) (x : α) :
 @[simp]
 lemma finSupport_liftM [LawfulMonad m] [DecidableEq α] (mx : m α) :
     finSupport (liftM mx : ExceptT ε m α) = finSupport mx := by
-  ext x; simp [mem_finSupport_iff']
+  ext x
+  rw [mem_finSupport_iff', mem_finSupport_iff_mem_support, mem_finSupport_iff_mem_support]
+  change Except.ok x ∈ support (Except.ok <$> mx) ↔ x ∈ support mx
+  simp
 
-end HasEvalFinset
+end EvalFinset
 
-section HasEvalSPMF
+section EvalSPMF
 
 /-- Monad homomorphism from `ExceptT ε m` to `SPMF`, treating errors as failure mass.
 Given `mx : ExceptT ε m α`, we evaluate the underlying `m (Except ε α)` to an `SPMF`,
 then route `Except.ok x` to `pure x` and `Except.error _` to `failure`. -/
-noncomputable def toSPMF' [HasEvalPMF m] : ExceptT ε m →ᵐ SPMF where
+noncomputable def toSPMF' [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] : ExceptT ε m →ᵐ SPMF where
   toFun {α} (mx : ExceptT ε m α) : SPMF α :=
-    HasEvalSPMF.toSPMF mx.run >>= fun r =>
+    (liftM mx.run : SPMF _) >>= fun r =>
       match r with
       | Except.ok x => pure x
       | Except.error _ => failure
   toFun_pure' x := by simp
   toFun_bind' mx f := by
-    change HasEvalSPMF.toSPMF (mx.run >>= ExceptT.bindCont f) >>= _ = _
-    simp only [MonadHom.toFun_bind', monad_norm]
+    change (liftM (mx.run >>= ExceptT.bindCont f) : SPMF _) >>= _ = _
+    simp only [liftM_bind, monad_norm]
     congr 1; funext r
     cases r with
     | ok a =>
-      change HasEvalSPMF.toSPMF (f a).run >>= _ =
-        pure a >>= fun b => HasEvalSPMF.toSPMF (f b).run >>= _
+      change (liftM (f a).run : SPMF _) >>= _ =
+        pure a >>= fun b => (liftM (f b).run : SPMF _) >>= _
       simp
     | error e => simp [ExceptT.bindCont]
 
-private lemma toSPMF'_apply_eq [HasEvalPMF m] (mx : ExceptT ε m α) (x : α) :
-    ExceptT.toSPMF' mx x = HasEvalSPMF.toSPMF mx.run (Except.ok x) := by
+private lemma toSPMF'_apply_eq [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    (mx : ExceptT ε m α) (x : α) :
+    ExceptT.toSPMF' mx x = (liftM mx.run : SPMF _) (Except.ok x) := by
   rw [show (ExceptT.toSPMF' mx : SPMF α) =
-    HasEvalSPMF.toSPMF mx.run >>= fun r =>
+    (liftM mx.run : SPMF _) >>= fun r =>
       match r with | Except.ok a => pure a | Except.error _ => failure from rfl]
   rw [SPMF.bind_apply_eq_tsum]
   refine (tsum_eq_single (Except.ok x) fun y hy => ?_).trans ?_
@@ -170,18 +182,48 @@ private lemma toSPMF'_apply_eq [HasEvalPMF m] (mx : ExceptT ε m α) (x : α) :
         simp [this]
   · simp
 
-/-- Lift `HasEvalPMF m` to `HasEvalSPMF (ExceptT ε m)`.
+/-- Lift `MonadLiftT m PMF` to `MonadLiftT (ExceptT ε m) SPMF`.
 Errors contribute to failure mass. -/
-noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalPMF m] :
-    HasEvalSPMF (ExceptT ε m) where
-  toSPMF := ExceptT.toSPMF'
-  support_eq mx := by
-    ext x
-    rw [ExceptT.mem_support_iff, SPMF.mem_support_iff, toSPMF'_apply_eq]
-    change Except.ok x ∈ support mx.run ↔ 𝒟[mx.run] (Except.ok x) ≠ 0
-    exact mem_support_iff_evalDist_apply_ne_zero mx.run (Except.ok x)
+noncomputable instance instMonadLiftTSPMF (ε : Type u) (m : Type u → Type v) [Monad m]
+    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] :
+    MonadLiftT (ExceptT ε m) SPMF where
+  monadLift mx := ExceptT.toSPMF' mx
 
-variable [HasEvalPMF m]
+noncomputable instance instLawfulMonadLiftTSPMF (ε : Type u) (m : Type u → Type v) [Monad m]
+    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] :
+    LawfulMonadLiftT (ExceptT ε m) SPMF where
+  monadLift_pure := ExceptT.toSPMF'.toFun_pure'
+  monadLift_bind := ExceptT.toSPMF'.toFun_bind'
+
+/-- The successful-output support of `ExceptT ε m` agrees with the output support of its
+`SPMF` semantics, provided the underlying monad has the corresponding bridge. Errors only
+contribute failure mass, not successful outputs. -/
+instance instEvalDistCompatible (ε : Type u) (m : Type u → Type v) [Monad m]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [EvalDistCompatible m] :
+    EvalDistCompatible (ExceptT ε m) where
+  support_eq_SPMF_support {α} mx := by
+    change Except.ok ⁻¹' (SetM.run (liftM mx.run : SetM (Except ε α))) =
+      SPMF.support ((liftM mx.run : SPMF (Except ε α)) >>= fun r =>
+        match r with | Except.ok a => pure a | Except.error _ => failure)
+    rw [SPMF.support_bind]
+    have hbridge : SetM.run (liftM mx.run : SetM (Except ε α)) =
+        SPMF.support (liftM mx.run : SPMF (Except ε α)) :=
+      EvalDistCompatible.support_eq_SPMF_support mx.run
+    rw [hbridge]
+    ext a
+    simp only [Set.mem_preimage, Set.mem_iUnion, exists_prop]
+    refine ⟨fun h => ⟨Except.ok a, h, by simp [SPMF.support_pure]⟩, ?_⟩
+    rintro ⟨r, hr, ha⟩
+    cases r with
+    | ok b =>
+        rw [SPMF.support_pure, Set.mem_singleton_iff] at ha
+        exact ha ▸ hr
+    | error e =>
+        simp only [SPMF.mem_support_iff, SPMF.failure_apply, ne_eq, not_true_eq_false] at ha
+
+variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
 
 lemma evalDist_eq (mx : ExceptT ε m α) :
     𝒟[mx] = ExceptT.toSPMF' mx := rfl
@@ -197,7 +239,7 @@ lemma probFailure_eq (mx : ExceptT ε m α) :
     Pr[⊥ | mx] = Pr[⊥ | mx.run] +
       Pr[ (fun r => match r with | Except.error _ => True | Except.ok _ => False) | mx.run] := by
   simp only [probFailure_def, probEvent_eq_tsum_indicator, probOutput_def]
-  rw [show 𝒟[mx] = (HasEvalSPMF.toSPMF mx.run >>= fun r =>
+  rw [show 𝒟[mx] = ((liftM mx.run : SPMF _) >>= fun r =>
       match r with | Except.ok a => pure a | Except.error _ => failure : SPMF α) from rfl]
   simp only [SPMF.run_eq_toPMF, SPMF.toPMF_bind, Option.elimM, PMF.monad_bind_eq_bind,
     PMF.bind_apply, ENNReal.summable, tsum_option, Option.elim_none, PMF.pure_apply, ↓reduceIte,
@@ -223,6 +265,6 @@ lemma probEvent_liftM [LawfulMonad m] (mx : m α) (p : α → Prop) :
     Pr[ p | (liftM mx : ExceptT ε m α)] = Pr[ p | mx] := by
   simp only [probEvent_def, evalDist_liftM]
 
-end HasEvalSPMF
+end EvalSPMF
 
 end ExceptT

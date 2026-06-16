@@ -56,7 +56,7 @@ open ENNReal OracleComp.ProgramLogic OracleComp.ProgramLogic.PropLogic
 namespace OracleComp.Loom.Coherence
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α : Type}
 
 /-! ## Probabilistic ↔ Quantitative
@@ -70,9 +70,9 @@ which then occludes the qualitative tier discussed below. -/
 
 /-! ## Qualitative ↔ Probabilistic (support-vs-expectation bridge)
 
-For an `OracleComp` (which has `HasEvalPMF`, so total probability is
-exactly `1`), the support-based `Prop`-valued `wp` agrees with "the
-probabilistic `wp` on the indicator post equals `1`". -/
+For an `OracleComp` (which has a canonical `MonadLiftT … PMF`, so total
+probability is exactly `1`), the support-based `Prop`-valued `wp` agrees
+with "the probabilistic `wp` on the indicator post equals `1`". -/
 
 /-- Qualitative ↔ Probabilistic coherence: a `Prop`-valued post is
 satisfied almost-surely iff its indicator post has probabilistic `wp`

@@ -149,13 +149,13 @@ end Prob
 The probabilistic WP wraps the existing quantitative `MAlgOrdered.wp`
 post-composed with the `Prob` constructor. The `≤ 1` bound is witnessed
 by monotonicity of `MAlgOrdered.wp` against the constant-`1` post,
-which evaluates to `1` on `OracleComp` (since `OracleComp` has
-`HasEvalPMF`, a true probability monad). -/
+which evaluates to `1` on `OracleComp` (since `OracleComp` has a
+canonical `MonadLiftT … PMF` — a true probability monad). -/
 
 namespace OracleComp.Probabilistic
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 /-- The underlying `ℝ≥0∞`-valued WP, packaged for use inside the `Prob`

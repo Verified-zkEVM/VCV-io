@@ -58,8 +58,6 @@ open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
-  [Fintype M] [Fintype S] [Fintype C]
-  [Inhabited M] [Inhabited S] [Inhabited C]
 
 /-! ## Adversary, game, and inner computation -/
 
@@ -94,13 +92,12 @@ private def bindingInner {t : ℕ} (A : BindingAdversary M S C t) :
   let c₁ ← (CMOracle M S C).query (m₁, s₁)
   return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))
 
-omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- The binding game equals `simulateQ cachingOracle` on `bindingInner`. -/
 private lemma bindingGame_eq {t : ℕ} (A : BindingAdversary M S C t) :
     bindingGame A = (simulateQ cachingOracle (bindingInner A)).run ∅ := rfl
 
-omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
-private lemma binding_win_implies_collision {t : ℕ} (A : BindingAdversary M S C t) :
+private lemma binding_win_implies_collision {t : ℕ} [Finite C] [Inhabited C]
+    (A : BindingAdversary M S C t) :
     ∀ z ∈ support ((simulateQ cachingOracle (bindingInner A)).run ∅),
       z.1 = true → CacheHasCollision z.2 := by
   intro z hz hwin
@@ -141,7 +138,6 @@ private lemma binding_win_implies_collision {t : ℕ} (A : BindingAdversary M S 
   exact ⟨(m₀, s₀), (m₁, s₁), c₀, c₁, hpair_ne, hcache₃_m₀, hcache₃,
     heq_of_eq (by rw [hc₀, hc₁])⟩
 
-omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- `IsTotalQueryBound` for the binding game's inner computation: `t + 2`
 (adversary's `t` queries + 2 verification queries). -/
 private lemma bindingInner_totalBound {t : ℕ} (A : BindingAdversary M S C t) :
@@ -157,8 +153,8 @@ private lemma bindingInner_totalBound {t : ℕ} (A : BindingAdversary M S C t) :
 /-! ## Fresh-query branch: bounding the verification-time guess -/
 
 /- In a collision-free cache, a value determines at most one query input. -/
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
-private lemma binding_rest_noCollision_le_inv
+private lemma binding_rest_noCollision_le_inv [Finite M] [Finite S] [Fintype C]
+    [Inhabited M] [Inhabited S] [Inhabited C]
     (c : C) (m₀ m₁ : M) (s₀ s₁ : S)
     (cache₁ : QueryCache (CMOracle M S C))
     (hno : ¬ CacheHasCollision cache₁) :
@@ -168,6 +164,8 @@ private lemma binding_rest_noCollision_le_inv
         let c₁ ← (CMOracle M S C).query (m₁, s₁)
         return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))).run cache₁] ≤
       (Fintype.card C : ℝ≥0∞)⁻¹ := by
+  haveI : Fintype M := Fintype.ofFinite M
+  haveI : Fintype S := Fintype.ofFinite S
   by_cases hneq : m₀ ≠ m₁
   · let q₀ : (CMOracle M S C).Domain := (m₀, s₀)
     let q₁ : (CMOracle M S C).Domain := (m₁, s₁)
@@ -244,7 +242,7 @@ private lemma binding_rest_noCollision_le_inv
           rw [hrun₁]
           simp [hneq, hv₀, hv₁]
       · rw [hrun₀]
-        refine le_of_eq_of_le ?_ (zero_le _)
+        refine le_of_eq_of_le ?_ (zero_le)
         apply probEvent_eq_zero
         intro z hz hwin
         simp only [simulateQ_bind, simulateQ_pure] at hz
@@ -255,7 +253,7 @@ private lemma binding_rest_noCollision_le_inv
         simp only [StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
         rw [hz] at hwin
         simp [hneq, hv₀] at hwin
-  · refine le_of_eq_of_le ?_ (zero_le _)
+  · refine le_of_eq_of_le ?_ (zero_le)
     apply probEvent_eq_zero
     intro z hz hwin
     simp only [simulateQ_bind, simulateQ_pure] at hz
@@ -278,12 +276,14 @@ private lemma binding_rest_noCollision_le_inv
  matched the commitment `c`. We bound each case separately:
  - Case 1 (collision in adversary's cache): ≤ `t(t-1)/(2|C|)` by tight birthday bound
  - Case 2 (no collision, fresh query matches `c`): ≤ `1/|C|` by unpredictability -/
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 private lemma binding_win_le_advCollision_add_fresh {t : ℕ}
+    [Finite M] [Finite S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C]
     (A : BindingAdversary M S C t) :
     Pr[fun z => z.1 = true | bindingGame A] ≤
     Pr[fun z => CacheHasCollision z.2 | (simulateQ cachingOracle A.run).run ∅] +
     (Fintype.card C : ℝ≥0∞)⁻¹ := by
+  haveI : Fintype M := Fintype.ofFinite M
+  haveI : Fintype S := Fintype.ofFinite S
   let restPart : (C × M × S × M × S) → OracleComp (CMOracle M S C) Bool
     | (c, m₀, s₀, m₁, s₁) => do
         let c₀ ← (CMOracle M S C).query (m₀, s₀)
@@ -305,7 +305,6 @@ private lemma binding_win_le_advCollision_add_fresh {t : ℕ}
         rintro ⟨⟨c, m₀, s₀, m₁, s₁⟩, cache₁⟩ _ hno
         simpa [restPart] using binding_rest_noCollision_le_inv c m₀ m₁ s₀ s₁ cache₁ hno))
 
-omit [Fintype M] [Fintype S] in
 /-- **Binding bound for the ROM commitment scheme (tight, Lemma cm-binding).**
 
 For every `t`-query binding adversary `A`,
@@ -328,9 +327,13 @@ verification query happening to land on the committed value (bounded by
 This is the bound a reader of the textbook lemma should reach for; the
 companion `binding_bound_via_cr_chain` produces the same shape of bound by
 factoring through the standard-model collision-resistance reduction. -/
-theorem binding_bound {t : ℕ} (A : BindingAdversary M S C t) :
+theorem binding_bound [Finite M] [Finite S] [Fintype C]
+    [Inhabited M] [Inhabited S] [Inhabited C]
+    {t : ℕ} (A : BindingAdversary M S C t) :
     Pr[fun z => z.1 = true | bindingGame A] ≤
     ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
+  haveI : Fintype M := Fintype.ofFinite M
+  haveI : Fintype S := Fintype.ofFinite S
   calc Pr[fun z => z.1 = true | bindingGame A]
       ≤ Pr[fun z => CacheHasCollision z.2 | (simulateQ cachingOracle A.run).run ∅] +
         (Fintype.card C : ℝ≥0∞)⁻¹ := binding_win_le_advCollision_add_fresh A
@@ -343,7 +346,6 @@ theorem binding_bound {t : ℕ} (A : BindingAdversary M S C t) :
         simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
           add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
 
-omit [Fintype M] [Fintype S] in
 /-- **Binding bound via the standard-model CR chain (looser).**
 
 For every `t`-query binding adversary `A`,
@@ -364,7 +366,8 @@ Proof: a binding-game win implies a collision in the final cache
 (`binding_win_implies_collision`), and the inner game makes at most `t + 2`
 total queries (`bindingInner_totalBound`); apply
 `probEvent_cacheCollision_le_birthday_total_tight` at `n = t + 2`. -/
-theorem binding_bound_via_cr_chain {t : ℕ} (A : BindingAdversary M S C t) :
+theorem binding_bound_via_cr_chain [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C]
+    {t : ℕ} (A : BindingAdversary M S C t) :
     Pr[fun z => z.1 = true | bindingGame A] ≤
     (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
   rw [bindingGame_eq]

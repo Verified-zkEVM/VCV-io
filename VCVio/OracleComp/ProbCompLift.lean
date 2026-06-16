@@ -80,7 +80,7 @@ def liftProbComp (runtime : ProbCompRuntime m) : ProbComp →ᵐ m :=
 
 /-- Canonical runtime for `ProbComp` itself. -/
 noncomputable def probComp : ProbCompRuntime ProbComp where
-  toSPMFSemantics := SPMFSemantics.ofHasEvalSPMF ProbComp
+  toSPMFSemantics := SPMFSemantics.ofMonadLift ProbComp
   toProbCompLift := ProbCompLift.id
 
 end ProbCompRuntime

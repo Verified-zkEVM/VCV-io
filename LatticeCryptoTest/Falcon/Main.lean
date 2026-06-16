@@ -58,6 +58,22 @@ private def checkFPR (st : IO.Ref TestState) (name : String)
 
 private def flush : IO Unit := IO.getStdout >>= IO.FS.Stream.flush
 
+/-- Generate a 40-byte salt (nonce) from the PRNG state.
+
+Diagnostic-only helper: the production signer derives its salts from
+`SHAKE256(seed ‖ counter_le32)` instead (see `concreteSignLoop` in
+`LatticeCrypto/Falcon/Concrete/Sign.lean`), which is why this definition was
+removed from the library; the target-vector diagnostic below only needs a
+deterministic salt drawn from a `PRNGState`. -/
+private def prngNextSalt (s : PRNGState) : Bytes 40 × PRNGState := Id.run do
+  let mut st := s
+  let mut bytes : Array UInt8 := Array.mkEmpty 40
+  for _ in [0:40] do
+    let (b, s') := st.nextByte
+    bytes := bytes.push b
+    st := s'
+  return (Vector.ofFn fun ⟨i, _⟩ => bytes.getD i 0, st)
+
 def main : IO Unit := do
   let st ← IO.mkRef ({} : TestState)
   IO.println "=== Falcon Correctness Tests ==="

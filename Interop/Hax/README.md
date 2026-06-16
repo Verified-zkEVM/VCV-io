@@ -106,7 +106,7 @@ def addOrPanicLifted (x y : Nat) : Interop.Rust.RustOracleComp spec Nat :=
   liftRustM (addOrPanic x y)
 
 theorem addOrPanicLifted_triple (x y : Nat)
-    [spec.Fintype] [spec.Inhabited] :
+    [IsUniformSpec spec] :
     ⦃⌜x + y < 2 ^ 32⌝⦄
     (addOrPanicLifted (spec := spec) x y)
     ⦃⇓ r => ⌜r = x + y⌝⦄ := by
@@ -118,8 +118,8 @@ With `@[spec] triple_liftRustM` registered in the `mvcgen` index,
 the `RustM` body of `addOrPanic`, and closes the residual vc in a
 single tactic call.
 
-The `[spec.Fintype] [spec.Inhabited]` constraints are inherited from
-VCVio's `WP (OracleComp spec) .pure` and are the only additional
+The `[IsUniformSpec spec]` constraint is inherited from
+VCVio's `WP (OracleComp spec) .pure` and is the only additional
 obligation the oracle layer imposes.
 
 ## Compositional boundary lemma
@@ -129,7 +129,7 @@ through the lift in one step:
 
 ```lean
 @[spec]
-theorem triple_liftRustM [spec.Fintype] [spec.Inhabited]
+theorem triple_liftRustM [IsUniformSpec spec]
     (x : RustM α)
     {Q : PostCond α (.except Interop.Rust.Error (.except PUnit .pure))}
     {P : Assertion (.except Interop.Rust.Error (.except PUnit .pure))}
@@ -187,7 +187,7 @@ def oracleThenAdd (x : Nat) (t : ι) (coe : spec.Range t → Nat) :
   liftRustM (addOrPanic x (coe y))
 
 theorem oracleThenAdd_triple (x : Nat) (t : ι) (coe : spec.Range t → Nat)
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     (hbound : ∀ y : spec.Range t, x + coe y < 2 ^ 32) :
     ⦃⌜True⌝⦄
     (oracleThenAdd (spec := spec) x t coe)
@@ -238,7 +238,7 @@ and transport it to `RustOracleComp` in one step via the boundary
 lemma:
 
 ```lean
-theorem computationLifted_triple [spec.Fintype] [spec.Inhabited]
+theorem computationLifted_triple [IsUniformSpec spec]
     (x : u32) :
     ⦃⌜2 * x.toNat + 1 < 2 ^ 32⌝⦄
     (computationLifted (spec := spec) x)
@@ -270,7 +270,7 @@ theorem checkedDiv_triple (x y : u32) (h : y ≠ 0) :
   unfold checkedDiv
   exact UInt32.haxDiv_spec x y h
 
-theorem checkedDivLifted_triple [spec.Fintype] [spec.Inhabited]
+theorem checkedDivLifted_triple [IsUniformSpec spec]
     (x y : u32) (h : y ≠ 0) :
     ⦃⌜True⌝⦄
     (checkedDivLifted (spec := spec) x y)
@@ -320,7 +320,7 @@ theorem adc_u32_spec (a b carry_in : u32) :
 Transport to `RustOracleComp` is still one line:
 
 ```lean
-theorem adc_u32_Lifted_spec [spec.Fintype] [spec.Inhabited]
+theorem adc_u32_Lifted_spec [IsUniformSpec spec]
     (a b carry_in : u32) :
     ⦃⌜carry_in ≤ 1⌝⦄
     (adc_u32_Lifted (spec := spec) a b carry_in)
@@ -409,7 +409,7 @@ def barrett_reduce_Lifted (value : i32) :
     Interop.Rust.RustOracleComp spec i32 :=
   liftRustM (barrett_reduce value)
 
-theorem barrett_reduce_Lifted_spec [spec.Fintype] [spec.Inhabited]
+theorem barrett_reduce_Lifted_spec [IsUniformSpec spec]
     (value : i32) :
     ⦃⌜value.toInt64 ≥ -(4194304 : Int64) ∧
        value.toInt64 ≤ (4194304 : Int64)⌝⦄
@@ -434,7 +434,7 @@ def oracleThenBarrett (t : ι) (coe : spec.Range t → i32) :
   barrett_reduce_Lifted (coe y)
 
 theorem oracleThenBarrett_triple
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     (t : ι) (coe : spec.Range t → i32)
     (hbound : ∀ y : spec.Range t,
       (coe y).toInt64 ≥ -(4194304 : Int64) ∧
@@ -458,8 +458,8 @@ Every spec above is a `Std.Do.Triple`, which is universal over oracle
 outcomes and contains no probabilistic content; effectively we have
 just been wrapping the `RustM` spec. The payoff of dropping `Hax.RustM`
 into `Interop.Rust.RustOracleComp` is that the underlying `OracleComp`
-layer carries `HasEvalSPMF` (via the `ExceptT` and `OptionT` instances
-in `VCVio.EvalDist.Instances.{ErrorT,OptionT}`), so claims like
+layer admits `evalDist` / `Pr[…]` (via the `ExceptT` and `OptionT`
+`MonadLiftT … SPMF` instances in `VCVio.EvalDist.Instances.{ErrorT,OptionT}`), so claims like
 `Pr[panic] = 1/2` become well-defined and provable. Those claims
 cannot be stated at the hax level: `Hax.RustM` has no oracle to sample
 at all, and the `Triple` layer has no way to talk about probability.
@@ -490,7 +490,7 @@ theorem tossedAdd_run_run :
 ```
 
 after which the panic probability follows by a one-liner sum over
-`Fin 2` using `HasEvalSPMF.probOutput_bind_eq_sum_fintype` and
+`Fin 2` using `probOutput_bind_eq_sum_fintype` and
 `ProbComp.probOutput_uniformFin`:
 
 ```lean

@@ -192,4 +192,12 @@ def toQueryImpl [HasQuery spec m] : QueryImpl spec m :=
 lemma toQueryImpl_apply [HasQuery spec m] (t : spec.Domain) :
     toQueryImpl (spec := spec) (m := m) t = HasQuery.query (spec := spec) (m := m) t := rfl
 
+/-- On `OracleComp spec`, `HasQuery.toQueryImpl` is the identity handler `QueryImpl.id'`.
+
+Not `@[simp]`: in `unifFwdImpl`-style definitions where `toQueryImpl.liftTarget` appears
+inside a `simp [unifFwdImpl]` call, the rewrite `toQueryImpl → id' = liftTarget _ (id _)`
+nests `liftTarget`s and triggers unbounded depth. Use via explicit `rw` instead. -/
+lemma toQueryImpl_eq_id' :
+    (toQueryImpl : QueryImpl spec (OracleComp spec)) = QueryImpl.id' spec := rfl
+
 end HasQuery

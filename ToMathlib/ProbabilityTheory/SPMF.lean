@@ -209,7 +209,10 @@ lemma support_def (p : SPMF α) :
 
 @[grind =]
 lemma support_eq_preimage_some (p : SPMF α) :
-    p.support = some ⁻¹' p.toPMF.support := by grind
+    p.support = some ⁻¹' p.toPMF.support := by
+  ext x
+  simp only [Set.mem_preimage, PMF.mem_support_iff, SPMF.support,
+    Function.mem_support, apply_eq_toPMF_some]
 
 @[simp, grind =]
 lemma mem_support_iff (p : SPMF α) (x : α) : x ∈ p.support ↔ p x ≠ 0 := by aesop
@@ -219,6 +222,19 @@ lemma support_liftM (p : PMF α) : (liftM p : SPMF α).support = p.support := by
 
 @[simp, grind =]
 lemma support_pure (x : α) : (pure x : SPMF α).support = {x} := by aesop
+
+@[simp, grind =]
+lemma support_bind (p : SPMF α) (q : α → SPMF β) :
+    (p >>= q).support = ⋃ x ∈ p.support, (q x).support := by
+  ext y
+  simp only [SPMF.mem_support_iff, bind_apply_eq_tsum, Set.mem_iUnion, exists_prop, ne_eq]
+  rw [ENNReal.tsum_eq_zero, not_forall]
+  constructor
+  · rintro ⟨x, hx⟩
+    rw [mul_eq_zero, not_or] at hx
+    exact ⟨x, hx.1, hx.2⟩
+  · rintro ⟨x, hpx, hqxy⟩
+    exact ⟨x, by rw [mul_eq_zero, not_or]; exact ⟨hpx, hqxy⟩⟩
 
 end support
 

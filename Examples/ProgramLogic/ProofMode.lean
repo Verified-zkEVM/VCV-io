@@ -22,7 +22,7 @@ open scoped OracleComp.ProgramLogic
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β γ : Type}
 
 /-! ## `game_trans` -/
@@ -39,7 +39,7 @@ example {g₁ g₂ g₃ : OracleComp spec α}
 section ByUpto
 
 variable {σ : Type} {ι : Type} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α : Type}
 
 example
@@ -68,7 +68,7 @@ end ByUpto
 section RelSim
 
 variable {σ₁ σ₂ : Type} {ι : Type} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α : Type}
 
 example
@@ -110,7 +110,7 @@ end RelSim
 section RelSimDist
 
 variable {σ : Type} {ι : Type} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α : Type}
 
 example
@@ -181,7 +181,7 @@ end ByDist
 
 section RelDist
 
-variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec]
 variable {α : Type}
 
 example {oa ob : OracleComp spec α}

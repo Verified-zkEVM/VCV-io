@@ -17,7 +17,7 @@ universe u
 namespace OracleComp.ProgramLogic
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α β : Type}
 
 /-! ## OracleComp-focused API examples -/

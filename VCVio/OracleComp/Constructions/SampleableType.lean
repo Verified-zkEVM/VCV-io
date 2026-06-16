@@ -324,7 +324,8 @@ instance SampleableType.Finite (α : Type) [SampleableType α] : Finite α :=
 /-- We avoid making this an instance globally as many types already have a `Fintype` instance
 that would not be definitionally equal to this one. -/
 @[reducible]
-def SampleableType.Fintype (α : Type) [h : SampleableType α] [DecidableEq α] : Fintype α where
+noncomputable def SampleableType.Fintype (α : Type) [h : SampleableType α] [DecidableEq α] :
+    Fintype α where
   elems := finSupport ($ᵗ α)
   complete := by grind
 
@@ -332,49 +333,9 @@ instance (n : ℕ) [NeZero n] : FinEnum (ZMod n) where
   card := n
   equiv := (ZMod.finEquiv n).symm.toEquiv
 
-instance (n : ℕ) : FinEnum (BitVec n) where
-  card := 2 ^ n
-  equiv := ⟨BitVec.toFin, BitVec.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt8 where
-  card := 2 ^ 8
-  equiv := ⟨UInt8.toFin, UInt8.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt16 where
-  card := 2 ^ 16
-  equiv := ⟨UInt16.toFin, UInt16.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt32 where
-  card := 2 ^ 32
-  equiv := ⟨UInt32.toFin, UInt32.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum UInt64 where
-  card := 2 ^ 64
-  equiv := ⟨UInt64.toFin, UInt64.ofFin, fun x => by simp, fun x => by simp⟩
-
 instance : FinEnum USize where
   card := 2 ^ System.Platform.numBits
   equiv := ⟨USize.toFin, USize.ofFin, fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int8 where
-  card := 2 ^ 8
-  equiv := ⟨BitVec.toFin ∘ Int8.toBitVec, Int8.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int16 where
-  card := 2 ^ 16
-  equiv := ⟨BitVec.toFin ∘ Int16.toBitVec, Int16.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int32 where
-  card := 2 ^ 32
-  equiv := ⟨BitVec.toFin ∘ Int32.toBitVec, Int32.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
-
-instance : FinEnum Int64 where
-  card := 2 ^ 64
-  equiv := ⟨BitVec.toFin ∘ Int64.toBitVec, Int64.ofBitVec ∘ BitVec.ofFin,
-    fun x => by simp, fun x => by simp⟩
 
 instance : FinEnum ISize where
   card := 2 ^ System.Platform.numBits
@@ -486,6 +447,17 @@ noncomputable instance instSampleableTypeEmbedding {β α : Type}
     SampleableType (β ↪ α) :=
   SampleableType.ofFintype _
 
+/-- A function from a finite type `D` with decidable equality to a `SampleableType` is itself
+`SampleableType`: transport the `Fin (Fintype.card D) → α` instance across the canonical
+equivalence `(D → α) ≃ (Fin (Fintype.card D) → α)`. This is the general Pi instance over an
+arbitrary finite domain presented by `Fintype` + `DecidableEq`, complementing the `FinEnum`-domain
+instance `instSampleableTypeFunc`. -/
+noncomputable instance instSampleableTypePiFintype {D : Type} [Fintype D] [DecidableEq D]
+    {α : Type} [SampleableType α] : SampleableType (D → α) :=
+  SampleableType.ofEquiv
+    (α := Fin (Fintype.card D) → α)
+    (Equiv.arrowCongr (Fintype.equivFin D).symm (Equiv.refl α))
+
 end instances
 
 section Marginalization
@@ -509,7 +481,7 @@ lemma evalDist_uniformSample_bind_update
   letI := Fintype.ofFinite R
   haveI : Nonempty (D → R) := ⟨fun _ => Classical.arbitrary R⟩
   refine evalDist_ext fun h => ?_
-  rw [probOutput_uniformSample (D → R) h, HasEvalSPMF.probOutput_bind_eq_sum_fintype]
+  rw [probOutput_uniformSample (D → R) h, probOutput_bind_eq_sum_fintype]
   -- For each fixed `u`, count the tables `g` whose `t`-update equals `h`.
   have hinner : ∀ u : R,
       Pr[= h | (do let g ← $ᵗ (D → R); pure (Function.update g t u))]
@@ -807,7 +779,7 @@ lemma probOutput_decide_eq_uniformBool_half
       Pr[= false | f false] := by
     rw [probOutput_bind_eq_tsum]; simp
   have hsum : Pr[= true | f false] + Pr[= false | f false] = 1 := by
-    have := HasEvalPMF.sum_probOutput_eq_one (f false)
+    have := sum_probOutput_of_liftM_PMF (f false)
     rwa [Fintype.sum_bool] at this
   rw [htrue, hfalse, h true, ← mul_add, hsum, mul_one]
   simp [one_div]
@@ -828,7 +800,7 @@ namespace uniformSampleImpl
 variable [∀ i, SampleableType (spec.Range i)]
 
 @[simp]
-lemma evalDist_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma evalDist_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) :
     𝒟[simulateQ uniformSampleImpl oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
@@ -836,19 +808,19 @@ lemma evalDist_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma probOutput_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma probOutput_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (x : α) :
     Pr[= x | simulateQ uniformSampleImpl oa] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ oa)) x
 
 @[simp]
-lemma probEvent_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma probEvent_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Pr[ p | simulateQ uniformSampleImpl oa] = Pr[ p | oa] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
 
 @[simp]
-lemma support_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma support_simulateQ [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) :
     support (simulateQ uniformSampleImpl oa) = support oa := by
   induction oa using OracleComp.inductionOn with
@@ -856,7 +828,7 @@ lemma support_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
   | query_bind t mx h => simp [h, uniformSampleImpl]
 
 @[simp]
-lemma finSupport_simulateQ [spec.Fintype] [spec.Inhabited] {α : Type}
+lemma finSupport_simulateQ [IsUniformSpec spec] {α : Type}
     [DecidableEq α] (oa : OracleComp spec α) :
     finSupport (simulateQ uniformSampleImpl oa) = finSupport oa := by
   simp [finSupport_eq_iff_support_eq_coe]

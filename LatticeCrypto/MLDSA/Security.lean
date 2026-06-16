@@ -50,13 +50,13 @@ open OracleComp OracleSpec ENNReal
 
 namespace MLDSA
 
-variable (p : Params) (prims : Primitives p) (nttOps : NTTRingOps)
+variable (p : Params) (prims : Primitives p) [nttOps : NTTRingOps]
   [DecidableEq prims.High]
 
 section Properties
 
 variable [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
+  [IsUniformSpec unifSpec]
 
 -- The algebraic core of completeness: whenever `respond` produces `some (z, h)`, the
 -- `verify` function accepts. This follows from the key generation relationship
@@ -67,10 +67,10 @@ variable
   (hRespondVerify : ∀ (pk : PublicKey p prims) (sk : SecretKey p),
     validKeyPair p prims pk sk = true →
     ∀ (w1 : Commitment p prims) (st : SigningState p) (cTilde : CommitHashBytes p),
-    (w1, st) ∈ support ((identificationScheme p prims nttOps).commit pk sk) →
+    (w1, st) ∈ support ((identificationScheme p prims).commit pk sk) →
     ∀ (zh : Response p prims),
-    some zh ∈ support ((identificationScheme p prims nttOps).respond pk sk st cTilde) →
-    (identificationScheme p prims nttOps).verify pk w1 cTilde zh = true)
+    some zh ∈ support ((identificationScheme p prims).respond pk sk st cTilde) →
+    (identificationScheme p prims).verify pk w1 cTilde zh = true)
 
 include hRespondVerify
 /-- Completeness of the ML-DSA identification scheme, conditional on `hRespondVerify`:
@@ -78,12 +78,11 @@ whenever `respond` returns `some (z, h)`, `verify` accepts. This algebraic fact 
 from the key generation identity, NTT linearity, and `Primitives.Laws`, but is isolated
 here to separate the probabilistic argument from the algebraic one. -/
 theorem idsWithAbort_complete' :
-    (identificationScheme p prims nttOps).Complete := by
+    (identificationScheme p prims).Complete := by
   classical
   intro pk sk hvalid
   rw [probOutput_eq_one_iff_forall]
-  refine ⟨HasEvalPMF.probFailure_eq_zero _, ?_⟩
-  intro b hb
+  refine ⟨probFailure_of_liftM_PMF _, fun b hb => ?_⟩
   rw [support_bind] at hb
   simp only [Set.mem_iUnion] at hb
   obtain ⟨t?, ht?, hb⟩ := hb
@@ -111,7 +110,7 @@ and the norm bounds satisfied by honest responses.
 The proof requires deriving the `hRespondVerify` algebraic fact from `Primitives.Laws`;
 see `idsWithAbort_complete'` for the conditional version. -/
 theorem idsWithAbort_complete (h_laws : Primitives.Laws prims nttOps) :
-    (identificationScheme p prims nttOps).Complete := by
+    (identificationScheme p prims).Complete := by
   classical
   sorry
 
@@ -129,11 +128,11 @@ transcript distribution is within an explicit total-variation bound `ζ_zk` of t
 transcript distribution. The bound is nonnegative by definition of total variation
 distance. -/
 theorem idsWithAbort_hvzk :
-    ∃ sim ζ_zk, 0 ≤ ζ_zk ∧ (identificationScheme p prims nttOps).HVZK sim ζ_zk := by
+    ∃ sim ζ_zk, 0 ≤ ζ_zk ∧ (identificationScheme p prims).HVZK sim ζ_zk := by
   classical
   sorry
 
-omit [SampleableType (CommitHashBytes p)] [unifSpec.Fintype] [unifSpec.Inhabited]
+omit [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec]
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
 from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
 enabling the CMA-to-NMA reduction in the security proof.
@@ -142,10 +141,10 @@ In our formalization, this is directly enforced by the `verify` function: it che
 `UseHint(h, w'_Approx) = w₁`, so any accepted transcript necessarily satisfies
 commitment recoverability. -/
 theorem idsWithAbort_commitment_recoverable :
-    ∃ recover, (identificationScheme p prims nttOps).CommitmentRecoverable recover := by
+    ∃ recover, (identificationScheme p prims).CommitmentRecoverable recover := by
   classical
   refine ⟨fun pk cTilde (z, h) =>
-    prims.useHintVec h (computeWApprox p prims nttOps (prims.expandA pk.rho)
+    prims.useHintVec h (computeWApprox p prims (prims.expandA pk.rho)
       (prims.sampleInBall cTilde) z pk.t1), ?_⟩
   rintro s w' c ⟨z, h⟩ hverify
   unfold identificationScheme at hverify
@@ -159,7 +158,7 @@ section NMASecurity
 
 variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
+  [IsUniformSpec unifSpec]
 
 open scoped Classical in
 /-- **NMA Security (Lemma 7, CRYPTO 2023).**
@@ -188,7 +187,7 @@ theorem nma_security
     (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
       (validKeyPair p prims)) :
     ∀ (adv : SignatureAlg.eufNmaAdv
-      (FiatShamirWithAbort (identificationScheme p prims nttOps) hr M maxAttempts)),
+      (FiatShamirWithAbort (identificationScheme p prims) hr M maxAttempts)),
     ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
       (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
       adv.advantage
@@ -234,7 +233,7 @@ section MainTheorem
 
 variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
+  [IsUniformSpec unifSpec]
 
 open scoped Classical in
 /-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**
@@ -290,10 +289,10 @@ theorem euf_cma_security
     (sim : PublicKey p prims →
       ProbComp (Option (Commitment p prims × CommitHashBytes p × Response p prims)))
     (ζ_zk : ℝ) (_hζ : 0 ≤ ζ_zk)
-    (_hhvzk : (identificationScheme p prims nttOps).HVZK sim ζ_zk)
+    (_hhvzk : (identificationScheme p prims).HVZK sim ζ_zk)
     (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1) :
     ∀ (adv : SignatureAlg.unforgeableAdv
-      (FiatShamirWithAbort (identificationScheme p prims nttOps)
+      (FiatShamirWithAbort (identificationScheme p prims)
         hr M maxAttempts)),
     ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
       (stmsisReduction : SelfTargetMSIS.Adversary stmsis),

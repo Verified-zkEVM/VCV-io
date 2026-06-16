@@ -20,7 +20,7 @@ set_option mvcgen.warning false
 namespace OracleComp.ProgramLogic.StdDo
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 variable {α : Type}
 
 example (x : α) :

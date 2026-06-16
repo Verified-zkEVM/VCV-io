@@ -116,7 +116,7 @@ theorem neverFail_simulateQ_randomOracle_run
     [DecidableEq ι] [spec.Inhabited] [(t : spec.Domain) → SampleableType (spec.Range t)]
     (oa : OracleComp spec α) (cache : spec.QueryCache) :
     NeverFail ((simulateQ randomOracle oa).run cache) := by
-  grind only [= HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
+  grind only [= neverFail_iff, = probFailure_of_liftM_PMF]
 
 /-- Support characterization for lazy random-oracle simulation.
 

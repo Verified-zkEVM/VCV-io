@@ -210,6 +210,26 @@ lemma simulateQ_list_forM (f : α → OracleComp spec PUnit) (xs : List α) :
     have h : (x :: xs).forM f = f x >>= fun _ => xs.forM f := rfl
     rw [h, simulateQ_bind]; congr 1; funext; exact ih
 
+/-- `simulateQ` distributes over `forIn` on a list: a monad morphism commutes with `forIn`.
+
+This is the `forIn` (early-exit / accumulating loop) sibling of `simulateQ_list_mapM` and
+`simulateQ_list_forM`. It lets a `simulateQ` pushed in front of a verifier-style loop
+`forIn (List.finRange t) init (fun j acc => …)` be moved inside the loop body, after which the
+individual simulated query steps can be discharged. -/
+@[simp]
+lemma simulateQ_list_forIn {β : Type u} (xs : List α) (init : β)
+    (f : α → β → OracleComp spec (ForInStep β)) :
+    simulateQ impl (forIn xs init f) = forIn xs init (fun a b => simulateQ impl (f a b)) := by
+  induction xs generalizing init with
+  | nil => simp
+  | cons x xs ih =>
+    rw [List.forIn_cons, List.forIn_cons, simulateQ_bind]
+    congr 1
+    funext step
+    cases step with
+    | done b => simp
+    | yield b => exact ih b
+
 end List
 
 /-! ## Composition of simulations via a per-query bridge -/
