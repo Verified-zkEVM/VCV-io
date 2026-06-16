@@ -112,46 +112,33 @@ private def roQueryImpl :
     (StateT ((Rand →ₒ M).QueryCache) ProbComp)
   idImpl + ro
 
-/-- Lift a `ProbComp` computation into the BR93 random-oracle world. -/
-private def liftProbComp {α : Type} (px : ProbComp α) : OracleComp (RO_Spec Rand M) α :=
-  px
-
-omit [Inhabited Rand] [Fintype Rand] [DecidableEq Rand] [SampleableType Rand] [Inhabited M]
-  [Fintype M] [DecidableEq M] [SampleableType M] [AddCommGroup M] in
-/-- A `ProbComp` lifted into the BR93 random-oracle world is the generic `liftComp` coercion,
-which threads every uniform sample through the left (`Sum.inl`) summand of the spec. -/
-private lemma liftProbComp_eq_liftComp {β : Type} (ob : ProbComp β) :
-    liftProbComp ob = OracleComp.liftComp ob (RO_Spec Rand M) := rfl
-
 omit [Inhabited Rand] [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
   [AddCommGroup M] in
 /-- The BR93 random-oracle handler is transparent on a computation lifted in from `unifSpec`,
 threading the cache unchanged: simulating such a computation just lifts it into the cache state
 monad. -/
-private lemma simulateQ_roQueryImpl_liftProbComp {β : Type} (ob : ProbComp β) :
-    simulateQ (roQueryImpl (Rand := Rand) (M := M)) (liftProbComp ob)
+private lemma simulateQ_roQueryImpl_liftM {β : Type} (ob : ProbComp β) :
+    simulateQ (roQueryImpl (Rand := Rand) (M := M))
+        (liftM ob : OracleComp (RO_Spec Rand M) β)
       = (liftM ob : StateT ((Rand →ₒ M).QueryCache) ProbComp β) := by
-  rw [liftProbComp_eq_liftComp]
-  unfold roQueryImpl
-  rw [QueryImpl.simulateQ_add_liftComp_left, HasQuery.toQueryImpl_eq_id',
-      simulateQ_liftTarget, simulateQ_id']
+  simp [roQueryImpl, QueryImpl.simulateQ_add_liftM_left, QueryImpl.simulateQ_toQueryImpl]
 
 omit [Inhabited Rand] [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
   [AddCommGroup M] in
 /-- A lifted `ProbComp` sample never touches the cache, so it commutes to the front of a run. -/
-private lemma run'_liftProbComp_bind {β γ : Type} (p : ProbComp β)
+private lemma run'_liftM_bind {β γ : Type} (p : ProbComp β)
     (k : β → OracleComp (RO_Spec Rand M) γ) (s : (Rand →ₒ M).QueryCache) :
-    (simulateQ roQueryImpl (liftProbComp p >>= k)).run' s
+    (simulateQ roQueryImpl (liftM p >>= k)).run' s
       = p >>= fun a => (simulateQ roQueryImpl (k a)).run' s := by
-  rw [simulateQ_bind, simulateQ_roQueryImpl_liftProbComp]
+  rw [simulateQ_bind, simulateQ_roQueryImpl_liftM]
   simp [StateT.run'_eq, StateT.run_bind, StateT.run_monadLift]
 
 omit [Inhabited Rand] [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
   [Inhabited M] [AddCommGroup M] in
 /-- Running a lifted `ProbComp` sample returns the sample paired with the unchanged cache. -/
-private lemma run_liftProbComp {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache) :
-    (simulateQ roQueryImpl (liftProbComp p)).run s = p >>= fun a => pure (a, s) := by
-  rw [simulateQ_roQueryImpl_liftProbComp]
+private lemma run_liftM {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache) :
+    (simulateQ roQueryImpl (liftM p)).run s = p >>= fun a => pure (a, s) := by
+  rw [simulateQ_roQueryImpl_liftM]
   simp [StateT.run_monadLift]
 
 omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited Rand]
@@ -195,9 +182,9 @@ entry is a left-oracle (uniform-sampling) query: lifted computations never touch
 oracle, so their transcript is invisible to any right-oracle (`Sum.inr`) predicate. -/
 private lemma forall_inl_of_mem_support_liftLog {β : Type} (p : ProbComp β)
     (s : (Rand →ₒ M).QueryCache) :
-    ∀ x ∈ support (((simulateQ roQueryImpl.withLogging (liftProbComp p)).run).run s),
+    ∀ x ∈ support (((simulateQ roQueryImpl.withLogging (liftM p)).run).run s),
       ∀ e ∈ x.1.2, ∃ a, e.1 = Sum.inl a := by
-  rw [liftProbComp_eq_liftComp]
+  rw [← OracleComp.liftComp_eq_liftM]
   induction p using OracleComp.inductionOn generalizing s with
   | pure x =>
     intro y hy e he
@@ -246,21 +233,21 @@ plain sample threading the cache unchanged: only the sampled value and resulting
 private lemma bind_logged_lift_of_log_unused {β : Type} (p : ProbComp β)
     (s : (Rand →ₒ M).QueryCache)
     (cont : β → (Rand →ₒ M).QueryCache → ProbComp Bool) :
-    ((simulateQ roQueryImpl.withLogging (liftProbComp p)).run.run s >>=
+    ((simulateQ roQueryImpl.withLogging (liftM p)).run.run s >>=
         fun x => cont x.1.1 x.2) = p >>= fun a => cont a s := by
   have hfst : (fun x => (x.1.1, x.2)) <$>
-      (simulateQ roQueryImpl.withLogging (liftProbComp p)).run.run s
+      (simulateQ roQueryImpl.withLogging (liftM p)).run.run s
       = p >>= fun a => pure (a, s) := by
-    have h1 : Prod.fst <$> (simulateQ roQueryImpl.withLogging (liftProbComp p)).run
-        = simulateQ roQueryImpl (liftProbComp p) :=
-      QueryImpl.fst_map_run_withLogging (roQueryImpl (Rand := Rand) (M := M)) (liftProbComp p)
+    have h1 : Prod.fst <$> (simulateQ roQueryImpl.withLogging (liftM p)).run
+        = simulateQ roQueryImpl (liftM p) :=
+      QueryImpl.fst_map_run_withLogging (roQueryImpl (Rand := Rand) (M := M)) (liftM p)
     have h2 := congrArg (fun (g : StateT _ ProbComp β) => g.run s) h1
     simp only [StateT.run_map] at h2
-    rw [h2, run_liftProbComp]
-  calc ((simulateQ roQueryImpl.withLogging (liftProbComp p)).run.run s >>=
+    rw [h2, run_liftM]
+  calc ((simulateQ roQueryImpl.withLogging (liftM p)).run.run s >>=
           fun x => cont x.1.1 x.2)
       = ((fun x => (x.1.1, x.2)) <$>
-          (simulateQ roQueryImpl.withLogging (liftProbComp p)).run.run s) >>=
+          (simulateQ roQueryImpl.withLogging (liftM p)).run.run s) >>=
             fun q => cont q.1 q.2 := by rw [bind_map_left]
     _ = (p >>= fun a => pure (a, s)) >>= fun q => cont q.1 q.2 := by rw [hfst]
     _ = p >>= fun a => cont a s := by rw [bind_assoc]; simp only [pure_bind]
@@ -277,10 +264,10 @@ private lemma evalDist_bind_add_right_uniform {γ : Type} (m : M) (f : M → Pro
 def cpaGame (tdp : TrapdoorPermutation PK SK Rand)
     (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) : ProbComp Bool :=
   (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-    let b ← liftProbComp ($ᵗ Bool)
-    let (pk, _sk) ← liftProbComp tdp.keygen
+    let b ← liftM ($ᵗ Bool)
+    let (pk, _sk) ← liftM tdp.keygen
     let (m₁, m₂, st) ← adv.choose pk
-    let r ← liftProbComp ($ᵗ Rand)
+    let r ← liftM ($ᵗ Rand)
     let h : M ← (RO_Spec Rand M).query (Sum.inr r)
     let c : Rand × M := (tdp.forward pk r, h + if b then m₁ else m₂)
     let b' ← adv.guess st c
@@ -292,11 +279,11 @@ hidden challenge randomness `r`. -/
 def game1 (tdp : TrapdoorPermutation PK SK Rand)
     (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) : ProbComp Bool :=
   (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-    let b ← liftProbComp ($ᵗ Bool)
-    let (pk, _sk) ← liftProbComp tdp.keygen
+    let b ← liftM ($ᵗ Bool)
+    let (pk, _sk) ← liftM tdp.keygen
     let (m₁, m₂, st) ← adv.choose pk
-    let r ← liftProbComp ($ᵗ Rand)
-    let h ← liftProbComp ($ᵗ M)
+    let r ← liftM ($ᵗ Rand)
+    let h ← liftM ($ᵗ M)
     let c : Rand × M := (tdp.forward pk r, h + if b then m₁ else m₂)
     let b' ← adv.guess st c
     return (b == b'))).run' ∅
@@ -308,10 +295,10 @@ def game2 (tdp : TrapdoorPermutation PK SK Rand)
   do
     let b ← ($ᵗ Bool)
     let b' ← (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-      let (pk, _sk) ← liftProbComp tdp.keygen
+      let (pk, _sk) ← liftM tdp.keygen
       let (_m₁, _m₂, st) ← adv.choose pk
-      let r ← liftProbComp ($ᵗ Rand)
-      let h ← liftProbComp ($ᵗ M)
+      let r ← liftM ($ᵗ Rand)
+      let h ← liftM ($ᵗ M)
       let c : Rand × M := (tdp.forward pk r, h)
       adv.guess st c)).run' ∅
     return (b == b')
@@ -324,11 +311,11 @@ def badEventExp (tdp : TrapdoorPermutation PK SK Rand)
       StateT ((Rand →ₒ M).QueryCache) ProbComp
         (Rand × QueryLog (RO_Spec Rand M)) :=
     (simulateQ roQueryImpl.withLogging <| (show OracleComp (RO_Spec Rand M) Rand from do
-      let (pk, _sk) ← liftProbComp tdp.keygen
+      let (pk, _sk) ← liftM tdp.keygen
       let (m₁, m₂, st) ← adv.choose pk
-      let b ← liftProbComp ($ᵗ Bool)
-      let r ← liftProbComp ($ᵗ Rand)
-      let h ← liftProbComp ($ᵗ M)
+      let b ← liftM ($ᵗ Bool)
+      let r ← liftM ($ᵗ Rand)
+      let h ← liftM ($ᵗ M)
       let c : Rand × M := (tdp.forward pk r, h + if b then m₁ else m₂)
       let _b' ← adv.guess st c
       return r)).run
@@ -353,8 +340,8 @@ def inverter (tdp : TrapdoorPermutation PK SK Rand)
           (Unit × QueryLog (RO_Spec Rand M)) :=
       (simulateQ roQueryImpl.withLogging <| (show OracleComp (RO_Spec Rand M) Unit from do
         let (m₁, m₂, st) ← adv.choose pk
-        let b ← liftProbComp ($ᵗ Bool)
-        let h ← liftProbComp ($ᵗ M)
+        let b ← liftM ($ᵗ Bool)
+        let h ← liftM ($ᵗ M)
         let c : Rand × M := (y, h + if b then m₁ else m₂)
         let _b' ← adv.guess st c
         return ())).run
@@ -386,7 +373,7 @@ theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
   -- Push the random-oracle simulation through both games: lifted samples become plain
   -- `ProbComp` binds, the adversary's `choose`/`guess` thread the cache, and the trailing
   -- `pure` collapses, leaving identical computations save for the challenge mask.
-  simp only [run'_simulateQ_bind, run_liftProbComp, simulateQ_pure, bind_assoc, pure_bind]
+  simp only [run'_simulateQ_bind, run_liftM, simulateQ_pure, bind_assoc, pure_bind]
   simp only [StateT.run'_eq, StateT.run_pure, map_eq_bind_pure_comp, Function.comp,
     bind_assoc, pure_bind]
   refine evalDist_bind_congr' _ fun b => ?_
@@ -405,10 +392,10 @@ theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     Pr[= true | game2 tdp adv] = 1 / 2 := by
   let f : Bool → ProbComp Bool := fun _ =>
     (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-      let (pk, _sk) ← liftProbComp tdp.keygen
+      let (pk, _sk) ← liftM tdp.keygen
       let (_m₁, _m₂, st) ← adv.choose pk
-      let r ← liftProbComp ($ᵗ Rand)
-      let h ← liftProbComp ($ᵗ M)
+      let r ← liftM ($ᵗ Rand)
+      let h ← liftM ($ᵗ M)
       let c : Rand × M := (tdp.forward pk r, h)
       adv.guess st c)).run' ∅
   simpa [game2, f] using
@@ -497,11 +484,11 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
   -- whose forward image matches the challenge, so the inverter returns a valid preimage and the
   -- inversion experiment succeeds; hence `bad ⟹ win` pointwise and the probabilities compare.
   have hbad : Pr[= true | badEventExp tdp adv] = Pr[= true | (do
-      let x ← (simulateQ roQueryImpl.withLogging (liftProbComp tdp.keygen)).run.run ∅
+      let x ← (simulateQ roQueryImpl.withLogging (liftM tdp.keygen)).run.run ∅
       let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose x.1.1.1)).run.run x.2
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Rand))).run.run x_2.2
-      let x_4 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run x_3.2
+      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
+      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run x_2.2
+      let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
       let x_5 ← (simulateQ roQueryImpl.withLogging
         (adv.guess x_1.1.1.2.2
           (tdp.forward x.1.1.1 x_3.1.1,
@@ -521,7 +508,7 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
     refine probOutput_bind_congr fun x_5 _ => ?_
     have inlFalse : ∀ {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache)
         (y : (β × QueryLog (RO_Spec Rand M)) × (Rand →ₒ M).QueryCache),
-        y ∈ support ((simulateQ roQueryImpl.withLogging (liftProbComp p)).run.run s) →
+        y ∈ support ((simulateQ roQueryImpl.withLogging (liftM p)).run.run s) →
         ∀ e ∈ y.1.2, (match e.fst with
           | Sum.inl _ => false
           | Sum.inr r' => decide (r' = x_3.1.1)) = false := by
@@ -546,11 +533,11 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
       toFalse _ hh, Bool.false_or, Bool.or_false,
       show (∅ : QueryLog (RO_Spec Rand M)) = [] from rfl, List.any_nil]
   have hbadCollapse : Pr[= true | (do
-      let x ← (simulateQ roQueryImpl.withLogging (liftProbComp tdp.keygen)).run.run ∅
+      let x ← (simulateQ roQueryImpl.withLogging (liftM tdp.keygen)).run.run ∅
       let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose x.1.1.1)).run.run x.2
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Rand))).run.run x_2.2
-      let x_4 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run x_3.2
+      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
+      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run x_2.2
+      let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
       let x_5 ← (simulateQ roQueryImpl.withLogging
         (adv.guess x_1.1.1.2.2
           (tdp.forward x.1.1.1 x_3.1.1,
@@ -575,9 +562,9 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
     rw [bind_logged_lift_of_log_unused (p := tdp.keygen) (s := ∅)
       (cont := fun pksk cache => do
         let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run cache
-        let x_2 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Bool))).run.run x_1.2
-        let x_3 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Rand))).run.run x_2.2
-        let x_4 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run x_3.2
+        let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
+        let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run x_2.2
+        let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
         let x_5 ← (simulateQ roQueryImpl.withLogging
           (adv.guess x_1.1.1.2.2
             (tdp.forward pksk.1 x_3.1.1,
@@ -590,8 +577,8 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
     refine probOutput_bind_congr fun cR _ => ?_
     rw [bind_logged_lift_of_log_unused (p := ($ᵗ Bool)) (s := cR.2)
       (cont := fun b cache_b => do
-        let x_3 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Rand))).run.run cache_b
-        let x_4 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run x_3.2
+        let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run cache_b
+        let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
         let x_5 ← (simulateQ roQueryImpl.withLogging
           (adv.guess cR.1.1.2.2
             (tdp.forward pksk.1 x_3.1.1,
@@ -603,7 +590,7 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
     refine probOutput_bind_congr fun b _ => ?_
     rw [bind_logged_lift_of_log_unused (p := ($ᵗ Rand)) (s := cR.2)
       (cont := fun r cache_r => do
-        let x_4 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run cache_r
+        let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run cache_r
         let x_5 ← (simulateQ roQueryImpl.withLogging
           (adv.guess cR.1.1.2.2
             (tdp.forward pksk.1 r,
@@ -686,8 +673,8 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
       let __discr ← tdp.keygen
       let x ← ($ᵗ Rand)
       let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose __discr.1)).run.run ∅
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run x_2.2
+      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
+      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_2.2
       let x_4 ← (simulateQ roQueryImpl.withLogging
         (adv.guess x_1.1.1.2.2
           (tdp.forward __discr.1 x, x_3.1.1 + if x_2.1.1 = true then x_1.1.1.1 else x_1.1.1.2.1)
@@ -714,7 +701,7 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
     refine probOutput_bind_congr fun x_4 _ => ?_
     have inlFalseF : ∀ {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache)
         (y : (β × QueryLog (RO_Spec Rand M)) × (Rand →ₒ M).QueryCache),
-        y ∈ support ((simulateQ roQueryImpl.withLogging (liftProbComp p)).run.run s) →
+        y ∈ support ((simulateQ roQueryImpl.withLogging (liftM p)).run.run s) →
         ∀ e ∈ y.1.2, (match e.fst with
           | Sum.inl _ => false
           | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x))
@@ -749,8 +736,8 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
       let __discr ← tdp.keygen
       let x ← ($ᵗ Rand)
       let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose __discr.1)).run.run ∅
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run x_2.2
+      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
+      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_2.2
       let x_4 ← (simulateQ roQueryImpl.withLogging
         (adv.guess x_1.1.1.2.2
           (tdp.forward __discr.1 x, x_3.1.1 + if x_2.1.1 = true then x_1.1.1.1 else x_1.1.1.2.1)
@@ -791,7 +778,7 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
     refine probOutput_bind_congr fun cR _ => ?_
     rw [bind_logged_lift_of_log_unused (p := ($ᵗ Bool)) (s := cR.2)
       (cont := fun b cache_b => do
-        let x_3 ← (simulateQ roQueryImpl.withLogging (liftProbComp ($ᵗ M))).run.run cache_b
+        let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run cache_b
         let x_4 ← (simulateQ roQueryImpl.withLogging
           (adv.guess cR.1.1.2.2
             (tdp.forward pksk.1 r, x_3.1.1 + if b = true then cR.1.1.1 else cR.1.1.2.1)
