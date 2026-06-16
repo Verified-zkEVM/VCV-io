@@ -284,8 +284,8 @@ private lemma support_eq_SPMF_support (oa : OracleComp spec α) :
             𝒟[mx u]).toPMF (some z) = 0
       rw [SPMF.toPMF_bind, Option.elimM, PMF.monad_bind_eq_bind, PMF.bind_apply,
         tsum_option _ ENNReal.summable]
-      have hzero : ((liftM (PMF.uniformOfFintype (spec.Range t))
-          : SPMF (spec.Range t))).toPMF none = 0 := by
+      have hzero : ((liftM (PMF.uniformOfFintype (spec.Range t)) :
+          SPMF (spec.Range t))).toPMF none = 0 := by
         simp [SPMF.toPMF_liftM]
       rw [hzero, zero_mul, zero_add]
       have hcontU : ∀ u : spec.Range t,

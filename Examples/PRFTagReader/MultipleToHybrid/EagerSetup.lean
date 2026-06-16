@@ -429,8 +429,8 @@ lemma probEvent_cacheBadReader_uniformSample_le [Finite Nonce] [Fintype Digest]
     -- `Pr[(b=true) | pure (cacheBadReader gFine t)] = if cacheBadReader gFine t then 1 else 0`
     have hinner :
         Pr[fun b : Bool => b = true |
-            (pure (cacheBadReader (sessionsPerTag := sessionsPerTag) gFine transcript)
-              : ProbComp Bool)] =
+            (pure (cacheBadReader (sessionsPerTag := sessionsPerTag) gFine transcript) :
+              ProbComp Bool)] =
           (if cacheBadReader (sessionsPerTag := sessionsPerTag) gFine transcript = true
             then (1 : ℝ≥0∞) else 0) := by
       simp
@@ -1013,8 +1013,8 @@ lemma evalDist_simulateQ_multipleBadTableHandlerFine_forget_cacheBad_eq
   refine tsum_congr fun z => ?_
   have hz := hcb z.val z.property
   have hrec : ((z.val.1, z.val.2.1,
-        ({z.val.2.2 with cacheBad := p.2.cacheBad} : UnlinkBadState TagId Nonce Digest))
-        : α × UnlinkState TagId × UnlinkBadState TagId Nonce Digest) = z.val := by
+        ({z.val.2.2 with cacheBad := p.2.cacheBad} : UnlinkBadState TagId Nonce Digest)) :
+        α × UnlinkState TagId × UnlinkBadState TagId Nonce Digest) = z.val := by
     have heq : ({z.val.2.2 with cacheBad := p.2.cacheBad} : UnlinkBadState TagId Nonce Digest)
         = z.val.2.2 := by
       conv_lhs => rw [← hz]
