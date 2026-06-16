@@ -184,6 +184,10 @@ private def mldsaCFlagsForSet (pkg : NPackage __name__) (paramSet : Nat) :
     "-I", mldsaDir.toString,
     "-I", (mldsaDir / "src").toString,
     s!"-DMLD_CONFIG_PARAMETER_SET={paramSet}",
+    -- Exclude the randomized signing API (mirrors mlkem's `MLK_CONFIG_NO_RANDOMIZED_API`):
+    -- it pulls in an undefined `randombytes` symbol that fails to link on Linux, and the
+    -- FFI tests only exercise the internal deterministic API.
+    "-DMLD_CONFIG_NO_RANDOMIZED_API",
     "-std=c99", "-O2"]
   return (weakArgs, #["-fPIC"])
 
