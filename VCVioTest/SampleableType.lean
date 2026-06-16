@@ -43,23 +43,30 @@ example : SampleableType (Fin 2 ⊕ Fin 3) := inferInstance
 example : SampleableType (Finset (Fin 3)) := inferInstance
 example : SampleableType (Finset (Fin 4 ⊕ Fin 2)) := inferInstance
 
-/-- Size-`n` multisets over a nonempty `Fintype`. -/
-noncomputable example : SampleableType (Sym Bool 3) := inferInstance
-noncomputable example : SampleableType (Sym (Fin 3) 2) := inferInstance
+/-- Size-`n` multisets over a nonempty `FinEnum` type, sampled uniformly and *computably*. -/
+example : SampleableType (Sym Bool 3) := inferInstance
+example : SampleableType (Sym (Fin 3) 2) := inferInstance
 
-/-- Permutations of a finite type: `n!` outcomes. -/
-noncomputable example : SampleableType (Equiv.Perm (Fin 3)) := inferInstance
-noncomputable example : SampleableType (Equiv.Perm Bool) := inferInstance
+/-- Permutations of a `FinEnum` type: `n!` outcomes, sampled uniformly and *computably*. -/
+example : SampleableType (Equiv.Perm (Fin 3)) := inferInstance
+example : SampleableType (Equiv.Perm Bool) := inferInstance
 
-/-- Function embeddings (injections) between finite types. The `Nonempty (β ↪ α)`
-hypothesis amounts to `card β ≤ card α`, which is supplied at use-site. -/
-noncomputable example : SampleableType (Fin 2 ↪ Fin 3) :=
+/-- Function embeddings (injections) between `FinEnum` types, sampled uniformly and *computably*.
+The `Nonempty (β ↪ α)` hypothesis amounts to `card β ≤ card α`, which is supplied at use-site. -/
+example : SampleableType (Fin 2 ↪ Fin 3) :=
   haveI : Nonempty (Fin 2 ↪ Fin 3) :=
     ⟨⟨Fin.castLE (by omega), Fin.castLE_injective _⟩⟩
   inferInstance
-noncomputable example : SampleableType (Fin 3 ↪ Fin 3) :=
+example : SampleableType (Fin 3 ↪ Fin 3) :=
   haveI : Nonempty (Fin 3 ↪ Fin 3) := ⟨.refl _⟩
   inferInstance
+
+/-- The underlying `FinEnum` enumerations are computable and have the expected cardinalities:
+`Sym (Fin 2) 2` has `multichoose 2 2 = 3` multisets, `Equiv.Perm (Fin 3)` has `3! = 6`
+permutations, and `Fin 2 ↪ Fin 3` has `3 · 2 = 6` injections. -/
+example : (Sym.finEnum (α := Fin 2) 2).card = 3 := by native_decide
+example : (Equiv.Perm.finEnum (α := Fin 3)).card = 6 := by native_decide
+example : (Function.Embedding.finEnum (β := Fin 2) (α := Fin 3)).card = 6 := by native_decide
 
 end SampleableType
 
