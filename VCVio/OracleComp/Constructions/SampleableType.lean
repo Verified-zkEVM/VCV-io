@@ -277,10 +277,6 @@ instance (α : Type) [Unique α] : SampleableType α where
   mem_support_selectElem x := Unique.eq_default x ▸ (by simp)
   probOutput_selectElem_eq x y := by rw [Unique.eq_default x, Unique.eq_default y]
 
--- `SampleableType Bool` is derived from `FinEnum Bool` (see `ToMathlib.Data.FinEnum`) via
--- `FinEnum.SampleableType`, keeping `FinEnum` as the canonical uniform-sampling pathway rather
--- than carrying a bespoke `Bool` sampler.
-
 /-- A sum of oracle specs with sampleable ranges again has sampleable ranges. -/
 instance {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
     [h : ∀ t, SampleableType (spec.Range t)] [h' : ∀ t, SampleableType (spec'.Range t)] :
