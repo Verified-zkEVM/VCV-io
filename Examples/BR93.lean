@@ -116,20 +116,14 @@ private def roQueryImpl :
 private def liftProbComp {α : Type} (px : ProbComp α) : OracleComp (RO_Spec Rand M) α :=
   px
 
-omit [Fintype Rand] [DecidableEq Rand] [SampleableType Rand] [Inhabited M]
+omit [Inhabited Rand] [Fintype Rand] [DecidableEq Rand] [SampleableType Rand] [Inhabited M]
   [Fintype M] [DecidableEq M] [SampleableType M] [AddCommGroup M] in
 /-- A `ProbComp` lifted into the BR93 random-oracle world is the generic `liftComp` coercion,
 which threads every uniform sample through the left (`Sum.inl`) summand of the spec. -/
 private lemma liftProbComp_eq_liftComp {β : Type} (ob : ProbComp β) :
-    liftProbComp ob = OracleComp.liftComp ob (RO_Spec Rand M) := by
-  induction ob using OracleComp.inductionOn with
-  | pure x => rfl
-  | query_bind t k ih =>
-    simp only [liftProbComp, liftComp_bind] at *
-    simp [ih, monad_norm]
-    rfl
+    liftProbComp ob = OracleComp.liftComp ob (RO_Spec Rand M) := rfl
 
-omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
+omit [Inhabited Rand] [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
   [AddCommGroup M] in
 /-- The BR93 random-oracle handler is transparent on a computation lifted in from `unifSpec`,
 threading the cache unchanged: simulating such a computation just lifts it into the cache state
@@ -142,7 +136,7 @@ private lemma simulateQ_roQueryImpl_liftProbComp {β : Type} (ob : ProbComp β) 
   rw [QueryImpl.simulateQ_add_liftComp_left, HasQuery.toQueryImpl_eq_id',
       simulateQ_liftTarget, simulateQ_id']
 
-omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
+omit [Inhabited Rand] [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
   [AddCommGroup M] in
 /-- A lifted `ProbComp` sample never touches the cache, so it commutes to the front of a run. -/
 private lemma run'_liftProbComp_bind {β γ : Type} (p : ProbComp β)
@@ -152,7 +146,7 @@ private lemma run'_liftProbComp_bind {β γ : Type} (p : ProbComp β)
   rw [simulateQ_bind, simulateQ_roQueryImpl_liftProbComp]
   simp [StateT.run'_eq, StateT.run_bind, StateT.run_monadLift]
 
-omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+omit [Inhabited Rand] [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
   [Inhabited M] [AddCommGroup M] in
 /-- Running a lifted `ProbComp` sample returns the sample paired with the unchanged cache. -/
 private lemma run_liftProbComp {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache) :
@@ -194,7 +188,7 @@ private lemma run'_simulateQ_bind_pure {β γ : Type} (mx : OracleComp (RO_Spec 
   rw [simulateQ_bind]
   simp [StateT.run'_eq, Functor.map_map]
 
-omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
+omit [Inhabited Rand] [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited M]
   [AddCommGroup M] in
 /-- Simulating a lifted `ProbComp` under the logging handler produces a transcript whose every
 entry is a left-oracle (uniform-sampling) query: lifted computations never touch the right random
@@ -246,7 +240,7 @@ private lemma forall_inl_of_mem_support_liftLog {β : Type} (p : ProbComp β)
     · exact ih pp.1.1 pp.2 qq hqq e he
 
 omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
-  [Inhabited M] [AddCommGroup M] in
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] in
 /-- A logged run of a lifted `ProbComp` sample whose transcript is discarded collapses to the
 plain sample threading the cache unchanged: only the sampled value and resulting cache survive. -/
 private lemma bind_logged_lift_of_log_unused {β : Type} (p : ProbComp β)
@@ -383,7 +377,7 @@ theorem cpaGame_gap_le_badEvent (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M
       badEventProb tdp adv := by
   sorry
 
-omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] in
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] [Inhabited Rand] in
 /-- Uniform masking step: once the challenge hash output is replaced by a fresh uniform mask,
 adding either challenge message yields the same ciphertext distribution. -/
 theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
