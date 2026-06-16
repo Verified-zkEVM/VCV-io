@@ -168,6 +168,85 @@ noncomputable def ofBackend (backend : PolyBackend R) (p : backend.Poly) :
     NegacyclicQuotient R backend.degree :=
   ofPolynomial backend.degree (backend.toPolynomial p)
 
+/-! ### Injectivity of `ofBackend` -/
+
+/-- Pushing `Polynomial.coeff n` inside a `Finset.sum` of polynomials.
+This is `AddMonoidHom.map_sum` for `Polynomial.lcoeff`, stated in a form that
+avoids dot-notation on `LinearMap` (which is not a structure field). -/
+private theorem polyCoeffFinsetSum {R : Type u} [CommRing R] {ι : Type*}
+    (s : Finset ι) (f : ι → Polynomial R) (n : ℕ) :
+    (∑ x ∈ s, f x).coeff n = ∑ x ∈ s, (f x).coeff n := by
+  classical
+  induction s using Finset.induction_on with
+  | empty => simp
+  | @insert a s ha ih => simp [Finset.sum_insert ha, ih]
+
+/-- `toPolynomial` is injective: distinct coefficient arrays yield
+distinct polynomials. -/
+theorem PolyBackend.toPolynomial_injective {R : Type u} [CommRing R]
+    (backend : PolyBackend R) : Function.Injective backend.toPolynomial := by
+  intro p q h
+  apply PolyBackend.ext_coeff
+  intro i
+  have extract : ∀ x : backend.Poly,
+      (backend.toPolynomial x).coeff i.val = backend.coeff x i := fun x => by
+    simp only [PolyBackend.toPolynomial]
+    rw [polyCoeffFinsetSum]
+    simp only [Polynomial.coeff_monomial, Fin.val_inj,
+               Finset.sum_ite_eq', Finset.mem_univ, if_true]
+  rw [← extract p, ← extract q, h]
+
+/-- Coefficients of `toPolynomial x` at indices `≥ backend.degree` are zero. -/
+private theorem PolyBackend.toPolynomial_coeff_high {R : Type u} [CommRing R]
+    (backend : PolyBackend R) (x : backend.Poly) {j : Nat}
+    (hj : backend.degree ≤ j) :
+    (backend.toPolynomial x).coeff j = 0 := by
+  simp only [PolyBackend.toPolynomial]
+  rw [polyCoeffFinsetSum]
+  apply Finset.sum_eq_zero
+  intro i _
+  simp only [Polynomial.coeff_monomial]
+  exact if_neg (Nat.ne_of_lt (i.isLt.trans_le hj))
+
+/-- `ofBackend` is injective: distinct backend carriers map to distinct
+elements of the negacyclic quotient. Holds for any `CommRing` coefficient type. -/
+theorem ofBackend_injective
+    {R : Type u} [CommRing R] (backend : PolyBackend R) :
+    Function.Injective (NegacyclicQuotient.ofBackend backend) := by
+  intro p q heq
+  apply PolyBackend.toPolynomial_injective
+  simp only [NegacyclicQuotient.ofBackend, NegacyclicQuotient.ofPolynomial] at heq
+  rcases Nat.eq_zero_or_pos backend.degree with hn | hn
+  · haveI : IsEmpty (Fin backend.degree) := hn ▸ inferInstance
+    simp [PolyBackend.toPolynomial]
+  have hmem : backend.toPolynomial p - backend.toPolynomial q ∈
+      Ideal.span ({negacyclicModulus R backend.degree} : Set (Polynomial R)) := by
+    have hzero : Ideal.Quotient.mk
+        (Ideal.span ({negacyclicModulus R backend.degree} : Set (Polynomial R)))
+        (backend.toPolynomial p - backend.toPolynomial q) = 0 := by
+      simp [map_sub, heq]
+    rwa [Ideal.Quotient.eq_zero_iff_mem] at hzero
+  rw [Ideal.mem_span_singleton] at hmem
+  obtain ⟨c, hc⟩ := hmem
+  suffices hc0 : c = 0 by
+    have : backend.toPolynomial p - backend.toPolynomial q = 0 := by
+      rw [hc, hc0, mul_zero]
+    exact sub_eq_zero.mp this
+  by_contra hcne
+  have hzero : (backend.toPolynomial p - backend.toPolynomial q).coeff
+      (c.natDegree + backend.degree) = 0 := by
+    simp only [Polynomial.coeff_sub,
+      PolyBackend.toPolynomial_coeff_high backend p (Nat.le_add_left _ _),
+      PolyBackend.toPolynomial_coeff_high backend q (Nat.le_add_left _ _), sub_self]
+  have hnonzero : (negacyclicModulus R backend.degree * c).coeff
+      (c.natDegree + backend.degree) ≠ 0 := by
+    have hdeg : c.natDegree < c.natDegree + backend.degree := by omega
+    simp only [negacyclicModulus, add_mul, one_mul, Polynomial.coeff_add,
+               mul_comm (Polynomial.X ^ backend.degree) c, Polynomial.coeff_mul_X_pow,
+               Polynomial.coeff_eq_zero_of_natDegree_lt hdeg, add_zero]
+    exact Polynomial.leadingCoeff_ne_zero.mpr hcne
+  exact hnonzero (hc ▸ hzero)
+
 end NegacyclicQuotient
 
 end LatticeCrypto
