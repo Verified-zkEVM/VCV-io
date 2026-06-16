@@ -4,32 +4,32 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
       - "FFI/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
+      - "VCVioWidgets/**/*.lean"
       - "Interop.lean"
       - "Interop/**/*.lean"
       - "lakefile.lean"
-      - "scripts/lint-style.py"
-      - "scripts/print-style-errors.sh"
+      - "scripts/lint_style.lean"
       - "scripts/nolints-style.txt"
-      - "scripts/style-exceptions.txt"
       - ".github/workflows/linting.yml"
   push:
     branches: [main]
     paths:
+      - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
       - "FFI/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
+      - "VCVioWidgets/**/*.lean"
       - "Interop.lean"
       - "Interop/**/*.lean"
       - "lakefile.lean"
-      - "scripts/lint-style.py"
-      - "scripts/print-style-errors.sh"
+      - "scripts/lint_style.lean"
       - "scripts/nolints-style.txt"
-      - "scripts/style-exceptions.txt"
       - ".github/workflows/linting.yml"
 
 concurrency:

@@ -365,8 +365,8 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
         𝒟[(simulateQ (dhTripleRand (F := F) gen)
               ((dhToLR_leftHandler (G := G)) (Sum.inr (m, m)))).run s] =
           𝒟[do
-              let bt ← (((dhTripleRand (F := F) gen) (Sum.inr ())).run s
-                : ProbComp ((G × G) × Option F))
+              let bt ← (((dhTripleRand (F := F) gen) (Sum.inr ())).run s :
+                ProbComp ((G × G) × Option F))
               pure ((bt.1.1, bt.1.2 + m), bt.2)] := by
       intro m
       simp only [dhToLR_leftHandler, simulateQ_query_bind, simulateQ_pure,
