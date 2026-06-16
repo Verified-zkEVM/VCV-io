@@ -35,9 +35,9 @@ This references the functional versions of `getPutativeRoot` and `buildMerkleTre
 -/
 @[simp, grind =]
 theorem functional_completeness {s : Skeleton}
-  (idx : SkeletonLeafIndex s)
-  (leaf_data_tree : LeafData α s)
-  (hash : α → α → α) :
+    (idx : SkeletonLeafIndex s)
+    (leaf_data_tree : LeafData α s)
+    (hash : α → α → α) :
   getPutativeRootWithHash
     idx
     (leaf_data_tree.get idx)

@@ -10,7 +10,11 @@ package VCVio where
     ⟨`relaxedAutoImplicit, false⟩,
     ⟨`weak.linter.mathlibStandardSet, true⟩,
     ⟨`weak.linter.modulesUpperCamelCase, true⟩,
-    ⟨`weak.linter.style.whitespace, true⟩
+    ⟨`weak.linter.style.whitespace, true⟩,
+    -- Disable the unicode allowlist linter: VCVio docstrings legitimately use
+    -- FIPS-204 math notation (combining tilde `c̃`) and cited author names with
+    -- diacritics (e.g. `Cătălin Hriţcu`).
+    ⟨`weak.linter.unicodeLinter, false⟩
   ]
 
 /-
@@ -282,3 +286,14 @@ lean_exe mldsa_test where
 /-- Falcon test executable (links against c-fn-dsa FFI). -/
 lean_exe falcon_test where
   root := `LatticeCryptoTest.Falcon.Main
+
+/-- `lake exe lint-style` runs Mathlib's text-based style linters over the VCVio
+libraries. The in-build syntax linters (`linter.style.*`, enabled via
+`linter.mathlibStandardSet` above) run during `lake build`; this executable
+covers the text-based checks. See `scripts/lint_style.lean`. -/
+lean_exe «lint-style» where
+  srcDir := "scripts"
+  root := `lint_style
+  supportInterpreter := true
+  -- Executables which import `Lake` must set `-lLake`.
+  weakLinkArgs := #["-lLake"]

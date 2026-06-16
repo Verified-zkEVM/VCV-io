@@ -157,8 +157,8 @@ lemma probEvent_bind_eq_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx :
   refine tsum_congr fun x => by split_ifs <;> simp
 
 @[grind =]
-lemma probFailure_bind_eq_add_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my
-    : α → m β) :
+lemma probFailure_bind_eq_add_tsum [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my :
+    α → m β) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
   simp [probFailure_def, Option.elimM, tsum_option, probOutput_def,
     SPMF.apply_eq_toPMF_some]
@@ -361,8 +361,8 @@ lemma probFailure_bind_le_of_forall {mx : m α}
 
 end mono
 
-lemma probFailure_bind_of_probFailure_eq_zero [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {mx
-    : m α}
+lemma probFailure_bind_of_probFailure_eq_zero [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {mx :
+    m α}
     (h' : Pr[⊥ | mx] = 0) {my : α → m β} :
     Pr[⊥ | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
   rw [probFailure_bind_eq_add_tsum, h', zero_add]
