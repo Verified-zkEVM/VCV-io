@@ -96,7 +96,15 @@ end add_right
 
 section left_add_left_add
 
-instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
+/-- Congruence on the left summand: an inclusion `spec₁ ⊂ₒ spec₃` extends to
+`spec₁ + spec₂ ⊂ₒ spec₃ + spec₂`.
+
+Low priority so that searches whose source spec is a metavariable (notably the
+`MonadLiftT (OracleComp spec) (OracleComp superSpec)` chain behind whole-computation
+coercions) prefer the direct embeddings `subSpec_add_left` / `subSpec_add_right`. This keeps
+such coercions a single `liftComp`, definitionally, instead of a stack of lifts through an
+intermediate spec. -/
+instance (priority := low) subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
     spec₁ + spec₂ ⊂ₒ spec₃ + spec₂ where
   monadLift
     | ⟨.inl t, f⟩ => ⟨.inl (h.onQuery t), f ∘ h.onResponse t⟩
@@ -144,7 +152,13 @@ end left_add_left_add
 
 section right_add_right_add
 
-instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
+/-- Congruence on the right summand: an inclusion `spec₂ ⊂ₒ spec₃` extends to
+`spec₁ + spec₂ ⊂ₒ spec₁ + spec₃`.
+
+Low priority for the same reason as `subSpec_left_add_left_add_of_subSpec`: the direct
+embeddings must win metavariable-headed searches so that whole-computation coercions stay a
+single `liftComp`. -/
+instance (priority := low) subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
     spec₁ + spec₂ ⊂ₒ spec₁ + spec₃ where
   monadLift
     | ⟨.inl t, f⟩ => ⟨.inl t, f⟩
@@ -371,5 +385,15 @@ example (q : OracleQuery spec₁ α) :
       OracleQuery (spec₁ + spec₂ + spec₃) α) =
     (liftM (liftM q : OracleQuery (spec₁ + spec₃) α) :
       OracleQuery (spec₁ + spec₂ + spec₃) α) := by simp
+
+-- Whole-computation coercions into a sum spec are *definitionally* a single `liftComp`,
+-- with no intermediate hop through another spec. In particular lifting out of `ProbComp`
+-- (e.g. into a random-oracle spec `unifSpec + (T →ₒ U)`) is `liftComp` by `rfl`.
+example (oa : OracleComp spec₁ α) :
+    (oa : OracleComp (spec₁ + spec₂) α) = OracleComp.liftComp oa (spec₁ + spec₂) := rfl
+example (oa : OracleComp spec₂ α) :
+    (oa : OracleComp (spec₁ + spec₂) α) = OracleComp.liftComp oa (spec₁ + spec₂) := rfl
+example (px : ProbComp α) :
+    (px : OracleComp (unifSpec + spec₁) α) = OracleComp.liftComp px (unifSpec + spec₁) := rfl
 
 end tests

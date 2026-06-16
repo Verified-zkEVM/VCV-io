@@ -410,7 +410,8 @@ theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     (fun x => (simulateQ roQueryImpl (adv.guess mmst.1.2.2 (tdp.forward ks.1 r, x))).run mmst.2 >>=
       fun p => pure (b == p.1))
 
-omit [Fintype Rand] [Inhabited M] [Fintype M] [DecidableEq M] [AddCommGroup M] in
+omit [Inhabited Rand] [Fintype Rand] [Inhabited M] [Fintype M] [DecidableEq M]
+  [AddCommGroup M] in
 /-- In the all-random game, the challenge ciphertext is independent of the hidden bit, so the
 adversary succeeds with probability exactly `1/2`. -/
 theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
