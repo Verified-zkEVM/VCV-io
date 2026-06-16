@@ -382,13 +382,6 @@ omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] [Inhabited Rand] i
 adding either challenge message yields the same ciphertext distribution. -/
 theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     𝒟[game1 tdp adv] = 𝒟[game2 tdp adv] := by
-  have congr_bind : ∀ {γ δ : Type} (oa : ProbComp γ) (f g : γ → ProbComp δ),
-      (∀ a, 𝒟[f a] = 𝒟[g a]) → 𝒟[oa >>= f] = 𝒟[oa >>= g] := by
-    intro γ δ oa f g hfg
-    rw [evalDist_bind, evalDist_bind]
-    congr 1
-    funext a
-    exact hfg a
   rw [game1, game2]
   -- Push the random-oracle simulation through both games: lifted samples become plain
   -- `ProbComp` binds, the adversary's `choose`/`guess` thread the cache, and the trailing
@@ -396,10 +389,10 @@ theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
   simp only [run'_simulateQ_bind, run_liftProbComp, simulateQ_pure, bind_assoc, pure_bind]
   simp only [StateT.run'_eq, StateT.run_pure, map_eq_bind_pure_comp, Function.comp,
     bind_assoc, pure_bind]
-  refine congr_bind _ _ _ fun b => ?_
-  refine congr_bind _ _ _ fun ks => ?_
-  refine congr_bind _ _ _ fun mmst => ?_
-  refine congr_bind _ _ _ fun r => ?_
+  refine evalDist_bind_congr' _ fun b => ?_
+  refine evalDist_bind_congr' _ fun ks => ?_
+  refine evalDist_bind_congr' _ fun mmst => ?_
+  refine evalDist_bind_congr' _ fun r => ?_
   exact evalDist_bind_add_right_uniform (if b = true then mmst.1.1 else mmst.1.2.1)
     (fun x => (simulateQ roQueryImpl (adv.guess mmst.1.2.2 (tdp.forward ks.1 r, x))).run mmst.2 >>=
       fun p => pure (b == p.1))
