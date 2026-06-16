@@ -244,7 +244,10 @@ private def falconCFlags (pkg : NPackage __name__) :
   let weakArgs := #[
     "-I", (← getLeanIncludeDir).toString,
     "-I", fndsaDir.toString,
-    "-std=c99", "-O2"]
+    -- `_GNU_SOURCE` is required on glibc: under `-std=c99` it otherwise hides
+    -- `getentropy` / `O_CLOEXEC`, which `third_party/c-fn-dsa/sysrng.c` uses, so
+    -- the Falcon RNG fails to compile on Linux (macOS exposes them regardless).
+    "-D_GNU_SOURCE", "-std=c99", "-O2"]
   return (weakArgs, #["-fPIC"])
 
 target fndsa.o pkg : System.FilePath := do
