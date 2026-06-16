@@ -481,6 +481,16 @@ lemma probEvent_bind_congr' (mx : m α) {ob₁ ob₂ : α → m β} (q : β → 
     Pr[ q | mx >>= ob₁] = Pr[ q | mx >>= ob₂] :=
   probEvent_bind_congr fun x _ => h x
 
+lemma evalDist_bind_congr {mx : m α} {ob₁ ob₂ : α → m β}
+    (h : ∀ x ∈ support mx, 𝒟[ob₁ x] = 𝒟[ob₂ x]) :
+    𝒟[mx >>= ob₁] = 𝒟[mx >>= ob₂] :=
+  evalDist_ext fun y => probOutput_bind_congr fun x hx => evalDist_ext_iff.mp (h x hx) y
+
+lemma evalDist_bind_congr' (mx : m α) {ob₁ ob₂ : α → m β}
+    (h : ∀ x, 𝒟[ob₁ x] = 𝒟[ob₂ x]) :
+    𝒟[mx >>= ob₁] = 𝒟[mx >>= ob₂] :=
+  evalDist_bind_congr fun x _ => h x
+
 lemma probEvent_bind_mono {mx : m α} {my oc : α → m β} {q : β → Prop}
     (h : ∀ x ∈ support mx, Pr[ q | my x] ≤ Pr[ q | oc x]) :
     Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] := by
