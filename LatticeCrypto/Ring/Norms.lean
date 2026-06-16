@@ -236,7 +236,7 @@ theorem cInfNorm_le_halfq (p : Poly (ZMod q) n) : cInfNorm p ≤ q / 2 :=
   simp only [cInfNorm, cInfNormOf, vectorBackend, zmodCenteredCoeffView]
   congr 1
   ext i
-  have hneg : (-f).get i = -(f.get i) := Vector.getElem_map (- ·) i.isLt
+  have hneg : (-f).get i = -(f.get i) := Poly.get_neg f i
   rw [hneg, centeredRepr_natAbs_neg]
 
 theorem l1Norm_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
