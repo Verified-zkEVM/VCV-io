@@ -9,6 +9,7 @@ import VCVio.OracleComp.EvalDist
 import VCVio.EvalDist.Bool
 import VCVio.EvalDist.Prod
 import VCVio.EvalDist.Fintype
+import ToMathlib.Data.FinEnum
 import Init.Data.UInt.Lemmas
 import Mathlib.Data.FinEnum
 import Mathlib.Data.Fintype.Perm
@@ -276,10 +277,9 @@ instance (α : Type) [Unique α] : SampleableType α where
   mem_support_selectElem x := Unique.eq_default x ▸ (by simp)
   probOutput_selectElem_eq x y := by rw [Unique.eq_default x, Unique.eq_default y]
 
-instance : SampleableType Bool where
-  selectElem := $! #v[true, false]
-  mem_support_selectElem x := by simp
-  probOutput_selectElem_eq x y := by simp
+-- `SampleableType Bool` is derived from `FinEnum Bool` (see `ToMathlib.Data.FinEnum`) via
+-- `FinEnum.SampleableType`, keeping `FinEnum` as the canonical uniform-sampling pathway rather
+-- than carrying a bespoke `Bool` sampler.
 
 /-- A sum of oracle specs with sampleable ranges again has sampleable ranges. -/
 instance {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
@@ -420,40 +420,52 @@ inhabited by `∅`, so no `Nonempty` hypothesis is needed. -/
 instance instSampleableTypeFinset {α : Type} [FinEnum α] : SampleableType (Finset α) :=
   inferInstance
 
-/-- Uniform sampling of size-`n` multisets over `α`. `Sym α n` is the correct finite analogue
-of `Multiset α`: a plain `Multiset α` is unbounded in multiplicity and thus not `Fintype`,
-while `Sym α n` is a `Fintype` whenever `α` is. The `Mathlib` instance lives in
-`Mathlib.Data.Fintype.Vector`; we lift it through `SampleableType.ofFintype`. -/
-noncomputable instance instSampleableTypeSym {α : Type} {n : ℕ}
-    [Fintype α] [DecidableEq α] [Nonempty α] : SampleableType (Sym α n) :=
-  haveI : Nonempty (Sym α n) := ⟨.replicate n (Classical.arbitrary α)⟩
-  SampleableType.ofFintype _
+/-- Uniform sampling of size-`n` multisets over a `FinEnum` type. `Sym α n` is the correct finite
+analogue of `Multiset α`: a plain `Multiset α` is unbounded in multiplicity and thus not finite,
+while `Sym α n` is finite whenever `α` is. We obtain a *computable* uniform sampler from the
+canonical enumeration `Sym.finEnum`; for a base type with only a `Fintype` instance use
+`SampleableType.ofFintype` instead.
 
-/-- Uniform sampling of permutations of a finite type. `Equiv.Perm α` has `n!` elements when
-`Fintype.card α = n`. Mathlib provides `Fintype (Equiv.Perm α)` via
-`Mathlib.Data.Fintype.Perm`; we lift through `SampleableType.ofFintype`. Useful for
-shuffle-based protocols and oblivious-permutation games. -/
-noncomputable instance instSampleableTypePerm {α : Type} [Fintype α] [DecidableEq α] :
+Note this is genuinely uniform on multisets: mapping a uniform `List.Vector α n` through
+`Sym.ofVector` is *not* (it weights each multiset by its number of orderings), so we enumerate
+`Sym α n` canonically rather than pushing forward from vectors. -/
+instance instSampleableTypeSym {α : Type} {n : ℕ} [FinEnum α] [Nonempty α] :
+    SampleableType (Sym α n) :=
+  letI : FinEnum (Sym α n) := Sym.finEnum n
+  haveI : Nonempty (Sym α n) := ⟨Sym.replicate n (Classical.arbitrary α)⟩
+  FinEnum.SampleableType _
+
+/-- Uniform sampling of permutations of a `FinEnum` type. `Equiv.Perm α` has `n!` elements when
+`Fintype.card α = n`. We obtain a *computable* uniform sampler from the canonical enumeration
+`Equiv.Perm.finEnum`. Useful for shuffle-based protocols and oblivious-permutation games. -/
+instance instSampleableTypePerm {α : Type} [FinEnum α] :
     SampleableType (Equiv.Perm α) :=
+  letI : FinEnum (Equiv.Perm α) := Equiv.Perm.finEnum
   haveI : Nonempty (Equiv.Perm α) := ⟨Equiv.refl α⟩
-  SampleableType.ofFintype _
+  FinEnum.SampleableType _
 
-/-- Uniform sampling of injections `β ↪ α` for finite types. The number of such embeddings is
+/-- Uniform sampling of injections `β ↪ α` for `FinEnum` types. The number of such embeddings is
 `α.card! / (α.card - β.card)!` when `β.card ≤ α.card`, else `0`; the `Nonempty (β ↪ α)`
-hypothesis rules out the latter case. Mathlib provides `Fintype (β ↪ α)` via
-`Mathlib.Data.Fintype.Pi`; we lift through `SampleableType.ofFintype`. -/
-noncomputable instance instSampleableTypeEmbedding {β α : Type}
-    [Fintype β] [Fintype α] [DecidableEq β] [DecidableEq α] [Nonempty (β ↪ α)] :
+hypothesis rules out the latter case. We obtain a *computable* uniform sampler from the canonical
+enumeration `Function.Embedding.finEnum` (itself computable, unlike Mathlib's `Fintype (β ↪ α)`). -/
+instance instSampleableTypeEmbedding {β α : Type}
+    [FinEnum β] [FinEnum α] [Nonempty (β ↪ α)] :
     SampleableType (β ↪ α) :=
-  SampleableType.ofFintype _
+  letI : FinEnum (β ↪ α) := Function.Embedding.finEnum
+  FinEnum.SampleableType _
 
-/-- A function from a finite type `D` with decidable equality to a `SampleableType` is itself
-`SampleableType`: transport the `Fin (Fintype.card D) → α` instance across the canonical
-equivalence `(D → α) ≃ (Fin (Fintype.card D) → α)`. This is the general Pi instance over an
-arbitrary finite domain presented by `Fintype` + `DecidableEq`, complementing the `FinEnum`-domain
-instance `instSampleableTypeFunc`. -/
-noncomputable instance instSampleableTypePiFintype {D : Type} [Fintype D] [DecidableEq D]
-    {α : Type} [SampleableType α] : SampleableType (D → α) :=
+/-- A function from a finite type `D` with `Fintype` + `DecidableEq` (not necessarily `FinEnum`)
+to a `SampleableType` is itself `SampleableType`, transporting the `Fin (Fintype.card D) → α`
+sampler across the canonical equivalence `(D → α) ≃ (Fin (Fintype.card D) → α)`.
+
+This is the *noncomputable* counterpart to the computable `FinEnum`-domain instance
+`instSampleableTypeFunc`, and is given **lower priority** so that for a `FinEnum` domain the
+computable instance is preferred; it is the fallback for `Fintype` + `DecidableEq`-only domains. -/
+noncomputable instance (priority := 100) instSampleableTypePiFintype {D : Type}
+    [Fintype D] [DecidableEq D] {α : Type} [SampleableType α] : SampleableType (D → α) :=
+  -- Provide the `Fin (card D) → α` sampler explicitly: synthesizing it could loop, since for the
+  -- abstract `Fintype.card D` the overlapping `instSampleableTypeFunc` descends without converging.
+  letI : SampleableType (Fin (Fintype.card D) → α) := instSampleableTypeFinFunc
   SampleableType.ofEquiv
     (α := Fin (Fintype.card D) → α)
     (Equiv.arrowCongr (Fintype.equivFin D).symm (Equiv.refl α))
@@ -632,7 +644,7 @@ patched first and the head point `d` is then overwritten with a fresh uniform dr
 
 This is the iterated form of `Function.update` used by `evalDist_uniformSample_patchList`: the
 outermost update is at the head, so the list is consumed head-first. -/
-noncomputable def patchTable {D R : Type} [DecidableEq D] [SampleableType R] :
+def patchTable {D R : Type} [DecidableEq D] [SampleableType R] :
     List D → (D → R) → ProbComp (D → R)
   | [], g => pure g
   | d :: ds, g => do
