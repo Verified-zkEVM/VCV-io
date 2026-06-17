@@ -314,6 +314,52 @@ lemma isQueryBoundP_cast_pred {ι : Type} {spec : OracleSpec ι} {α : Type}
   subst hp
   convert h using 2
 
+/-- Arithmetic kernel of the Sign → Prog charge: the discrete first moment of a truncated
+geometric series is dominated by the square of its zeroth moment, `∑_{a<m} a·pᵃ ≤
+(∑_{a<m} pᵃ)²`. The right-hand convolution `(∑ pᵃ)² = ∑_{i,j} p^{i+j}` collects, for each
+`k`, the `k+1` ordered pairs summing to `k`; injecting `(i, j) ↦ (i-j-1, j+1)` exhibits the
+left sum as a subset of those nonnegative contributions. -/
+lemma sum_natCast_mul_pow_le_sq_sum_pow (p : ℝ) (hp0 : 0 ≤ p) (m : ℕ) :
+    ∑ a ∈ Finset.range m, (a : ℝ) * p ^ a ≤ (∑ a ∈ Finset.range m, p ^ a) ^ 2 := by
+  rw [sq, Finset.sum_mul_sum, ← Finset.sum_product']
+  set P := Finset.range m ×ˢ Finset.range m with hP
+  set Q := (Finset.range m).sigma (fun i => Finset.range i) with hQ
+  have hLHS : ∑ a ∈ Finset.range m, (a : ℝ) * p ^ a = ∑ q ∈ Q, p ^ q.1 := by
+    rw [hQ, Finset.sum_sigma]
+    refine Finset.sum_congr rfl fun i hi => ?_
+    simp only
+    rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+  rw [hLHS, show (∑ a ∈ P, p ^ a.1 * p ^ a.2) = ∑ a ∈ P, p ^ (a.1 + a.2) from
+    Finset.sum_congr rfl fun a _ => by rw [pow_add]]
+  have himg : ∑ q ∈ Q, p ^ q.1
+      = ∑ r ∈ Q.image (fun q => (q.1 - (q.2 + 1), q.2 + 1)), p ^ (r.1 + r.2) := by
+    rw [Finset.sum_image]
+    · refine Finset.sum_congr rfl fun q hq => ?_
+      rw [hQ, Finset.mem_sigma, Finset.mem_range, Finset.mem_range] at hq
+      congr 1
+      omega
+    · intro a ha b hb hab
+      rw [Finset.mem_coe, hQ, Finset.mem_sigma, Finset.mem_range, Finset.mem_range] at ha hb
+      simp only [Prod.mk.injEq] at hab
+      obtain ⟨h1, h2⟩ := hab
+      obtain ⟨a1, a2⟩ := a
+      obtain ⟨b1, b2⟩ := b
+      simp only at *
+      have hsnd : a2 = b2 := by omega
+      subst hsnd
+      have hfst : a1 = b1 := by omega
+      subst hfst
+      rfl
+  rw [himg]
+  refine Finset.sum_le_sum_of_subset_of_nonneg ?_ (fun r _ _ => by positivity)
+  intro r hr
+  rw [Finset.mem_image] at hr
+  obtain ⟨q, hq, rfl⟩ := hr
+  rw [hQ, Finset.mem_sigma, Finset.mem_range, Finset.mem_range] at hq
+  rw [hP, Finset.mem_product, Finset.mem_range, Finset.mem_range]
+  omega
+
+omit [SampleableType Stmt] in
 /-- Hop G₀ → G₁ (Sign → Prog) at a fixed key: replacing the caching hash of each signing
 attempt by overwrite-reprogramming with a fresh challenge costs at most
 
@@ -370,7 +416,36 @@ lemma probOutput_hybridExpAtKey_real_le_prog
   have h_step_tv_charged : ∀ (t : _), (· matches .inr _) t → ∀ (s : σ),
       ENNReal.ofReal (tvDist ((flagLift implProg t).run (s, false))
           ((flagLift implReal t).run (s, false))) ≤ querySlack s := by
-    sorry
+    rintro (t' | msg) hc s
+    · exact absurd hc (by simp)
+    rcases s with ⟨c, l⟩
+    -- Both flag-lifted signing runs are a single (shared, injective) map over the
+    -- corresponding cache-level signing body; the map drops out of the TV distance,
+    -- and the body-level TV is the proven `signCollisionBound`.
+    have hrunProg : (flagLift implProg (Sum.inr msg)).run ((c, l), false) =
+        (fun x : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+          (x.1, ((x.2, msg :: l), false))) <$>
+            (progSignBody ids M pk sk msg maxAttempts).run c := by
+      rw [flagLift_run, himplProg, QueryImpl.add_apply_inr]
+      change (fun us => (us.1, us.2, false)) <$>
+          ((fun ac : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+            (ac.1, (ac.2, msg :: l))) <$> (progSignBody ids M pk sk msg maxAttempts).run c) = _
+      rw [Functor.map_map]
+    have hrunReal : (flagLift implReal (Sum.inr msg)).run ((c, l), false) =
+        (fun x : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+          (x.1, ((x.2, msg :: l), false))) <$>
+            (realSignBody ids M maxAttempts pk sk msg).run c := by
+      rw [flagLift_run, himplReal, QueryImpl.add_apply_inr]
+      change (fun us => (us.1, us.2, false)) <$>
+          ((fun ac : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+            (ac.1, (ac.2, msg :: l))) <$> (realSignBody ids M maxAttempts pk sk msg).run c) = _
+      rw [Functor.map_map]
+    rw [hrunProg, hrunReal]
+    refine le_trans (ENNReal.ofReal_le_ofReal
+      (le_trans (tvDist_map_le _ _ _) (le_of_eq (tvDist_comm _ _)))) ?_
+    refine le_trans (ofReal_tvDist_run_fsAbortSignLoop_progSignBody_le
+      ids M pk sk msg hGuess hAbort maxAttempts c) ?_
+    rw [signCollisionBound_eq, hquerySlack, hζ, hβ, hR]
   -- Uncharged (base) queries: the two handlers coincide.
   have h_step_eq_uncharged : ∀ (t : _), ¬ (· matches .inr _) t → ∀ (p : σ × Bool),
       (flagLift implProg t).run p = (flagLift implReal t).run p := by
@@ -392,12 +467,26 @@ lemma probOutput_hybridExpAtKey_real_le_prog
     · exact absurd hc (by simp)
     rcases p with ⟨⟨c, l⟩, b⟩
     -- Reduce the flag-lifted signing run to the `progSignBody` cache-growth tsum.
-    -- BLOCKED: the combined-spec `Range (Sum.inr msg)` index of the tsum is only
-    -- defeq (not syntactically equal) to `Option (Commit × Resp)`, so the
-    -- `tsum_probOutput_bind_mul`/`hybridSignImpl_run` rewrites do not fire; needs a
-    -- `Range`-index `Eq.mpr`/`change` bridge to apply
-    -- `tsum_probOutput_run_progSignBody_mul_enncard_le` (PROVEN, GhostBodies.lean).
-    sorry
+    -- The combined-spec `Range (Sum.inr msg)` index of the tsum is only defeq (not
+    -- syntactically equal) to `Option (Commit × Resp)`, so we `change` into the
+    -- explicit type and rewrite the run as a single map over `progSignBody`.
+    have hrun : (flagLift implProg (Sum.inr msg)).run ((c, l), b) =
+        (fun x : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+          (x.1, ((x.2, msg :: l), b))) <$>
+            (progSignBody ids M pk sk msg maxAttempts).run c := by
+      rw [flagLift_run, himplProg, QueryImpl.add_apply_inr]
+      change (fun us => (us.1, us.2, b)) <$>
+          ((fun ac : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+            (ac.1, (ac.2, msg :: l))) <$> (progSignBody ids M pk sk msg maxAttempts).run c) = _
+      rw [Functor.map_map]
+    rw [hrun]
+    change (∑' z : Option (Commit × Resp) × σ × Bool,
+      Pr[= z | (fun x : Option (Commit × Resp) × (M × Commit →ₒ Chal).QueryCache =>
+        (x.1, ((x.2, msg :: l), b))) <$>
+          (progSignBody ids M pk sk msg maxAttempts).run c] * R z.2.1) ≤ _
+    rw [map_eq_bind_pure_comp, tsum_probOutput_bind_mul]
+    simp only [Function.comp, tsum_probOutput_pure_mul]
+    exact tsum_probOutput_run_progSignBody_mul_enncard_le ids M pk sk msg hAbort maxAttempts c
   have h_growth : ∀ (t : _) (p : σ × Bool), p.2 = false →
       ¬ (· matches .inr _) t → (· matches .inl (.inr _)) t →
       ∀ z ∈ support ((flagLift implProg t).run p), R z.2.1 ≤ R p.1 + 1 := by
@@ -483,14 +572,177 @@ lemma probOutput_hybridExpAtKey_real_le_prog
       h_charged h_growth h_free (adv.main pk) (qS := qS) (qH := qH) ?_ ?_ ((∅, []) : σ)
     · exact isQueryBoundP_cast_pred (by funext x; rcases x with (_ | _) | _ <;> rfl) (hQ pk).1
     · exact isQueryBoundP_cast_pred (by funext x; rcases x with (_ | _) | _ <;> rfl) (hQ pk).2
-  -- Final assembly: combine `h_bridge` (with `h_bad_zero` ⇒ the `Pr[bad]` term is `0`) and
-  -- `h_slack_le` to bound `tvDist(run prog)(run real)` by `qS·ζ + (qS·qH + C(qS,2)·g)·β`
-  -- (using `R ∅ = 0`); lift to the games through the shared `hybridVerifyCont`
-  -- (`hybridExpAtKey_eq_run_bind` + `tvDist_bind_right_le`, in the style of the proven
-  -- `prog_le_trans`/`trans_le_sim` tails); then close the `ℝ≥0∞` arithmetic against the target
-  -- `qS·ε·(qS+1)/(2(1-p)²) + qS·(qH+1)·ε/(1-p)` via the verified bounds
-  -- `∑_{a<m} a·p^a ≤ 1/(1-p)²`, `(∑_{a<m} p^a)² ≤ 1/(1-p)²`, and `qS + C(qS,2) = qS(qS+1)/2`.
-  sorry
+  -- The flag-lifted run TV is bounded by the accumulated slack (the bad term vanishes).
+  set slack : ℝ≥0∞ := (qS : ℝ≥0∞) * ζ +
+      ((qS : ℝ≥0∞) * R ((∅, []) : σ) + (qS : ℝ≥0∞) * (qH : ℝ≥0∞)
+        + (qS.choose 2 : ℝ≥0∞) * g) * β with hslack
+  have h_flag_tv : ENNReal.ofReal (tvDist
+      ((simulateQ (flagLift implProg) (adv.main pk)).run ((∅, []), false))
+      ((simulateQ (flagLift implReal) (adv.main pk)).run ((∅, []), false))) ≤ slack := by
+    refine le_trans h_bridge ?_
+    rw [h_bad_zero, add_zero]
+    exact h_slack_le
+  -- Project the flag away: the flag-lifted runs map onto the (unflagged) hybrid runs.
+  have hprojP : ∀ (t : _) (sb : σ × Bool),
+      Prod.map id (Prod.fst : σ × Bool → σ) <$> (flagLift implProg t).run sb =
+        (implProg t).run sb.1 := by
+    intro t sb
+    rw [flagLift_run, Functor.map_map]
+    simp only [Prod.map, id_eq, Prod.mk.eta, id_map']
+  have hprojR : ∀ (t : _) (sb : σ × Bool),
+      Prod.map id (Prod.fst : σ × Bool → σ) <$> (flagLift implReal t).run sb =
+        (implReal t).run sb.1 := by
+    intro t sb
+    rw [flagLift_run, Functor.map_map]
+    simp only [Prod.map, id_eq, Prod.mk.eta, id_map']
+  have hrunProj_P : (simulateQ implProg (adv.main pk)).run (∅, []) =
+      Prod.map id (Prod.fst : σ × Bool → σ) <$>
+        (simulateQ (flagLift implProg) (adv.main pk)).run ((∅, []), false) :=
+    (OracleComp.map_run_simulateQ_eq_of_query_map_eq (flagLift implProg) implProg
+      (Prod.fst : σ × Bool → σ) hprojP (adv.main pk) ((∅, []), false)).symm
+  have hrunProj_R : (simulateQ implReal (adv.main pk)).run (∅, []) =
+      Prod.map id (Prod.fst : σ × Bool → σ) <$>
+        (simulateQ (flagLift implReal) (adv.main pk)).run ((∅, []), false) :=
+    (OracleComp.map_run_simulateQ_eq_of_query_map_eq (flagLift implReal) implReal
+      (Prod.fst : σ × Bool → σ) hprojR (adv.main pk) ((∅, []), false)).symm
+  -- Hence the unflagged run TV is also bounded by the slack.
+  have h_run_tv : ENNReal.ofReal (tvDist
+      ((simulateQ implProg (adv.main pk)).run (∅, []))
+      ((simulateQ implReal (adv.main pk)).run (∅, []))) ≤ slack := by
+    rw [hrunProj_P, hrunProj_R]
+    exact le_trans (ENNReal.ofReal_le_ofReal (tvDist_map_le _ _ _)) h_flag_tv
+  -- Lift the run-level bound to the games through the shared verification continuation.
+  have h_games_tv : ENNReal.ofReal (tvDist
+      (hybridExpAtKey ids hr M maxAttempts adv (realSignBody ids M maxAttempts pk sk) pk)
+      (hybridExpAtKey ids hr M maxAttempts adv
+        (progSignBody ids M pk sk · maxAttempts) pk)) ≤ slack := by
+    rw [hybridExpAtKey_eq_run_bind, hybridExpAtKey_eq_run_bind, tvDist_comm]
+    refine le_trans (ENNReal.ofReal_le_ofReal (tvDist_bind_right_le _ _ _)) ?_
+    rw [← himplProg, ← himplReal]
+    exact h_run_tv
+  -- Convert the game-level TV bound into the probability-output inequality.
+  have h_prob : Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+        (realSignBody ids M maxAttempts pk sk) pk] ≤
+      Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (progSignBody ids M pk sk · maxAttempts) pk] + slack := by
+    have habs := abs_probOutput_toReal_sub_le_tvDist
+      (hybridExpAtKey ids hr M maxAttempts adv (realSignBody ids M maxAttempts pk sk) pk)
+      (hybridExpAtKey ids hr M maxAttempts adv (progSignBody ids M pk sk · maxAttempts) pk)
+    have h2 := (abs_le.mp habs).2
+    calc Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (realSignBody ids M maxAttempts pk sk) pk]
+        = ENNReal.ofReal (Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (realSignBody ids M maxAttempts pk sk) pk].toReal) :=
+          (ENNReal.ofReal_toReal probOutput_ne_top).symm
+      _ ≤ ENNReal.ofReal (Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (progSignBody ids M pk sk · maxAttempts) pk].toReal +
+          tvDist (hybridExpAtKey ids hr M maxAttempts adv
+              (realSignBody ids M maxAttempts pk sk) pk)
+            (hybridExpAtKey ids hr M maxAttempts adv
+              (progSignBody ids M pk sk · maxAttempts) pk)) := by
+            refine ENNReal.ofReal_le_ofReal ?_; linarith [h2]
+      _ = Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (progSignBody ids M pk sk · maxAttempts) pk] +
+          ENNReal.ofReal (tvDist _ _) := by
+            rw [ENNReal.ofReal_add ENNReal.toReal_nonneg (tvDist_nonneg _ _),
+              ENNReal.ofReal_toReal probOutput_ne_top]
+      _ ≤ Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (progSignBody ids M pk sk · maxAttempts) pk] + slack :=
+          add_le_add le_rfl h_games_tv
+  -- Close: `slack ≤ ofReal(target)` via the `ℝ≥0∞` arithmetic.
+  refine le_trans h_prob (add_le_add le_rfl ?_)
+  rw [hslack]
+  -- The starting cache is empty, so the resource base `R ∅` vanishes.
+  have hR0 : R ((∅, []) : σ) = 0 := by rw [hR]; exact QueryCache.enncard_empty
+  rw [hR0]
+  rcases lt_or_ge ε 0 with hε | hε
+  · -- `ε < 0`: the `ofReal ε` factors collapse `ζ` and `β` to `0`.
+    have h0 : ENNReal.ofReal ε = 0 := ENNReal.ofReal_eq_zero.mpr hε.le
+    have hζ0 : ζ = 0 := by rw [hζ, h0, zero_mul]
+    have hβ0 : β = 0 := by rw [hβ, h0, zero_mul]
+    rw [hζ0, hβ0, mul_zero, mul_zero, zero_add]
+    exact bot_le
+  · -- Main case: convert the `ℝ≥0∞` slack into `ofReal` of a real expression.
+    set S : ℝ := ∑ a ∈ Finset.range maxAttempts, p_abort ^ a with hSdef
+    set Tm : ℝ := ∑ a ∈ Finset.range maxAttempts, (a : ℝ) * p_abort ^ a with hTdef
+    have hSnn : 0 ≤ S := Finset.sum_nonneg fun a _ => pow_nonneg hp₀ a
+    have hTnn : 0 ≤ Tm :=
+      Finset.sum_nonneg fun a _ => mul_nonneg (Nat.cast_nonneg a) (pow_nonneg hp₀ a)
+    have hg_eq : g = ENNReal.ofReal S := by
+      rw [hg, hSdef, ENNReal.ofReal_sum_of_nonneg (fun a _ => pow_nonneg hp₀ a)]
+      exact Finset.sum_congr rfl fun a _ => by rw [← ENNReal.ofReal_pow hp₀]
+    have hTsum : (∑ a ∈ Finset.range maxAttempts, (a : ℝ≥0∞) * ENNReal.ofReal p_abort ^ a)
+        = ENNReal.ofReal Tm := by
+      rw [hTdef, ENNReal.ofReal_sum_of_nonneg
+        (fun a _ => mul_nonneg (Nat.cast_nonneg a) (pow_nonneg hp₀ a))]
+      exact Finset.sum_congr rfl fun a _ => by
+        rw [ENNReal.ofReal_mul (Nat.cast_nonneg a), ← ENNReal.ofReal_pow hp₀,
+          ENNReal.ofReal_natCast]
+    have hζ_eq : ζ = ENNReal.ofReal (ε * Tm) := by
+      rw [hζ, hTsum, ← ENNReal.ofReal_mul hε]
+    have hβ_eq : β = ENNReal.ofReal (ε * S) := by
+      rw [hβ, hg_eq, ← ENNReal.ofReal_mul hε]
+    -- The convolution bound `∑ a·pᵃ ≤ (∑ pᵃ)²` and the geometric bound `∑ pᵃ ≤ 1/(1-p)`.
+    have hTS : Tm ≤ S ^ 2 := by
+      rw [hTdef, hSdef]; exact sum_natCast_mul_pow_le_sq_sum_pow p_abort hp₀ maxAttempts
+    have hSgeo : S ≤ 1 / (1 - p_abort) := by
+      rw [hSdef, le_div_iff₀ h1p]
+      have hmul := geom_sum_mul p_abort maxAttempts
+      nlinarith [pow_nonneg hp₀ maxAttempts]
+    rw [hζ_eq, hβ_eq, hg_eq, mul_zero, zero_add,
+      show (qS : ℝ≥0∞) = ENNReal.ofReal qS from (ENNReal.ofReal_natCast qS).symm,
+      show (qH : ℝ≥0∞) = ENNReal.ofReal qH from (ENNReal.ofReal_natCast qH).symm,
+      show (qS.choose 2 : ℝ≥0∞) = ENNReal.ofReal (qS.choose 2) from
+        (ENNReal.ofReal_natCast _).symm]
+    rw [← ENNReal.ofReal_mul (by positivity),
+      ← ENNReal.ofReal_mul (by positivity),
+      ← ENNReal.ofReal_mul (by positivity),
+      ← ENNReal.ofReal_add (by positivity) (by positivity),
+      ← ENNReal.ofReal_mul (by positivity),
+      ← ENNReal.ofReal_add (by positivity) (by positivity)]
+    refine ENNReal.ofReal_le_ofReal ?_
+    -- Pure real inequality.
+    have hchoose : (qS.choose 2 : ℝ) = qS * (qS - 1) / 2 := Nat.cast_choose_two ℝ qS
+    have hqS : (0 : ℝ) ≤ qS := Nat.cast_nonneg qS
+    have hqH : (0 : ℝ) ≤ qH := Nat.cast_nonneg qH
+    have hS2 : S ^ 2 ≤ 1 / (1 - p_abort) ^ 2 := by
+      have hsq : S ^ 2 ≤ (1 / (1 - p_abort)) ^ 2 := by gcongr
+      rwa [div_pow, one_pow] at hsq
+    have hTle : Tm ≤ 1 / (1 - p_abort) ^ 2 := le_trans hTS hS2
+    have ht1 : ↑qS * (ε * Tm) ≤ qS * ε / (1 - p_abort) ^ 2 := by
+      rw [show (qS : ℝ) * (ε * Tm) = (qS * ε) * Tm by ring,
+        show (qS : ℝ) * ε / (1 - p_abort) ^ 2 = (qS * ε) * (1 / (1 - p_abort) ^ 2) by ring]
+      exact mul_le_mul_of_nonneg_left hTle (by positivity)
+    have ht2 : ↑qS * ↑qH * (ε * S) ≤ qS * qH * ε / (1 - p_abort) := by
+      rw [show (qS : ℝ) * qH * (ε * S) = (qS * qH * ε) * S by ring,
+        show (qS : ℝ) * qH * ε / (1 - p_abort) = (qS * qH * ε) * (1 / (1 - p_abort)) by ring]
+      exact mul_le_mul_of_nonneg_left hSgeo (by positivity)
+    have ht3 : (qS.choose 2 : ℝ) * (ε * S ^ 2) ≤ (qS.choose 2 : ℝ) * ε / (1 - p_abort) ^ 2 := by
+      rw [show (qS.choose 2 : ℝ) * (ε * S ^ 2) = ((qS.choose 2 : ℝ) * ε) * S ^ 2 by ring,
+        show (qS.choose 2 : ℝ) * ε / (1 - p_abort) ^ 2
+          = ((qS.choose 2 : ℝ) * ε) * (1 / (1 - p_abort) ^ 2) by ring]
+      exact mul_le_mul_of_nonneg_left hS2 (by positivity)
+    have hcomb : ↑qS * (ε * Tm) + (↑qS * ↑qH + ↑(qS.choose 2) * S) * (ε * S)
+        ≤ qS * ε / (1 - p_abort) ^ 2 + qS * qH * ε / (1 - p_abort)
+          + (qS.choose 2 : ℝ) * ε / (1 - p_abort) ^ 2 := by
+      rw [show (↑qS * ↑qH + ↑(qS.choose 2) * S) * (ε * S)
+          = ↑qS * ↑qH * (ε * S) + (qS.choose 2 : ℝ) * (ε * S ^ 2) by ring]
+      linarith [ht1, ht2, ht3]
+    refine le_trans hcomb ?_
+    rw [hchoose]
+    have hne : (1 - p_abort) ^ 2 ≠ 0 := by positivity
+    have hkey : (qS : ℝ) * ε / (1 - p_abort) ^ 2 + (qS * (qS - 1) / 2) * ε / (1 - p_abort) ^ 2
+        = ↑qS * ε * (↑qS + 1) / (2 * (1 - p_abort) ^ 2) := by
+      field_simp
+      ring
+    rw [show (qS : ℝ) * ε / (1 - p_abort) ^ 2 + qS * qH * ε / (1 - p_abort)
+        + (qS * (qS - 1) / 2) * ε / (1 - p_abort) ^ 2
+        = ((qS : ℝ) * ε / (1 - p_abort) ^ 2 + (qS * (qS - 1) / 2) * ε / (1 - p_abort) ^ 2)
+          + qS * qH * ε / (1 - p_abort) by ring, hkey]
+    have hextra : (qS : ℝ) * qH * ε / (1 - p_abort) ≤ qS * (qH + 1) * ε / (1 - p_abort) := by
+      gcongr (?_ / (1 - p_abort))
+      nlinarith [mul_nonneg hqS hε, hqS, hqH, hε]
+    linarith [hextra]
 
 omit [SampleableType Stmt] in
 /-- Hop G₁ → G₂ (Prog → Trans) at a fixed key: dropping the reprogramming of rejected
