@@ -238,7 +238,7 @@ Returns `true` (the "bad event") when verification succeeds but the extracted
 output is either `none` or an invalid witness.
 
 The `prover` argument is the raw function rather than `KnowledgeSoundnessAdv`
-to keep type inference tractable with `sorry` bodies. -/
+to keep type inference tractable. -/
 noncomputable def knowledgeSoundnessExp
     (prover : Stmt → M →
       OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)

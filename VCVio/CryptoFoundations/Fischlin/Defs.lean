@@ -23,15 +23,42 @@ import Mathlib.Algebra.Order.Antidiag.Pi
 /-!
 # Fischlin Transform: Core Definitions
 
-Core definitions for the Fischlin transform: the random-oracle input type
-`FischlinROInput`, the oracle signature `fischlinROSpec`, the proof type
-`FischlinProof`, the prover's inner search `fischlinSearchAux`, the transform
-`Fischlin` itself, and the bundled random-oracle `runtime` used to denote the
-signature scheme as a probabilistic computation.
+This file defines the Fischlin transform (CRYPTO 2005), which converts a Σ-protocol
+into a signature scheme (non-interactive proof of knowledge) in the random oracle model
+with *online (straight-line) extraction*.
 
-See `VCVio.CryptoFoundations.Fischlin` for the umbrella module and the overview
-docstring; cost accounting, completeness, and knowledge soundness live in the
-sibling files under `Fischlin/`.
+Unlike the Fiat-Shamir transform, which requires a rewinding extractor (via the forking lemma),
+the Fischlin transform enables extraction by simply observing the prover's hash queries.
+This comes at the cost of a more complex prover that performs a "proof-of-work" search
+over the challenge space, and a slight completeness error.
+
+This module holds the core definitions: the random-oracle input type `FischlinROInput`, the
+oracle signature `fischlinROSpec`, the proof type `FischlinProof`, the prover's inner search
+`fischlinSearchAux`, the transform `Fischlin` itself, and the bundled random-oracle `runtime`
+used to denote the signature scheme as a probabilistic computation.
+
+## Parameters
+
+* `ρ` — number of parallel repetitions
+* `b` — hash output bit-length (random oracle range is `Fin (2^b)`)
+* `S` — maximum allowed sum of hash values in a valid proof (paper notation)
+
+## Module layout
+
+The development is split across the sibling modules under `Fischlin/`:
+
+* `Fischlin.Defs` — the definitions in this file.
+* `Fischlin.CostAccounting` — random-oracle query-cost and expected-query bounds for
+  `sign` and `verify`.
+* `Fischlin.Completeness` — the completeness bound `almostComplete` via the pure-probability
+  model game.
+* `Fischlin.KnowledgeSoundness` — online extraction and the `knowledgeSoundness` bound via a
+  supermartingale potential argument.
+
+## References
+
+* Marc Fischlin, "Communication-Efficient Non-Interactive Proofs of Knowledge
+  with Online Extractors", CRYPTO 2005.
 -/
 
 universe u v
