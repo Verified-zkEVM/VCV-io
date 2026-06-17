@@ -1256,13 +1256,135 @@ theorem euf_cma_to_nma
       Pr[= true | SignatureAlg.managedRoNmaExp (runtime M)
         (simulatedNmaAdv ids hr M maxAttempts sim adv)] +
       ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
-  -- Chain: advantage = Pr[G₀] (per-key bridge), then average the per-key chain
-  -- G₀ ≤ G₃ + perKeyLoss over `hr.gen`, paying `δ` for keys outside `Good`
-  -- (the keys where `gen_sound` holds but the pointwise bounds may fail),
-  -- then apply the NMA bridge. The averaging step uses `probOutput_bind_eq_tsum`
-  -- and splits the key sum on `Good`, in the style of
-  -- `SignatureAlg.probOutput_bind_ge_of_forall_support`.
-  sorry
+  classical
+  -- `advantage = Pr[G₀]` via the per-key bridge `G₀`.
+  rw [SignatureAlg.unforgeableAdv.advantage,
+    probOutput_unforgeableExp_eq_hybridExpAtKey_real ids hr M maxAttempts adv]
+  -- Nonnegativity of the three per-hop slack pieces.
+  have h1p : (0 : ℝ) < 1 - p_abort := by linarith
+  have hA : 0 ≤ qS * ε * (qS + 1) / (2 * (1 - p_abort) ^ 2) + qS * (qH + 1) * ε / (1 - p_abort) :=
+    add_nonneg
+      (div_nonneg (by positivity) (by positivity))
+      (div_nonneg (by positivity) (le_of_lt h1p))
+  have hB : 0 ≤ qS * (qH + 1) * ε / (1 - p_abort) := div_nonneg (by positivity) (le_of_lt h1p)
+  have hC : 0 ≤ qS * ζ_zk / (1 - p_abort) := div_nonneg (by positivity) (le_of_lt h1p)
+  have hPK : 0 ≤ perKeyLoss qS qH ε p_abort ζ_zk := by unfold perKeyLoss; positivity
+  -- Per-key chain on good keys: `real ≤ sim + ofReal (perKeyLoss)`.
+  have hperkey : ∀ x ∈ support hr.gen, Good x.1 x.2 →
+      Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (realSignBody ids M maxAttempts x.1 x.2) x.1] ≤
+        Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+          (simSignBody M maxAttempts sim x.1 x.2) x.1] +
+        ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) := by
+    rintro ⟨pk, sk⟩ hmem hgood
+    have hrel : rel pk sk = true := hr.gen_sound pk sk hmem
+    have step1 := probOutput_hybridExpAtKey_real_le_prog ids hr M maxAttempts adv qS qH ε p_abort
+      hp₀ hp hQ pk sk (hGuess pk sk hgood) (hAbort pk sk hgood)
+    have step2 := probOutput_hybridExpAtKey_prog_le_trans ids hr M maxAttempts adv qS qH ε p_abort
+      hp hQ pk sk (hGuess pk sk hgood) (hAbort pk sk hgood)
+    have step3 := probOutput_hybridExpAtKey_trans_le_sim ids hr M maxAttempts sim adv ζ_zk hζ hhvzk
+      qS qH p_abort hp₀ hp hQ pk sk hrel (hAbortSim pk sk hgood)
+    -- Chain the three hops and collapse the `ofReal` sums (slack pieces nonneg).
+    calc Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (realSignBody ids M maxAttempts pk sk) pk]
+        ≤ Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+              (fun x ↦ progSignBody ids M pk sk x maxAttempts) pk] +
+            ENNReal.ofReal (qS * ε * (qS + 1) / (2 * (1 - p_abort) ^ 2) +
+              qS * (qH + 1) * ε / (1 - p_abort)) := step1
+      _ ≤ (Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+              (transSignBody ids M maxAttempts pk sk) pk] +
+            ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort))) +
+            ENNReal.ofReal (qS * ε * (qS + 1) / (2 * (1 - p_abort) ^ 2) +
+              qS * (qH + 1) * ε / (1 - p_abort)) := by gcongr
+      _ ≤ ((Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+              (simSignBody M maxAttempts sim pk sk) pk] +
+            ENNReal.ofReal (qS * ζ_zk / (1 - p_abort))) +
+            ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort))) +
+            ENNReal.ofReal (qS * ε * (qS + 1) / (2 * (1 - p_abort) ^ 2) +
+              qS * (qH + 1) * ε / (1 - p_abort)) := by gcongr
+      _ = Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+              (simSignBody M maxAttempts sim pk sk) pk] +
+            ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) := by
+          have hcollapse :
+              ENNReal.ofReal (qS * ζ_zk / (1 - p_abort)) +
+                ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) +
+                ENNReal.ofReal (qS * ε * (qS + 1) / (2 * (1 - p_abort) ^ 2) +
+                  qS * (qH + 1) * ε / (1 - p_abort)) =
+                ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) := by
+            rw [← ENNReal.ofReal_add hC hB, ← ENNReal.ofReal_add (add_nonneg hC hB) hA]
+            congr 1
+            unfold perKeyLoss
+            ring
+          rw [add_assoc, add_assoc, ← add_assoc (ENNReal.ofReal (qS * ζ_zk / (1 - p_abort))),
+            hcollapse]
+  -- Average the per-key bound over `hr.gen`, paying `δ` on the complement of `Good`.
+  have hbound : Pr[= true | do
+        let x ← hr.gen
+        hybridExpAtKey ids hr M maxAttempts adv (realSignBody ids M maxAttempts x.1 x.2) x.1] ≤
+      Pr[= true | do
+        let x ← hr.gen
+        hybridExpAtKey ids hr M maxAttempts adv (simSignBody M maxAttempts sim x.1 x.2) x.1] +
+        ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) + ENNReal.ofReal δ := by
+    simp only [probOutput_bind_eq_tsum]
+    -- Pointwise: split on `Good`. On `Good` use `hperkey`; off `Good` charge the `δ` slot.
+    have hpt : ∀ x : Stmt × Wit,
+        Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (realSignBody ids M maxAttempts x.1 x.2) x.1] ≤
+          Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (simSignBody M maxAttempts sim x.1 x.2) x.1] +
+          Pr[= x | hr.gen] * ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) +
+          Pr[= x | hr.gen] * (if ¬ Good x.1 x.2 then 1 else 0) := by
+      intro x
+      by_cases hx : x ∈ support hr.gen
+      · by_cases hg : Good x.1 x.2
+        · have := mul_le_mul' (le_refl (Pr[= x | hr.gen])) (hperkey x hx hg)
+          calc Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+                  (realSignBody ids M maxAttempts x.1 x.2) x.1]
+              ≤ Pr[= x | hr.gen] *
+                  (Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+                    (simSignBody M maxAttempts sim x.1 x.2) x.1] +
+                  ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk)) := this
+            _ = Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+                  (simSignBody M maxAttempts sim x.1 x.2) x.1] +
+                Pr[= x | hr.gen] * ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) :=
+                mul_add ..
+            _ ≤ _ := by simp [hg]
+        · -- Off `Good`: real ≤ 1, charged to the indicator slot.
+          have : Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+                  (realSignBody ids M maxAttempts x.1 x.2) x.1] ≤
+              Pr[= x | hr.gen] * (if ¬ Good x.1 x.2 then 1 else 0) := by
+            simp only [hg, not_false_eq_true, if_true]
+            exact mul_le_mul' le_rfl probOutput_le_one
+          exact le_trans this le_add_self
+      · simp [probOutput_eq_zero_of_not_mem_support hx]
+    calc ∑' x, Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+            (realSignBody ids M maxAttempts x.1 x.2) x.1]
+        ≤ ∑' x, (Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+              (simSignBody M maxAttempts sim x.1 x.2) x.1] +
+            Pr[= x | hr.gen] * ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) +
+            Pr[= x | hr.gen] * (if ¬ Good x.1 x.2 then 1 else 0)) :=
+          ENNReal.tsum_le_tsum hpt
+      _ = (∑' x, Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+              (simSignBody M maxAttempts sim x.1 x.2) x.1]) +
+            (∑' x, Pr[= x | hr.gen] * ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk)) +
+            (∑' x, Pr[= x | hr.gen] * (if ¬ Good x.1 x.2 then 1 else 0)) := by
+          rw [ENNReal.tsum_add, ENNReal.tsum_add]
+      _ ≤ (∑' x, Pr[= x | hr.gen] * Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+              (simSignBody M maxAttempts sim x.1 x.2) x.1]) +
+            ENNReal.ofReal (perKeyLoss qS qH ε p_abort ζ_zk) + ENNReal.ofReal δ := by
+          gcongr
+          · rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+          · calc ∑' x, Pr[= x | hr.gen] * (if ¬ Good x.1 x.2 then 1 else 0)
+                = ∑' x, if ¬ Good x.1 x.2 then Pr[= x | hr.gen] else 0 := by
+                  refine tsum_congr fun x => ?_; by_cases hg : Good x.1 x.2 <;> simp [hg]
+              _ = Pr[fun xw : Stmt × Wit => ¬ Good xw.1 xw.2 | hr.gen] := by
+                  rw [probEvent_eq_tsum_ite]
+              _ ≤ ENNReal.ofReal δ := hGood
+  -- Final: glue with the NMA bridge and reassociate the loss.
+  refine le_trans hbound ?_
+  rw [cmaToNmaLoss_eq_perKeyLoss_add, ENNReal.ofReal_add hPK hδ, add_assoc]
+  gcongr
+  exact probOutput_hybridExp_sim_le_managedRoNmaExp ids hr M maxAttempts sim adv
 
 omit [SampleableType Stmt] [SampleableType Chal] in
 /-- Cache-invariant companion to `simulatedNmaAdv`: the reduction issues at most `qH`
