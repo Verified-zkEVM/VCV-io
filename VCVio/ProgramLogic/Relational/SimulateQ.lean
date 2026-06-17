@@ -2842,4 +2842,131 @@ theorem probOutput_simulateQ_run'_le_add_bad_add_slack
 
 end HeterogeneousBadSlack
 
+/-! ## Single-world resource-charged bad accumulator
+
+A *single-world* accumulator bounding `Pr[flag = true]` for a stateful simulation whose
+state `σ × Bool` carries a monotone resource `R : σ → ℝ≥0∞` and a never-reset bad flag.
+Unlike the identical-until-bad theorems above, which bound only the TV distance between two
+worlds and treat `Pr[output bad]` as an *additive remainder term they never bound*, this
+lemma bounds the bad-flag mass directly, by the resource-weighted query slack
+`expectedQuerySlack impl charged (fun s => R s · ε)`.
+
+The per-step hypotheses are:
+
+* `h_charged_step`: at a *charged* (read) step from a non-bad state, the bad mass after the
+  step-and-continuation is at most `R s · ε` (the flip charge) plus the expected
+  continuation bad mass;
+* `h_free_step`: at a *free* step, no flip charge is paid.
+
+Folding the resulting `expectedQuerySlack` against a resource bound (e.g. via
+`expectedQuerySlack_resource_le` / `expectedQuerySlack_expected_resource_le`) yields a
+closed-form bilinear bound. -/
+section SingleWorldResourceBad
+
+variable {ι : Type} {spec : OracleSpec ι}
+variable {ι' : Type} {spec' : OracleSpec ι'} [IsUniformSpec spec']
+variable {σ γ : Type}
+
+/-- Collapse a `tsum` over a state-bool product to its non-bad slice when the bad slice
+vanishes. Used to discard bad-output terms (whose `expectedQuerySlack` is `0`) in the
+inductive step of `probEvent_bad_simulateQ_run_le_expectedQuerySlack`. -/
+private lemma tsum_prod_right_bool_eq_of_zero {A B : Type} (f : A × B × Bool → ℝ≥0∞)
+    (h : ∀ z : A × B, f (z.1, z.2, true) = 0) :
+    (∑' z : A × B × Bool, f z) = ∑' z : A × B, f (z.1, z.2, false) := by
+  have e : (∑' z : A × B × Bool, f z)
+      = ∑' z : (A × B) × Bool, f (z.1.1, z.1.2, z.2) :=
+    ((Equiv.tsum_eq (Equiv.prodAssoc A B Bool) f).symm.trans rfl)
+  rw [e, ENNReal.tsum_prod']
+  refine tsum_congr fun z => ?_
+  rw [tsum_bool (f := fun b => f (z.1, z.2, b)), h z, add_zero]
+
+/-- **Single-world resource-charged bad accumulator.**
+
+For `simulateQ impl oa` over a state `σ × Bool` (resource `σ`, never-reset bad flag), if
+
+* every charged step pays a flip charge `R s · ε` (`h_charged_step`), routing any further
+  bad mass through its good (non-flagged) output states, while
+* every free step pays nothing and introduces no bad mass (`h_free_step`),
+
+then the probability the flag is set after the whole run from a non-bad state is bounded by
+the resource-weighted query slack
+`expectedQuerySlack impl charged (fun s => R s * ε) oa qS (s, false)`. This is the
+single-world, output-event analogue of
+`probEvent_fst_simulateQ_run_le_add_bad_add_slack`: the inductive structure (good branch
+reduced through the head bind by the per-step premise, bad output states discarded since
+their slack is `0`) is similar, but the conclusion bounds `Pr[bad]` itself rather than
+carrying it as
+an additive remainder. -/
+theorem probEvent_bad_simulateQ_run_le_expectedQuerySlack
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (charged : spec.Domain → Prop) [DecidablePred charged]
+    (R : σ → ℝ≥0∞) (ε : ℝ≥0∞)
+    (h_charged_step : ∀ (t : spec.Domain) (s : σ), charged t →
+      ∀ (k : spec.Range t × σ × Bool → OracleComp spec' (γ × σ × Bool)),
+        Pr[ fun z : γ × σ × Bool => z.2.2 = true | (impl t).run (s, false) >>= k] ≤
+          R s * ε +
+          ∑' z : spec.Range t × σ,
+            Pr[= (z.1, z.2, false) | (impl t).run (s, false)] *
+              Pr[fun w : γ × σ × Bool => w.2.2 = true | k (z.1, z.2, false)])
+    (h_free_step : ∀ (t : spec.Domain) (s : σ), ¬ charged t →
+      ∀ (k : spec.Range t × σ × Bool → OracleComp spec' (γ × σ × Bool)),
+        Pr[fun z : γ × σ × Bool => z.2.2 = true | (impl t).run (s, false) >>= k] ≤
+          ∑' z : spec.Range t × σ,
+            Pr[= (z.1, z.2, false) | (impl t).run (s, false)] *
+              Pr[fun w : γ × σ × Bool => w.2.2 = true | k (z.1, z.2, false)])
+    (oa : OracleComp spec γ) :
+    ∀ {qS : ℕ}, OracleComp.IsQueryBoundP oa charged qS →
+      ∀ (s : σ),
+        Pr[fun z : γ × σ × Bool => z.2.2 = true | (simulateQ impl oa).run (s, false)] ≤
+          expectedQuerySlack impl charged (fun s => R s * ε) oa qS (s, false) := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro qS _ s
+      simp only [simulateQ_pure, StateT.run_pure, probEvent_pure, expectedQuerySlack_pure,
+        Bool.false_eq_true, if_false, le_refl]
+  | @query_bind t cont ih =>
+      intro qS hqb s
+      rw [isQueryBoundP_query_bind_iff] at hqb
+      obtain ⟨hvalid, hcont⟩ := hqb
+      -- Rewrite the run to head-bind form.
+      have hsim : (simulateQ impl (query t >>= cont)).run (s, false) =
+          (impl t).run (s, false) >>= fun z => (simulateQ impl (cont z.1)).run z.2 := by
+        simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+          OracleQuery.cont_query, StateT.run_bind]
+      rw [hsim]
+      set k : spec.Range t × σ × Bool → OracleComp spec' (γ × σ × Bool) :=
+        fun z => (simulateQ impl (cont z.1)).run z.2 with hk
+      rw [expectedQuerySlack_query_bind]
+      by_cases hSt : charged t
+      · -- Charged step: pay `R s · ε` then forward to the IH on the good output states.
+        have hqS_pos : 0 < qS := hvalid.resolve_left (· hSt)
+        rw [expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos,
+          tsum_prod_right_bool_eq_of_zero
+            (f := fun z : spec.Range t × σ × Bool =>
+              Pr[= z | (impl t).run (s, false)] *
+                expectedQuerySlack impl charged (fun s => R s * ε) (cont z.1) (qS - 1) z.2)
+            (by rintro ⟨u, s'⟩; simp)]
+        refine (h_charged_step t s hSt k).trans
+          (add_le_add le_rfl (ENNReal.tsum_le_tsum fun z => ?_))
+        rcases z with ⟨u, s'⟩
+        simp only [hk]
+        gcongr
+        have := ih u (hcont u) s'
+        rwa [if_pos hSt] at this
+      · -- Free step: no charge.
+        rw [expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt,
+          tsum_prod_right_bool_eq_of_zero
+            (f := fun z : spec.Range t × σ × Bool =>
+              Pr[= z | (impl t).run (s, false)] *
+                expectedQuerySlack impl charged (fun s => R s * ε) (cont z.1) qS z.2)
+            (by rintro ⟨u, s'⟩; simp)]
+        refine (h_free_step t s hSt k).trans (ENNReal.tsum_le_tsum fun z => ?_)
+        rcases z with ⟨u, s'⟩
+        simp only [hk]
+        gcongr
+        have := ih u (hcont u) s'
+        rwa [if_neg hSt] at this
+
+end SingleWorldResourceBad
+
 end OracleComp.ProgramLogic.Relational
