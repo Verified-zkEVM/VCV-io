@@ -381,14 +381,82 @@ lemma probOutput_unforgeableExp_eq_hybridExpAtKey_real :
   -- `base.liftTarget _` (it equals `(HasQuery.toQueryImpl).liftTarget _` for this instance).
   letI hq : HasQuery (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := base.toHasQuery
-  -- Remaining: (a) replay the WriterT log into a `StateT (List M)` input log carrying
-  -- `log.map fst` (the freshness check reads the log only through `map fst` via
-  -- `QueryLog.wasQueried_eq_decide_mem_map_fst`, and the final cache is discarded by the
-  -- outer `(· .1) <$> _`); (b) `OracleComp.simulateQ_flattenStateT_run` to collapse the
-  -- nested `StateT (List M) (StateT cache ProbComp)` into `StateT (cache × List M) ProbComp`;
-  -- (c) `map_run_simulateQ_eq_of_query_map_eq` to match the flattened handler against
-  -- `hybridBaseImpl + hybridSignImpl realSignBody` (append-vs-prepend list order is invisible
-  -- to membership); (d) identify the verify tail with `hybridVerifyCont`.
+  -- Replay the WriterT log into a `StateT (List M)` input log, flatten the nested
+  -- `StateT (List M) (StateT cache ProbComp)` to `StateT (List M × cache) ProbComp`, and
+  -- match the flattened handler against `hybridBaseImpl + hybridSignImpl realSignBody` under
+  -- the state swap `(List M × cache) → (cache × List M)`.
+  set so : QueryImpl (M →ₒ Option (Commit × Resp))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
+    (fun msg => realSignBody ids M maxAttempts pk sk msg) with hso
+  -- (a) the WriterT-log run, mapped to `(out, log.map fst)`, equals the `appendInputLog` run.
+  have hreplay := QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog
+    (spec₀ := unifSpec + (M × Commit →ₒ Chal)) (loggedSpec := M →ₒ Option (Commit × Resp))
+    (m₀ := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)
+    so (adv.main pk) ([] : List M)
+  simp only [] at hreplay
+  -- The flattened `appendInputLog` handler.
+  set implAppend : QueryImpl
+      ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (StateT (List M) (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+    (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+      (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)).liftTarget
+        (StateT (List M) (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) +
+      QueryImpl.appendInputLog so with himplAppend
+  -- (c) the flattened handler equals `hybridBaseImpl + hybridSignImpl realSignBody` after
+  -- swapping the joint state `(List M × cache) → (cache × List M)`.
+  -- `proj` swaps the components and reverses the list: the hybrid prepends each signed
+  -- message (`msg :: l`) while `appendInputLog` appends it (`l ++ [msg]`), and reversing
+  -- reconciles the two orderings step by step.
+  set proj : List M × (M × Commit →ₒ Chal).QueryCache →
+      (M × Commit →ₒ Chal).QueryCache × List M := fun s => (s.2, s.1.reverse) with hproj
+  have hmatch : ∀ (t : ((unifSpec + (M × Commit →ₒ Chal)) +
+        (M →ₒ Option (Commit × Resp))).Domain)
+      (s : List M × (M × Commit →ₒ Chal).QueryCache),
+      Prod.map id proj <$> (implAppend.flattenStateT t).run s =
+        ((hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+          hybridSignImpl M so) t).run (proj s) := by
+    rintro ((tu | tro) | tsign) ⟨l, c⟩
+    · simp only [hproj, himplAppend, QueryImpl.flattenStateT, QueryImpl.add_apply_inl,
+        QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply, hybridBaseImpl, unifFwdImpl]
+      rfl
+    · have hlhs : (implAppend.flattenStateT (Sum.inl (Sum.inr tro))).run (l, c) =
+          roStep M c tro >>= fun a => pure (a.1, (l, a.2)) := by
+        rw [himplAppend]
+        simp only [QueryImpl.flattenStateT, QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply,
+          StateT.run_mk]
+        erw [StateT.run_monadLift]
+        have hbq : (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+            (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) (Sum.inr tro)).run c
+            = roStep M c tro := randomOracle_run_eq_roStep M c tro
+        rw [StateT.run_bind]
+        erw [hbq]
+        simp [map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp, monad_norm]
+      rw [hlhs, hproj]
+      simp only [QueryImpl.add_apply_inl]
+      erw [hybridBaseImpl_run_ro]
+      simp [map_eq_bind_pure_comp, bind_assoc, Function.comp]
+    · have hlhs : (implAppend.flattenStateT (Sum.inr tsign)).run (l, c) =
+          (so tsign).run c >>= fun a => pure (a.1, (l ++ [tsign], a.2)) := by
+        simp [himplAppend, QueryImpl.flattenStateT, QueryImpl.add_apply_inr,
+          QueryImpl.appendInputLog_apply, StateT.run_mk, StateT.run_bind, StateT.run_monadLift,
+          StateT.run_modifyGet, modify, map_eq_bind_pure_comp, bind_assoc, Function.comp,
+          monad_norm]
+      rw [hlhs, hproj]
+      simp only [QueryImpl.add_apply_inr]
+      erw [hybridSignImpl_run]
+      simp [map_eq_bind_pure_comp, bind_assoc, Function.comp, List.reverse_append]
+  have hflat := fun {β : Type}
+      (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) +
+        (M →ₒ Option (Commit × Resp))) β) (s : List M × (M × Commit →ₒ Chal).QueryCache) =>
+    OracleComp.map_run_simulateQ_eq_of_query_map_eq implAppend.flattenStateT
+      (hybridBaseImpl (Commit := Commit) (Chal := Chal) M + hybridSignImpl M so)
+      proj hmatch oa s
+  -- Remaining final assembly (steps b/d): chain `hreplay` (WriterT-log → `appendInputLog`),
+  -- `OracleComp.simulateQ_flattenStateT_run` (flatten the nested `StateT (List M) (StateT cache)`
+  -- to `StateT (List M × cache)`), and `hflat` (the `proj`-projection to the hybrid run on
+  -- `(cache × List M)`), then identify the verify tail with `hybridVerifyCont` using
+  -- `QueryLog.wasQueried_eq_decide_mem_map_fst` (`wasQueried msg ↔ msg ∈ log.map fst ↔
+  -- msg ∈ (final signed list).reverse`, membership-invariant under the `proj` list reversal).
   sorry
 
 /-- Lift a cache-level hybrid handler to one carrying a never-touched bad flag in its
