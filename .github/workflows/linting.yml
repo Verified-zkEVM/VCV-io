@@ -4,32 +4,30 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
       - "FFI/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
+      - "VCVioWidgets/**/*.lean"
       - "Interop.lean"
       - "Interop/**/*.lean"
       - "lakefile.lean"
-      - "scripts/lint-style.py"
-      - "scripts/print-style-errors.sh"
       - "scripts/nolints-style.txt"
-      - "scripts/style-exceptions.txt"
       - ".github/workflows/linting.yml"
   push:
     branches: [main]
     paths:
+      - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
       - "FFI/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
+      - "VCVioWidgets/**/*.lean"
       - "Interop.lean"
       - "Interop/**/*.lean"
       - "lakefile.lean"
-      - "scripts/lint-style.py"
-      - "scripts/print-style-errors.sh"
       - "scripts/nolints-style.txt"
-      - "scripts/style-exceptions.txt"
       - ".github/workflows/linting.yml"
 
 concurrency:
@@ -42,6 +40,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: leanprover-community/lint-style-action@a7e7428fa44f9635d6eb8e01919d16fd498d387a # 2025-08-18
+      - uses: actions/checkout@v4
+
+      # Repo-wide hygiene checks that the old `scripts/lint-style.sh` enforced.
+      - name: Check for executable Lean files
+        run: |
+          execs="$(git ls-files -s '*.lean' | grep -E '^100755 ' | cut -f2-)"
+          if [ -n "$execs" ]; then
+            echo "ERROR: the following Lean files have the executable bit set:"
+            echo "$execs"
+            exit 1
+          fi
+
+      - name: Check for case-insensitive filename clashes
+        run: |
+          clashes="$(git ls-files | sort --ignore-case | uniq -D --ignore-case)"
+          if [ -n "$clashes" ]; then
+            echo "ERROR: the following files have the same lower-case form:"
+            echo "$clashes"
+            exit 1
+          fi
+
+      - name: Set up Lean environment
+        uses: leanprover/lean-action@v1
         with:
-          mode: check
+          auto-config: false
+          build: false
+          test: false
+          lint: false
+          use-github-cache: false
+          use-mathlib-cache: false
+
+      - name: Fetch Mathlib cache
+        run: lake exe cache get
+
+      # `lake exe lint-style` resolves to Mathlib's text-based style linter (the
+      # project deliberately defines no `lint-style` exe, so it does not link the
+      # FFI backends). Pass the libraries explicitly for full coverage.
+      - name: Run text-based style linters
+        run: lake exe lint-style ToMathlib VCVio FFI LatticeCrypto Examples VCVioWidgets Interop

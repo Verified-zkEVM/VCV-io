@@ -1,0 +1,51 @@
+name: FFI Nightly Check
+
+# Builds and runs the native-backed FFI test executables (ML-KEM / ML-DSA /
+# Falcon) against the vendored reference implementations in third_party/.
+# This is the ONLY job that links the native .o files, so it is kept off the
+# per-PR path (expensive: three amalgamated C backends + three linked exes)
+# and run nightly instead. Trigger manually via the Actions tab when touching
+# FFI glue or bumping a third_party submodule pin.
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # daily 07:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ffi-check:
+    name: Build + run FFI test executables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Lean environment
+        uses: leanprover/lean-action@v1
+        with:
+          auto-config: false
+          build: false
+          test: false
+          lint: false
+          use-github-cache: false
+          use-mathlib-cache: false
+
+      - name: Fetch Mathlib cache
+        run: lake exe cache get
+
+      - name: Build FFI test executables
+        run: lake build mlkem_test mldsa_test falcon_test
+
+      - name: Run ML-KEM FFI tests
+        run: .lake/build/bin/mlkem_test
+
+      - name: Run ML-DSA FFI tests
+        run: .lake/build/bin/mldsa_test
+
+      - name: Run Falcon FFI tests
+        run: .lake/build/bin/falcon_test

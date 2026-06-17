@@ -124,6 +124,15 @@ def useHintVec {k : ℕ} (h : Vector prims.Hint k) (r : RqVec k) :
     Vector prims.High k :=
   Vector.zipWith prims.useHint h r
 
+/-- The uncompressed key vector `t = Â·s₁ + s₂` derived from a 32-byte seed by honest key
+generation (FIPS 204 Algorithm 6, lines 1–5), expressed at the primitives level: `ρ` and `ρ'`
+come from `expandSeed`, `Â = ExpandA(ρ)`, and `(s₁, s₂) = ExpandS(ρ')`. Key generation then
+splits `Power2Round(t) = (t₁, t₀)` into the published part `t₁` and the withheld part `t₀`. -/
+def keyVector (nttOps : NTTRingOps) (seed : Bytes 32) : RqVec p.k :=
+  nttOps.coeffMatVecMul (prims.expandA (prims.expandSeed seed).1)
+      (prims.expandS (prims.expandSeed seed).2.1).1
+    + (prims.expandS (prims.expandSeed seed).2.1).2
+
 /-- Bundle the rounding operations from `Primitives` into an abstract `RoundingOps`. -/
 def toRoundingOps : LatticeCrypto.RoundingOps coeffRing (2 * p.gamma2) where
   High := prims.High
@@ -178,5 +187,54 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
     polyNorm (prims.power2Round r).2 ≤ 2 ^ (droppedBits - 1)
   /-- `w1Encode` is injective: distinct commitments encode to distinct byte strings. -/
   w1Encode_injective : Function.Injective prims.w1Encode
+  /-- The challenge-secret product `c · s` has infinity norm at most `β = τ·η` whenever the
+  vector `s` is bounded by `η`. This reflects that `SampleInBall(c̃)` has exactly `τ` nonzero
+  coefficients, each in `{-1, +1}`, so `‖c · sⱼ‖∞ ≤ τ·η = β`. -/
+  sampleInBall_smul_bound : ∀ (cTilde : CommitHashBytes p) {k : ℕ} (s : RqVec k),
+    polyVecBounded s p.eta →
+    polyVecNorm (nttOps.coeffScalarVecMul (prims.sampleInBall cTilde) s) ≤ p.beta
+  /-- **Honest sampling of the secret vectors (random-oracle modeling of `ExpandS`/`ExpandSeed`).**
+  Over a uniform `seed`, the derived secrets `(s₁, s₂) = ExpandS((ExpandSeed seed).2.1)` are jointly
+  uniform on `RqVec p.l × RqVec p.k` and independent of the public seed `ρ = (ExpandSeed seed).1`.
+  Concretely, for every continuation `f` taking `(ρ, s₁, s₂)`, sampling the secrets through
+  `ExpandS` produces the same distribution as drawing `s₁`, `s₂` independently and uniformly while
+  keeping the same `ρ`. This is the standard ROM idealization of the `ExpandSeed`/`ExpandS` XOFs and
+  is not derivable from the deterministic `prims`; it is what the MLWE key-swap hop `(H0)` residue
+  requires (see `MLDSA.NMA.nma_keyswap_hop`). -/
+  expandS_honest_sampling : ∀ {γ : Type}
+    [SampleableType (RqVec p.l)] [SampleableType (RqVec p.k)] [IsUniformSpec unifSpec]
+    (f : Bytes 32 → RqVec p.l → RqVec p.k → ProbComp γ),
+    evalDist (do
+        let seed ← $ᵗ (Bytes 32)
+        f (prims.expandSeed seed).1
+          (prims.expandS (prims.expandSeed seed).2.1).1
+          (prims.expandS (prims.expandSeed seed).2.1).2) =
+      evalDist (do
+        let seed ← $ᵗ (Bytes 32)
+        let s₁ ← $ᵗ (RqVec p.l)
+        let s₂ ← $ᵗ (RqVec p.k)
+        f (prims.expandSeed seed).1 s₁ s₂)
+  /-- **Public determinacy of the withheld key part `t₀` (key-generation collision-freeness).**
+  Any two seeds that agree on the published key data — the public seed `ρ = (ExpandSeed ·).1`
+  and the rounded part `t₁ = (Power2Round (Â·s₁ + s₂)).1` — also agree on the withheld part
+  `t₀ = (Power2Round (Â·s₁ + s₂)).2`. Equivalently, `seed ↦ (ρ, t₁)` refines `seed ↦ t₀`, so
+  `t₀` is a (noncomputable) function of the public key on honestly generated keys.
+
+  For FIPS 204 this is the standard idealization under which the full `t = t₁·2^d + t₀` is
+  treated as public: omitting `t₀` from the encoded public key is a bandwidth optimization,
+  not a hiding mechanism (the zero-knowledge simulator of the Dilithium identification scheme
+  is explicitly given `t`, cf. ePrint 2023/246 and the Dilithium specification's security
+  analysis). Concretely, `ExpandSeed`/`ExpandS` are SHAKE-based XOFs modeled as random
+  functions; the map `seed ↦ (ρ, t₁)` sends the `2^256` seeds into a space of at least
+  `2^256 · 2^{2560·k}` values, so two distinct seeds collide on `(ρ, t₁)` — the only way the
+  hypotheses can hold with differing `t₀` — except with probability about `2^{511 - 2560·k}`.
+  Like `expandS_honest_sampling`, this field is a random-oracle-style modeling assumption
+  about the XOFs and is not derivable from a fixed concrete instantiation. -/
+  keyVector_t0_determined : ∀ s s' : Bytes 32,
+    (prims.expandSeed s).1 = (prims.expandSeed s').1 →
+    (prims.power2RoundVec (prims.keyVector nttOps s)).1 =
+      (prims.power2RoundVec (prims.keyVector nttOps s')).1 →
+    (prims.power2RoundVec (prims.keyVector nttOps s)).2 =
+      (prims.power2RoundVec (prims.keyVector nttOps s')).2
 
 end MLDSA

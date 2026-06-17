@@ -153,7 +153,11 @@ def idealWorld : Raw DHAtom PortBoundary.empty :=
 
 /-! ## DOT output -/
 
+#guard_msgs (drop info) in
 #eval IO.println "=== Real World ==="
+#guard_msgs (drop info) in
 #eval IO.println (Raw.toDot renderDHAtom realWorld)
+#guard_msgs (drop info) in
 #eval IO.println "=== Ideal World ==="
+#guard_msgs (drop info) in
 #eval IO.println (Raw.toDot renderDHAtom idealWorld)

@@ -278,7 +278,8 @@ example (oa : OracleComp spec α) (post : List α → ℝ≥0∞) :
   vcstep
 
 /--
-info: [vcspec cache] miss `OracleComp.ProgramLogic.TacticInternals.Unary.wp_pure_le_vcspec` (raw, unaryWP)
+info: [vcspec cache] miss `OracleComp.ProgramLogic.TacticInternals.Unary.wp_pure_le_vcspec`
+(raw, unaryWP)
 -/
 #guard_msgs in
 set_option vcvio.vcgen.traceCachedRules true in
@@ -300,7 +301,9 @@ example (c : Prop) [Decidable c]
   vcstep
 
 /--
-info: [vcspec cache] miss `OracleComp.ProgramLogic.TacticInternals.Unary.wp_replicate_succ_le_vcspec` (raw, unaryWP)
+info: [vcspec cache] miss
+`OracleComp.ProgramLogic.TacticInternals.Unary.wp_replicate_succ_le_vcspec`
+(raw, unaryWP)
 -/
 #guard_msgs in
 set_option vcvio.vcgen.traceCachedRules true in

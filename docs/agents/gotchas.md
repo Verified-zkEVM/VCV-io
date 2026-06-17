@@ -139,6 +139,11 @@ Do not add `set_option linter.* false`, `set_option weak.linter.* false`, or rep
 `leanOptions` that turn lints off just to get a clean build. Treat linter failures as real
 problems and fix the underlying declaration, proof, naming, or formatting issue instead.
 
+The one deliberate, documented exception is the text-based unicode allowlist linter, turned
+off via `weak.linter.unicodeLinter, false` in `lakefile.lean`. This is a policy choice, not a
+dodge: VCVio docstrings legitimately use FIPS-204 math notation (a combining tilde on `c`) and
+diacritics in cited author names, which the Mathlib allowlist would otherwise reject.
+
 ### 20. After adding new `.lean` files, run `./scripts/update-lib.sh`
 
 This regenerates the root import files covered by the build import check:

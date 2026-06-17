@@ -111,15 +111,18 @@ def keyGenFromSeed (seed : Bytes 32) : PublicKey p prims × SecretKey p :=
   let sk : SecretKey p := ⟨rho, key, tr, s1, s2, t0⟩
   (pk, sk)
 
-/-- A key pair is valid when the public and secret keys are consistently derived:
-the public seed matches, and `tr` is the hash of the encoded public key. -/
-def validKeyPair (pk : PublicKey p prims) (sk : SecretKey p) : Bool :=
-  decide (pk.rho = sk.rho ∧ sk.tr = prims.hashPublicKey pk.rho pk.t1)
+open Classical in
+/-- A key pair is valid when it is honestly generated: there is a seed `ξ` such that
+`keyGenFromSeed ξ = (pk, sk)`. This captures the full key-generation relationship
+(`t = A·s₁ + s₂`, `(t₁, t₀) = Power2Round(t)`, `s₁, s₂` bounded by `η`), which is what the
+completeness and signing-correctness proofs require. The predicate is decidable because the
+seed space `Bytes 32` is finite. -/
+noncomputable def validKeyPair (pk : PublicKey p prims) (sk : SecretKey p) : Bool :=
+  decide (∃ seed : Bytes 32, keyGenFromSeed p prims seed = (pk, sk))
 
-omit nttOps in
 @[simp] theorem validKeyPair_eq_true_iff (pk : PublicKey p prims) (sk : SecretKey p) :
     validKeyPair p prims pk sk = true ↔
-      pk.rho = sk.rho ∧ sk.tr = prims.hashPublicKey pk.rho pk.t1 := by
+      ∃ seed : Bytes 32, keyGenFromSeed p prims seed = (pk, sk) := by
   simp [validKeyPair]
 
 /-! ### Identification Scheme -/
@@ -178,7 +181,8 @@ def identificationScheme
 theorem keyGenFromSeed_validKeyPair (seed : Bytes 32) :
     let (pk, sk) := keyGenFromSeed p prims seed
     validKeyPair p prims pk sk = true := by
-  simp [keyGenFromSeed, validKeyPair]
+  simp only [validKeyPair_eq_true_iff]
+  exact ⟨seed, rfl⟩
 
 /-- The key generation algebraic identity: `A·z - c·(t₁·2^d) = A·y - c·s₂ + c·t₀`
 when `z = y + c·s₁` and the key pair comes from `keyGenFromSeed`.
@@ -193,6 +197,60 @@ theorem keyGenFromSeed_wApprox_eq {pk : PublicKey p prims} {sk : SecretKey p}
     ∀ (c : Rq) (y : RqVec p.l),
       computeWApprox p prims (prims.expandA pk.rho) c (y + c • sk.s1) pk.t1 =
       (prims.expandA pk.rho) * y - c • sk.s2 + c • sk.t0 := by
-  sorry
+  intro c y
+  haveI := h_laws.transform
+  let laws := h_laws.transform
+  set aHat := prims.expandA pk.rho
+  simp only [computeWApprox]
+  refine Vector.ext fun i hi => ?_
+  simp only [Vector.getElem_add, Vector.getElem_sub,
+    nttOps.hatVec_add, nttOps.unhatVec_sub, nttOps.matVecMul_add, nttOps.unhatVec_add]
+  have h_kg : prims.power2RoundShiftVec pk.t1 + sk.t0 = aHat * sk.s1 + sk.s2 := by
+    simp only [keyGenFromSeed, Prod.mk.injEq] at hkeygen
+    obtain ⟨hpk, hsk⟩ := hkeygen
+    have hrho  := congr_arg PublicKey.rho hpk.symm
+    have hs1   := congr_arg SecretKey.s1 hsk.symm
+    have hs2   := congr_arg SecretKey.s2 hsk.symm
+    have haHat : aHat = prims.expandA (prims.expandSeed seed).1 := by simp [aHat, hrho]
+    rw [show pk.t1 = (prims.power2RoundVec (aHat * sk.s1 + sk.s2)).1 from by
+          rw [hs1, hs2, haHat]; exact congr_arg PublicKey.t1 hpk.symm,
+        show sk.t0 = (prims.power2RoundVec (aHat * sk.s1 + sk.s2)).2 from by
+          rw [hs1, hs2, haHat]; exact congr_arg SecretKey.t0 hsk.symm]
+    refine Vector.ext fun i hi => ?_
+    simp only [Vector.getElem_add, Primitives.power2RoundShiftVec, Primitives.power2RoundVec,
+      Vector.map_map, Vector.getElem_map, Function.comp]
+    exact h_laws.power2Round_decomp _
+  have hAs1_hat : nttOps.matVecMul aHat (nttOps.hatVec sk.s1) =
+      nttOps.hatVec (prims.power2RoundShiftVec pk.t1 + sk.t0 - sk.s2) := by
+    rw [h_kg]
+    refine Vector.ext fun j hj => ?_
+    simp only [hatVec, HMul.hMul, coeffMatVecMul, unhatVec, matVecMul,
+               Vector.getElem_map, Vector.getElem_sub, Vector.getElem_add]
+    have hcancel : (fromHat (dot nttOps aHat[j] (Vector.map toHat sk.s1)) : Rq) +
+        sk.s2[j] - sk.s2[j] = fromHat (dot nttOps aHat[j] (Vector.map toHat sk.s1)) := by
+      abel
+    rw [hcancel, laws.toHat_fromHat]
+  have hMatScalarComm : nttOps.matVecMul aHat (nttOps.hatVec (c • sk.s1)) =
+      nttOps.scalarVecMul (toHat c) (nttOps.matVecMul aHat (nttOps.hatVec sk.s1)) := by
+    have hNTTSmul : nttOps.hatVec (c • sk.s1) =
+        nttOps.scalarVecMul (toHat c) (nttOps.hatVec sk.s1) := by
+      refine Vector.ext fun j hj => ?_
+      simp only [hatVec, scalarVecMul, Vector.getElem_map]
+      change nttOps.toHat (nttOps.coeffScalarVecMul c sk.s1)[j] = _
+      simp only [coeffScalarVecMul, unhatVec, scalarVecMul, hatVec,
+                 Vector.map_map, Vector.getElem_map, Function.comp_apply, laws.toHat_fromHat]
+    rw [hNTTSmul]
+    refine Vector.ext fun j hj => ?_
+    simp only [matVecMul, scalarVecMul, Vector.getElem_map]
+    exact nttOps.dot_scalar_right (toHat c) _ _
+  simp only [hMatScalarComm, hAs1_hat]
+  change (aHat * y)[i] +
+      (nttOps.coeffScalarVecMul c (prims.power2RoundShiftVec pk.t1 + sk.t0 - sk.s2))[i] -
+      (nttOps.coeffScalarVecMul c (prims.power2RoundShiftVec pk.t1))[i] =
+      (aHat * y)[i] -
+      (nttOps.coeffScalarVecMul c sk.s2)[i] + (nttOps.coeffScalarVecMul c sk.t0)[i]
+  simp only [nttOps.coeffScalarVecMul_sub, nttOps.coeffScalarVecMul_add,
+             Vector.getElem_sub, Vector.getElem_add]
+  abel
 
 end MLDSA
