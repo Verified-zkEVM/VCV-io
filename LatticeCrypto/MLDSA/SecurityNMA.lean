@@ -715,6 +715,102 @@ theorem nma_security (h_laws : Primitives.Laws prims nttOps)
         rw [add_comm]
         exact add_le_add (ENNReal.ofReal_le_ofReal hB) le_rfl
 
+open scoped Classical in
+/-- **EUF-CMA security of ML-DSA (Theorem 4, CRYPTO 2023), wired end to end.**
+
+This is the sound CMA-to-NMA-to-hardness composition. It relocates here (rather than to
+`LatticeCrypto.MLDSA.Security`) to avoid the circular import: `nma_security` lives in this
+file, which already imports `LatticeCrypto.MLDSA.Security`.
+
+For any EUF-CMA adversary `adv` against the Fiat-Shamir-with-aborts ML-DSA signature, the
+advantage is bounded by the MLWE advantage, the SelfTargetMSIS advantage, and the
+statistical CMA-to-NMA loss `FiatShamirWithAbort.cmaToNmaLoss`. The proof composes three
+pieces:
+
+1. `FiatShamirWithAbort.euf_cma_to_nma`: `adv.advantage ≤ Pr[managedRoNmaExp simulatedNmaAdv]
+   + cmaToNmaLoss`, under the good-key/commitment-guessing/abort/query hypotheses;
+2. `FiatShamirWithAbort.managedRoNmaExp_simulatedNmaAdv_eq_eufNmaExp` (Option B): the managed-RO
+   NMA success probability equals the plain EUF-NMA advantage of `simulatedEufNmaAdv`, the
+   cache-forgetting reduction — this is the soundness fix that makes the bridge legitimate;
+3. `nma_security` (Lemma 7) applied to `simulatedEufNmaAdv`: `≤ MLWE + SelfTargetMSIS`.
+
+The loss parameters carry the nonnegativity and good-key hypotheses that the abstract
+reduction needs; the `nma_security` bridge hypotheses (`hGen`, `hStmsis`, `hMlweBridge`) pin
+the abstract hardness problems to the concrete ML-DSA ones. -/
+theorem euf_cma_security_of_nma [SampleableType (PublicKey p prims)]
+    (h_laws : Primitives.Laws prims nttOps)
+    (mlwe : LearningWithErrors.Problem (TqMatrix p.k p.l) (RqVec p.l) (RqVec p.k))
+    (stmsis : SelfTargetMSIS.Problem
+      (TqMatrix p.k p.l) (Response p prims)
+      (PublicKey p prims) (M × Commitment p prims) (CommitHashBytes p))
+    (maxAttempts : ℕ)
+    (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
+      (validKeyPair p prims))
+    (hGen : hr.gen = keygen0 p prims)
+    (hStmsis : stmsis = mldsaSTMSIS p prims M)
+    (sim : PublicKey p prims →
+      ProbComp (Option (Commitment p prims × CommitHashBytes p × Response p prims)))
+    (ζ_zk : ℝ) (hζ : 0 ≤ ζ_zk)
+    (hhvzk : (identificationScheme p prims).HVZK sim ζ_zk)
+    (qS qH : ℕ) (ε p_abort δ : ℝ)
+    (hε : 0 ≤ ε) (hδ : 0 ≤ δ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1)
+    (Good : PublicKey p prims → SecretKey p → Prop)
+    (hGood : Pr[ fun xw : PublicKey p prims × SecretKey p => ¬ Good xw.1 xw.2 | hr.gen] ≤
+      ENNReal.ofReal δ)
+    (hGuess : ∀ pk sk, Good pk sk → ∀ cm : Commitment p prims,
+      Pr[= cm | Prod.fst <$> (identificationScheme p prims).commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : ∀ pk sk, Good pk sk →
+      Pr[= none | (identificationScheme p prims).honestExecution pk sk] ≤
+        ENNReal.ofReal p_abort)
+    (hAbortSim : ∀ pk sk, Good pk sk →
+      Pr[= none | sim pk] ≤ ENNReal.ofReal p_abort)
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamirWithAbort (identificationScheme p prims) hr M maxAttempts))
+    (hQ : ∀ pk, FiatShamir.signHashQueryBound M
+      (S' := Option (Commitment p prims × Response p prims)) (oa := adv.main pk) qS qH)
+    (hMlweBridge : ∀ (main : PublicKey p prims →
+        OracleComp (unifSpec + (M × Commitment p prims →ₒ CommitHashBytes p))
+          (M × Option (Commitment p prims × Response p prims))),
+      ∃ B : LearningWithErrors.Adversary mlwe,
+        LearningWithErrors.advantage (mldsaMLWE p prims)
+          (distinguisherB p prims hr maxAttempts main) ≤
+          LearningWithErrors.advantage mlwe B) :
+    ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
+      (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
+      adv.advantage
+          (FiatShamirWithAbort.runtime
+            (Commit := Commitment p prims) (Chal := CommitHashBytes p) M) ≤
+        ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
+        SelfTargetMSIS.advantage stmsisReduction +
+        ENNReal.ofReal
+          (FiatShamirWithAbort.cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
+  classical
+  -- Step 1: CMA advantage ≤ managed-RO NMA success of `simulatedNmaAdv` + loss.
+  have hcma := FiatShamirWithAbort.euf_cma_to_nma (identificationScheme p prims) hr M
+    maxAttempts sim adv ζ_zk hζ hhvzk qS qH ε p_abort δ hε hδ hp₀ hp Good hGood hGuess
+    hAbort hAbortSim hQ
+  -- Step 2 (Option B bridge): managed-RO NMA success = plain EUF-NMA advantage of the
+  -- cache-forgetting reduction `simulatedEufNmaAdv`.
+  have hbridge := FiatShamirWithAbort.managedRoNmaExp_simulatedNmaAdv_eq_eufNmaExp
+    (identificationScheme p prims) hr M maxAttempts sim adv
+  -- Step 3 (Lemma 7): the plain EUF-NMA advantage is bounded by MLWE + SelfTargetMSIS.
+  obtain ⟨mlweRed, stmsisRed, hnma⟩ := nma_security p prims h_laws mlwe stmsis maxAttempts hr
+    hGen hStmsis hMlweBridge
+    (FiatShamirWithAbort.simulatedEufNmaAdv (identificationScheme p prims) hr M maxAttempts
+      sim adv)
+  refine ⟨mlweRed, stmsisRed, ?_⟩
+  -- Assemble: advantage ≤ (managed = eufNma advantage ≤ MLWE + STMSIS) + loss.
+  refine le_trans hcma ?_
+  have hmanaged : Pr[= true | SignatureAlg.managedRoNmaExp
+        (FiatShamirWithAbort.runtime M)
+        (FiatShamirWithAbort.simulatedNmaAdv (identificationScheme p prims) hr M maxAttempts
+          sim adv)] =
+      (FiatShamirWithAbort.simulatedEufNmaAdv (identificationScheme p prims) hr M maxAttempts
+        sim adv).advantage (FiatShamirWithAbort.runtime M) := by
+    rw [SignatureAlg.eufNmaAdv.advantage, hbridge]
+  rw [hmanaged]
+  exact add_le_add hnma le_rfl
+
 end Headline
 
 /-! ## Status
