@@ -7,6 +7,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.GhostBodies
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.ProgramLogic.Relational.SimulateQ
+import VCVio.OracleComp.SimSemantics.StateT.StateSeparating
 
 /-!
 # EUF-CMA security of Fiat-Shamir with aborts
@@ -1276,6 +1277,54 @@ noncomputable def simulatedNmaAdv :
         | none => cache
       pure ((msg, σ), advCache)
 
+omit [SampleableType Stmt] in
+/-- **Nested-simulation fusion for the managed NMA run.** The managed reduction runs the
+common adversary `adv.main pk` under the inner managed handler `(unifSim + roSim) + sigSim`
+threading the inner cache (`StateT spec.QueryCache (OracleComp spec)`), then `.run ∅`
+re-simulates the residual live queries under the outer runtime handler
+`unifFwdImpl + randomOracle` threading the outer cache. By
+`QueryImpl.Stateful.simulateQ_link_run` this two-layer nesting is a single simulation of the
+*linked* handler `outer.link inner` over the product cache `(inner, outer)`, up to the
+canonical `linkReshape` regrouping of the final state. This collapses the explicit `.run ∅`
+boundary into a single `simulateQ` whose state is the genuine `(inner managed cache, outer
+runtime cache)` pair the coupling projects onto. -/
+lemma managedRun_eq_link_run (pk : Stmt) :
+    letI spec := unifSpec + (M × Commit →ₒ Chal)
+    letI fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
+    letI unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
+      fun n => fwd (.inl n)
+    letI roSim : QueryImpl (M × Commit →ₒ Chal)
+        (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
+      let cache ← get
+      match cache (.inr mc) with
+      | some v => pure v
+      | none => do
+          let v ← fwd (.inr mc)
+          modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+    letI sigSim : QueryImpl (M →ₒ Option (Commit × Resp))
+        (StateT spec.QueryCache (OracleComp spec)) := fun msg => do
+      let r ← simulateQ unifSim (firstSome (sim pk) maxAttempts)
+      match r with
+      | some (w, c, z) =>
+          modifyGet fun cache => (some (w, z), cache.cacheQuery (.inr (msg, w)) c)
+      | none => pure none
+    letI outer : QueryImpl.Stateful spec
+        ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+        spec.QueryCache := (unifSim + roSim) + sigSim
+    letI inner : QueryImpl.Stateful unifSpec spec ((M × Commit →ₒ Chal).QueryCache) :=
+      unifFwdImpl (M × Commit →ₒ Chal) +
+        (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp))
+    (simulateQ (outer.link inner) (adv.main pk)).run (∅, ∅) =
+      (QueryImpl.Stateful.Frame.prod spec.QueryCache
+          ((M × Commit →ₒ Chal).QueryCache)).linkReshape (∅, ∅) <$>
+        (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
+            (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+              (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+          ((simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅)).run ∅ := by
+  exact (QueryImpl.Stateful.simulateQ_link_run _ _ (adv.main pk) ∅ ∅)
+
 /-- **State-coupling for the NMA bridge** (genuine two-layer content). At a fixed key pair
 the single-cache hybrid run of `hybridExpAtKey`, *followed by its verification-and-freshness
 tail* `hybridVerifyCont`, is bounded by the run-normal-form of the managed-RO NMA
@@ -1320,41 +1369,58 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
               (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
           (withCacheOverlay p.1.2 ((FiatShamirWithAbort ids hr M maxAttempts).verify
             pk p.1.1.1 p.1.1.2))).run p.2] := by
-  -- RESIDUAL SUBGOAL (genuine two-layer state coupling — the hardest piece).
+  -- Step 1 (banked, axiom-clean): collapse the explicit `.run ∅` re-simulation boundary on
+  -- the RHS. Distributing the outer `simulateQ` over `simulatedNmaAdv`'s post-processing bind
+  -- (`simulateQ_bind`/`StateT.run_bind`) exposes the nested managed run
+  --   `(simulateQ (unifFwd+ro) ((simulateQ ((unifSim+roSim)+sigSim) (adv.main pk)).run ∅)).run ∅`,
+  -- which `managedRun_eq_link_run` rewrites to the canonical `linkReshape` of a *single*
+  -- linked simulation `(simulateQ (outer.link inner) (adv.main pk)).run (∅, ∅)` over the
+  -- product cache `(inner managed cache, outer runtime cache)`. After this rewrite the RHS is
+  -- a single `simulateQ` whose state is genuinely the inner/outer cache pair, so the coupling
+  -- to the hybrid is a plain `map_run_simulateQ_eq_of_query_map_eq_inv'` state-projection (no
+  -- nesting). The fusion lemma `managedRun_eq_link_run` is proven and axiom-clean.
   --
-  -- The proof is a state-projection (`OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'`)
-  -- coupling the single hybrid cache to the *overlay* of the inner managed cache onto the
-  -- outer runtime cache, run on the common adversary `adv.main pk`, followed by the
-  -- verify-tail comparison spelled out below. Concretely:
+  -- RESIDUAL SUBGOAL (the genuinely hard, still-open content): the state-projection coupling
+  -- of `impl₁ := hybridBaseImpl + hybridSignImpl simSignBody` (single state `(reCache, signed)
+  -- : (M × Commit →ₒ Chal).QueryCache × List M`) against `impl₂ := outer.link inner` (state
+  -- `(innerCache, outerCache) : spec.QueryCache × (M × Commit →ₒ Chal).QueryCache`), followed
+  -- by the verify-tail split.
   --
-  --   * `proj (cache, signed) := …` maps the hybrid's single-layer state to the managed
-  --     reduction's (inner managed cache, outer runtime cache) pair by *splitting* the
-  --     single cache into the points written by the signing simulation (inner managed
-  --     layer) and the points written by live RO reads (outer runtime layer); the overlay
-  --     `withCacheOverlay (inner) (outer)` recovers the single cache (cf. `overlayCache`).
-  --   * `inv (cache, signed)` records that every point the signing simulation programmed
-  --     sits at `(msg, w)` with `msg ∈ signed` (the `fsAbortSignLoop_cache_invariant`
-  --     analogue for `simSignBody`/`signProgramCont`), so a fresh forgery's verification
-  --     point is never a managed-programmed point; combined with Option B's erasure of the
-  --     forgery's own point this gives the `withCacheOverlay_verify_eq_of_miss` hypothesis.
-  --   * `hproj`: each `hybridBaseImpl`/`hybridSignImpl` step maps under `proj` to the
-  --     corresponding `(unifSim+roSim)+sigSim` step re-simulated under `unifFwdImpl+ro` —
-  --     the per-query content is `randomOracle_run_eq_roStep` for RO reads and the
-  --     `signProgramCont`/`sigSim` programming agreement for signing reads.
+  -- DESIGN OBSTRUCTION FOUND (corrects the original `proj` recipe). A per-step replay of both
+  -- handlers shows the linked caches evolve as:
+  --   * `outerCache` accumulates *only live RO reads* (`roSim` forwards inner misses to `fwd`,
+  --     re-simulated by `inner`'s `randomOracle`, which writes the outer layer); signing's
+  --     `sigSim` programs the *inner* layer only and never forwards to the outer oracle;
+  --   * `innerCache` accumulates *both* live RO reads *and* the signing-programmed points.
+  -- Hence `reCache = innerCache` and `overlayCache outerCache innerCache = reCache`
+  -- throughout — matching the docstring's overlay claim. The problem is that the verifying
+  -- direction of `map_run_simulateQ_eq_of_query_map_eq_inv'` requires `proj` to be a *total
+  -- function of the hybrid state* `(reCache, signed)` whose value reproduces the linked state
+  -- pair *exactly* (not just up to overlay): `(impl₂ t).run (proj s) = Prod.map id proj <$>
+  -- (impl₁ t).run s`. But `outerCache = reCache ∖ {signing-only-programmed points}` is **not a
+  -- function of `(reCache, signed)`**: a point `(msg, w)` with `msg ∈ signed` may have entered
+  -- `reCache` either by a live RO read (then it is in `outerCache`) or by `signProgramCont`
+  -- (then it is *absent* from `outerCache`), and the current hybrid state records no flag
+  -- distinguishing the two. Defining `proj.outerCache := reCache` fails on the signing step
+  -- (hybrid writes the programmed point to `reCache`, so `proj.outerCache` would gain it, but
+  -- the linked `outerCache` does not), and the restricted-by-`signed` choice fails on live
+  -- reads at signed messages (those *are* in the linked `outerCache`). The split therefore
+  -- depends on per-query programming history that neither the hybrid `(reCache, signed)` nor
+  -- the linked cache pair records on its own — so the coupling is *not* a single
+  -- `map_run_simulateQ_eq_of_query_map_eq_inv'` over the existing states.
   --
-  -- The verify tail then splits on `result.1.1 ∈ signed`:
-  --   - `msg ∈ signed`: `probOutput_true_hybridVerifyCont_of_mem` forces the LHS summand to
-  --     `0`, so the inequality is vacuous on that branch;
-  --   - `msg ∉ signed` (fresh): `withCacheOverlay_verify_eq_of_miss` makes the overlay
-  --     verification agree with the live verification at `(msg, w')`, and
-  --     `hybridVerifyCont_cache_congr` transports the hybrid verification along the
-  --     `overlayCache` identity, so the two per-forgery successes coincide.
-  --
-  -- This is the same magnitude of `simulateQ`-commutation bookkeeping as the sibling
-  -- Sign → Prog assembly (~150 lines) and is the open content of this lemma; the verify-tail
-  -- toolkit (`hybridVerifyCont_cache_congr`, `probOutput_true_hybridVerifyCont_of_mem`,
-  -- `withCacheOverlay_verify_eq_of_miss`) and the projection workhorse
-  -- (`map_run_simulateQ_eq_of_query_map_eq_inv'`) are all in place.
+  -- RESOLUTION (not yet built; ~150–250 lines of new infrastructure). Run the hybrid (or the
+  -- linked managed handler) on an *enriched, layered* cache state that explicitly tags each
+  -- entry as live-read vs signing-programmed — the same `overlayCache`/ghost-layer device
+  -- already used for the Prog→Trans hop in `GhostBodies` (`ghostHybridImpl`, `GhostState`,
+  -- `run_ghostSignBody_overlay`/`_fst`). On that layered state the partition *is* a function
+  -- of the state, both projection directions (`overlay`-to-hybrid and `forget`-to-managed) are
+  -- per-step state projections, and `map_run_simulateQ_eq_of_query_map_eq_inv'` applies. The
+  -- verify-tail then splits on `result.1.1 ∈ signed` exactly as in the original recipe:
+  -- `probOutput_true_hybridVerifyCont_of_mem` zeroes the LHS on `msg ∈ signed`, while on fresh
+  -- forgeries `withCacheOverlay_verify_eq_of_miss` + `hybridVerifyCont_cache_congr` align the
+  -- overlay verification with the live verification. The fusion (Step 1) and the verify-tail
+  -- toolkit are in place; the open content is the layered-state projection.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
