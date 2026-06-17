@@ -618,6 +618,31 @@ noncomputable def simulatedNmaAdv :
       | none => pure none
     (simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅
 
+/-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
+simulated single-cache hybrid (with the freshness check) is bounded by the run-normal-form
+of the managed-RO NMA experiment — the managed-cache run of `simulatedNmaAdv` followed by
+overlay verification, all under the runtime's `randomOracle` layer.
+
+This is the genuine distributional content of `probOutput_hybridExp_sim_le_managedRoNmaExp`:
+the inner managed cache threaded by `roSim`/`sigSim` together with the runtime's outer
+`randomOracle` layer reproduces the single-cache hybrid run of `hybridExpAtKey`, and on
+fresh forgeries the `withCacheOverlay` verification agrees with the live oracle at the
+verification point (a cache invariant in the style of `fsAbortSignLoop_cache_invariant`:
+every entry programmed by the signing simulation has its message recorded in the signed
+list, so the freshness conjunct can only decrease the left-hand side). -/
+lemma hybridExp_sim_le_managedRun_perKey
+    (ro : QueryImpl (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp))
+    (hro : ro = randomOracle) (pk : Stmt) (sk : Wit) :
+    Pr[= true | hybridExpAtKey ids hr M maxAttempts adv
+        (simSignBody M maxAttempts sim pk sk) pk] ≤
+      Pr[= true | (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) + ro)
+        ((simulatedNmaAdv ids hr M maxAttempts sim adv).main pk >>= fun result =>
+          withCacheOverlay result.2
+            ((FiatShamirWithAbort ids hr M maxAttempts).verify
+              pk result.1.1 result.1.2))).run' ∅] := by
+  sorry
+
 /-- NMA bridge: the success probability of the simulated hybrid (averaged over key
 generation, with the freshness check) is at most the success probability of
 `simulatedNmaAdv` in the managed-RO NMA experiment.
@@ -637,7 +662,45 @@ lemma probOutput_hybridExp_sim_le_managedRoNmaExp :
         hybridExpAtKey ids hr M maxAttempts adv (simSignBody M maxAttempts sim pk sk) pk] ≤
       Pr[= true | SignatureAlg.managedRoNmaExp (runtime M)
         (simulatedNmaAdv ids hr M maxAttempts sim adv)] := by
-  sorry
+  classical
+  -- Abbreviation for the runtime random-oracle simulator.
+  set ro : QueryImpl (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle with hro
+  -- Normal form of the managed-RO NMA experiment: the runtime's `withStateOracle`
+  -- semantics unfolds to a single `simulateQ … |>.run' ∅`, and the lifted key
+  -- generation pulls out as an ordinary `ProbComp` bind via `roSim.run'_liftM_bind`.
+  have hRHS : Pr[= true | SignatureAlg.managedRoNmaExp (runtime M)
+        (simulatedNmaAdv ids hr M maxAttempts sim adv)] =
+      Pr[= true | hr.gen >>= fun pksk =>
+        (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) + ro)
+          ((simulatedNmaAdv ids hr M maxAttempts sim adv).main pksk.1 >>= fun result =>
+            withCacheOverlay result.2
+              ((FiatShamirWithAbort ids hr M maxAttempts).verify
+                pksk.1 result.1.1 result.1.2))).run' ∅] := by
+    unfold SignatureAlg.managedRoNmaExp
+    -- Expose the bundled `withStateOracle` semantics as a run-normal-form ProbComp.
+    change Pr[= true | 𝒟[(simulateQ (unifFwdImpl (M × Commit →ₒ Chal) + ro)
+        (do
+          let (pk, _) ← (FiatShamirWithAbort ids hr M maxAttempts).keygen
+          let result ← (simulatedNmaAdv ids hr M maxAttempts sim adv).main pk
+          withCacheOverlay result.2
+            ((FiatShamirWithAbort ids hr M maxAttempts).verify
+              pk result.1.1 result.1.2))).run' ∅]] = _
+    -- `keygen = monadLift hr.gen`; pull it out of the simulation.
+    rw [show (FiatShamirWithAbort ids hr M maxAttempts).keygen =
+      (liftM hr.gen : OracleComp (unifSpec + (M × Commit →ₒ Chal)) (Stmt × Wit)) from rfl]
+    rw [simulateQ_bind, roSim.run'_liftM_bind]
+    rfl
+  rw [hRHS]
+  -- Reduce to a per-key statement under the shared `hr.gen` prefix.
+  refine probOutput_bind_mono fun pksk _ => ?_
+  -- Per-key core: the simulated hybrid (with the freshness check) is bounded by the
+  -- managed-cache run of `simulatedNmaAdv` followed by overlay verification. This is the
+  -- cache-overlay invariant: the inner managed cache `roSim` plus the runtime's outer
+  -- `randomOracle` layer reproduces the single-cache hybrid, and on fresh forgeries the
+  -- overlay agrees with the live oracle at the verification point.
+  obtain ⟨pk, sk⟩ := pksk
+  exact hybridExp_sim_le_managedRun_perKey ids hr M maxAttempts sim adv ro hro pk sk
 
 /-! ## Assembly -/
 
