@@ -262,6 +262,34 @@ lemma probEvent_ghostRead_bad_le
             ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
               List M), false)]
       ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
+  -- REMAINING SUBGOAL (reduction skeleton; ε-cell first-fire library proven in
+  -- `OracleComp.probEvent_probeManyEps_le`, axiom-clean).
+  --
+  -- The bound is the ghost-read instance of the `expectedQuerySlack_expected_resource_le`
+  -- framework already used in the sibling Sign → Prog hop above (search `h_charged` /
+  -- `h_slack_le`). The mapping is:
+  --   * resource `R s := QueryCache.enncard s.1.1.2` — the size of the *ghost* cache layer;
+  --   * charged queries = adversarial RO reads (`· matches .inl (.inr _)`): a read at `mc`
+  --     fires the bad flag iff `mc` is in the ghost domain, which (since each ghost entry was
+  --     created with a commitment `w` of per-outcome mass `≤ ε`, by `hGuess`) happens with
+  --     probability at most `R s · ε` — this is exactly `probEvent_commit_hit_le` read in the
+  --     dual direction, and abstractly `probEvent_probeStepEps_le`;
+  --   * resource growth = signing queries: `ghostSignBody` adds one ghost entry per rejected
+  --     attempt (the `none` branch `s.2.cacheQuery (msg, w) c` in `ghostSignBody`), so the
+  --     ghost cache grows by the number of rejections, whose expectation per signing query is
+  --     `≤ 1/(1 - p_abort)` by `hAbort` (cf. `tsum_probOutput_commit_mul_abort_le`);
+  --   * the budget `qH + 1` from `(hQ pk).2` (`signHashQueryBound`), `qS` from `(hQ pk).1`.
+  -- Folding the expected `qS/(1 - p_abort)` ghost-creation mass against the `(qH + 1)` reads,
+  -- each charged `ε`, gives `qS · (qH + 1) · ε / (1 - p_abort)`. The abstract first-fire union
+  -- bound `probEvent_probeManyEps_le` (`Pr[fire] ≤ q · ε`) is the per-signing-query content;
+  -- `expectedQuerySlack_expected_resource_le` folds the `1/(1 - p_abort)` attempt factor and
+  -- the `qS` outer count, exactly as in the sibling hop.
+  -- What remains is the run-normal-form bookkeeping: instantiating the framework's
+  -- `h_charged`/`h_growth`/`h_free` obligations for `ghostHybridImpl` (the ghost-read charge
+  -- via `probEvent_commit_hit_le`, the ghost-cache growth via `ghostSignBody`'s `none` branch),
+  -- and matching the framework's `ζ + R·β`-shaped output to the `qS·(qH+1)·ε/(1-p)` RHS. This
+  -- is the same magnitude of `simulateQ`-commutation bookkeeping as the sibling Sign → Prog
+  -- assembly (~120 lines) and is the open content of this lemma.
   sorry
 
 /-! ## Hop lemmas
