@@ -414,6 +414,8 @@ lemma evalDist_apply_eq_zero_iff' [MonadLiftT m SPMF] [MonadLiftT m SetM]
   rw [evalDist_apply_eq_zero_iff]
   grind
 
+/-! ## Pushing probabilities through `ite` and `Eq.rec` -/
+
 section ite
 
 variable (p : Prop) [Decidable p]
@@ -466,6 +468,8 @@ lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m]
   aesop (rule_sets := [UnfoldEvalDist])
 
 end sums
+
+/-! ## Probability bounds and total-probability sums -/
 
 section bounds
 
@@ -743,6 +747,8 @@ lemma probOutput_eq_inv_finSupport_card_of_liftM_PMF [MonadLiftT m SetM] [EvalDi
     _ = 1 / (finSupport mx).card := by rw [one_div]
 
 end pmf_denotation
+
+/-! ## Monotonicity and complementation for `probEvent` -/
 
 section probEvent_mono_compl
 
