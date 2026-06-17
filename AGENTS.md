@@ -36,6 +36,7 @@ The repo also includes a first-class lattice cryptography library under `Lattice
 - `ToMathlib/`: local Mathlib-facing utilities and lemmas intended to remain below the framework layer.
 - `FFI/`: shared Lean FFI bindings used by concrete implementations.
 - `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
+- `HashSig/`: hash-based signatures — SLH-DSA (SPHINCS+, FIPS 205) proof-level specs and security. Peer of `LatticeCrypto/`; depends on `VCVio`/`ToMathlib` but nothing in those imports it back.
 - `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
 - `VCVioTest/`: framework smoke tests and test support modules.
 - `VCVioWidgets/`: optional widget experiments and visualizations.
@@ -168,7 +169,7 @@ lake exe cache get && lake build
 ```
 
 CI runs the timed build on the non-test Lean libraries:
-`ToMathlib`, `VCVio`, `FFI`, `LatticeCrypto`, `Examples`,
+`ToMathlib`, `VCVio`, `FFI`, `LatticeCrypto`, `HashSig`, `Examples`,
 `VCVioWidgets`, and `Interop`.
 The timing report parses per-file build times only for that same set.
 Test libraries and test executables are not part of the timed build; CI only
