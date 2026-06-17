@@ -996,6 +996,109 @@ lemma probEvent_commit_hit_le (pk : Stmt) (sk : Wit) {ε : ℝ}
     _ = (S.card : ℝ≥0∞) * ENNReal.ofReal ε := by simp [Finset.sum_const, nsmul_eq_mul]
     _ ≤ QueryCache.enncard c * ENNReal.ofReal ε := mul_le_mul' h_card_le le_rfl
 
+/-! ### Deferred-sampling read step (lazy ghost firing)
+
+The eager ghost handler `ghostHybridImpl … true` pre-populates the ghost cache during
+signing and reads it deterministically, so an adversarial read at a ghost point flips the
+bad flag with mass `1`. That deterministic flip is *not* amortized by `enncard · ε`, which
+is why the charged-step premise of `probEvent_bad_simulateQ_run_le_expectedQuerySlack`
+fails for the eager run.
+
+The fix is deferred sampling: postpone each rejected attempt's commitment draw to read
+time. A read at point `(msg, w')` then redraws the `pending` deferred commitments and fires
+iff one of them equals `w'`. Under the pointwise guessing bound `hGuess`, each redraw lands
+on `w'` with probability `≤ ε`, so the union bound over `pending` redraws gives the per-read
+charge `pending · ε` — exactly the `R s · ε` shape the accumulator's charged-step premise
+demands, with `R s := enncard (ghost cache) = pending`. `lazyGhostFire` is that read step
+and `probOutput_lazyGhostFire_true_le` is its charge bound. -/
+
+/-- Deferred-sampling ghost read: draw `pending` fresh commitments and fire iff some draw
+equals the adversary's read point `w'`. The lazy counterpart of the eager ghost-domain
+membership test in `ghostHybridImpl … true`, with the rejected attempts' commitment draws
+postponed to read time. -/
+noncomputable def lazyGhostFire (pk : Stmt) (sk : Wit) (w' : Commit) :
+    ℕ → ProbComp Bool
+  | 0 => pure false
+  | n + 1 => do
+    let w ← Prod.fst <$> ids.commit pk sk
+    let b ← lazyGhostFire pk sk w' n
+    pure (decide (w = w') || b)
+
+omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] in
+/-- Boolean-or read shape: appending one fresh `decide (w = w')` flag to a Boolean draw
+raises the firing probability by at most `1` (when the fresh flag is set) over the residual
+draw. The per-summand step of `probOutput_lazyGhostFire_true_le`. -/
+lemma probOutput_bind_or_pure_le (q : Bool) (mb : ProbComp Bool) :
+    Pr[= true | mb >>= fun b => pure (q || b)] ≤ (if q then 1 else 0) + Pr[= true | mb] := by
+  cases q with
+  | true => simp
+  | false => simp
+
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- **Charged-step bound for the lazy ghost read.** Under the pointwise commitment-guessing
+bound `ε`, the deferred-sampling read `lazyGhostFire … pending` fires with probability at
+most `pending · ε`. This is the `R s · ε` charge that makes the charged-step premise of
+`probEvent_bad_simulateQ_run_le_expectedQuerySlack` *true* for the lazy run (with
+`R s := enncard (ghost cache) = pending`), in contrast to the eager run's deterministic
+flip. Proved by a union bound over the `pending` redraws, each bounded by `hGuess`. -/
+lemma probOutput_lazyGhostFire_true_le (pk : Stmt) (sk : Wit) {ε : ℝ}
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (w' : Commit) :
+    ∀ n : ℕ, Pr[= true | lazyGhostFire ids pk sk w' n] ≤ (n : ℝ≥0∞) * ENNReal.ofReal ε := by
+  intro n
+  induction n with
+  | zero => simp [lazyGhostFire]
+  | succ n ih =>
+      have hbody : Pr[= true | lazyGhostFire ids pk sk w' (n + 1)] ≤
+          Pr[= w' | Prod.fst <$> ids.commit pk sk] +
+            Pr[= true | lazyGhostFire ids pk sk w' n] := by
+        change Pr[= true | (Prod.fst <$> ids.commit pk sk) >>= fun w =>
+            lazyGhostFire ids pk sk w' n >>= fun b => pure (decide (w = w') || b)] ≤ _
+        rw [probOutput_bind_eq_tsum]
+        calc (∑' w : Commit, Pr[= w | Prod.fst <$> ids.commit pk sk] *
+              Pr[= true | lazyGhostFire ids pk sk w' n >>=
+                fun b => pure (decide (w = w') || b)])
+            ≤ ∑' w : Commit, Pr[= w | Prod.fst <$> ids.commit pk sk] *
+                ((if w = w' then 1 else 0) +
+                  Pr[= true | lazyGhostFire ids pk sk w' n]) := by
+              refine ENNReal.tsum_le_tsum fun w => ?_
+              gcongr
+              have h := probOutput_bind_or_pure_le (decide (w = w'))
+                (lazyGhostFire ids pk sk w' n)
+              simp only [decide_eq_true_eq] at h
+              exact h
+          _ = (∑' w : Commit, Pr[= w | Prod.fst <$> ids.commit pk sk] *
+                  (if w = w' then 1 else 0)) +
+                (∑' w : Commit, Pr[= w | Prod.fst <$> ids.commit pk sk]) *
+                  Pr[= true | lazyGhostFire ids pk sk w' n] := by
+              rw [← ENNReal.tsum_mul_right, ← ENNReal.tsum_add]
+              exact tsum_congr fun w => by ring
+          _ ≤ Pr[= w' | Prod.fst <$> ids.commit pk sk] +
+                Pr[= true | lazyGhostFire ids pk sk w' n] := by
+              gcongr
+              · rw [tsum_eq_single w' (by intro b hb; simp [hb]), if_pos rfl, mul_one]
+              · exact mul_le_of_le_one_left (zero_le') tsum_probOutput_le_one
+      refine hbody.trans ?_
+      push_cast
+      rw [add_mul, one_mul, add_comm]
+      gcongr
+      exact hGuess w'
+
+omit [SampleableType Stmt] [SampleableType Chal] [DecidableEq M] in
+/-- The lazy ghost read fires with probability at most `enncard gh · ε`, where the deferred
+attempt count is the ghost cache size. The `R s · ε` charge in the shape consumed by the
+accumulator's charged-step premise (`R s := QueryCache.enncard`). -/
+lemma probOutput_lazyGhostFire_true_le_enncard (pk : Stmt) (sk : Wit) {ε : ℝ}
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (w' : Commit) (gh : (M × Commit →ₒ Chal).QueryCache)
+    (hpending : (gh.toSet.encard.toNat : ℝ≥0∞) ≤ QueryCache.enncard gh) :
+    Pr[= true | lazyGhostFire ids pk sk w' gh.toSet.encard.toNat]
+      ≤ QueryCache.enncard gh * ENNReal.ofReal ε := by
+  refine (probOutput_lazyGhostFire_true_le ids pk sk hGuess w' _).trans ?_
+  gcongr
+
 /-! ### The two body-level cores of the Sign → Prog hop -/
 
 omit [SampleableType Stmt] in
