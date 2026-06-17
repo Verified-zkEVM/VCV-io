@@ -283,6 +283,84 @@ lemma probOutput_unforgeableExp_eq_hybridExpAtKey_real :
       Pr[= true | do
         let (pk, sk) ← hr.gen
         hybridExpAtKey ids hr M maxAttempts adv (realSignBody ids M maxAttempts pk sk) pk] := by
+  classical
+  set base : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
+    unifFwdImpl (M × Commit →ₒ Chal) +
+      (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+        (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) with hbase
+  -- `base` matches the runtime's `withStateOracle` interpreter: both lift `unifSpec` by
+  -- `liftTarget` (`unifFwdImpl` is exactly that) and use the caching `randomOracle`.
+  have hrt : ∀ {α : Type} (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α),
+      (runtime M).evalDist oa = 𝒟[(simulateQ base oa).run' ∅] := fun {α} oa => by
+    rw [hbase]
+    rfl
+  unfold SignatureAlg.unforgeableExp
+  rw [hrt]
+  rw [show (FiatShamirWithAbort ids hr M maxAttempts).keygen =
+    (liftM hr.gen : OracleComp (unifSpec + (M × Commit →ₒ Chal)) (Stmt × Wit)) from rfl]
+  rw [simulateQ_bind, roSim.run'_liftM_bind]
+  refine probOutput_congr rfl ?_
+  refine congrArg _ (bind_congr fun pksk => ?_)
+  obtain ⟨pk, sk⟩ := pksk
+  simp only []
+  rw [hybridExpAtKey_eq_run_bind]
+  -- Fuse the inner WriterT-logging `simulateQ` pass with the outer cache simulation
+  -- `simulateQ base` via `writerTMapBase`, so the whole left-hand experiment becomes a
+  -- single `simulateQ` over the run-normal-form cache base, still carrying the WriterT log.
+  rw [simulateQ_bind, StateT.run'_eq, StateT.run_bind,
+    QueryImpl.simulateQ_writerTMapBase_run]
+  -- Remaining: reconcile the fused WriterT-log-over-`StateT cache` run with the hybrid's
+  -- flat `StateT (cache × List M)` run. The bridge follows the Sigma-side recipe in
+  -- `FiatShamir/Sigma/Stateful/Compatibility.lean`:
+  --   1. `base.writerTMapBase implW = (toQueryImpl _).liftTarget _ + (realSignBody …).withLogging`
+  --      (a per-query handler equality; the signing handler is `simulateQ base (sign …) =
+  --      realSignBody`);
+  --   2. `QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog` rewrites the WriterT log
+  --      into a `StateT (List M)` input log carrying `[] ++ log.map fst`;
+  --   3. `OracleComp.simulateQ_flattenStateT_run` flattens the nested `StateT (List M)
+  --      (StateT cache ProbComp)` into the hybrid's flat `StateT (cache × List M) ProbComp`;
+  --   4. a state-projection (`map_run_simulateQ_eq_of_query_map_eq`) matches the flattened
+  --      handler against `hybridBaseImpl + hybridSignImpl realSignBody` (the lists differ only
+  --      by append-vs-prepend ordering, which is invisible to the freshness check);
+  --   5. the verify tail matches `hybridVerifyCont` with `wasQueried msg ↔ msg ∈ signed`
+  --      via `QueryLog.wasQueried_eq_decide_mem_map_fst`.
+  have hHandler : base.writerTMapBase
+      ((HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))).liftTarget
+          (WriterT (QueryLog (M →ₒ Option (Commit × Resp)))
+            (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) +
+        (FiatShamirWithAbort (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+          ids hr M maxAttempts).signingOracle pk sk) =
+      base.liftTarget
+          (WriterT (QueryLog (M →ₒ Option (Commit × Resp)))
+            (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) +
+        QueryImpl.withLogging
+          (fun msg => realSignBody ids M maxAttempts pk sk msg :
+            QueryImpl (M →ₒ Option (Commit × Resp))
+              (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) := by
+    funext t
+    rcases t with bq | sq
+    · ext s
+      simp [QueryImpl.writerTMapBase, QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply,
+        HasQuery.toQueryImpl_apply, base, unifFwdImpl]
+    · ext s
+      simp [QueryImpl.writerTMapBase, QueryImpl.add_apply_inr, SignatureAlg.signingOracle,
+        QueryImpl.withLogging_apply, FiatShamirWithAbort, realSignBody, base]
+  rw [hHandler]
+  -- Provide the cache base as a `HasQuery` instance so the WriterT-log → input-list replay
+  -- lemma `QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog` matches
+  -- `base.liftTarget _` (it equals `(HasQuery.toQueryImpl).liftTarget _` for this instance).
+  letI hq : HasQuery (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := base.toHasQuery
+  -- Remaining: (a) replay the WriterT log into a `StateT (List M)` input log carrying
+  -- `log.map fst` (the freshness check reads the log only through `map fst` via
+  -- `QueryLog.wasQueried_eq_decide_mem_map_fst`, and the final cache is discarded by the
+  -- outer `(· .1) <$> _`); (b) `OracleComp.simulateQ_flattenStateT_run` to collapse the
+  -- nested `StateT (List M) (StateT cache ProbComp)` into `StateT (cache × List M) ProbComp`;
+  -- (c) `map_run_simulateQ_eq_of_query_map_eq` to match the flattened handler against
+  -- `hybridBaseImpl + hybridSignImpl realSignBody` (append-vs-prepend list order is invisible
+  -- to membership); (d) identify the verify tail with `hybridVerifyCont`.
   sorry
 
 /-- Lift a cache-level hybrid handler to one carrying a never-touched bad flag in its
