@@ -50,8 +50,8 @@ lemma WriterPreservesInv.trivial {ι : Type} {spec : OracleSpec ι}
     WriterPreservesInv impl (fun _ => True) :=
   fun _ _ _ _ _ => True.intro
 
-lemma WriterPreservesInv.and {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {ω
-    : Type} [Monoid ω]
+lemma WriterPreservesInv.and {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {ω :
+    Type} [Monoid ω]
     {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {P Q : ω → Prop}
     (hP : WriterPreservesInv impl P) (hQ : WriterPreservesInv impl Q) :
     WriterPreservesInv impl (fun s => P s ∧ Q s) :=

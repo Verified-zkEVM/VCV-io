@@ -235,6 +235,151 @@ class Laws (ops : TransformOps ring Hat) : Prop where
   mul_comm : ∀ a b : Hat, ops.mulHat a b = ops.mulHat b a
   mul_assoc : ∀ a b c : Hat, ops.mulHat (ops.mulHat a b) c = ops.mulHat a (ops.mulHat b c)
 
+variable [laws : Laws ops]
+
+theorem hatVec_add {k} (u v : PolyVec ring.Poly k) :
+    ops.hatVec (u + v) = ops.hatVec u + ops.hatVec v := by
+  refine Vector.ext fun i _ => ?_
+  simp only [hatVec, Vector.getElem_map, Vector.getElem_add]
+  exact laws.toHat_add u[i] v[i]
+
+theorem hatVec_sub {k} (u v : PolyVec ring.Poly k) :
+    ops.hatVec (u - v) = ops.hatVec u - ops.hatVec v := by
+  refine Vector.ext fun i _ => ?_
+  simp only [hatVec, Vector.getElem_map, Vector.getElem_sub]
+  exact laws.toHat_sub u[i] v[i]
+
+private theorem addHat_eq (a b : Hat) :
+    a + b = ops.toHat (ops.fromHat a + ops.fromHat b) := by
+  rw [← laws.toHat_fromHat a, ← laws.toHat_fromHat b, ← laws.toHat_add]
+  congr 3
+  · rw[laws.toHat_fromHat]
+  · rw[laws.toHat_fromHat]
+
+theorem unhatVec_add {k} (uHat vHat : PolyVec Hat k) :
+    ops.unhatVec (uHat + vHat) = ops.unhatVec uHat + ops.unhatVec vHat := by
+  refine Vector.ext fun i _ => ?_
+  simp only [unhatVec, Vector.getElem_map, Vector.getElem_add]
+  rw [addHat_eq ops, laws.fromHat_toHat]
+
+private theorem subHat_eq (a b : Hat) :
+    a - b = ops.toHat (ops.fromHat a - ops.fromHat b) := by
+  rw [← laws.toHat_fromHat a, ← laws.toHat_fromHat b, ← laws.toHat_sub]
+  congr 3
+  · rw[laws.toHat_fromHat]
+  · rw[laws.toHat_fromHat]
+
+theorem unhatVec_sub {k} (uHat vHat : PolyVec Hat k) :
+    ops.unhatVec (uHat - vHat) = ops.unhatVec uHat - ops.unhatVec vHat := by
+  refine Vector.ext fun i _ => ?_
+  simp only [unhatVec, Vector.getElem_map, Vector.getElem_sub]
+  rw [subHat_eq ops, laws.fromHat_toHat]
+
+private theorem zipWith_push {β γ} {n : ℕ}
+  (f : α → β → γ) (a : Vector α n) (b : Vector β n) (x : α) (y : β) :
+    Vector.zipWith f (a.push x) (b.push y) = (Vector.zipWith f a b).push (f x y) := by
+  refine Vector.ext fun i _ => ?_
+  simp only [Vector.getElem_zipWith, Vector.getElem_push]
+  by_cases h : i < n <;> simp [h]
+
+private theorem foldl_distribute {k} (a b : PolyVec Hat k) :
+  (a + b).foldl (· + ·) 0 = (a.foldl (· + ·) 0) + (b.foldl (· + ·) 0) := by
+  induction k with
+  | zero =>
+    have : a = #v[] := Vector.eq_empty
+    have : b = #v[] := Vector.eq_empty
+    subst a b
+    simp only [Vector.eq_empty, Vector.foldl_empty, add_zero]
+  | succ n ih =>
+    haveI : NeZero (n + 1) := ⟨Nat.succ_ne_zero n⟩
+    rw [← Vector.push_pop_back a, ← Vector.push_pop_back b]
+    set sum_a := a.pop.foldl (· + ·) 0
+    set sum_b := b.pop.foldl (· + ·) 0
+    have : (a.pop.zipWith (· + ·) b.pop).foldl (· + ·) 0 = sum_a + sum_b := ih a.pop b.pop
+    change ((a.pop.push a.back).zipWith (· + ·) (b.pop.push b.back)).foldl (· + ·) 0  =
+      (a.pop.push a.back).foldl (· + ·) 0  + (b.pop.push b.back).foldl (· + ·) 0
+    rw [zipWith_push, Vector.foldl_push, Vector.foldl_push, Vector.foldl_push, this]
+    abel
+
+theorem dot_add_right {k} (row u v : PolyVec Hat k) :
+    ops.dot row (u + v) = (ops.dot row u) + ops.dot row v := by
+  have h_pt : Vector.zipWith ops.mulHat row (u + v) =
+    (row.zipWith ops.mulHat u) + (row.zipWith ops.mulHat v) := by
+    refine Vector.ext fun i _ => ?_
+    simp [Vector.getElem_zipWith, laws.mul_add]
+  simp only [dot]
+  rw [h_pt, foldl_distribute]
+
+theorem matVecMul_add {r c} (A : PolyMatrix Hat r c) (u v : PolyVec Hat c) :
+    ops.matVecMul A (u + v) = (ops.matVecMul A u) + ops.matVecMul A v := by
+  simp only [matVecMul]
+  refine Vector.ext fun i _ => ?_
+  simp only [Vector.getElem_map, Vector.getElem_add]
+  exact dot_add_right ops _ u v
+
+theorem mulHat_comm (a b : Hat) :
+    ops.mulHat a b = ops.mulHat b a := by
+  rw [show a = ops.toHat (ops.fromHat a) from (laws.toHat_fromHat a).symm,
+      show b = ops.toHat (ops.fromHat b) from (laws.toHat_fromHat b).symm,
+      ← laws.toHat_mul, laws.mul_comm, laws.toHat_mul]
+
+theorem mulHat_assoc (a b c : Hat) :
+    ops.mulHat (ops.mulHat a b) c = ops.mulHat a (ops.mulHat b c) :=
+  laws.mul_assoc a b c
+
+theorem fromHat_subHat (a b : Hat) :
+    ops.fromHat (a - b) = ops.fromHat a - ops.fromHat b := by
+  conv_lhs => rw [← laws.toHat_fromHat a, ← laws.toHat_fromHat b, ← laws.toHat_sub]
+  exact laws.fromHat_toHat _
+
+theorem fromHat_addHat (a b : Hat) :
+    ops.fromHat (a + b) = ops.fromHat a + ops.fromHat b := by
+  conv_lhs => rw [← laws.toHat_fromHat a, ← laws.toHat_fromHat b, ← laws.toHat_add]
+  exact laws.fromHat_toHat _
+
+theorem coeffScalarVecMul_sub {k} (c : ring.Poly)
+    (u v : PolyVec ring.Poly k) :
+    ops.coeffScalarVecMul c (u - v) =
+        ops.coeffScalarVecMul c u - ops.coeffScalarVecMul c v := by
+  refine Vector.ext fun i hi => ?_
+  simp only [coeffScalarVecMul, unhatVec, scalarVecMul, hatVec,
+             Vector.getElem_map, Vector.getElem_sub]
+  rw[laws.toHat_sub u[i] v[i], laws.mul_sub, fromHat_subHat ops]
+
+theorem coeffScalarVecMul_add {k} (c : ring.Poly)
+    (u v : PolyVec ring.Poly k) :
+    ops.coeffScalarVecMul c (u + v) =
+        ops.coeffScalarVecMul c u + ops.coeffScalarVecMul c v := by
+  refine Vector.ext fun i hi => ?_
+  simp only [coeffScalarVecMul, unhatVec, scalarVecMul, hatVec,
+             Vector.getElem_map, Vector.getElem_add]
+  rw [laws.toHat_add u[i] v[i], laws.mul_add, fromHat_addHat ops]
+
+theorem dot_scalar_right {k} (cHat : Hat)
+    (row v : PolyVec Hat k) :
+    ops.dot row (ops.scalarVecMul cHat v) = ops.mulHat cHat (ops.dot row v) := by
+  induction k with
+  | zero =>
+    have : row = #v[] := Vector.eq_empty; have : v = #v[] := Vector.eq_empty; subst_eqs
+    simp only [dot, scalarVecMul, Vector.map_mk, List.map_toArray, List.map_nil,
+      Vector.zipWith_self, Vector.foldl_mk, List.size_toArray, List.length_nil, List.foldl_toArray',
+      List.foldl_nil]
+    have h := laws.mul_sub cHat cHat cHat
+    simp only [sub_self] at h
+    rw[h]
+  | succ n ih =>
+    haveI : NeZero (n + 1) := ⟨Nat.succ_ne_zero n⟩
+    rw [← Vector.push_pop_back row, ← Vector.push_pop_back v]
+    change ops.dot (row.pop.push row.back) (ops.scalarVecMul cHat (v.pop.push v.back)) =
+      ops.mulHat cHat (ops.dot (row.pop.push row.back) (v.pop.push v.back))
+    simp only [dot, scalarVecMul, Vector.map_push, zipWith_push, Vector.foldl_push]
+    have ih_pop : ops.dot row.pop (ops.scalarVecMul cHat v.pop) =
+      ops.mulHat cHat (ops.dot row.pop v.pop) := ih row.pop v.pop
+    simp only [dot, scalarVecMul] at ih_pop
+    rw [ih_pop, laws.mul_add]
+    congr 1
+    rw[mulHat_comm ops, mulHat_assoc ops, mulHat_comm ops v.back]
+
 end TransformOps
 
 end LatticeCrypto

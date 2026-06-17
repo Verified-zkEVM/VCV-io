@@ -1000,8 +1000,7 @@ lemma count_pred_le_queryBound_of_mem_support_run_hidingImplCountAll
     z.2.2 s - 1 ≤ t := by
   haveI : Fintype S := Fintype.ofFinite S
   have hsum :
-      (∑ s' : S, z.2.2 s') ≤ t + 1 :=
-    by
+      (∑ s' : S, z.2.2 s') ≤ t + 1 := by
       simpa using
         (sum_counts_le_of_mem_support_run_hidingImplCountAll
           (M := M) (S := S) (C := C)
