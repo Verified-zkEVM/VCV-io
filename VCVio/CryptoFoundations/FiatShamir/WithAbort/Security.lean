@@ -1270,6 +1270,87 @@ noncomputable def simulatedNmaAdv :
         | none => cache
       pure ((msg, σ), advCache)
 
+/-- **State-coupling for the NMA bridge** (genuine two-layer content). At a fixed key pair
+the single-cache hybrid run of `hybridExpAtKey`, *followed by its verification-and-freshness
+tail* `hybridVerifyCont`, is bounded by the run-normal-form of the managed-RO NMA
+experiment: the managed-cache run of `simulatedNmaAdv` (re-simulated under the runtime's
+outer `randomOracle`), followed by overlay verification.
+
+The two presentations run the *same* adversary `adv.main pk` but thread the random-oracle
+cache through genuinely different layers:
+
+* the **hybrid** (`impl₁ := hybridBaseImpl + hybridSignImpl simSignBody`) keeps a *single*
+  cache `(cache, signed)`, into which both live RO reads (`randomOracle`) and the signing
+  simulation's accepted-transcript programming (`simSignBody` via `signProgramCont`) write;
+* the **managed reduction** (`simulatedNmaAdv.main`) keeps an *inner managed* cache threaded
+  by `roSim`/`sigSim`, whose live `fwd` reads are resolved by the runtime's *separate outer*
+  `randomOracle` cache. `simulateQ_compose` (`∘ₛ`) does not collapse these two layers because
+  the inner `.run ∅` boundary turns `roSim`/`fwd` misses into live queries answered by the
+  outer oracle.
+
+The coupling claim is that the *overlay* of the inner managed cache onto the outer runtime
+cache reproduces the single hybrid cache throughout the run (a state-projection in the sense
+of `OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'`), and that the signed-message list
+matches the set of points the managed simulation programmed (a cache invariant in the style
+of `fsAbortSignLoop_cache_invariant`). On `msg ∈ signed` the freshness conjunct kills the
+left side (`probOutput_true_hybridVerifyCont_of_mem`); on fresh forgeries the
+`withCacheOverlay` verification agrees with the live verification at the verification point
+(`withCacheOverlay_verify_eq_of_miss`, since the managed point at `(msg, w')` carries the
+programmed challenge that equals the hybrid's cached value, while the freshness check rules
+out a stale read). Hence the per-forgery success of the hybrid tail is at most that of the
+overlay verification, and the bound follows. -/
+lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
+    Pr[= true | (simulateQ
+          (hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+            hybridSignImpl M (simSignBody M maxAttempts sim pk sk))
+          (adv.main pk)).run (∅, []) >>= hybridVerifyCont ids hr M maxAttempts pk] ≤
+      Pr[= true | (fun x : Bool × _ => x.1) <$> do
+        let p ← (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
+            (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+              (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+          ((simulatedNmaAdv ids hr M maxAttempts sim adv).main pk)).run ∅
+        (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
+            (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+              (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+          (withCacheOverlay p.1.2 ((FiatShamirWithAbort ids hr M maxAttempts).verify
+            pk p.1.1.1 p.1.1.2))).run p.2] := by
+  -- RESIDUAL SUBGOAL (genuine two-layer state coupling — the hardest piece).
+  --
+  -- The proof is a state-projection (`OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'`)
+  -- coupling the single hybrid cache to the *overlay* of the inner managed cache onto the
+  -- outer runtime cache, run on the common adversary `adv.main pk`, followed by the
+  -- verify-tail comparison spelled out below. Concretely:
+  --
+  --   * `proj (cache, signed) := …` maps the hybrid's single-layer state to the managed
+  --     reduction's (inner managed cache, outer runtime cache) pair by *splitting* the
+  --     single cache into the points written by the signing simulation (inner managed
+  --     layer) and the points written by live RO reads (outer runtime layer); the overlay
+  --     `withCacheOverlay (inner) (outer)` recovers the single cache (cf. `overlayCache`).
+  --   * `inv (cache, signed)` records that every point the signing simulation programmed
+  --     sits at `(msg, w)` with `msg ∈ signed` (the `fsAbortSignLoop_cache_invariant`
+  --     analogue for `simSignBody`/`signProgramCont`), so a fresh forgery's verification
+  --     point is never a managed-programmed point; combined with Option B's erasure of the
+  --     forgery's own point this gives the `withCacheOverlay_verify_eq_of_miss` hypothesis.
+  --   * `hproj`: each `hybridBaseImpl`/`hybridSignImpl` step maps under `proj` to the
+  --     corresponding `(unifSim+roSim)+sigSim` step re-simulated under `unifFwdImpl+ro` —
+  --     the per-query content is `randomOracle_run_eq_roStep` for RO reads and the
+  --     `signProgramCont`/`sigSim` programming agreement for signing reads.
+  --
+  -- The verify tail then splits on `result.1.1 ∈ signed`:
+  --   - `msg ∈ signed`: `probOutput_true_hybridVerifyCont_of_mem` forces the LHS summand to
+  --     `0`, so the inequality is vacuous on that branch;
+  --   - `msg ∉ signed` (fresh): `withCacheOverlay_verify_eq_of_miss` makes the overlay
+  --     verification agree with the live verification at `(msg, w')`, and
+  --     `hybridVerifyCont_cache_congr` transports the hybrid verification along the
+  --     `overlayCache` identity, so the two per-forgery successes coincide.
+  --
+  -- This is the same magnitude of `simulateQ`-commutation bookkeeping as the sibling
+  -- Sign → Prog assembly (~150 lines) and is the open content of this lemma; the verify-tail
+  -- toolkit (`hybridVerifyCont_cache_congr`, `probOutput_true_hybridVerifyCont_of_mem`,
+  -- `withCacheOverlay_verify_eq_of_miss`) and the projection workhorse
+  -- (`map_run_simulateQ_eq_of_query_map_eq_inv'`) are all in place.
+  sorry
+
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
 simulated single-cache hybrid (with the freshness check) is bounded by the run-normal-form
 of the managed-RO NMA experiment — the managed-cache run of `simulatedNmaAdv` followed by
@@ -1293,7 +1374,16 @@ lemma hybridExp_sim_le_managedRun_perKey
           withCacheOverlay result.2
             ((FiatShamirWithAbort ids hr M maxAttempts).verify
               pk result.1.1 result.1.2))).run' ∅] := by
-  sorry
+  subst hro
+  -- Put the hybrid LHS into run-normal-form (`run` of the hybrid handler on `adv.main pk`
+  -- followed by the verify-and-freshness tail `hybridVerifyCont`).
+  rw [hybridExpAtKey_eq_run_bind]
+  -- Put the managed RHS into run-normal-form: `simulateQ_bind` distributes the outer RO
+  -- simulation over the managed run and the overlay verification, and `StateT.run'`/`run`
+  -- exposes the `(forgery, runtimeCache)` bind as a `ProbComp` bind whose final value is the
+  -- forgery's verification bit (`pure p.1`).
+  rw [simulateQ_bind, StateT.run'_eq, StateT.run_bind]
+  exact hybridSimRun_le_managedRun_verify ids hr M maxAttempts sim adv pk sk
 
 /-- NMA bridge: the success probability of the simulated hybrid (averaged over key
 generation, with the freshness check) is at most the success probability of
