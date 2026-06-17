@@ -262,34 +262,40 @@ lemma probEvent_ghostRead_bad_le
             ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
               List M), false)]
       ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
-  -- REMAINING SUBGOAL (reduction skeleton; ε-cell first-fire library proven in
-  -- `OracleComp.probEvent_probeManyEps_le`, axiom-clean).
-  --
-  -- The bound is the ghost-read instance of the `expectedQuerySlack_expected_resource_le`
-  -- framework already used in the sibling Sign → Prog hop above (search `h_charged` /
-  -- `h_slack_le`). The mapping is:
-  --   * resource `R s := QueryCache.enncard s.1.1.2` — the size of the *ghost* cache layer;
-  --   * charged queries = adversarial RO reads (`· matches .inl (.inr _)`): a read at `mc`
-  --     fires the bad flag iff `mc` is in the ghost domain, which (since each ghost entry was
-  --     created with a commitment `w` of per-outcome mass `≤ ε`, by `hGuess`) happens with
-  --     probability at most `R s · ε` — this is exactly `probEvent_commit_hit_le` read in the
-  --     dual direction, and abstractly `probEvent_probeStepEps_le`;
-  --   * resource growth = signing queries: `ghostSignBody` adds one ghost entry per rejected
-  --     attempt (the `none` branch `s.2.cacheQuery (msg, w) c` in `ghostSignBody`), so the
-  --     ghost cache grows by the number of rejections, whose expectation per signing query is
-  --     `≤ 1/(1 - p_abort)` by `hAbort` (cf. `tsum_probOutput_commit_mul_abort_le`);
-  --   * the budget `qH + 1` from `(hQ pk).2` (`signHashQueryBound`), `qS` from `(hQ pk).1`.
-  -- Folding the expected `qS/(1 - p_abort)` ghost-creation mass against the `(qH + 1)` reads,
-  -- each charged `ε`, gives `qS · (qH + 1) · ε / (1 - p_abort)`. The abstract first-fire union
-  -- bound `probEvent_probeManyEps_le` (`Pr[fire] ≤ q · ε`) is the per-signing-query content;
-  -- `expectedQuerySlack_expected_resource_le` folds the `1/(1 - p_abort)` attempt factor and
-  -- the `qS` outer count, exactly as in the sibling hop.
-  -- What remains is the run-normal-form bookkeeping: instantiating the framework's
-  -- `h_charged`/`h_growth`/`h_free` obligations for `ghostHybridImpl` (the ghost-read charge
-  -- via `probEvent_commit_hit_le`, the ghost-cache growth via `ghostSignBody`'s `none` branch),
-  -- and matching the framework's `ζ + R·β`-shaped output to the `qS·(qH+1)·ε/(1-p)` RHS. This
-  -- is the same magnitude of `simulateQ`-commutation bookkeeping as the sibling Sign → Prog
-  -- assembly (~120 lines) and is the open content of this lemma.
+  -- REMAINING SUBGOAL. The single-world `Pr[bad]` accumulator that R9 found missing is now
+  -- PROVEN axiom-clean as `OracleComp.ProgramLogic.Relational`.
+  -- `probEvent_bad_simulateQ_run_le_expectedQuerySlack` (in `Relational/SimulateQ.lean`):
+  -- it bounds `Pr[flag = true | (simulateQ impl oa).run (s, false)]` DIRECTLY by
+  -- `expectedQuerySlack impl charged (fun s => R s * ε) oa K (s, false)`, given a per-read
+  -- flip charge `R s · ε` (`h_charged_step`) and bad-mass-free free steps (`h_free_step`).
+  -- Applying it here with
+  --   * `impl := ghostHybridImpl ids M maxAttempts true pk sk`,
+  --   * `charged t := t matches .inl (.inr _)` (adversarial RO reads),
+  --   * `R s := QueryCache.enncard s.1.2` (the *ghost* cache `gh`; `σ = ((QC × QC) × List M)`),
+  --   * `ε := ENNReal.ofReal ε`, `K := qH + 1` from `(hQ pk).2`,
+  -- reduces this lemma to THREE isolated, smaller residual obligations:
+  --   (R1) `h_charged_step`: a read at `mc` from a non-bad state flips the flag with mass
+  --        `≤ enncard gh · ENNReal.ofReal ε`, routing further bad mass through the good output
+  --        states. This is `probEvent_commit_hit_le` (already proven) read at the ghost layer
+  --        `gh = s.1.2`, after unfolding the `.inl (.inr mc)` branch of `ghostHybridImpl … true`
+  --        (the `some`/`none` cache cases of `s.1.1.2 mc`).
+  --   (R2) `h_free_step`: the unif (`.inl (.inl _)`) and signing (`.inr _`) branches never set
+  --        the flag (`ghostHybridImpl … true` only writes `true` in the `.inl (.inr mc)` some
+  --        branch), so their bad mass equals the good-continuation tsum with no flip charge.
+  --   (R3) the FOLD: `expectedQuerySlack ghostHybridImpl charged (R · ε) (adv.main pk) (qH+1)
+  --        ((((∅,∅),[]),false)) ≤ ENNReal.ofReal (qS·(qH+1)·ε/(1-p_abort))`.
+  --        This is the genuine remaining content and needs a NEW expected-resource fold:
+  --        the existing `expectedQuerySlack_expected_resource_le` does NOT apply, because its
+  --        `h_growth` requires `R` to grow by ≤ +1 per growth query, whereas a signing query
+  --        grows `gh` by the number of rejected attempts (up to `maxAttempts − 1`, not ≤ 1).
+  --        The correct fold uses that `R` is monotone and the EXPECTED final ghost size is
+  --        `≤ qS / (1 − p_abort)` (each signing query adds expected `≤ 1/(1−p_abort)` ghost
+  --        entries, via `tsum_probOutput_commit_mul_abort_le` / `hAbort`, cf. the proven
+  --        `tsum_probOutput_run_progSignBody_mul_enncard_le`), so each of the `qH+1` reads is
+  --        charged `E[R] · ε ≤ (qS/(1−p_abort)) · ε`. Folding the `qH+1` reads gives the RHS.
+  --        Building this monotone-expected-resource fold (a supermartingale-style joint
+  --        induction tracking `slack` and `∑' z, Pr[=z|run]·R z` together) is the open ~150-line
+  --        framework piece; it is the single blocker to closing this lemma.
   sorry
 
 /-! ## Hop lemmas
