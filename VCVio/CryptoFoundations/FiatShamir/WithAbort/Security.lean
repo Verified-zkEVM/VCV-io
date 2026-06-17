@@ -1574,13 +1574,19 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   --     sum spec), i.e. the left component of `proj₂ ((base,ghost),signed) = (baseEmbed base,
   --     overlayCache base ghost)`; `baseEmbed_cacheQuery` provides the RO-step algebra
   --     `baseEmbed (base.cacheQuery mc v) = (baseEmbed base).cacheQuery (.inr mc) v`.
-  -- STILL OPEN: the per-step coupling `hproj₂` itself, which requires (i) promoting the local
-  -- `outer`/`inner`/`roSim`/`sigSim`/`unifSim` lets of `simulatedNmaAdv`/`managedRun_eq_link_run`
-  -- to top-level handlers so `outer.link inner` is nameable, and (ii) the nested-simulation
-  -- collapse `simulateQ inner ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` to
+  -- DONE part (i): the local `outer`/`inner`/`roSim`/`sigSim`/`unifSim` lets of
+  -- `simulatedNmaAdv`/`managedRun_eq_link_run` are now top-level handlers `nmaOuterImpl`,
+  -- `nmaInnerImpl`, and `nmaLinkImpl := (nmaOuterImpl …).link (nmaInnerImpl …)`, so the linked
+  -- handler is nameable; `managedRun_eq_link_run` is re-expressed in terms of them and stays
+  -- axiom-clean. The next-round per-step coupling can therefore be stated directly as
+  --   `hproj₂ : Prod.map id proj₂ <$> (ghostNmaImpl t).run s
+  --              = (nmaLinkImpl M maxAttempts sim pk t).run (proj₂ s)`
+  -- with `proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base ghost)`.
+  -- STILL OPEN part (ii): the nested-simulation collapse
+  -- `simulateQ (nmaInnerImpl …) ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` to
   -- the lifted `firstSome` loop so the sign step matches `simGhostSignBody`. That is the
-  -- remaining multi-week refactor; (a), the verify-tail toolkit (c), the invariant gate, and the
-  -- `baseEmbed` algebra are in place.
+  -- remaining multi-week content; (a), the verify-tail toolkit (c), the invariant gate, the
+  -- `baseEmbed` algebra, and now the named/linked handlers are in place.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
