@@ -18,6 +18,8 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
 open ENNReal
 
+/-! ## Probabilities of `pure` -/
+
 section pure
 
 @[simp, grind =] lemma support_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x : α) :
@@ -105,6 +107,8 @@ lemma sum_probOutput_pure' [Fintype α] [MonadLiftT m SPMF] [LawfulMonadLiftT m 
   have : DecidableEq α := Classical.decEq α; simp
 
 end pure
+
+/-! ## Probabilities of `bind` -/
 
 section bind
 
@@ -403,6 +407,8 @@ variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 end forall_support
 
 
+/-! ## Congruence and monotonicity for `bind` -/
+
 section congr_mono
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
@@ -511,6 +517,17 @@ lemma probOutput_bind_congr_div_const {mx : m α}
   · rw [h x hx, div_eq_mul_inv, mul_assoc]
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
+lemma probEvent_bind_congr_div_const {mx : m α}
+    {ob₁ ob₂ : α → m β} {q : β → Prop} {r : ℝ≥0∞}
+    (h : ∀ x ∈ support mx, Pr[ q | ob₁ x] = Pr[ q | ob₂ x] / r) :
+    Pr[ q | mx >>= ob₁] = Pr[ q | mx >>= ob₂] / r := by
+  simp only [probEvent_bind_eq_tsum, div_eq_mul_inv]
+  rw [← ENNReal.tsum_mul_right]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx, div_eq_mul_inv, mul_assoc]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
+
 lemma probOutput_bind_congr_eq_add {γ₁ γ₂ : Type u}
     {mx : m α} {my : α → m β}
       {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
@@ -518,6 +535,18 @@ lemma probOutput_bind_congr_eq_add {γ₁ γ₂ : Type u}
     (h : ∀ x ∈ support mx, Pr[= y | my x] = Pr[= z₁ | oc₁ x] + Pr[= z₂ | oc₂ x]) :
     Pr[= y | mx >>= my] = Pr[= z₁ | mx >>= oc₁] + Pr[= z₂ | mx >>= oc₂] := by
   simp only [probOutput_bind_eq_tsum, ← ENNReal.tsum_add]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx, left_distrib]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
+
+lemma probEvent_bind_congr_eq_add {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {q : β → Prop} {q₁ : γ₁ → Prop} {q₂ : γ₂ → Prop}
+    (h : ∀ x ∈ support mx, Pr[ q | my x] = Pr[ q₁ | oc₁ x] + Pr[ q₂ | oc₂ x]) :
+    Pr[ q | mx >>= my] = Pr[ q₁ | mx >>= oc₁] + Pr[ q₂ | mx >>= oc₂] := by
+  simp only [probEvent_bind_eq_tsum, ← ENNReal.tsum_add]
   refine tsum_congr fun x => ?_
   by_cases hx : x ∈ support mx
   · rw [h x hx, left_distrib]
@@ -551,6 +580,20 @@ lemma probOutput_bind_congr_add_le {γ₁ γ₂ : Type u}
       _ ≤ Pr[= x | mx] * Pr[= y | my x] := mul_le_mul' le_rfl (h x hx)
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
+lemma probEvent_bind_congr_add_le {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {q : β → Prop} {q₁ : γ₁ → Prop} {q₂ : γ₂ → Prop}
+    (h : ∀ x ∈ support mx, Pr[ q₁ | oc₁ x] + Pr[ q₂ | oc₂ x] ≤ Pr[ q | my x]) :
+    Pr[ q₁ | mx >>= oc₁] + Pr[ q₂ | mx >>= oc₂] ≤ Pr[ q | mx >>= my] := by
+  simp only [probEvent_bind_eq_tsum, ← ENNReal.tsum_add]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · calc Pr[= x | mx] * Pr[ q₁ | oc₁ x] + Pr[= x | mx] * Pr[ q₂ | oc₂ x]
+      _ = Pr[= x | mx] * (Pr[ q₁ | oc₁ x] + Pr[ q₂ | oc₂ x]) := (left_distrib ..).symm
+      _ ≤ Pr[= x | mx] * Pr[ q | my x] := mul_le_mul' le_rfl (h x hx)
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
+
 lemma probOutput_bind_congr_le_sub {γ₁ γ₂ : Type u}
     {mx : m α} {my : α → m β}
       {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
@@ -568,6 +611,23 @@ lemma probOutput_bind_congr_le_sub {γ₁ γ₂ : Type u}
     · simp [probOutput_eq_zero_of_not_mem_support hx]
   exact (ENNReal.cancel_of_ne probOutput_ne_top).le_tsub_of_add_le_right hadd
 
+lemma probEvent_bind_congr_le_sub {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {q : β → Prop} {q₁ : γ₁ → Prop} {q₂ : γ₂ → Prop}
+    (h : ∀ x ∈ support mx, Pr[ q | my x] ≤ Pr[ q₁ | oc₁ x] - Pr[ q₂ | oc₂ x])
+    (h' : ∀ x ∈ support mx, Pr[ q₂ | oc₂ x] ≤ Pr[ q₁ | oc₁ x]) :
+    Pr[ q | mx >>= my] ≤ Pr[ q₁ | mx >>= oc₁] - Pr[ q₂ | mx >>= oc₂] := by
+  have hadd : Pr[ q | mx >>= my] + Pr[ q₂ | mx >>= oc₂] ≤ Pr[ q₁ | mx >>= oc₁] := by
+    simp only [probEvent_bind_eq_tsum, ← ENNReal.tsum_add]
+    refine ENNReal.tsum_le_tsum fun x => ?_
+    by_cases hx : x ∈ support mx
+    · rw [← left_distrib]
+      exact mul_le_mul' le_rfl
+        ((add_le_add (h x hx) le_rfl).trans_eq (tsub_add_cancel_of_le (h' x hx)))
+    · simp [probOutput_eq_zero_of_not_mem_support hx]
+  exact (ENNReal.cancel_of_ne probEvent_ne_top).le_tsub_of_add_le_right hadd
+
 lemma probOutput_bind_congr_sub_le {γ₁ γ₂ : Type u}
     {mx : m α} {my : α → m β}
       {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
@@ -575,6 +635,20 @@ lemma probOutput_bind_congr_sub_le {γ₁ γ₂ : Type u}
     (h : ∀ x ∈ support mx, Pr[= z₁ | oc₁ x] - Pr[= z₂ | oc₂ x] ≤ Pr[= y | my x]) :
     Pr[= z₁ | mx >>= oc₁] - Pr[= z₂ | mx >>= oc₂] ≤ Pr[= y | mx >>= my] := by
   simp only [probOutput_bind_eq_tsum]
+  rw [tsub_le_iff_right, ← ENNReal.tsum_add]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [← left_distrib]
+    exact mul_le_mul' le_rfl (tsub_le_iff_right.mp (h x hx))
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
+
+lemma probEvent_bind_congr_sub_le {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {q : β → Prop} {q₁ : γ₁ → Prop} {q₂ : γ₂ → Prop}
+    (h : ∀ x ∈ support mx, Pr[ q₁ | oc₁ x] - Pr[ q₂ | oc₂ x] ≤ Pr[ q | my x]) :
+    Pr[ q₁ | mx >>= oc₁] - Pr[ q₂ | mx >>= oc₂] ≤ Pr[ q | mx >>= my] := by
+  simp only [probEvent_bind_eq_tsum]
   rw [tsub_le_iff_right, ← ENNReal.tsum_add]
   refine ENNReal.tsum_le_tsum fun x => ?_
   by_cases hx : x ∈ support mx
@@ -632,6 +706,8 @@ lemma probEvent_bind_congr_le_add {mx : m α} {my oc : α → m β}
         add_le_add le_rfl (mul_le_of_le_one_left (zero_le) tsum_probOutput_le_one)
 
 end congr_mono
+
+/-! ## Complement swapping and union bounds -/
 
 section swap_compl
 
