@@ -1618,11 +1618,77 @@ lemma run_simGhostSignBody_overlay (pk : Stmt) (sk : Wit) (msg : M)
   refine congrArg (firstSome (sim pk) maxAttempts >>= ·) (funext fun oz => ?_)
   exact run_ghostSignProgramCont_overlay M msg oz re gh
 
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- Ghost-domain support fact for `simGhostSignBody`: every ghost-layer entry of an output
+state is either an entry already present in the input ghost layer, or sits at a point whose
+message component equals the signed message `msg`.  The base layer is never touched. -/
+lemma simGhostSignBody_support_ghost (pk : Stmt) (msg : M)
+    (re gh : (M × Commit →ₒ Chal).QueryCache)
+    (z : Option (Commit × Resp) ×
+      ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache))
+    (hz : z ∈ support ((simGhostSignBody M maxAttempts sim pk msg).run (re, gh)))
+    (q : M × Commit) (hq : z.2.2 q ≠ none) : gh q ≠ none ∨ q.1 = msg := by
+  simp only [simGhostSignBody, StateT.run_bind, OracleComp.liftM_run_StateT, bind_assoc,
+    pure_bind, support_bind, Set.mem_iUnion, exists_prop] at hz
+  obtain ⟨oz, -, hz⟩ := hz
+  cases oz with
+  | none =>
+      simp only [ghostSignProgramCont, StateT.run_pure, support_pure,
+        Set.mem_singleton_iff] at hz
+      subst hz
+      exact Or.inl hq
+  | some wcz =>
+      obtain ⟨w, c, z'⟩ := wcz
+      simp only [ghostSignProgramCont, StateT.run_bind, StateT.run_modify, pure_bind,
+        StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      simp only at hq
+      by_cases hqw : q = (msg, w)
+      · exact Or.inr (by simp [hqw])
+      · exact Or.inl (by rwa [QueryCache.cacheQuery_of_ne _ _ hqw] at hq)
+
 /-- State of the layered ghost-tagged NMA run: a base/ghost cache pair together with the
 signed-message list. (No bad flag is needed for the NMA bridge: the coupling is exact, not
 identical-until-bad.) -/
 abbrev NmaGhostState (M Commit Chal : Type) : Type :=
   ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M
+
+/-- Embed a base random-oracle cache (keyed by `M × Commit`) into the outer runtime cache of
+the linked managed run, which is keyed by the sum spec `unifSpec + (M × Commit →ₒ Chal)`. The
+uniform-query slots are empty (the runtime forwards uniform queries through `unifFwdImpl`
+without caching), and the random-oracle slots carry the base entries. This is the left
+component of the linked-run projection `proj₂` for sub-lemma (b). -/
+def baseEmbed (base : (M × Commit →ₒ Chal).QueryCache) :
+    (unifSpec + (M × Commit →ₒ Chal)).QueryCache
+  | .inl _ => none
+  | .inr mc => base mc
+
+omit [SampleableType Stmt] [DecidableEq Commit] [DecidableEq M] [SampleableType Chal] in
+@[simp] lemma baseEmbed_inr (base : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
+    baseEmbed M base (.inr mc) = base mc := rfl
+
+omit [SampleableType Stmt] [DecidableEq Commit] [DecidableEq M] [SampleableType Chal] in
+@[simp] lemma baseEmbed_inl (base : (M × Commit →ₒ Chal).QueryCache)
+    (n : unifSpec.Domain) : baseEmbed M base (.inl n) = none := rfl
+
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- Embedding commutes with caching a random-oracle point: `baseEmbed` of a base cache
+extended at `mc` equals the outer cache extended at the `.inr mc` slot. -/
+lemma baseEmbed_cacheQuery (base : (M × Commit →ₒ Chal).QueryCache)
+    (mc : M × Commit) (v : Chal) :
+    baseEmbed M (base.cacheQuery mc v) =
+      (baseEmbed M base).cacheQuery (.inr mc) v := by
+  funext t
+  cases t with
+  | inl n =>
+      rw [QueryCache.cacheQuery_of_ne _ _ (show (Sum.inl n : (unifSpec +
+        (M × Commit →ₒ Chal)).Domain) ≠ Sum.inr mc by simp), baseEmbed_inl, baseEmbed_inl]
+  | inr mc' =>
+      by_cases h : mc' = mc
+      · subst h; simp [baseEmbed, QueryCache.cacheQuery_self]
+      · rw [baseEmbed_inr, QueryCache.cacheQuery_of_ne _ _ h,
+          QueryCache.cacheQuery_of_ne _ _ (show (Sum.inr mc' : (unifSpec +
+            (M × Commit →ₒ Chal)).Domain) ≠ Sum.inr mc by simp [h]), baseEmbed_inr]
 
 /-- Layered ghost-tagged handler for the simulated hybrid.  Base oracles (uniform and the
 caching random oracle) write live RO reads to the *base* layer, reading through the overlay
@@ -1671,6 +1737,44 @@ lemma ghostNmaImpl_run_sign (pk : Stmt) (sk : Wit) (msg : M)
           ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) =>
         (alc.1, (alc.2, msg :: s.2))) <$>
         (simGhostSignBody M maxAttempts sim pk msg).run s.1 := rfl
+
+omit [SampleableType Stmt] in
+/-- **Ghost-domain invariant for `ghostNmaImpl`.** Along any run of the layered NMA handler,
+every ghost-layer entry's message component has been recorded in the signed list. This is the
+NMA analogue of `ghostHybridImpl_preserves_signed_inv`: the base oracles never write the ghost
+layer, and the signing oracle records the signed message before programming the ghost layer at
+a point whose message component equals that signed message (`simGhostSignBody_support_ghost`).
+This invariant is the gate for the linked-run coupling (sub-lemma (b)): it certifies that on a
+random-oracle step a live read hits the base/outer layer, while the ghost layer only carries
+signing-programmed points. -/
+lemma ghostNmaImpl_preserves_signed_inv (pk : Stmt) (sk : Wit)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (s : NmaGhostState M Commit Chal)
+    (hs : ∀ q : M × Commit, s.1.2 q ≠ none → q.1 ∈ s.2) :
+    ∀ z ∈ support ((ghostNmaImpl M maxAttempts sim pk sk t).run s),
+      ∀ q : M × Commit, z.2.1.2 q ≠ none → q.1 ∈ z.2.2 := by
+  intro z hz
+  rcases t with (n | mc) | msg
+  · simp only [ghostNmaImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨u, -, rfl⟩ := hz
+    exact hs
+  · simp only [ghostNmaImpl, StateT.run_mk] at hz
+    cases hgh : s.1.2 mc with
+    | some v =>
+        simp only [hgh, support_pure, Set.mem_singleton_iff] at hz
+        subst hz
+        exact hs
+    | none =>
+        simp only [hgh, support_map] at hz
+        obtain ⟨cu, -, rfl⟩ := hz
+        exact hs
+  · simp only [ghostNmaImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨alc, halc, rfl⟩ := hz
+    intro q hq
+    rcases simGhostSignBody_support_ghost M maxAttempts sim pk msg s.1.1 s.1.2 alc halc q hq
+      with hgh | hmsg
+    · exact List.mem_cons_of_mem _ (hs q hgh)
+    · exact hmsg ▸ List.mem_cons_self
 
 omit [SampleableType Stmt] in
 /-- **Sub-lemma (a): overlay projection of the layered NMA handler.** Each step of the

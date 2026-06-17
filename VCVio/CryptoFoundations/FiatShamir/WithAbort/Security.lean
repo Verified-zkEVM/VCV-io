@@ -1523,6 +1523,27 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   -- live read writes the base layer and outer cache identically, while the signing step's ghost
   -- write matches the inner cache's `cacheQuery (.inr (msg, w)) c` and never touches the outer.
   -- This is the genuine multi-week content; (a) and the verify-tail toolkit (c) are in place.
+  --
+  -- BANKED toward (b) (axiom-clean, `GhostBodies.lean`). The ghost-domain *gate* and the left
+  -- component of `proj₂` are now built and proven:
+  --   * `ghostNmaImpl_preserves_signed_inv` — the invariant "every ghost-layer point's msg ∈
+  --     signed" is preserved by every `ghostNmaImpl` step (NMA analogue of
+  --     `ghostHybridImpl_preserves_signed_inv`), backed by the new support fact
+  --     `simGhostSignBody_support_ghost` (the signing body only writes ghost points whose msg is
+  --     the signed message). This is exactly the `inv` to feed
+  --     `map_run_simulateQ_eq_of_query_map_eq_inv'`.
+  --   * `baseEmbed` (+ `baseEmbed_inr`/`baseEmbed_inl`/`baseEmbed_cacheQuery`) — the embedding
+  --     of a base RO cache (keyed by `M × Commit`) into the outer runtime cache (keyed by the
+  --     sum spec), i.e. the left component of `proj₂ ((base,ghost),signed) = (baseEmbed base,
+  --     overlayCache base ghost)`; `baseEmbed_cacheQuery` provides the RO-step algebra
+  --     `baseEmbed (base.cacheQuery mc v) = (baseEmbed base).cacheQuery (.inr mc) v`.
+  -- STILL OPEN: the per-step coupling `hproj₂` itself, which requires (i) promoting the local
+  -- `outer`/`inner`/`roSim`/`sigSim`/`unifSim` lets of `simulatedNmaAdv`/`managedRun_eq_link_run`
+  -- to top-level handlers so `outer.link inner` is nameable, and (ii) the nested-simulation
+  -- collapse `simulateQ inner ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` to
+  -- the lifted `firstSome` loop so the sign step matches `simGhostSignBody`. That is the
+  -- remaining multi-week refactor; (a), the verify-tail toolkit (c), the invariant gate, and the
+  -- `baseEmbed` algebra are in place.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
