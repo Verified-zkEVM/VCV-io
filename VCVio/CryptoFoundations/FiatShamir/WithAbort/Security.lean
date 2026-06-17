@@ -297,6 +297,7 @@ lemma probEvent_ghostRead_bad_le
 Each hop is stated per key pair, under pointwise hypotheses at that key; the good-key
 event and `δ` enter only once, in the final averaging over `hr.gen`. -/
 
+omit [SampleableType Stmt] in
 /-- G₀ bridge: at every key pair produced by key generation, the real-signing hybrid
 experiment reproduces the success probability of the standard unforgeability experiment
 `SignatureAlg.unforgeableExp` under `runtime M`.
@@ -451,13 +452,51 @@ lemma probOutput_unforgeableExp_eq_hybridExpAtKey_real :
     OracleComp.map_run_simulateQ_eq_of_query_map_eq implAppend.flattenStateT
       (hybridBaseImpl (Commit := Commit) (Chal := Chal) M + hybridSignImpl M so)
       proj hmatch oa s
-  -- Remaining final assembly (steps b/d): chain `hreplay` (WriterT-log → `appendInputLog`),
+  -- Final assembly (steps b/d): chain `hreplay` (WriterT-log → `appendInputLog`),
   -- `OracleComp.simulateQ_flattenStateT_run` (flatten the nested `StateT (List M) (StateT cache)`
   -- to `StateT (List M × cache)`), and `hflat` (the `proj`-projection to the hybrid run on
   -- `(cache × List M)`), then identify the verify tail with `hybridVerifyCont` using
   -- `QueryLog.wasQueried_eq_decide_mem_map_fst` (`wasQueried msg ↔ msg ∈ log.map fst ↔
   -- msg ∈ (final signed list).reverse`, membership-invariant under the `proj` list reversal).
-  sorry
+  -- (b) Apply `.run ∅` to `hreplay` (a `StateT cache` identity) to obtain a `ProbComp`
+  -- identity for the cache-run of the WriterT log, with the log already projected to its
+  -- list of queried messages.
+  have hreplay' := congrArg
+    (fun (g : StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp _) => g.run ∅) hreplay
+  simp only [StateT.run_map] at hreplay'
+  -- (c) Flatten the nested `StateT (List M) (StateT cache)` run into the joint-state run.
+  have hflatten := OracleComp.simulateQ_flattenStateT_run implAppend (adv.main pk) ([] : List M)
+    (∅ : (M × Commit →ₒ Chal).QueryCache)
+  -- (d) Project the joint-state run onto the hybrid run via `proj`.
+  have hflatHybrid := hflat (adv.main pk) (([], ∅) : List M × (M × Commit →ₒ Chal).QueryCache)
+  rw [hproj] at hflatHybrid
+  simp only [List.reverse_nil] at hflatHybrid
+  -- Rewrite the hybrid run on the right as a pure relabelling of the cache-run of the
+  -- WriterT-logged adversary, sending `(((msg, σ), log), cache)` to
+  -- `((msg, σ), (cache, (log.map fst).reverse))`.
+  rw [← hflatHybrid, hflatten, ← hreplay']
+  simp only [map_bind, bind_assoc, map_pure, pure_bind, Prod.map, id]
+  -- The cache base appearing in the left generator is exactly the `HasQuery.toQueryImpl`
+  -- instance used by the replayed run (`hq := base.toHasQuery`).
+  rw [show (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+      (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) = base from rfl]
+  -- Push the relabelling map into the bind so both sides bind over the same generator.
+  rw [bind_map_left]
+  refine bind_congr fun p => ?_
+  -- For each WriterT-run outcome `p = (((msg, σ), log), cache)`, the left verify tail equals
+  -- `hybridVerifyCont` at the relabelled state `((msg, σ), (cache, (log.map fst).reverse))`.
+  obtain ⟨⟨⟨msg, σ⟩, log⟩, cache⟩ := p
+  simp only [hybridVerifyCont]
+  rw [simulateQ_bind]
+  simp only [simulateQ_pure, StateT.run_bind, StateT.run', map_bind, bind_map_left]
+  refine bind_congr fun verified => ?_
+  obtain ⟨ok, c⟩ := verified
+  simp only [StateT.run_pure, map_pure, List.nil_append, List.mem_reverse,
+    QueryLog.wasQueried_eq_decide_mem_map_fst, decide_not]
+  -- Both sides are `!decide (msg ∈ log.map fst) && ok`; they differ only in the choice of
+  -- `Decidable` instance for the membership test, which is a subsingleton, so `decide`
+  -- agrees on the nose after normalising.
+  norm_num [Bool.and_left_comm]
 
 /-- Lift a cache-level hybrid handler to one carrying a never-touched bad flag in its
 state, so the `expectedQuerySlack` bridge of `ProgramLogic/Relational/SimulateQ.lean`
