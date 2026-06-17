@@ -1418,6 +1418,27 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   -- forgeries `withCacheOverlay_verify_eq_of_miss` + `hybridVerifyCont_cache_congr` align the
   -- overlay verification with the live verification. The fusion (Step 1) and the verify-tail
   -- toolkit are in place; the open content is the layered-state projection.
+  --
+  -- STEP 1 (executed below, axiom-clean): the mechanical link-fusion plumbing. Distributing
+  -- `simulateQ_bind`/`StateT.run_bind` over `simulatedNmaAdv.main`'s Option-B post-processing
+  -- bind exposes the bare nested managed run, and `managedRun_eq_link_run` rewrites it to the
+  -- single linked simulation `(simulateQ (outer.link inner) (adv.main pk)).run (∅, ∅)`.
+  simp only [simulatedNmaAdv, simulateQ_bind, StateT.run_bind, bind_assoc]
+  -- The RHS is now `(fun x => x.1) <$> do let p ← (simulateQ (unifFwd+ro)
+  --   ((simulateQ ((unifSim+roSim)+sigSim) (adv.main pk)).run ∅)).run ∅; (Option-B post)…`,
+  -- with the bare nested managed run exposed. `managedRun_eq_link_run` equates this nested
+  -- run (modulo the canonical `linkReshape <$> _` regrouping of the final state) with the
+  -- single linked simulation `(simulateQ (outer.link inner) (adv.main pk)).run (∅, ∅)`.
+  --
+  -- REMAINING SUBGOAL (the genuine still-open content). With the nested boundary exposed, the
+  -- bound is the state-projection coupling described above: a layered ghost-tagged handler that
+  -- partitions each cache point as live-read (base layer) vs signing-programmed (ghost layer),
+  -- projecting (a) by `overlayCache` to the single hybrid cache and (b) by the
+  -- `randomOracle_run_eq_roStep` round-trip to the linked (inner,outer) pair under the invariant
+  -- "every ghost-tagged point's msg ∈ signed", then (c) the verify-tail split on `msg ∈ signed`
+  -- (`probOutput_true_hybridVerifyCont_of_mem`, `withCacheOverlay_verify_eq_of_miss`,
+  -- `hybridVerifyCont_cache_congr`). The fusion `simp only` above is the executed, axiom-clean
+  -- Step 1; the layered-state projection is the open content.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
