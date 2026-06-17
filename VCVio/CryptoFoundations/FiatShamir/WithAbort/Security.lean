@@ -15,7 +15,7 @@ import VCVio.OracleComp.SimSemantics.StateT.StateSeparating
 Statistical CMA-to-NMA reduction for the Fiat-Shamir-with-aborts transform,
 following Theorem 3 of Barbosa et al. (CRYPTO 2023, ePrint 2023/246).
 Instantiates `FiatShamir.signHashQueryBound` at the with-aborts signature type
-and exposes `cmaToNmaLoss` plus `euf_cma_bound` / `euf_cma_bound_perfectHVZK`,
+and exposes `cmaToNmaLoss` plus `euf_cma_to_nma` (the managed-RO NMA interface),
 together with the hybrid game chain (`hybridExpAtKey` over the signing bodies
 `realSignBody`, `progSignBody`, `transSignBody`, `simSignBody`) that structures
 the proof.
@@ -1956,108 +1956,6 @@ lemma simulatedNmaAdv_nmaHashQueryBound
 
 end scaffold
 
-/-- **CMA-to-NMA security bound for Fiat-Shamir with aborts (Theorem 3, CRYPTO 2023).**
-
-For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
-random-oracle queries, there exists a witness-finding reduction whose success
-probability in `hardRelationExp` absorbs the computational part of the bound:
-
-  `Adv^{EUF-CMA}(A) ≤ Pr[hardRelationExp hr reduction] + L`
-
-with `L = cmaToNmaLoss qS qH ε p_abort ζ_zk δ`. The quantitative hypotheses tie each
-loss parameter to the identification scheme on a good-key event `Good` (the event `Γ`
-of the paper's Lemma 1):
-
-- `hGood`: key generation leaves `Good` with probability at most `δ`;
-- `hGuess`: on good keys, every fixed commitment is hit by `ids.commit` with
-  probability at most `ε` (commitment-guessing / min-entropy bound);
-- `hAbort` / `hAbortSim`: on good keys, a single honest signing attempt
-  (resp. simulator attempt) aborts with probability at most `p_abort`;
-- `hhvzk`: the simulator is within total-variation distance `ζ_zk` of one honest
-  attempt, over optional transcripts (`IdenSchemeWithAbort.HVZK`).
-
-The reduction uses the HVZK simulator to answer signing queries without the secret key
-and commitment recoverability `recover` to convert between the standard and
-commitment-recoverable signature formats; see `euf_cma_to_nma` for the hybrid chain and
-the managed-RO NMA interface, and `MLDSA.nma_security` / `MLDSA.euf_cma_security` for
-the scheme-specific computational step. -/
-theorem euf_cma_bound
-    (hc : ids.Complete)
-    (sim : Stmt → ProbComp (Option (Commit × Chal × Resp)))
-    (ζ_zk : ℝ)
-    (hζ : 0 ≤ ζ_zk)
-    (hhvzk : ids.HVZK sim ζ_zk)
-    (recover : Stmt → Chal → Resp → Commit)
-    (hcr : ids.CommitmentRecoverable recover)
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamirWithAbort
-        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) ids hr M maxAttempts))
-    (qS qH : ℕ) (ε p_abort δ : ℝ)
-    (hε : 0 ≤ ε) (hδ : 0 ≤ δ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1)
-    (Good : Stmt → Wit → Prop)
-    (hGood : Pr[ fun xw : Stmt × Wit => ¬ Good xw.1 xw.2 | hr.gen] ≤ ENNReal.ofReal δ)
-    (hGuess : ∀ pk sk, Good pk sk → ∀ cm : Commit,
-      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
-    (hAbort : ∀ pk sk, Good pk sk →
-      Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
-    (hAbortSim : ∀ pk sk, Good pk sk →
-      Pr[= none | sim pk] ≤ ENNReal.ofReal p_abort)
-    (hQ : ∀ pk, FiatShamir.signHashQueryBound M
-      (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH) :
-    ∃ reduction : Stmt → ProbComp Wit,
-      adv.advantage (runtime M) ≤
-        Pr[= true | hardRelationExp hr reduction] +
-          ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
-  let _ := hc
-  let _ := hcr
-  -- From `euf_cma_to_nma`, the advantage is bounded by the managed-RO NMA success
-  -- probability of `simulatedNmaAdv` plus the loss. The remaining step relates the
-  -- NMA success probability to `hardRelationExp`. NOTE (statement-level): in this
-  -- non-asymptotic formulation `hardRelationExp` admits an unbounded witness-search
-  -- reduction, so this conclusion is strictly weaker than the NMA-advantage form of
-  -- `euf_cma_to_nma`; downstream consumers (e.g. `MLDSA.euf_cma_security`) should
-  -- compose with `euf_cma_to_nma` and the scheme-specific NMA theorem instead.
-  sorry
-
-/-- Perfect-HVZK special case of `euf_cma_bound`, where the simulator contributes no
-zero-knowledge loss term. The simulator abort hypothesis `hAbortSim` is retained: even a
-perfect per-attempt simulator participates in the restart loop, whose length governs the
-reprogramming terms. -/
-theorem euf_cma_bound_perfectHVZK
-    (hc : ids.Complete)
-    (sim : Stmt → ProbComp (Option (Commit × Chal × Resp)))
-    (hhvzk : ids.PerfectHVZK sim)
-    (recover : Stmt → Chal → Resp → Commit)
-    (hcr : ids.CommitmentRecoverable recover)
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamirWithAbort
-        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) ids hr M maxAttempts))
-    (qS qH : ℕ) (ε p_abort δ : ℝ)
-    (hε : 0 ≤ ε) (hδ : 0 ≤ δ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1)
-    (Good : Stmt → Wit → Prop)
-    (hGood : Pr[ fun xw : Stmt × Wit => ¬ Good xw.1 xw.2 | hr.gen] ≤ ENNReal.ofReal δ)
-    (hGuess : ∀ pk sk, Good pk sk → ∀ cm : Commit,
-      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
-    (hAbort : ∀ pk sk, Good pk sk →
-      Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
-    (hAbortSim : ∀ pk sk, Good pk sk →
-      Pr[= none | sim pk] ≤ ENNReal.ofReal p_abort)
-    (hQ : ∀ pk, FiatShamir.signHashQueryBound M
-      (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH) :
-    ∃ reduction : Stmt → ProbComp Wit,
-      adv.advantage (runtime M) ≤
-        Pr[= true | hardRelationExp hr reduction] +
-          ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
-  simpa using
-    (euf_cma_bound (ids := ids) (M := M) (maxAttempts := maxAttempts)
-      (hc := hc) (sim := sim) (ζ_zk := 0) (hζ := le_rfl)
-      (hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp hhvzk)
-      (recover := recover) (hcr := hcr) (adv := adv)
-      (qS := qS) (qH := qH) (ε := ε) (p_abort := p_abort) (δ := δ)
-      (hε := hε) (hδ := hδ) (hp₀ := hp₀) (hp := hp)
-      (Good := Good) (hGood := hGood) (hGuess := hGuess)
-      (hAbort := hAbort) (hAbortSim := hAbortSim)
-      (hQ := hQ))
 
 end EUF_CMA
 
