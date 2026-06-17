@@ -1462,6 +1462,36 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   -- (`probOutput_true_hybridVerifyCont_of_mem`, `withCacheOverlay_verify_eq_of_miss`,
   -- `hybridVerifyCont_cache_congr`). The fusion `simp only` above is the executed, axiom-clean
   -- Step 1; the layered-state projection is the open content.
+  --
+  -- BANKED (sub-lemma (a), axiom-clean, `GhostBodies.lean`). The layered ghost-tagged handler
+  -- is now built: `ghostNmaImpl` over the state `((baseCache, ghostCache), signed)` (abbrev
+  -- `NmaGhostState`), with `simGhostSignBody`/`ghostSignProgramCont` writing the accepted
+  -- transcript to the ghost layer and the base oracles writing live RO reads to the base layer.
+  -- The overlay projection back to the plain single-cache hybrid is proven:
+  --   `ghostNmaImpl_proj_hybrid` (per step) and
+  --   `map_run_simulateQ_ghostNmaImpl_overlay`/`_empty` (full run), via
+  --   `OracleComp.map_run_simulateQ_eq_of_query_map_eq` with
+  --   `proj ((base, ghost), signed) = (overlayCache base ghost, signed)`.
+  -- Hence the hybrid LHS equals `Pr[= true | (overlay-projected ghostNmaImpl run) >>= …]`.
+  --
+  -- EXACT OPEN RESIDUAL (sub-lemma (b), not landed; ~2-3 weeks). Couple the *same* layered run
+  -- `(simulateQ (ghostNmaImpl …) (adv.main pk)).run ((∅,∅), [])` to the linked managed run
+  -- `(simulateQ (outer.link inner) (adv.main pk)).run (∅, ∅)` (from `managedRun_eq_link_run`)
+  -- under the projection `proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base
+  -- ghost)` onto the linked `(outerCache : spec.QueryCache, innerCache : (M×Commit→ₒChal).
+  -- QueryCache)` pair (outer = live-read layer = base, inner = full hybrid cache = overlay).
+  -- The per-step `hproj` linchpin is NOT a primitive-query projection against `outer.link inner`:
+  -- by `linkWith_apply_run`, each `(outer.link inner) t` step is itself a *nested*
+  -- `simulateQ inner ((outer t).run …)`, where `outer t` (roSim/sigSim) is a multi-query
+  -- composite — roSim does an inner cache lookup then forwards a miss to `fwd` (re-simulated by
+  -- `inner`'s `randomOracle`, the `randomOracle_run_eq_roStep` round-trip), and sigSim runs a
+  -- whole `simulateQ unifSim (firstSome (sim pk) maxAttempts)`. So (b) requires coupling
+  -- `ghostNmaImpl` against the *nested-simulation* form of the managed handler step-by-step,
+  -- under the ghost-domain invariant "every ghost point's msg ∈ signed" (cf.
+  -- `ghostHybridImpl_preserves_signed_inv` for the sibling hop), so that on the RO step the
+  -- live read writes the base layer and outer cache identically, while the signing step's ghost
+  -- write matches the inner cache's `cacheQuery (.inr (msg, w)) c` and never touches the outer.
+  -- This is the genuine multi-week content; (a) and the verify-tail toolkit (c) are in place.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
