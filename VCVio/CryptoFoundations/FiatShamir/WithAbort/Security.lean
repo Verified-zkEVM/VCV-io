@@ -294,6 +294,29 @@ lemma probEvent_ghostRead_bad_le
   -- the eager run to that variant (the genuine probabilistic content described in the docstring
   -- above). That bridge is a multi-week deferred-sampling rewrite, not a local discharge; it is
   -- the single remaining blocker. R3 (the fold) and R2 (free-step bad-freedom) are not blockers.
+  --
+  -- TRANSFER VERDICT (does the `feat/first-fire-library` probe oracle close R1?): NO. The probe
+  -- library's deferred-sampling equivalence `evalDist_genTable_bind_eagerProbeImpl` and its
+  -- first-fire bound `probEvent_genTable_bind_eagerProbeImpl_le` (in
+  -- `OracleComp/QueryTracking/RandomOracle/ProbeEquiv.lean`) model a *range-uniform* firing:
+  -- cells `D → R` are pre-sampled via `genTable K` (uniform on each cell's allowed `Finset R`),
+  -- a `ProbeOp.probe d a` fires iff the FRESH UNIFORM cell value `g d` equals the adversary's
+  -- target `a`, and the bound is the uniform `q / (|R| − m)`. The ghost firing is the DUAL and
+  -- non-uniform: the fresh draw is the cache KEY commitment `w ← ids.commit` (bounded only by the
+  -- arbitrary guessing bound `hGuess : Pr[= cm | fst <$> ids.commit] ≤ ofReal ε`, NOT `1/|R|`),
+  -- the cache VALUE (a uniform `Chal`) is irrelevant to firing, and the event is the adversary's
+  -- read point `(msg, w')` matching a ghost-cached key `(msg, w)`. The bridge pre-samples a fixed
+  -- `g : D → R` and has no mechanism to randomize cache KEYS post-hoc nor any slot to inject the
+  -- `hGuess` commitment bound; its firing probability is intrinsically `1/(|R|−m)`. So the
+  -- library is structurally inapplicable. The CLOSEST in-repo lemma is the native commitment-hit
+  -- bound `probEvent_commit_hit_le` (GhostBodies.lean): one commit lands on a cached point with
+  -- prob `≤ enncard c · ofReal ε` — exactly the ghost firing mechanism, and already used by the
+  -- proven Sign→Prog TV induction `ofReal_tvDist_run_fsAbortSignLoop_progSignBody_le`. The
+  -- MISSING piece is a Prog→Trans deferred-sampling bridge built on `probEvent_commit_hit_le`
+  -- (not on the probe library): a lazy ghost handler whose reads test commitment membership at
+  -- read time, plus a distributional equivalence from the eager `ghostHybridImpl … true` run to
+  -- it, so that the per-attempt commit-hit charge can be amortized over later reads via R3's fold.
+  -- This is the multi-week rewrite; no existing library shortcuts it.
   sorry
 
 /-! ## Hop lemmas
