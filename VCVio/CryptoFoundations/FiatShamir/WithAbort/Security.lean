@@ -317,6 +317,37 @@ lemma probEvent_ghostRead_bad_le
   -- read time, plus a distributional equivalence from the eager `ghostHybridImpl … true` run to
   -- it, so that the per-attempt commit-hit charge can be amortized over later reads via R3's fold.
   -- This is the multi-week rewrite; no existing library shortcuts it.
+  --
+  -- R14 BANKED INFRASTRUCTURE (all axiom-clean, in GhostBodies.lean):
+  --  * `lazyGhostHybridImpl` : the deferred-sampling handler. Same `GhostState` and same
+  --    `ghostSignBody` signing as `ghostHybridImpl … true`, but the adversarial read step
+  --    draws `lazyGhostFire` over the pending ghost count `enncard (ghost cache)` and fires
+  --    the bad flag with prob `≤ enncard · ε` (via `probOutput_lazyGhostFire_true_le_enncard`),
+  --    answering the adversary from the real layer through `roStep`. This is the handler for
+  --    which the accumulator's `h_charged_step` is TRUE (the eager handler's deterministic flip
+  --    is replaced by the amortizable lazy draw).
+  --  * `tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le` : the ghost-layer growth law —
+  --    a rejected attempt adds ≤ 1 ghost point, an accepted attempt only removes one
+  --    (`enncard_uncacheQuery_le`), so the expected ghost size grows by `≤ ∑_{a<n} p^a` per
+  --    signing query. This is the fold's `h_growth` for `R s := enncard (ghost cache)`,
+  --    `g := ∑_{a<n} p^a` (with `tsum_probOutput_commit_mul_abort_le` supplying the
+  --    per-attempt rejection bound). Supporting: `run_ghostSignBody_succ`,
+  --    `toSet_uncacheQuery_subset`, `enncard_uncacheQuery_le`.
+  --
+  -- REMAINING RESIDUAL (the single blocker, unchanged in nature):
+  --  (A) The lazy-side bound `Pr[bad | (simulateQ lazyGhostHybridImpl (adv.main pk)).run init]
+  --      ≤ ofReal (qS·(qH+1)·ε/(1-p))` via `probEvent_bad_simulateQ_run_le_expectedQuerySlack`
+  --      (charged-read budget `qH+1`, growth-sign budget `qS`) chained with the now-proven fold
+  --      `expectedQuerySlack_charged_read_expected_growth_le` using the two banked laws above.
+  --      The only open premise is the accumulator's `h_charged_step` for the lazy read: a
+  --      `lazyFire >>= roStep` bind whose `fired = true` mass is `≤ enncard · ε`
+  --      (`probOutput_lazyGhostFire_true_le_enncard`) and whose `fired = false` mass passes
+  --      unchanged to the continuation. This is a finite distributional bookkeeping step.
+  --  (B) The eager↔lazy bad-flag equivalence `Pr[bad | eager run] = Pr[bad | lazy run]` by a
+  --      never-read-before-write deferred-sampling commutation (the programmed ghost point is
+  --      only ever READ, never re-keyed). This is the genuine multi-week probabilistic content;
+  --      mirror `run_ghostSignBody_overlay` / `run_ghostSignBody_fst` in GhostBodies.lean.
+  -- Closing :252 = (B) ∘ (A); both must land. (A) is now fully scaffolded by the banked laws.
   sorry
 
 /-! ## Hop lemmas

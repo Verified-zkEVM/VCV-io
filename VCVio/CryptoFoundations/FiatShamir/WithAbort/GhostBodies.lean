@@ -238,6 +238,23 @@ lemma overlayCache_cacheQuery_uncacheQuery
   · simp [overlayCache, uncacheQuery, hq]
 
 omit [SampleableType Chal] in
+/-- Removing a point from a cache does not increase its live-entry count: the support set
+of `uncacheQuery cache q` is a subset of that of `cache`. -/
+lemma toSet_uncacheQuery_subset (cache : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) :
+    (uncacheQuery M cache q).toSet ⊆ cache.toSet := by
+  rintro ⟨t', u'⟩ hmem
+  rw [QueryCache.mem_toSet] at hmem ⊢
+  by_cases ht : t' = q
+  · subst ht; simp only [uncacheQuery, if_true] at hmem; exact absurd hmem (by simp)
+  · rwa [uncacheQuery, if_neg ht] at hmem
+
+omit [SampleableType Chal] in
+/-- `uncacheQuery` does not increase the `enncard` resource. -/
+lemma enncard_uncacheQuery_le (cache : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) :
+    QueryCache.enncard (uncacheQuery M cache q) ≤ QueryCache.enncard cache :=
+  ENat.toENNReal_mono (Set.encard_le_encard (toSet_uncacheQuery_subset M cache q))
+
+omit [SampleableType Chal] in
 lemma overlayCache_cacheQuery_ghost
     (re gh : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) (c : Chal) :
     overlayCache M re (gh.cacheQuery q c) = (overlayCache M re gh).cacheQuery q c := by
@@ -1099,6 +1116,35 @@ lemma probOutput_lazyGhostFire_true_le_enncard (pk : Stmt) (sk : Wit) {ε : ℝ}
   refine (probOutput_lazyGhostFire_true_le ids pk sk hGuess w' _).trans ?_
   gcongr
 
+/-! ### Deferred-sampling (lazy) ghost-instrumented hybrid handler
+
+`lazyGhostHybridImpl` is the deferred-sampling counterpart of `ghostHybridImpl … true`.
+It carries the *same* layered-cache-plus-flag state `GhostState`, and signs with the same
+`ghostSignBody` (so the ghost layer records the same per-attempt programmings and grows by
+the same amount). The only change is the adversarial random-oracle read step: instead of
+the eager deterministic ghost lookup that flips the bad flag with mass `1`, the read draws
+`lazyGhostFire` over the *pending count* `enncard (ghost cache)` and fires the bad flag with
+probability `≤ enncard (ghost cache) · ε` (the deferred-sampling charge
+`probOutput_lazyGhostFire_true_le_enncard`). The answer to the adversary is taken from the
+real layer via `roStep`, independently of the fire draw. This is the handler for which the
+charged-step premise of `probEvent_bad_simulateQ_run_le_expectedQuerySlack` holds. -/
+
+/-- Deferred-sampling ghost-instrumented hybrid handler: signs with `ghostSignBody`, answers
+uniform queries by forwarding, and answers adversarial random-oracle reads from the real
+layer while firing the bad flag lazily (`lazyGhostFire` over the pending ghost count). -/
+noncomputable def lazyGhostHybridImpl (pk : Stmt) (sk : Wit) :
+    QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (StateT (GhostState M Commit Chal) ProbComp) :=
+  fun t => match t with
+  | .inl (.inl n) => StateT.mk fun s =>
+      (fun u => (u, s)) <$> (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n
+  | .inl (.inr mc) => StateT.mk fun s =>
+      lazyGhostFire ids pk sk mc.2 s.1.1.2.toSet.encard.toNat >>= fun fired =>
+        (fun cu => (cu.1, (((cu.2, s.1.1.2), s.1.2), s.2 || fired))) <$> roStep M s.1.1.1 mc
+  | .inr msg => StateT.mk fun s =>
+      (fun alc => (alc.1, ((alc.2, msg :: s.1.2), s.2))) <$>
+        (ghostSignBody ids M pk sk msg maxAttempts).run s.1.1
+
 /-! ### The two body-level cores of the Sign → Prog hop -/
 
 omit [SampleableType Stmt] in
@@ -1350,6 +1396,154 @@ lemma tsum_probOutput_run_progSignBody_mul_enncard_le (pk : Stmt) (sk : Wit) (ms
           ≤ QueryCache.enncard c + 1 + ENNReal.ofReal p_abort * S :=
             add_le_add_right this _
         _ = QueryCache.enncard c + (1 + ENNReal.ofReal p_abort * S) := by
+            rw [add_assoc]
+
+omit [SampleableType Stmt] in
+/-- One-attempt unfolding of the ghost reprogramming loop's layered-cache run. -/
+lemma run_ghostSignBody_succ (pk : Stmt) (sk : Wit) (msg : M) (n : ℕ)
+    (re gh : (M × Commit →ₒ Chal).QueryCache) :
+    (ghostSignBody ids M pk sk msg (n + 1)).run (re, gh) =
+      ids.commit pk sk >>= fun ws =>
+        uniformSample Chal >>= fun ch =>
+          ids.respond pk sk ws.2 ch >>= fun oz =>
+            match oz with
+            | some z =>
+                pure (some (ws.1, z),
+                  (re.cacheQuery (msg, ws.1) ch, uncacheQuery M gh (msg, ws.1)))
+            | none =>
+                (ghostSignBody ids M pk sk msg n).run (re, gh.cacheQuery (msg, ws.1) ch) := by
+  simp only [ghostSignBody, bind_assoc, StateT.run_bind, OracleComp.liftM_run_StateT,
+    pure_bind]
+  refine congrArg (ids.commit pk sk >>= ·) (funext fun ws => ?_)
+  obtain ⟨w, st⟩ := ws
+  refine congrArg (uniformSample Chal >>= ·) (funext fun ch => ?_)
+  refine congrArg (ids.respond pk sk st ch >>= ·) (funext fun oz => ?_)
+  cases oz with
+  | some z => rfl
+  | none => rfl
+
+omit [SampleableType Stmt] in
+/-- **Expected ghost-layer growth of the reprogramming loop.** Each rejected attempt of
+`ghostSignBody` programs at most one new ghost-cache point; an accepted attempt only
+*removes* a point from the ghost layer (`uncacheQuery`). The loop continues only on a
+fresh-challenge rejection, so the expected size of the final ghost cache is at most
+`|gh| + ∑_{a<n} p ^ a` — the deferred-attempt count that bounds the lazy ghost read. -/
+lemma tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le (pk : Stmt) (sk : Wit) (msg : M)
+    {p_abort : ℝ}
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort) :
+    ∀ (n : ℕ) (re gh : (M × Commit →ₒ Chal).QueryCache),
+      ∑' z : Option (Commit × Resp) ×
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+        Pr[= z | (ghostSignBody ids M pk sk msg n).run (re, gh)] * QueryCache.enncard z.2.2
+        ≤ QueryCache.enncard gh + ∑ a ∈ Finset.range n, ENNReal.ofReal p_abort ^ a := by
+  intro n
+  induction n with
+  | zero =>
+      intro re gh
+      simp only [ghostSignBody, StateT.run_pure, tsum_probOutput_pure_mul]
+      simp
+  | succ n ih =>
+      intro re gh
+      classical
+      set S : ℝ≥0∞ := ∑ a ∈ Finset.range n, ENNReal.ofReal p_abort ^ a with hS
+      have hSucc : ∑ a ∈ Finset.range (n + 1), ENNReal.ofReal p_abort ^ a =
+          1 + ENNReal.ofReal p_abort * S := by
+        rw [Finset.sum_range_succ', pow_zero, add_comm]
+        congr 1
+        rw [Finset.mul_sum]
+        exact Finset.sum_congr rfl fun a _ => pow_succ' _ _
+      rw [run_ghostSignBody_succ, tsum_probOutput_bind_mul]
+      have h_ws : ∀ ws : Commit × PrvState,
+          (∑' z : Option (Commit × Resp) ×
+              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+            Pr[= z | uniformSample Chal >>= fun ch =>
+              ids.respond pk sk ws.2 ch >>= fun oz =>
+                match oz with
+                | some z =>
+                    pure (some (ws.1, z),
+                      (re.cacheQuery (msg, ws.1) ch, uncacheQuery M gh (msg, ws.1)))
+                | none =>
+                    (ghostSignBody ids M pk sk msg n).run
+                      (re, gh.cacheQuery (msg, ws.1) ch)] *
+              QueryCache.enncard z.2.2)
+          ≤ (QueryCache.enncard gh + 1) +
+              Pr[= none | uniformSample Chal >>= fun ch => ids.respond pk sk ws.2 ch] *
+                S := by
+        intro ws
+        rw [tsum_probOutput_bind_mul]
+        have h_ch : ∀ ch : Chal,
+            (∑' z : Option (Commit × Resp) ×
+                ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+              Pr[= z | ids.respond pk sk ws.2 ch >>= fun oz =>
+                match oz with
+                | some z =>
+                    pure (some (ws.1, z),
+                      (re.cacheQuery (msg, ws.1) ch, uncacheQuery M gh (msg, ws.1)))
+                | none =>
+                    (ghostSignBody ids M pk sk msg n).run
+                      (re, gh.cacheQuery (msg, ws.1) ch)] *
+                QueryCache.enncard z.2.2)
+            ≤ (QueryCache.enncard gh + 1) +
+                Pr[= none | ids.respond pk sk ws.2 ch] * S := by
+          intro ch
+          rw [tsum_probOutput_bind_mul]
+          have h_oz : ∀ oz : Option Resp,
+              (∑' z : Option (Commit × Resp) ×
+                  ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+                Pr[= z | (match oz with
+                  | some z =>
+                      pure (some (ws.1, z),
+                        (re.cacheQuery (msg, ws.1) ch, uncacheQuery M gh (msg, ws.1)))
+                  | none =>
+                      (ghostSignBody ids M pk sk msg n).run
+                        (re, gh.cacheQuery (msg, ws.1) ch) :
+                  ProbComp (Option (Commit × Resp) ×
+                    ((M × Commit →ₒ Chal).QueryCache ×
+                      (M × Commit →ₒ Chal).QueryCache)))] *
+                  QueryCache.enncard z.2.2)
+              ≤ (QueryCache.enncard gh + 1) + (if oz = none then S else 0) := by
+            intro oz
+            cases oz with
+            | some z =>
+                rw [if_neg (by simp), add_zero, tsum_probOutput_pure_mul]
+                exact le_trans (enncard_uncacheQuery_le M gh (msg, ws.1)) le_self_add
+            | none =>
+                rw [if_pos rfl]
+                refine le_trans (ih re (gh.cacheQuery (msg, ws.1) ch)) ?_
+                exact add_le_add_left
+                  (QueryCache.enncard_cacheQuery_le gh (msg, ws.1) ch) S
+          refine le_trans (tsum_probOutput_mul_le_add_of_le _ h_oz) ?_
+          refine add_le_add_right (le_of_eq ?_) _
+          rw [tsum_eq_single (none : Option Resp) fun oz hoz => by simp [hoz]]
+          simp [mul_comm]
+        refine le_trans (tsum_probOutput_mul_le_add_of_le _ h_ch) ?_
+        refine add_le_add_right (le_of_eq ?_) _
+        rw [probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_right]
+        exact tsum_congr fun ch => (mul_assoc _ _ _).symm
+      refine le_trans (tsum_probOutput_mul_le_add_of_le _ h_ws) ?_
+      rw [hSucc]
+      have : ∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+          (Pr[= none | uniformSample Chal >>= fun ch =>
+            ids.respond pk sk ws.2 ch] * S)
+          ≤ ENNReal.ofReal p_abort * S := by
+        calc ∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+              (Pr[= none | uniformSample Chal >>= fun ch =>
+                ids.respond pk sk ws.2 ch] * S)
+            = (∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+                Pr[= none | uniformSample Chal >>= fun ch =>
+                  ids.respond pk sk ws.2 ch]) * S := by
+              rw [← ENNReal.tsum_mul_right]
+              exact tsum_congr fun ws => (mul_assoc _ _ _).symm
+          _ ≤ ENNReal.ofReal p_abort * S :=
+              mul_le_mul_left
+                (tsum_probOutput_commit_mul_abort_le ids pk sk hAbort) _
+      calc QueryCache.enncard gh + 1 +
+            ∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+              (Pr[= none | uniformSample Chal >>= fun ch =>
+                ids.respond pk sk ws.2 ch] * S)
+          ≤ QueryCache.enncard gh + 1 + ENNReal.ofReal p_abort * S :=
+            add_le_add_right this _
+        _ = QueryCache.enncard gh + (1 + ENNReal.ofReal p_abort * S) := by
             rw [add_assoc]
 
 /-! ## Layered ghost-tagged NMA handler
