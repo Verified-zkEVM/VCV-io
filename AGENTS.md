@@ -36,6 +36,7 @@ The repo also includes a first-class lattice cryptography library under `Lattice
 - `ToMathlib/`: local Mathlib-facing utilities and lemmas intended to remain below the framework layer.
 - `FFI/`: shared Lean FFI bindings used by concrete implementations.
 - `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
+- `HashSig/`: hash-based signatures — SLH-DSA (SPHINCS+, FIPS 205) proof-level specs and security. Peer of `LatticeCrypto/`; depends on `VCVio`/`ToMathlib` but nothing in those imports it back.
 - `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
 - `VCVioTest/`: framework smoke tests and test support modules.
 - `VCVioWidgets/`: optional widget experiments and visualizations.
@@ -88,7 +89,7 @@ or `VCVioTest/`. This contract is enforced by
 4. **`++ₒ` is dead** — use `+` for combining oracle specs.
 5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad/Basic.lean` as canonical reference.
 6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
-7. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off. Fix the root cause instead.
+7. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off to dodge a fixable issue. Fix the root cause instead. (The one deliberate, documented exception is `weak.linter.unicodeLinter, false` in `lakefile.lean`, off so FIPS-204 math notation and diacritics in cited author names are allowed.)
 8. **Interop TCB isolation is mandatory**. Core VCVio (`VCVio/`, `ToMathlib/`, `LatticeCrypto/`, `Examples/`, `LatticeCryptoTest/`, `FFI/`, `VCVioWidgets/`, `VCVioTest/`) must never `import Interop.…`, `import Hax.…`, or `import Aeneas.…`. CI fails the PR if it does. See `docs/agents/interop.md`.
 
 For the full list, see `docs/agents/gotchas.md`.
@@ -168,7 +169,7 @@ lake exe cache get && lake build
 ```
 
 CI runs the timed build on the non-test Lean libraries:
-`ToMathlib`, `VCVio`, `FFI`, `LatticeCrypto`, `Examples`,
+`ToMathlib`, `VCVio`, `FFI`, `LatticeCrypto`, `HashSig`, `Examples`,
 `VCVioWidgets`, and `Interop`.
 The timing report parses per-file build times only for that same set.
 Test libraries and test executables are not part of the timed build; CI only
@@ -176,7 +177,8 @@ times the smoke module separately with `lake env lean VCVioTest/Smoke.lean`.
 
 After adding new `.lean` files: `./scripts/update-lib.sh`
 
-Lean toolchain and Mathlib must stay in sync (both currently `v4.29.0`). Files should stay under 1500 lines.
+Lean toolchain and Mathlib must stay in sync (both currently `v4.30.0`). Keep files
+reasonably sized, but there is no hard line-count limit (the file-length linter is off).
 
 ## Further Reading
 

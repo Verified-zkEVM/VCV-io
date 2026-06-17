@@ -233,8 +233,8 @@ noncomputable def runStepsAsync
         | .envTick e => do
             let es' ← envAction.react e st.envState
             pure ({ st with envState := es' } :
-              AsyncRuntimeState process.Proc State)
-        : m (AsyncRuntimeState process.Proc State))
+              AsyncRuntimeState process.Proc State) :
+        m (AsyncRuntimeState process.Proc State))
       let (final, tail) ← runStepsAsync process envAction
         procScheduler envScheduler n st'
       pure (final, event :: tail)

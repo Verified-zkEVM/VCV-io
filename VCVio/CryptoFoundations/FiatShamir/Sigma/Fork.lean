@@ -145,8 +145,7 @@ lemma forkPoint_getElem?_eq_some_target
       (l := trace.queryLog)
       (i := trace.queryLog.findIdx (· == trace.target))
       (x := trace.target)
-      hlt).mp <|
-      by
+      hlt).mp <| by
         simpa [Trace.target] using
           (List.findIdx_getElem (xs := trace.queryLog) (p := fun x => x == trace.target)
             (w := hlt))
@@ -613,8 +612,8 @@ private theorem queryLog_cache_outer_lockstep
           obtain ⟨ω, hcache, hlog⟩ := hlock i h_lo h_hi
           refine ⟨ω, hcache, ?_⟩
           change QueryLog.getQueryValue?
-            ((⟨Sum.inl n, u⟩ : (j : ℕ ⊕ Unit) × (wrappedSpec Chal).Range j)
-              :: pw.2) (Sum.inr ()) (i - l₀.length) = some ω
+            ((⟨Sum.inl n, u⟩ : (j : ℕ ⊕ Unit) × (wrappedSpec Chal).Range j) ::
+              pw.2) (Sum.inr ()) (i - l₀.length) = some ω
           rw [QueryLog.getQueryValue?_cons_of_ne]
           · exact hlog
           · exact Sum.inl_ne_inr
@@ -669,8 +668,8 @@ private theorem queryLog_cache_outer_lockstep
                 · rw [hidx]
                   exact hmono' mc v (QueryCache.cacheQuery_self c₀ mc v)
                 · change QueryLog.getQueryValue?
-                    ((⟨Sum.inr (), v⟩ : (j : ℕ ⊕ Unit) × (wrappedSpec Chal).Range j)
-                      :: pw.2) (Sum.inr ()) (l₀.length - l₀.length) = some v
+                    ((⟨Sum.inr (), v⟩ : (j : ℕ ⊕ Unit) × (wrappedSpec Chal).Range j) ::
+                      pw.2) (Sum.inr ()) (l₀.length - l₀.length) = some v
                   rw [Nat.sub_self]
                   exact QueryLog.getQueryValue?_cons_self_zero (Sum.inr ()) v pw.2
               · have h_lo' : (l₀ ++ [mc]).length ≤ i := by
@@ -681,8 +680,8 @@ private theorem queryLog_cache_outer_lockstep
                 have hk_eq : k = i - (l₀ ++ [mc]).length := by
                   simp [List.length_append] at hk ⊢; omega
                 change QueryLog.getQueryValue?
-                  ((⟨Sum.inr (), v⟩ : (j : ℕ ⊕ Unit) × (wrappedSpec Chal).Range j)
-                    :: pw.2) (Sum.inr ()) (i - l₀.length) = some ω
+                  ((⟨Sum.inr (), v⟩ : (j : ℕ ⊕ Unit) × (wrappedSpec Chal).Range j) ::
+                    pw.2) (Sum.inr ()) (i - l₀.length) = some ω
                 rw [hk]
                 rw [QueryLog.getQueryValue?_cons_self_succ]
                 rw [hk_eq]

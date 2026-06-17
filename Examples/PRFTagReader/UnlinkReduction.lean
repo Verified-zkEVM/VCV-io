@@ -269,8 +269,8 @@ theorem unlinkMultipleExp_not_map
         OracleComp (UnlinkOracleSpec TagId Nonce Digest) Bool) =
     (fun b => !b) <$> unlinkMultipleExp (TagId := TagId) (Nonce := Nonce)
       (Digest := Digest) prfs adversary := by
-  have key : (adversary >>= fun b => pure (!b)
-      : OracleComp (UnlinkOracleSpec TagId Nonce Digest) Bool) =
+  have key : (adversary >>= fun b => pure (!b) :
+      OracleComp (UnlinkOracleSpec TagId Nonce Digest) Bool) =
       (fun b => !b) <$> adversary := by rw [map_eq_bind_pure_comp]; rfl
   rw [key]
   unfold unlinkMultipleExp
@@ -289,8 +289,8 @@ theorem unlinkSingleExp_not_map
         OracleComp (UnlinkOracleSpec TagId Nonce Digest) Bool) =
     (fun b => !b) <$> unlinkSingleExp (TagId := TagId) (Nonce := Nonce)
       (Digest := Digest) prfs adversary := by
-  have key : (adversary >>= fun b => pure (!b)
-      : OracleComp (UnlinkOracleSpec TagId Nonce Digest) Bool) =
+  have key : (adversary >>= fun b => pure (!b) :
+      OracleComp (UnlinkOracleSpec TagId Nonce Digest) Bool) =
       (fun b => !b) <$> adversary := by rw [map_eq_bind_pure_comp]; rfl
   rw [key]
   unfold unlinkSingleExp

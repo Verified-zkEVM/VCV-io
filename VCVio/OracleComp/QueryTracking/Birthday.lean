@@ -629,8 +629,8 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
         -- Bound the bad set cardinality by k
         suffices hbad_le_k : (Finset.univ.filter
             (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card ≤ k by
-          calc (↑(Finset.univ.filter (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card
-                  : ℝ≥0∞) / ↑(Fintype.card (spec.Range t))
+          calc (↑(Finset.univ.filter (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card :
+                  ℝ≥0∞) / ↑(Fintype.card (spec.Range t))
               ≤ (k : ℝ≥0∞) / ↑(Fintype.card (spec.Range t)) := by
                 apply ENNReal.div_le_div_right
                 exact_mod_cast hbad_le_k
