@@ -2590,6 +2590,155 @@ lemma expectedQuerySlack_expected_resource_le
               rw [ENNReal.tsum_mul_right]
               exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
 
+/-- **Charged-read / expected-growth resource bound for `expectedQuerySlack`.**
+
+A variant of `expectedQuerySlack_expected_resource_le` for the situation where the
+*charged* queries never grow the resource (they only read it), while a separate class of
+*growth* queries grows the resource by at most `g` **in expectation** (and may grow it by
+arbitrarily much in support). Free queries never grow it.
+
+Each charged query pays `R s · β` at the state `s` reached when it fires. Since the
+charged queries do not grow `R`, and the growth queries grow it by at most `g` in
+expectation, the resource seen by any charged query is at most `R s₀ + qH · g` in
+expectation, where `s₀` is the starting state and `qH` bounds the growth queries. Folding
+the `qS` charged reads against this expected cap gives accumulated slack at most
+`qS · (R s₀ + qH · g) · β`, with **no** `(qS choose 2)` cross-term and **no** dependence on
+the in-support growth of the resource (which `expectedQuerySlack_expected_resource_le`
+would charge through its `h_growth`/`h_charged ≤ R p.1 + g` shape).
+
+This is the fold used by the ghost-read collision charge of the Fiat-Shamir-with-aborts
+Prog → Trans hop, where the charged queries are the adversary's random-oracle reads (which
+only grow the *real* cache, leaving the *ghost* cache `R` untouched) and the growth queries
+are the signing queries (which grow the ghost cache by the number of rejected attempts, up
+to `maxAttempts − 1` in support but at most `∑_{a} p^a ≤ 1/(1−p)` in expectation). -/
+lemma expectedQuerySlack_charged_read_expected_growth_le
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (chargedQuery growthQuery : spec.Domain → Prop)
+    [DecidablePred chargedQuery] [DecidablePred growthQuery]
+    (R : σ → ℝ≥0∞) (β g : ℝ≥0∞)
+    (h_charged : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = false → chargedQuery t →
+      ∀ z ∈ support ((impl t).run p), R z.2.1 ≤ R p.1)
+    (h_growth : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = false →
+      ¬ chargedQuery t → growthQuery t →
+      ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run p] * R z.2.1 ≤ R p.1 + g)
+    (h_free : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = false →
+      ¬ chargedQuery t → ¬ growthQuery t →
+      ∀ z ∈ support ((impl t).run p), R z.2.1 ≤ R p.1)
+    (oa : OracleComp spec α) {qS qH : ℕ}
+    (h_qS : OracleComp.IsQueryBoundP oa chargedQuery qS)
+    (h_qH : OracleComp.IsQueryBoundP oa growthQuery qH)
+    (s : σ) :
+    expectedQuerySlack impl chargedQuery (fun s => R s * β) oa qS (s, false)
+      ≤ (qS : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
+  induction oa using OracleComp.inductionOn generalizing qS qH s with
+  | pure x => simp only [expectedQuerySlack_pure, zero_le]
+  | query_bind t cont ih =>
+      rw [isQueryBoundP_query_bind_iff] at h_qS h_qH
+      obtain ⟨hcanS, hcontS⟩ := h_qS
+      obtain ⟨hcanH, hcontH⟩ := h_qH
+      by_cases hSt : chargedQuery t
+      · -- Charged read: pays `R s · β`, does not grow `R`, continuation budget `qS - 1`.
+        simp only [hSt, if_true] at hcontS
+        have hqS_pos : 0 < qS := hcanS.resolve_left (· hSt)
+        obtain ⟨m, rfl⟩ : ∃ m, qS = m + 1 := ⟨qS - 1, by omega⟩
+        rw [expectedQuerySlack_query_bind,
+          expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
+        simp only [Nat.add_sub_cancel] at hcontS ⊢
+        -- A charged query is not a growth query budget-wise: continuation keeps budget `qH`.
+        have hqH'_le : (if growthQuery t then qH - 1 else qH) ≤ qH := by split_ifs <;> omega
+        have h_tsum_le :
+            (∑' z : spec.Range t × σ × Bool,
+              Pr[= z | (impl t).run (s, false)] *
+                expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) m z.2)
+              ≤ (m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
+          calc (∑' z : spec.Range t × σ × Bool,
+                Pr[= z | (impl t).run (s, false)] *
+                  expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) m z.2)
+              ≤ ∑' z : spec.Range t × σ × Bool,
+                  Pr[= z | (impl t).run (s, false)] *
+                    ((m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β) :=
+                ENNReal.tsum_le_tsum fun z => by
+                  by_cases hz : z ∈ support ((impl t).run (s, false))
+                  · obtain ⟨u, s', bad'⟩ := z
+                    cases bad' with
+                    | true => simp
+                    | false =>
+                        refine mul_le_mul_right ((ih u (hcontS u) (hcontH u) s').trans ?_) _
+                        have hRs' : R s' ≤ R s := h_charged t (s, false) rfl hSt _ hz
+                        gcongr
+                  · simp [probOutput_eq_zero_of_not_mem_support hz]
+            _ ≤ (m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
+                rw [ENNReal.tsum_mul_right]
+                exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
+        calc R s * β +
+              (∑' z : spec.Range t × σ × Bool,
+                Pr[= z | (impl t).run (s, false)] *
+                  expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) m z.2)
+            ≤ R s * β + (m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by gcongr
+          _ ≤ (R s + (qH : ℝ≥0∞) * g) * β + (m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
+              gcongr
+              exact le_self_add
+          _ = ((m + 1 : ℕ) : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by push_cast; ring
+      · -- Uncharged query: no charge. Split growth vs. free.
+        simp only [hSt, if_false] at hcontS
+        rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
+        by_cases hHt : growthQuery t
+        · -- Growth query: `R` grows by `≤ g` in expectation, charged budget unchanged.
+          have hqH_pos : 0 < qH := hcanH.resolve_left (· hHt)
+          obtain ⟨h, rfl⟩ : ∃ h, qH = h + 1 := ⟨qH - 1, by omega⟩
+          simp only [hHt, if_true] at hcontH
+          simp only [Nat.add_sub_cancel] at hcontH
+          calc (∑' z : spec.Range t × σ × Bool,
+                Pr[= z | (impl t).run (s, false)] *
+                  expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) qS z.2)
+              ≤ ∑' z : spec.Range t × σ × Bool,
+                  Pr[= z | (impl t).run (s, false)] *
+                    ((qS : ℝ≥0∞) * (R z.2.1 + (h : ℝ≥0∞) * g) * β) :=
+                ENNReal.tsum_le_tsum fun z => by
+                  obtain ⟨u, s', bad'⟩ := z
+                  cases bad' with
+                  | true => simp
+                  | false => exact mul_le_mul_right (ih u (hcontS u) (hcontH u) s') _
+            _ = (qS : ℝ≥0∞) * β *
+                  (∑' z : spec.Range t × σ × Bool,
+                    Pr[= z | (impl t).run (s, false)] * (R z.2.1 + (h : ℝ≥0∞) * g)) := by
+                rw [← ENNReal.tsum_mul_left]
+                refine tsum_congr fun z => ?_
+                ring
+            _ ≤ (qS : ℝ≥0∞) * β * ((R s + g) + (h : ℝ≥0∞) * g) := by
+                gcongr
+                calc (∑' z : spec.Range t × σ × Bool,
+                      Pr[= z | (impl t).run (s, false)] * (R z.2.1 + (h : ℝ≥0∞) * g))
+                    = (∑' z, Pr[= z | (impl t).run (s, false)] * R z.2.1)
+                        + ∑' z, Pr[= z | (impl t).run (s, false)] * ((h : ℝ≥0∞) * g) := by
+                      rw [← ENNReal.tsum_add]; exact tsum_congr fun z => by rw [mul_add]
+                  _ ≤ (R s + g) + (h : ℝ≥0∞) * g := by
+                      refine add_le_add (h_growth t (s, false) rfl hSt hHt) ?_
+                      rw [ENNReal.tsum_mul_right]
+                      exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
+            _ = (qS : ℝ≥0∞) * (R s + ((h + 1 : ℕ) : ℝ≥0∞) * g) * β := by push_cast; ring
+        · -- Free query: `R` does not grow, budgets unchanged.
+          simp only [hHt, if_false] at hcontH
+          calc (∑' z : spec.Range t × σ × Bool,
+                Pr[= z | (impl t).run (s, false)] *
+                  expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) qS z.2)
+              ≤ ∑' z : spec.Range t × σ × Bool,
+                  Pr[= z | (impl t).run (s, false)] *
+                    ((qS : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β) :=
+                ENNReal.tsum_le_tsum fun z => by
+                  by_cases hz : z ∈ support ((impl t).run (s, false))
+                  · obtain ⟨u, s', bad'⟩ := z
+                    cases bad' with
+                    | true => simp
+                    | false =>
+                        refine mul_le_mul_right ((ih u (hcontS u) (hcontH u) s').trans ?_) _
+                        have hRs' : R s' ≤ R s := h_free t (s, false) rfl hSt hHt _ hz
+                        gcongr
+                  · simp [probOutput_eq_zero_of_not_mem_support hz]
+            _ ≤ (qS : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
+                rw [ENNReal.tsum_mul_right]
+                exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
+
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
 This is the ENNReal-form analogue of the existing real-valued

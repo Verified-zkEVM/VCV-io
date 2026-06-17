@@ -263,40 +263,37 @@ lemma probEvent_ghostRead_bad_le
             ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
               List M), false)]
       ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
-  -- REMAINING SUBGOAL. The single-world `Pr[bad]` accumulator that R9 found missing is now
-  -- PROVEN axiom-clean as `OracleComp.ProgramLogic.Relational`.
-  -- `probEvent_bad_simulateQ_run_le_expectedQuerySlack` (in `Relational/SimulateQ.lean`):
-  -- it bounds `Pr[flag = true | (simulateQ impl oa).run (s, false)]` DIRECTLY by
-  -- `expectedQuerySlack impl charged (fun s => R s * ε) oa K (s, false)`, given a per-read
-  -- flip charge `R s · ε` (`h_charged_step`) and bad-mass-free free steps (`h_free_step`).
-  -- Applying it here with
-  --   * `impl := ghostHybridImpl ids M maxAttempts true pk sk`,
-  --   * `charged t := t matches .inl (.inr _)` (adversarial RO reads),
-  --   * `R s := QueryCache.enncard s.1.2` (the *ghost* cache `gh`; `σ = ((QC × QC) × List M)`),
-  --   * `ε := ENNReal.ofReal ε`, `K := qH + 1` from `(hQ pk).2`,
-  -- reduces this lemma to THREE isolated, smaller residual obligations:
-  --   (R1) `h_charged_step`: a read at `mc` from a non-bad state flips the flag with mass
-  --        `≤ enncard gh · ENNReal.ofReal ε`, routing further bad mass through the good output
-  --        states. This is `probEvent_commit_hit_le` (already proven) read at the ghost layer
-  --        `gh = s.1.2`, after unfolding the `.inl (.inr mc)` branch of `ghostHybridImpl … true`
-  --        (the `some`/`none` cache cases of `s.1.1.2 mc`).
-  --   (R2) `h_free_step`: the unif (`.inl (.inl _)`) and signing (`.inr _`) branches never set
-  --        the flag (`ghostHybridImpl … true` only writes `true` in the `.inl (.inr mc)` some
-  --        branch), so their bad mass equals the good-continuation tsum with no flip charge.
-  --   (R3) the FOLD: `expectedQuerySlack ghostHybridImpl charged (R · ε) (adv.main pk) (qH+1)
-  --        ((((∅,∅),[]),false)) ≤ ENNReal.ofReal (qS·(qH+1)·ε/(1-p_abort))`.
-  --        This is the genuine remaining content and needs a NEW expected-resource fold:
-  --        the existing `expectedQuerySlack_expected_resource_le` does NOT apply, because its
-  --        `h_growth` requires `R` to grow by ≤ +1 per growth query, whereas a signing query
-  --        grows `gh` by the number of rejected attempts (up to `maxAttempts − 1`, not ≤ 1).
-  --        The correct fold uses that `R` is monotone and the EXPECTED final ghost size is
-  --        `≤ qS / (1 − p_abort)` (each signing query adds expected `≤ 1/(1−p_abort)` ghost
-  --        entries, via `tsum_probOutput_commit_mul_abort_le` / `hAbort`, cf. the proven
-  --        `tsum_probOutput_run_progSignBody_mul_enncard_le`), so each of the `qH+1` reads is
-  --        charged `E[R] · ε ≤ (qS/(1−p_abort)) · ε`. Folding the `qH+1` reads gives the RHS.
-  --        Building this monotone-expected-resource fold (a supermartingale-style joint
-  --        induction tracking `slack` and `∑' z, Pr[=z|run]·R z` together) is the open ~150-line
-  --        framework piece; it is the single blocker to closing this lemma.
+  -- REMAINING SUBGOAL. The fold piece (R3) is now PROVEN axiom-clean as
+  -- `OracleComp.ProgramLogic.Relational.expectedQuerySlack_charged_read_expected_growth_le`
+  -- (in `Relational/SimulateQ.lean`): with charged reads that do not grow the resource and
+  -- growth (signing) queries that grow it by `≤ g` in expectation, the accumulated slack is
+  -- `≤ qS_reads · (R s₀ + qS_sign · g) · β` — exactly the right shape, with no `(K choose 2)`
+  -- cross-term and no eager in-support growth charge. Instantiated here with
+  -- `R s := enncard s.1.2` (ghost cache), `β := ofReal ε`,
+  -- `g := ∑_{a<maxAttempts} ofReal p_abort ^ a` (and `g ≤ 1/(1-p_abort)` via the geometric
+  -- bound, `tsum_probOutput_commit_mul_abort_le` supplying the expected-growth hypothesis),
+  -- it yields `qH · (0 + qS · g) · ofReal ε ≤ ofReal (qS · (qH+1) · ε / (1-p_abort))`.
+  --
+  -- THE BLOCKER (R1) is the *charged-step premise* of the single-world accumulator
+  -- `probEvent_bad_simulateQ_run_le_expectedQuerySlack`. That premise requires, for EVERY
+  -- reachable non-bad state `s` and every continuation `k`,
+  --   `Pr[bad | (impl (.inl (.inr mc))).run (s,false) >>= k]
+  --       ≤ enncard s.1.2 · ofReal ε + (good-continuation tsum)`.
+  -- For the EAGER handler `ghostHybridImpl … true`, a read at `mc` with `s.1.2 mc = some v`
+  -- runs `pure (v, (s.1, true))` — it flips the bad flag DETERMINISTICALLY (mass 1). Its
+  -- single support point is bad, so the good-continuation tsum is `0`, and the premise reduces
+  -- to `Pr[bad | k (v, (s.1, true))] ≤ enncard s.1.2 · ofReal ε`, i.e. (taking `k` that stays
+  -- bad) `1 ≤ enncard s.1.2 · ofReal ε`, which is FALSE for small `enncard`/`ε`. (Verified by
+  -- unfolding via `ghostHybridImpl_run_ro_ghost_some`: the run is `pure (v, s.1, true)`.)
+  --
+  -- The accumulator's `h_charged_step` thus does NOT hold for the eager ghost run: the per-read
+  -- flip is deterministic, not amortized by `enncard · ε`. `probEvent_commit_hit_le` bounds the
+  -- *deferred-sampling* event (a random commitment landing in the cache), not the eager-state
+  -- read event. Closing R1 needs a deferred-sampling rewrite: a lazy variant of
+  -- `ghostHybridImpl` whose ghost reads resample, plus a distributional-equivalence bridge from
+  -- the eager run to that variant (the genuine probabilistic content described in the docstring
+  -- above). That bridge is a multi-week deferred-sampling rewrite, not a local discharge; it is
+  -- the single remaining blocker. R3 (the fold) and R2 (free-step bad-freedom) are not blockers.
   sorry
 
 /-! ## Hop lemmas
