@@ -788,7 +788,22 @@ noncomputable def simulatedNmaAdv :
       | some (w, c, z) =>
           modifyGet fun cache => (some (w, z), cache.cacheQuery (.inr (msg, w)) c)
       | none => pure none
-    (simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅
+    -- Run the inner CMA adversary under the managed simulation, then erase the
+    -- forgery's own verification point from the returned cache (Option B). The
+    -- with-aborts `verify pk msg (some (w', z))` issues exactly one hash query, at
+    -- `(msg, w')`; clearing that entry makes `withCacheOverlay advCache verify` miss
+    -- there and fall through to the live oracle, so the managed-RO experiment agrees
+    -- with the plain EUF-NMA verification on *every* forgery. In particular a replayed
+    -- signed `(msg, w')` no longer wins through the programmed challenge, which is what
+    -- makes the bridge to `eufNmaAdv.advantage` sound. Other programmed entries sit at
+    -- different points and are never read by `verify`.
+    (simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅ >>= fun result =>
+      let ((msg, σ), cache) := result
+      let advCache : spec.QueryCache :=
+        match σ with
+        | some (w', _) => Function.update cache (Sum.inr (msg, w')) none
+        | none => cache
+      pure ((msg, σ), advCache)
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
 simulated single-cache hybrid (with the freshness check) is bounded by the run-normal-form
@@ -873,6 +888,93 @@ lemma probOutput_hybridExp_sim_le_managedRoNmaExp :
   -- overlay agrees with the live oracle at the verification point.
   obtain ⟨pk, sk⟩ := pksk
   exact hybridExp_sim_le_managedRun_perKey ids hr M maxAttempts sim adv ro hro pk sk
+
+/-! ## Bridge to the plain EUF-NMA interface
+
+Option B makes `simulatedNmaAdv` discard the forgery's own verification point from the
+returned managed cache. The single hash query issued by `FiatShamirWithAbort.verify`
+therefore always *misses* in the overlay and falls through to the live oracle, so the
+overlay verification coincides — as an `OracleComp` — with the plain verification. This
+collapses the managed-RO NMA experiment onto the plain EUF-NMA experiment of the
+cache-forgetting adversary `simulatedEufNmaAdv`, making the bound
+`Pr[managedRoNmaExp simulatedNmaAdv] ≤ simulatedEufNmaAdv.advantage` sound. -/
+
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- If a cache misses at the forgery's verification point `Sum.inr (msg, w')`, the overlay
+verification of `FiatShamirWithAbort.verify pk msg (some (w', z))` agrees with the plain
+live verification: the single query at `Sum.inr (msg, w')` misses and is forwarded live.
+The `none` case is verification-free, so it is trivially overlay-insensitive. -/
+lemma withCacheOverlay_verify_eq_of_miss
+    (cache : (unifSpec + (M × Commit →ₒ Chal)).QueryCache) (pk : Stmt)
+    (msg : M) (σ : Option (Commit × Resp))
+    (hmiss : ∀ w' z, σ = some (w', z) → cache (Sum.inr (msg, w')) = none) :
+    withCacheOverlay cache
+        ((FiatShamirWithAbort (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+          ids hr M maxAttempts).verify pk msg σ) =
+      (FiatShamirWithAbort (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+        ids hr M maxAttempts).verify pk msg σ := by
+  cases σ with
+  | none => simp only [FiatShamirWithAbort, withCacheOverlay_pure]
+  | some wz =>
+      obtain ⟨w', z⟩ := wz
+      have hm : cache (Sum.inr (msg, w')) = none := hmiss w' z rfl
+      change withCacheOverlay _
+          ((query (Sum.inr (msg, w')) :
+            OracleComp (unifSpec + (M × Commit →ₒ Chal))
+              ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr (msg, w')))) >>=
+            fun c => pure (ids.verify pk w' c z)) =
+        (query (Sum.inr (msg, w')) :
+            OracleComp (unifSpec + (M × Commit →ₒ Chal))
+              ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr (msg, w')))) >>=
+            fun c => pure (ids.verify pk w' c z)
+      rw [withCacheOverlay_bind_pure, bind_pure_comp]
+      congr 1
+      exact withCacheOverlay_query_miss _ (Sum.inr (msg, w')) hm
+
+/-- The plain EUF-NMA adversary underlying `simulatedNmaAdv`: run the same managed
+simulation of the CMA adversary, but forget the returned cache and verify in the plain
+random-oracle model. By Option B (`withCacheOverlay_verify_eq_of_miss`) the managed-RO NMA
+experiment of `simulatedNmaAdv` coincides with the plain EUF-NMA experiment of this
+adversary. -/
+noncomputable def simulatedEufNmaAdv :
+    SignatureAlg.eufNmaAdv
+      (FiatShamirWithAbort
+        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) ids hr M maxAttempts) where
+  main pk := Prod.fst <$> (simulatedNmaAdv ids hr M maxAttempts sim adv).main pk
+
+omit [SampleableType Stmt] in
+/-- **Soundness of the managed-RO → plain EUF-NMA bridge** (Option B). The managed-RO NMA
+success probability of `simulatedNmaAdv` equals the plain EUF-NMA success probability of
+`simulatedEufNmaAdv`. The Option B post-processing erases the forgery's own verification
+point from the returned cache, so `withCacheOverlay` agrees with the plain live verifier
+on every forgery (`withCacheOverlay_verify_eq_of_miss`); in particular a replayed signed
+forgery no longer wins through a programmed challenge. -/
+lemma managedRoNmaExp_simulatedNmaAdv_eq_eufNmaExp :
+    SignatureAlg.managedRoNmaExp (runtime M)
+        (simulatedNmaAdv ids hr M maxAttempts sim adv) =
+      SignatureAlg.eufNmaExp (runtime M)
+        (simulatedEufNmaAdv ids hr M maxAttempts sim adv) := by
+  unfold SignatureAlg.managedRoNmaExp SignatureAlg.eufNmaExp
+  refine congrArg (runtime M).evalDist ?_
+  refine bind_congr fun pksk => ?_
+  -- Reduce the eufNma side `Prod.fst <$> _` to a bind, so both sides bind over
+  -- `simulatedNmaAdv.main`, then compare the verification wrappers pointwise.
+  change ((simulatedNmaAdv ids hr M maxAttempts sim adv).main pksk.1 >>= fun result =>
+      withCacheOverlay result.2
+        ((FiatShamirWithAbort ids hr M maxAttempts).verify
+          pksk.1 result.1.1 result.1.2)) =
+    (Prod.fst <$> (simulatedNmaAdv ids hr M maxAttempts sim adv).main pksk.1) >>= fun ms =>
+      (FiatShamirWithAbort ids hr M maxAttempts).verify pksk.1 ms.1 ms.2
+  rw [map_eq_bind_pure_comp, bind_assoc]
+  -- Unfold `.main` to expose the inner managed run followed by the Option-B
+  -- post-processing, then `bind_congr` over the inner run.
+  simp only [simulatedNmaAdv, bind_assoc, pure_bind, Function.comp_apply]
+  refine bind_congr fun r => ?_
+  -- `r.1.2` is the inner forgery's signature; the post-processed cache erases its own
+  -- verification point, so the overlay verification agrees with the plain verification.
+  refine withCacheOverlay_verify_eq_of_miss ids hr M maxAttempts _ pksk.1 r.1.1 r.1.2 ?_
+  intro w' z hσ
+  simp only [hσ, Function.update_self]
 
 /-! ## Assembly -/
 
@@ -1027,19 +1129,40 @@ lemma simulatedNmaAdv_nmaHashQueryBound
     have hbind := FiatShamir.nmaHashQueryBound_bind (M := M) (Commit := Commit)
       (Chal := Chal) htranscript (fun rs => hcont rs)
     simpa [sigSim, StateT.run_bind] using hbind
+  -- The run-level managed simulation issues at most `qH` live hash queries; the final
+  -- pure post-processing (erasing the forgery's own verification point from the returned
+  -- cache, Option B) issues none, so the total bound is `qH + 0 = qH`.
+  have hrun : FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅) qH := by
+    unfold FiatShamir.nmaHashQueryBound
+    refine OracleComp.IsQueryBoundP.simulateQ_run_of_step (hQ pk).2 ?_ ?_ ∅
+    · rintro ((n | mc) | msg) hp s'
+      · simp at hp
+      · simpa only [QueryImpl.add_apply_inl, QueryImpl.add_apply_inr] using hro mc s'
+      · simp at hp
+    · rintro ((n | mc) | msg) hnp s'
+      · have h := hfwd (.inl n) s'
+        simpa only [QueryImpl.add_apply_inl, FiatShamir.nmaHashQueryBound] using h
+      · simp at hnp
+      · simpa only [QueryImpl.add_apply_inr] using hsig msg s'
+  have hpost : ∀ result : (M × Option (Commit × Resp)) × spec.QueryCache,
+      FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+        (oa := (pure ((result.1.1, result.1.2),
+          match result.1.2 with
+          | some (w', _) => Function.update result.2 (Sum.inr (result.1.1, w')) none
+          | none => result.2) :
+          OracleComp spec ((M × Option (Commit × Resp)) × spec.QueryCache))) 0 := by
+    intro result
+    simp [FiatShamir.nmaHashQueryBound]
+  have hbind := FiatShamir.nmaHashQueryBound_bind (M := M) (Commit := Commit)
+    (Chal := Chal) hrun (fun result => hpost result)
   change FiatShamir.nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-    (oa := (simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅) qH
-  unfold FiatShamir.nmaHashQueryBound
-  refine OracleComp.IsQueryBoundP.simulateQ_run_of_step (hQ pk).2 ?_ ?_ ∅
-  · rintro ((n | mc) | msg) hp s'
-    · simp at hp
-    · simpa only [QueryImpl.add_apply_inl, QueryImpl.add_apply_inr] using hro mc s'
-    · simp at hp
-  · rintro ((n | mc) | msg) hnp s'
-    · have h := hfwd (.inl n) s'
-      simpa only [QueryImpl.add_apply_inl, FiatShamir.nmaHashQueryBound] using h
-    · simp at hnp
-    · simpa only [QueryImpl.add_apply_inr] using hsig msg s'
+    (oa := (simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅ >>= fun result =>
+      pure ((result.1.1, result.1.2),
+        match result.1.2 with
+        | some (w', _) => Function.update result.2 (Sum.inr (result.1.1, w')) none
+        | none => result.2)) qH
+  simpa only [Nat.add_zero] using hbind
 
 end scaffold
 
