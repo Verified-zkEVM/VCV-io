@@ -33,7 +33,7 @@ scheme (e.g. `MLDSA.nma_security`).
 universe u v
 
 open OracleComp OracleSpec
-open scoped BigOperators
+open scoped BigOperators ENNReal
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 
@@ -285,6 +285,35 @@ lemma probOutput_unforgeableExp_eq_hybridExpAtKey_real :
         hybridExpAtKey ids hr M maxAttempts adv (realSignBody ids M maxAttempts pk sk) pk] := by
   sorry
 
+/-- Lift a cache-level hybrid handler to one carrying a never-touched bad flag in its
+state, so the `expectedQuerySlack` bridge of `ProgramLogic/Relational/SimulateQ.lean`
+applies. The flag is preserved on every step, hence stays `false` along any run started
+from `false`. -/
+noncomputable def flagLift {ι : Type} {spec : OracleSpec ι} {σ : Type}
+    (impl : QueryImpl spec (StateT σ ProbComp)) :
+    QueryImpl spec (StateT (σ × Bool) ProbComp) :=
+  fun t => StateT.mk fun p =>
+    (fun us : spec.Range t × σ => (us.1, (us.2, p.2))) <$> (impl t).run p.1
+
+omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+lemma flagLift_run {ι : Type} {spec : OracleSpec ι} {σ : Type}
+    (impl : QueryImpl spec (StateT σ ProbComp)) (t : spec.Domain) (s : σ) (b : Bool) :
+    ((flagLift impl t).run (s, b)) =
+      (fun us : spec.Range t × σ => (us.1, (us.2, b))) <$> (impl t).run s := rfl
+
+omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+/-- Transport a predicate-targeted query bound across a (propositionally equal) choice of
+predicate and `DecidablePred` instance. The predicate is allowed to differ by its match
+auxiliary (which arises when the same matches-notation is elaborated in different
+modules), and the decidability instance is a subsingleton. -/
+lemma isQueryBoundP_cast_pred {ι : Type} {spec : OracleSpec ι} {α : Type}
+    {oa : OracleComp spec α} {p₁ p₂ : spec.Domain → Prop}
+    {i₁ : DecidablePred p₁} {i₂ : DecidablePred p₂} {n : ℕ} (hp : p₁ = p₂)
+    (h : @OracleComp.IsQueryBoundP _ spec α oa p₁ i₁ n) :
+    @OracleComp.IsQueryBoundP _ spec α oa p₂ i₂ n := by
+  subst hp
+  convert h using 2
+
 /-- Hop G₀ → G₁ (Sign → Prog) at a fixed key: replacing the caching hash of each signing
 attempt by overwrite-reprogramming with a fresh challenge costs at most
 
@@ -318,6 +347,149 @@ lemma probOutput_hybridExpAtKey_real_le_prog
           (progSignBody ids M pk sk · maxAttempts) pk] +
         ENNReal.ofReal (qS * ε * (qS + 1) / (2 * (1 - p_abort) ^ 2) +
           qS * (qH + 1) * ε / (1 - p_abort)) := by
+  classical
+  have h1p : (0 : ℝ) < 1 - p_abort := by linarith
+  set σ := (M × Commit →ₒ Chal).QueryCache × List M with hσ
+  -- The combined cache-level handlers for the two games.
+  set implReal : QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (StateT σ ProbComp) :=
+    hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+      hybridSignImpl M (realSignBody ids M maxAttempts pk sk) with himplReal
+  set implProg : QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (StateT σ ProbComp) :=
+    hybridBaseImpl (Commit := Commit) (Chal := Chal) M +
+      hybridSignImpl M (progSignBody ids M pk sk · maxAttempts) with himplProg
+  set R : σ → ℝ≥0∞ := fun s => QueryCache.enncard s.1 with hR
+  set ζ : ℝ≥0∞ := ENNReal.ofReal ε *
+    ∑ a ∈ Finset.range maxAttempts, (a : ℝ≥0∞) * ENNReal.ofReal p_abort ^ a with hζ
+  set β : ℝ≥0∞ := ENNReal.ofReal ε *
+    ∑ a ∈ Finset.range maxAttempts, ENNReal.ofReal p_abort ^ a with hβ
+  set g : ℝ≥0∞ := ∑ a ∈ Finset.range maxAttempts, ENNReal.ofReal p_abort ^ a with hg
+  set querySlack : σ → ℝ≥0∞ := fun s => ζ + R s * β with hquerySlack
+  -- The per-charged-query TV slack: real-vs-prog within a single signing query.
+  have h_step_tv_charged : ∀ (t : _), (· matches .inr _) t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((flagLift implProg t).run (s, false))
+          ((flagLift implReal t).run (s, false))) ≤ querySlack s := by
+    sorry
+  -- Uncharged (base) queries: the two handlers coincide.
+  have h_step_eq_uncharged : ∀ (t : _), ¬ (· matches .inr _) t → ∀ (p : σ × Bool),
+      (flagLift implProg t).run p = (flagLift implReal t).run p := by
+    rintro (t' | msg) hnc p
+    · rw [flagLift_run, flagLift_run, himplProg, himplReal,
+        QueryImpl.add_apply_inl, QueryImpl.add_apply_inl]
+    · exact absurd rfl hnc
+  -- The flag is never set: monotonicity is vacuous-by-preservation.
+  have h_mono₁ : ∀ (t : _) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((flagLift implProg t).run p), z.2.2 = true := by
+    intro t p hp2 z hz
+    rw [flagLift_run, support_map] at hz
+    obtain ⟨us, -, rfl⟩ := hz
+    exact hp2
+  -- Expected-resource hypotheses for `expectedQuerySlack_expected_resource_le`.
+  have h_charged : ∀ (t : _) (p : σ × Bool), p.2 = false → (· matches .inr _) t →
+      ∑' z : _ × σ × Bool, Pr[= z | (flagLift implProg t).run p] * R z.2.1 ≤ R p.1 + g := by
+    rintro (t' | msg) p - hc
+    · exact absurd hc (by simp)
+    rcases p with ⟨⟨c, l⟩, b⟩
+    -- Reduce the flag-lifted signing run to the `progSignBody` cache-growth tsum.
+    -- BLOCKED: the combined-spec `Range (Sum.inr msg)` index of the tsum is only
+    -- defeq (not syntactically equal) to `Option (Commit × Resp)`, so the
+    -- `tsum_probOutput_bind_mul`/`hybridSignImpl_run` rewrites do not fire; needs a
+    -- `Range`-index `Eq.mpr`/`change` bridge to apply
+    -- `tsum_probOutput_run_progSignBody_mul_enncard_le` (PROVEN, GhostBodies.lean).
+    sorry
+  have h_growth : ∀ (t : _) (p : σ × Bool), p.2 = false →
+      ¬ (· matches .inr _) t → (· matches .inl (.inr _)) t →
+      ∀ z ∈ support ((flagLift implProg t).run p), R z.2.1 ≤ R p.1 + 1 := by
+    rintro ((n | mc) | msg) p - hnc hg z hz
+    · exact absurd hg (by simp)
+    · rcases p with ⟨⟨c, l⟩, b⟩
+      rw [flagLift_run, himplProg, QueryImpl.add_apply_inl] at hz
+      replace hz : z ∈ support ((fun us : Chal × σ => (us.1, (us.2, b))) <$>
+          ((fun cu : Chal × (M × Commit →ₒ Chal).QueryCache => (cu.1, (cu.2, l))) <$>
+            roStep M c mc)) := by
+        rw [← hybridBaseImpl_run_ro]; exact hz
+      simp only [support_map] at hz
+      obtain ⟨cu', ⟨cu'', hcu'', rfl⟩, rfl⟩ := hz
+      -- The random-oracle step grows the cache by at most one entry.
+      simp only [hR]
+      rcases hmc : c mc with _ | v
+      · rw [roStep_of_none M hmc] at hcu''
+        simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff] at hcu''
+        obtain ⟨ch, -, rfl⟩ := hcu''
+        exact QueryCache.enncard_cacheQuery_le c mc ch
+      · rw [roStep_of_some M hmc] at hcu''
+        rw [(by simpa using hcu'' : cu'' = (v, c))]
+        exact le_self_add
+    · exact absurd hg (by simp)
+  have h_free : ∀ (t : _) (p : σ × Bool), p.2 = false →
+      ¬ (· matches .inr _) t → ¬ (· matches .inl (.inr _)) t →
+      ∀ z ∈ support ((flagLift implProg t).run p), R z.2.1 ≤ R p.1 := by
+    rintro ((n | mc) | msg) p - hnc hng z hz
+    · -- Uniform query: forwarded without touching the cache.
+      rcases p with ⟨⟨c, l⟩, b⟩
+      have hrun : (hybridBaseImpl (Commit := Commit) (Chal := Chal) M (.inl n)).run
+          (c, l) = (fun x => (x, (c, l))) <$>
+            (liftM (unifSpec.query n) : ProbComp (unifSpec.Range n)) := by
+        simp only [hybridBaseImpl, QueryImpl.add_apply_inl]
+        rfl
+      rw [flagLift_run, himplProg, QueryImpl.add_apply_inl] at hz
+      replace hz : z ∈ support ((fun us : unifSpec.Range n × σ => (us.1, (us.2, b))) <$>
+          ((fun x : unifSpec.Range n => (x, ((c, l) : σ))) <$>
+            (liftM (unifSpec.query n) : ProbComp (unifSpec.Range n)))) := by
+        rw [← hrun]; exact hz
+      simp only [support_map] at hz
+      obtain ⟨x, ⟨y, -, rfl⟩, rfl⟩ := hz
+      exact le_rfl
+    · exact absurd rfl hng
+    · exact absurd rfl hnc
+  -- The bridge: run-level TV ≤ accumulated slack + Pr[bad].
+  open OracleComp.ProgramLogic.Relational in
+  have h_bridge :
+      ENNReal.ofReal (tvDist
+          ((simulateQ (flagLift implProg) (adv.main pk)).run ((∅, []), false))
+          ((simulateQ (flagLift implReal) (adv.main pk)).run ((∅, []), false)))
+        ≤ expectedQuerySlack (flagLift implProg)
+            (· matches .inr _) querySlack (adv.main pk) qS (((∅, []) : σ), false)
+          + Pr[fun z : _ × σ × Bool => z.2.2 = true |
+              (simulateQ (flagLift implProg) (adv.main pk)).run (((∅, []) : σ), false)] := by
+    refine ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent_output_bad
+      (flagLift implProg) (flagLift implReal) (· matches .inr _) querySlack
+      h_step_tv_charged h_step_eq_uncharged h_mono₁ (adv.main pk)
+      (queryBudget := qS) ?_ (((∅, []) : σ), false)
+    exact isQueryBoundP_cast_pred (by funext x; rcases x with (_ | _) | _ <;> rfl) (hQ pk).1
+  -- The bad-flag probability vanishes: the flag is preserved from `false`.
+  have h_bad_zero : Pr[fun z : _ × σ × Bool => z.2.2 = true |
+      (simulateQ (flagLift implProg) (adv.main pk)).run (((∅, []) : σ), false)] = 0 := by
+    refine probEvent_eq_zero fun z hz hbad => ?_
+    have hinv : ∀ y ∈ support ((simulateQ (flagLift implProg) (adv.main pk)).run
+        (((∅, []) : σ), false)), y.2.2 = false := by
+      refine OracleComp.simulateQ_run_preserves_inv_of_query (flagLift implProg)
+        (fun s : σ × Bool => s.2 = false) (fun t s hs y hy => ?_) (adv.main pk)
+        (((∅, []) : σ), false) rfl
+      rw [flagLift_run, support_map] at hy
+      obtain ⟨us, -, rfl⟩ := hy
+      exact hs
+    rw [hinv z hz] at hbad
+    exact absurd hbad (by decide)
+  -- The accumulated slack is bounded by the resource estimate.
+  have h_slack_le : OracleComp.ProgramLogic.Relational.expectedQuerySlack (flagLift implProg)
+        (· matches .inr _) querySlack (adv.main pk) qS (((∅, []) : σ), false)
+      ≤ (qS : ℝ≥0∞) * ζ +
+          ((qS : ℝ≥0∞) * R ((∅, []) : σ) + (qS : ℝ≥0∞) * (qH : ℝ≥0∞)
+            + (qS.choose 2 : ℝ≥0∞) * g) * β := by
+    refine OracleComp.ProgramLogic.Relational.expectedQuerySlack_expected_resource_le
+      (flagLift implProg) (· matches .inr _) (· matches .inl (.inr _)) R ζ β g
+      h_charged h_growth h_free (adv.main pk) (qS := qS) (qH := qH) ?_ ?_ ((∅, []) : σ)
+    · exact isQueryBoundP_cast_pred (by funext x; rcases x with (_ | _) | _ <;> rfl) (hQ pk).1
+    · exact isQueryBoundP_cast_pred (by funext x; rcases x with (_ | _) | _ <;> rfl) (hQ pk).2
+  -- Final assembly: combine `h_bridge` (with `h_bad_zero` ⇒ the `Pr[bad]` term is `0`) and
+  -- `h_slack_le` to bound `tvDist(run prog)(run real)` by `qS·ζ + (qS·qH + C(qS,2)·g)·β`
+  -- (using `R ∅ = 0`); lift to the games through the shared `hybridVerifyCont`
+  -- (`hybridExpAtKey_eq_run_bind` + `tvDist_bind_right_le`, in the style of the proven
+  -- `prog_le_trans`/`trans_le_sim` tails); then close the `ℝ≥0∞` arithmetic against the target
+  -- `qS·ε·(qS+1)/(2(1-p)²) + qS·(qH+1)·ε/(1-p)` via the verified bounds
+  -- `∑_{a<m} a·p^a ≤ 1/(1-p)²`, `(∑_{a<m} p^a)² ≤ 1/(1-p)²`, and `qS + C(qS,2) = qS(qS+1)/2`.
   sorry
 
 omit [SampleableType Stmt] in
