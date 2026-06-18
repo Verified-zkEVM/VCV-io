@@ -868,61 +868,92 @@ lemma eagerGhostRead_bad_le_lazyGhostRead_bad (pk : Stmt) (sk : Wit) :
       (ghostHybridImpl ids M maxAttempts true pk sk),
     ← OracleComp.ProgramLogic.Relational.avgBad_pure_state
       (lazyGhostHybridImpl ids M maxAttempts pk sk)]
-  refine OracleComp.ProgramLogic.Relational.avgBad_le_of_steps
+  -- Averaged-state-measure route, now on the *invariant-carrying* framework shape
+  -- `avgBad_le_of_steps_inv`. The invariant `Inv μ := True` is the conservative instantiation
+  -- that recovers the original telescoping; it suffices for the `pure`, uniform, and signing
+  -- steps (which are per-`p` pointwise identities) and is the slot into which the genuine
+  -- pushforward invariant must be threaded to close the read step at the `∑' p` level.
+  refine OracleComp.ProgramLogic.Relational.avgBad_le_of_steps_inv
     (ghostHybridImpl ids M maxAttempts true pk sk)
     (bound := fun {_} ob ν =>
       OracleComp.ProgramLogic.Relational.avgBad
         (lazyGhostHybridImpl ids M maxAttempts pk sk) ν ob)
-    ?_ ?_ (adv.main pk) _
+    (Inv := fun _ => True)
+    ?_ ?_ (adv.main pk) _ trivial
   · -- `h_pure`: at a `pure` leaf neither handler queries, so the carried bad mass of `μ`
     -- equals the lazy leaf value (both are `∑' p, μ p · 1_{p.2}`). Closed by `avgBad_pure`.
-    intro μ x
+    intro μ _ x
     beta_reduce
     rw [OracleComp.ProgramLogic.Relational.avgBad_pure]
-  · -- `h_step`: one telescoped query step. `ih μ' u : avgBad eager μ' (cont u) ≤
+  · -- `h_step`: one telescoped query step. `ih μ' _ u : avgBad eager μ' (cont u) ≤
     -- avgBad lazy μ' (cont u)` folds through the post-step law. The eager telescoped average
     -- (LHS, `avgBad_query_bind_eq`) must be dominated by `avgBad lazy μ (query t >>= cont)`.
-    intro μ t cont ih
+    intro μ _ t cont ih
     -- The `h_step` premise's LHS is *already* the telescoped eager average
     -- (`avgBad_query_bind_eq`); only the RHS `bound (query t >>= cont) μ` needs unfolding to
     -- the matching lazy telescoped average.
     beta_reduce
     rw [OracleComp.ProgramLogic.Relational.avgBad_query_bind_eq
         (lazyGhostHybridImpl ids M maxAttempts pk sk) μ t cont]
-    refine ENNReal.tsum_le_tsum fun p => mul_le_mul_right ?_ _
+    -- CRITICAL: split on the query *before* reducing to a per-`p` bound. The uniform and
+    -- signing steps are genuine per-`p` pointwise identities (handled below by the
+    -- `mul_le_mul_right` per-`p` reduction). The read step is NOT: the eager read flips bad
+    -- with mass `1` at a ghost-hit state while the lazy read fires sub-unit, so it must stay
+    -- at the `∑' p, μ p · (…)` level where the average over `p ∼ μ` collapses the hit charge.
     rcases t with (n | mc) | msg
-    · -- Uniform step: `ghostHybridImpl … true` and `lazyGhostHybridImpl` are *definitionally
-      -- identical* on uniform queries (`lazyGhostHybridImpl_run_unif_eq`); the eager telescoped
-      -- average equals the lazy one pointwise, so fold the IH through each output state.
+    · -- Uniform step: per-`p` pointwise. `ghostHybridImpl … true` and `lazyGhostHybridImpl`
+      -- are *definitionally identical* on uniform queries (`lazyGhostHybridImpl_run_unif_eq`);
+      -- fold the IH through each output state at its Dirac law.
+      refine ENNReal.tsum_le_tsum fun p => mul_le_mul_right ?_ _
       refine ENNReal.tsum_le_tsum fun z => ?_
       rw [lazyGhostHybridImpl_run_unif_eq ids M maxAttempts pk sk n p]
       gcongr
-      have hih := ih (PMF.pure z.2) z.1
+      have hih := ih (PMF.pure z.2) trivial z.1
       simp only [] at hih
       rwa [OracleComp.ProgramLogic.Relational.avgBad_pure_state,
         OracleComp.ProgramLogic.Relational.avgBad_pure_state] at hih
-    · -- Read step: THE SOLE RESIDUAL (deferred-sampling read-step recoupling).
-      -- The eager read flips bad deterministically on a structural ghost hit
-      -- `mc ∈ ghostCache(p)` (mass `1`, real cache untouched), while the lazy read fires with
-      -- sub-unit mass `lazyGhostFire … (enncard ghostCache)` and answers from the real layer.
-      -- The averaged eager read charge is `Pr_{p∼μ}[mc ∈ ghostCache(p)]`; when `μ` is the
-      -- pushforward of the pending commit draws this collapses (Fubini /
-      -- `tsum_pushforward_mem_eq_draw_hit`, single-pending base case
-      -- `probOutput_lazyGhostFire_one`) to the *same* mass the lazy read charges, and the
-      -- post-read state laws recouple to feed the IH. Discharging this — exhibiting `μ` as the
-      -- pushforward of the pending draws and recoupling the post-read continuation law — is the
-      -- genuine multi-week probabilistic content, now isolated as the sole residual on the
-      -- *correct* (averaged-state-measure) framework shape rather than the provably-stuck
-      -- per-state shape.
+    · -- Read step: THE SOLE RESIDUAL (deferred-sampling read-step recoupling), now correctly
+      -- positioned at the `∑' p, μ p · (…)` level (no premature per-`p` reduction — `rcases t`
+      -- precedes the `mul_le_mul_right` used only by the uniform/signing branches).
+      --
+      -- EXACT residual goal (after `avgBad_query_bind_eq`, with `t = .inl (.inr mc)`):
+      --   `∑' p, μ p · (∑' z, Pr[= z | eagerRead.run p] · Bcont z)`
+      --     ≤ `∑' p, μ p · (∑' z, Pr[= z | lazyRead.run p] · Bcont z)`,
+      -- where `Bcont z := probEvent (fun w => w.2.2 = true) ((simulateQ _ (cont z.1)).run z.2)`,
+      -- `eagerRead` flips bad with mass `1` on a structural ghost hit `mc ∈ ghostCache(p)`
+      -- (real cache untouched), and `lazyRead` draws `lazyGhostFire … (enncard ghostCache(p))`
+      -- and answers from the real layer.
+      --
+      -- WHY THIS NEEDS THE `Inv` STRENGTHENING (and why `Inv := True` is insufficient here):
+      -- the per-`p` charges are NOT ordered — `A_eager(p) = 1 > A_lazy(p)` at a ghost-hit `p` —
+      -- so the inequality holds only *after* averaging against `μ`. The collapse
+      --   `∑' p, μ p · 1_{mc ∈ ghostCache(p)} = (the lazy fire mass)`
+      -- is the banked Fubini change-of-variables `tsum_pushforward_mem_eq_draw_hit` composed
+      -- with the banked B-lemmas `probOutput_eagerMultiReadBad_eq_lazyFire_or` /
+      -- `probOutput_lazyGhostFire_one`, and it requires `μ` to be a *pushforward*
+      -- `kn.map place` of a list of iid `Prod.fst <$> ids.commit pk sk` draws. That is the
+      -- genuine invariant to thread through the now-available `Inv` slot.
+      --
+      -- THE OPEN STRUCTURAL OBSTRUCTION (the multi-week content). Strengthening `Inv` to the
+      -- pushforward predicate is incompatible with the *current* uniform/signing branches: those
+      -- close by folding the IH at the Dirac laws `PMF.pure z.2` (via `avgBad_pure_state`), and a
+      -- Dirac at a ghost-populated reachable state is NOT a pushforward of iid commit draws
+      -- (only the empty-cache start `δ_∅` is). Closing the read step therefore forces the
+      -- uniform/signing branches to also thread the pushforward law `μ'` rather than collapse to
+      -- Diracs — i.e. the full deferred-sampling rewrite of all three branches in a single
+      -- pushforward-carrying induction, not a local read-only patch. The framework now exposes
+      -- the correct hook (`avgBad_le_of_steps_inv`'s `Inv` parameter) and the read-charge
+      -- collapse primitives are banked; the residual is the joint re-coupling of the post-read
+      -- continuation law `μ'` as a pushforward across all branches simultaneously.
       sorry
-    · -- Signing step: `ghostHybridImpl … true` and `lazyGhostHybridImpl` are *definitionally
-      -- identical* on signing queries (`lazyGhostHybridImpl_run_sign_eq`); the eager telescoped
-      -- average equals the lazy one pointwise and the ghost cache grows identically, so fold the
-      -- IH through.
+    · -- Signing step: per-`p` pointwise. `ghostHybridImpl … true` and `lazyGhostHybridImpl`
+      -- are *definitionally identical* on signing queries (`lazyGhostHybridImpl_run_sign_eq`);
+      -- the ghost cache grows identically, so fold the IH through at its Dirac law.
+      refine ENNReal.tsum_le_tsum fun p => mul_le_mul_right ?_ _
       refine ENNReal.tsum_le_tsum fun z => ?_
       rw [lazyGhostHybridImpl_run_sign_eq ids M maxAttempts pk sk msg p]
       gcongr
-      have hih := ih (PMF.pure z.2) z.1
+      have hih := ih (PMF.pure z.2) trivial z.1
       simp only [] at hih
       rwa [OracleComp.ProgramLogic.Relational.avgBad_pure_state,
         OracleComp.ProgramLogic.Relational.avgBad_pure_state] at hih

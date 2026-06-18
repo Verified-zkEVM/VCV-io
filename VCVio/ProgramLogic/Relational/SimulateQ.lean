@@ -3484,6 +3484,56 @@ bookkeeping is handled here; the *probabilistic* content lives entirely in disch
 `h_step` at the read query, where the caller must supply the Fubini charge equality
 (`tsum_pushforward_mem_eq_draw_hit`) recoupling the post-read state law `μ'` — the genuine
 residual isolated for the instantiation. -/
+
+/-- **Averaged-bad telescoping with a state-law invariant.** A strict generalization of
+`avgBad_le_of_steps` that threads a predicate `Inv : PMF (σ × Bool) → Prop` on the state law
+through the free-monad induction. The conclusion holds for every `μ` satisfying `Inv μ`, and
+the two per-step premises may *assume* `Inv μ`:
+
+* `h_pure` discharges the `pure` leaf assuming `Inv μ`;
+* `h_step` discharges one telescoped query step assuming `Inv μ`, and is handed an inductive
+  hypothesis that fires only at post-step laws `μ'` for which `Inv μ'` holds — so `h_step` is
+  responsible for re-establishing `Inv` on every post-step law it feeds the IH.
+
+This is the shape required by the deferred-sampling read step: the eager read flips the bad
+flag deterministically at a structural ghost-hit state, so a *per-state* bound is false; the
+collapse to the lazy fire mass only happens once the average is taken against a state law that
+is a pushforward of the upstream commit draws. The invariant carries exactly that pushforward
+structure across the induction (preserved by reads — the ghost cache is untouched — grown by
+signs — one more draw — and holding at the empty-cache Dirac start). The probabilistic content
+still lives entirely in discharging `h_step`; the framework supplies only the `Inv` plumbing. -/
+theorem avgBad_le_of_steps_inv
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (bound : {β : Type} → OracleComp spec β → PMF (σ × Bool) → ℝ≥0∞)
+    (Inv : PMF (σ × Bool) → Prop)
+    (h_pure : ∀ (μ : PMF (σ × Bool)), Inv μ → ∀ (x : γ),
+      (∑' p : σ × Bool, μ p * (if p.2 = true then 1 else 0))
+        ≤ bound (pure x : OracleComp spec γ) μ)
+    (h_step : ∀ (μ : PMF (σ × Bool)), Inv μ → ∀ (t : spec.Domain)
+      (cont : spec.Range t → OracleComp spec γ),
+      (∀ (μ' : PMF (σ × Bool)), Inv μ' → ∀ (u : spec.Range t),
+        avgBad impl μ' (cont u) ≤ bound (cont u) μ') →
+      (∑' p : σ × Bool, μ p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[ fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2])
+        ≤ bound (query t >>= cont) μ)
+    (oa : OracleComp spec γ) :
+    ∀ (μ : PMF (σ × Bool)), Inv μ → avgBad impl μ oa ≤ bound oa μ := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro μ hμ
+      rw [avgBad_pure]
+      exact h_pure μ hμ x
+  | @query_bind t cont ih =>
+      intro μ hμ
+      rw [avgBad_query_bind_eq]
+      exact h_step μ hμ t cont (fun μ' hμ' u => ih u μ' hμ')
+
+/-- **Averaged-bad telescoping (invariant-free corollary).** The `Inv := fun _ => True`
+specialization of `avgBad_le_of_steps_inv`: the original telescoping shape, recovered so
+callers that do not need a state-law invariant are unaffected. -/
 theorem avgBad_le_of_steps
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (bound : {β : Type} → OracleComp spec β → PMF (σ × Bool) → ℝ≥0∞)
@@ -3502,15 +3552,11 @@ theorem avgBad_le_of_steps
         ≤ bound (query t >>= cont) μ)
     (oa : OracleComp spec γ) :
     ∀ (μ : PMF (σ × Bool)), avgBad impl μ oa ≤ bound oa μ := by
-  induction oa using OracleComp.inductionOn with
-  | pure x =>
-      intro μ
-      rw [avgBad_pure]
-      exact h_pure μ x
-  | @query_bind t cont ih =>
-      intro μ
-      rw [avgBad_query_bind_eq]
-      exact h_step μ t cont (fun μ' u => ih u μ')
+  intro μ
+  exact avgBad_le_of_steps_inv impl bound (fun _ => True)
+    (fun μ _ x => h_pure μ x)
+    (fun μ _ t cont ih => h_step μ t cont (fun μ' u => ih μ' trivial u))
+    oa μ trivial
 
 end AveragedStateMeasureBad
 
