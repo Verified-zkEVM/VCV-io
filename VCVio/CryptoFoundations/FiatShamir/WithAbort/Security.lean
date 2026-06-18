@@ -704,6 +704,28 @@ lemma hiddenReadList_fold_le_target (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abo
     _ ≤ ENNReal.ofReal (qS * ((qH : ℝ) + 1) * ε / (1 - p_abort)) := by
         apply ENNReal.ofReal_le_ofReal; apply le_of_eq; field_simp
 
+omit [SampleableType Stmt] in
+/-- **(c) Expected-attempt geometric fold.** The per-signing-query attempt-count mass
+`∑_{a<maxAttempts} ofReal p^a` — which counts *all* attempts (each attempt `a` is reached
+with probability `≤ pᵃ`, *including* the accepting one) — is bounded by `ofReal (1/(1-p))`.
+This is the geometric sum that turns the per-query charge increment of
+`tsum_probOutput_run_ghostSignBody_mul_memCharge_le` (factor `∑_{a<maxAttempts} pᵃ`) into the
+`1/(1-p)` factor of the target `qS·(qH+1)·ε/(1-p)`. -/
+lemma geomAttemptSum_le {p_abort : ℝ} (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) :
+    (∑ a ∈ Finset.range maxAttempts, ENNReal.ofReal p_abort ^ a)
+      ≤ ENNReal.ofReal (1 / (1 - p_abort)) := by
+  have h1p : (0 : ℝ) < 1 - p_abort := by linarith
+  set S : ℝ := ∑ a ∈ Finset.range maxAttempts, p_abort ^ a with hSdef
+  have hg_eq : (∑ a ∈ Finset.range maxAttempts, ENNReal.ofReal p_abort ^ a)
+      = ENNReal.ofReal S := by
+    rw [hSdef, ENNReal.ofReal_sum_of_nonneg (fun a _ => pow_nonneg hp₀ a)]
+    exact Finset.sum_congr rfl fun a _ => by rw [← ENNReal.ofReal_pow hp₀]
+  rw [hg_eq]
+  refine ENNReal.ofReal_le_ofReal ?_
+  rw [hSdef, le_div_iff₀ h1p]
+  have hmul := geom_sum_mul p_abort maxAttempts
+  nlinarith [pow_nonneg hp₀ maxAttempts]
+
 /-! ## Deferred-sampling eager↔lazy coupling (ghost-read leaf) -/
 
 omit [SampleableType Stmt] in
