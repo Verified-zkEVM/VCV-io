@@ -118,4 +118,112 @@ theorem probEvent_probeManyEps_le {oa : ProbComp R} {ε : ℝ≥0∞} (hε : ∀
     rw [tsum_bool, if_pos rfl, if_neg (by simp : ¬ (false = true))]
     rw [Nat.cast_succ, add_mul, one_mul, add_comm]
 
+/-! ## Hidden-target adaptive first-fire bound
+
+The companion of `probeManyEps` for the *same-target-reused* regime. Where `probeManyEps`
+redraws a fresh sample `v ← oa` at **every** probe (the memoryless, deferred-sampling model),
+`hiddenReadMany` draws a single hidden target `w ← oa` **once** and lets an adaptive `q`-read
+strategy probe that *fixed* `w` repeatedly. This is the structure of an eager run that commits a
+sampled key into its state at draw time and then exposes it only through later membership tests:
+the key's value is hidden until the first hit, so up to the first hit the read points are fixed
+(determined by the all-miss reply history) and independent of `w`. Averaging over the single hidden
+draw — without ever conditioning on the drawn value — gives the same union bound `q · ε`. -/
+
+/-- Adaptive `q`-read game against a FIXED hidden target `w`: the strategy `σ` maps the list of
+boolean replies (hit/miss) seen so far to the next read point, and the game fires (returns `true`)
+iff some read equals `w`. The target `w` is reused across all reads; it is drawn once, outside this
+program (see `hiddenReadMany`). -/
+noncomputable def readMany (w : R) : ℕ → (List Bool → R) → Bool
+  | 0, _ => false
+  | q + 1, σ =>
+    let b := decide (σ [] = w)
+    b || readMany w q (fun h => σ (b :: h))
+
+/-- The hidden-target game: draw the target `w ← oa` **once**, then run `q` adaptive reads against
+that fixed `w`. -/
+noncomputable def hiddenReadMany (oa : ProbComp R) (q : ℕ) (σ : List Bool → R) : ProbComp Bool :=
+  oa >>= fun w => pure (readMany w q σ)
+
+/-- **Fixed read points before the first hit.** A FIXED-target adaptive read game fires iff the
+hidden target `w` equals one of the `q` read points reached along the all-miss history
+`σ (List.replicate j false)`. The point: those read points do **not** depend on `w` (until a hit,
+every reply is a miss, so the history is `replicate j false`), which is exactly what turns the
+averaged firing probability into a plain union bound. -/
+theorem readMany_true_iff (w : R) (q : ℕ) (σ : List Bool → R) :
+    readMany w q σ = true ↔ ∃ j < q, w = σ (List.replicate j false) := by
+  induction q generalizing σ with
+  | zero => simp [readMany]
+  | succ q ih =>
+    rw [readMany]
+    simp only [Bool.or_eq_true, decide_eq_true_eq]
+    constructor
+    · rintro (h | h)
+      · exact ⟨0, Nat.succ_pos q, by simpa using h.symm⟩
+      · by_cases hhead : σ [] = w
+        · exact ⟨0, Nat.succ_pos q, hhead.symm⟩
+        · rw [decide_eq_false (by simpa using hhead)] at h
+          obtain ⟨j, hj, hwj⟩ := (ih (fun h => σ (false :: h))).1 h
+          exact ⟨j + 1, Nat.succ_lt_succ hj, by simpa [List.replicate_succ] using hwj⟩
+    · rintro ⟨j, hj, hwj⟩
+      cases j with
+      | zero => left; simpa using hwj.symm
+      | succ j =>
+        by_cases hhead : σ [] = w
+        · exact Or.inl hhead
+        · refine Or.inr ?_
+          rw [decide_eq_false (by simpa using hhead)]
+          exact (ih (fun h => σ (false :: h))).2
+            ⟨j, Nat.lt_of_succ_lt_succ hj, by simpa [List.replicate_succ] using hwj⟩
+
+/-- **Hidden-target adaptive first-fire bound.** A FIXED target `w ← oa` drawn **once** and probed
+by `q` adaptive reads fires with probability at most `q · ε`, whenever every outcome of `oa` has
+mass at most `ε`. The averaging is over the single hidden draw; we never condition on `w`. Because
+the read points are fixed by the all-miss history (`readMany_true_iff`), the firing event is the
+union of the `q` fixed singletons `{w = σ (replicate j false)}`, each of mass at most `ε`. This is
+the same-target-reused sibling of `probEvent_probeManyEps_le`. -/
+theorem probEvent_hiddenReadMany_le {oa : ProbComp R} {ε : ℝ≥0∞}
+    (hε : ∀ r : R, Pr[= r | oa] ≤ ε) (q : ℕ) (σ : List Bool → R) :
+    Pr[ (fun b : Bool => b = true) | hiddenReadMany oa q σ ] ≤ (q : ℝ≥0∞) * ε := by
+  rw [hiddenReadMany, probEvent_bind_eq_tsum]
+  have hstep : ∀ w : R,
+      Pr[= w | oa] * Pr[(fun b => b = true) | (pure (readMany w q σ) : ProbComp Bool)]
+        ≤ ∑ j ∈ Finset.range q,
+            if w = σ (List.replicate j false) then Pr[= w | oa] else 0 := by
+    intro w
+    by_cases hfire : readMany w q σ = true
+    · rw [probEvent_pure]
+      simp only [hfire, if_true, mul_one]
+      obtain ⟨j, hj, hwj⟩ := (readMany_true_iff w q σ).1 hfire
+      calc Pr[= w | oa]
+          = (if w = σ (List.replicate j false) then Pr[= w | oa] else 0) := by rw [if_pos hwj]
+        _ ≤ ∑ j ∈ Finset.range q,
+              if w = σ (List.replicate j false) then Pr[= w | oa] else 0 :=
+            Finset.single_le_sum
+              (f := fun j => if w = σ (List.replicate j false) then Pr[= w | oa] else 0)
+              (fun i _ => by positivity) (Finset.mem_range.2 hj)
+    · rw [probEvent_pure, if_neg hfire, mul_zero]
+      exact zero_le'
+  refine le_trans (ENNReal.tsum_le_tsum hstep) ?_
+  rw [Summable.tsum_finsetSum (fun _ _ => ENNReal.summable)]
+  calc ∑ j ∈ Finset.range q, ∑' w : R,
+          (if w = σ (List.replicate j false) then Pr[= w | oa] else 0)
+      ≤ ∑ j ∈ Finset.range q, ε := by
+        refine Finset.sum_le_sum fun j _ => ?_
+        rw [tsum_eq_single (σ (List.replicate j false))
+          (by intro b hb; rw [if_neg hb])]
+        rw [if_pos rfl]
+        exact hε _
+    _ = (q : ℝ≥0∞) * ε := by rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+
+/-- The multi-key fixed-target game: a list `ws` of hidden keys, each probed by the same `q`
+adaptive reads; fires iff some read hits some key. Used to model the eager ghost run, whose ghost
+cache accumulates one sampled key per rejected signing attempt. -/
+noncomputable def readManyList (ws : List R) (q : ℕ) (σ : List Bool → R) : Bool :=
+  ws.any (fun w => readMany w q σ)
+
+/-- The list game fires iff some individual key's game fires. -/
+theorem readManyList_true_iff (ws : List R) (q : ℕ) (σ : List Bool → R) :
+    readManyList ws q σ = true ↔ ∃ w ∈ ws, readMany w q σ = true := by
+  simp [readManyList, List.any_eq_true]
+
 end OracleComp
