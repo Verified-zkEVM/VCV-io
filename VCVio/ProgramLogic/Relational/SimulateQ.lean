@@ -3352,6 +3352,196 @@ variable {ι : Type} {spec : OracleSpec ι}
 variable {ι' : Type} {spec' : OracleSpec ι'} [IsUniformSpec spec']
 variable {σ γ : Type}
 
+/-! ### Bare-measure averaged bad mass
+
+The `avgBad` scaffold below averages the per-state bad mass against a *probability*
+state law `μ : PMF (σ × Bool)`. That total-mass-1 constraint is never used: the telescoping
+identities and the free-monad induction only ever use `μ p` as an `ℝ≥0∞` weight. An
+**aborting** signing step, however, produces a *sub*-probability post-step state law (its
+total mass drops by the rejection mass), so a `PMF`-typed average cannot carry the charge
+invariant across it.
+
+This block re-states the whole scaffold over a **bare measure** `ν : σ × Bool → ℝ≥0∞`
+(no total-mass constraint), so the same telescoping carries sub-probability post-step laws.
+The `PMF` lemmas above are recovered verbatim as corollaries by instantiating `ν := fun p => μ p`.
+
+A caller (e.g. the deferred-sampling charge route) instantiates `avgBadM_le_of_steps_inv`
+directly at the sub-probability state laws produced by the aborting sign step. -/
+
+/-- **Bare-measure averaged bad mass.** As `avgBad`, but averaging against an arbitrary
+measure `ν : σ × Bool → ℝ≥0∞` rather than a probability law. The total-mass-1 constraint of
+`PMF` is never needed by the telescoping, so this version carries the sub-probability
+post-step laws emitted by an aborting step. -/
+noncomputable def avgBadM
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (oa : OracleComp spec γ) : ℝ≥0∞ :=
+  ∑' p : σ × Bool, ν p *
+    Pr[fun z : γ × σ × Bool => z.2.2 = true | (simulateQ impl oa).run p]
+
+open scoped Classical in
+/-- `avgBadM` at a Dirac (single-point indicator) measure is the plain per-state bad
+probability. The bare-measure analogue of `avgBad_pure_state`. -/
+lemma avgBadM_pure_state
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (p₀ : σ × Bool) (oa : OracleComp spec γ) :
+    avgBadM impl (fun p => if p = p₀ then 1 else 0) oa =
+      Pr[fun z : γ × σ × Bool => z.2.2 = true | (simulateQ impl oa).run p₀] := by
+  rw [avgBadM, tsum_eq_single p₀ (by intro p hp; rw [if_neg hp, zero_mul]), if_pos rfl, one_mul]
+
+open scoped Classical in
+/-- **Linearity of `avgBadM` in the state measure.** The bare-measure analogue of
+`avgBad_eq_tsum_pure`: the averaged bad mass over `ν` is the `ν`-weighted sum of the
+per-state (Dirac) bad masses. -/
+lemma avgBadM_eq_tsum_pure
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (oa : OracleComp spec γ) :
+    avgBadM impl ν oa =
+      ∑' s' : σ × Bool, ν s' * avgBadM impl (fun p => if p = s' then 1 else 0) oa := by
+  rw [avgBadM]
+  exact tsum_congr fun s' => by rw [avgBadM_pure_state]
+
+/-- **Pure base case of `avgBadM`.** With no queries, the bad mass is exactly the carried
+bad mass of the measure `ν` — the `ν`-mass on states with the flag already set. Bare-measure
+analogue of `avgBad_pure`. -/
+lemma avgBadM_pure
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (x : γ) :
+    avgBadM impl ν (pure x : OracleComp spec γ) =
+      ∑' p : σ × Bool, ν p * (if p.2 = true then 1 else 0) := by
+  rw [avgBadM]
+  refine tsum_congr fun p => ?_
+  rw [simulateQ_pure, StateT.run_pure]
+  rcases p with ⟨s, b⟩
+  cases b with
+  | false => simp
+  | true => simp [probEvent_pure]
+
+/-- **One-step telescoping of `avgBadM` (joint-law form).** Bare-measure analogue of
+`avgBad_query_bind_eq`: moves one query off the front and exposes the post-step joint law,
+holding for any impl and any measure `ν`. No probabilistic content — pure rearrangement. -/
+lemma avgBadM_query_bind_eq
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (cont : spec.Range t → OracleComp spec γ) :
+    avgBadM impl ν (query t >>= cont) =
+      ∑' p : σ × Bool, ν p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2] := by
+  rw [avgBadM]
+  refine tsum_congr fun p => ?_
+  congr 1
+  have hsim : (simulateQ impl (query t >>= cont)).run p =
+      (impl t).run p >>= fun z => (simulateQ impl (cont z.1)).run z.2 := by
+    simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+      OracleQuery.cont_query, StateT.run_bind]
+  rw [hsim, probEvent_bind_eq_tsum]
+
+/-- **Post-step joint measure of a query step (bare-measure form).** The measure over
+`(output, post-state)` produced by averaging the per-state impl step `Pr[= z | (impl t).run p]`
+against the state measure `ν`. Bare-measure analogue of `postStepJoint`; stated directly as a
+`tsum` since `ν` need not be a probability law. -/
+noncomputable def postStepJointM
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (z : spec.Range t × σ × Bool) : ℝ≥0∞ :=
+  ∑' p : σ × Bool, ν p * Pr[= z | (impl t).run p]
+
+open scoped Classical in
+/-- **Output-grouped telescoping of the bare-measure average.** Bare-measure analogue of
+`avgBad_telescope_eq_tsum_postStep`: the telescoped one-step average regroups as a single
+`tsum` over the post-step joint measure `postStepJointM impl ν t`, weighting each
+`(output, post-state)` pair by the Dirac bad mass at the post-state. Pure `tsum`-Fubini. -/
+lemma avgBadM_telescope_eq_tsum_postStep
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (cont : spec.Range t → OracleComp spec γ) :
+    (∑' p : σ × Bool, ν p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2]) =
+      ∑' z : spec.Range t × σ × Bool,
+        postStepJointM impl ν t z *
+          avgBadM impl (fun p => if p = z.2 then 1 else 0) (cont z.1) := by
+  classical
+  have hstep : (∑' p : σ × Bool, ν p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2]) =
+      ∑' p : σ × Bool, ∑' z : spec.Range t × σ × Bool,
+          ν p * (Pr[= z | (impl t).run p] *
+            avgBadM impl (fun q => if q = z.2 then 1 else 0) (cont z.1)) := by
+    refine tsum_congr fun p => ?_
+    rw [← ENNReal.tsum_mul_left]
+    refine tsum_congr fun z => ?_
+    rw [avgBadM_pure_state, ← mul_assoc]
+  rw [hstep, ENNReal.tsum_comm]
+  refine tsum_congr fun z => ?_
+  rw [postStepJointM, ← ENNReal.tsum_mul_right]
+  refine tsum_congr fun p => ?_
+  rw [mul_assoc]
+
+/-- **Bare-measure averaged-bad telescoping with a state-measure invariant.** Bare-measure
+analogue of `avgBad_le_of_steps_inv`: threads a predicate `Inv : (σ × Bool → ℝ≥0∞) → Prop`
+on the state *measure* through the free-monad induction. The conclusion holds for every
+measure `ν` satisfying `Inv ν`, and the two per-step premises may assume `Inv ν`. The
+total-mass-1 constraint is never used, so an aborting step's sub-probability post-step law is
+admissible — which is exactly why this generalization is needed for the charge route. -/
+theorem avgBadM_le_of_steps_inv
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (bound : {β : Type} → OracleComp spec β → (σ × Bool → ℝ≥0∞) → ℝ≥0∞)
+    (Inv : (σ × Bool → ℝ≥0∞) → Prop)
+    (h_pure : ∀ (ν : σ × Bool → ℝ≥0∞), Inv ν → ∀ (x : γ),
+      (∑' p : σ × Bool, ν p * (if p.2 = true then 1 else 0))
+        ≤ bound (pure x : OracleComp spec γ) ν)
+    (h_step : ∀ (ν : σ × Bool → ℝ≥0∞), Inv ν → ∀ (t : spec.Domain)
+      (cont : spec.Range t → OracleComp spec γ),
+      (∀ (ν' : σ × Bool → ℝ≥0∞), Inv ν' → ∀ (u : spec.Range t),
+        avgBadM impl ν' (cont u) ≤ bound (cont u) ν') →
+      (∑' p : σ × Bool, ν p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[ fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2])
+        ≤ bound (query t >>= cont) ν)
+    (oa : OracleComp spec γ) :
+    ∀ (ν : σ × Bool → ℝ≥0∞), Inv ν → avgBadM impl ν oa ≤ bound oa ν := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro ν hν
+      rw [avgBadM_pure]
+      exact h_pure ν hν x
+  | @query_bind t cont ih =>
+      intro ν hν
+      rw [avgBadM_query_bind_eq]
+      exact h_step ν hν t cont (fun ν' hν' u => ih u ν' hν')
+
+/-- **Bare-measure averaged-bad telescoping (invariant-free corollary).** The
+`Inv := fun _ => True` specialization of `avgBadM_le_of_steps_inv`. -/
+theorem avgBadM_le_of_steps
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (bound : {β : Type} → OracleComp spec β → (σ × Bool → ℝ≥0∞) → ℝ≥0∞)
+    (h_pure : ∀ (ν : σ × Bool → ℝ≥0∞) (x : γ),
+      (∑' p : σ × Bool, ν p * (if p.2 = true then 1 else 0))
+        ≤ bound (pure x : OracleComp spec γ) ν)
+    (h_step : ∀ (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain)
+      (cont : spec.Range t → OracleComp spec γ),
+      (∀ (ν' : σ × Bool → ℝ≥0∞) (u : spec.Range t),
+        avgBadM impl ν' (cont u) ≤ bound (cont u) ν') →
+      (∑' p : σ × Bool, ν p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[ fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2])
+        ≤ bound (query t >>= cont) ν)
+    (oa : OracleComp spec γ) :
+    ∀ (ν : σ × Bool → ℝ≥0∞), avgBadM impl ν oa ≤ bound oa ν := by
+  intro ν
+  exact avgBadM_le_of_steps_inv impl bound (fun _ => True)
+    (fun ν _ x => h_pure ν x)
+    (fun ν _ t cont ih => h_step ν t cont (fun ν' u => ih ν' trivial u))
+    oa ν trivial
+
 /-- **Averaged bad mass over a state measure.** The probability the bad flag is set after
 `(simulateQ impl oa).run p`, *averaged* over the starting state `p` drawn from the state
 law `μ : PMF (σ × Bool)`. This is the quantity an eager (commit-upstream) handler must be
@@ -3365,6 +3555,15 @@ noncomputable def avgBad
     (μ : PMF (σ × Bool)) (oa : OracleComp spec γ) : ℝ≥0∞ :=
   ∑' p : σ × Bool, μ p *
     Pr[fun z : γ × σ × Bool => z.2.2 = true | (simulateQ impl oa).run p]
+
+/-- **Bridge: `avgBad` is `avgBadM` at the underlying measure.** The `PMF`-typed average is
+definitionally the bare-measure average against the coerced measure `fun p => μ p`. This lets
+every `PMF` corollary be derived from its bare-measure counterpart, and lets a caller move a
+`PMF` hypothesis into the bare-measure machinery. -/
+lemma avgBad_eq_avgBadM
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (oa : OracleComp spec γ) :
+    avgBad impl μ oa = avgBadM impl (fun p => μ p) oa := rfl
 
 /-- `avgBad` at a Dirac state measure is the plain per-state bad probability: the average
 over `PMF.pure p₀` collapses to the single term at `p₀`. This is the bridge that reduces
