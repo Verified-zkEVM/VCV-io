@@ -2236,7 +2236,7 @@ private lemma relTriple_graph_of_evalDist_map_eq
     (oa := oa) (ob := ob) (R := fun a b => F a = b)).2
   refine ⟨⟨𝒟[oa] >>= fun a => pure (a, F a), ?_, ?_⟩, ?_⟩
   · rw [map_bind]; simp
-  · rw [← h, evalDist_map, map_bind]; simp [Function.comp]
+  · rw [← h, evalDist_map, map_bind]; simp
   · intro z hz
     rcases (mem_support_bind_iff
       (𝒟[oa]) (fun a => (pure (a, F a) : SPMF (α' × σ'))) z).1 hz with ⟨a, _, hz'⟩
@@ -2527,40 +2527,30 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   -- with `proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base ghost)`, split into
   -- `hproj2_unif`, `hproj2_ro`, `hproj2_ro_fresh` (all PROVEN, axiom-clean) and `hproj2_sign`.
   --
-  -- R19 REFRAME (collision-accounting; the per-step sign equality is PROVEN IMPOSSIBLE). The
-  -- unconditional sign-step equality `hproj2_sign` is *false*: a sign-programmed `(msg, w)` can
-  -- coincide with a base-layer live read (the `signLiveCollision` event, `GhostBodies.lean`),
-  -- and `proj₂` cannot recover the linked inner/outer split from `(base, ghost)` at such a point.
-  -- Since this leaf is an *inequality* (`≤`), the route is the GHOST-leaf machinery
-  -- (`relTriple_simulateQ_run_mono` + `probEvent_le_of_relTriple_imp`): an *exact coupling off
-  -- the collision event* (where `proj₂` IS a state function, so the per-step coupling is an
-  -- equality) PLUS the collision probability paid on the bad side via the commit-guessing charge
-  -- `probEvent_commit_hit_le` (live-read count · ε) — the SAME charge class as the ghost-read
-  -- collision `probEvent_ghostRead_bad_le`.
+  -- R21 RESOLUTION (the per-step sign equality is now PROVEN — UNCONDITIONALLY). The earlier
+  -- obstruction (the sign step is not a per-step state function under `proj₂ = (baseEmbed base,
+  -- overlayCache base ghost)`) is fixed by *redesigning* `proj₂` to
+  -- `proj2 ((base, ghost), signed) = (baseEmbed (overlayCache base ghost), base)` — inner managed
+  -- cache = full hybrid overlay (live reads + sign points), outer runtime cache = live-read base
+  -- layer only. Under this projection ALL per-step couplings are exact unconditional equalities
+  -- (`hproj2_unif`, `hproj2_ro`, `hproj2_ro_ghost_hit`, `hproj2_ro_fresh`, `hproj2_sign`), bundled
+  -- into `hproj2_evalDist` and lifted to the whole run by
+  -- `evalDist_map_run_simulateQ_ghostNmaImpl_proj2` (via `relTriple_simulateQ_run` + the graph
+  -- coupling `relTriple_graph_of_evalDist_map_eq`). The `signLiveCollision` reframe is no longer
+  -- needed: the redesigned projection carries the sign point in the inner slot whether or not it
+  -- coincides with a prior live read.
   --
-  -- BANKED THIS ROUND (axiom-clean):
-  --   * `signLiveCollision` / `not_signLiveCollision_iff` (`GhostBodies.lean`) — the exact
-  --     state-level collision event distinguishing the two runs, and its no-collision negation
-  --     `base (msg, w) = none` under which the sign-step projection is exact.
-  --   * `simulateQ_unifSim_run` (above) — sub-lemma (b) PART (i), the uniform-only
-  --     nested-simulation collapse `(simulateQ unifSim oa).run cache = (·, cache) <$> liftComp oa`
-  --     for any `unifSpec`-only `oa`. This collapses the `simulateQ unifSim (firstSome (sim pk)
-  --     maxAttempts)` loop inside `sigSim`/`nmaOuterImpl` back to the bare lifted `firstSome`
-  --     loop, exactly the collision-independent half of `hproj2_sign`. `hproj2_sign`'s proof body
-  --     now executes the `link_impl_apply_run` + `nmaOuterImpl` reduction exposing this
-  --     nested loop as its residual goal.
-  --
-  -- EXACT REMAINING RESIDUAL. (1) Finish `hproj2_sign` *conditioned on no collision*
-  -- (`¬ signLiveCollision base msg w`): push `simulateQ nmaInnerImpl` through the collapsed
-  -- `firstSome` loop (via `simulateQ_unifSim_run`) and match the ghost-layer `cacheQuery (msg, w)
-  -- c` against the inner-cache `cacheQuery (.inr (msg, w)) c` under `proj₂` (exact off-collision).
-  -- (2) Assemble the off-collision per-step couplings (`hproj2_unif`/`_ro`/`_ro_fresh` plus the
-  -- conditional sign step) into a global `relTriple_simulateQ_run_mono` coupling whose
-  -- post-implication pays the collision mass through `probEvent_commit_hit_le`, then split the
-  -- verify tail on `msg ∈ signed` (`probOutput_true_hybridVerifyCont_of_mem`,
-  -- `withCacheOverlay_verify_eq_of_miss`, `hybridVerifyCont_cache_congr`). The fusion (Step 1),
-  -- sub-lemma (a), the invariant gate, the `baseEmbed` algebra, part (i), the collision predicate,
-  -- and the verify-tail toolkit are all in place.
+  -- REMAINING ASSEMBLY (the verify-tail split). With (a)
+  -- `map_run_simulateQ_ghostNmaImpl_overlay_empty` and (b)
+  -- `evalDist_map_run_simulateQ_ghostNmaImpl_proj2` both PROVEN, the hybrid LHS run and the
+  -- linked managed RHS run are both projections of the *same* layered ghost-tagged run
+  -- `(simulateQ ghostNmaImpl (adv.main pk)).run ((∅,∅), [])`. What remains is to (1) align the two
+  -- verify tails on this common run — on `msg ∈ signed` the freshness conjunct zeroes the hybrid
+  -- side (`probOutput_true_hybridVerifyCont_of_mem`), and on fresh forgeries the overlay
+  -- verification agrees with the live verification (`withCacheOverlay_verify_eq_of_miss`,
+  -- `hybridVerifyCont_cache_congr`) — and (2) thread the `linkReshape` / Option-B post-processing
+  -- regrouping (`managedRun_eq_link_run`). The state-projection content (the genuine multi-week
+  -- core) is closed; this residual is the verify-tail probabilistic split.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
