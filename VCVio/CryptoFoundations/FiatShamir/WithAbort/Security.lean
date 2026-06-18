@@ -771,7 +771,28 @@ uniform/sign steps reuse the banked rfl handler equalities. This is the genuine,
 documented multi-week probabilistic content; it is isolated here as the sole `sorry` of
 #228. The framework around it (deliverable A, the rfl handler equalities, the
 single-pending draw-commutation, and the never-read-before-write invariant
-`ghostHybridImpl_preserves_signed_inv`) is fully banked and axiom-clean. -/
+`ghostHybridImpl_preserves_signed_inv`) is fully banked and axiom-clean.
+
+**Direct route (Angle A) and its banked primitive.** An alternative that *bypasses* the
+eager↔lazy comparison entirely bounds the eager bad probability directly as a
+*hidden-target first-fire* union bound. Each ghost key `w ← ids.commit` is drawn at
+signing time and is **hidden**: the eager handler exposes it only through the
+ghost-domain membership test of a later adversarial read, and only the *first* such hit
+flips bad. Up to that first hit the adversary's transcript — hence each read point — is
+independent of `w`, so averaging over the single hidden draw (never conditioning on the
+drawn `w`) charges `Pr[read hits w] ≤ ε` per read, summing to `(qH+1)·ε` per key and
+`(qH+1)·(qS/(1−p))·ε` over the expected key count. The averaged-over-the-draw per-key
+charge is exactly the banked, axiom-clean primitive
+`OracleComp.probEvent_hiddenReadMany_le` (the *same-target-reused* sibling of
+`probeManyEps`): a FIXED target `w ← oa` with `∀ a, Pr[= a | oa] ≤ ε` probed by `q`
+adaptive reads fires with probability `≤ q·ε`, because the read points are fixed by the
+all-miss reply history (`OracleComp.readMany_true_iff`). The single remaining obligation
+of this route is the *connection*: factoring the eager `simulateQ` run so that each
+signing-time key draw is read off as a `hiddenReadMany` target probed by the (≤ qH+1)
+subsequent adversarial reads (`OracleComp.readManyList` for the accumulating ghost cache).
+That factoring is the same deferred-sampling commutation as the bespoke route above — it
+moves the per-key draw to the front and makes the eager reads deterministic — and is the
+genuine multi-week content; the primitive that discharges its union-bound half is banked. -/
 lemma eagerGhostRead_bad_le_lazyGhostRead_bad (pk : Stmt) (sk : Wit) :
     Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
         (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
