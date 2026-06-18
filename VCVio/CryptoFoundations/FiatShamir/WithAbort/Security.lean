@@ -670,6 +670,57 @@ lemma probEvent_lazyGhostHybridImpl_bad_le
           gcongr
       _ = qS * ((qH : ℝ) + 1) * ε / (1 - p_abort) := by ring
 
+/-! ## Deferred-sampling eager↔lazy coupling (ghost-read leaf) -/
+
+omit [SampleableType Stmt] in
+/-- **Uniform-branch per-query coupling for the eager↔lazy ghost handlers** (banked). On a
+uniform query both `ghostHybridImpl … true` and `lazyGhostHybridImpl` forward the draw and
+leave the state untouched (`lazyGhostHybridImpl_run_unif_eq`), so they are coupled by the
+identity coupling on the shared uniform sample with *equal outputs* and the bad-flag
+implication preserved verbatim. This is the divergence-free branch of `h_step`. -/
+theorem relTriple_ghostHybrid_lazyGhost_unif (pk : Stmt) (sk : Wit)
+    (n : unifSpec.Domain) (e l : GhostState M Commit Chal) (hRel : e.2 = true → l.2 = true) :
+    OracleComp.ProgramLogic.Relational.RelTriple
+      ((ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inl n))).run e)
+      ((lazyGhostHybridImpl ids M maxAttempts pk sk (.inl (.inl n))).run l)
+      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ (p₁.2.2 = true → p₂.2.2 = true)) := by
+  classical
+  rw [lazyGhostHybridImpl_run_unif_eq ids M maxAttempts pk sk n l]
+  simp only [ghostHybridImpl, StateT.run_mk]
+  refine OracleComp.ProgramLogic.Relational.relTriple_bind
+    (OracleComp.ProgramLogic.Relational.relTriple_refl
+      ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n)) ?_
+  rintro u u' rfl
+  exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure ⟨rfl, hRel⟩
+
+omit [SampleableType Stmt] in
+/-- **Signing-branch per-query coupling for the eager↔lazy ghost handlers** (banked). On a
+signing query both handlers run the *same* `ghostSignBody` over the layered cache, prepend
+`msg` to the signed-message list, and leave the bad flag untouched
+(`lazyGhostHybridImpl_run_sign_eq`); they are therefore identical, so coupled by the
+identity coupling with equal outputs and the bad-flag implication preserved. This is the
+second divergence-free branch of `h_step`. -/
+theorem relTriple_ghostHybrid_lazyGhost_sign (pk : Stmt) (sk : Wit)
+    (msg : M) (e l : GhostState M Commit Chal) (hRel : e.2 = true → l.2 = true) :
+    OracleComp.ProgramLogic.Relational.RelTriple
+      ((ghostHybridImpl ids M maxAttempts true pk sk (.inr msg)).run e)
+      ((lazyGhostHybridImpl ids M maxAttempts pk sk (.inr msg)).run l)
+      (fun p₁ p₂ => p₁.2.2 = true → p₂.2.2 = true) := by
+  classical
+  -- The signing handlers copy the input bad flag to the output (`alc ↦ (…, s.2)`), so the
+  -- output bad flag is the *constant* `e.2` on the left and `l.2` on the right, independent of
+  -- the `ghostSignBody` draw. Couple the two (possibly differently-cached) `ghostSignBody`
+  -- runs by *any* coupling (the product coupling from `relTriple_true`), then map both to
+  -- `pure`s whose bad flags are `e.2` / `l.2`; the post is then exactly `hRel`.
+  rw [lazyGhostHybridImpl_run_sign_eq ids M maxAttempts pk sk msg l]
+  simp only [ghostHybridImpl, StateT.run_mk]
+  refine OracleComp.ProgramLogic.Relational.relTriple_bind
+    (OracleComp.ProgramLogic.Relational.relTriple_true
+      ((ghostSignBody ids M pk sk msg maxAttempts).run e.1.1)
+      ((ghostSignBody ids M pk sk msg maxAttempts).run l.1.1)) ?_
+  rintro a b -
+  exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure hRel
+
 /-! ## The ghost-read collision charge (open) -/
 
 omit [SampleableType Stmt] in
@@ -773,6 +824,15 @@ lemma probEvent_ghostRead_bad_le
     -- sampling commutation, not a state relation — the single remaining multi-week obligation.
     set R_couple : GhostState M Commit Chal → GhostState M Commit Chal → Prop :=
       fun e l => (e.2 = true → l.2 = true) with hR_couple
+    -- The per-query divergent-branch coupling required by `relTriple_simulateQ_run_mono`. The
+    -- uniform and signing branches are *fully banked* as
+    -- `relTriple_ghostHybrid_lazyGhost_unif` / `relTriple_ghostHybrid_lazyGhost_sign`; on those
+    -- branches the two handlers return equal outputs (uniform) or are definitionally identical
+    -- (signing), so the self-referential continuation field reduces to recoupling *identical*
+    -- continuations — which is provable. The random-oracle read branch genuinely diverges (the
+    -- two handlers return different answers AND the eager bad-flag fires with mass `1` against
+    -- the lazy sub-unit fire), so the coupling there must resample the deferred commitment draw
+    -- at read time; that is the isolated residual recorded below.
     have h_step : ∀ (t : ((unifSpec + (M × Commit →ₒ Chal)) +
           (M →ₒ Option (Commit × Resp))).Domain)
         (e l : GhostState M Commit Chal), R_couple e l →
