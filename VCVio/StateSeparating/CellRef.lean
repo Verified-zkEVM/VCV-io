@@ -138,41 +138,36 @@ theorem supportWritesOnly_mono {m : Type (max u v) → Type*} [Monad m] [MonadLi
     [LawfulMonadLiftT m SetM]
     {α : Type (max u v)} {c : StateT (Heap Ident) m α} {writes₁ writes₂ : Set Ident}
     (hc : SupportWritesOnly c writes₁) (hsubset : writes₁ ⊆ writes₂) :
-    SupportWritesOnly c writes₂ := by
-  intro r hr
-  exact hc r (fun hmem => hr (hsubset hmem))
+    SupportWritesOnly c writes₂ :=
+  fun r hr => hc r (fun hmem => hr (hsubset hmem))
 
 theorem supportPreserves_pure {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     [LawfulMonadLiftT m SetM]
     {α : Type (max u v)} (x : α) (r : CellRef Ident) :
     SupportPreserves (pure x : StateT (Heap Ident) m α) r := by
   intro h z hz
-  have hz_eq : z = (x, h) := by
-    simpa using (mem_support_pure_iff z (x, h)).1 hz
-  simp [hz_eq]
+  obtain rfl := (mem_support_pure_iff z (x, h)).1 hz
+  simp
 
 theorem supportWritesOnly_pure_empty {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     [LawfulMonadLiftT m SetM]
     {α : Type (max u v)} (x : α) :
-    SupportWritesOnly (pure x : StateT (Heap Ident) m α) (∅ : Set Ident) := by
-  intro r hr
-  exact supportPreserves_pure x r
+    SupportWritesOnly (pure x : StateT (Heap Ident) m α) (∅ : Set Ident) :=
+  fun r _ => supportPreserves_pure x r
 
 theorem supportPreserves_readM {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     [LawfulMonadLiftT m SetM]
     (r s : CellRef Ident) :
     SupportPreserves (r.readM : StateT (Heap Ident) m r.Value) s := by
   intro h z hz
-  have hz_eq : z = (r.get h, h) := by
-    simpa using (mem_support_pure_iff z (r.get h, h)).1 hz
-  simp [hz_eq]
+  obtain rfl := (mem_support_pure_iff z (r.get h, h)).1 hz
+  simp
 
 theorem readM_supportWritesOnly_empty {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     [LawfulMonadLiftT m SetM]
     (r : CellRef Ident) :
-    SupportWritesOnly (r.readM : StateT (Heap Ident) m r.Value) (∅ : Set Ident) := by
-  intro s hs
-  exact supportPreserves_readM r s
+    SupportWritesOnly (r.readM : StateT (Heap Ident) m r.Value) (∅ : Set Ident) :=
+  fun s _ => supportPreserves_readM r s
 
 theorem supportPreserves_bind {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     [LawfulMonadLiftT m SetM]
@@ -181,10 +176,8 @@ theorem supportPreserves_bind {m : Type (max u v) → Type*} [Monad m] [MonadLif
     (hc : SupportPreserves c r) (hk : ∀ a, SupportPreserves (k a) r) :
     SupportPreserves (c >>= k) r := by
   intro h z hz
-  have hz' :
-      z ∈ support ((c.run h) >>= fun us => (k us.1).run us.2) := by
-    simpa [StateT.run_bind] using hz
-  rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
+  rw [StateT.run_bind] at hz
+  rcases (mem_support_bind_iff _ _ _).1 hz with ⟨us, hus, hzcont⟩
   exact (hk us.1 us.2 z hzcont).trans (hc h us hus)
 
 theorem writeM_supportWritesOnly_single [DecidableEq Ident]
@@ -193,22 +186,16 @@ theorem writeM_supportWritesOnly_single [DecidableEq Ident]
     SupportWritesOnly
       (r.writeM x : StateT (Heap Ident) m PUnit) ({r.id} : Set Ident) := by
   intro s hs h z hz
-  have hz_eq : z = (PUnit.unit, r.set h x) := by
-    simpa using (mem_support_pure_iff z (PUnit.unit, r.set h x)).1 hz
-  simpa [hz_eq] using get_set_of_ne r s h x (by
-    intro heq
-    exact hs (by
-      change s.id = r.id
-      exact heq))
+  obtain rfl := (mem_support_pure_iff z (PUnit.unit, r.set h x)).1 hz
+  simpa using get_set_of_ne r s h x hs
 
 theorem supportWritesOnly_bind {m : Type (max u v) → Type*} [Monad m] [MonadLiftT m SetM]
     [LawfulMonadLiftT m SetM]
     {α β : Type (max u v)} {c : StateT (Heap Ident) m α}
     {k : α → StateT (Heap Ident) m β} {writes₁ writes₂ : Set Ident}
     (hc : SupportWritesOnly c writes₁) (hk : ∀ a, SupportWritesOnly (k a) writes₂) :
-    SupportWritesOnly (c >>= k) (writes₁ ∪ writes₂) := by
-  intro r hr
-  exact supportPreserves_bind (hc r (fun hmem => hr (Or.inl hmem)))
+    SupportWritesOnly (c >>= k) (writes₁ ∪ writes₂) :=
+  fun r hr => supportPreserves_bind (hc r (fun hmem => hr (Or.inl hmem)))
     (fun a => hk a r (fun hmem => hr (Or.inr hmem)))
 
 /-- Dependent effectful bind form: the continuation's write set may depend on
@@ -219,9 +206,8 @@ theorem supportWritesOnly_bind_dep {m : Type (max u v) → Type*} [Monad m] [Mon
     {k : α → StateT (Heap Ident) m β} {writes₁ : Set Ident}
     {writes₂ : α → Set Ident}
     (hc : SupportWritesOnly c writes₁) (hk : ∀ a, SupportWritesOnly (k a) (writes₂ a)) :
-    SupportWritesOnly (c >>= k) (writes₁ ∪ {i | ∃ a, i ∈ writes₂ a}) := by
-  intro r hr
-  exact supportPreserves_bind (hc r (fun hmem => hr (Or.inl hmem)))
+    SupportWritesOnly (c >>= k) (writes₁ ∪ {i | ∃ a, i ∈ writes₂ a}) :=
+  fun r hr => supportPreserves_bind (hc r (fun hmem => hr (Or.inl hmem)))
     (fun a => hk a r (fun hmem => hr (Or.inr ⟨a, hmem⟩)))
 
 /-- A support-based write footprint packages a program with the set of cells it
@@ -278,22 +264,15 @@ variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident
 zero. This is the probability-facing corollary most proofs want after a
 generic frame theorem has done the support-level work. -/
 theorem prob_changed_eq_zero (hc : SupportPreserves c r) (h : Heap Ident) :
-    Pr[ fun z => r.get z.2 ≠ r.get h | c.run h] = 0 := by
-  rw [probEvent_eq_zero_iff]
-  intro z hz hchange
-  exact hchange (hc h z hz)
+    Pr[ fun z => r.get z.2 ≠ r.get h | c.run h] = 0 :=
+  probEvent_eq_zero_iff.2 fun z hz hchange => hchange (hc h z hz)
 
 /-- If a cell is support-preserved, then the probability of reading the
 initial value at the end is exactly one minus the failure probability. -/
 theorem prob_unchanged_eq_sub_probFailure (hc : SupportPreserves c r) (h : Heap Ident) :
     Pr[ fun z => r.get z.2 = r.get h | c.run h] = 1 - Pr[⊥ | c.run h] := by
-  calc
-    Pr[ fun z => r.get z.2 = r.get h | c.run h]
-        = Pr[ fun _ => True | c.run h] := by
-          refine probEvent_ext ?_
-          intro z hz
-          exact ⟨fun _ => True.intro, fun _ => hc h z hz⟩
-    _ = 1 - Pr[⊥ | c.run h] := probEvent_True_eq_sub (c.run h)
+  rw [probEvent_ext (q := fun _ => True) fun z hz => ⟨fun _ => True.intro, fun _ => hc h z hz⟩,
+    probEvent_True_eq_sub]
 
 /-- Failure-free specialization of `prob_unchanged_eq_sub_probFailure`. -/
 theorem prob_unchanged_eq_one_of_probFailure_eq_zero (hc : SupportPreserves c r)
@@ -315,10 +294,8 @@ theorem prob_unchanged_eq_one {m : Type (max u v) → Type*} [Monad m]
 final value `x` with probability zero. -/
 theorem prob_final_eq_eq_zero_of_ne (hc : SupportPreserves c r) (h : Heap Ident)
     {x : r.Value} (hne : x ≠ r.get h) :
-    Pr[ fun z => r.get z.2 = x | c.run h] = 0 := by
-  rw [probEvent_eq_zero_iff]
-  intro z hz hzval
-  exact hne (hzval.symm.trans (hc h z hz))
+    Pr[ fun z => r.get z.2 = x | c.run h] = 0 :=
+  probEvent_eq_zero_iff.2 fun z hz hzval => hne (hzval.symm.trans (hc h z hz))
 
 end SupportPreserves
 
@@ -366,22 +343,19 @@ variable {α : Type (max u v)} {c : StateT (Heap Ident) m α} {r : CellRef Ident
 variable {event : Heap Ident → α × Heap Ident → Prop}
 
 theorem of_supportPreserves (hc : SupportPreserves c r) :
-    SupportPreservesExcept c r event := by
-  intro h z hz hevent
-  exact hc h z hz
+    SupportPreservesExcept c r event :=
+  fun h z hz _ => hc h z hz
 
 theorem mono_event (hc : SupportPreservesExcept c r event)
     {event' : Heap Ident → α × Heap Ident → Prop}
     (hsubset : ∀ h z, event h z → event' h z) :
-    SupportPreservesExcept c r event' := by
-  intro h z hz hnot
-  exact hc h z hz (fun hevent => hnot (hsubset h z hevent))
+    SupportPreservesExcept c r event' :=
+  fun h z hz hnot => hc h z hz fun hevent => hnot (hsubset h z hevent)
 
 theorem supportPreserves_of_false_event
     (hc : SupportPreservesExcept c r (fun _ _ => False)) :
-    SupportPreserves c r := by
-  intro h z hz
-  exact hc h z hz (by simp)
+    SupportPreserves c r :=
+  fun h z hz => hc h z hz (by simp)
 
 end support
 
@@ -397,16 +371,14 @@ is bounded by the event probability. -/
 theorem prob_changed_le_prob_event (hc : SupportPreservesExcept c r event)
     (h : Heap Ident) :
     Pr[ fun z => r.get z.2 ≠ r.get h | c.run h] ≤
-      Pr[ fun z => event h z | c.run h] := by
-  exact probEvent_mono (fun z hz hchange => by
-    by_contra hevent
-    exact hchange (hc h z hz hevent))
+      Pr[ fun z => event h z | c.run h] :=
+  probEvent_mono fun z hz hchange => not_not.1 fun hevent => hchange (hc h z hz hevent)
 
 theorem prob_changed_eq_zero_of_prob_event_eq_zero
     (hc : SupportPreservesExcept c r event) (h : Heap Ident)
     (hevent : Pr[ fun z => event h z | c.run h] = 0) :
-    Pr[ fun z => r.get z.2 ≠ r.get h | c.run h] = 0 := by
-  exact le_antisymm ((prob_changed_le_prob_event hc h).trans (le_of_eq hevent)) (zero_le)
+    Pr[ fun z => r.get z.2 ≠ r.get h | c.run h] = 0 :=
+  le_zero_iff.1 ((prob_changed_le_prob_event hc h).trans hevent.le)
 
 theorem prob_changed_le_of_prob_event_le
     (hc : SupportPreservesExcept c r event) (h : Heap Ident) {ε : ENNReal}
@@ -439,24 +411,20 @@ variable {k : α → StateT (Heap Ident) m β} {r : CellRef Ident}
 variable {rel : r.Value → r.Value → Prop}
 
 theorem of_supportPreserves (hc : SupportPreserves c r) :
-    SupportCellRel c r Eq := by
-  intro h z hz
-  exact (hc h z hz).symm
+    SupportCellRel c r Eq :=
+  fun h z hz => (hc h z hz).symm
 
 theorem supportPreserves_of_eq (hc : SupportCellRel c r Eq) :
-    SupportPreserves c r := by
-  intro h z hz
-  exact (hc h z hz).symm
+    SupportPreserves c r :=
+  fun h z hz => (hc h z hz).symm
 
 theorem bind (hc : SupportCellRel c r rel)
     (hk : ∀ a, SupportCellRel (k a) r rel)
     (htrans : ∀ x y z, rel x y → rel y z → rel x z) :
     SupportCellRel (c >>= k) r rel := by
   intro h z hz
-  have hz' :
-      z ∈ support ((c.run h) >>= fun us => (k us.1).run us.2) := by
-    simpa [StateT.run_bind] using hz
-  rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
+  rw [StateT.run_bind] at hz
+  rcases (mem_support_bind_iff _ _ _).1 hz with ⟨us, hus, hzcont⟩
   exact htrans (r.get h) (r.get us.2) (r.get z.2)
     (hc h us hus) (hk us.1 us.2 z hzcont)
 
@@ -472,10 +440,8 @@ variable {rel : r.Value → r.Value → Prop}
 /-- A support-level cell relation makes violations of the relation a
 probability-zero event. -/
 theorem prob_violate_eq_zero (hc : SupportCellRel c r rel) (h : Heap Ident) :
-    Pr[ fun z => ¬ rel (r.get h) (r.get z.2) | c.run h] = 0 := by
-  rw [probEvent_eq_zero_iff]
-  intro z hz hviol
-  exact hviol (hc h z hz)
+    Pr[ fun z => ¬ rel (r.get h) (r.get z.2) | c.run h] = 0 :=
+  probEvent_eq_zero_iff.2 fun z hz hviol => hviol (hc h z hz)
 
 end probability
 
@@ -506,18 +472,15 @@ theorem of_supportPreserves (hc : SupportPreserves c r) :
 
 theorem mono_delta {δ₁ δ₂ : Nat} (hc : SupportMeasureBound c r measure δ₁)
     (hle : δ₁ ≤ δ₂) :
-    SupportMeasureBound c r measure δ₂ := by
-  intro h z hz
-  exact (hc h z hz).trans (Nat.add_le_add_left hle (measure (r.get h)))
+    SupportMeasureBound c r measure δ₂ :=
+  fun h z hz => (hc h z hz).trans (Nat.add_le_add_left hle (measure (r.get h)))
 
 theorem bind {δ₁ δ₂ : Nat} (hc : SupportMeasureBound c r measure δ₁)
     (hk : ∀ a, SupportMeasureBound (k a) r measure δ₂) :
     SupportMeasureBound (c >>= k) r measure (δ₁ + δ₂) := by
   intro h z hz
-  have hz' :
-      z ∈ support ((c.run h) >>= fun us => (k us.1).run us.2) := by
-    simpa [StateT.run_bind] using hz
-  rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
+  rw [StateT.run_bind] at hz
+  rcases (mem_support_bind_iff _ _ _).1 hz with ⟨us, hus, hzcont⟩
   exact (hk us.1 us.2 z hzcont).trans (by
     simpa [Nat.add_assoc] using
       Nat.add_le_add_right (hc h us hus) δ₂)
@@ -534,10 +497,8 @@ variable {measure : r.Value → Nat} {δ : Nat}
 /-- A measured support bound gives probability zero to exceeding the bound. -/
 theorem prob_exceeds_eq_zero (hc : SupportMeasureBound c r measure δ)
     (h : Heap Ident) :
-    Pr[ fun z => measure (r.get h) + δ < measure (r.get z.2) | c.run h] = 0 := by
-  rw [probEvent_eq_zero_iff]
-  intro z hz hgt
-  exact Nat.not_lt_of_ge (hc h z hz) hgt
+    Pr[ fun z => measure (r.get h) + δ < measure (r.get z.2) | c.run h] = 0 :=
+  probEvent_eq_zero_iff.2 fun z hz hgt => Nat.not_lt_of_ge (hc h z hz) hgt
 
 end probability
 
@@ -564,15 +525,13 @@ theorem supportPreserves_of_preserves {α : Type (max u v)} {c : StateT (Heap Id
     {r : CellRef Ident} (hc : Preserves c r) :
     SupportPreserves c r := by
   intro h z hz
-  have hz_eq : z = (c.run h).run := by
-    simpa [Id.support_eq_singleton] using hz
-  simpa [hz_eq] using hc h
+  obtain rfl : z = (c.run h).run := by simpa [Id.support_eq_singleton] using hz
+  simpa using hc h
 
 theorem preserves_of_supportPreserves {α : Type (max u v)} {c : StateT (Heap Ident) Id α}
     {r : CellRef Ident} (hc : SupportPreserves c r) :
-    Preserves c r := by
-  intro h
-  exact hc h (c.run h).run (by simp [Id.support_eq_singleton])
+    Preserves c r :=
+  fun h => hc h (c.run h).run (by simp [Id.support_eq_singleton])
 
 /-- For the `Id` monad, support-based cell preservation is exactly the same as
 the direct final-state equality predicate. -/
@@ -583,15 +542,13 @@ theorem supportPreserves_iff_preserves {α : Type (max u v)} {c : StateT (Heap I
 
 theorem supportWritesOnly_of_writesOnly {α : Type (max u v)} {c : StateT (Heap Ident) Id α}
     {writes : Set Ident} (hc : WritesOnly c writes) :
-    SupportWritesOnly c writes := by
-  intro r hr
-  exact supportPreserves_of_preserves (hc r hr)
+    SupportWritesOnly c writes :=
+  fun r hr => supportPreserves_of_preserves (hc r hr)
 
 theorem writesOnly_of_supportWritesOnly {α : Type (max u v)} {c : StateT (Heap Ident) Id α}
     {writes : Set Ident} (hc : SupportWritesOnly c writes) :
-    WritesOnly c writes := by
-  intro r hr
-  exact preserves_of_supportPreserves (hc r hr)
+    WritesOnly c writes :=
+  fun r hr => preserves_of_supportPreserves (hc r hr)
 
 theorem supportWritesOnly_iff_writesOnly {α : Type (max u v)} {c : StateT (Heap Ident) Id α}
     {writes : Set Ident} :
@@ -611,16 +568,13 @@ theorem preserves_pure {α : Type (max u v)} (x : α) (r : CellRef Ident) :
 
 theorem preserves_read (r s : CellRef Ident) :
     Preserves (r.read) s := by
-  refine preserves_of_supportPreserves ?_
-  intro h z hz
-  have hz_eq : z = (r.get h, h) := by
-    simpa [read, Id.support_eq_singleton] using hz
-  simp [hz_eq]
+  refine preserves_of_supportPreserves fun h z hz => ?_
+  obtain rfl : z = (r.get h, h) := by simpa [read, Id.support_eq_singleton] using hz
+  simp
 
 theorem read_writesOnly_empty (r : CellRef Ident) :
-    WritesOnly (r.read) (∅ : Set Ident) := by
-  intro s hs
-  exact preserves_read r s
+    WritesOnly (r.read) (∅ : Set Ident) :=
+  fun s _ => preserves_read r s
 
 theorem preserves_bind {α β : Type (max u v)} {c : StateT (Heap Ident) Id α}
     {k : α → StateT (Heap Ident) Id β} {r : CellRef Ident}
@@ -634,13 +588,8 @@ theorem write_writesOnly_single [DecidableEq Ident] (r : CellRef Ident) (x : r.V
     WritesOnly (r.write x) ({r.id} : Set Ident) := by
   refine writesOnly_of_supportWritesOnly ?_
   intro s hs h z hz
-  have hz_eq : z = (PUnit.unit, r.set h x) := by
-    simpa [write, Id.support_eq_singleton] using hz
-  simpa [hz_eq] using get_set_of_ne r s h x (by
-    intro heq
-    exact hs (by
-      change s.id = r.id
-      exact heq))
+  obtain rfl : z = (PUnit.unit, r.set h x) := by simpa [write, Id.support_eq_singleton] using hz
+  simpa using get_set_of_ne r s h x hs
 
 theorem writesOnly_bind {α β : Type (max u v)} {c : StateT (Heap Ident) Id α}
     {k : α → StateT (Heap Ident) Id β} {writes₁ writes₂ : Set Ident}
@@ -670,15 +619,13 @@ def SameOn (cells : Set Ident) (h₁ h₂ : Heap Ident) : Prop :=
   ∀ r : CellRef Ident, r.id ∈ cells → r.get h₁ = r.get h₂
 
 theorem sameOn_refl (cells : Set Ident) (h : Heap Ident) :
-    SameOn cells h h := by
-  intro r hr
-  rfl
+    SameOn cells h h :=
+  fun _ _ => rfl
 
 theorem sameOn_mono {cells₁ cells₂ : Set Ident} {h₁ h₂ : Heap Ident}
     (hsubset : cells₁ ⊆ cells₂) (hsame : SameOn cells₂ h₁ h₂) :
-    SameOn cells₁ h₁ h₂ := by
-  intro r hr
-  exact hsame r (hsubset hr)
+    SameOn cells₁ h₁ h₂ :=
+  fun r hr => hsame r (hsubset hr)
 
 theorem sameOn_singleton_read {r : CellRef Ident} {h₁ h₂ : Heap Ident}
     (hsame : SameOn ({r.id} : Set Ident) h₁ h₂) :
@@ -693,19 +640,16 @@ def ResultDependsOnly {α : Type (max u v)} (c : StateT (Heap Ident) Id α)
   ∀ h₁ h₂, SameOn reads h₁ h₂ → (c.run h₁).1 = (c.run h₂).1
 
 theorem resultDependsOnly_pure {α : Type (max u v)} (x : α) :
-    ResultDependsOnly (pure x : StateT (Heap Ident) Id α) (∅ : Set Ident) := by
-  intro h₁ h₂ hsame
-  rfl
+    ResultDependsOnly (pure x : StateT (Heap Ident) Id α) (∅ : Set Ident) :=
+  fun _ _ _ => rfl
 
 theorem resultDependsOnly_read (r : CellRef Ident) :
-    ResultDependsOnly r.read ({r.id} : Set Ident) := by
-  intro h₁ h₂ hsame
-  exact sameOn_singleton_read hsame
+    ResultDependsOnly r.read ({r.id} : Set Ident) :=
+  fun _ _ hsame => sameOn_singleton_read hsame
 
 theorem resultDependsOnly_write [DecidableEq Ident] (r : CellRef Ident) (x : r.Value) :
-    ResultDependsOnly (r.write x) (∅ : Set Ident) := by
-  intro h₁ h₂ hsame
-  rfl
+    ResultDependsOnly (r.write x) (∅ : Set Ident) :=
+  fun _ _ _ => rfl
 
 /-! ## Compositional write footprints -/
 
@@ -729,9 +673,7 @@ theorem preserves {c : StateT (Heap Ident) Id α} (footprint : WriteFootprint c)
 
 def pure (x : α) : WriteFootprint (pure x : StateT (Heap Ident) Id α) where
   writes := ∅
-  sound := by
-    intro r hr
-    exact preserves_pure x r
+  sound := fun r _ => preserves_pure x r
 
 def read (r : CellRef Ident) : WriteFootprint r.read where
   writes := ∅
@@ -780,17 +722,15 @@ def WritesOnlyCells (impl : QueryImpl spec (StateT (Heap Ident₀) m))
 theorem writesOnlyCells_mono {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
     {writes₁ writes₂ : spec.Domain → Set Ident₀} (himpl : WritesOnlyCells impl writes₁)
     (hsubset : ∀ t, writes₁ t ⊆ writes₂ t) :
-    WritesOnlyCells impl writes₂ := by
-  intro t
-  exact CellRef.supportWritesOnly_mono (himpl t) (hsubset t)
+    WritesOnlyCells impl writes₂ :=
+  fun t => CellRef.supportWritesOnly_mono (himpl t) (hsubset t)
 
 theorem preservesCell_of_writesOnlyCells
     {impl : QueryImpl spec (StateT (Heap Ident₀) m)}
     {writes : spec.Domain → Set Ident₀} {r : CellRef Ident₀}
     (himpl : WritesOnlyCells impl writes) (hr : ∀ t, r.id ∉ writes t) :
-    PreservesCell impl r := by
-  intro t h z hz
-  exact himpl t r (hr t) h z hz
+    PreservesCell impl r :=
+  fun t h z hz => himpl t r (hr t) h z hz
 
 /-- A compositional cell-write footprint for a whole query implementation: every
 domain element gets a set of cells it may write, plus a support-level proof
@@ -832,9 +772,8 @@ theorem simulateQ_run_cellPreserved
   induction A using OracleComp.inductionOn with
   | pure a =>
       intro h z hz
-      have hz_eq : z = (a, h) := by
-        simpa using (mem_support_pure_iff z (a, h)).1 hz
-      simp [hz_eq]
+      obtain rfl := (mem_support_pure_iff z (a, h)).1 hz
+      simp
   | query_bind t oa ih =>
       intro h z hz
       have hz' :
@@ -844,17 +783,8 @@ theorem simulateQ_run_cellPreserved
               fun us => (simulateQ impl (oa us.1)).run us.2) := by
         simpa [simulateQ_bind, OracleComp.liftM_def] using hz
       rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
-      have hq_run :
-          (simulateQ impl (OracleSpec.query t : OracleComp spec (spec.Range t))).run h =
-            (impl t).run h := by
-        have hq :
-            simulateQ impl (OracleSpec.query t : OracleComp spec (spec.Range t)) =
-              impl t := by
-          simp [OracleSpec.query_def, simulateQ_query]
-        simp [hq]
-      have hus' : us ∈ support ((impl t).run h) := by
-        simpa [hq_run] using hus
-      exact (ih us.1 us.2 z hzcont).trans (himpl t h us hus')
+      refine (ih us.1 us.2 z hzcont).trans (himpl t h us ?_)
+      simpa [OracleSpec.query_def, simulateQ_spec_query] using hus
 
 end OracleComp
 
@@ -915,21 +845,18 @@ theorem simulateQ_run_cellChange_prob_eq_zero
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
     (r : CellRef Ident₀) (himpl : QueryImpl.PreservesCell impl r)
     (A : OracleComp spec α) (h : Heap Ident₀) :
-    Pr[ fun z => r.get z.2 ≠ r.get h | (simulateQ impl A).run h] = 0 := by
-  rw [probEvent_eq_zero_iff]
-  intro z hz hchange
-  exact hchange (simulateQ_run_cellPreserved impl r himpl A h z hz)
+    Pr[ fun z => r.get z.2 ≠ r.get h | (simulateQ impl A).run h] = 0 :=
+  probEvent_eq_zero_iff.2 fun z hz hchange =>
+    hchange (simulateQ_run_cellPreserved impl r himpl A h z hz)
 
 theorem simulateQ_run_cellUnchanged_prob_eq_sub_probFailure
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
     (r : CellRef Ident₀) (himpl : QueryImpl.PreservesCell impl r)
     (A : OracleComp spec α) (h : Heap Ident₀) :
     Pr[ fun z => r.get z.2 = r.get h | (simulateQ impl A).run h] =
-      1 - Pr[⊥ | (simulateQ impl A).run h] := by
-  have hpres : CellRef.SupportPreserves (simulateQ impl A) r := by
-    intro h' z hz
-    exact simulateQ_run_cellPreserved impl r himpl A h' z hz
-  exact CellRef.SupportPreserves.prob_unchanged_eq_sub_probFailure hpres h
+      1 - Pr[⊥ | (simulateQ impl A).run h] :=
+  CellRef.SupportPreserves.prob_unchanged_eq_sub_probFailure
+    (fun h' z hz => simulateQ_run_cellPreserved impl r himpl A h' z hz) h
 
 theorem simulateQ_run_cellUnchanged_prob_eq_one_of_probFailure_eq_zero
     (impl : QueryImpl spec (StateT (Heap Ident₀) m))
@@ -1102,25 +1029,15 @@ theorem demoImpl_writesOnly :
   cases t with
   | touchLog =>
       simpa [demoImpl, demoWrites, logRef] using
-        (CellRef.writeM_supportWritesOnly_single logRef 1 :
-          CellRef.SupportWritesOnly
-              (logRef.writeM 1 : StateT (Heap DemoCell) ProbComp PUnit) {DemoCell.log})
+        CellRef.writeM_supportWritesOnly_single logRef 1
   | touchCache =>
       simpa [demoImpl, demoWrites, cacheRef] using
-        (CellRef.writeM_supportWritesOnly_single cacheRef 1 :
-          CellRef.SupportWritesOnly
-              (cacheRef.writeM 1 : StateT (Heap DemoCell) ProbComp PUnit) {DemoCell.cache})
+        CellRef.writeM_supportWritesOnly_single cacheRef 1
   | readFlag =>
-      have hbind :
-          CellRef.SupportWritesOnly
-            ((flagRef.readM : StateT (Heap DemoCell) ProbComp Bool) >>= fun _ =>
-              pure PUnit.unit) (∅ ∪ ∅ : Set DemoCell) :=
+      simpa [demoImpl, demoWrites] using
         CellRef.supportWritesOnly_bind
-          (CellRef.readM_supportWritesOnly_empty
-            (m := ProbComp) flagRef)
-          (fun _ => CellRef.supportWritesOnly_pure_empty
-            (m := ProbComp) PUnit.unit)
-      simpa [demoImpl, demoWrites] using hbind
+          (CellRef.readM_supportWritesOnly_empty (m := ProbComp) flagRef)
+          (fun _ => CellRef.supportWritesOnly_pure_empty (m := ProbComp) PUnit.unit)
 
 /-- Pack the handler-level footprint once, so later proofs need not unfold
 every query branch. -/
@@ -1133,9 +1050,7 @@ it. -/
 theorem demoImpl_preserves_flag :
     QueryImpl.PreservesCell demoImpl flagRef :=
   demoFootprint.preservesCell flagRef (by
-    intro t
-    change DemoCell.flag ∉ demoWrites t
-    cases t <;> simp [demoWrites])
+    intro t; cases t <;> simp [demoFootprint, demoWrites])
 
 /-- A tiny client computation that calls several branches of the demo handler. -/
 def demoClient : OracleComp demoSpec PUnit := do
@@ -1149,15 +1064,12 @@ theorem demoClient_preserves_flag (h : Heap DemoCell) :
     ∀ z ∈ support ((simulateQ demoImpl demoClient).run h),
       flagRef.get z.2 = flagRef.get h :=
   demoFootprint.simulateQ_run_cellPreserved flagRef (by
-    intro t
-    change DemoCell.flag ∉ demoWrites t
-    cases t <;> simp [demoWrites]) demoClient h
+    intro t; cases t <;> simp [demoFootprint, demoWrites]) demoClient h
 
 /-- The previous theorem as a reusable support-preservation predicate. -/
 theorem demoClient_supportPreserves_flag :
-    CellRef.SupportPreserves (simulateQ demoImpl demoClient) flagRef := by
-  intro h z hz
-  exact demoClient_preserves_flag h z hz
+    CellRef.SupportPreserves (simulateQ demoImpl demoClient) flagRef :=
+  fun h z hz => demoClient_preserves_flag h z hz
 
 /-- From the empty heap, the framed flag is never `true`. The cell's
 `CellSpec.default` value is `false`, so support preservation collapses the event
@@ -1190,13 +1102,8 @@ theorem cacheAndLogStep_writesOnly :
   intro r hr h
   rcases r with ⟨id⟩
   cases id with
-  | log =>
-      exact False.elim (hr
-        (show DemoCell.log = DemoCell.cache ∨ DemoCell.log = DemoCell.log from Or.inr rfl))
-  | cache =>
-      exact False.elim (hr
-        (show DemoCell.cache = DemoCell.cache ∨ DemoCell.cache = DemoCell.log from
-          Or.inl rfl))
+  | log => exact (hr (by simp)).elim
+  | cache => exact (hr (by simp)).elim
   | flag =>
       change
         (((h.update DemoCell.cache (h.get DemoCell.cache + 1)).update
@@ -1237,11 +1144,7 @@ state update in the final proof. -/
 theorem cacheAndLogStep_preserves_flag_via_footprint :
     CellRef.Preserves cacheAndLogStep flagRef := by
   unfold cacheAndLogStep
-  exact cacheAndLogFootprint.preserves flagRef (by
-    intro h
-    rcases h with h | h
-    · cases h
-    · cases h)
+  exact cacheAndLogFootprint.preserves flagRef (by simp [cacheAndLogFootprint])
 
 /-- A smaller example that uses the generic frame combinators directly: two
 writes outside the flag cell preserve the flag. -/
@@ -1253,13 +1156,9 @@ theorem writeCacheThenLog_preserves_flag :
     CellRef.Preserves writeCacheThenLog flagRef := by
   unfold writeCacheThenLog
   apply CellRef.preserves_bind
-  · exact (CellRef.write_writesOnly_single cacheRef 1) flagRef (by
-      intro h
-      cases h)
+  · exact (CellRef.write_writesOnly_single cacheRef 1) flagRef (by simp)
   · intro _
-    exact (CellRef.write_writesOnly_single logRef 1) flagRef (by
-      intro h
-      cases h)
+    exact (CellRef.write_writesOnly_single logRef 1) flagRef (by simp)
 
 /-- A compositional footprint for the two-write program. The write set is
 computed by `WriteFootprint.bind`: first `{cache}`, then `{log}`. -/
@@ -1273,11 +1172,7 @@ is a one-line frame application plus a membership proof. -/
 theorem writeCacheThenLog_preserves_flag_via_footprint :
     CellRef.Preserves writeCacheThenLog flagRef := by
   unfold writeCacheThenLog
-  exact writeCacheThenLogFootprint.preserves flagRef (by
-    intro h
-    rcases h with h | ⟨_, h⟩
-    · cases h
-    · cases h)
+  exact writeCacheThenLogFootprint.preserves flagRef (by rintro (h | ⟨_, h⟩) <;> cases h)
 
 /-- Reads have a separate result-dependence footprint: reading `cacheRef`
 depends only on the cache cell. -/
@@ -1288,12 +1183,8 @@ example {h₁ h₂ : Heap DemoCell}
 
 /-- As a corollary, `flagRef` is preserved by `cacheAndLogStep`. -/
 theorem cacheAndLogStep_preserves_flag :
-    CellRef.Preserves cacheAndLogStep flagRef := by
-  exact cacheAndLogStep_writesOnly flagRef (by
-    intro h
-    cases h with
-    | inl hflag => cases hflag
-    | inr hflag => cases hflag)
+    CellRef.Preserves cacheAndLogStep flagRef :=
+  cacheAndLogStep_writesOnly flagRef (by simp)
 
 example (h : Heap DemoCell) :
     flagRef.get (cacheAndLogStep.run h).2 = flagRef.get h :=
