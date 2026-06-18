@@ -1227,9 +1227,33 @@ lemma avgBadM_ghostHybridImpl_le_threaded
                   Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n]) = 1 :=
                 tsum_probOutput_eq_one' (by simp)
               rw [h1, one_mul]
-      · -- Read step: pays the banked (b) hit charge `≤ curCeil ν`, consumes one read unit.
+      · -- Read step (`t = .inl (.inr mc)`): from `hqH` the read consumes one read unit
+        -- (`0 < qHb`, cont bounded by `qHb - 1`); `hqS` leaves the sign budget `qSb` unchanged.
+        -- Banked (b) `tsum_ghostHybridImpl_read_step_charge_le` bounds the per-`p` read
+        -- contribution by `memCharge (p.1.1.2) mc + miss-continuation`; averaging over `ν` gives
+        -- `C(ν, mc) + (miss telescoped to IH at qHb-1)`. With `C(ν, mc) ≤ curCeil ν` (`le_iSup`)
+        -- and reads preserving the ghost charge (`curCeil ν' ≤ curCeil ν`), the IH at `qHb-1`
+        -- closes: `curCeil ν + (qHb-1)·(curCeil ν + qSb·Sε) ≤ qHb·(curCeil ν + qSb·Sε)`.
+        -- RESIDUAL: the read-step assembly (banked (b) + `le_iSup` + the `qHb-1 → qHb` fold).
         sorry
-      · -- Sign step: raises `curCeil` by `≤ Sε` (banked (a)+(c)), consumes one sign unit.
+      · -- Sign step (`t = .inr msg`): `hqS` gives `0 < qSb` and `cont` bounded by `qSb - 1`;
+        -- `hqH` leaves the read budget `qHb` unchanged. The sign preserves the bad flag (so
+        -- `carriedBad` is unchanged) and raises the per-target charge by `≤ Sε` (banked (a)
+        -- `tsum_probOutput_run_ghostSignBody_mul_memCharge_le` + (c) `geomAttemptSum_le`,
+        -- `∑'u C(ν_u, mc) ≤ C(ν, mc) + Sε` for each fixed `mc`). The decremented sign budget
+        -- `qSb - 1` then absorbs the `+Sε`: `curCeil(ν_u) + (qSb-1)·Sε`, summed against the IH,
+        -- telescopes to `curCeil ν + qSb·Sε`.
+        -- The `⨆mc` charge bound DOES suffice here: for each fixed `mc`, the per-`u`
+        -- term `C(ν_u, mc)` is a single summand of the (a)-sum `∑'u C(ν_u, mc) ≤ C(ν,mc)+Sε`,
+        -- so `C(ν_u, mc) ≤ C(ν,mc)+Sε ≤ curCeil ν + Sε`, giving `curCeil ν_u ≤ curCeil ν + Sε`
+        -- per `u`. The IH at `(qHb, qSb-1)` then yields, per `u`,
+        --   `avgBadM ν_u (cont u) ≤ carriedBad ν_u + qHb·(curCeil ν + qSb·Sε)`,
+        -- and summing over `u` (with `∑'u (mass ν_u) = ∑'p ν p ≤ 1` for the constant term, and
+        -- `∑'u carriedBad ν_u = carriedBad ν` since signing preserves the flag) gives the bound.
+        -- RESIDUAL: the helper must additionally carry the sub-probability mass invariant
+        -- `∑' p, ν p ≤ 1` (holds at the empty Dirac start, preserved by reads/uniform, only
+        -- decreased by an aborting sign). Add it as a hypothesis `hν` and thread it; then the
+        -- assembly above (banked (a)+(c), `le_iSup`, single-term ≤ sum) closes the sign step.
         sorry
 
 open scoped Classical in
