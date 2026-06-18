@@ -84,8 +84,7 @@ The main stateful proof path should assume or prove facts about
 `statefulCmaFreshAdvantage`. If a caller needs the historical
 `SignatureAlg.unforgeableAdv.advantage` API, the required normalization theorem
 should target this proposition in this quarantined module. -/
-def PublicCompatible
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) : Prop :=
+def PublicCompatible (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) : Prop :=
   publicUnforgeableAdvantage σ hr M adv =
     statefulCmaFreshAdvantage σ hr M adv
 
@@ -101,16 +100,7 @@ private lemma simulateQ_cmaReal_liftM_sourceCma_eq
     simulateQ (cmaRealSourceFullSum M Commit Chal σ hr) oa := by
   apply QueryImpl.simulateQ_liftM_eq_of_query
   intro t
-  rcases t with (n | mc) | m
-  · rfl
-  · change simulateQ (cmaReal M Commit Chal σ hr)
-      (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.ro mc))) = _
-    rw [simulateQ_spec_query]
-    rfl
-  · change simulateQ (cmaReal M Commit Chal σ hr)
-      (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.sign m))) = _
-    rw [simulateQ_spec_query]
-    rfl
+  rcases t with (n | mc) | m <;> exact simulateQ_spec_query (cmaReal M Commit Chal σ hr) _
 
 /-- The Fiat-Shamir public random-oracle interface has the same real-CMA
 semantics whether it is embedded directly into the named CMA interface or first
@@ -127,11 +117,7 @@ private lemma simulateQ_cmaReal_liftM_fsRo_eq_sourceCma
   | pure x => simp
   | query_bind t k ih =>
       rw [liftM_bind, liftM_bind, simulateQ_bind, simulateQ_bind]
-      rcases t with n | mc
-      · simp only [add_apply_inl]
-        exact bind_congr ih
-      · simp only [add_apply_inr]
-        exact bind_congr ih
+      cases t <;> exact bind_congr ih
 
 /-- Fixed-key `postKeygenAdv` over the named CMA interface is the source
 post-keygen computation interpreted by the full-state source handler. -/
@@ -148,12 +134,10 @@ private lemma postKeygenAdv_runState_eq_postKeygenAdvBase_run
   rw [simulateQ_cmaReal_liftM_sourceCma_eq (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     (Stmt := Stmt) (oa := adv.main pk)]
-  apply bind_congr
-  intro a
+  refine bind_congr fun a => ?_
   rw [simulateQ_cmaReal_liftM_fsRo_eq_sourceCma (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-    (Stmt := Stmt)
-    (oa := (SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify pk a.1.1 a.1.2)]
+    (Stmt := Stmt) (oa := (SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify pk a.1.1 a.1.2)]
   simp
 
 /-- The direct `cmaRealRun` endpoint and the fixed-key post-keygen endpoint are
@@ -167,9 +151,7 @@ theorem statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage
   rw [cmaRealRun_eq_keygen_bind (σ := σ) (hr := hr) (M := M)
     (Commit := Commit) (Chal := Chal) (Resp := Resp) adv]
   simp only [monad_norm]
-  apply congrArg (fun p => Pr[= true | p])
-  apply bind_congr
-  intro ps
+  refine congrArg (fun p => Pr[= true | p]) (bind_congr fun ps => ?_)
   unfold postKeygenFreshProb
   rw [postKeygenAdv_runState_eq_postKeygenAdvBase_run (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
@@ -179,8 +161,7 @@ theorem statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage
 /-! ## Public WriterT compatibility -/
 
 /-- Fixed-key public signing-query handler in the generic `appendInputLog` form. -/
-@[reducible, fs_simp] private noncomputable def postKeygenAppendImpl
-    (pk : Stmt) (sk : Wit) :
+@[reducible, fs_simp] private noncomputable def postKeygenAppendImpl (pk : Stmt) (sk : Wit) :
     QueryImpl (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
       (StateT (List M) (StateT (RoCache M Commit Chal) ProbComp)) := by
   letI : HasQuery (unifSpec + roSpec M Commit Chal)
@@ -195,8 +176,7 @@ theorem statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage
       (cmaRealFixedSign (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) σ hr pk sk)
 
-private abbrev postKeygenState (M Commit Chal : Type) :=
-  List M × RoCache M Commit Chal
+private abbrev postKeygenState (M Commit Chal : Type) := List M × RoCache M Commit Chal
 
 /-- Product-state version of `postKeygenAppendImpl`, used to compare with the
 full `CmaState` handler by projection. -/
@@ -219,13 +199,11 @@ full `CmaState` handler by projection. -/
             (Resp := Resp) σ hr pk sk m).run cache
         pure (sig, (signed ++ [m], cache'))
 
-@[fs_simp] private def cmaPostKeygenProj
-    (s : CmaState M Commit Chal Stmt Wit) :
+@[fs_simp] private def cmaPostKeygenProj (s : CmaState M Commit Chal Stmt Wit) :
     postKeygenState M Commit Chal :=
   (s.1.1, s.1.2.1)
 
-private def cmaPostKeygenInv
-    (pk : Stmt) (sk : Wit)
+private def cmaPostKeygenInv (pk : Stmt) (sk : Wit)
     (s : CmaState M Commit Chal Stmt Wit) : Prop :=
   s.1.2.2 = some (pk, sk) ∧ s.2 = false
 
@@ -260,13 +238,8 @@ private lemma cmaRealSourceFullSum_sign_run_some
             pure ((cp.1, π), ((signed ++ [m],
               cache.cacheQuery (m, cp.1) ch, some (pk, sk)), false))) := by
   dsimp [cmaRealSourceFullSum, cmaRealSourceFull]
-  refine bind_congr (m := ProbComp) fun cp => ?_
-  rcases cp with ⟨c, prv⟩
-  cases hcache : cache (m, c) with
-  | some ch =>
-      simp [monad_norm]
-  | none =>
-      simp [monad_norm]
+  refine bind_congr (m := ProbComp) fun ⟨c, prv⟩ => ?_
+  cases hcache : cache (m, c) <;> simp [monad_norm]
 
 private def cmaRealSourceFullSum_postKeygenOrnament
     (pk : Stmt) (sk : Wit) :
@@ -286,31 +259,22 @@ private def cmaRealSourceFullSum_postKeygenOrnament
     subst bad
     rcases t with (n | mc) | m
     · intro z hz
-      have hz' := by
-        simpa [fs_simp] using hz
-      rcases hz' with ⟨r, _hr, rfl⟩
+      obtain ⟨r, _hr, rfl⟩ := by simpa [fs_simp] using hz
       exact ⟨rfl, rfl⟩
     · intro z hz
       cases hcache : cache mc with
       | some ch =>
-          have hz' := by
-            simpa [fs_simp, hcache] using hz
-          subst hz'
+          obtain rfl := by simpa [fs_simp, hcache] using hz
           exact ⟨rfl, rfl⟩
       | none =>
-          have hz' := by
-            simpa [fs_simp, hcache] using hz
-          rcases hz' with ⟨ch, _hch, rfl⟩
+          obtain ⟨ch, _hch, rfl⟩ := by simpa [fs_simp, hcache] using hz
           exact ⟨rfl, rfl⟩
     · intro z hz
       rw [cmaRealSourceFullSum_sign_run_some (σ := σ) (hr := hr)
         (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
         (Stmt := Stmt) (Wit := Wit) pk sk m signed cache] at hz
-      have hz' := hz
-      rw [support_bind] at hz'
-      simp only [Set.mem_iUnion] at hz'
-      rcases hz' with ⟨cp, _hcp, hz⟩
-      rcases cp with ⟨c, prv⟩
+      simp only [support_bind, Set.mem_iUnion] at hz
+      rcases hz with ⟨⟨c, prv⟩, _hcp, hz⟩
       cases hcache : cache (m, c) with
       | some ch =>
           simp only [hcache, support_bind, support_pure, Set.mem_iUnion,
@@ -318,11 +282,9 @@ private def cmaRealSourceFullSum_postKeygenOrnament
           rcases hz with ⟨π, _hπ, rfl⟩
           exact ⟨rfl, rfl⟩
       | none =>
-          simp only [hcache, support_bind, Set.mem_iUnion] at hz
-          rcases hz with ⟨ch, _hch, hz⟩
-          rcases hz with ⟨π, _hπ, hz⟩
-          simp only [support_pure, Set.mem_singleton_iff] at hz
-          subst hz
+          simp only [hcache, support_bind, support_pure, Set.mem_iUnion,
+            Set.mem_singleton_iff] at hz
+          rcases hz with ⟨ch, _hch, π, _hπ, rfl⟩
           exact ⟨rfl, rfl⟩
   project_step := fun t st hst => by
     rcases st with ⟨⟨signed, cache, keypair⟩, bad⟩
@@ -332,23 +294,15 @@ private def cmaRealSourceFullSum_postKeygenOrnament
     subst bad
     rcases t with (n | mc) | m
     · simp [fs_simp]
-    · cases hcache : cache mc with
-      | some ch =>
-          simp [fs_simp, hcache]
-      | none =>
-          simp [fs_simp, hcache, uniformSampleImpl]
+    · cases hcache : cache mc <;> simp [fs_simp, hcache, uniformSampleImpl]
     · simp only [add_apply_inr, fs_simp, bind_pure_comp,
         map_eq_bind_pure_comp, Prod.mk.eta, StateT.run_mk, monad_norm,
         FiatShamir, QueryImpl.toHasQuery_query,
         randomOracle, QueryImpl.withCaching_apply, StateT.run_bind, StateT.run_monadLift,
         monadLift_self, StateT.run_get, Function.comp_apply]
-      refine bind_congr (m := ProbComp) fun cp => ?_
-      rcases cp with ⟨c, prv⟩
-      cases hcache : cache (m, c) with
-      | some ch =>
-          simp [fs_simp, monad_norm]
-      | none =>
-          simp [fs_simp, uniformSampleImpl, StateT.run_modifyGet, monad_norm]
+      refine bind_congr (m := ProbComp) fun ⟨c, prv⟩ => ?_
+      cases hcache : cache (m, c) <;>
+        simp [fs_simp, uniformSampleImpl, StateT.run_modifyGet, monad_norm]
 
 private lemma postKeygenAppendProdImpl_eq_flattenStateT
     (pk : Stmt) (sk : Wit) :
@@ -357,31 +311,17 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
       (postKeygenAppendImpl (σ := σ) (hr := hr) (M := M)
         (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk).flattenStateT := by
   funext t
-  rcases t with (n | mc) | m
+  rcases t with nmc | m
   · ext st
     rcases st with ⟨signed, cache⟩
-    conv_lhs =>
-      simp [postKeygenAppendProdImpl]
-    conv_rhs =>
-      simp [postKeygenAppendImpl, QueryImpl.add_apply_inl]
+    conv_lhs => simp [postKeygenAppendProdImpl]
+    conv_rhs => simp [postKeygenAppendImpl, QueryImpl.add_apply_inl]
     change _ =
       (((fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).liftTarget
           (StateT (List M) (StateT (RoCache M Commit Chal) ProbComp))).flattenStateT
-        (.inl n)).run (signed, cache)
+        nmc).run (signed, cache)
     rw [QueryImpl.flattenStateT_liftTarget_apply_run]
-    simp [fsBaseImpl, unifFwdImpl, monad_norm]
-  · ext st
-    rcases st with ⟨signed, cache⟩
-    conv_lhs =>
-      simp [postKeygenAppendProdImpl]
-    conv_rhs =>
-      simp [postKeygenAppendImpl, QueryImpl.add_apply_inl]
-    change _ =
-      (((fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).liftTarget
-          (StateT (List M) (StateT (RoCache M Commit Chal) ProbComp))).flattenStateT
-        (.inr mc)).run (signed, cache)
-    rw [QueryImpl.flattenStateT_liftTarget_apply_run]
-    simp [fsBaseImpl, unifFwdImpl, randomOracle, monad_norm]
+    rcases nmc with n | mc <;> simp [fsBaseImpl, unifFwdImpl, randomOracle, monad_norm]
   · ext st
     rcases st with ⟨signed, cache⟩
     simp [postKeygenAppendProdImpl, postKeygenAppendImpl, monad_norm,
@@ -391,10 +331,8 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
 /-- Fixed-key public post-keygen experiment after WriterT logging has been
 converted to an input log. This is split at the candidate/log boundary. -/
 private noncomputable def postKeygenFreshAppendProb
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (pk : Stmt) (sk : Wit) : ProbComp Bool :=
-  letI : HasQuery (roSpec M Commit Chal)
-      (StateT (RoCache M Commit Chal) ProbComp) :=
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) : ProbComp Bool :=
+  letI : HasQuery (roSpec M Commit Chal) (StateT (RoCache M Commit Chal) ProbComp) :=
     (randomOracle : QueryImpl (roSpec M Commit Chal) _).toHasQuery
   (((simulateQ (postKeygenAppendImpl (σ := σ) (hr := hr) (M := M)
       (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
@@ -407,12 +345,9 @@ private noncomputable def postKeygenFreshAppendProb
             pk msg sig
         pure (!decide (msg ∈ signed) && verified)).run' (∅ : RoCache M Commit Chal)
 
-private lemma postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run
-    {α : Type}
-    (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal)
-      (Resp := Resp) α)
-    (pk : Stmt) (sk : Wit) (signed : List M)
-    (cache : RoCache M Commit Chal) :
+private lemma postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run {α : Type}
+    (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) α)
+    (pk : Stmt) (sk : Wit) (signed : List M) (cache : RoCache M Commit Chal) :
     ((simulateQ (postKeygenAppendImpl (σ := σ) (hr := hr) (M := M)
       (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk) oa).run signed).run cache =
       (fun z : α × CmaState M Commit Chal Stmt Wit =>
@@ -441,25 +376,20 @@ private lemma postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run
         (Stmt := Stmt) (Wit := Wit) pk sk).run_eq oa st hst
   rw [postKeygenAppendProdImpl_eq_flattenStateT (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk] at hproj
-  have hflat :=
-    OracleComp.simulateQ_flattenStateT_run (impl := impl) oa signed cache
   calc
     ((simulateQ impl oa).run signed).run cache =
         (fun z : α × (List M × RoCache M Commit Chal) => ((z.1, z.2.1), z.2.2)) <$>
           (simulateQ impl.flattenStateT oa).run (signed, cache) := by
-        rw [hflat]
+        rw [OracleComp.simulateQ_flattenStateT_run (impl := impl) oa signed cache]
         simp [monad_norm]
     _ =
         (fun z : α × CmaState M Commit Chal Stmt Wit =>
           ((z.1, z.2.1.1), z.2.1.2.1)) <$>
           (simulateQ (cmaRealSourceFullSum M Commit Chal σ hr) oa).run st := by
-        have hreassoc :=
-          congrArg
-            (fun p : ProbComp (α × (postKeygenState M Commit Chal)) =>
-              (fun z : α × (List M × RoCache M Commit Chal) =>
-                ((z.1, z.2.1), z.2.2)) <$> p)
+        simpa [impl, st, cmaPostKeygenProj, Functor.map_map] using
+          congrArg (fun p : ProbComp (α × postKeygenState M Commit Chal) =>
+            (fun z : α × (List M × RoCache M Commit Chal) => ((z.1, z.2.1), z.2.2)) <$> p)
             hproj.symm
-        simpa [impl, st, cmaPostKeygenProj, Functor.map_map] using hreassoc
 
 private theorem postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
@@ -474,30 +404,20 @@ private theorem postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb
     StateT.run'_eq, StateT.run_bind, StateT.run_get, StateT.run_map, pure_bind,
     postKeygenAdvBase, SourceSigAlg, liftM_map, Prod.mk.eta, simulateQ_bind, simulateQ_map]
   rw [postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run (σ := σ) (hr := hr)
-    (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-    (oa := adv.main pk)
+    (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) (oa := adv.main pk)
     pk sk ([] : List M) (∅ : RoCache M Commit Chal)]
   simp only [monad_norm]
-  refine bind_congr (m := ProbComp) fun z => ?_
-  rcases z with ⟨out, st⟩
-  rcases out with ⟨msg, sig⟩
-  rcases sig with ⟨c, resp⟩
-  rcases st with ⟨⟨signed, cache, keypair⟩, bad⟩
+  refine bind_congr (m := ProbComp) fun ⟨⟨msg, c, resp⟩, ⟨signed, cache, keypair⟩, bad⟩ => ?_
   rw [cmaRealSourceFullSum_lift_ro_query_run (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
     (Stmt := Stmt) (Wit := Wit) (mc := (msg, c))]
-  cases hcache : cache (msg, c) with
-  | some ch =>
-      simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache]
-  | none =>
-      simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache, uniformSampleImpl]
+  cases hcache : cache (msg, c) <;>
+    simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache, uniformSampleImpl]
 
 @[fs_simp] private def cmaRealAppendAux
-    (t : (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal)
-      (Resp := Resp)).Domain)
+    (t : (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)).Domain)
     (_st : CmaState M Commit Chal Stmt Wit)
-    (_out : (SourceCmaSpec (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp)).Range t)
+    (_out : (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)).Range t)
     (_st' : CmaState M Commit Chal Stmt Wit)
     (signed : List M) : List M :=
   match t with
@@ -551,13 +471,9 @@ private lemma cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
     rw [simulateQ_spec_query]
     ext st
     rcases st with ⟨signed, st⟩
-    cases hcache : st.1.2.1 mc with
-    | some ch =>
-        simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase,
-          QueryImpl.flattenStateT, hcache]
-    | none =>
-        simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase,
-          QueryImpl.flattenStateT, hcache]
+    cases hcache : st.1.2.1 mc <;>
+      simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase,
+        QueryImpl.flattenStateT, hcache]
   · change simulateQ
         (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp))
@@ -585,19 +501,15 @@ private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
         (Commit := Commit) (Chal := Chal) (Resp := Resp))
       (impl₁ := cmaRealAppendProdImpl (σ := σ) (hr := hr) (M := M)
         (Commit := Commit) (Chal := Chal) (Resp := Resp))
-      (h := fun t => by
-        exact cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
-          (σ := σ) (hr := hr) (M := M) (Commit := Commit)
-          (Chal := Chal) (Resp := Resp) t)
+      (h := cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
+        (σ := σ) (hr := hr) (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
       (oa := oa))
 
-@[fs_simp] private def cmaRealAppendProj
-    (st : CmaState M Commit Chal Stmt Wit) :
+@[fs_simp] private def cmaRealAppendProj (st : CmaState M Commit Chal Stmt Wit) :
     List M × CmaState M Commit Chal Stmt Wit :=
   (st.1.1, st)
 
-private def cmaRealAppendOrnament :
-    QueryImpl.StateOrnament
+private def cmaRealAppendOrnament : QueryImpl.StateOrnament
       (cmaRealSourceFullSum M Commit Chal σ hr)
       (cmaRealAppendProdImpl (σ := σ) (hr := hr)
         (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) where
@@ -609,41 +521,26 @@ private def cmaRealAppendOrnament :
     rcases st with ⟨⟨signed, cache, keypair⟩, bad⟩
     rcases t with (n | mc) | m
     · simp [fs_simp, QueryImpl.extendStateLeft, monad_norm]
-    · cases hcache : cache mc with
-      | some ch =>
-          simp [fs_simp, QueryImpl.extendStateLeft, hcache, monad_norm]
-      | none =>
-          simp [fs_simp, QueryImpl.extendStateLeft, hcache, monad_norm]
+    · cases hcache : cache mc <;>
+        simp [fs_simp, QueryImpl.extendStateLeft, hcache, monad_norm]
     · cases hkp : keypair with
       | none =>
           simp only [add_apply_inr, fs_simp, monad_norm, QueryImpl.extendStateLeft,
             Prod.mk.eta, StateT.run_mk]
           refine bind_congr (m := ProbComp) fun ps => ?_
-          refine bind_congr (m := ProbComp) fun cp => ?_
-          rcases cp with ⟨c, prv⟩
-          cases hcache : cache (m, c) with
-          | some ch =>
-              simp [fs_simp, monad_norm]
-          | none =>
-              simp [fs_simp, monad_norm]
+          refine bind_congr (m := ProbComp) fun ⟨c, prv⟩ => ?_
+          cases hcache : cache (m, c) <;> simp [fs_simp, monad_norm]
       | some ps =>
           rcases ps with ⟨pk, sk⟩
           simp only [add_apply_inr, fs_simp, monad_norm, QueryImpl.extendStateLeft,
             Prod.mk.eta, StateT.run_mk]
-          refine bind_congr (m := ProbComp) fun cp => ?_
-          rcases cp with ⟨c, prv⟩
-          cases hcache : cache (m, c) with
-          | some ch =>
-              simp [fs_simp, monad_norm]
-          | none =>
-              simp [fs_simp, monad_norm]
+          refine bind_congr (m := ProbComp) fun ⟨c, prv⟩ => ?_
+          cases hcache : cache (m, c) <;> simp [fs_simp, monad_norm]
 
 private lemma cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run
-    {α : Type}
-    (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal)
+    {α : Type} (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) α)
-    (pk : Stmt) (sk : Wit) (signed : List M)
-    (cache : RoCache M Commit Chal) :
+    (pk : Stmt) (sk : Wit) (signed : List M) (cache : RoCache M Commit Chal) :
     (simulateQ (cmaReal M Commit Chal σ hr)
         ((simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
           (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
@@ -656,8 +553,7 @@ private lemma cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run
         (simulateQ (cmaRealSourceFullSum M Commit Chal σ hr) oa).run
           (((signed, cache, some (pk, sk)), false) :
             CmaState M Commit Chal Stmt Wit) := by
-  let st : CmaState M Commit Chal Stmt Wit :=
-    (((signed, cache, some (pk, sk)), false))
+  let st : CmaState M Commit Chal Stmt Wit := ((signed, cache, some (pk, sk)), false)
   have hlogged :
       (simulateQ (cmaReal M Commit Chal σ hr)
           ((simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
@@ -684,16 +580,75 @@ private lemma cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run
         Prod.map id (cmaRealAppendProj (M := M) (Commit := Commit)
           (Chal := Chal) (Stmt := Stmt) (Wit := Wit)) <$>
           (simulateQ (cmaRealSourceFullSum M Commit Chal σ hr) oa).run st := by
-    have hrun := (cmaRealAppendOrnament (σ := σ) (hr := hr)
+    simpa [st, cmaRealAppendProj] using ((cmaRealAppendOrnament (σ := σ) (hr := hr)
       (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-      (Stmt := Stmt) (Wit := Wit)).run_eq oa st trivial
-    simpa [st, cmaRealAppendProj] using hrun.symm
-  rw [hlogged]
-  rw [cmaRealLoggedProdImpl_liftAdv_run (σ := σ) (hr := hr)
+      (Stmt := Stmt) (Wit := Wit)).run_eq oa st trivial).symm
+  rw [hlogged, cmaRealLoggedProdImpl_liftAdv_run (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-    (oa := oa) (st := (signed, st))]
-  rw [happend]
+    (oa := oa) (st := (signed, st)), happend]
   simp [st, cmaRealAppendProj, Functor.map_map]
+
+section SignedFreshStep
+
+/-- Random-oracle `HasQuery` instance threaded through the per-message freshness
+step, matching the `letI` used in
+`statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv`. -/
+local instance signedFreshRandomOracle :
+    HasQuery (roSpec M Commit Chal) (StateT (RoCache M Commit Chal) ProbComp) :=
+  (randomOracle : QueryImpl (roSpec M Commit Chal) _).toHasQuery
+
+/-- Cached-challenge case of the per-message freshness step: when the random
+oracle already holds a challenge `ch` for `(msg, c)`, the `FiatShamir.verify`
+run and the `cmaRealSourceFullSum` run agree on the freshness Boolean. -/
+private lemma fiatShamirVerify_run_eq_cmaRealSourceFullSum_run_signedFresh_cache_some
+    (ps : Stmt × Wit) (msg : M) (c : Commit) (resp : Resp) (bad : Bool) (signed : OuterState M)
+    (cache : RoCache M Commit Chal) (keypair : Option (Stmt × Wit))
+    (ch : (roSpec M Commit Chal).Range (msg, c)) (hcache : cache (msg, c) = some ch) :
+    (((_root_.FiatShamir (m := StateT (RoCache M Commit Chal) ProbComp) σ hr M).verify
+          ps.1 msg (c, resp)).run cache >>= fun a => pure (!decide (msg ∈ signed) && a.1)) =
+      ((simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
+          ((SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify ps.1 msg (c, resp))).run
+          (((signed, cache, keypair), bad) : CmaState M Commit Chal Stmt Wit) >>=
+        fun a => pure (!decide (msg ∈ signed) && a.1)) := by
+  rw [show (simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
+        ((SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify ps.1 msg (c, resp))).run
+        (((signed, cache, keypair), bad) : CmaState M Commit Chal Stmt Wit) =
+      pure (σ.verify ps.1 c ch resp,
+        (((signed, cache, keypair), bad) : CmaState M Commit Chal Stmt Wit)) from ?_]
+  · simp [FiatShamir, hcache]
+  · simp only [SourceSigAlg, FiatShamir, HasQuery.instOfMonadLift_query,
+      bind_pure_comp, liftM_map, simulateQ_map, StateT.run_map]
+    rw [cmaRealSourceFullSum_lift_ro_query_run (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      (Stmt := Stmt) (Wit := Wit) (mc := (msg, c))]
+    simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache]
+
+/-- Fresh-challenge case of the per-message freshness step: when the random
+oracle has no challenge for `(msg, c)`, both the `FiatShamir.verify` run and the
+`cmaRealSourceFullSum` run sample a fresh `ch` and agree on the freshness Boolean. -/
+private lemma fiatShamirVerify_run_eq_cmaRealSourceFullSum_run_signedFresh_cache_none
+    (ps : Stmt × Wit) (msg : M) (c : Commit) (resp : Resp) (bad : Bool) (signed : OuterState M)
+    (cache : RoCache M Commit Chal) (keypair : Option (Stmt × Wit))
+    (hcache : cache (msg, c) = none) :
+    (((_root_.FiatShamir (m := StateT (RoCache M Commit Chal) ProbComp) σ hr M).verify
+          ps.1 msg (c, resp)).run cache >>= fun a => pure (!decide (msg ∈ signed) && a.1)) =
+      ((simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
+          ((SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify ps.1 msg (c, resp))).run
+          (((signed, cache, keypair), bad) : CmaState M Commit Chal Stmt Wit) >>=
+        fun a => pure (!decide (msg ∈ signed) && a.1)) := by
+  rw [show (((_root_.FiatShamir (m := StateT (RoCache M Commit Chal) ProbComp) σ hr M).verify
+          ps.1 msg (c, resp)).run cache >>= fun a => pure (!decide (msg ∈ signed) && a.1)) =
+        (($ᵗ Chal) >>= fun ch => pure (!decide (msg ∈ signed) && σ.verify ps.1 c ch resp)) from ?_]
+  · simp only [SourceSigAlg, FiatShamir, HasQuery.instOfMonadLift_query,
+      monad_norm, liftM_bind, liftM_pure,
+      simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure]
+    rw [cmaRealSourceFullSum_lift_ro_query_run (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      (Stmt := Stmt) (Wit := Wit) (mc := (msg, c))]
+    simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache, monad_norm]
+  · simp [FiatShamir, hcache, uniformSampleImpl, monad_norm]
+
+end SignedFreshStep
 
 /-- The post-keygen freshness endpoint is the same Boolean experiment as running
 `signedFreshAdv` in the direct stateful CMA game. -/
@@ -710,8 +665,7 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
       ((hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
         postKeygenFreshAppendProb (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2) := by
-    apply bind_congr
-    intro ps
+    refine bind_congr fun ps => ?_
     exact (postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb (σ := σ)
       (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) adv ps.1 ps.2).symm
@@ -726,95 +680,35 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
     cmaSignLogImpl, bind_pure, CompTriple.comp_eq, StateT.run_monadLift, monadLift_self,
     simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
     cmaReal, Prod.mk.eta, simulateQ_pure, cmaInit, StateT.run_bind, StateT.run_mk]
-  apply bind_congr
-  intro ps
+  refine bind_congr fun ps => ?_
   rw [postKeygenAppendImpl_run_eq_cmaRealSourceFullSum_run (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-    (oa := adv.main ps.1) ps.1 ps.2 ([] : List M) (∅ : RoCache M Commit Chal)]
-  rw [cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run (σ := σ)
+    (oa := adv.main ps.1) ps.1 ps.2 ([] : List M) (∅ : RoCache M Commit Chal),
+    cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run (σ := σ)
     (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
     (Resp := Resp) (oa := adv.main ps.1) ps.1 ps.2
     ([] : List M) (∅ : RoCache M Commit Chal)]
   simp only [Prod.mk.eta, monad_norm, Function.comp_apply]
   refine bind_congr (m := ProbComp) fun z => ?_
-  rcases z with ⟨out, st⟩
-  rcases out with ⟨msg, sig⟩
-  rcases sig with ⟨c, resp⟩
-  rcases st with ⟨⟨signed, cache, keypair⟩, bad⟩
-  letI : HasQuery (roSpec M Commit Chal)
-      (StateT (RoCache M Commit Chal) ProbComp) :=
-    (randomOracle : QueryImpl (roSpec M Commit Chal)
-      (StateT (RoCache M Commit Chal) ProbComp)).toHasQuery
-  rw [simulateQ_cmaReal_liftM_fsRo_eq_sourceCma (σ := σ) (hr := hr)
-    (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-    (Stmt := Stmt)
+  rcases z with ⟨⟨msg, c, resp⟩, ⟨signed, cache, keypair⟩, bad⟩
+  letI : HasQuery (roSpec M Commit Chal) (StateT (RoCache M Commit Chal) ProbComp) :=
+    (randomOracle : QueryImpl (roSpec M Commit Chal) _).toHasQuery
+  rw [simulateQ_cmaReal_liftM_fsRo_eq_sourceCma (σ := σ) (hr := hr) (M := M)
+    (Commit := Commit) (Chal := Chal) (Resp := Resp) (Stmt := Stmt)
     (oa := (SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify ps.1 msg (c, resp))]
   cases hcache : cache (msg, c) with
   | some ch =>
-      have hleft :
-          (((_root_.FiatShamir
-              (m := StateT (RoCache M Commit Chal) ProbComp) σ hr M).verify
-              ps.1 msg (c, resp)).run cache >>=
-            fun a => pure (!decide (msg ∈ signed) && a.1)) =
-            pure (!decide (msg ∈ signed) && σ.verify ps.1 c ch resp) := by
-        simp [FiatShamir, hcache]
-      have hright :
-          ((simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
-              ((SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify
-                ps.1 msg (c, resp))).run
-            (((signed, cache, keypair), bad) :
-              CmaState M Commit Chal Stmt Wit) >>=
-            fun a => pure (!decide (msg ∈ signed) && a.1)) =
-            pure (!decide (msg ∈ signed) && σ.verify ps.1 c ch resp) := by
-        have hrun :
-            (simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
-              ((SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify
-                ps.1 msg (c, resp))).run
-              (((signed, cache, keypair), bad) :
-                CmaState M Commit Chal Stmt Wit) =
-              pure (σ.verify ps.1 c ch resp,
-                (((signed, cache, keypair), bad) :
-                  CmaState M Commit Chal Stmt Wit)) := by
-          simp only [SourceSigAlg, FiatShamir, HasQuery.instOfMonadLift_query,
-            bind_pure_comp, liftM_map, simulateQ_map, StateT.run_map]
-          rw [cmaRealSourceFullSum_lift_ro_query_run (σ := σ) (hr := hr)
-            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-            (Stmt := Stmt) (Wit := Wit) (mc := (msg, c))]
-          simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache]
-        rw [hrun]
-        simp
-      simpa [monad_norm] using hleft.trans hright.symm
+      simpa [monad_norm] using
+        fiatShamirVerify_run_eq_cmaRealSourceFullSum_run_signedFresh_cache_some
+          σ hr M ps msg c resp bad signed cache keypair ch hcache
   | none =>
-      have hleft :
-          (((_root_.FiatShamir
-              (m := StateT (RoCache M Commit Chal) ProbComp) σ hr M).verify
-              ps.1 msg (c, resp)).run cache >>=
-            fun a => pure (!decide (msg ∈ signed) && a.1)) =
-            (($ᵗ Chal) >>= fun ch =>
-              pure (!decide (msg ∈ signed) && σ.verify ps.1 c ch resp)) := by
-        simp [FiatShamir, hcache, uniformSampleImpl, monad_norm]
-      have hright :
-          ((simulateQ (cmaRealSourceFullSum M Commit Chal σ hr)
-              ((SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify
-                ps.1 msg (c, resp))).run
-            (((signed, cache, keypair), bad) :
-              CmaState M Commit Chal Stmt Wit) >>=
-            fun a => pure (!decide (msg ∈ signed) && a.1)) =
-            (($ᵗ Chal) >>= fun ch =>
-              pure (!decide (msg ∈ signed) && σ.verify ps.1 c ch resp)) := by
-        simp only [SourceSigAlg, FiatShamir, HasQuery.instOfMonadLift_query,
-          monad_norm, liftM_bind, liftM_pure,
-          simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure]
-        rw [cmaRealSourceFullSum_lift_ro_query_run (σ := σ) (hr := hr)
-          (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
-          (Stmt := Stmt) (Wit := Wit) (mc := (msg, c))]
-        simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache, monad_norm]
-      simpa [monad_norm] using hleft.trans hright.symm
+      simpa [monad_norm] using
+        fiatShamirVerify_run_eq_cmaRealSourceFullSum_run_signedFresh_cache_none
+          σ hr M ps msg c resp bad signed cache keypair hcache
 
 /-- Fixed-key public post-keygen experiment in the WriterT signing-log form. -/
 @[reducible] private noncomputable def postKeygenFreshWriterComp
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (pk : Stmt) (sk : Wit) :
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) :
     OracleComp (unifSpec + roSpec M Commit Chal) Bool := by
   letI : DecidableEq (Commit × Resp) := Classical.decEq _
   let so := (SourceSigAlg (σ := σ) (hr := hr) (M := M)).signingOracle pk sk
@@ -834,8 +728,8 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
     pure (!log.wasQueried msg && verified)
 
 @[reducible] private noncomputable def postKeygenFreshWriterProb
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (pk : Stmt) (sk : Wit) : ProbComp Bool := by
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) :
+    ProbComp Bool := by
   let runtime := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
   letI : HasQuery (unifSpec + roSpec M Commit Chal)
       (StateT (RoCache M Commit Chal) ProbComp) := runtime.toHasQuery
@@ -868,8 +762,7 @@ theorem statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
         pure (!decide (msg ∈ signed) && verified)).run' ∅
 
 private theorem postKeygenWriterLog_eq_inputLog
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (pk : Stmt) (sk : Wit) :
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) :
     let runtime := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
     letI : HasQuery (unifSpec + roSpec M Commit Chal)
         (StateT (RoCache M Commit Chal) ProbComp) := runtime.toHasQuery
@@ -909,8 +802,7 @@ private theorem postKeygenWriterLog_eq_inputLog
       so (adv.main pk) ([] : List M))
 
 private theorem postKeygenFreshWriterProb_eq_postKeygenFreshProb
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (pk : Stmt) (sk : Wit) :
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) :
     postKeygenFreshWriterProb (σ := σ) (hr := hr) (M := M)
       (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk =
     postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
@@ -967,9 +859,8 @@ private theorem postKeygenFreshWriterProb_eq_postKeygenFreshProb
   change (mappedW >>= kont).run' (∅ : RoCache M Commit Chal) =
     postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
       (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk
-  rw [hlog, hprod]
-  exact postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb (σ := σ) (hr := hr)
-    (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk
+  rw [hlog, hprod, postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb (σ := σ)
+    (hr := hr) (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk]
 
 private lemma fsBaseImpl_writerTMapBase_signingOracle_eq
     (pk : Stmt) (sk : Wit) :
@@ -998,21 +889,17 @@ private lemma fsBaseImpl_writerTMapBase_signingOracle_eq
     (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).writerTMapBase implW =
       implS := by
   funext t
-  rcases t with (n | mc) | m
-  · ext cache
-    simp [QueryImpl.writerTMapBase, QueryImpl.liftTarget_apply,
+  rcases t with (n | mc) | m <;> ext cache
+  · simp [QueryImpl.writerTMapBase, QueryImpl.liftTarget_apply,
       HasQuery.toQueryImpl_apply, fsBaseImpl, unifFwdImpl]
-  · ext cache
-    simp [QueryImpl.writerTMapBase, QueryImpl.liftTarget_apply,
+  · simp [QueryImpl.writerTMapBase, QueryImpl.liftTarget_apply,
       HasQuery.toQueryImpl_apply, fsBaseImpl, unifFwdImpl, randomOracle]
-  · ext cache
-    simp [QueryImpl.writerTMapBase, SignatureAlg.signingOracle,
+  · simp [QueryImpl.writerTMapBase, SignatureAlg.signingOracle,
       QueryImpl.withLogging_apply, cmaRealFixedSign, SourceSigAlg, FiatShamir,
       fsBaseImpl, randomOracle, StateT.run_bind, roSim.run_liftM]
 
 private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (pk : Stmt) (sk : Wit) :
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) :
     (simulateQ (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal))
         (postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk)).run'
@@ -1051,8 +938,7 @@ private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
   simp only [simulateQ_bind, StateT.run'_eq, StateT.run_bind]
   rw [QueryImpl.simulateQ_writerTMapBase_run
     (outer := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal))
-    (inner := implW) (oa := adv.main pk)]
-  rw [hmap]
+    (inner := implW) (oa := adv.main pk), hmap]
   letI : DecidableEq (Commit × Resp) := Classical.decEq _
   conv_lhs =>
     simp [implS, baseS, fsBaseImpl, cmaRealFixedSign, SourceSigAlg, FiatShamir,
@@ -1060,22 +946,21 @@ private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
   conv_rhs =>
     simp [implS, baseS, fsBaseImpl, cmaRealFixedSign, SourceSigAlg, FiatShamir,
       randomOracle, QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
+
 private theorem runtime_evalDist_postKeygenFreshWriterComp_eq
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (pk : Stmt) (sk : Wit) :
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) :
     (_root_.FiatShamir.runtime M).evalDist
         (postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk) =
       𝒟[postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
         (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk] := by
-  rw [_root_.FiatShamir.runtime_eq_runtimeWithCache_empty (M := M)]
-  rw [runtimeWithCache_evalDist_eq_fsBaseImpl (M := M) (Commit := Commit)
-    (Chal := Chal) (cache := (∅ : RoCache M Commit Chal))]
-  rw [simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq (σ := σ)
-    (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
-    (Resp := Resp) adv pk sk]
-  rw [postKeygenFreshWriterProb_eq_postKeygenFreshProb (σ := σ) (hr := hr)
-    (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk]
+  rw [_root_.FiatShamir.runtime_eq_runtimeWithCache_empty (M := M),
+    runtimeWithCache_evalDist_eq_fsBaseImpl (M := M) (Commit := Commit)
+      (Chal := Chal) (cache := (∅ : RoCache M Commit Chal)),
+    simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk,
+    postKeygenFreshWriterProb_eq_postKeygenFreshProb (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk]
 
 omit [DecidableEq Commit] in
 /-- The public EUF-CMA experiment factors into keygen followed by the fixed-key
@@ -1096,9 +981,7 @@ private theorem unforgeableExp_eq_runtime_bind_postKeygenFreshWriterComp
   simp only [QueryLog.wasQueried_eq_decide_mem_map_fst, List.mem_map, Sigma.exists,
     exists_and_right, Prod.exists, exists_eq_right]
   refine bind_congr (m := OracleComp (unifSpec + roSpec M Commit Chal)) fun z => ?_
-  congr
-  funext a
-  congr
+  congr; funext a; congr
 
 /-- Public EUF-CMA advantage in the shared fixed-key post-keygen normal form. -/
 theorem publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage
@@ -1107,14 +990,13 @@ theorem publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage
       statefulPostKeygenFreshAdvantage σ hr M adv := by
   unfold publicUnforgeableAdvantage SignatureAlg.unforgeableAdv.advantage
     statefulPostKeygenFreshAdvantage
-  rw [unforgeableExp_eq_runtime_bind_postKeygenFreshWriterComp (σ := σ)
-    (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
-    (Resp := Resp) adv]
-  rw [_root_.FiatShamir.runtime_evalDist_bind_liftComp (M := M)
-    (oa := (hr.gen : ProbComp (Stmt × Wit)))
-    (rest := fun ps =>
-      postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
-        (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2)]
+  rw [unforgeableExp_eq_runtime_bind_postKeygenFreshWriterComp (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv,
+    _root_.FiatShamir.runtime_evalDist_bind_liftComp (M := M)
+      (oa := (hr.gen : ProbComp (Stmt × Wit)))
+      (rest := fun ps =>
+        postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
+          (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2)]
   change
     Pr[= true | (𝒟[(hr.gen : ProbComp (Stmt × Wit))] >>= fun ps =>
       (_root_.FiatShamir.runtime M).evalDist
@@ -1135,12 +1017,10 @@ theorem publicCompatible
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) :
     PublicCompatible σ hr M adv := by
   unfold PublicCompatible
-  rw [publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage (σ := σ)
-    (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
-    (Resp := Resp) adv]
-  rw [← statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage (σ := σ)
-    (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
-    (Resp := Resp) adv]
+  rw [publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv,
+    ← statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv]
 
 /-- Public compatibility, in inequality form, against the direct stateful
 freshness experiment. -/
@@ -1148,8 +1028,7 @@ theorem publicUnforgeableAdvantage_le_statefulCmaFresh
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (hCompat : PublicCompatible σ hr M adv) :
     adv.advantage (_root_.FiatShamir.runtime M) ≤
-      statefulCmaFreshAdvantage σ hr M adv := by
-  rw [← hCompat]
-  rfl
+      statefulCmaFreshAdvantage σ hr M adv :=
+  hCompat ▸ le_refl _
 
 end FiatShamir.Stateful
