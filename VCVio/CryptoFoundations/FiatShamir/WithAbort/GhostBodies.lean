@@ -1896,6 +1896,216 @@ lemma tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le (pk : Stmt) (sk : W
         _ = QueryCache.enncard gh + (1 + ENNReal.ofReal p_abort * S) := by
             rw [add_assoc]
 
+/-! ### Charge route: per-target ghost-membership increment (sign step)
+
+The eager bad event fires when an adversarial read hits the ghost cache. The charge route
+bounds the bad probability by the *averaged* ghost-membership charge of a *fixed* read
+target `mc`, tracked inductively across the run. The signing step is the only step that
+writes to the ghost layer, and the lemma below is its effect on that per-target charge.
+
+The key correctness move (the one that removes the rejection skew of the eager↔lazy
+comparison) is to **drop the rejection event**: a rejected attempt writes `(msg, ws.1)` to
+the ghost layer, so it creates a *new* hit at `mc` only when `ws.1 = mc.2` and `msg = mc.1`;
+charging that draw against `hGuess` directly gives `Pr[ws.1 = mc.2] ≤ ε` (no `1/Pr[reject]`
+conditioning). An *accepted* attempt only `uncacheQuery`-removes a ghost point, so it can
+only *decrease* the membership charge. Summed over the `≤ ∑_{a<n} pᵃ` expected attempts the
+charge rises by `≤ (∑_{a<n} pᵃ) · ε` above the starting `gh`-membership. -/
+
+/-- **Membership indicator** of a fixed key `mc` in a query cache: `1` if cached, `0`
+otherwise. The per-target ghost charge tracked by the charge route. -/
+noncomputable def memCharge (gh : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
+    ℝ≥0∞ :=
+  if gh mc = none then 0 else 1
+
+omit [SampleableType Chal] in
+@[simp] lemma memCharge_uncacheQuery_self (gh : (M × Commit →ₒ Chal).QueryCache)
+    (q : M × Commit) :
+    memCharge M (uncacheQuery M gh q) q = 0 := by
+  simp [memCharge, uncacheQuery]
+
+omit [SampleableType Chal] in
+/-- `uncacheQuery` cannot increase the membership charge at any target. -/
+lemma memCharge_uncacheQuery_le (gh : (M × Commit →ₒ Chal).QueryCache)
+    (q mc : M × Commit) :
+    memCharge M (uncacheQuery M gh q) mc ≤ memCharge M gh mc := by
+  unfold memCharge uncacheQuery
+  by_cases hq : mc = q
+  · subst hq; simp
+  · simp only [if_neg hq, le_refl]
+
+omit [SampleableType Chal] in
+/-- A `cacheQuery` write raises the membership charge at `mc` by at most the indicator of the
+written key equaling `mc`. -/
+lemma memCharge_cacheQuery_le (gh : (M × Commit →ₒ Chal).QueryCache)
+    (q : M × Commit) (c : Chal) (mc : M × Commit) :
+    memCharge M (gh.cacheQuery q c) mc
+      ≤ memCharge M gh mc + (if q = mc then 1 else 0) := by
+  unfold memCharge
+  by_cases hq : mc = q
+  · subst hq
+    rw [QueryCache.cacheQuery_self, if_neg (by simp : ¬ (some c = none)), if_pos rfl]
+    exact le_add_self
+  · have hmcq : gh.cacheQuery q c mc = gh mc := by
+      simp only [QueryCache.cacheQuery, Function.update_of_ne hq]
+    rw [hmcq]
+    exact le_self_add
+
+omit [SampleableType Chal] [SampleableType Stmt] in
+/-- **Per-attempt commit-hit bound** at a fixed target: averaging the indicator that a fresh
+commit draw `ws.1` lands so that the new ghost write `(msg, ws.1)` equals `mc` is at most
+`ofReal ε` — the raw `hGuess` charge, with **no rejection conditioning**. -/
+lemma tsum_probOutput_commit_mul_writeHit_le (pk : Stmt) (sk : Wit) (msg : M)
+    {ε : ℝ}
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (mc : M × Commit) :
+    ∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+        (if ((msg, ws.1) : M × Commit) = mc then (1 : ℝ≥0∞) else 0)
+      ≤ ENNReal.ofReal ε := by
+  classical
+  refine le_trans ?_ (hGuess mc.2)
+  rw [probOutput_map_eq_tsum_ite (ids.commit pk sk) Prod.fst mc.2]
+  refine ENNReal.tsum_le_tsum fun ws => ?_
+  obtain ⟨w, st⟩ := ws
+  by_cases hhit : ((msg, w) : M × Commit) = mc
+  · rw [if_pos hhit, mul_one, if_pos (by rw [← hhit])]
+  · rw [if_neg hhit, mul_zero]; exact zero_le'
+
+omit [SampleableType Stmt] in
+/-- **(a) Sign-step ghost-membership charge increment.** Running `ghostSignBody` for `n`
+attempts raises the averaged membership charge at a fixed target `mc` by at most
+`(∑_{a<n} pᵃ) · ε` above the charge already present in the starting ghost cache `gh`. The
+proof mirrors `tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le`, but tracks the
+single-target indicator `memCharge mc` rather than the total `enncard`: an accepted attempt
+only removes (`memCharge_uncacheQuery_le`), a rejected attempt's write costs at most the raw
+commit-hit charge `ofReal ε` (`tsum_probOutput_commit_mul_writeHit_le`, dropping the
+rejection event), and the loop is reached with probability `≤ pᵃ` at attempt `a`. -/
+lemma tsum_probOutput_run_ghostSignBody_mul_memCharge_le (pk : Stmt) (sk : Wit) (msg : M)
+    {ε p_abort : ℝ}
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (mc : M × Commit) :
+    ∀ (n : ℕ) (re gh : (M × Commit →ₒ Chal).QueryCache),
+      ∑' z : Option (Commit × Resp) ×
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+        Pr[= z | (ghostSignBody ids M pk sk msg n).run (re, gh)] * memCharge M z.2.2 mc
+        ≤ memCharge M gh mc + (∑ a ∈ Finset.range n, ENNReal.ofReal p_abort ^ a)
+            * ENNReal.ofReal ε := by
+  intro n
+  induction n with
+  | zero =>
+      intro re gh
+      simp only [ghostSignBody, StateT.run_pure, tsum_probOutput_pure_mul, Finset.range_zero,
+        Finset.sum_empty, zero_mul, add_zero, le_refl]
+  | succ n ih =>
+      intro re gh
+      classical
+      set S : ℝ≥0∞ := ∑ a ∈ Finset.range n, ENNReal.ofReal p_abort ^ a with hS
+      have hSucc : (∑ a ∈ Finset.range (n + 1), ENNReal.ofReal p_abort ^ a) * ENNReal.ofReal ε =
+          ENNReal.ofReal ε + (ENNReal.ofReal p_abort * S) * ENNReal.ofReal ε := by
+        rw [Finset.sum_range_succ', pow_zero, add_comm, add_mul, one_mul]
+        congr 2
+        rw [Finset.mul_sum]
+        exact Finset.sum_congr rfl fun a _ => pow_succ' _ _
+      rw [run_ghostSignBody_succ, tsum_probOutput_bind_mul]
+      have h_ws : ∀ ws : Commit × PrvState,
+          (∑' z : Option (Commit × Resp) ×
+              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+            Pr[= z | uniformSample Chal >>= fun ch =>
+              ids.respond pk sk ws.2 ch >>= fun oz =>
+                match oz with
+                | some z =>
+                    pure (some (ws.1, z),
+                      (re.cacheQuery (msg, ws.1) ch, uncacheQuery M gh (msg, ws.1)))
+                | none =>
+                    (ghostSignBody ids M pk sk msg n).run
+                      (re, gh.cacheQuery (msg, ws.1) ch)] *
+              memCharge M z.2.2 mc)
+          ≤ (memCharge M gh mc + (if ((msg, ws.1) : M × Commit) = mc then 1 else 0)) +
+              Pr[= none | uniformSample Chal >>= fun ch => ids.respond pk sk ws.2 ch] *
+                (S * ENNReal.ofReal ε) := by
+        intro ws
+        rw [tsum_probOutput_bind_mul]
+        have h_ch : ∀ ch : Chal,
+            (∑' z : Option (Commit × Resp) ×
+                ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+              Pr[= z | ids.respond pk sk ws.2 ch >>= fun oz =>
+                match oz with
+                | some z =>
+                    pure (some (ws.1, z),
+                      (re.cacheQuery (msg, ws.1) ch, uncacheQuery M gh (msg, ws.1)))
+                | none =>
+                    (ghostSignBody ids M pk sk msg n).run
+                      (re, gh.cacheQuery (msg, ws.1) ch)] *
+                memCharge M z.2.2 mc)
+            ≤ (memCharge M gh mc + (if ((msg, ws.1) : M × Commit) = mc then 1 else 0)) +
+                Pr[= none | ids.respond pk sk ws.2 ch] * (S * ENNReal.ofReal ε) := by
+          intro ch
+          rw [tsum_probOutput_bind_mul]
+          have h_oz : ∀ oz : Option Resp,
+              (∑' z : Option (Commit × Resp) ×
+                  ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+                Pr[= z | (match oz with
+                  | some z =>
+                      pure (some (ws.1, z),
+                        (re.cacheQuery (msg, ws.1) ch, uncacheQuery M gh (msg, ws.1)))
+                  | none =>
+                      (ghostSignBody ids M pk sk msg n).run
+                        (re, gh.cacheQuery (msg, ws.1) ch) :
+                  ProbComp (Option (Commit × Resp) ×
+                    ((M × Commit →ₒ Chal).QueryCache ×
+                      (M × Commit →ₒ Chal).QueryCache)))] *
+                  memCharge M z.2.2 mc)
+              ≤ (memCharge M gh mc + (if ((msg, ws.1) : M × Commit) = mc then 1 else 0)) +
+                  (if oz = none then S * ENNReal.ofReal ε else 0) := by
+            intro oz
+            cases oz with
+            | some z =>
+                rw [if_neg (Option.some_ne_none z), add_zero, tsum_probOutput_pure_mul]
+                exact le_trans (memCharge_uncacheQuery_le M gh (msg, ws.1) mc) le_self_add
+            | none =>
+                rw [if_pos rfl]
+                refine le_trans (ih re (gh.cacheQuery (msg, ws.1) ch)) ?_
+                exact add_le_add (memCharge_cacheQuery_le M gh (msg, ws.1) ch mc) le_rfl
+          refine le_trans (tsum_probOutput_mul_le_add_of_le _ h_oz) ?_
+          refine add_le_add_right (le_of_eq ?_) _
+          rw [tsum_eq_single (none : Option Resp) fun oz hoz => by simp [hoz]]
+          simp [mul_comm]
+        refine le_trans (tsum_probOutput_mul_le_add_of_le _ h_ch) ?_
+        refine add_le_add_right (le_of_eq ?_) _
+        rw [probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_right]
+        exact tsum_congr fun ch => (mul_assoc _ _ _).symm
+      refine le_trans (ENNReal.tsum_le_tsum fun ws => mul_le_mul_right (h_ws ws) _) ?_
+      rw [hSucc]
+      rw [show (∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+            ((memCharge M gh mc + (if ((msg, ws.1) : M × Commit) = mc then 1 else 0)) +
+              Pr[= none | uniformSample Chal >>= fun ch => ids.respond pk sk ws.2 ch] *
+                (S * ENNReal.ofReal ε))) =
+          ∑' ws : Commit × PrvState, (Pr[= ws | ids.commit pk sk] * memCharge M gh mc +
+            (Pr[= ws | ids.commit pk sk] *
+              (if ((msg, ws.1) : M × Commit) = mc then 1 else 0) +
+            Pr[= ws | ids.commit pk sk] *
+              (Pr[= none | uniformSample Chal >>= fun ch => ids.respond pk sk ws.2 ch] *
+                (S * ENNReal.ofReal ε)))) from tsum_congr fun ws => by ring,
+        ENNReal.tsum_add, ENNReal.tsum_add]
+      refine add_le_add ?_ (add_le_add ?_ ?_)
+      · rw [ENNReal.tsum_mul_right]
+        exact mul_le_of_le_one_left (zero_le) tsum_probOutput_le_one
+      · exact tsum_probOutput_commit_mul_writeHit_le ids M pk sk msg hGuess mc
+      · calc ∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+              (Pr[= none | uniformSample Chal >>= fun ch =>
+                ids.respond pk sk ws.2 ch] * (S * ENNReal.ofReal ε))
+            = (∑' ws : Commit × PrvState, Pr[= ws | ids.commit pk sk] *
+                Pr[= none | uniformSample Chal >>= fun ch =>
+                  ids.respond pk sk ws.2 ch]) * (S * ENNReal.ofReal ε) := by
+              rw [← ENNReal.tsum_mul_right]
+              exact tsum_congr fun ws => (mul_assoc _ _ _).symm
+          _ ≤ ENNReal.ofReal p_abort * (S * ENNReal.ofReal ε) :=
+              mul_le_mul_left (tsum_probOutput_commit_mul_abort_le ids pk sk hAbort) _
+          _ = ENNReal.ofReal p_abort * S * ENNReal.ofReal ε := by rw [mul_assoc]
+
+
 /-! ## Layered ghost-tagged NMA handler
 
 The NMA bridge (`hybridSimRun_le_managedRun_verify`) couples the single-cache simulated
