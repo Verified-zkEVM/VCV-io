@@ -926,25 +926,49 @@ lemma eagerGhostRead_bad_le_lazyGhostRead_bad (pk : Stmt) (sk : Wit) :
       --
       -- WHY THIS NEEDS THE `Inv` STRENGTHENING (and why `Inv := True` is insufficient here):
       -- the per-`p` charges are NOT ordered — `A_eager(p) = 1 > A_lazy(p)` at a ghost-hit `p` —
-      -- so the inequality holds only *after* averaging against `μ`. The collapse
-      --   `∑' p, μ p · 1_{mc ∈ ghostCache(p)} = (the lazy fire mass)`
-      -- is the banked Fubini change-of-variables `tsum_pushforward_mem_eq_draw_hit` composed
-      -- with the banked B-lemmas `probOutput_eagerMultiReadBad_eq_lazyFire_or` /
-      -- `probOutput_lazyGhostFire_one`, and it requires `μ` to be a *pushforward*
-      -- `kn.map place` of a list of iid `Prod.fst <$> ids.commit pk sk` draws. That is the
-      -- genuine invariant to thread through the now-available `Inv` slot.
+      -- so the inequality holds only *after* averaging against `μ`. Crucially the premature
+      -- per-`p` reduction `ENNReal.tsum_le_tsum fun p => mul_le_mul_right …` (used by the
+      -- uniform/signing branches) commits to the FALSE per-`p` subgoal here, so the read step
+      -- must stay at the `∑' p, μ p · (…)` level.
       --
-      -- THE OPEN STRUCTURAL OBSTRUCTION (the multi-week content). Strengthening `Inv` to the
-      -- pushforward predicate is incompatible with the *current* uniform/signing branches: those
-      -- close by folding the IH at the Dirac laws `PMF.pure z.2` (via `avgBad_pure_state`), and a
-      -- Dirac at a ghost-populated reachable state is NOT a pushforward of iid commit draws
-      -- (only the empty-cache start `δ_∅` is). Closing the read step therefore forces the
-      -- uniform/signing branches to also thread the pushforward law `μ'` rather than collapse to
-      -- Diracs — i.e. the full deferred-sampling rewrite of all three branches in a single
-      -- pushforward-carrying induction, not a local read-only patch. The framework now exposes
-      -- the correct hook (`avgBad_le_of_steps_inv`'s `Inv` parameter) and the read-charge
-      -- collapse primitives are banked; the residual is the joint re-coupling of the post-read
-      -- continuation law `μ'` as a pushforward across all branches simultaneously.
+      -- REDUCTIONS NOW BANKED (this campaign).
+      --   * The eager inner `∑'z` splits per state by the ghost-domain test via
+      --     `tsum_ghostHybridImpl_read_step_split`: on a HIT it collapses to the continuation
+      --     success mass `Pr[True | simulateQ … (cont v) (p.1, true)]` (real cache untouched,
+      --     bad forced — `tsum_ghostHybridImpl_read_hit_eq` / `support_simulateQ_…_bad`); on a
+      --     MISS it is the `roStep`-pushed continuation from the unchanged-bad post-state.
+      --   * The output-grouped telescoping `avgBad_telescope_eq_tsum_postStep` (SimulateQ.lean)
+      --     plus the linearity `avgBad_eq_tsum_pure` rewrite the telescoped eager average as a
+      --     `tsum` over the post-step joint law `postStepJoint`, exposing the post-state so the
+      --     IH can be folded at the genuine post-step law rather than at a Dirac.
+      --   * The HIT-charge collapse `∑' p, μ p · 1_{mc ∈ ghostCache(p)} = lazy fire mass` is the
+      --     banked Fubini change-of-variables `tsum_pushforward_mem_eq_draw_hit` composed with
+      --     the B-lemmas `probOutput_eagerMultiReadBad_eq_lazyFire_or` /
+      --     `probOutput_lazyGhostFire_one`.
+      --
+      -- TWO OPEN OBSTRUCTIONS (the genuine multi-week content), confirmed this campaign.
+      --   (a) FRAMEWORK GAP. Folding the IH at the post-step law requires carrying a *state law*
+      --       through the induction; but the genuine post-step state law `postStepJoint` is a
+      --       sub-probability `SPMF` (the impl step can fail), whereas `avgBad`/`Inv` are typed
+      --       over `PMF`. The plumbing fix is to generalize `avgBad`/`avgBad_le_of_steps_inv` to a
+      --       bare measure `μ : σ × Bool → ℝ≥0∞` (the `pure`/`query_bind`/induction proofs all go
+      --       through unchanged — verified). This unblocks threading `μ'` across all branches but
+      --       is *not by itself* sufficient.
+      --   (b) DISTRIBUTIONAL CORE. The HIT-charge collapse needs `μ` to be the law of the eager
+      --       ghost cache, and `tsum_pushforward_mem_eq_draw_hit` matches it against the lazy fire
+      --       mass ONLY when that law is a pushforward of the lazy draws. But the eager ghost
+      --       cache is NOT a pushforward of iid *raw* `Prod.fst <$> ids.commit` draws:
+      --       `ghostSignBody` writes a key to the ghost layer *only on a rejected attempt* (and an
+      --       *accepted* attempt CLEARS the ghost entry via `uncacheQuery`), so each ghost key is a
+      --       *rejection-conditioned* commit draw, and the count is correlated with the keys. The
+      --       eager↔lazy match therefore relies on the rejection-skew cancellation (the
+      --       `1/Pr[reject]` of the conditioned key law against the attempt's rejection prob —
+      --       see the
+      --       `probEvent_ghostRead_bad_le` docstring), which is strictly the PMF×PMF
+      --       distributional-coupling content moving the signing-time sampling site past the opaque
+      --       `simulateQ (adv.main pk)` fold to read time. The literal "pushforward of iid raw
+      --       draws" invariant of the naive plan does not hold; the correct invariant carries the
+      --       rejection-conditioned joint law. This is the single remaining residual of #228.
       sorry
     · -- Signing step: per-`p` pointwise. `ghostHybridImpl … true` and `lazyGhostHybridImpl`
       -- are *definitionally identical* on signing queries (`lazyGhostHybridImpl_run_sign_eq`);

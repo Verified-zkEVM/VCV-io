@@ -1460,6 +1460,41 @@ lemma tsum_ghostHybridImpl_read_hit_eq
   exact probEvent_simulateQ_ghostHybridImpl_bad_eq_true ids M maxAttempts pk sk (cont v)
     (p.1, true) rfl
 
+omit [SampleableType Stmt] in
+/-- **Per-state eager read-step inner-sum split.** The telescoped eager read contribution at
+a fixed starting state `p` splits by the ghost-domain test `p.1.1.2 mc`:
+
+* on a **HIT** (`some v`) the eager read returns the ghost value with the real cache untouched
+  and forces the bad flag, so the inner `∑'z` collapses (by `tsum_ghostHybridImpl_read_hit_eq`)
+  to the continuation's full success mass from the flagged state `(p.1, true)`;
+* on a **MISS** (`none`) the read runs `roStep` on the real layer leaving the bad flag
+  unchanged, so the inner `∑'z` is left untouched.
+
+This is the per-state structural decomposition that isolates the read-step's HIT charge — the
+quantity whose `μ`-average against the upstream commit draws is the genuine deferred-sampling
+residual. It is the eager-side companion of the lazy read step (`lazyGhostHybridImpl` over the
+pending ghost count) and is purely structural (no probabilistic content beyond the banked HIT
+collapse). -/
+lemma tsum_ghostHybridImpl_read_step_split
+    (pk : Stmt) (sk : Wit) (mc : M × Commit)
+    (cont : Chal → OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (M × Option (Commit × Resp)))
+    (p : GhostState M Commit Chal) :
+    (∑' z : Chal × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+          Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal => w.2.2 = true |
+            (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run z.2]) =
+      match p.1.1.2 mc with
+      | some v => Pr[fun _ => True |
+          (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont v)).run (p.1, true)]
+      | none => ∑' z : Chal × GhostState M Commit Chal,
+          Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+            Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal => w.2.2 = true |
+              (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run z.2] := by
+  cases h : p.1.1.2 mc with
+  | some v => rw [tsum_ghostHybridImpl_read_hit_eq ids M maxAttempts pk sk mc cont p v h]
+  | none => rfl
+
 /-! ### The two body-level cores of the Sign → Prog hop -/
 
 omit [SampleableType Stmt] in
