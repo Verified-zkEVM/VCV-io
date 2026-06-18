@@ -3859,6 +3859,273 @@ theorem avgBad_le_of_steps
     (fun μ _ t cont ih => h_step μ t cont (fun μ' u => ih μ' trivial u))
     oa μ trivial
 
+/-- **Total post-step joint mass equals the `ν`-weighted per-state step mass.** Marginalizing
+the post-step joint measure over all `(output, post-state)` pairs gives the `ν`-average of the
+per-state impl-step total mass `∑' z, Pr[= z | (impl t).run p]`. -/
+lemma tsum_postStepJointM_eq
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) :
+    (∑' z : spec.Range t × σ × Bool, postStepJointM impl ν t z)
+      = ∑' p : σ × Bool, ν p *
+          ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run p] := by
+  unfold postStepJointM
+  rw [ENNReal.tsum_comm]
+  exact tsum_congr fun p => ENNReal.tsum_mul_left
+
+/-- **Per-output post-step mass is bounded by the pre-step mass.** Each per-output slice
+`postStepOutM impl ν t u` has total mass at most the total mass of `ν`, since the per-state
+step `(impl t).run p` is a sub-probability. The `h_massU` premise of
+`avgBadM_le_threaded_linear`. -/
+lemma tsum_postStepOutM_single_le
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (u : spec.Range t) :
+    (∑' s : σ × Bool, postStepOutM impl ν t u s) ≤ ∑' p : σ × Bool, ν p := by
+  calc (∑' s : σ × Bool, postStepOutM impl ν t u s)
+      ≤ ∑' z : spec.Range t × σ × Bool, postStepJointM impl ν t z := by
+        simp only [postStepOutM]
+        rw [ENNReal.tsum_prod' (f := fun z => postStepJointM impl ν t z)]
+        exact ENNReal.le_tsum u
+    _ = ∑' p : σ × Bool, ν p *
+          ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run p] :=
+        tsum_postStepJointM_eq impl ν t
+    _ ≤ ∑' p : σ × Bool, ν p :=
+        ENNReal.tsum_le_tsum fun p => mul_le_of_le_one_right zero_le' tsum_probOutput_le_one
+
+/-- **Total post-step mass is bounded by the pre-step mass.** Summed over both the query
+output `u` and the post-state, the post-step joint mass is at most the total mass of `ν`. The
+`h_mass` premise of `avgBadM_le_threaded_linear`. -/
+lemma tsum_tsum_postStepOutM_le
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) :
+    (∑' u : spec.Range t, ∑' s : σ × Bool, postStepOutM impl ν t u s)
+      ≤ ∑' p : σ × Bool, ν p := by
+  calc (∑' u : spec.Range t, ∑' s : σ × Bool, postStepOutM impl ν t u s)
+      = ∑' z : spec.Range t × σ × Bool, postStepJointM impl ν t z := by
+        simp only [postStepOutM]
+        rw [ENNReal.tsum_prod' (f := fun z => postStepJointM impl ν t z)]
+    _ = ∑' p : σ × Bool, ν p *
+          ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run p] :=
+        tsum_postStepJointM_eq impl ν t
+    _ ≤ ∑' p : σ × Bool, ν p :=
+        ENNReal.tsum_le_tsum fun p => mul_le_of_le_one_right zero_le' tsum_probOutput_le_one
+
+/-- **Threaded linear (mass-weighted) accumulator bound for `avgBadM`.** A reusable
+free-monad telescoping that, unlike `avgBadM_le_of_steps_inv`, bakes in a *linear,
+mass-weighted, additive* bound shape so it telescopes across the output-branching of a
+query step (where a `⨆`-ceiling bound does not).
+
+The bound carried for a measure `ν` at read/sign budgets `(qHb, qSb)` is
+`carriedBad ν + qHb · (K ν · ε) + (mass ν) · qHb · qSb · (g · ε)`,
+where `carriedBad ν := ∑' p, ν p · 1_{p.2}`, `mass ν := ∑' p, ν p`, `K` is an arbitrary
+charge functional, and `g, ε : ℝ≥0∞` are constants.
+
+Each query domain point `t` is classified by two decidable predicates `pHb` (a "read":
+consumes a read unit, pays its hit charge `≤ K ν · ε` into the post-step carried bad mass)
+and `pSb` (a "sign": consumes a sign unit, raises the post-step charge by `≤ g · mass ν`).
+Steps that fire neither predicate are inert (preserve everything). The numeric premises,
+summed over the query output `u` against the per-output post-step measures
+`νu := postStepOutM impl ν t u`, are:
+
+* `h_carry` — the carried bad mass telescopes, paying the read hit charge on a read step
+  (the charge `≤ K ν · ε` is provided by the carried invariant `Inv ν`);
+* `h_mass` — the total mass is non-increasing across the step;
+* `h_K` — the charge telescopes, growing by `≤ g · mass ν` on a sign step;
+* `h_massU` — each per-output mass is bounded by the pre-step mass (so the IH's
+  sub-probability hypothesis is re-established);
+* `h_inv` — the invariant `Inv` is preserved across every per-output post-step measure.
+
+The read charge bound `Inv ν → C(ν, ·) ≤ K ν · ε` is in general only an *averaged* fact
+(the rejected commit lands at the read target with probability `≤ ε`), so it cannot be a
+universal hypothesis over arbitrary `ν`; it is carried as the invariant `Inv` and
+re-established incrementally on each post-step measure. The read/sign budgets are threaded
+by `isQueryBoundP_query_bind_iff`; the budget decrement on the fired predicate exactly
+absorbs the charge increment. -/
+theorem avgBadM_le_threaded_linear
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (K : (σ × Bool → ℝ≥0∞) → ℝ≥0∞) (g ε : ℝ≥0∞)
+    (Inv : (σ × Bool → ℝ≥0∞) → Prop)
+    (pHb pSb : ι → Prop) [DecidablePred pHb] [DecidablePred pSb]
+    (hpExcl : ∀ t, pHb t → pSb t → False)
+    (h_carry : ∀ (ν : σ × Bool → ℝ≥0∞), Inv ν → ∀ (t : spec.Domain),
+      (∑' u : spec.Range t,
+          ∑' p : σ × Bool, postStepOutM impl ν t u p * (if p.2 = true then 1 else 0))
+        ≤ (∑' p : σ × Bool, ν p * (if p.2 = true then 1 else 0)) +
+            (if pHb t then K ν * ε else 0))
+    (h_mass : ∀ (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain),
+      (∑' u : spec.Range t, ∑' p : σ × Bool, postStepOutM impl ν t u p)
+        ≤ ∑' p : σ × Bool, ν p)
+    (h_massU : ∀ (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (u : spec.Range t),
+      (∑' p : σ × Bool, postStepOutM impl ν t u p) ≤ ∑' p : σ × Bool, ν p)
+    (h_K : ∀ (ν : σ × Bool → ℝ≥0∞), Inv ν → ∀ (t : spec.Domain),
+      (∑' u : spec.Range t, K (postStepOutM impl ν t u))
+        ≤ K ν + (if pSb t then g * (∑' p : σ × Bool, ν p) else 0))
+    (h_inv : ∀ (ν : σ × Bool → ℝ≥0∞), Inv ν → ∀ (t : spec.Domain) (u : spec.Range t),
+      Inv (postStepOutM impl ν t u))
+    (oa : OracleComp spec γ) :
+    ∀ (ν : σ × Bool → ℝ≥0∞) (qHb qSb : ℕ),
+      Inv ν → (∑' p : σ × Bool, ν p) ≤ 1 →
+      oa.IsQueryBoundP pHb qHb → oa.IsQueryBoundP pSb qSb →
+      avgBadM impl ν oa
+        ≤ (∑' p : σ × Bool, ν p * (if p.2 = true then 1 else 0)) +
+            (qHb : ℝ≥0∞) * (K ν * ε) +
+            (∑' p : σ × Bool, ν p) * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) := by
+  classical
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro ν qHb qSb _ _ _ _
+      rw [avgBadM_pure]
+      exact le_add_right (le_add_right le_rfl)
+  | @query_bind t cont ih =>
+      intro ν qHb qSb hInv hν hqH hqS
+      rw [avgBadM_query_bind_eq_tsum_output]
+      -- Abbreviations.
+      set cb : (σ × Bool → ℝ≥0∞) → ℝ≥0∞ :=
+        fun μ => ∑' p : σ × Bool, μ p * (if p.2 = true then 1 else 0) with hcb
+      set M : (σ × Bool → ℝ≥0∞) → ℝ≥0∞ := fun μ => ∑' p : σ × Bool, μ p with hM
+      set νu : spec.Range t → (σ × Bool → ℝ≥0∞) := fun u => postStepOutM impl ν t u with hνu
+      -- Per-output mass ≤ 1, from `h_massU` and `hν`.
+      have hνuMass : ∀ u, M (νu u) ≤ 1 := fun u =>
+        le_trans (h_massU ν t u) hν
+      -- The invariant is preserved on every per-output post-step measure.
+      have hInvU : ∀ u, Inv (νu u) := fun u => h_inv ν hInv t u
+      rw [isQueryBoundP_query_bind_iff] at hqH hqS
+      obtain ⟨hqHfst, hqHcont⟩ := hqH
+      obtain ⟨hqSfst, hqScont⟩ := hqS
+      -- Three cases by which predicate fires.
+      by_cases hHb : pHb t
+      · -- Read step: `pHb t` true, `pSb t` false; budgets `(qHb-1, qSb)`.
+        have hSbF : ¬ pSb t := fun hSb => hpExcl t hHb hSb
+        have hpos : 0 < qHb := by
+          rcases hqHfst with h | h
+          · exact absurd hHb h
+          · exact h
+        simp only [hHb, if_pos, hSbF, if_neg, not_false_eq_true] at hqHcont hqScont
+        have hqHcont : ∀ u, (cont u).IsQueryBoundP pHb (qHb - 1) := hqHcont
+        have hqScont' : ∀ u, (cont u).IsQueryBoundP pSb qSb := hqScont
+        -- Per-output IH, summed.
+        calc (∑' u : spec.Range t, avgBadM impl (νu u) (cont u))
+            ≤ ∑' u : spec.Range t,
+                (cb (νu u) + ((qHb - 1 : ℕ) : ℝ≥0∞) * (K (νu u) * ε) +
+                  M (νu u) * ((qHb - 1 : ℕ) : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε)) :=
+              ENNReal.tsum_le_tsum fun u =>
+                ih u (νu u) (qHb - 1) qSb (hInvU u) (hνuMass u) (hqHcont u) (hqScont' u)
+          _ = (∑' u, cb (νu u)) +
+                ((qHb - 1 : ℕ) : ℝ≥0∞) * ε * (∑' u, K (νu u)) +
+                ((qHb - 1 : ℕ) : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) * (∑' u, M (νu u)) := by
+              rw [ENNReal.tsum_add, ENNReal.tsum_add, ← ENNReal.tsum_mul_left,
+                ← ENNReal.tsum_mul_left]
+              congr 1
+              · congr 1
+                exact tsum_congr fun u => by ring
+              · exact tsum_congr fun u => by ring
+          _ ≤ (cb ν + K ν * ε) +
+                ((qHb - 1 : ℕ) : ℝ≥0∞) * ε * (K ν) +
+                ((qHb - 1 : ℕ) : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) * (M ν) := by
+              refine add_le_add (add_le_add ?_ ?_) ?_
+              · have := h_carry ν hInv t; simpa [hcb, hνu, hHb] using this
+              · gcongr
+                have := h_K ν hInv t; simpa [hνu, hSbF] using this
+              · gcongr
+                have := h_mass ν t; simpa [hM, hνu] using this
+          _ ≤ cb ν + (qHb : ℝ≥0∞) * (K ν * ε) +
+                M ν * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) := by
+              have hsucc : ((qHb - 1 : ℕ) : ℝ≥0∞) + 1 = (qHb : ℝ≥0∞) := by
+                rw [show ((qHb - 1 : ℕ) : ℝ≥0∞) + 1 = (((qHb - 1) + 1 : ℕ) : ℝ≥0∞) by
+                  push_cast; ring, Nat.sub_add_cancel hpos]
+              -- Charge term: `(K ν · ε) + (qHb-1)·ε·K ν = qHb·(K ν · ε)`.
+              have hch : K ν * ε + ((qHb - 1 : ℕ) : ℝ≥0∞) * ε * K ν
+                  = (qHb : ℝ≥0∞) * (K ν * ε) := by
+                rw [← hsucc]; ring
+              -- Future term: `(qHb-1) ≤ qHb`.
+              have hfut : ((qHb - 1 : ℕ) : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) * M ν
+                  ≤ M ν * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) := by
+                rw [show M ν * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε)
+                      = ((qHb : ℝ≥0∞)) * (qSb : ℝ≥0∞) * (g * ε) * M ν by ring]
+                gcongr
+                exact_mod_cast Nat.sub_le qHb 1
+              calc cb ν + K ν * ε + ((qHb - 1 : ℕ) : ℝ≥0∞) * ε * K ν +
+                    ((qHb - 1 : ℕ) : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) * M ν
+                  = cb ν + (K ν * ε + ((qHb - 1 : ℕ) : ℝ≥0∞) * ε * K ν) +
+                      ((qHb - 1 : ℕ) : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) * M ν := by ring
+                _ ≤ cb ν + (qHb : ℝ≥0∞) * (K ν * ε) +
+                      M ν * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) := by
+                    rw [hch]; gcongr
+      · by_cases hSb : pSb t
+        · -- Sign step: `pSb t` true, `pHb t` false; budgets `(qHb, qSb-1)`.
+          have hpos : 0 < qSb := by
+            rcases hqSfst with h | h
+            · exact absurd hSb h
+            · exact h
+          simp only [hHb, if_neg, not_false_eq_true, hSb, if_pos] at hqHcont hqScont
+          have hqHcont' : ∀ u, (cont u).IsQueryBoundP pHb qHb := hqHcont
+          have hqScont' : ∀ u, (cont u).IsQueryBoundP pSb (qSb - 1) := hqScont
+          calc (∑' u : spec.Range t, avgBadM impl (νu u) (cont u))
+              ≤ ∑' u : spec.Range t,
+                  (cb (νu u) + (qHb : ℝ≥0∞) * (K (νu u) * ε) +
+                    M (νu u) * (qHb : ℝ≥0∞) * ((qSb - 1 : ℕ) : ℝ≥0∞) * (g * ε)) :=
+                ENNReal.tsum_le_tsum fun u =>
+                  ih u (νu u) qHb (qSb - 1) (hInvU u) (hνuMass u) (hqHcont' u) (hqScont' u)
+            _ = (∑' u, cb (νu u)) +
+                  (qHb : ℝ≥0∞) * ε * (∑' u, K (νu u)) +
+                  (qHb : ℝ≥0∞) * ((qSb - 1 : ℕ) : ℝ≥0∞) * (g * ε) * (∑' u, M (νu u)) := by
+                rw [ENNReal.tsum_add, ENNReal.tsum_add, ← ENNReal.tsum_mul_left,
+                  ← ENNReal.tsum_mul_left]
+                congr 1
+                · congr 1
+                  exact tsum_congr fun u => by ring
+                · exact tsum_congr fun u => by ring
+            _ ≤ cb ν +
+                  (qHb : ℝ≥0∞) * ε * (K ν + g * M ν) +
+                  (qHb : ℝ≥0∞) * ((qSb - 1 : ℕ) : ℝ≥0∞) * (g * ε) * (M ν) := by
+                refine add_le_add (add_le_add ?_ ?_) ?_
+                · have := h_carry ν hInv t; simpa [hcb, hνu, hHb] using this
+                · gcongr
+                  have := h_K ν hInv t; simpa [hM, hνu, hSb] using this
+                · gcongr
+                  have := h_mass ν t; simpa [hM, hνu] using this
+            _ ≤ cb ν + (qHb : ℝ≥0∞) * (K ν * ε) +
+                  M ν * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) := by
+                have hsucc : ((qSb - 1 : ℕ) : ℝ≥0∞) + 1 = (qSb : ℝ≥0∞) := by
+                  rw [show ((qSb - 1 : ℕ) : ℝ≥0∞) + 1 = (((qSb - 1) + 1 : ℕ) : ℝ≥0∞) by
+                    push_cast; ring, Nat.sub_add_cancel hpos]
+                -- Charge: `qHb·ε·(K ν + g·M ν) = qHb·K ν·ε + qHb·g·ε·M ν`; the second piece
+                -- combines with the future term via the `qSb-1 → qSb` increment.
+                refine le_of_eq ?_
+                rw [show cb ν + (qHb : ℝ≥0∞) * ε * (K ν + g * M ν) +
+                      (qHb : ℝ≥0∞) * ((qSb - 1 : ℕ) : ℝ≥0∞) * (g * ε) * (M ν)
+                    = cb ν + (qHb : ℝ≥0∞) * (K ν * ε) +
+                      M ν * (qHb : ℝ≥0∞) * (((qSb - 1 : ℕ) : ℝ≥0∞) + 1) * (g * ε) by ring,
+                  hsucc]
+        · -- Inert step: neither fires; budgets `(qHb, qSb)`.
+          simp only [hHb, if_neg, not_false_eq_true, hSb] at hqHcont hqScont
+          have hqHcont' : ∀ u, (cont u).IsQueryBoundP pHb qHb := hqHcont
+          have hqScont' : ∀ u, (cont u).IsQueryBoundP pSb qSb := hqScont
+          calc (∑' u : spec.Range t, avgBadM impl (νu u) (cont u))
+              ≤ ∑' u : spec.Range t,
+                  (cb (νu u) + (qHb : ℝ≥0∞) * (K (νu u) * ε) +
+                    M (νu u) * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε)) :=
+                ENNReal.tsum_le_tsum fun u =>
+                  ih u (νu u) qHb qSb (hInvU u) (hνuMass u) (hqHcont' u) (hqScont' u)
+            _ = (∑' u, cb (νu u)) +
+                  (qHb : ℝ≥0∞) * ε * (∑' u, K (νu u)) +
+                  (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) * (∑' u, M (νu u)) := by
+                rw [ENNReal.tsum_add, ENNReal.tsum_add, ← ENNReal.tsum_mul_left,
+                  ← ENNReal.tsum_mul_left]
+                congr 1
+                · congr 1
+                  exact tsum_congr fun u => by ring
+                · exact tsum_congr fun u => by ring
+            _ ≤ cb ν + (qHb : ℝ≥0∞) * ε * (K ν) +
+                  (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) * (M ν) := by
+                refine add_le_add (add_le_add ?_ ?_) ?_
+                · have := h_carry ν hInv t; simpa [hcb, hνu, hHb] using this
+                · gcongr
+                  have := h_K ν hInv t; simpa [hνu, hSb] using this
+                · gcongr
+                  have := h_mass ν t; simpa [hM, hνu] using this
+            _ = cb ν + (qHb : ℝ≥0∞) * (K ν * ε) +
+                  M ν * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) * (g * ε) := by ring
+
 end AveragedStateMeasureBad
 
 end OracleComp.ProgramLogic.Relational

@@ -1130,24 +1130,110 @@ lemma tsum_probOutput_map_state_fixed {R G : Type} (oa : ProbComp R) (p : G)
     obtain ⟨u', _, hu'⟩ := hmem
     exact hg (Prod.ext_iff.mp hu').2.symm
 
+/-- **Per-state ghost charge accumulator** for the threaded eager-charge bound: the
+mass-weighted total size of the ghost cache layer. Linear in the state measure `ν`, preserved
+by read/uniform steps (which never write the ghost layer) and grown additively by sign steps
+(banked `tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le`). -/
+noncomputable def ghostChargeK (ν : GhostState M Commit Chal → ℝ≥0∞) : ℝ≥0∞ :=
+  ∑' p : GhostState M Commit Chal, ν p * QueryCache.enncard (p.1.1.2)
+
+/-- **Averaged ghost-membership charge invariant.** For every read target `mc`, the
+`ν`-averaged membership charge at `mc` is dominated by the ghost-size accumulator scaled by
+`ofReal ε`. This is the carried invariant of the threaded eager-charge bound: it holds at the
+empty-cache Dirac start (`0 ≤ 0`), is preserved by reads (ghost layer untouched) and signs
+(banked (a) raises the charge by `≤ (attempts)·ε`, matching the enncard growth of
+`ghostChargeK`). It is only an *averaged* fact — pointwise per state it is false, since a
+single ghost entry costs `1`, not `ε`. -/
+def ghostChargeInv (ε : ℝ) (ν : GhostState M Commit Chal → ℝ≥0∞) : Prop :=
+  ∀ mc : M × Commit,
+    (∑' p : GhostState M Commit Chal, ν p * memCharge M p.1.1.2 mc)
+      ≤ ghostChargeK M ν * ENNReal.ofReal ε
+
+omit [SampleableType Stmt] in
+/-- **`h_carry` premise of the threaded bound for the ghost handler.** The carried bad mass
+telescopes across one step, paying the read hit charge `≤ K ν · ofReal ε` on a read step
+(via the invariant `ghostChargeInv`). Uniform/sign steps preserve the carried bad mass. -/
+lemma avgBadM_ghostHybridImpl_threaded_carry
+    (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (_hε : 0 ≤ ε)
+    (pk : Stmt) (sk : Wit)
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (ν : GhostState M Commit Chal → ℝ≥0∞)
+    (_hInv : ghostChargeInv M ε ν)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain) :
+    (∑' u : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Range t,
+        ∑' p : GhostState M Commit Chal,
+          OracleComp.ProgramLogic.Relational.postStepOutM
+            (ghostHybridImpl ids M maxAttempts true pk sk) ν t u p *
+            (if p.2 = true then 1 else 0))
+      ≤ (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
+          (if (t matches Sum.inl (Sum.inr _)) then
+            ghostChargeK M ν * ENNReal.ofReal ε else 0) := by
+  sorry
+
+omit [SampleableType Stmt] in
+/-- **`h_K` premise of the threaded bound for the ghost handler.** The ghost-size accumulator
+`ghostChargeK` telescopes across one step, growing by `≤ ofReal (1/(1-p)) · mass ν` on a sign
+step (banked (a)/(c)); reads and uniform steps preserve it (the ghost layer is untouched). -/
+lemma avgBadM_ghostHybridImpl_threaded_K
+    (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (_hε : 0 ≤ ε)
+    (pk : Stmt) (sk : Wit)
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (ν : GhostState M Commit Chal → ℝ≥0∞)
+    (_hInv : ghostChargeInv M ε ν)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain) :
+    (∑' u : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Range t,
+        ghostChargeK M
+          (OracleComp.ProgramLogic.Relational.postStepOutM
+            (ghostHybridImpl ids M maxAttempts true pk sk) ν t u))
+      ≤ ghostChargeK M ν +
+          (if (t matches Sum.inr _) then
+            ENNReal.ofReal (1 / (1 - p_abort)) *
+              (∑' p : GhostState M Commit Chal, ν p) else 0) := by
+  sorry
+
 open scoped Classical in
 omit [SampleableType Stmt] in
-/-- **Threaded averaged-charge accumulator (the `hAcc` engine).** A direct free-monad
-induction (telescoping via `avgBadM_query_bind_eq` / `avgBadM_pure`, reusing the banked
-read-step charge bound (b), sign-step ghost-membership increment (a), and geometric fold
-(c)) bounding the averaged eager bad mass.
+/-- **`h_inv` premise of the threaded bound for the ghost handler.** The averaged-charge
+invariant `ghostChargeInv` is preserved across every per-output post-step measure: reads leave
+the ghost layer (and the charge) untouched; signs grow both the membership charge and the
+ghost size in lockstep (banked (a) vs the enncard sibling); uniform steps are inert. -/
+lemma avgBadM_ghostHybridImpl_threaded_inv
+    (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (_hε : 0 ≤ ε)
+    (pk : Stmt) (sk : Wit)
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (ν : GhostState M Commit Chal → ℝ≥0∞)
+    (hInv : ghostChargeInv M ε ν)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (u : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Range t) :
+    ghostChargeInv M ε
+      (OracleComp.ProgramLogic.Relational.postStepOutM
+        (ghostHybridImpl ids M maxAttempts true pk sk) ν t u) := by
+  sorry
 
-The bound carries, threaded through the recursion:
+open scoped Classical in
+omit [SampleableType Stmt] in
+/-- **Threaded averaged-charge accumulator (the `hAcc` engine).** The averaged eager bad mass
+is bounded by a *linear, mass-weighted, additive* accumulator bound (an instance of the
+generic `avgBadM_le_threaded_linear`), threading:
+
 * `carriedBad ν := ∑' p, ν p · 1_{p.2}` — the bad mass already present in `ν` (the pure base);
 * a read budget `qHb` (consumed one unit per random-oracle read, `IsQueryBoundP … reads`);
 * a sign budget `qSb` (consumed one unit per signing query, `IsQueryBoundP … signs`);
-* the per-target charge ceiling `curCeil ν := ⨆ mc, ∑' p, ν p · memCharge (p.1.1.2) mc`.
+* the *linear* ghost-size accumulator `K ν := ghostChargeK ν`, alongside the averaged-charge
+  invariant `ghostChargeInv ε ν`.
 
-A read pays `≤ curCeil ν · Sε`-worth (its hit charge, banked (b)) and leaves the ghost
-charge untouched, consuming one read unit; a sign raises `curCeil` by `≤ Sε` (banked (a)+(c))
-while consuming one sign unit, so the decremented `qSb` exactly absorbs the `+Sε`; a uniform
-step is inert. Here `Sε := ofReal (1/(1-p_abort)) · ofReal ε` is the per-sign-query charge
-increment ceiling. -/
+A read pays its hit charge `≤ K ν · ofReal ε` (banked (b) `tsum_ghostHybridImpl_read_step…`
+plus the invariant) into the post-step carried bad mass and leaves the ghost charge untouched
+(read unit consumed); a sign raises `K` by `≤ ofReal (1/(1-p)) · mass` (banked (a)+(c)) and
+preserves the invariant (sign unit consumed); a uniform step is inert. The mass-weighting of
+the future term makes the per-output sum converge over the (infinite) output type — the
+property the prior `⨆`-ceiling bound lacked. -/
 lemma avgBadM_ghostHybridImpl_le_threaded
     (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (_hε : 0 ≤ ε)
     (pk : Stmt) (sk : Wit)
@@ -1155,136 +1241,40 @@ lemma avgBadM_ghostHybridImpl_le_threaded
       Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
     (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
     (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
-      (M × Option (Commit × Resp))) :
-    ∀ (ν : GhostState M Commit Chal → ℝ≥0∞) (qHb qSb : ℕ),
-      (∑' p : GhostState M Commit Chal, ν p) ≤ 1 →
-      oa.IsQueryBoundP (fun t => t matches Sum.inl (Sum.inr _)) qHb →
-      oa.IsQueryBoundP (fun t => t matches Sum.inr _) qSb →
-      OracleComp.ProgramLogic.Relational.avgBadM
-          (ghostHybridImpl ids M maxAttempts true pk sk) ν oa
-        ≤ (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
-            (qHb : ℝ≥0∞) *
-              ((⨆ mc : M × Commit, ∑' p : GhostState M Commit Chal,
-                  ν p * memCharge M p.1.1.2 mc) +
-                (qSb : ℝ≥0∞) *
-                  (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε)) := by
-  classical
-  set Sε : ℝ≥0∞ := ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε with hSε
-  -- `curCeil ν := ⨆ mc, ∑' p, ν p · memCharge (p.1.1.2) mc`.
-  induction oa using OracleComp.inductionOn with
-  | pure x =>
-      intro ν qHb qSb _ _ _
-      rw [OracleComp.ProgramLogic.Relational.avgBadM_pure]
-      exact le_add_right le_rfl
-  | @query_bind t cont ih =>
-      intro ν qHb qSb hν hqH hqS
-      rw [OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq]
-      set RHS : ℝ≥0∞ :=
-        (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
+      (M × Option (Commit × Resp)))
+    (ν : GhostState M Commit Chal → ℝ≥0∞) (qHb qSb : ℕ)
+    (hInv : ghostChargeInv M ε ν)
+    (hν : (∑' p : GhostState M Commit Chal, ν p) ≤ 1)
+    (hqH : oa.IsQueryBoundP (fun t => t matches Sum.inl (Sum.inr _)) qHb)
+    (hqS : oa.IsQueryBoundP (fun t => t matches Sum.inr _) qSb) :
+    OracleComp.ProgramLogic.Relational.avgBadM
+        (ghostHybridImpl ids M maxAttempts true pk sk) ν oa
+      ≤ (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
           (qHb : ℝ≥0∞) *
-            ((⨆ mc : M × Commit, ∑' p : GhostState M Commit Chal,
-                ν p * memCharge M p.1.1.2 mc) + (qSb : ℝ≥0∞) * Sε) with hRHS
-      rcases t with (n | mc) | msg
-      · -- Uniform step: inert. The handler forwards the draw and leaves the state untouched.
-        -- Budgets pass through unchanged.
-        rw [isQueryBoundP_query_bind_iff] at hqH hqS
-        obtain ⟨_, hqHcont⟩ := hqH
-        obtain ⟨_, hqScont⟩ := hqS
-        simp only [Bool.false_eq_true, if_false] at hqHcont hqScont
-        -- The inner tsum collapses: the handler returns `(u, p)` for `u ~ unif`, state fixed.
-        calc (∑' p : GhostState M Commit Chal, ν p *
-                ∑' z : unifSpec.Range n × GhostState M Commit Chal,
-                  Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inl n))).run p] *
-                    Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
-                        w.2.2 = true |
-                      (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run
-                        z.2])
-            = ∑' p : GhostState M Commit Chal, ν p *
-                ∑' u : unifSpec.Range n,
-                  Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] *
-                    Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
-                        w.2.2 = true |
-                      (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont u)).run p] :=
-              tsum_congr fun p => by
-                congr 1
-                -- The uniform handler is `(fun u => (u, p)) <$> unif n`, a pushforward of the
-                -- uniform draw fixing the state to `p`; the per-`p` inner sum collapses by the
-                -- standalone pushforward identity `tsum_probOutput_map_state_fixed`.
-                rw [show (ghostHybridImpl ids M maxAttempts true pk sk (Sum.inl (Sum.inl n))).run p
-                      = (fun u => (u, p)) <$> (HasQuery.toQueryImpl (spec := unifSpec)
-                        (m := ProbComp)) n from rfl]
-                exact tsum_probOutput_map_state_fixed
-                  ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n) p _
-          _ = ∑' u : unifSpec.Range n,
-                Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] *
-                  OracleComp.ProgramLogic.Relational.avgBadM
-                    (ghostHybridImpl ids M maxAttempts true pk sk) ν (cont u) := by
-              rw [show (∑' p : GhostState M Commit Chal, ν p *
-                    ∑' u : unifSpec.Range n,
-                      Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] *
-                        Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
-                            w.2.2 = true |
-                          (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk)
-                            (cont u)).run p])
-                  = ∑' p : GhostState M Commit Chal, ∑' u : unifSpec.Range n,
-                      Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] *
-                        (ν p *
-                          Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
-                              w.2.2 = true |
-                            (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk)
-                              (cont u)).run p]) from by
-                refine tsum_congr fun p => ?_
-                rw [← ENNReal.tsum_mul_left]
-                refine tsum_congr fun u => ?_
-                ring]
-              rw [ENNReal.tsum_comm]
-              refine tsum_congr fun u => ?_
-              rw [OracleComp.ProgramLogic.Relational.avgBadM, ← ENNReal.tsum_mul_left]
-          _ ≤ ∑' u : unifSpec.Range n,
-                Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] * RHS :=
-              ENNReal.tsum_le_tsum fun u => by
-                gcongr
-                exact hRHS ▸ ih u ν qHb qSb hν (hqHcont u) (hqScont u)
-          _ = RHS := by
-              rw [ENNReal.tsum_mul_right]
-              have h1 : (∑' u : unifSpec.Range n,
-                  Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n]) = 1 :=
-                tsum_probOutput_eq_one' (by simp)
-              rw [h1, one_mul]
-      · -- Read step (`t = .inl (.inr mc)`).
-        -- Output-grouping (`avgBadM_query_bind_eq_tsum_output`, added this campaign) regroups the
-        -- inner telescope as `∑'u avgBadM (postStepOutM ν (read mc) u) (cont u)`, applying the IH
-        -- once per output `u` at the genuine per-output state *measure* `νu := postStepOutM …`
-        -- (not a Dirac — this is what avoids the per-state `∑`-of-`⨆` blow-up). The IH at
-        -- `(qHb-1, qSb)` per `u`, reads preserving the ghost charge, would fold the read HIT
-        -- charge `≤ curCeil ν` into the `qHb-1 → qHb` step.
-        --
-        -- RESIDUAL (framework redesign, NOT assembly): summing the per-`u` IH bound over `u`
-        -- does **not** close with the current bound shape. Both the ceiling term `qHb·curCeil νu`
-        -- and the absolute term `qHb·qSb·Sε` are *unweighted by the per-output mass*, so summing
-        -- over the (in general infinite) output type `u` diverges: `∑'u curCeil νu` is a
-        -- `∑`-of-`⨆` that exceeds `curCeil ν` (the read-charge `∑'u C(νu,mc') ≤ C(ν,mc')` holds
-        -- only under a single `⨆mc'`, the wrong way for `∑'u ⨆mc'`), and `∑'u qHb·qSb·Sε = ∞`.
-        -- Threading `hν : ∑'p ν p ≤ 1` is necessary but not sufficient: closing requires
-        -- re-deriving the engine bound with the charge terms *mass-weighted* (proportional to
-        -- `∑'p νu p`) so they are additive across the output branches — the extended-accumulator
-        -- framework step described in `probEvent_ghostRead_bad_le_charge`. See the campaign note.
-        sorry
-      · -- Sign step (`t = .inr msg`). Same output-grouping route
-        -- (`avgBadM_query_bind_eq_tsum_output`): `∑'u avgBadM (postStepOutM ν (sign) u) (cont u)`,
-        -- IH at `(qHb, qSb-1)` per output `u`. Banked (a)
-        -- `tsum_probOutput_run_ghostSignBody_mul_memCharge_le` + (c) `geomAttemptSum_le` give
-        -- `∑'u C(νu, mc') ≤ C(ν, mc') + Sε` per fixed `mc'`, hence (single-summand ≤ sum, then
-        -- `⨆mc'`) `curCeil νu ≤ curCeil ν + Sε` per `u`; the decremented `qSb-1` then absorbs the
-        -- `+Sε`.
-        --
-        -- RESIDUAL (framework redesign, NOT assembly): identical obstruction to the read step.
-        -- The per-`u` IH bound `carriedBad νu + qHb·(curCeil ν + qSb·Sε)` has the constant term
-        -- `qHb·(curCeil ν + qSb·Sε)` unweighted by `mass νu`, so `∑'u` of it diverges over an
-        -- infinite output type; and `∑'u curCeil νu` is a `∑`-of-`⨆` not bounded by
-        -- `curCeil ν + Sε`. Closing needs the mass-weighted engine bound (charge terms scaled by
-        -- `∑'p νu p`, summing via `hν : ∑'p ν p ≤ 1`). See the campaign note.
-        sorry
+            (ghostChargeK M ν * ENNReal.ofReal ε) +
+          (∑' p : GhostState M Commit Chal, ν p) * (qHb : ℝ≥0∞) * (qSb : ℝ≥0∞) *
+            (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε) := by
+  refine OracleComp.ProgramLogic.Relational.avgBadM_le_threaded_linear
+    (ghostHybridImpl ids M maxAttempts true pk sk)
+    (ghostChargeK M) (ENNReal.ofReal (1 / (1 - p_abort))) (ENNReal.ofReal ε)
+    (ghostChargeInv M ε)
+    (fun t => t matches Sum.inl (Sum.inr _)) (fun t => t matches Sum.inr _)
+    (by rintro ((n | mc) | msg) h1 h2 <;> simp_all)
+    ?_ ?_ ?_ ?_ ?_
+    oa ν qHb qSb hInv hν hqH hqS
+  · intro ν' hInv' t
+    have h := avgBadM_ghostHybridImpl_threaded_carry ids M maxAttempts ε p_abort hp₀ hp _hε
+      pk sk hGuess hAbort ν' hInv' t
+    rcases t with (n | mc) | msg <;> exact h
+  · exact fun ν' t => OracleComp.ProgramLogic.Relational.tsum_tsum_postStepOutM_le _ ν' t
+  · exact fun ν' t u => OracleComp.ProgramLogic.Relational.tsum_postStepOutM_single_le _ ν' t u
+  · intro ν' hInv' t
+    have h := avgBadM_ghostHybridImpl_threaded_K ids M maxAttempts ε p_abort hp₀ hp _hε
+      pk sk hGuess hAbort ν' hInv' t
+    rcases t with (n | mc) | msg <;> exact h
+  · intro ν' hInv' t u
+    exact avgBadM_ghostHybridImpl_threaded_inv ids M maxAttempts ε p_abort hp₀ hp _hε
+      pk sk hGuess hAbort ν' hInv' t u
 
 open scoped Classical in
 omit [SampleableType Stmt] in
@@ -1439,15 +1429,36 @@ lemma probEvent_ghostRead_bad_le
         ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
       (fun p hp => by rw [if_neg hp])]
     rw [if_pos rfl]
-  -- Rewrite the empty-Dirac start as a single-point indicator measure and apply the engine.
+  -- The empty Dirac start: the ghost layer is empty, so the membership charge vanishes for
+  -- every target, hence the averaged-charge invariant holds (`0 ≤ K · ε`).
+  have hstartCharge : ∀ mc : M × Commit,
+      (∑' p : GhostState M Commit Chal,
+        (if p = ((((∅, ∅), []) :
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+            then (1 : ℝ≥0∞) else 0) * memCharge M p.1.1.2 mc) = 0 := by
+    intro mc
+    rw [ENNReal.tsum_eq_zero]
+    intro p
+    by_cases hp' : p = ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+    · subst hp'; simp [memCharge]
+    · rw [if_neg hp', zero_mul]
+  have hInvStart : ghostChargeInv M ε
+      (fun p => if p = ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+          then 1 else 0) := by
+    intro mc
+    rw [hstartCharge mc]
+    exact zero_le'
+  -- Apply the threaded engine at the empty Dirac start, budgets `(qH+1, qS)`.
   have hstart := avgBadM_ghostHybridImpl_le_threaded ids M maxAttempts ε p_abort
     hp₀ hp hε pk sk hGuess hAbort (adv.main pk)
     (fun p => if p = ((((∅, ∅), []) :
         ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
           then 1 else 0)
-    (qH + 1) qS hνstart hqHbudget hqSbudget
+    (qH + 1) qS hInvStart hνstart hqHbudget hqSbudget
   refine hstart.trans ?_
-  -- The Dirac measure: `carriedBad = 0` (start flag `false`) and `curCeil = 0` (empty ghost).
+  -- The Dirac measure: `carriedBad = 0` (start flag `false`), `K = 0` (empty ghost), `mass = 1`.
   have hcarried : (∑' p : GhostState M Commit Chal,
       (if p = ((((∅, ∅), []) :
         ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
@@ -1458,27 +1469,39 @@ lemma probEvent_ghostRead_bad_le
         ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
     · subst hp'; simp
     · rw [if_neg hp', zero_mul]
-  have hceil : (⨆ mc : M × Commit, ∑' p : GhostState M Commit Chal,
-      (if p = ((((∅, ∅), []) :
+  have hKzero : ghostChargeK M
+      (fun p => if p = ((((∅, ∅), []) :
         ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-          then (1 : ℝ≥0∞) else 0) * memCharge M p.1.1.2 mc) = 0 := by
-    rw [ENNReal.iSup_eq_zero]
-    intro mc
-    rw [ENNReal.tsum_eq_zero]
+          then (1 : ℝ≥0∞) else 0) = 0 := by
+    rw [ghostChargeK, ENNReal.tsum_eq_zero]
     intro p
     by_cases hp' : p = ((((∅, ∅), []) :
         ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-    · subst hp'; simp [memCharge]
+    · subst hp'; simp [QueryCache.enncard]
     · rw [if_neg hp', zero_mul]
-  rw [hcarried, hceil, zero_add, zero_add]
-  -- `(qH+1) · (qS · Sε) ≤ (qH+1) · (ofReal (qS/(1-p)) · ofReal ε)`, with equality.
+  have hmassOne : (∑' p : GhostState M Commit Chal,
+      (if p = ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+          then (1 : ℝ≥0∞) else 0)) = 1 := by
+    rw [tsum_eq_single ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+      (fun p hp => by rw [if_neg hp]), if_pos rfl]
+  rw [hcarried, hKzero, hmassOne, zero_mul, mul_zero, add_zero, zero_add, one_mul]
+  -- `(qH+1) · qS · (ofReal (1/(1-p)) · ofReal ε) = (qH+1) · (ofReal (qS/(1-p)) · ofReal ε)`,
+  -- the `hAcc` target shape of `probEvent_ghostRead_bad_le_charge`.
+  rw [Nat.cast_add, Nat.cast_one]
+  refine le_of_eq ?_
   have hSrw : (qS : ℝ≥0∞) * (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε)
       = ENNReal.ofReal (qS / (1 - p_abort)) * ENNReal.ofReal ε := by
     rw [show (qS : ℝ≥0∞) = ENNReal.ofReal qS from (ENNReal.ofReal_natCast qS).symm,
       ← mul_assoc, ← ENNReal.ofReal_mul (by positivity)]
     congr 2
     rw [mul_one_div]
-  rw [hSrw, Nat.cast_add, Nat.cast_one]
+  rw [show ((qH : ℝ≥0∞) + 1) * (qS : ℝ≥0∞) *
+        (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε)
+      = ((qH : ℝ≥0∞) + 1) *
+        ((qS : ℝ≥0∞) * (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε)) by ring,
+    hSrw]
 
 /-! ## Hop lemmas
 
