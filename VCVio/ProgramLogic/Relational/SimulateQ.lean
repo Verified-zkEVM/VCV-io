@@ -3315,4 +3315,203 @@ theorem probEvent_bad_simulateQ_run_le_expectedQuerySlack
 
 end SingleWorldResourceBad
 
+/-! ## Averaged-state-measure bad accumulator
+
+The single-world resource accumulator `probEvent_bad_simulateQ_run_le_expectedQuerySlack`
+charges a flip cost `R s · ε` **at a fixed reachable state** `s`. That is exactly the right
+shape for a handler that *draws the hidden randomness at the read* (the lazy /
+deferred-sampling handler), where the per-state read charge is genuinely the averaged
+guessing mass `R s · ε < 1`.
+
+It is the *wrong* shape for an **eager** handler that *commits the hidden draw upstream*
+(at signing time) and then reads it back deterministically: at a committed state `s` the
+read-hit indicator `1_{mc ∈ slot(s)}` is `0` or `1`, never `ε`. The averaging that
+produces `ε` happened earlier, at the commit draw, and cannot be localized to any fixed
+read state.
+
+The fix carried here is to average not over a single fixed state but over a **state
+measure** `μ : PMF (σ × Bool)` — the *law* of the eager handler's slot under the pending
+upstream draws. The averaged bad mass
+
+  `avgBad impl μ oa := ∑' p, μ p · Pr[bad | (simulateQ impl oa).run p]`
+
+telescopes through the free monad exactly like `expectedQuerySlack`, but the read step's
+charge is now `∑' p, μ p · 1_{mc ∈ slot(p)} = Pr_{p∼μ}[mc ∈ slot(p)]`, a genuine
+probability over the state law. When `μ` is the pushforward of the upstream commit draws,
+this collapses (by Fubini / `tsum`-swap over the pending draws) to the *same* mass the lazy
+handler charges at the read — `probOutput_lazyGhostFire_one` is its single-pending base
+case. This is the missing-framework analogue of `expectedQuerySlack`: it carries a
+state-**law** plus an averaged-output invariant rather than a per-state resource charge.
+
+This section builds the reusable telescoping scaffold (`avgBad`, its `pure`/`query_bind`
+unfoldings, and the pushforward step law `avgBad_query_bind_eq`) and isolates the read-step
+charge as the standalone Fubini lemma the instantiation must match against the lazy run. -/
+section AveragedStateMeasureBad
+
+variable {ι : Type} {spec : OracleSpec ι}
+variable {ι' : Type} {spec' : OracleSpec ι'} [IsUniformSpec spec']
+variable {σ γ : Type}
+
+/-- **Averaged bad mass over a state measure.** The probability the bad flag is set after
+`(simulateQ impl oa).run p`, *averaged* over the starting state `p` drawn from the state
+law `μ : PMF (σ × Bool)`. This is the quantity an eager (commit-upstream) handler must be
+bounded by: the averaging happens over the state law `μ` rather than at a fixed reachable
+state, so the deterministic per-state read charge `1_{mc ∈ slot(p)}` averages to the
+genuine guessing mass `Pr_{p∼μ}[mc ∈ slot(p)]`. Specializing `μ := PMF.pure (s, false)`
+recovers the plain per-state bad probability `Pr[bad | (simulateQ impl oa).run (s, false)]`
+(see `avgBad_pure_state`). -/
+noncomputable def avgBad
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (oa : OracleComp spec γ) : ℝ≥0∞ :=
+  ∑' p : σ × Bool, μ p *
+    Pr[fun z : γ × σ × Bool => z.2.2 = true | (simulateQ impl oa).run p]
+
+/-- `avgBad` at a Dirac state measure is the plain per-state bad probability: the average
+over `PMF.pure p₀` collapses to the single term at `p₀`. This is the bridge that reduces
+the averaged invariant back to the concrete eager probability at the empty-cache start
+state (`μ = δ_∅`). -/
+lemma avgBad_pure_state
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (p₀ : σ × Bool) (oa : OracleComp spec γ) :
+    avgBad impl (PMF.pure p₀) oa =
+      Pr[fun z : γ × σ × Bool => z.2.2 = true | (simulateQ impl oa).run p₀] := by
+  rw [avgBad, tsum_eq_single p₀ (by intro p hp; rw [PMF.pure_apply, if_neg hp, zero_mul]),
+    PMF.pure_apply, if_pos rfl, one_mul]
+
+/-- **Pure base case of `avgBad`.** With no queries, the run leaves the state untouched and
+the bad mass is exactly the carried bad mass of the state law `μ` — the probability `μ`
+assigns to states with the flag already set. -/
+lemma avgBad_pure
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (x : γ) :
+    avgBad impl μ (pure x : OracleComp spec γ) =
+      ∑' p : σ × Bool, μ p * (if p.2 = true then 1 else 0) := by
+  rw [avgBad]
+  refine tsum_congr fun p => ?_
+  rw [simulateQ_pure, StateT.run_pure]
+  rcases p with ⟨s, b⟩
+  cases b with
+  | false => simp
+  | true => simp [probEvent_pure]
+
+/-- **One-step telescoping of `avgBad` (joint-law form).** Averaging the bad mass of a
+`query t >>= cont` run over the state law `μ` equals averaging, over `μ` *and* the
+per-state impl step `(impl t).run p`, the bad mass of the continuation run started from the
+post-step state. This is the averaged analogue of `expectedQuerySlack_query_bind`: it moves
+one query off the front and exposes the post-step joint law `(p, z)` over which the next
+`avgBad` is taken. No probabilistic content yet — it is a pure rearrangement
+(`probEvent_bind_eq_tsum` inside the average) and holds for *any* impl and `μ`. -/
+lemma avgBad_query_bind_eq
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (t : spec.Domain) (cont : spec.Range t → OracleComp spec γ) :
+    avgBad impl μ (query t >>= cont) =
+      ∑' p : σ × Bool, μ p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2] := by
+  rw [avgBad]
+  refine tsum_congr fun p => ?_
+  congr 1
+  have hsim : (simulateQ impl (query t >>= cont)).run p =
+      (impl t).run p >>= fun z => (simulateQ impl (cont z.1)).run z.2 := by
+    simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+      OracleQuery.cont_query, StateT.run_bind]
+  rw [hsim, probEvent_bind_eq_tsum]
+
+/-! ### Read-step Fubini charge equality (the genuine new content)
+
+The eager read at a structural ghost hit pays a *deterministic* charge `1_{mc ∈ slot(p)}`
+at the committed state `p`. The averaged-state-measure invariant turns this into a genuine
+probability by averaging over the state law `μ`:
+
+  `E_{p∼μ}[1_{mc ∈ slot(p)}] = Pr_{p∼μ}[mc ∈ slot(p)]`.
+
+When `μ` is the pushforward of the upstream commit draws into the slot, this collapses (by
+`tsum`-swap over the pending draws) to the *same* mass the lazy handler charges at the read.
+The lemmas here express that collapse abstractly: a membership-indicator average over a
+**pushforward measure** equals the draw's hit probability. The single-pending case is the
+framework analogue of the banked `probOutput_lazyGhostFire_one`. -/
+
+/-- **Single-pending read-charge Fubini equality.** Let `draw : PMF κ` be one pending draw,
+let `place : κ → σ × Bool` push a drawn value into the slot, and let `hit : σ × Bool → ℝ≥0∞`
+read the (deterministic) charge off the resulting state. Averaging the read charge over the
+pushforward law `draw.map place` equals averaging `hit ∘ place` directly over `draw`. This is
+the pure change-of-variables that moves the averaging site from the *state law* (eager view:
+the slot is already populated) to the *draw* (lazy view: the value is sampled at read time);
+the eager `1_{mc ∈ slot}` after `place` becomes the lazy `decide (w = mc)` charge under the
+draw. The multi-pending case is the `tsum`-swap over independent draws (the genuine residual
+isolated below). -/
+lemma tsum_pushforward_eq_tsum_draw {κ : Type}
+    (draw : PMF κ) (place : κ → σ × Bool) (hit : σ × Bool → ℝ≥0∞) :
+    (∑' p : σ × Bool, (draw.map place) p * hit p) =
+      ∑' w : κ, draw w * hit (place w) := by
+  classical
+  simp only [PMF.map_apply, ← ENNReal.tsum_mul_right]
+  rw [ENNReal.tsum_comm]
+  refine tsum_congr fun w => ?_
+  rw [tsum_eq_single (place w) (by intro p hp; rw [if_neg hp, zero_mul]), if_pos rfl]
+
+/-- **Membership-indicator average over a pushforward equals hit probability.** Specialize
+`tsum_pushforward_eq_tsum_draw` with the read charge being the structural membership
+indicator of the read point `mc` in the slot reached by `place`. The eager averaged
+read-hit charge `E_{p∼μ}[1_{mc ∈ slot(p)}]` (here `μ = draw.map place`, `slot` extracted by
+`testMem`) equals the draw's mass on values that `place` maps to a hit. With
+`testMem (place w) = decide (w hits mc)` this is exactly the lazy single-pending fire mass
+(`probOutput_lazyGhostFire_one`). -/
+lemma tsum_pushforward_mem_eq_draw_hit {κ : Type}
+    (draw : PMF κ) (place : κ → σ × Bool) (testMem : σ × Bool → Bool) :
+    (∑' p : σ × Bool, (draw.map place) p * (if testMem p = true then 1 else 0)) =
+      ∑' w : κ, draw w * (if testMem (place w) = true then 1 else 0) :=
+  tsum_pushforward_eq_tsum_draw draw place (fun p => if testMem p = true then 1 else 0)
+
+/-! ### Averaged-bad telescoping skeleton
+
+The fully-proven free-monad telescoping for the averaged invariant. The theorem
+`avgBad_le_of_steps` reduces the averaged eager bad mass `avgBad impl_e μ oa` to a target
+`bound : OracleComp spec γ → PMF (σ × Bool) → ℝ≥0∞` supplied by the caller (the lazy /
+deferred-sampling charge), provided two per-step premises hold:
+
+* `h_pure`: at a `pure` leaf the carried bad mass of `μ` is below the target's leaf value;
+* `h_step`: at each `query t >>= cont`, the one-step telescoped eager average
+  (`avgBad_query_bind_eq`) — i.e. the impl-`t` push of `μ` into the continuation average —
+  is dominated by the target at the same point.
+
+The proof is a pure free-monad induction: `pure` discharges by `h_pure`, and `query_bind`
+rewrites the eager side by `avgBad_query_bind_eq` and discharges by `h_step` (whose premise
+in turn folds the inductive hypothesis through the post-step law). All free-monad
+bookkeeping is handled here; the *probabilistic* content lives entirely in discharging
+`h_step` at the read query, where the caller must supply the Fubini charge equality
+(`tsum_pushforward_mem_eq_draw_hit`) recoupling the post-read state law `μ'` — the genuine
+residual isolated for the instantiation. -/
+theorem avgBad_le_of_steps
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (bound : {β : Type} → OracleComp spec β → PMF (σ × Bool) → ℝ≥0∞)
+    (h_pure : ∀ (μ : PMF (σ × Bool)) (x : γ),
+      (∑' p : σ × Bool, μ p * (if p.2 = true then 1 else 0))
+        ≤ bound (pure x : OracleComp spec γ) μ)
+    (h_step : ∀ (μ : PMF (σ × Bool)) (t : spec.Domain)
+      (cont : spec.Range t → OracleComp spec γ),
+      (∀ (μ' : PMF (σ × Bool)) (u : spec.Range t),
+        avgBad impl μ' (cont u) ≤ bound (cont u) μ') →
+      (∑' p : σ × Bool, μ p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[ fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2])
+        ≤ bound (query t >>= cont) μ)
+    (oa : OracleComp spec γ) :
+    ∀ (μ : PMF (σ × Bool)), avgBad impl μ oa ≤ bound oa μ := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro μ
+      rw [avgBad_pure]
+      exact h_pure μ x
+  | @query_bind t cont ih =>
+      intro μ
+      rw [avgBad_query_bind_eq]
+      exact h_step μ t cont (fun μ' u => ih u μ')
+
+end AveragedStateMeasureBad
+
 end OracleComp.ProgramLogic.Relational
