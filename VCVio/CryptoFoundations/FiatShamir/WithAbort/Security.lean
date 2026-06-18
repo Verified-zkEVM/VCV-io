@@ -1106,6 +1106,31 @@ lemma ghostRead_bad_le_bind_hiddenReadList
 -/
 
 open scoped Classical in
+/-- **Uniform-handler pushforward identity (inert plumbing).** The uniform branch of
+`ghostHybridImpl` is the state-fixing pushforward `(fun u => (u, p)) <$> oa` of the uniform
+draw `oa`. Averaging a functional `F` over the post-step `(output, state)` pair therefore
+collapses the state coordinate to the fixed `p`: the per-`p` inner sum equals the plain
+uniform average of `F (·, p)`. Pure measure-theoretic rearrangement (`ENNReal.tsum_prod'`,
+off-diagonal collapse, `probOutput_map_injective` on the injective `(·, p)`); no
+probabilistic content. -/
+lemma tsum_probOutput_map_state_fixed {R G : Type} (oa : ProbComp R) (p : G)
+    (F : R × G → ℝ≥0∞) :
+    (∑' z : R × G, Pr[= z | (fun u => (u, p)) <$> oa] * F z)
+      = ∑' u : R, Pr[= u | oa] * F (u, p) := by
+  classical
+  rw [ENNReal.tsum_prod']
+  refine tsum_congr fun u => ?_
+  rw [tsum_eq_single p ?_]
+  · rw [probOutput_map_injective oa (f := fun u => (u, p))
+      (fun a b h => (Prod.ext_iff.mp h).1) u]
+  · intro g hg
+    rw [probOutput_eq_zero_of_not_mem_support, zero_mul]
+    intro hmem
+    rw [support_map] at hmem
+    obtain ⟨u', _, hu'⟩ := hmem
+    exact hg (Prod.ext_iff.mp hu').2.symm
+
+open scoped Classical in
 omit [SampleableType Stmt] in
 /-- **Threaded averaged-charge accumulator (the `hAcc` engine).** A direct free-monad
 induction (telescoping via `avgBadM_query_bind_eq` / `avgBadM_pure`, reusing the banked
@@ -1132,6 +1157,7 @@ lemma avgBadM_ghostHybridImpl_le_threaded
     (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (M × Option (Commit × Resp))) :
     ∀ (ν : GhostState M Commit Chal → ℝ≥0∞) (qHb qSb : ℕ),
+      (∑' p : GhostState M Commit Chal, ν p) ≤ 1 →
       oa.IsQueryBoundP (fun t => t matches Sum.inl (Sum.inr _)) qHb →
       oa.IsQueryBoundP (fun t => t matches Sum.inr _) qSb →
       OracleComp.ProgramLogic.Relational.avgBadM
@@ -1147,11 +1173,11 @@ lemma avgBadM_ghostHybridImpl_le_threaded
   -- `curCeil ν := ⨆ mc, ∑' p, ν p · memCharge (p.1.1.2) mc`.
   induction oa using OracleComp.inductionOn with
   | pure x =>
-      intro ν qHb qSb _ _
+      intro ν qHb qSb _ _ _
       rw [OracleComp.ProgramLogic.Relational.avgBadM_pure]
       exact le_add_right le_rfl
   | @query_bind t cont ih =>
-      intro ν qHb qSb hqH hqS
+      intro ν qHb qSb hν hqH hqS
       rw [OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq]
       set RHS : ℝ≥0∞ :=
         (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
@@ -1181,16 +1207,14 @@ lemma avgBadM_ghostHybridImpl_le_threaded
                       (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont u)).run p] :=
               tsum_congr fun p => by
                 congr 1
-                -- RESIDUAL (uniform-handler pushforward plumbing). The uniform handler is
-                -- `(fun u => (u, p)) <$> unif n`, a pushforward of the uniform draw fixing the
-                -- state to `p`; the per-`p` inner sum is therefore
-                --   `∑' z, Pr[= z | (·, p) <$> unif n] · G z = ∑' u, Pr[= u | unif n] · G (u, p)`.
-                -- Pure measure-theoretic rearrangement (`ENNReal.tsum_prod'`, off-diagonal
-                -- collapse, then `probOutput_map_injective` on the injective `(·, p)`). The
-                -- `support_map` / `<$>`-keyed rewrites do not fire on the `.run`-elaborated
-                -- handler form here; this is the sole remaining plumbing gap of the inert
-                -- uniform step (no probabilistic content).
-                sorry
+                -- The uniform handler is `(fun u => (u, p)) <$> unif n`, a pushforward of the
+                -- uniform draw fixing the state to `p`; the per-`p` inner sum collapses by the
+                -- standalone pushforward identity `tsum_probOutput_map_state_fixed`.
+                rw [show (ghostHybridImpl ids M maxAttempts true pk sk (Sum.inl (Sum.inl n))).run p
+                      = (fun u => (u, p)) <$> (HasQuery.toQueryImpl (spec := unifSpec)
+                        (m := ProbComp)) n from rfl]
+                exact tsum_probOutput_map_state_fixed
+                  ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n) p _
           _ = ∑' u : unifSpec.Range n,
                 Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] *
                   OracleComp.ProgramLogic.Relational.avgBadM
@@ -1220,7 +1244,7 @@ lemma avgBadM_ghostHybridImpl_le_threaded
                 Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] * RHS :=
               ENNReal.tsum_le_tsum fun u => by
                 gcongr
-                exact hRHS ▸ ih u ν qHb qSb (hqHcont u) (hqScont u)
+                exact hRHS ▸ ih u ν qHb qSb hν (hqHcont u) (hqScont u)
           _ = RHS := by
               rw [ENNReal.tsum_mul_right]
               have h1 : (∑' u : unifSpec.Range n,
@@ -1399,13 +1423,23 @@ lemma probEvent_ghostRead_bad_le
       (fun t => t matches Sum.inr _) qS := by
     have h := (hQ pk).1
     convert h using 3
+  -- The empty Dirac start has total mass `1 ≤ 1`: the sub-probability mass invariant.
+  have hνstart : (∑' p : GhostState M Commit Chal,
+      (if p = ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+          then (1 : ℝ≥0∞) else 0)) ≤ 1 := by
+    refine le_of_eq ?_
+    rw [tsum_eq_single ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+      (fun p hp => by rw [if_neg hp])]
+    rw [if_pos rfl]
   -- Rewrite the empty-Dirac start as a single-point indicator measure and apply the engine.
   have hstart := avgBadM_ghostHybridImpl_le_threaded ids M maxAttempts ε p_abort
     hp₀ hp hε pk sk hGuess hAbort (adv.main pk)
     (fun p => if p = ((((∅, ∅), []) :
         ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
           then 1 else 0)
-    (qH + 1) qS hqHbudget hqSbudget
+    (qH + 1) qS hνstart hqHbudget hqSbudget
   refine hstart.trans ?_
   -- The Dirac measure: `carriedBad = 0` (start flag `false`) and `curCeil = 0` (empty ghost).
   have hcarried : (∑' p : GhostState M Commit Chal,
