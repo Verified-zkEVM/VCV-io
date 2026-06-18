@@ -8,6 +8,7 @@ import VCVio.CryptoFoundations.FiatShamir.WithAbort.GhostBodies
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.OracleComp.SimSemantics.StateT.StateSeparating
+import VCVio.OracleComp.QueryTracking.RandomOracle.ProbeEps
 
 /-!
 # EUF-CMA security of Fiat-Shamir with aborts
@@ -754,10 +755,23 @@ theorem relTriple_ghostHybrid_lazyGhost_sign (pk : Stmt) (sk : Wit)
   rintro a b -
   exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure hRel
 
-/-! ## The ghost-read collision charge (open) -/
+/-! ## The ghost-read collision charge (open)
+
+The ghost-read bad probability is bounded directly by the per-attempt union bound of the
+*direct route* (VEHICLE B, `ghostRead_bad_le_bind_hiddenReadList` below), which probes the
+**raw** commit draws and drops the rejection event. The earlier eager↔lazy detour
+(`Pr[bad | eager] ≤ Pr[bad | lazy]` via a deferred-sampling state-law coupling) is retired:
+the R30 correctness finding established that the eager ghost cache is populated by
+*rejection-conditioned* draws (a ghost key is written only on a rejected attempt and cleared
+on accept), so the eager↔lazy read-charge match requires an irreducible `1/Pr[reject]` skew
+cancellation. The direct route avoids that skew entirely — its per-target charge is the clean
+raw `ε` from `hGuess` — at the cost of carrying the *factorization* residual `hfac` (the same
+deferred-sampling commutation, moving each attempt's draw past the opaque adversary fold to a
+front block), which is strictly cleaner since the abstract game's `ε` matches verbatim. -/
 
 omit [SampleableType Stmt] in
-/-- **Eager↔lazy ghost-read bad dominance** (the single genuine residual of #228).
+/-- **Eager↔lazy ghost-read bad dominance** (retired detour; superseded by the direct route
+`ghostRead_bad_le_bind_hiddenReadList`).
 
 The eager ghost handler `ghostHybridImpl … true` and the deferred-sampling handler
 `lazyGhostHybridImpl` run the *same* `ghostSignBody` and forward uniform queries
@@ -982,6 +996,77 @@ lemma eagerGhostRead_bad_le_lazyGhostRead_bad (pk : Stmt) (sk : Wit) :
       rwa [OracleComp.ProgramLogic.Relational.avgBad_pure_state,
         OracleComp.ProgramLogic.Relational.avgBad_pure_state] at hih
 
+/-! ## Direct route: the RAW-draw factorization residual
+
+The mandated direct route (VEHICLE B) bounds the eager ghost-read bad probability
+*directly* by a per-attempt union bound that **drops the rejection event** and probes the
+**raw** commit draws, sidestepping the rejection skew of the eager↔lazy comparison
+(`eagerGhostRead_bad_le_lazyGhostRead_bad`). The argument is:
+
+```
+Pr[eager bad]
+  = Pr[some adversarial read hits some ghost key]
+  ≤ Pr[some read hits some ATTEMPT commit-draw]   -- ghost cache ⊆ {all attempt draws};
+                                                     accept-clearing only shrinks it
+  ≤ Pr[true | kn >>= hiddenReadList (Prod.fst <$> ids.commit pk sk) (qH+1) σ]
+  ≤ E[#attempts] · (qH+1) · ε                     -- `probEvent_bind_hiddenReadList_le`
+  ≤ (qS/(1-p)) · (qH+1) · ε = target.             -- `hiddenReadList_fold_le_target`
+```
+
+Here `oa := Prod.fst <$> ids.commit pk sk` so that `hGuess` supplies the per-target mass
+bound `∀ a, Pr[= a | oa] ≤ ε` **directly on the RAW commit draw** — there is no
+rejection conditioning, hence no `1/Pr[reject]` skew (the decisive R30 correctness finding
+that refuted the eager↔lazy match). The accepting attempt's draw is over-counted into the
+attempt-draw set, but that is a valid (and exactly target-tight) upper bound; the rejection
+event is dropped via `Pr[reject | key = mc] ≤ 1`.
+
+The *entire downstream arithmetic* — averaging the random attempt count against the fixed-`n`
+multi-key bound (`OracleComp.probEvent_bind_hiddenReadList_le`) and folding it into the target
+(`hiddenReadList_fold_le_target`) — is banked and axiom-clean. The single residual carried by
+`ghostRead_bad_le_bind_hiddenReadList` below is the **factorization** `hfac`: exhibiting the
+eager run's bad marginal as the abstract front-loaded game `kn >>= hiddenReadList oa (qH+1) σ`
+with the attempt-count law `kn` of mean `≤ qS/(1-p)`. This is the deferred-sampling commutation
+— moving each attempt's commit draw, which in the concrete run happens *inside* the opaque
+`simulateQ (adv.main pk)` fold interleaved with the adversary's reads, to an independent front
+block whose subsequent reads become the deterministic all-miss strategy `σ`. The direct route
+**removes the rejection skew** (the per-target charge is now the clean raw `ε`), but the
+*commutation itself* remains: the attempt draws are entangled with the adversary fold, and
+front-loading them past that opaque fold is the genuine PMF×PMF distributional-coupling content.
+This is strictly cleaner than the skewed eager↔lazy `sorry` it isolates: the residual is now a
+single RAW-draw factorization with the abstract game's `ε` matched verbatim by `hGuess`. -/
+omit [SampleableType Stmt] in
+lemma ghostRead_bad_le_bind_hiddenReadList
+    (qS qH : ℕ) (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (hε : 0 ≤ ε)
+    (hQ : ∀ pk, FiatShamir.signHashQueryBound M
+      (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
+    (pk : Stmt) (sk : Wit)
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort) :
+    ∃ (kn : ProbComp ℕ) (σ : List Bool → Commit),
+      (∑' n : ℕ, Pr[= n | kn] * (n : ℝ≥0∞)) ≤ ENNReal.ofReal (qS / (1 - p_abort)) ∧
+      Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+          (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
+            ((((∅, ∅), []) :
+              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+                List M), false)]
+        ≤ Pr[(fun b : Bool => b = true) |
+            kn >>= fun n => OracleComp.hiddenReadList (Prod.fst <$> ids.commit pk sk)
+              (qH + 1) σ n] := by
+  classical
+  -- RESIDUAL (the deferred-sampling commutation with RAW draws). Provide:
+  --   * `kn`  : the run's attempt-count law (mean `≤ qS/(1-p)` — banked aggregate
+  --             `tsum_probOutput_commit_mul_abort_le` + geometric sum, identical to the
+  --             closed lazy assembly's `g ≤ 1/(1-p)` step);
+  --   * `σ`   : the adversary's all-miss read strategy on the accumulating ghost cache;
+  --   * `hfac`: the factorization exhibiting `Pr[eager bad]` as the front-loaded game.
+  -- The over-approximation `eager bad ⟹ some read hits some ATTEMPT commit-draw` drops the
+  -- rejection event (so each target is a RAW `ids.commit` draw, charged by `hGuess` with no
+  -- skew); front-loading those draws past the opaque `simulateQ (adv.main pk)` fold is the
+  -- remaining commutation. Banked everywhere downstream (`probEvent_bind_hiddenReadList_le`,
+  -- `hiddenReadList_fold_le_target`); see `probEvent_ghostRead_bad_le`.
+  sorry
+
 omit [SampleableType Stmt] in
 /-- **Ghost-read collision bound** for the Prog → Trans hop: the probability that the
 adversary ever queries the random oracle at a ghost point (a rejected signing attempt's
@@ -1015,73 +1100,29 @@ lemma probEvent_ghostRead_bad_le
               List M), false)]
       ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
   classical
-  -- (A) is PROVEN: the deferred-sampling (lazy) handler's bad-flag probability is bounded.
-  have h_lazy :
-      Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
-          (simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (adv.main pk)).run
-            ((((∅, ∅), []) :
-              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
-                List M), false)]
-        ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) :=
-    probEvent_lazyGhostHybridImpl_bad_le ids hr M maxAttempts adv qS qH ε p_abort
+  -- DIRECT ROUTE (VEHICLE B). Bound `Pr[eager bad]` directly by the per-attempt union bound
+  -- over RAW commit draws, dropping the rejection event. The factorization residual
+  -- `ghostRead_bad_le_bind_hiddenReadList` supplies the attempt-count law `kn` (mean
+  -- `≤ qS/(1-p)`), the all-miss read strategy `σ`, and the factorization `hfac` exhibiting the
+  -- eager bad marginal as the front-loaded game `kn >>= hiddenReadList oa (qH+1) σ` with
+  -- `oa := Prod.fst <$> ids.commit pk sk`. Everything downstream is banked: averaging the random
+  -- count against the fixed-`n` multi-key bound (`probEvent_bind_hiddenReadList_le`, giving
+  -- `E[n]·(qH+1)·ε`) and folding to the target (`hiddenReadList_fold_le_target`). The `ε` of the
+  -- abstract game is matched verbatim by `hGuess` on the RAW draw — no rejection skew.
+  obtain ⟨kn, σ, hmean, hfac⟩ :=
+    ghostRead_bad_le_bind_hiddenReadList ids hr M maxAttempts adv qS qH ε p_abort
       hp₀ hp hε hQ pk sk hGuess hAbort
-  -- (B) RESIDUAL: the eager↔lazy bad-flag equivalence. The eager handler
-  -- `ghostHybridImpl … true` and the deferred-sampling handler `lazyGhostHybridImpl` are
-  -- definitionally identical on uniform queries (`lazyGhostHybridImpl_run_unif_eq`) and on
-  -- signing queries (`lazyGhostHybridImpl_run_sign_eq`); the *entire* distributional gap is
-  -- the adversarial random-oracle read step `.inl (.inr mc)`:
-  --   * eager: a ghost hit `s.1.1.2 mc = some v` runs `pure (v, (s.1, true))` — the bad flag
-  --     flips DETERMINISTICALLY (mass 1) on the structural cache match, the cache key `w` of
-  --     which was sampled `w ← ids.commit` during a rejected signing attempt;
-  --   * lazy: the read draws `lazyGhostFire (enncard ghost)` and fires with prob `≤ enncard·ε`,
-  --     answering from the real layer via `roStep`.
-  -- These two read steps have the SAME bad-flag marginal under the never-read-before-write
-  -- deferred-sampling commutation: a programmed ghost point `(msg, w)` is only ever READ
-  -- (never re-keyed/overwritten — see `ghostHybridImpl_preserves_signed_inv`), so postponing
-  -- its draw `w ← ids.commit` from signing time to read time preserves the joint law of the
-  -- bad flag. Closing this requires a global induction on `adv.main pk` carrying a deferred-
-  -- sampling invariant relating the eager ghost cache (concrete sampled keys) to the lazy
-  -- pending count, in the term-equality style of `run_ghostSignBody_overlay` /
-  -- `run_ghostSignBody_fst`. It is NOT reducible to a per-state handler equality
-  -- (`probOutput_simulateQ_run_eq_of_impl_eq_preservesInv`) — the read handlers genuinely
-  -- diverge on the bad-flag marginal at every reachable non-empty-ghost state — nor to a
-  -- per-query state coupling (`relTriple_simulateQ_run`), since the eager world has already
-  -- committed the sampled keys into the state; the commutation moves the *sampling site*,
-  -- changing the structure of the computation, not merely the state relation. This is the
-  -- single remaining blocker, the genuine multi-week probabilistic content. Bounding the
-  -- eager probability by the lazy one suffices to close the leaf via `h_lazy`.
-  have h_eager_le_lazy :
-      Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
-          (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
-            ((((∅, ∅), []) :
-              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
-                List M), false)]
-        ≤ Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
-            (simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (adv.main pk)).run
-              ((((∅, ∅), []) :
-                ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
-                  List M), false)] := by
-    -- The eager↔lazy bad-flag dominance is the single genuine residual of #228. It is the
-    -- joint-law (deferred-sampling) statement `eagerGhostRead_bad_le_lazyGhostRead_bad`,
-    -- isolated below as its own lemma so that the precise obligation — and precisely why
-    -- neither banked framework induction discharges it — is documented in one place rather
-    -- than diffused across two per-branch `sorry`s inside a provably-insufficient framework
-    -- call. See that lemma's docstring for the full obstruction analysis.
-    --
-    -- Direct-route note. The mandated alternative replaces this `eager ≤ lazy` detour by
-    -- `eager ≤ hiddenReadList ≤ target`, where the right-hand arithmetic step is the banked,
-    -- axiom-clean `hiddenReadList_fold_le_target` (`∑ₖ P k · k·(qH+1)·ε ≤ target` when the
-    -- key-count mean is `≤ qS/(1-p)`) composed with the banked multi-key first-fire bound
-    -- `OracleComp.probEvent_hiddenReadList_le` (`≤ n·(qH+1)·ε`). That direct route does *not*
-    -- close the leaf either: its `eager ≤ hiddenReadList` connection (the bad-event
-    -- over-approximation `[D1]` plus the draw-deferral factorization `[D2]`) is the *same*
-    -- deferred-sampling commutation as this `eager ≤ lazy` dominance — both move the
-    -- signing-time ghost-key sampling site past the opaque `simulateQ (adv.main pk)` fold to
-    -- read time, the multi-week PMF×PMF distributional-coupling content. The fold half of the
-    -- direct route is banked (`hiddenReadList_fold_le_target`); the connection half coincides
-    -- with this residual.
-    exact eagerGhostRead_bad_le_lazyGhostRead_bad ids hr M maxAttempts adv pk sk
-  exact h_eager_le_lazy.trans h_lazy
+  refine hfac.trans ?_
+  -- Average the random attempt count against the fixed-`n` bound (`E[n]·(qH+1)·ε`), then fold
+  -- to the target via `hiddenReadList_fold_le_target` at `P := fun n => Pr[= n | kn]`.
+  refine (OracleComp.probEvent_bind_hiddenReadList_le
+    (oa := Prod.fst <$> ids.commit pk sk) (ε := ENNReal.ofReal ε)
+    hGuess (qH + 1) σ kn).trans ?_
+  -- `E[n]·((qH+1)·ε) = ∑' n, P n · (n · ((qH+1)·ε)) ≤ target` by the banked fold.
+  rw [← ENNReal.tsum_mul_right]
+  refine le_trans (le_of_eq (tsum_congr fun n => ?_))
+    (hiddenReadList_fold_le_target qS qH ε p_abort hp (fun n => Pr[= n | kn]) hmean)
+  rw [mul_assoc, Nat.cast_add, Nat.cast_one]
 
 /-! ## Hop lemmas
 
