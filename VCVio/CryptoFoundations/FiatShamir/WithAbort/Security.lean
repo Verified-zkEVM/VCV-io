@@ -1278,6 +1278,76 @@ def ghostChargeInv (ε : ℝ) (ν : GhostState M Commit Chal → ℝ≥0∞) : P
       ≤ ghostChargeK M ν * ENNReal.ofReal ε
 
 omit [SampleableType Stmt] in
+/-- A step that never writes the ghost layer and preserves the bad flag (uniform forward, or a
+signing step — whose handler leaves `s.2` untouched) preserves the per-state expected bad
+mass: the post-step flag equals the pre-step flag with probability one (mass `≤ 1`). -/
+lemma ghostHybridImpl_flag_preserved_le {γ : Type}
+    (run : ProbComp (γ × GhostState M Commit Chal)) (p : GhostState M Commit Chal)
+    (hflag : ∀ z ∈ support run, z.2.2 = p.2) :
+    (∑' z : γ × GhostState M Commit Chal, Pr[= z | run] * (if z.2.2 = true then 1 else 0))
+      ≤ (if p.2 = true then 1 else 0) := by
+  classical
+  calc (∑' z : γ × GhostState M Commit Chal, Pr[= z | run] * (if z.2.2 = true then 1 else 0))
+      = ∑' z : γ × GhostState M Commit Chal, Pr[= z | run] * (if p.2 = true then 1 else 0) := by
+        refine tsum_congr fun z => ?_
+        by_cases hz : z ∈ support run
+        · rw [hflag z hz]
+        · rw [probOutput_eq_zero_of_not_mem_support hz, zero_mul, zero_mul]
+    _ = (∑' z : γ × GhostState M Commit Chal, Pr[= z | run]) * (if p.2 = true then 1 else 0) := by
+        rw [ENNReal.tsum_mul_right]
+    _ ≤ (if p.2 = true then 1 else 0) :=
+        mul_le_of_le_one_left zero_le' tsum_probOutput_le_one
+
+omit [SampleableType Stmt] in
+/-- Per-state read-step bad-mass bound: the eager read sets the bad flag only on a ghost hit,
+so the expected post-step bad mass is at most the pre-step flag plus the membership charge of
+the read target. -/
+lemma ghostHybridImpl_read_expected_flag_le (pk : Stmt) (sk : Wit)
+    (mc : M × Commit) (p : GhostState M Commit Chal) :
+    (∑' z : Chal × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+          (if z.2.2 = true then 1 else 0))
+      ≤ (if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc := by
+  classical
+  -- On a miss the post-step flag is preserved; on a hit it is forced true. In both cases the
+  -- post-step flag is `≤ p.2 ∨ (ghost hit at mc)` — captured by `memCharge`.
+  have hflag : ∀ z ∈ support ((ghostHybridImpl ids M maxAttempts true pk sk
+      (.inl (.inr mc))).run p),
+      (if z.2.2 = true then (1 : ℝ≥0∞) else 0)
+        ≤ (if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc := by
+    intro z hz
+    simp only [ghostHybridImpl, StateT.run_mk] at hz
+    rcases hgh : p.1.1.2 mc with _ | v
+    · -- Miss: flag preserved, `memCharge = 0`.
+      simp only [hgh, support_map] at hz
+      obtain ⟨cu, -, rfl⟩ := hz
+      show (if p.2 = true then (1 : ℝ≥0∞) else 0) ≤ _
+      exact le_add_right le_rfl
+    · -- Hit: flag forced true, `memCharge = 1`.
+      simp only [hgh, ↓reduceIte, support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      rw [show memCharge M p.1.1.2 mc = 1 by simp [memCharge, hgh]]
+      exact le_add_self
+  calc (∑' z : Chal × GhostState M Commit Chal,
+          Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+            (if z.2.2 = true then 1 else 0))
+      ≤ ∑' z : Chal × GhostState M Commit Chal,
+          Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+            ((if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc) := by
+        refine ENNReal.tsum_le_tsum fun z => ?_
+        by_cases hz : z ∈ support ((ghostHybridImpl ids M maxAttempts true pk sk
+            (.inl (.inr mc))).run p)
+        · exact mul_le_mul_left' (hflag z hz) _
+        · exact le_of_eq (mul_eq_zero.mpr (Or.inl (probOutput_eq_zero_of_not_mem_support hz))) |>.trans
+            zero_le'
+    _ = (∑' z : Chal × GhostState M Commit Chal,
+          Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p]) *
+          ((if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc) := by
+        rw [ENNReal.tsum_mul_right]
+    _ ≤ (if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc :=
+        mul_le_of_le_one_left zero_le' tsum_probOutput_le_one
+
+omit [SampleableType Stmt] in
 /-- **`h_carry` premise of the threaded bound for the ghost handler.** The carried bad mass
 telescopes across one step, paying the read hit charge `≤ K ν · ofReal ε` on a read step
 (via the invariant `ghostChargeInv`). Uniform/sign steps preserve the carried bad mass. -/
@@ -1298,7 +1368,42 @@ lemma avgBadM_ghostHybridImpl_threaded_carry
       ≤ (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
           (if (t matches Sum.inl (Sum.inr _)) then
             ghostChargeK M ν * ENNReal.ofReal ε else 0) := by
-  sorry
+  classical
+  -- Rewrite the telescoped carried-bad mass as the weighted post-step bad mass.
+  rw [OracleComp.ProgramLogic.Relational.tsum_tsum_postStepOutM_mul
+    (ghostHybridImpl ids M maxAttempts true pk sk) ν t (fun s => if s.2 = true then 1 else 0)]
+  rcases t with (n | mc) | msg
+  · -- Uniform step: flag preserved.
+    rw [if_neg (by simp), add_zero]
+    refine ENNReal.tsum_le_tsum fun p => mul_le_mul_left' ?_ _
+    refine ghostHybridImpl_flag_preserved_le M _ p ?_
+    intro z hz
+    simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨_, -, rfl⟩ := hz; rfl
+  · -- Read step: pays the per-target membership charge, bounded via the invariant by `K ν · ε`.
+    rw [if_pos (by simp)]
+    calc (∑' p : GhostState M Commit Chal, ν p *
+            ∑' z : Chal × GhostState M Commit Chal,
+              Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+                (if z.2.2 = true then 1 else 0))
+        ≤ ∑' p : GhostState M Commit Chal, ν p *
+            ((if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc) :=
+          ENNReal.tsum_le_tsum fun p => mul_le_mul_left'
+            (ghostHybridImpl_read_expected_flag_le ids M maxAttempts pk sk mc p) _
+      _ = (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
+            ∑' p : GhostState M Commit Chal, ν p * memCharge M p.1.1.2 mc := by
+          rw [← ENNReal.tsum_add]; exact tsum_congr fun p => by rw [mul_add]
+      _ ≤ (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
+            ghostChargeK M ν * ENNReal.ofReal ε := by
+          gcongr
+          exact _hInv mc
+  · -- Sign step: the signing handler leaves `s.2` untouched, so the flag is preserved.
+    rw [if_neg (by simp), add_zero]
+    refine ENNReal.tsum_le_tsum fun p => mul_le_mul_left' ?_ _
+    refine ghostHybridImpl_flag_preserved_le M _ p ?_
+    intro z hz
+    simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
+    obtain ⟨_, -, rfl⟩ := hz; rfl
 
 omit [SampleableType Stmt] in
 /-- **`h_K` premise of the threaded bound for the ghost handler.** The ghost-size accumulator
