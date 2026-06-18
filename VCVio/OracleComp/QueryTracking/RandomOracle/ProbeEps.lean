@@ -226,4 +226,67 @@ theorem readManyList_true_iff (ws : List R) (q : ℕ) (σ : List Bool → R) :
     readManyList ws q σ = true ↔ ∃ w ∈ ws, readMany w q σ = true := by
   simp [readManyList, List.any_eq_true]
 
+/-- Appending a fixed OR-flag `q` to a Boolean draw raises the firing probability by at most the
+mass of `q` (i.e. `1` when `q = true`, `0` otherwise) over the residual draw. -/
+theorem probEvent_bind_const_or_pure (q : Bool) (mb : ProbComp Bool) :
+    Pr[(fun c : Bool => c = true) | mb >>= fun b => pure (q || b)]
+      ≤ Pr[(fun c : Bool => c = true) | (pure q : ProbComp Bool)]
+        + Pr[(fun c : Bool => c = true) | mb] := by
+  cases q with
+  | true => simp
+  | false => simp
+
+/-- The probabilistic multi-key game: draw `n` hidden targets independently from `oa`, one per
+rejected signing attempt, and probe each by the same `q` adaptive reads; fire iff some read hits
+some target. This is the accumulating-ghost-cache form of `hiddenReadMany`. -/
+noncomputable def hiddenReadList (oa : ProbComp R) (q : ℕ) (σ : List Bool → R) :
+    ℕ → ProbComp Bool
+  | 0 => pure false
+  | n + 1 => do
+    let w ← oa
+    let b ← hiddenReadList oa q σ n
+    pure (readMany w q σ || b)
+
+/-- **Multi-key hidden-target first-fire bound.** Drawing `n` independent hidden targets from `oa`
+(each outcome of mass at most `ε`) and probing each by `q` adaptive reads fires with probability at
+most `n · q · ε`. Proved by induction on `n`: the head key's contribution is the single-target
+bound `probEvent_hiddenReadMany_le` (`≤ q · ε`), the tail's is the inductive hypothesis
+(`≤ n · q · ε`), combined by the OR-append step `probEvent_bind_const_or_pure`. This is the form
+that bounds the eager ghost run's bad probability once the run is factored so that each rejected
+signing attempt's key draw is read off as an independent `hiddenReadMany` target. -/
+theorem probEvent_hiddenReadList_le {oa : ProbComp R} {ε : ℝ≥0∞} (hε : ∀ r : R, Pr[= r | oa] ≤ ε)
+    (q : ℕ) (σ : List Bool → R) (n : ℕ) :
+    Pr[(fun b : Bool => b = true) | hiddenReadList oa q σ n] ≤ (n : ℝ≥0∞) * ((q : ℝ≥0∞) * ε) := by
+  induction n with
+  | zero => simp [hiddenReadList]
+  | succ n ih =>
+    rw [hiddenReadList, probEvent_bind_eq_tsum]
+    have hsplit : ∀ w : R,
+        Pr[= w | oa] * Pr[(fun c : Bool => c = true) |
+            hiddenReadList oa q σ n >>= fun b => pure (readMany w q σ || b)]
+          ≤ Pr[= w | oa] * Pr[(fun c : Bool => c = true) | (pure (readMany w q σ) : ProbComp Bool)]
+            + Pr[= w | oa] * Pr[(fun c : Bool => c = true) | hiddenReadList oa q σ n] := by
+      intro w
+      rw [← mul_add]
+      gcongr
+      exact probEvent_bind_const_or_pure (readMany w q σ) (hiddenReadList oa q σ n)
+    refine le_trans (ENNReal.tsum_le_tsum hsplit) ?_
+    rw [ENNReal.tsum_add]
+    have h1 : (∑' w : R, Pr[= w | oa] *
+        Pr[(fun c : Bool => c = true) | (pure (readMany w q σ) : ProbComp Bool)])
+        = Pr[(fun b : Bool => b = true) | hiddenReadMany oa q σ] := by
+      rw [hiddenReadMany, probEvent_bind_eq_tsum]
+    have h2 : (∑' w : R, Pr[= w | oa] *
+        Pr[(fun c : Bool => c = true) | hiddenReadList oa q σ n])
+        ≤ Pr[(fun c : Bool => c = true) | hiddenReadList oa q σ n] := by
+      rw [ENNReal.tsum_mul_right]
+      exact mul_le_of_le_one_left zero_le' tsum_probOutput_le_one
+    rw [h1]
+    calc Pr[(fun b : Bool => b = true) | hiddenReadMany oa q σ]
+          + (∑' w : R, Pr[= w | oa] *
+              Pr[(fun c : Bool => c = true) | hiddenReadList oa q σ n])
+        ≤ (q : ℝ≥0∞) * ε + (n : ℝ≥0∞) * ((q : ℝ≥0∞) * ε) :=
+          add_le_add (probEvent_hiddenReadMany_le hε q σ) (le_trans h2 ih)
+      _ = (↑(n + 1) : ℝ≥0∞) * ((q : ℝ≥0∞) * ε) := by push_cast; ring
+
 end OracleComp
