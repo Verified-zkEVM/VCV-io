@@ -612,6 +612,69 @@ private lemma probEvent_bad_eq
         rw [← h2]; exact ENNReal.add_sub_cancel_right
           (ne_top_of_le_ne_top one_ne_top probEvent_le_one)
 
+omit [IsUniformSpec spec] in
+/-- **Marginal stochastic dominance through `simulateQ` (self-referential / Fubini form).**
+
+The marginal counterpart of `relTriple_simulateQ_run_mono`. Where the latter demands a
+*pointwise* per-step coupling whose support respects an output-and-state relation, this lemma
+demands only a *marginal* per-step inequality: at every query and every pair of `R`-related
+states, the one-step run of `impl₁` followed by *any* left tail `k₁` has bad-marginal at most
+the one-step run of `impl₂` followed by *any* right tail `k₂`, provided the two tails are
+themselves marginally bad-dominated from every pair of `R`-related successor states.
+
+This is the right shape when the two handlers genuinely diverge on the answer distribution at a
+single step (e.g. an eager deterministic ghost read vs. a deferred-sampling read), so no
+pointwise coupling can dominate the bad flag at that step, yet the *marginal* bad mass — the
+`tsum` over the deferred draw, taken before the divergent continuation is applied — is still
+ordered (Fubini / tsum-swap). The per-step premise is self-referential by design: discharging
+it at the divergent step is exactly the marginal draw-commutation, the hard content this lemma
+isolates from the free-monad bookkeeping.
+
+The base hypothesis `h_base` (`R s₁ s₂ → bad₁ s₁ → bad₂ s₂`) discharges the `pure` leaf, where no
+further step can repair the bad flag: there the bad marginal is exactly the indicator of the
+current state, so `R` must already carry the bad implication. -/
+theorem probEvent_marginal_simulateQ_mono
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
+    {σ₁ σ₂ : Type}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
+    (R : σ₁ → σ₂ → Prop)
+    (bad₁ : σ₁ → Prop) (bad₂ : σ₂ → Prop)
+    (h_base : ∀ (s₁ : σ₁) (s₂ : σ₂), R s₁ s₂ → bad₁ s₁ → bad₂ s₂)
+    (h_step : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂), R s₁ s₂ →
+      ∀ {γ : Type} (k₁ : (spec.Range t × σ₁) → OracleComp spec₁ (γ × σ₁))
+        (k₂ : (spec.Range t × σ₂) → OracleComp spec₂ (γ × σ₂)),
+        (∀ (u : spec.Range t) (s₁' : σ₁) (s₂' : σ₂), R s₁' s₂' →
+          Pr[ fun z => bad₁ z.2 | k₁ (u, s₁')] ≤ Pr[ fun z => bad₂ z.2 | k₂ (u, s₂')]) →
+        Pr[ fun z => bad₁ z.2 | (impl₁ t).run s₁ >>= k₁] ≤
+          Pr[ fun z => bad₂ z.2 | (impl₂ t).run s₂ >>= k₂])
+    (oa : OracleComp spec α) (s₁ : σ₁) (s₂ : σ₂) (hR : R s₁ s₂) :
+    Pr[fun z => bad₁ z.2 | (simulateQ impl₁ oa).run s₁] ≤
+      Pr[fun z => bad₂ z.2 | (simulateQ impl₂ oa).run s₂] := by
+  classical
+  induction oa using OracleComp.inductionOn generalizing s₁ s₂ with
+  | pure a =>
+    simp only [simulateQ_pure, StateT.run_pure]
+    -- both sides are point masses on `(a, s₁)` / `(a, s₂)`; reduce to the base implication.
+    by_cases hb : bad₁ s₁
+    · have hb₂ : bad₂ s₂ := h_base s₁ s₂ hR hb
+      calc Pr[fun z => bad₁ z.2 | (pure (a, s₁) : OracleComp spec₁ (α × σ₁))]
+          ≤ 1 := probEvent_le_one
+        _ = Pr[fun z => bad₂ z.2 | (pure (a, s₂) : OracleComp spec₂ (α × σ₂))] := by
+            rw [probEvent_pure]; simp [hb₂]
+    · rw [probEvent_pure]
+      simp [hb]
+  | query_bind t ob ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+      id_map, StateT.run_bind]
+    refine h_step t s₁ s₂ hR
+      (fun p => (simulateQ impl₁ (ob p.1)).run p.2)
+      (fun p => (simulateQ impl₂ (ob p.1)).run p.2) ?_
+    intro u s₁' s₂' hR'
+    exact ih u s₁' s₂' hR'
+
 /-- The fundamental lemma of game playing: if two oracle implementations agree whenever
 a "bad" flag is unset, then the total variation distance between the two simulations
 is bounded by the probability that bad gets set.
