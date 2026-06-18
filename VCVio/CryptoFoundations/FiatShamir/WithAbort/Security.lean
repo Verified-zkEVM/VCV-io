@@ -1464,6 +1464,179 @@ lemma avgBadM_ghostHybridImpl_threaded_K
     gcongr
     exact ghostHybridImpl_sign_expected_enncard_le ids M maxAttempts pk sk msg hAbort hp₀ hp p
 
+/-! ## Measure-level eager↔lazy coupling engine
+
+The headline ghost-read bad bound is reached by dominating the *eager* averaged bad mass by
+the *lazy* averaged bad mass and chaining the proven lazy bound
+`probEvent_lazyGhostHybridImpl_bad_le`. The two handlers `ghostHybridImpl … true` and
+`lazyGhostHybridImpl` carry the **same** `GhostState`, run the **same** `ghostSignBody`, and
+forward uniform queries identically (`lazyGhostHybridImpl_run_sign_eq`,
+`lazyGhostHybridImpl_run_unif_eq`); the entire eager↔lazy distributional gap is localized to
+the adversarial random-oracle read step.
+
+`avgBadM_eager_le_lazy_joint` is the reusable free-monad telescoping engine for this
+comparison. It carries a **two-measure coupling invariant** `Inv νe νl` through the induction:
+the uniform and signing steps preserve `Inv` on the per-output post-step measures (the
+handlers are definitionally identical there, so `postStepOutM` agrees and `Inv` is threaded
+unchanged), the pure leaf compares the carried bad mass under `Inv`, and the read step
+supplies the single genuine deferred-sampling inequality — the eager read's averaged ghost-hit
+marginal over `νe` dominated by the lazy read's deferred-fire marginal over `νl`, with the
+invariant-conditional inductive hypothesis available for the continuations.
+
+A per-state (single-measure, `νe = νl`) version of the read inequality is **false** — at a
+committed ghost-hit state the eager read flips the bad flag with mass `1` while the lazy read
+fires with sub-unit mass — so the two-measure coupling (averaging the signing-time commit draw
+into `νe` versus the read-time redraw of `νl`) is essential. -/
+
+omit [SampleableType Stmt] in
+/-- **Two-measure eager↔lazy averaged-bad coupling engine.** Threads a coupling invariant
+`Inv : (state-measure) → (state-measure) → Prop` through the free-monad induction on `oa`:
+
+* `h_step_eq`: a non-read step (uniform forward or signing query) preserves `Inv` on the
+  per-output post-step measures. The eager and lazy handlers are definitionally identical on
+  these steps, so the two `postStepOutM` measures are produced by the same map and `Inv` is
+  threaded across them.
+* `h_pure`: at a pure leaf the carried bad mass of `νe` is dominated by that of `νl` (under
+  `Inv`).
+* `h_read`: at a random-oracle read step, the eager read's averaged ghost-hit bad marginal
+  over `νe` is dominated by the lazy read's deferred-fire marginal over `νl` (under `Inv`),
+  with the invariant-conditional inductive hypothesis on the continuations available.
+
+Given these, `avgBadM eager νe oa ≤ avgBadM lazy νl oa` for every `Inv`-related pair. This is
+the measure-level coupling vehicle: the read-step averaging (signing-time draw into `νe`
+versus read-time redraw of `νl`) is exactly what the per-output post-step *measures* (not
+per-state Diracs) carry, which is why a per-state comparison cannot replace it. -/
+lemma avgBadM_eager_le_lazy_joint (pk : Stmt) (sk : Wit)
+    (Inv : (GhostState M Commit Chal → ℝ≥0∞) → (GhostState M Commit Chal → ℝ≥0∞) → Prop)
+    (h_step_eq : ∀ (νe νl : GhostState M Commit Chal → ℝ≥0∞), Inv νe νl →
+      ∀ (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain),
+        (¬ t matches Sum.inl (Sum.inr _)) →
+        ∀ u, Inv (OracleComp.ProgramLogic.Relational.postStepOutM
+                (ghostHybridImpl ids M maxAttempts true pk sk) νe t u)
+              (OracleComp.ProgramLogic.Relational.postStepOutM
+                (lazyGhostHybridImpl ids M maxAttempts pk sk) νl t u))
+    (h_read : ∀ (νe νl : GhostState M Commit Chal → ℝ≥0∞), Inv νe νl →
+      ∀ (mc : M × Commit)
+        (cont : Chal → OracleComp ((unifSpec + (M × Commit →ₒ Chal)) +
+          (M →ₒ Option (Commit × Resp))) (M × Option (Commit × Resp))),
+        (∀ u νe' νl', Inv νe' νl' →
+          OracleComp.ProgramLogic.Relational.avgBadM
+              (ghostHybridImpl ids M maxAttempts true pk sk) νe' (cont u)
+            ≤ OracleComp.ProgramLogic.Relational.avgBadM
+              (lazyGhostHybridImpl ids M maxAttempts pk sk) νl' (cont u)) →
+        (∑' p : GhostState M Commit Chal, νe p *
+            ∑' z : Chal × GhostState M Commit Chal,
+              Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk
+                  (Sum.inl (Sum.inr mc))).run p] *
+                Pr[ fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
+                    w.2.2 = true |
+                  (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run z.2])
+          ≤ ∑' p : GhostState M Commit Chal, νl p *
+            ∑' z : Chal × GhostState M Commit Chal,
+              Pr[= z | (lazyGhostHybridImpl ids M maxAttempts pk sk
+                  (Sum.inl (Sum.inr mc))).run p] *
+                Pr[ fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
+                    w.2.2 = true |
+                  (simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (cont z.1)).run z.2])
+    (h_pure : ∀ (νe νl : GhostState M Commit Chal → ℝ≥0∞), Inv νe νl →
+      ∀ _x : M × Option (Commit × Resp),
+        (∑' p : GhostState M Commit Chal, νe p * (if p.2 = true then 1 else 0))
+            ≤ ∑' p : GhostState M Commit Chal, νl p * (if p.2 = true then 1 else 0))
+    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (M × Option (Commit × Resp))) :
+    ∀ νe νl : GhostState M Commit Chal → ℝ≥0∞, Inv νe νl →
+      OracleComp.ProgramLogic.Relational.avgBadM
+          (ghostHybridImpl ids M maxAttempts true pk sk) νe oa
+        ≤ OracleComp.ProgramLogic.Relational.avgBadM
+          (lazyGhostHybridImpl ids M maxAttempts pk sk) νl oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro νe νl hInv
+      rw [OracleComp.ProgramLogic.Relational.avgBadM_pure,
+        OracleComp.ProgramLogic.Relational.avgBadM_pure]
+      exact h_pure νe νl hInv x
+  | @query_bind t cont ih =>
+      intro νe νl hInv
+      rcases t with (n | mc) | msg
+      · rw [OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq_tsum_output,
+          OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq_tsum_output]
+        refine ENNReal.tsum_le_tsum fun u => ?_
+        exact ih u _ _ (h_step_eq νe νl hInv (Sum.inl (Sum.inl n)) (by simp) u)
+      · rw [OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq,
+          OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq]
+        exact h_read νe νl hInv mc cont (fun u νe' νl' h => ih u νe' νl' h)
+      · rw [OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq_tsum_output,
+          OracleComp.ProgramLogic.Relational.avgBadM_query_bind_eq_tsum_output]
+        refine ENNReal.tsum_le_tsum fun u => ?_
+        exact ih u _ _ (h_step_eq νe νl hInv (Sum.inr msg) (by simp) u)
+
+omit [SampleableType Stmt] in
+/-- **Measure-level eager↔lazy ghost-read bad dominance** (the genuine deferred-sampling
+residual of #228). At the empty-cache Dirac start, the eager ghost handler's run sets the bad
+flag with probability at most that of the lazy (deferred-sampling) handler's run:
+
+`Pr[bad | (simulateQ (ghostHybridImpl … true) (adv.main pk)).run δ_∅]`
+`  ≤ Pr[bad | (simulateQ lazyGhostHybridImpl (adv.main pk)).run δ_∅]`.
+
+This is the single open obstruction of the chain. It is the **measure-level** coupling
+`avgBadM eager δ_∅ (adv.main pk) ≤ avgBadM lazy δ_∅ (adv.main pk)` (via `avgBadM_pure_state`),
+to be discharged through the banked engine `avgBadM_eager_le_lazy_joint`: the uniform and
+signing steps preserve the coupling invariant `Inv` definitionally (the handlers agree there),
+the pure leaf is the carried-bad comparison, and the read step is the deferred-sampling
+read-marginal match — the eager run's *signing-time-sampled* ghost-cache hit marginal
+dominated by the lazy run's *read-time-redrawn* deferred-fire marginal.
+
+The genuinely multi-week content lives in the coupling invariant for the read step: the eager
+ghost cache is populated by **rejection-conditioned** commit draws (`ghostSignBody` writes a
+ghost entry only on a rejected attempt and clears it on accept), so the correct `Inv` carries
+the rejection-conditioned joint law of `(νe, νl)` — `νe`'s committed ghost-cache law as the
+pushforward of `νl`'s pending deferred-draw counts under the per-slot commit law — rather than
+the (false) "pushforward of iid raw draws" invariant. A per-state (`νe = νl`) comparison is
+provably **false** at a committed ghost-hit state (eager fires with mass `1`, lazy sub-unit);
+only the two-measure averaging carried by the per-output post-step measures of
+`avgBadM_eager_le_lazy_joint` closes it. The downstream chain to the target is fully banked:
+the lazy bound is `probEvent_lazyGhostHybridImpl_bad_le`. -/
+lemma probEvent_ghostHybridImpl_bad_le_lazy (pk : Stmt) (sk : Wit) :
+    Pr[ fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+        (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
+          ((((∅, ∅), []) :
+            ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+              List M), false)]
+      ≤ Pr[ fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+        (simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (adv.main pk)).run
+          ((((∅, ∅), []) :
+            ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+              List M), false)] := by
+  classical
+  -- Both sides are `avgBadM … (Dirac δ_∅) (adv.main pk)` (`avgBadM_pure_state`); the engine
+  -- `avgBadM_eager_le_lazy_joint` reduces the dominance to the read-step coupling under the
+  -- rejection-conditioned invariant `Inv` (the multi-week deferred-sampling content).
+  rw [← OracleComp.ProgramLogic.Relational.avgBadM_pure_state
+      (ghostHybridImpl ids M maxAttempts true pk sk)
+      ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+      (adv.main pk),
+    ← OracleComp.ProgramLogic.Relational.avgBadM_pure_state
+      (lazyGhostHybridImpl ids M maxAttempts pk sk)
+      ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+      (adv.main pk)]
+  sorry
+
+/- RETIRED (superseded by the measure-level coupling route). `probEvent_ghostRead_bad_le` now
+routes through `probEvent_ghostHybridImpl_bad_le_lazy` (the eager↔lazy measure-level dominance
+via the engine `avgBadM_eager_le_lazy_joint`) chained with the proven lazy bound
+`probEvent_lazyGhostHybridImpl_bad_le`. The *linear-accumulator* charge route below
+(`avgBadM_ghostHybridImpl_le_threaded` → `probEvent_ghostRead_bad_le_charge`) is no longer on
+the live path: its per-output `h_inv` premise (`avgBadM_ghostHybridImpl_threaded_inv`) carries
+the sign-branch rejection skew (a single sign output that writes a fresh ghost entry has
+membership charge `1` against `enncard·ε < 1`), so the linear accumulator is *false per
+output* and the route could only ever isolate the skew, never discharge it. The measure-level
+route instead averages the signing-time commit draw at the read step (the deferred-sampling
+content), matching the read marginal where the obstruction actually lives. The threaded route's
+framework, `h_carry`, and `h_K` lemmas remain proven above; the dead chain is preserved here
+(commented) per repo policy.
+
 open scoped Classical in
 omit [SampleableType Stmt] in
 /-- **`h_inv` premise of the threaded bound for the ghost handler.** The averaged-charge
@@ -1648,6 +1821,7 @@ lemma probEvent_ghostRead_bad_le_charge
   rw [hqH1, ← ENNReal.ofReal_mul (by positivity), ← ENNReal.ofReal_mul (by positivity)]
   refine ENNReal.ofReal_le_ofReal (le_of_eq ?_)
   field_simp
+-/
 
 omit [SampleableType Stmt] in
 /-- **Ghost-read collision bound** for the Prog → Trans hop: the probability that the
@@ -1681,110 +1855,16 @@ lemma probEvent_ghostRead_bad_le
             ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
               List M), false)]
       ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
-  classical
-  -- CHARGE ROUTE (VEHICLE B). Bound `Pr[eager bad]` via the averaged ghost-membership charge,
-  -- threaded through the free-monad telescoping `avgBadM_ghostHybridImpl_le_threaded` with the
-  -- read budget `qH+1` (`hQ`) and the sign budget `qS` (`hQ`). The threaded accumulator
-  -- conclusion is supplied as `hAcc` to `probEvent_ghostRead_bad_le_charge`, which performs the
-  -- final arithmetic to the target.
-  refine probEvent_ghostRead_bad_le_charge ids hr M maxAttempts adv qS qH ε p_abort
-    hp₀ hp hε hQ pk sk hGuess hAbort ?_
-  -- `hAcc`: instantiate the threaded accumulator at the empty Dirac start, `qHb := qH+1`,
-  -- `qSb := qS`.  `carriedBad(δ_init) = 0`, `curCeil(δ_init) = 0` (empty ghost cache), and
-  -- `qS · Sε = ofReal (qS/(1-p)) · ofReal ε`.
-  have h1p : (0 : ℝ) < 1 - p_abort := by linarith
-  -- Budget bounds from `hQ`: read budget `qH+1`, sign budget `qS`.
-  have hqHbudget : (adv.main pk).IsQueryBoundP
-      (fun t => t matches Sum.inl (Sum.inr _)) (qH + 1) := by
-    have h := (hQ pk).2.mono (Nat.le_succ qH)
-    convert h using 3
-  have hqSbudget : (adv.main pk).IsQueryBoundP
-      (fun t => t matches Sum.inr _) qS := by
-    have h := (hQ pk).1
-    convert h using 3
-  -- The empty Dirac start has total mass `1 ≤ 1`: the sub-probability mass invariant.
-  have hνstart : (∑' p : GhostState M Commit Chal,
-      (if p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-          then (1 : ℝ≥0∞) else 0)) ≤ 1 := by
-    refine le_of_eq ?_
-    rw [tsum_eq_single ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-      (fun p hp => by rw [if_neg hp])]
-    rw [if_pos rfl]
-  -- The empty Dirac start: the ghost layer is empty, so the membership charge vanishes for
-  -- every target, hence the averaged-charge invariant holds (`0 ≤ K · ε`).
-  have hstartCharge : ∀ mc : M × Commit,
-      (∑' p : GhostState M Commit Chal,
-        (if p = ((((∅, ∅), []) :
-          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-            then (1 : ℝ≥0∞) else 0) * memCharge M p.1.1.2 mc) = 0 := by
-    intro mc
-    rw [ENNReal.tsum_eq_zero]
-    intro p
-    by_cases hp' : p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-    · subst hp'; simp [memCharge]
-    · rw [if_neg hp', zero_mul]
-  have hInvStart : ghostChargeInv M ε
-      (fun p => if p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-          then 1 else 0) := by
-    intro mc
-    rw [hstartCharge mc]
-    exact zero_le'
-  -- Apply the threaded engine at the empty Dirac start, budgets `(qH+1, qS)`.
-  have hstart := avgBadM_ghostHybridImpl_le_threaded ids M maxAttempts ε p_abort
-    hp₀ hp hε pk sk hGuess hAbort (adv.main pk)
-    (fun p => if p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-          then 1 else 0)
-    (qH + 1) qS hInvStart hνstart hqHbudget hqSbudget
-  refine hstart.trans ?_
-  -- The Dirac measure: `carriedBad = 0` (start flag `false`), `K = 0` (empty ghost), `mass = 1`.
-  have hcarried : (∑' p : GhostState M Commit Chal,
-      (if p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-          then (1 : ℝ≥0∞) else 0) * (if p.2 = true then 1 else 0)) = 0 := by
-    rw [ENNReal.tsum_eq_zero]
-    intro p
-    by_cases hp' : p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-    · subst hp'; simp
-    · rw [if_neg hp', zero_mul]
-  have hKzero : ghostChargeK M
-      (fun p => if p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-          then (1 : ℝ≥0∞) else 0) = 0 := by
-    rw [ghostChargeK, ENNReal.tsum_eq_zero]
-    intro p
-    by_cases hp' : p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-    · subst hp'; simp [QueryCache.enncard]
-    · rw [if_neg hp', zero_mul]
-  have hmassOne : (∑' p : GhostState M Commit Chal,
-      (if p = ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-          then (1 : ℝ≥0∞) else 0)) = 1 := by
-    rw [tsum_eq_single ((((∅, ∅), []) :
-        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
-      (fun p hp => by rw [if_neg hp]), if_pos rfl]
-  rw [hcarried, hKzero, hmassOne, zero_mul, mul_zero, add_zero, zero_add, one_mul]
-  -- `(qH+1) · qS · (ofReal (1/(1-p)) · ofReal ε) = (qH+1) · (ofReal (qS/(1-p)) · ofReal ε)`,
-  -- the `hAcc` target shape of `probEvent_ghostRead_bad_le_charge`.
-  rw [Nat.cast_add, Nat.cast_one]
-  refine le_of_eq ?_
-  have hSrw : (qS : ℝ≥0∞) * (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε)
-      = ENNReal.ofReal (qS / (1 - p_abort)) * ENNReal.ofReal ε := by
-    rw [show (qS : ℝ≥0∞) = ENNReal.ofReal qS from (ENNReal.ofReal_natCast qS).symm,
-      ← mul_assoc, ← ENNReal.ofReal_mul (by positivity)]
-    congr 2
-    rw [mul_one_div]
-  rw [show ((qH : ℝ≥0∞) + 1) * (qS : ℝ≥0∞) *
-        (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε)
-      = ((qH : ℝ≥0∞) + 1) *
-        ((qS : ℝ≥0∞) * (ENNReal.ofReal (1 / (1 - p_abort)) * ENNReal.ofReal ε)) by ring,
-    hSrw]
+  -- MEASURE-LEVEL COUPLING ROUTE. Dominate the eager ghost-read bad mass by the lazy
+  -- (deferred-sampling) bad mass `probEvent_ghostHybridImpl_bad_le_lazy`, then close with the
+  -- proven lazy bound `probEvent_lazyGhostHybridImpl_bad_le` (`≤ qS·(qH+1)·ε/(1-p)`). The
+  -- eager↔lazy dominance is the measure-level coupling `avgBadM eager δ_∅ ≤ avgBadM lazy δ_∅`
+  -- through the engine `avgBadM_eager_le_lazy_joint`; the lazy bound is itself a single-world
+  -- resource-charged accumulator over the deferred-fire charge, where the per-output skew of
+  -- the eager read is absent.
+  refine (probEvent_ghostHybridImpl_bad_le_lazy ids hr M maxAttempts adv pk sk).trans ?_
+  exact probEvent_lazyGhostHybridImpl_bad_le ids hr M maxAttempts adv qS qH ε p_abort
+    hp₀ hp hε hQ pk sk hGuess hAbort
 
 /-! ## Hop lemmas
 
