@@ -864,7 +864,18 @@ lemma probEvent_ghostRead_bad_le
       -- draw makes the eager structural hit and the lazy redraw coincide
       -- (`probOutput_lazyGhostFire_one` is the single-pending case), then `htail` recouples the
       -- diverged continuations. Closing this is the residual probabilistic content; the framework
-      -- induction around it is now fully banked as `probEvent_marginal_simulateQ_mono`.
+      -- induction around it is now fully banked in TWO forms: the pointwise
+      -- `probEvent_marginal_simulateQ_mono` (used here) and the *distribution-level* sibling
+      -- `probEvent_dist_simulateQ_mono` (Relational/SimulateQ.lean), whose carried relation is on
+      -- the run DISTRIBUTIONS rather than the states. The dist-level form is the correct tool for
+      -- this branch: the eager ghost-hit returns a *different answer* to the adversary (mass `1` on
+      -- the ghost value `v`) than the lazy real-layer read, so the continuations act on divergent
+      -- answer distributions and NO pointwise state relation survives the step (the real caches
+      -- `e.1.1.1` / `l.1.1.1` diverge thereafter). The remaining content is to construct the
+      -- deferred-sampling coupling `Rrun` (eager sampled keys ~ lazy pending count, agreeing on
+      -- `(reCache, signed)`) under which `h_bind` at this read step closes by lifting
+      -- `probOutput_lazyGhostFire_one` via Fubini over the commit measure. That coupling
+      -- construction is the genuine multi-week obligation.
       sorry
     · -- signing: the handler runs `ghostSignBody` and leaves the bad flag untouched on both sides
       -- (`lazyGhostHybridImpl_run_sign_eq`), so neither side introduces bad mass at this step. The

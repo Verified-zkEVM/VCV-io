@@ -675,6 +675,66 @@ theorem probEvent_marginal_simulateQ_mono
     intro u s₁' s₂' hR'
     exact ih u s₁' s₂' hR'
 
+omit [IsUniformSpec spec] in
+/-- **Distribution-level stochastic dominance through `simulateQ`.**
+
+The *distribution-level* sibling of `probEvent_marginal_simulateQ_mono`. Where the latter carries
+a **pointwise** state relation `R : σ₁ → σ₂ → Prop` and discharges the per-query step at every pair
+of `R`-related *states*, this lemma carries a relation `Rrun` directly on the two run
+**distributions** (the whole `OracleComp spec₁ (γ × σ₁)` / `OracleComp spec₂ (γ × σ₂)`
+computations), generic over the output type `γ`. This is the shape needed when the per-step
+recoupling is inherently *joint-law* — e.g. an eager handler that has already committed sampled
+keys into its state versus a deferred-sampling handler that only carries a pending *count*, so that
+no pointwise state predicate relates the two successor states yet the two run distributions are
+related by a coupling over the deferred draw.
+
+The induction is pure free-monad bookkeeping; the entire probabilistic content is isolated into the
+two premises:
+
+* `h_pure` seeds the relation at the `pure` leaves (the run distributions are the two point masses
+  `pure (a, s₁)` / `pure (a, s₂)`);
+* `h_bind` is the distribution-level bind congruence: given a query `t` and any two tails `k₁ k₂`
+  whose per-output continuations are already `Rrun`-related, the one-step runs followed by those
+  tails are again `Rrun`-related. Discharging `h_bind` at a divergent step *is* the marginal
+  draw-commutation, the hard content this lemma isolates.
+
+Once the relation is established along the whole run, `h_bad` reads off the ordered bad marginals.
+
+`s₁ : σ₁`, `s₂ : σ₂` are the initial states and `hbase : Rrun (pure …) …`-free: instead the
+seed is supplied through `h_pure`, applied at the actual reachable leaves during the induction, so
+no separate base hypothesis on `s₁ s₂` is required beyond what `h_pure`/`h_bind` carry. -/
+theorem probEvent_dist_simulateQ_mono
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
+    {σ₁ σ₂ : Type}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
+    (Rrun : ∀ {γ : Type}, OracleComp spec₁ (γ × σ₁) → OracleComp spec₂ (γ × σ₂) → Prop)
+    (bad₁ : σ₁ → Prop) (bad₂ : σ₂ → Prop)
+    (h_pure : ∀ {γ : Type} (a : γ) (s₁ : σ₁) (s₂ : σ₂),
+      Rrun (pure (a, s₁)) (pure (a, s₂)))
+    (h_bind : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂),
+      ∀ {γ : Type} (k₁ : (spec.Range t × σ₁) → OracleComp spec₁ (γ × σ₁))
+        (k₂ : (spec.Range t × σ₂) → OracleComp spec₂ (γ × σ₂)),
+        (∀ (u : spec.Range t) (s₁' : σ₁) (s₂' : σ₂), Rrun (k₁ (u, s₁')) (k₂ (u, s₂'))) →
+        Rrun ((impl₁ t).run s₁ >>= k₁) ((impl₂ t).run s₂ >>= k₂))
+    (h_bad : ∀ {γ : Type} (r₁ : OracleComp spec₁ (γ × σ₁)) (r₂ : OracleComp spec₂ (γ × σ₂)),
+      Rrun r₁ r₂ → Pr[ fun z => bad₁ z.2 | r₁] ≤ Pr[ fun z => bad₂ z.2 | r₂])
+    (oa : OracleComp spec α) (s₁ : σ₁) (s₂ : σ₂) :
+    Pr[fun z => bad₁ z.2 | (simulateQ impl₁ oa).run s₁] ≤
+      Pr[fun z => bad₂ z.2 | (simulateQ impl₂ oa).run s₂] := by
+  classical
+  refine h_bad _ _ ?_
+  induction oa using OracleComp.inductionOn generalizing s₁ s₂ with
+  | pure a =>
+    simp only [simulateQ_pure, StateT.run_pure]
+    exact h_pure a s₁ s₂
+  | query_bind t ob ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+      id_map, StateT.run_bind]
+    exact h_bind t s₁ s₂ _ _ (fun u s₁' s₂' => ih u s₁' s₂')
+
 /-- The fundamental lemma of game playing: if two oracle implementations agree whenever
 a "bad" flag is unset, then the total variation distance between the two simulations
 is bounded by the probability that bad gets set.
