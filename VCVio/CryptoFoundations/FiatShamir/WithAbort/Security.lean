@@ -724,6 +724,84 @@ theorem relTriple_ghostHybrid_lazyGhost_sign (pk : Stmt) (sk : Wit)
 /-! ## The ghost-read collision charge (open) -/
 
 omit [SampleableType Stmt] in
+/-- **Eager↔lazy ghost-read bad dominance** (the single genuine residual of #228).
+
+The eager ghost handler `ghostHybridImpl … true` and the deferred-sampling handler
+`lazyGhostHybridImpl` run the *same* `ghostSignBody` and forward uniform queries
+identically (`lazyGhostHybridImpl_run_sign_eq`, `lazyGhostHybridImpl_run_unif_eq`); the
+two runs differ only at the adversarial random-oracle read step `.inl (.inr mc)`:
+
+* **eager**: on a structural ghost hit `s.1.1.2 mc = some v` the bad flag flips with mass
+  `1` and the adversary is answered with the *ghost value* `v` (the rejected attempt's
+  programmed challenge), leaving the real layer `s.1.1.1` untouched;
+* **lazy**: the read draws `lazyGhostFire … (enncard ghost)` (firing with sub-unit mass)
+  and answers from the real layer via `roStep`, updating `s.1.1.1`.
+
+`Pr[bad | eager] ≤ Pr[bad | lazy]` holds because the eager run reuses the
+*signing-time-sampled* ghost keys (correlated with the whole post-rejection trajectory),
+whereas the lazy run redraws a fresh commitment per read; the union bound over the
+read-time redraws dominates the single correlated signing-time hit. The single-pending
+case is the banked draw-commutation `probOutput_lazyGhostFire_one`
+(`Pr[fire | lazyGhostFire … 1] = Pr[= w' | commit]`), which matches the marginal of the
+eager structural hit `w = w'` over the signing-time draw of `w`.
+
+**Why neither banked framework induction discharges this.** The two free-monad inductions
+banked in `Relational/SimulateQ.lean` both expose a per-query step that quantifies the two
+states (resp. the two run distributions) *without a relating hypothesis at the step*:
+
+* `probEvent_marginal_simulateQ_mono`'s `h_step` fixes a *single* state `s` for both
+  worlds (it carries a pointwise `R : σ₁ → σ₂ → Prop`, but the step premise still compares
+  `(impl₁ t).run s₁` against `(impl₂ t).run s₂` at the *given* related pair). At a ghost-hit
+  state the eager read flips bad with mass `1` while the lazy read fires with sub-unit
+  mass, so the read-branch inequality is *false at that state*. The dominance is only true
+  after averaging over the signing-time draw of the ghost key, which the pointwise step
+  cannot perform.
+* `probEvent_dist_simulateQ_mono`'s `h_bind` quantifies the two *initial states*
+  `s₁ s₂` of the step **universally and unconditionally** (no `Rrun s₁ s₂` hypothesis on
+  the states). Choosing `s₁` with a populated ghost cache and `s₂` with an empty one
+  refutes any state-blind read-branch inequality, so this lemma likewise cannot carry the
+  deferred-sampling *state coupling* the read step needs.
+
+Closing the leaf therefore requires a **bespoke** induction on `adv.main pk` that threads
+the joint law as auxiliary data — the multiset of pending ghost draws plus the partial
+commit measure, with the eager pre-drawn ghost cache as a sample-consistent realization —
+recoupling the diverged real caches through the carried joint law and discharging the read
+step by Fubini over the commit measure against `probOutput_lazyGhostFire_one`. The
+uniform/sign steps reuse the banked rfl handler equalities. This is the genuine,
+documented multi-week probabilistic content; it is isolated here as the sole `sorry` of
+#228. The framework around it (deliverable A, the rfl handler equalities, the
+single-pending draw-commutation, and the never-read-before-write invariant
+`ghostHybridImpl_preserves_signed_inv`) is fully banked and axiom-clean. -/
+lemma eagerGhostRead_bad_le_lazyGhostRead_bad (pk : Stmt) (sk : Wit) :
+    Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+        (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
+          ((((∅, ∅), []) :
+            ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+              List M), false)]
+      ≤ Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+          (simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (adv.main pk)).run
+            ((((∅, ∅), []) :
+              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+                List M), false)] := by
+  classical
+  -- BESPOKE JOINT-LAW INDUCTION (skeleton; the read-step recoupling is the sole residual).
+  --
+  -- The intended proof is an induction on `oa := adv.main pk` carrying, as auxiliary data,
+  -- the joint law `(pending ghost-draw multiset, partial commit measure)` together with the
+  -- eager pre-drawn ghost cache as a sample-consistent realization of that law. Concretely:
+  --   * `pure`: bad marginals are the two point masses, equal by the carried law;
+  --   * uniform / signing steps: `lazyGhostHybridImpl_run_unif_eq` /
+  --     `lazyGhostHybridImpl_run_sign_eq` make the two steps identical, so the carried law is
+  --     advanced by the *same* transition and the IH applies at the (coupled) successor;
+  --   * read step `.inl (.inr mc)`: rewrite both sides' bad-flag probability as a
+  --     `tsum`/expectation over the pending multiset and apply `probOutput_lazyGhostFire_one`
+  --     (= `Pr[= w' | commit]`) to dominate the eager correlated-key hit by the lazy fresh
+  --     redraw, then recouple the diverged real-cache continuations through the carried law.
+  --
+  -- The residual below is exactly that read-step recoupling, the genuine multi-week content.
+  sorry
+
+omit [SampleableType Stmt] in
 /-- **Ghost-read collision bound** for the Prog → Trans hop: the probability that the
 adversary ever queries the random oracle at a ghost point (a rejected signing attempt's
 programmed point) is at most `qS·(qH+1)·ε/(1-p)`.
@@ -802,89 +880,13 @@ lemma probEvent_ghostRead_bad_le
               ((((∅, ∅), []) :
                 ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
                   List M), false)] := by
-    -- MARGINAL ROUTE (not a coupling). The eager↔lazy bad-flag dominance is now obtained from
-    -- the banked framework lemma
-    -- `OracleComp.ProgramLogic.Relational.probEvent_marginal_simulateQ_mono`, the *marginal*
-    -- counterpart of `relTriple_simulateQ_run_mono`. It runs the global free-monad induction on
-    -- `adv.main pk`, but its per-query premise is a marginal inequality
-    -- `Pr[bad | eager-step >>= k₁] ≤ Pr[bad | lazy-step >>= k₂]` (with the two tails assumed
-    -- marginally bad-dominated), not a pointwise coupling. This sidesteps the refutation of the
-    -- relTriple route: at the read step the eager handler flips the bad flag with mass `1` on a
-    -- structural ghost hit while the lazy handler fires `lazyGhostFire` with sub-unit mass, so no
-    -- pointwise coupling can dominate; but the *marginal* bad mass — the `tsum` over the deferred
-    -- commitment draw, taken before the divergent continuation — is still ordered.
-    --
-    -- The state relation `R_couple e l := (e.2 = true → l.2 = true)` is the bad-flag implication;
-    -- `bad₁ = bad₂ := (·.2 = true)`. The base hypothesis is `R_couple` itself; the uniform and
-    -- signing per-step premises hold because both handlers are definitionally identical there
-    -- (`lazyGhostHybridImpl_run_unif_eq`, `lazyGhostHybridImpl_run_sign_eq`), so the two sides are
-    -- the SAME computation and the tail-domination premise applied at the (equal) successor states
-    -- closes them by `probEvent_bind_eq_tsum` monotonicity.
-    --
-    -- ISOLATED RESIDUAL (`h_step_read`): the read-branch marginal inequality. After both sides are
-    -- expanded by `probEvent_bind_eq_tsum`, the eager read's structural ghost hit `s.1.1.2 mc`
-    -- (a deterministic `0/1` over the *signing-time* commitment draw) and the lazy read's
-    -- `lazyGhostFire pending` (the read-time redraw) must be shown to give an ordered marginal.
-    -- The single-pending case is banked as `lazyGhostFire_one_eq` / `probOutput_lazyGhostFire_one`
-    -- (GhostBodies.lean): the lazy read fires with probability exactly
-    -- `Pr[= w' | Prod.fst <$> ids.commit pk sk]`, matching the marginal of the eager signing-time
-    -- draw over the structural hit `w = w'`. Lifting that single-pending draw-commutation through
-    -- the full run — relating the eager ghost cache (the actually-sampled keys) to the lazy
-    -- `pending` count under the never-read-before-write invariant
-    -- (`ghostHybridImpl_preserves_signed_inv`) — is the remaining probabilistic content. This is
-    -- the genuine multi-week obligation; the framework induction is fully banked and the residual
-    -- is now a single per-state marginal inequality at the read branch, not a global proof.
-    refine OracleComp.ProgramLogic.Relational.probEvent_marginal_simulateQ_mono
-      (spec₁ := unifSpec) (spec₂ := unifSpec)
-      (σ₁ := GhostState M Commit Chal) (σ₂ := GhostState M Commit Chal)
-      (ghostHybridImpl ids M maxAttempts true pk sk)
-      (lazyGhostHybridImpl ids M maxAttempts pk sk)
-      (R := fun e l => (e.2 = true → l.2 = true))
-      (bad₁ := fun s => s.2 = true) (bad₂ := fun s => s.2 = true)
-      (h_base := fun _ _ hel hb => hel hb) (h_step := ?_) (oa := adv.main pk)
-      (s₁ := (((∅, ∅), []), false)) (s₂ := (((∅, ∅), []), false))
-      (hR := fun (h : (false : Bool) = true) => absurd h (by decide))
-    -- The per-query marginal step premise, by branch.
-    rintro ((n | mc) | msg) e l hel γ k₁ k₂ htail
-    · -- uniform: the handler forwards the query and leaves the state untouched on both sides, so
-      -- after the bind both marginals are the SAME `tsum` over the forwarded answer, with the tail
-      -- domination `htail` (at the unchanged states `e`/`l`, by `hel`) closing each summand.
-      change Pr[ fun z => z.2.2 = true |
-          ((fun u => (u, e)) <$> (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n)
-            >>= k₁] ≤
-        Pr[ fun z => z.2.2 = true |
-          ((fun u => (u, l)) <$> (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n)
-            >>= k₂]
-      simp only [map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp]
-      rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
-      exact ENNReal.tsum_le_tsum fun u => by gcongr; exact htail u e l hel
-    · -- random-oracle read: the genuine marginal residual.
-      -- The eager handler reads the ghost cache `e.1.1.2 mc` deterministically; the lazy handler
-      -- redraws via `lazyGhostFire pending`. The marginal over the shared signing-time commitment
-      -- draw makes the eager structural hit and the lazy redraw coincide
-      -- (`probOutput_lazyGhostFire_one` is the single-pending case), then `htail` recouples the
-      -- diverged continuations. Closing this is the residual probabilistic content; the framework
-      -- induction around it is now fully banked in TWO forms: the pointwise
-      -- `probEvent_marginal_simulateQ_mono` (used here) and the *distribution-level* sibling
-      -- `probEvent_dist_simulateQ_mono` (Relational/SimulateQ.lean), whose carried relation is on
-      -- the run DISTRIBUTIONS rather than the states. The dist-level form is the correct tool for
-      -- this branch: the eager ghost-hit returns a *different answer* to the adversary (mass `1` on
-      -- the ghost value `v`) than the lazy real-layer read, so the continuations act on divergent
-      -- answer distributions and NO pointwise state relation survives the step (the real caches
-      -- `e.1.1.1` / `l.1.1.1` diverge thereafter). The remaining content is to construct the
-      -- deferred-sampling coupling `Rrun` (eager sampled keys ~ lazy pending count, agreeing on
-      -- `(reCache, signed)`) under which `h_bind` at this read step closes by lifting
-      -- `probOutput_lazyGhostFire_one` via Fubini over the commit measure. That coupling
-      -- construction is the genuine multi-week obligation.
-      sorry
-    · -- signing: the handler runs `ghostSignBody` and leaves the bad flag untouched on both sides
-      -- (`lazyGhostHybridImpl_run_sign_eq`), so neither side introduces bad mass at this step. The
-      -- residual is to recouple the post-sign continuations: the eager and lazy real caches may
-      -- already have diverged at an earlier read, so the two body runs act on different caches;
-      -- `htail` must be applied at the post-sign states, which requires the deferred-sampling
-      -- invariant relating the eager ghost cache to the lazy `pending` count
-      -- (`ghostHybridImpl_preserves_signed_inv`). Part of the same residual probabilistic content.
-      sorry
+    -- The eager↔lazy bad-flag dominance is the single genuine residual of #228. It is the
+    -- joint-law (deferred-sampling) statement `eagerGhostRead_bad_le_lazyGhostRead_bad`,
+    -- isolated below as its own lemma so that the precise obligation — and precisely why
+    -- neither banked framework induction discharges it — is documented in one place rather
+    -- than diffused across two per-branch `sorry`s inside a provably-insufficient framework
+    -- call. See that lemma's docstring for the full obstruction analysis.
+    exact eagerGhostRead_bad_le_lazyGhostRead_bad ids hr M maxAttempts adv pk sk
   exact h_eager_le_lazy.trans h_lazy
 
 /-! ## Hop lemmas
