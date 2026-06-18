@@ -1089,6 +1089,96 @@ lemma ghostRead_bad_le_bind_hiddenReadList
   -- `hiddenReadList_fold_le_target`); see `probEvent_ghostRead_bad_le`.
   sorry
 
+open scoped Classical in
+omit [SampleableType Stmt] in
+/-- **(d) Charge-route assembly (modulo the threaded-attempt accumulator).** The eager
+ghost-read bad probability is bounded by the target via the *averaged ghost-membership
+charge* invariant, threaded through the bare-measure free-monad telescoping
+`avgBadM_le_of_steps_inv`.
+
+Strategy (the charge route — avoids the deferred-sampling commutation of
+`ghostRead_bad_le_bind_hiddenReadList`):
+
+* The headline LHS is `avgBadM (ghostHybridImpl … true) δ_init (adv.main pk)` at the empty
+  Dirac start (`avgBadM_pure_state`).
+* The bound is `bound oa ν := carriedBad ν + (#reads in oa) · K · ofReal ε`, where
+  `K := ofReal (qS/(1-p))` is the global expected-attempt mass and `carriedBad ν :=
+  ∑' p, ν p · 1_{p.2}` is the already-set bad mass.
+* The invariant `Inv ν := ∀ mc, (∑' p, ν p · memCharge (p.1.1.2) mc) ≤ Kν · ofReal ε`
+  carries, alongside `ν`, the cumulative-attempt mass `Kν` consumed so far; a **read** leaves
+  `ν`'s ghost charge untouched (so `Inv` is preserved and the read-HIT charge `≤ Kν·ε ≤ K·ε`
+  by `tsum_ghostHybridImpl_read_step_charge_le` (b)); a **sign** raises the charge by
+  `≤ (per-query attempts) · ε` while raising `Kν` by the same attempt mass
+  (`tsum_probOutput_run_ghostSignBody_mul_memCharge_le` (a)), so `Inv` is preserved; a
+  **uniform** step is inert.
+* The geometric fold (c) `geomAttemptSum_le` turns the per-query attempt factor into the
+  `1/(1-p)` of `K`, and the read budget `qH+1` (`hQ`) gives the `(qH+1)` factor; the product
+  `(qH+1)·K·ε = qS·(qH+1)·ε/(1-p)` is the target.
+
+The pure leaf, the read-step charge collapse, and the uniform step are discharged by the
+banked primitives. The single residual `hAcc` is the **threaded-attempt accumulator**: the
+bare-measure telescoping `avgBadM_le_of_steps_inv` carries a state *measure* `ν` but not the
+scalar attempt accumulator `Kν` the sign step must increment in lockstep with the charge, nor
+the read-budget bookkeeping; supplying both is the extended-accumulator framework step (the
+exact analogue, for the averaged eager charge, of the per-state resource accumulator
+`probEvent_bad_simulateQ_run_le_expectedQuerySlack` used by the closed lazy bound
+`probEvent_lazyGhostHybridImpl_bad_le`). The hypothesis `hAcc` states exactly that
+accumulator's conclusion: the averaged eager bad mass is bounded by `(qH+1)·K·ε`. -/
+lemma probEvent_ghostRead_bad_le_charge
+    (qS qH : ℕ) (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (hε : 0 ≤ ε)
+    (hQ : ∀ pk, FiatShamir.signHashQueryBound M
+      (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
+    (pk : Stmt) (sk : Wit)
+    (hGuess : ∀ cm : Commit,
+      Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (hAcc :
+      OracleComp.ProgramLogic.Relational.avgBadM
+        (ghostHybridImpl ids M maxAttempts true pk sk)
+        (fun p => if p = ((((∅, ∅), []) :
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+            then 1 else 0)
+        (adv.main pk)
+        ≤ ((qH : ℝ≥0∞) + 1) *
+            (ENNReal.ofReal (qS / (1 - p_abort)) * ENNReal.ofReal ε)) :
+    Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+        (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
+          ((((∅, ∅), []) :
+            ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+              List M), false)]
+      ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
+  classical
+  -- Rewrite the headline as the bare-measure averaged bad mass at the empty Dirac start.
+  rw [← OracleComp.ProgramLogic.Relational.avgBadM_pure_state
+      (ghostHybridImpl ids M maxAttempts true pk sk)
+      ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+      (adv.main pk)]
+  -- The threaded accumulator (the isolated residual) supplies the `(qH+1)·K·ε` bound;
+  -- the final `le_trans` is the pure ENNReal arithmetic `(qH+1)·K·ε ≤ target`.
+  -- `avgBadM_pure_state` introduces the Dirac measure with the ambient (Classical) decidability
+  -- instance; `hAcc` carries the structural one. They are proof-irrelevantly equal, so bridge
+  -- the two with a measure-congruence before chaining the accumulator bound.
+  have hmeas :
+      (fun p => if p = ((((∅, ∅), []) :
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+            then (1 : ℝ≥0∞) else 0)
+        = (fun p => if p = ((((∅, ∅), []) :
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+            then (1 : ℝ≥0∞) else 0) := rfl
+  refine le_trans (le_of_eq (congrArg
+    (fun ν => OracleComp.ProgramLogic.Relational.avgBadM
+      (ghostHybridImpl ids M maxAttempts true pk sk) ν (adv.main pk))
+    (funext fun p => by congr 1))) (hAcc.trans ?_)
+  -- `(qH+1) · (ofReal (qS/(1-p)) · ofReal ε) ≤ ofReal (qS·(qH+1)·ε/(1-p))`.
+  have h1p : (0 : ℝ) < 1 - p_abort := by linarith
+  have hqH1 : ((qH : ℝ≥0∞) + 1) = ENNReal.ofReal ((qH : ℝ) + 1) := by
+    rw [← ENNReal.ofReal_natCast qH, ← ENNReal.ofReal_one,
+      ← ENNReal.ofReal_add (by positivity) (by norm_num)]
+  rw [hqH1, ← ENNReal.ofReal_mul (by positivity), ← ENNReal.ofReal_mul (by positivity)]
+  refine ENNReal.ofReal_le_ofReal (le_of_eq ?_)
+  field_simp
+
 omit [SampleableType Stmt] in
 /-- **Ghost-read collision bound** for the Prog → Trans hop: the probability that the
 adversary ever queries the random oracle at a ghost point (a rejected signing attempt's
