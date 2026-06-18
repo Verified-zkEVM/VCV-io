@@ -1662,6 +1662,86 @@ noncomputable def nmaLinkImpl (pk : Stmt) :
       ((unifSpec + (M × Commit →ₒ Chal)).QueryCache × (M × Commit →ₒ Chal).QueryCache) :=
   (nmaOuterImpl M maxAttempts sim pk).link (nmaInnerImpl M)
 
+/-- The linked-run projection of sub-lemma (b): map the layered ghost-tagged NMA state
+`((base, ghost), signed)` onto the linked managed handler's product cache pair. The left
+component is the inner managed cache, recovered as `baseEmbed base` (the live-read base layer
+embedded into the sum-keyed inner cache, with no signing-programmed points: those live in the
+ghost layer); the right component is the outer runtime cache, recovered as the full overlay
+`overlayCache base ghost` (live reads plus signing-programmed points). The signed-message list
+is forgotten — the linked handler carries no such list. -/
+def proj2 (s : NmaGhostState M Commit Chal) :
+    (unifSpec + (M × Commit →ₒ Chal)).QueryCache × (M × Commit →ₒ Chal).QueryCache :=
+  (baseEmbed M s.1.1, overlayCache M s.1.1 s.1.2)
+
+omit [SampleableType Stmt] in
+/-- **Sub-lemma (b), uniform-query step.** On a uniform query the layered ghost-tagged
+handler `ghostNmaImpl`, projected by `proj2`, matches the linked managed handler `nmaLinkImpl`
+applied to the projected state. The uniform query forwards straight through both handlers
+(`unifSim`/`unifFwdImpl`) without touching either cache layer, so the coupling is the
+straightforward forward pass. -/
+lemma hproj2_unif (pk : Stmt) (sk : Wit) (n : unifSpec.Domain)
+    (s : NmaGhostState M Commit Chal) :
+    Prod.map id (proj2 M) <$> (ghostNmaImpl M maxAttempts sim pk sk (.inl (.inl n))).run s =
+      (nmaLinkImpl M maxAttempts sim pk (.inl (.inl n))).run (proj2 M s) := by
+  rw [ghostNmaImpl_run_unif, nmaLinkImpl, QueryImpl.Stateful.link_impl_apply_run]
+  simp only [nmaOuterImpl, QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply,
+    HasQuery.toQueryImpl_apply, nmaInnerImpl, unifFwdImpl, proj2]
+  rfl
+
+omit [SampleableType Stmt] in
+/-- **Sub-lemma (b), random-oracle step — cached-read sub-case.** On a random-oracle query at a
+point `mc` whose ghost layer misses (`hgm`) and whose base layer already holds a value `v`
+(`hbh : s.1.1 mc = some v`), the layered ghost-tagged handler `ghostNmaImpl`, projected by
+`proj2`, matches the linked managed handler `nmaLinkImpl` applied to the projected state. Both
+sides read the cached value: `ghostNmaImpl` returns `roStep`'s cached branch (base hit), while
+the linked `roSim` finds the same value in the inner managed cache (`baseEmbed base`, which holds
+the base entry at `.inr mc`) and short-circuits, so neither cache layer is written.
+
+The two RO sub-cases left open (gated by the reachable-state invariant, see `hproj2_sign`'s
+docstring and the residual in `hybridSimRun_le_managedRun_verify`) are:
+
+* **fresh live read** (`s.1.1 mc = none`, ghost miss): the read resamples; both sides write the
+  sampled value to base/inner (`baseEmbed_cacheQuery`) and to overlay/outer
+  (`overlayCache_cacheQuery_real_of_ghost_none`, via the `randomOracle_run_eq_roStep` round-trip).
+  This is true and reduces to a `roStep`-on-`overlayCache` match, but the inner-`roSim` /
+  outer-`randomOracle` nested-simulation `.run` plumbing is part of the deferred coupling.
+* **ghost hit** (`s.1.2 mc ≠ none`): genuinely *not* a per-step state projection — `ghostNmaImpl`
+  returns the ghost value leaving its state untouched, whereas the linked `roSim` re-reads through
+  the runtime `randomOracle` (recovering the same value from `overlayCache base ghost`) but
+  *writes it back* into the inner managed cache's `.inr mc` slot, so the two final inner caches
+  differ by exactly that re-cached point. Reconciling it needs the reachable-state invariant "a
+  ghost point is never separately live-read" rather than a pointwise projection. -/
+lemma hproj2_ro (pk : Stmt) (sk : Wit) (mc : M × Commit) (v : Chal)
+    (s : NmaGhostState M Commit Chal) (hgm : s.1.2 mc = none) (hbh : s.1.1 mc = some v) :
+    Prod.map id (proj2 M) <$> (ghostNmaImpl M maxAttempts sim pk sk (.inl (.inr mc))).run s =
+      (nmaLinkImpl M maxAttempts sim pk (.inl (.inr mc))).run (proj2 M s) := by
+  rw [ghostNmaImpl_run_ro, nmaLinkImpl, QueryImpl.Stateful.link_impl_apply_run]
+  simp only [nmaOuterImpl, QueryImpl.add_apply_inl, QueryImpl.add_apply_inr, proj2]
+  rw [hgm]
+  erw [StateT.run_bind, StateT.run_get]
+  simp only [pure_bind, baseEmbed_inr, hbh, roStep_of_some M hbh, map_pure, nmaInnerImpl]
+  erw [StateT.run_pure]
+  simp only [map_pure, QueryImpl.Stateful.Frame.linkReshape, QueryImpl.Stateful.Frame.prod,
+    PFunctor.Lens.State.fst, PFunctor.Lens.State.snd, Prod.map, id_eq, proj2]
+  rfl
+
+omit [SampleableType Stmt] in
+/-- **Sub-lemma (b), signing-query step — STILL OPEN (genuine multi-week content).** On a
+signing query the layered ghost-tagged handler `ghostNmaImpl` runs `simGhostSignBody` (a
+`liftM (firstSome (sim pk) maxAttempts)` followed by `ghostSignProgramCont`), while the linked
+managed handler `nmaLinkImpl` runs `sigSim`, which is the *nested* simulation
+`simulateQ nmaInnerImpl ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` re-folded
+through the outer runtime. Collapsing that nested simulation back to the lifted `firstSome`
+loop and matching the accepted-transcript programming (ghost-layer `cacheQuery (msg, w) c`
+vs inner-cache `cacheQuery (.inr (msg, w)) c`, base/outer layers untouched) is the remaining
+multi-week content of the NMA bridge. -/
+lemma hproj2_sign (pk : Stmt) (sk : Wit) (msg : M)
+    (s : NmaGhostState M Commit Chal)
+    (hs : ∀ q : M × Commit, s.1.2 q ≠ none → q.1 ∈ s.2) :
+    Prod.map id (proj2 M) <$> (ghostNmaImpl M maxAttempts sim pk sk (.inr msg)).run s =
+      (nmaLinkImpl M maxAttempts sim pk (.inr msg)).run (proj2 M s) := by
+  sorry
+
 /-- The managed-RO NMA reduction for Fiat-Shamir with aborts: run the CMA adversary,
 forwarding uniform queries, answering live hash queries through a managed cache, and
 answering signing queries with the simulator loop of `simSignBody` (programming the
