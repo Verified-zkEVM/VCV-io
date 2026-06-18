@@ -1818,6 +1818,59 @@ lemma hproj2_ro (pk : Stmt) (sk : Wit) (mc : M × Commit) (v : Chal)
   rfl
 
 omit [SampleableType Stmt] in
+/-- **Sub-lemma (b), random-oracle step — fresh-live-read sub-case.** On a random-oracle
+query at a point `mc` whose ghost layer misses (`hgm`) and whose base layer also misses
+(`hbm : s.1.1 mc = none`), the layered ghost-tagged handler `ghostNmaImpl`, projected by
+`proj2`, matches the linked managed handler `nmaLinkImpl` applied to the projected state.
+Both sides resample a fresh value `c`; `ghostNmaImpl` writes it to the base layer (`roStep`'s
+miss branch), while the linked `roSim` misses the inner managed cache (`baseEmbed base`,
+which has no entry at `.inr mc` since `base mc = none`) and forwards to the runtime
+`randomOracle` (the `randomOracle_run_eq_roStep` round-trip), caching the result both in the
+inner managed cache and the outer runtime cache. Under `proj2`, the inner write matches
+`baseEmbed_cacheQuery` and the outer write matches `overlayCache_cacheQuery_real_of_ghost_none`. -/
+lemma hproj2_ro_fresh (pk : Stmt) (sk : Wit) (mc : M × Commit)
+    (s : NmaGhostState M Commit Chal) (hgm : s.1.2 mc = none) (hbm : s.1.1 mc = none) :
+    Prod.map id (proj2 M) <$> (ghostNmaImpl M maxAttempts sim pk sk (.inl (.inr mc))).run s =
+      (nmaLinkImpl M maxAttempts sim pk (.inl (.inr mc))).run (proj2 M s) := by
+  rw [ghostNmaImpl_run_ro, nmaLinkImpl, QueryImpl.Stateful.link_impl_apply_run]
+  simp only [nmaOuterImpl, QueryImpl.add_apply_inl, QueryImpl.add_apply_inr, proj2]
+  rw [hgm]
+  erw [StateT.run_bind, StateT.run_get]
+  simp only [pure_bind, baseEmbed_inr, hbm]
+  rw [QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply]
+  -- Reduce the inner `roSim` body run to a single `query` followed by a base-cache write,
+  -- then push `simulateQ nmaInnerImpl` through it: the `.inr mc` query is answered by the
+  -- runtime `randomOracle`, whose run is `roStep` on the outer cache.
+  conv_rhs =>
+    enter [2, 1, 2]
+    change (query (Sum.inr mc) : OracleComp (unifSpec + (M × Commit →ₒ Chal)) _) >>=
+      fun v => pure (v, (baseEmbed M s.1.1).cacheQuery (Sum.inr mc) v)
+  rw [simulateQ_bind]
+  simp only [simulateQ_pure]
+  conv_rhs =>
+    enter [2, 1, 1]
+    rw [show (query (Sum.inr mc) : OracleComp (unifSpec + (M × Commit →ₒ Chal)) _) =
+        liftM ((unifSpec + (M × Commit →ₒ Chal)).query (Sum.inr mc)) from rfl,
+      simulateQ_spec_query]
+    simp only [nmaInnerImpl, QueryImpl.add_apply_inr]
+  rw [StateT.run_bind]
+  conv_rhs => enter [2, 1]; erw [randomOracle_run_eq_roStep]
+  -- Both sides resample, since the base layer and the overlay both miss at `mc`.
+  have hov : overlayCache M s.1.1 s.1.2 mc = none := by simp [overlayCache, hgm, hbm]
+  rw [roStep_of_none M hbm, roStep_of_none M hov]
+  -- Normalise both sides to a single resample, mapping `c` to a `(c, inner, outer)` triple.
+  simp only [bind_pure_comp, StateT.run_pure]
+  conv_lhs => erw [Functor.map_map, Functor.map_map]
+  conv_rhs => erw [Functor.map_map, Functor.map_map]
+  refine map_congr fun c => ?_
+  -- Reconcile the cache writes on the two layers: the inner write matches `baseEmbed`'s
+  -- `cacheQuery`, the outer write matches the overlay's `cacheQuery` (ghost misses at `mc`).
+  simp only [Prod.map, id_eq, proj2, QueryImpl.Stateful.Frame.linkReshape,
+    QueryImpl.Stateful.Frame.prod, PFunctor.Lens.State.fst, PFunctor.Lens.State.snd,
+    PFunctor.Lens.State.put, PFunctor.Lens.State.mk]
+  rw [baseEmbed_cacheQuery, overlayCache_cacheQuery_real_of_ghost_none (M := M) s.1.1 hgm]
+
+omit [SampleableType Stmt] in
 /-- **Sub-lemma (b), signing-query step — STILL OPEN (genuine multi-week content).** On a
 signing query the layered ghost-tagged handler `ghostNmaImpl` runs `simGhostSignBody` (a
 `liftM (firstSome (sim pk) maxAttempts)` followed by `ghostSignProgramCont`), while the linked
