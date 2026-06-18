@@ -3378,6 +3378,20 @@ lemma avgBad_pure_state
   rw [avgBad, tsum_eq_single p₀ (by intro p hp; rw [PMF.pure_apply, if_neg hp, zero_mul]),
     PMF.pure_apply, if_pos rfl, one_mul]
 
+/-- **Linearity of `avgBad` in the state law.** The averaged bad mass over a state law `μ`
+is the `μ`-weighted average of the per-state (Dirac) bad masses. Immediate from
+`avgBad_pure_state` under the `tsum` defining `avgBad`. This is the structural fact that
+lets the output-grouped telescoping fold the inductive hypothesis at an *unnormalized*
+post-step measure: a `tsum`-weighted sum of Dirac `avgBad`s is itself an `avgBad` at the
+weighting law. -/
+lemma avgBad_eq_tsum_pure
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (oa : OracleComp spec γ) :
+    avgBad impl μ oa =
+      ∑' s' : σ × Bool, μ s' * avgBad impl (PMF.pure s') oa := by
+  rw [avgBad]
+  exact tsum_congr fun s' => by rw [avgBad_pure_state]
+
 /-- **Pure base case of `avgBad`.** With no queries, the run leaves the state untouched and
 the bad mass is exactly the carried bad mass of the state law `μ` — the probability `μ`
 assigns to states with the flag already set. -/
@@ -3418,6 +3432,65 @@ lemma avgBad_query_bind_eq
     simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
       OracleQuery.cont_query, StateT.run_bind]
   rw [hsim, probEvent_bind_eq_tsum]
+
+/-- **Post-step joint law of a query step.** The law over `(output, post-state)` produced by
+drawing the starting state from `μ` and running one impl step `(impl t).run p`. This is the
+`SPMF`-valued joint measure whose first marginal is the output law and whose conditional
+second marginal (given an output) is the post-step state law the inductive hypothesis is
+folded at. -/
+noncomputable def postStepJoint
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (t : spec.Domain) :
+    SPMF (spec.Range t × σ × Bool) :=
+  (liftM μ : SPMF (σ × Bool)) >>= fun p => evalDist ((impl t).run p)
+
+/-- The post-step joint law evaluated pointwise: the `μ`-average of the per-state impl-step
+output probability. -/
+lemma postStepJoint_apply
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (t : spec.Domain) (z : spec.Range t × σ × Bool) :
+    postStepJoint impl μ t z = ∑' p : σ × Bool, μ p * Pr[= z | (impl t).run p] := by
+  rw [postStepJoint, SPMF.bind_apply_eq_tsum]
+  refine tsum_congr fun p => ?_
+  rw [SPMF.liftM_apply]
+  rfl
+
+/-- **Output-grouped telescoping of the eager average.** The telescoped one-step eager
+average (the right-hand side of `avgBad_query_bind_eq`) regroups as a single `tsum` over the
+post-step joint law `postStepJoint impl μ t`, weighting each `(output u, post-state s')` pair
+by the Dirac bad mass `avgBad impl δ_{s'} (cont u)`. This is the pure `tsum`-Fubini
+rearrangement that exposes the post-step state `s'` (grouped by output `u`) so the inductive
+hypothesis can be folded at the genuine post-step law rather than collapsed to a Dirac at a
+single reachable state. No probabilistic content — `PMF.bind` Fubini plus `avgBad_pure_state`. -/
+lemma avgBad_telescope_eq_tsum_postStep
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (μ : PMF (σ × Bool)) (t : spec.Domain) (cont : spec.Range t → OracleComp spec γ) :
+    (∑' p : σ × Bool, μ p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2]) =
+      ∑' z : spec.Range t × σ × Bool,
+        postStepJoint impl μ t z * avgBad impl (PMF.pure z.2) (cont z.1) := by
+  classical
+  -- Pull the `μ p` weight inside the inner `tsum` and replace the Dirac bad mass.
+  have hstep : (∑' p : σ × Bool, μ p *
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run p] *
+            Pr[fun w : γ × σ × Bool => w.2.2 = true |
+              (simulateQ impl (cont z.1)).run z.2]) =
+      ∑' p : σ × Bool, ∑' z : spec.Range t × σ × Bool,
+          μ p * (Pr[= z | (impl t).run p] *
+            avgBad impl (PMF.pure z.2) (cont z.1)) := by
+    refine tsum_congr fun p => ?_
+    rw [← ENNReal.tsum_mul_left]
+    refine tsum_congr fun z => ?_
+    rw [avgBad_pure_state, ← mul_assoc]
+  rw [hstep, ENNReal.tsum_comm]
+  refine tsum_congr fun z => ?_
+  rw [postStepJoint_apply, ← ENNReal.tsum_mul_right]
+  refine tsum_congr fun p => ?_
+  rw [mul_assoc]
 
 /-! ### Read-step Fubini charge equality (the genuine new content)
 
