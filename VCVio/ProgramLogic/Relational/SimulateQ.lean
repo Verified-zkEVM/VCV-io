@@ -72,6 +72,80 @@ theorem relTriple_simulateQ_run
     exact (relTriple_bind (himpl t s₁ s₂ hs) (fun ⟨u₁, s₁'⟩ ⟨u₂, s₂'⟩ ⟨eq_u, hs'⟩ => by
       dsimp at eq_u hs' ⊢; subst eq_u; exact ih u₁ s₁' s₂' hs')) trivial
 
+/-- **Monotone relational `simulateQ`.** A generalization of `relTriple_simulateQ_run` that
+does *not* require equal per-query outputs. Instead, each per-query coupling must (a) preserve
+the state invariant and (b) supply, for the *same* free-monad continuation applied to the two
+(possibly different) coupled outputs, a recoupling of the two continued simulations preserving
+the invariant. This is the right shape when the two handlers genuinely diverge on the answer
+returned to the caller (e.g. an eager vs. deferred-sampling random-oracle read), so output
+equality cannot be maintained and the coupling must be rebuilt across the branch point.
+
+The continuation hypothesis is self-referential by design: discharging it is exactly the
+construction of the divergent-branch coupling, which is the hard probabilistic content this
+lemma isolates from the free-monad bookkeeping. -/
+theorem relTriple_simulateQ_run_mono
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
+    {σ₁ σ₂ : Type}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
+    (R_state : σ₁ → σ₂ → Prop)
+    (oa : OracleComp spec α)
+    (himpl : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂),
+      R_state s₁ s₂ →
+      RelTriple ((impl₁ t).run s₁) ((impl₂ t).run s₂)
+        (fun p₁ p₂ => R_state p₁.2 p₂.2 ∧
+          ∀ (ob : spec.Range t → OracleComp spec α),
+            RelTriple ((simulateQ impl₁ (ob p₁.1)).run p₁.2)
+                      ((simulateQ impl₂ (ob p₂.1)).run p₂.2)
+              (fun q₁ q₂ => R_state q₁.2 q₂.2)))
+    (s₁ : σ₁) (s₂ : σ₂) (hs : R_state s₁ s₂) :
+    RelTriple
+      ((simulateQ impl₁ oa).run s₁)
+      ((simulateQ impl₂ oa).run s₂)
+      (fun p₁ p₂ => R_state p₁.2 p₂.2) := by
+  induction oa using OracleComp.inductionOn generalizing s₁ s₂ with
+  | pure x =>
+    simp only [simulateQ_pure, StateT.run_pure, relTriple_iff_relWP,
+      MAlgRelOrdered.relWP_pure]
+    exact hs
+  | query_bind t ob ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+      id_map, StateT.run_bind, relTriple_iff_relWP, relWP_iff_couplingPost]
+    refine (relTriple_bind (himpl t s₁ s₂ hs) ?_) trivial
+    rintro ⟨u₁, s₁'⟩ ⟨u₂, s₂'⟩ ⟨_, hcont⟩
+    exact hcont ob
+
+/-- **Marginal stochastic dominance from a coupling.** If `oa` and `ob` are related by a
+coupling whose post-relation `R` carries an event implication `P a → Q b`, then the marginal
+probability of `P` on the left is at most that of `Q` on the right. This is the one-sided
+(inequality) counterpart of `evalDist_map_eq_of_relTriple`: where the latter extracts a
+distributional equality from output equality, this extracts a probability inequality from an
+output implication. The proof reads off both marginals from the single coupling distribution
+`c` and applies pointwise monotonicity of `probEvent` on `c`. -/
+theorem probEvent_le_of_relTriple_imp
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
+    {β : Type}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : α → β → Prop} {P : α → Prop} {Q : β → Prop}
+    (h : RelTriple oa ob R)
+    (himp : ∀ a b, R a b → P a → Q b) :
+    Pr[P | oa] ≤ Pr[Q | ob] := by
+  rw [relTriple_iff_relWP, relWP_iff_couplingPost] at h
+  obtain ⟨c, hc⟩ := h
+  have hfst : (Prod.fst <$> c.1 : SPMF α) = 𝒟[oa] := c.2.map_fst
+  have hsnd : (Prod.snd <$> c.1 : SPMF β) = 𝒟[ob] := c.2.map_snd
+  calc Pr[P | oa]
+      = Pr[P | (Prod.fst <$> c.1 : SPMF α)] := by rw [hfst]; rfl
+    _ = Pr[fun z => P z.1 | c.1] := probEvent_fst_map _ _
+    _ ≤ Pr[fun z => Q z.2 | c.1] :=
+        probEvent_mono fun z hz hPz => himp z.1 z.2 (hc z hz) hPz
+    _ = Pr[Q | (Prod.snd <$> c.1 : SPMF β)] := (probEvent_snd_map _ _).symm
+    _ = Pr[Q | ob] := by rw [hsnd]; rfl
+
 /-- Projection: relational `simulateQ` preserving only output equality. -/
 theorem relTriple_simulateQ_run'
     {ι₁ : Type u} {ι₂ : Type u}

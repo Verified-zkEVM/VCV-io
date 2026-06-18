@@ -751,12 +751,50 @@ lemma probEvent_ghostRead_bad_le
               ((((∅, ∅), []) :
                 ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
                   List M), false)] := by
-    -- DEFERRED-SAMPLING COMMUTATION (the eager↔lazy bad-flag equivalence). See the comment
-    -- block above for the full statement of the residual and why no existing infrastructure
-    -- (`probOutput_simulateQ_run_eq_of_impl_eq_preservesInv`, `relTriple_simulateQ_run`,
-    -- the first-fire probe library) discharges it. The handlers agree off the read step
-    -- (`lazyGhostHybridImpl_run_unif_eq`, `lazyGhostHybridImpl_run_sign_eq`).
-    sorry
+    -- DEFERRED-SAMPLING COMMUTATION (the eager↔lazy bad-flag dominance). The bookkeeping is
+    -- now handled by two banked, general-purpose relational rules:
+    --   * `relTriple_simulateQ_run_mono` runs the global free-monad induction on `adv.main pk`,
+    --     carrying a coupling invariant `R_couple` between the eager state
+    --     `((reCache, ghostEager), signed)` and the lazy state
+    --     `((reCache, ghostLazy), signed)`. Unlike `relTriple_simulateQ_run` it permits the two
+    --     handlers to return *different* answers at the random-oracle read step, recoupling the
+    --     diverged continuations rather than demanding output equality;
+    --   * `probEvent_le_of_relTriple_imp` reads the bad-flag marginal inequality off the
+    --     resulting coupling, using the post-implication `eager.bad → lazy.bad`.
+    -- The uniform and signing steps preserve `R_couple` by the banked definitional handler
+    -- equalities (`lazyGhostHybridImpl_run_unif_eq`, `lazyGhostHybridImpl_run_sign_eq`).
+    --
+    -- ISOLATED RESIDUAL (`h_step`): the per-query divergent-branch coupling. At the read step
+    -- the eager handler flips the bad flag with mass 1 on a structural ghost hit, while the lazy
+    -- handler fires `lazyGhostFire` with sub-unit mass; pointwise bad-dominance therefore fails
+    -- on a single step, and the coupling must instead *resample* the deferred commitment draw
+    -- `w ← ids.commit` at read time to match the eager sample-consistent ghost cache. This moves
+    -- the sampling site inside the handler body, so it is genuinely a body-level deferred-
+    -- sampling commutation, not a state relation — the single remaining multi-week obligation.
+    set R_couple : GhostState M Commit Chal → GhostState M Commit Chal → Prop :=
+      fun e l => (e.2 = true → l.2 = true) with hR_couple
+    have h_step : ∀ (t : ((unifSpec + (M × Commit →ₒ Chal)) +
+          (M →ₒ Option (Commit × Resp))).Domain)
+        (e l : GhostState M Commit Chal), R_couple e l →
+        OracleComp.ProgramLogic.Relational.RelTriple
+          ((ghostHybridImpl ids M maxAttempts true pk sk t).run e)
+          ((lazyGhostHybridImpl ids M maxAttempts pk sk t).run l)
+          (fun p₁ p₂ => R_couple p₁.2 p₂.2 ∧
+            ∀ (ob : _ → OracleComp _
+                (M × Option (Commit × Resp))),
+              OracleComp.ProgramLogic.Relational.RelTriple
+                ((simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (ob p₁.1)).run p₁.2)
+                ((simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (ob p₂.1)).run p₂.2)
+                (fun q₁ q₂ => R_couple q₁.2 q₂.2)) := by
+      sorry
+    refine OracleComp.ProgramLogic.Relational.probEvent_le_of_relTriple_imp
+      (R := fun p₁ p₂ => R_couple p₁.2 p₂.2) ?_ ?_
+    · exact OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run_mono
+        (ghostHybridImpl ids M maxAttempts true pk sk)
+        (lazyGhostHybridImpl ids M maxAttempts pk sk) R_couple (adv.main pk) h_step
+        _ _ (by simp [hR_couple])
+    · intro a b hab hbad
+      exact hab hbad
   exact h_eager_le_lazy.trans h_lazy
 
 /-! ## Hop lemmas
