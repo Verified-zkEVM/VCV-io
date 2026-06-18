@@ -1596,7 +1596,71 @@ lemma probOutput_hybridExpAtKey_trans_le_sim
         rw [ENNReal.ofReal_add ENNReal.toReal_nonneg h_loss_nonneg,
           ENNReal.ofReal_toReal probOutput_ne_top]
 
-/-! ## The NMA reduction -/
+/-! ## The NMA reduction
+
+### Named managed/runtime handlers for the linked-run coupling
+
+The managed NMA run is a two-layer nested simulation: an *inner managed* handler
+`nmaOuterImpl pk` (forward uniform, managed-cache RO reads, simulator-loop signing) threads
+the inner cache, and an *outer runtime* handler `nmaInnerImpl` (`unifFwdImpl + randomOracle`)
+re-simulates the residual live queries. Their `link`, `nmaLinkImpl pk`, is the single
+combined simulation over the product cache that the per-step state-coupling projects onto.
+These were previously inline `letI` bindings inside `simulatedNmaAdv` and
+`managedRun_eq_link_run`; promoting them to top level makes `nmaLinkImpl pk` a nameable
+handler so the coupling can be stated and proved one query step at a time. -/
+
+/-- The inner *managed* handler of the NMA reduction: forward uniform queries to the live
+spec (`unifSim`), answer hash queries through the managed cache (`roSim`, forwarding misses
+to the live oracle), and answer signing queries with the simulator loop (`sigSim`), programming
+the accepted transcript's challenge into the managed cache. This is the
+`(unifSim + roSim) + sigSim` handler used inside `simulatedNmaAdv`. -/
+noncomputable def nmaOuterImpl (pk : Stmt) :
+    QueryImpl.Stateful (unifSpec + (M × Commit →ₒ Chal))
+      ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (unifSpec + (M × Commit →ₒ Chal)).QueryCache :=
+  letI spec := unifSpec + (M × Commit →ₒ Chal)
+  letI fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
+  letI unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
+    fun n => fwd (.inl n)
+  letI roSim : QueryImpl (M × Commit →ₒ Chal)
+      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
+    let cache ← get
+    match cache (.inr mc) with
+    | some v => pure v
+    | none => do
+        let v ← fwd (.inr mc)
+        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+  letI sigSim : QueryImpl (M →ₒ Option (Commit × Resp))
+      (StateT spec.QueryCache (OracleComp spec)) := fun msg => do
+    let r ← simulateQ unifSim (firstSome (sim pk) maxAttempts)
+    match r with
+    | some (w, c, z) =>
+        modifyGet fun cache => (some (w, z), cache.cacheQuery (.inr (msg, w)) c)
+    | none => pure none
+  (unifSim + roSim) + sigSim
+
+/-- The outer *runtime* handler of the NMA reduction: forward uniform queries (`unifFwdImpl`)
+and answer the residual live random-oracle reads through the runtime's own random oracle
+(`randomOracle`), threading the outer cache. This is the
+`unifFwdImpl + randomOracle` handler that re-simulates the `.run ∅` boundary in
+`simulatedNmaAdv`. -/
+noncomputable def nmaInnerImpl :
+    QueryImpl.Stateful unifSpec (unifSpec + (M × Commit →ₒ Chal))
+      ((M × Commit →ₒ Chal).QueryCache) :=
+  unifFwdImpl (M × Commit →ₒ Chal) +
+    (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp))
+
+/-- The single *linked* handler `nmaOuterImpl pk |>.link nmaInnerImpl` that collapses the
+two-layer managed/runtime nesting into one simulation over the product cache
+`((unifSpec + (M × Commit →ₒ Chal)).QueryCache × (M × Commit →ₒ Chal).QueryCache)`.
+The per-step state-coupling for the NMA bridge is stated against this handler. -/
+noncomputable def nmaLinkImpl (pk : Stmt) :
+    QueryImpl.Stateful unifSpec
+      ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      ((unifSpec + (M × Commit →ₒ Chal)).QueryCache × (M × Commit →ₒ Chal).QueryCache) :=
+  (nmaOuterImpl M maxAttempts sim pk).link (nmaInnerImpl M)
 
 /-- The managed-RO NMA reduction for Fiat-Shamir with aborts: run the CMA adversary,
 forwarding uniform queries, answering live hash queries through a managed cache, and
@@ -1647,50 +1711,23 @@ noncomputable def simulatedNmaAdv :
 
 omit [SampleableType Stmt] in
 /-- **Nested-simulation fusion for the managed NMA run.** The managed reduction runs the
-common adversary `adv.main pk` under the inner managed handler `(unifSim + roSim) + sigSim`
-threading the inner cache (`StateT spec.QueryCache (OracleComp spec)`), then `.run ∅`
-re-simulates the residual live queries under the outer runtime handler
-`unifFwdImpl + randomOracle` threading the outer cache. By
-`QueryImpl.Stateful.simulateQ_link_run` this two-layer nesting is a single simulation of the
-*linked* handler `outer.link inner` over the product cache `(inner, outer)`, up to the
-canonical `linkReshape` regrouping of the final state. This collapses the explicit `.run ∅`
-boundary into a single `simulateQ` whose state is the genuine `(inner managed cache, outer
-runtime cache)` pair the coupling projects onto. -/
+common adversary `adv.main pk` under the inner managed handler `nmaOuterImpl pk` threading the
+inner cache (`StateT spec.QueryCache (OracleComp spec)`), then `.run ∅` re-simulates the
+residual live queries under the outer runtime handler `nmaInnerImpl` (`unifFwdImpl +
+randomOracle`) threading the outer cache. By `QueryImpl.Stateful.simulateQ_link_run` this
+two-layer nesting is a single simulation of the *linked* handler `nmaLinkImpl pk =
+(nmaOuterImpl pk).link nmaInnerImpl` over the product cache, up to the canonical `linkReshape`
+regrouping of the final state. This collapses the explicit `.run ∅` boundary into a single
+`simulateQ` whose state is the genuine `(inner managed cache, outer runtime cache)` pair the
+per-step coupling projects onto. -/
 lemma managedRun_eq_link_run (pk : Stmt) :
     letI spec := unifSpec + (M × Commit →ₒ Chal)
-    letI fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-    letI unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
-      fun n => fwd (.inl n)
-    letI roSim : QueryImpl (M × Commit →ₒ Chal)
-        (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
-      let cache ← get
-      match cache (.inr mc) with
-      | some v => pure v
-      | none => do
-          let v ← fwd (.inr mc)
-          modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
-    letI sigSim : QueryImpl (M →ₒ Option (Commit × Resp))
-        (StateT spec.QueryCache (OracleComp spec)) := fun msg => do
-      let r ← simulateQ unifSim (firstSome (sim pk) maxAttempts)
-      match r with
-      | some (w, c, z) =>
-          modifyGet fun cache => (some (w, z), cache.cacheQuery (.inr (msg, w)) c)
-      | none => pure none
-    letI outer : QueryImpl.Stateful spec
-        ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
-        spec.QueryCache := (unifSim + roSim) + sigSim
-    letI inner : QueryImpl.Stateful unifSpec spec ((M × Commit →ₒ Chal).QueryCache) :=
-      unifFwdImpl (M × Commit →ₒ Chal) +
-        (randomOracle : QueryImpl (M × Commit →ₒ Chal)
-          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp))
-    (simulateQ (outer.link inner) (adv.main pk)).run (∅, ∅) =
+    (simulateQ (nmaLinkImpl M maxAttempts sim pk) (adv.main pk)).run (∅, ∅) =
       (QueryImpl.Stateful.Frame.prod spec.QueryCache
           ((M × Commit →ₒ Chal).QueryCache)).linkReshape (∅, ∅) <$>
-        (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
-            (randomOracle : QueryImpl (M × Commit →ₒ Chal)
-              (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
-          ((simulateQ ((unifSim + roSim) + sigSim) (adv.main pk)).run ∅)).run ∅ := by
+        (simulateQ (nmaInnerImpl M)
+          ((simulateQ (nmaOuterImpl M maxAttempts sim pk)
+            (adv.main pk)).run ∅)).run ∅ := by
   exact (QueryImpl.Stateful.simulateQ_link_run _ _ (adv.main pk) ∅ ∅)
 
 /-- **State-coupling for the NMA bridge** (genuine two-layer content). At a fixed key pair
@@ -1854,13 +1891,19 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   --     sum spec), i.e. the left component of `proj₂ ((base,ghost),signed) = (baseEmbed base,
   --     overlayCache base ghost)`; `baseEmbed_cacheQuery` provides the RO-step algebra
   --     `baseEmbed (base.cacheQuery mc v) = (baseEmbed base).cacheQuery (.inr mc) v`.
-  -- STILL OPEN: the per-step coupling `hproj₂` itself, which requires (i) promoting the local
-  -- `outer`/`inner`/`roSim`/`sigSim`/`unifSim` lets of `simulatedNmaAdv`/`managedRun_eq_link_run`
-  -- to top-level handlers so `outer.link inner` is nameable, and (ii) the nested-simulation
-  -- collapse `simulateQ inner ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` to
+  -- DONE part (i): the local `outer`/`inner`/`roSim`/`sigSim`/`unifSim` lets of
+  -- `simulatedNmaAdv`/`managedRun_eq_link_run` are now top-level handlers `nmaOuterImpl`,
+  -- `nmaInnerImpl`, and `nmaLinkImpl := (nmaOuterImpl …).link (nmaInnerImpl …)`, so the linked
+  -- handler is nameable; `managedRun_eq_link_run` is re-expressed in terms of them and stays
+  -- axiom-clean. The next-round per-step coupling can therefore be stated directly as
+  --   `hproj₂ : Prod.map id proj₂ <$> (ghostNmaImpl t).run s
+  --              = (nmaLinkImpl M maxAttempts sim pk t).run (proj₂ s)`
+  -- with `proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base ghost)`.
+  -- STILL OPEN part (ii): the nested-simulation collapse
+  -- `simulateQ (nmaInnerImpl …) ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` to
   -- the lifted `firstSome` loop so the sign step matches `simGhostSignBody`. That is the
-  -- remaining multi-week refactor; (a), the verify-tail toolkit (c), the invariant gate, and the
-  -- `baseEmbed` algebra are in place.
+  -- remaining multi-week content; (a), the verify-tail toolkit (c), the invariant gate, the
+  -- `baseEmbed` algebra, and now the named/linked handlers are in place.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
