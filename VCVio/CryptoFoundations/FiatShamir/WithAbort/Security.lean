@@ -1170,8 +1170,7 @@ lemma ghostHybridImpl_read_expected_enncard (pk : Stmt) (sk : Wit)
     rcases hgh : p.1.1.2 mc with _ | v
     · simp only [hgh, support_map] at hz
       obtain ⟨cu, _, rfl⟩ := hz; rfl
-    · simp only [hgh] at hz
-      simp only [↓reduceIte, support_pure, Set.mem_singleton_iff] at hz
+    · simp only [hgh, ↓reduceIte, support_pure] at hz
       subst hz; rfl
   have hconst : (∑' z : Chal × GhostState M Commit Chal,
         Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
@@ -1193,9 +1192,8 @@ lemma ghostHybridImpl_read_expected_enncard (pk : Stmt) (sk : Wit)
     refine tsum_probOutput_eq_one' ?_
     simp only [ghostHybridImpl, StateT.run_mk]
     rcases hgh : p.1.1.2 mc with _ | v
-    · simp only [hgh, roStep]
-      rcases p.1.1.1 mc with _ | v' <;> simp
-    · simp [hgh]
+    · rcases p.1.1.1 mc with _ | v' <;> simp [roStep]
+    · simp
   rw [hone, one_mul]
 
 omit [SampleableType Stmt] in
@@ -1247,7 +1245,7 @@ lemma ghostHybridImpl_sign_expected_enncard_le (pk : Stmt) (sk : Wit) (msg : M)
       have heq : ((g w).2.1.1.2) = w.2.2 := rfl
       rw [heq] at hz; exact hz.2
     · rintro ⟨w, hw⟩
-      show Pr[= g w | g <$> (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1] *
+      change Pr[= g w | g <$> (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1] *
           QueryCache.enncard ((g w).2.1.1.2)
         = Pr[= w | (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1] *
           QueryCache.enncard (w.2.2)
@@ -1277,7 +1275,7 @@ def ghostChargeInv (ε : ℝ) (ν : GhostState M Commit Chal → ℝ≥0∞) : P
     (∑' p : GhostState M Commit Chal, ν p * memCharge M p.1.1.2 mc)
       ≤ ghostChargeK M ν * ENNReal.ofReal ε
 
-omit [SampleableType Stmt] in
+omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
 /-- A step that never writes the ghost layer and preserves the bad flag (uniform forward, or a
 signing step — whose handler leaves `s.2` untouched) preserves the per-state expected bad
 mass: the post-step flag equals the pre-step flag with probability one (mass `≤ 1`). -/
@@ -1321,7 +1319,6 @@ lemma ghostHybridImpl_read_expected_flag_le (pk : Stmt) (sk : Wit)
     · -- Miss: flag preserved, `memCharge = 0`.
       simp only [hgh, support_map] at hz
       obtain ⟨cu, -, rfl⟩ := hz
-      show (if p.2 = true then (1 : ℝ≥0∞) else 0) ≤ _
       exact le_add_right le_rfl
     · -- Hit: flag forced true, `memCharge = 1`.
       simp only [hgh, ↓reduceIte, support_pure, Set.mem_singleton_iff] at hz
@@ -1337,9 +1334,9 @@ lemma ghostHybridImpl_read_expected_flag_le (pk : Stmt) (sk : Wit)
         refine ENNReal.tsum_le_tsum fun z => ?_
         by_cases hz : z ∈ support ((ghostHybridImpl ids M maxAttempts true pk sk
             (.inl (.inr mc))).run p)
-        · exact mul_le_mul_left' (hflag z hz) _
-        · exact le_of_eq (mul_eq_zero.mpr (Or.inl (probOutput_eq_zero_of_not_mem_support hz))) |>.trans
-            zero_le'
+        · gcongr; exact hflag z hz
+        · refine le_of_eq (mul_eq_zero.mpr (Or.inl ?_)) |>.trans zero_le'
+          exact probOutput_eq_zero_of_not_mem_support hz
     _ = (∑' z : Chal × GhostState M Commit Chal,
           Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p]) *
           ((if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc) := by
@@ -1352,11 +1349,11 @@ omit [SampleableType Stmt] in
 telescopes across one step, paying the read hit charge `≤ K ν · ofReal ε` on a read step
 (via the invariant `ghostChargeInv`). Uniform/sign steps preserve the carried bad mass. -/
 lemma avgBadM_ghostHybridImpl_threaded_carry
-    (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (_hε : 0 ≤ ε)
+    (ε p_abort : ℝ) (_hp₀ : 0 ≤ p_abort) (_hp : p_abort < 1) (_hε : 0 ≤ ε)
     (pk : Stmt) (sk : Wit)
-    (hGuess : ∀ cm : Commit,
+    (_hGuess : ∀ cm : Commit,
       Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
-    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (_hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
     (ν : GhostState M Commit Chal → ℝ≥0∞)
     (_hInv : ghostChargeInv M ε ν)
     (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain) :
@@ -1375,7 +1372,8 @@ lemma avgBadM_ghostHybridImpl_threaded_carry
   rcases t with (n | mc) | msg
   · -- Uniform step: flag preserved.
     rw [if_neg (by simp), add_zero]
-    refine ENNReal.tsum_le_tsum fun p => mul_le_mul_left' ?_ _
+    refine ENNReal.tsum_le_tsum fun p => ?_
+    gcongr
     refine ghostHybridImpl_flag_preserved_le M _ p ?_
     intro z hz
     simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
@@ -1388,8 +1386,9 @@ lemma avgBadM_ghostHybridImpl_threaded_carry
                 (if z.2.2 = true then 1 else 0))
         ≤ ∑' p : GhostState M Commit Chal, ν p *
             ((if p.2 = true then 1 else 0) + memCharge M p.1.1.2 mc) :=
-          ENNReal.tsum_le_tsum fun p => mul_le_mul_left'
-            (ghostHybridImpl_read_expected_flag_le ids M maxAttempts pk sk mc p) _
+          ENNReal.tsum_le_tsum fun p => by
+            gcongr
+            exact ghostHybridImpl_read_expected_flag_le ids M maxAttempts pk sk mc p
       _ = (∑' p : GhostState M Commit Chal, ν p * (if p.2 = true then 1 else 0)) +
             ∑' p : GhostState M Commit Chal, ν p * memCharge M p.1.1.2 mc := by
           rw [← ENNReal.tsum_add]; exact tsum_congr fun p => by rw [mul_add]
@@ -1399,7 +1398,8 @@ lemma avgBadM_ghostHybridImpl_threaded_carry
           exact _hInv mc
   · -- Sign step: the signing handler leaves `s.2` untouched, so the flag is preserved.
     rw [if_neg (by simp), add_zero]
-    refine ENNReal.tsum_le_tsum fun p => mul_le_mul_left' ?_ _
+    refine ENNReal.tsum_le_tsum fun p => ?_
+    gcongr
     refine ghostHybridImpl_flag_preserved_le M _ p ?_
     intro z hz
     simp only [ghostHybridImpl, StateT.run_mk, support_map] at hz
@@ -1412,7 +1412,7 @@ step (banked (a)/(c)); reads and uniform steps preserve it (the ghost layer is u
 lemma avgBadM_ghostHybridImpl_threaded_K
     (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (_hε : 0 ≤ ε)
     (pk : Stmt) (sk : Wit)
-    (hGuess : ∀ cm : Commit,
+    (_hGuess : ∀ cm : Commit,
       Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
     (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
     (ν : GhostState M Commit Chal → ℝ≥0∞)
@@ -1427,7 +1427,8 @@ lemma avgBadM_ghostHybridImpl_threaded_K
             ENNReal.ofReal (1 / (1 - p_abort)) *
               (∑' p : GhostState M Commit Chal, ν p) else 0) := by
   classical
-  -- Rewrite `∑'u K(postStepOutM ν t u)` as the weighted post-step charge for `F := enncard ∘ ghost`.
+  -- Rewrite `∑'u K(postStepOutM ν t u)` as the weighted post-step charge
+  -- for `F := enncard ∘ ghost`.
   have hrw : (∑' u : ((unifSpec + (M × Commit →ₒ Chal)) +
         (M →ₒ Option (Commit × Resp))).Range t,
         ghostChargeK M
@@ -1460,7 +1461,7 @@ lemma avgBadM_ghostHybridImpl_threaded_K
       ← ENNReal.tsum_add]
     refine ENNReal.tsum_le_tsum fun p => ?_
     rw [← mul_add]
-    refine mul_le_mul_left' ?_ _
+    gcongr
     exact ghostHybridImpl_sign_expected_enncard_le ids M maxAttempts pk sk msg hAbort hp₀ hp p
 
 open scoped Classical in
