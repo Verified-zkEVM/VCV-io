@@ -1041,6 +1041,37 @@ noncomputable def lazyGhostFire (pk : Stmt) (sk : Wit) (w' : Commit) :
     let b ← lazyGhostFire pk sk w' n
     pure (decide (w = w') || b)
 
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- **Single-pending deferred-sampling read** (banked draw-commutation, term form). With
+exactly one pending ghost attempt the lazy read `lazyGhostFire … 1` is the deferred draw
+`do w ← ids.commit pk sk; pure (decide (w = w'))`: a fresh commitment is sampled at read
+time and compared against the adversary's read point `w'`. This is the term-level
+draw-commutation that postpones a single rejected attempt's commitment draw to read time;
+the eager handler instead reads the *already-sampled* `w` from the ghost cache. -/
+lemma lazyGhostFire_one_eq (pk : Stmt) (sk : Wit) (w' : Commit) :
+    lazyGhostFire ids pk sk w' 1 =
+      ((Prod.fst <$> ids.commit pk sk) >>= fun w => pure (decide (w = w'))) := by
+  change (Prod.fst <$> ids.commit pk sk >>= fun w =>
+      lazyGhostFire ids pk sk w' 0 >>= fun b => pure (decide (w = w') || b)) = _
+  simp only [lazyGhostFire, pure_bind, Bool.or_false]
+
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- **Single-pending lazy fire marginal** (banked draw-commutation, probability form). The
+deferred read fires with probability exactly the commitment law's mass at the read point:
+`Pr[fire | lazyGhostFire … 1] = Pr[= w' | Prod.fst <$> ids.commit pk sk]`. This is the
+read-time marginal that the body-level deferred-sampling commutation must match against the
+eager handler's signing-time draw of the same commitment: the eager run draws `w` while
+signing and fires deterministically on a structural ghost hit `w = w'`, whose marginal over
+that earlier draw is the *same* `Pr[= w']`. The single-pending case of the Fubini/tsum-swap
+that moves the sampling site from signing time to read time. -/
+lemma probOutput_lazyGhostFire_one (pk : Stmt) (sk : Wit) (w' : Commit) :
+    Pr[= true | lazyGhostFire ids pk sk w' 1] = Pr[= w' | Prod.fst <$> ids.commit pk sk] := by
+  rw [lazyGhostFire_one_eq ids pk sk w', probOutput_bind_eq_tsum]
+  rw [tsum_eq_single w' ?_]
+  · simp [probOutput_pure]
+  · intro b hb
+    simp [probOutput_pure, hb]
+
 omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] in
 /-- Boolean-or read shape: appending one fresh `decide (w = w')` flag to a Boolean draw
 raises the firing probability by at most `1` (when the fresh flag is set) over the residual

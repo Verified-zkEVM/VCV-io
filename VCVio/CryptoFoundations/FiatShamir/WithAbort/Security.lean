@@ -828,11 +828,36 @@ lemma probEvent_ghostRead_bad_le
     -- uniform and signing branches are *fully banked* as
     -- `relTriple_ghostHybrid_lazyGhost_unif` / `relTriple_ghostHybrid_lazyGhost_sign`; on those
     -- branches the two handlers return equal outputs (uniform) or are definitionally identical
-    -- (signing), so the self-referential continuation field reduces to recoupling *identical*
-    -- continuations — which is provable. The random-oracle read branch genuinely diverges (the
-    -- two handlers return different answers AND the eager bad-flag fires with mass `1` against
-    -- the lazy sub-unit fire), so the coupling there must resample the deferred commitment draw
-    -- at read time; that is the isolated residual recorded below.
+    -- (signing).
+    --
+    -- REFUTATION OF THE relTriple ROUTE AT THE READ BRANCH. The state-coupling conjunct
+    -- `R_couple p₁.2 p₂.2` (= `eager.bad → lazy.bad`) must hold *pointwise on the support of the
+    -- per-step coupling*. At a ghost-hit read state the eager read step is the point mass
+    -- `δ_{bad = true}`, while the lazy read step (`lazyGhostFire … >>= roStep`) puts mass
+    -- `1 - Pr[fire] > 0` on `bad = false`. Any coupling's left marginal is `δ_{bad = true}`, so
+    -- its support is contained in `{true} × _`; for `eager.bad → lazy.bad` to hold there, every
+    -- support point must have right component `bad = true`, forcing the right marginal to put no
+    -- mass on `bad = false` — contradicting the lazy read's positive `bad = false` mass.
+    -- Therefore NO coupling discharges this branch: `h_step` is *false*, not merely hard, and the
+    -- `relTriple_simulateQ_run_mono` route below cannot close the leaf. (A direct collision bound
+    -- on the eager run is likewise refuted: the ghost keys are pre-drawn at signing time, so each
+    -- adversarial read is a deterministic `0/1` hit, never an `ε`-mass event.)
+    --
+    -- THE ACTUAL ROUTE (marginal / Fubini, not a coupling). Bound the eager bad-flag *marginal*
+    -- by the lazy one through a bespoke global induction on `adv.main pk` that tracks the bad-flag
+    -- marginal as a `tsum` over the deferred commitment draw, NOT a per-state relation. At the
+    -- read step both sides reduce to the SAME `tsum` over the `ids.commit` measure — the eager run
+    -- summed over its earlier signing-time draw of `w`, the lazy run summed over its read-time
+    -- draw — *before* the divergent continuation is applied, which sidesteps the refutation above.
+    -- The single-pending read-time marginal of that `tsum` is now banked as
+    -- `lazyGhostFire_one_eq` / `probOutput_lazyGhostFire_one` (GhostBodies.lean): the lazy read
+    -- fires with probability exactly `Pr[= w' | Prod.fst <$> ids.commit pk sk]`, which is the same
+    -- quantity as the marginal of the eager handler's signing-time draw of `w` over the structural
+    -- ghost hit `w = w'`. Lifting this single-pending draw-commutation through the full run is the
+    -- remaining multi-week obligation (a `probEvent_marginal_simulateQ_mono` over deferred draws,
+    -- which the framework does not yet provide). The dead-end relTriple scaffolding is retained
+    -- below only so the leaf still elaborates; the `sorry` discharges the *false* `h_step` and
+    -- must be replaced by the marginal induction, NOT by a coupling.
     have h_step : ∀ (t : ((unifSpec + (M × Commit →ₒ Chal)) +
           (M →ₒ Option (Commit × Resp))).Domain)
         (e l : GhostState M Commit Chal), R_couple e l →
