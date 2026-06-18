@@ -1378,6 +1378,88 @@ lemma lazyGhostHybridImpl_run_sign_eq (pk : Stmt) (sk : Wit) (msg : M)
     (lazyGhostHybridImpl ids M maxAttempts pk sk (.inr msg)).run s =
       (ghostHybridImpl ids M maxAttempts true pk sk (.inr msg)).run s := rfl
 
+omit [SampleableType Stmt] in
+/-- **Bad-flag absorption for the eager run.** Once the bad flag is set, the eager hybrid
+run keeps it set: every output of `(simulateQ (ghostHybridImpl … true) oa).run p` from a
+state `p` with `p.2 = true` again has its bad flag set. This lifts the per-step monotonicity
+`ghostHybridImpl_bad_mono` through the whole free-monad fold. It is the support fact behind
+the read-step HIT collapse: at a structural ghost hit the eager read forces the bad flag to
+`true` and returns the *real cache untouched*, so the continuation run cannot lower the
+charge — its bad mass is the run's success mass. -/
+lemma support_simulateQ_ghostHybridImpl_bad
+    (pk : Stmt) (sk : Wit)
+    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (M × Option (Commit × Resp)))
+    (p : GhostState M Commit Chal) (hp : p.2 = true) :
+    ∀ z ∈ support ((simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) oa).run p),
+      z.2.2 = true := by
+  induction oa using OracleComp.inductionOn generalizing p with
+  | pure x =>
+      intro z hz
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      exact hp
+  | query_bind t cont ih =>
+      intro z hz
+      rw [simulateQ_bind, simulateQ_query, StateT.run_bind, support_bind] at hz
+      simp only [OracleQuery.input_query, OracleQuery.cont_query, Set.mem_iUnion] at hz
+      obtain ⟨y, hy, hz⟩ := hz
+      refine ih y.1 y.2 ?_ z hz
+      exact ghostHybridImpl_bad_mono ids M maxAttempts true pk sk t p hp y (by simpa using hy)
+
+omit [SampleableType Stmt] in
+/-- **Eager bad mass from a set flag is the run's success mass.** Starting the eager run from
+a state whose bad flag is already set, the probability the bad flag is set in the output
+equals the (unconditional) probability the run produces *any* output — i.e. the success mass
+`1 - probFailure`. Immediate from `support_simulateQ_ghostHybridImpl_bad` via
+`probEvent_congr'`: on the support the event `z.2.2 = true` is constantly `True`. This is the
+read-step HIT value: after the eager read forces the flag at the committed state `p` (with
+the real cache untouched, `z = (v, (p.1, true))`), the continuation `cont v` contributes its
+full success mass to the bad charge. -/
+lemma probEvent_simulateQ_ghostHybridImpl_bad_eq_true
+    (pk : Stmt) (sk : Wit)
+    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (M × Option (Commit × Resp)))
+    (p : GhostState M Commit Chal) (hp : p.2 = true) :
+    Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+        (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) oa).run p] =
+      Pr[fun _ => True | (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) oa).run p] := by
+  refine probEvent_congr' (fun z hz => ?_) rfl
+  simp [support_simulateQ_ghostHybridImpl_bad ids M maxAttempts pk sk oa p hp z hz]
+
+omit [SampleableType Stmt] in
+/-- **Eager read HIT charge.** At a state `p` whose ghost cache *hits* the adversary's read
+point (`p.1.1.2 mc = some v`), the eager read flips the bad flag and returns the real cache
+*untouched* as the single output `(v, (p.1, true))`. The contribution of this read to the
+telescoped bad average therefore collapses to a single term: the continuation `cont v` run
+from `(p.1, true)`, whose bad mass is its full success mass
+(`probEvent_simulateQ_ghostHybridImpl_bad_eq_true`). This is the per-state HIT value the
+read-step ∑-over-`p` collapse charges; averaging it over the upstream commit draws (the
+pushforward law of `p`) is where the eager signing-time hit marginalizes to the lazy
+read-time fire mass. -/
+lemma tsum_ghostHybridImpl_read_hit_eq
+    (pk : Stmt) (sk : Wit) (mc : M × Commit)
+    (cont : Chal → OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (M × Option (Commit × Resp)))
+    (p : GhostState M Commit Chal) (v : Chal) (hgh : p.1.1.2 mc = some v) :
+    (∑' z : Chal × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+          Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal => w.2.2 = true |
+            (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run z.2]) =
+      Pr[fun _ => True |
+        (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont v)).run (p.1, true)] := by
+  have hrun : (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p =
+      (pure (v, (p.1, true)) :
+        ProbComp (Chal × GhostState M Commit Chal)) := by
+    simp only [ghostHybridImpl, StateT.run_mk, hgh, if_pos trivial]
+    rfl
+  rw [hrun]
+  refine (tsum_probOutput_pure_mul (β := Chal × GhostState M Commit Chal) (v, (p.1, true))
+    fun z => Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal => w.2.2 = true |
+      (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run z.2]).trans ?_
+  exact probEvent_simulateQ_ghostHybridImpl_bad_eq_true ids M maxAttempts pk sk (cont v)
+    (p.1, true) rfl
+
 /-! ### The two body-level cores of the Sign → Prog hop -/
 
 omit [SampleableType Stmt] in
