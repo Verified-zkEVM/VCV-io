@@ -2350,6 +2350,81 @@ lemma managedRun_eq_link_run (pk : Stmt) :
             (adv.main pk)).run ∅)).run ∅ := by
   exact (QueryImpl.Stateful.simulateQ_link_run _ _ (adv.main pk) ∅ ∅)
 
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- If a cache misses at the forgery's verification point `Sum.inr (msg, w')`, the overlay
+verification of `FiatShamirWithAbort.verify pk msg (some (w', z))` agrees with the plain
+live verification: the single query at `Sum.inr (msg, w')` misses and is forwarded live.
+The `none` case is verification-free, so it is trivially overlay-insensitive. -/
+lemma withCacheOverlay_verify_eq_of_miss
+    (cache : (unifSpec + (M × Commit →ₒ Chal)).QueryCache) (pk : Stmt)
+    (msg : M) (σ : Option (Commit × Resp))
+    (hmiss : ∀ w' z, σ = some (w', z) → cache (Sum.inr (msg, w')) = none) :
+    withCacheOverlay cache
+        ((FiatShamirWithAbort (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+          ids hr M maxAttempts).verify pk msg σ) =
+      (FiatShamirWithAbort (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+        ids hr M maxAttempts).verify pk msg σ := by
+  cases σ with
+  | none => simp only [FiatShamirWithAbort, withCacheOverlay_pure]
+  | some wz =>
+      obtain ⟨w', z⟩ := wz
+      have hm : cache (Sum.inr (msg, w')) = none := hmiss w' z rfl
+      change withCacheOverlay _
+          ((query (Sum.inr (msg, w')) :
+            OracleComp (unifSpec + (M × Commit →ₒ Chal))
+              ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr (msg, w')))) >>=
+            fun c => pure (ids.verify pk w' c z)) =
+        (query (Sum.inr (msg, w')) :
+            OracleComp (unifSpec + (M × Commit →ₒ Chal))
+              ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr (msg, w')))) >>=
+            fun c => pure (ids.verify pk w' c z)
+      rw [withCacheOverlay_bind_pure, bind_pure_comp]
+      congr 1
+      exact withCacheOverlay_query_miss _ (Sum.inr (msg, w')) hm
+
+omit [SampleableType Stmt] in
+/-- **Verify-tail pointwise split** (the per-forgery content of the NMA bridge). On a common
+ghost-tagged output state `((base, ghost), signed)` satisfying the ghost-domain invariant
+(every ghost point's message is signed), the hybrid verification-and-freshness continuation
+`hybridVerifyCont` on the overlay cache is bounded by the managed overlay verification on the
+base cache. On `msg ∈ signed` the freshness conjunct zeroes the left
+(`probOutput_true_hybridVerifyCont_of_mem`); on a fresh forgery `msg ∉ signed` the invariant
+makes the ghost layer miss at every `(msg, w)`, so the overlay agrees with the base cache
+(`hybridVerifyCont_cache_congr`), the Option-B post-processing makes `withCacheOverlay` miss
+its own verification point (`withCacheOverlay_verify_eq_of_miss`), and the two tails coincide. -/
+lemma probOutput_hybridVerifyCont_le_managed_verify (pk : Stmt)
+    (ms : M × Option (Commit × Resp)) (base ghost : (M × Commit →ₒ Chal).QueryCache)
+    (signed : List M)
+    (hinv : ∀ q : M × Commit, ghost q ≠ none → q.1 ∈ signed) :
+    Pr[= true | hybridVerifyCont ids hr M maxAttempts pk
+        (ms, (overlayCache M base ghost, signed))] ≤
+      Pr[= true | (fun x : Bool × _ => x.1) <$>
+        (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
+            (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+              (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+          (withCacheOverlay
+            (match ms.2 with
+              | some (w', _) => Function.update (baseEmbed M (overlayCache M base ghost))
+                  (Sum.inr (ms.1, w')) none
+              | none => baseEmbed M (overlayCache M base ghost))
+            ((FiatShamirWithAbort ids hr M maxAttempts).verify pk ms.1 ms.2))).run base] := by
+  obtain ⟨msg, σ⟩ := ms
+  by_cases hmem : msg ∈ signed
+  · rw [probOutput_true_hybridVerifyCont_of_mem ids hr M maxAttempts pk (msg, σ)
+      (overlayCache M base ghost) signed hmem]
+    exact zero_le'
+  · rw [withCacheOverlay_verify_eq_of_miss ids hr M maxAttempts _ pk msg σ
+        (by intro w' z hσ; simp [hσ]),
+      hybridVerifyCont_cache_congr ids hr M maxAttempts pk (msg, σ)
+        (overlayCache M base ghost) base signed
+        (fun w => overlayCache_apply_ghost_none (M := M) base
+          (by by_contra h; exact hmem (hinv (msg, w) h)))]
+    refine le_of_eq ?_
+    simp only [hybridVerifyCont, hmem, not_false_eq_true, decide_true, Bool.true_and,
+      StateT.run', bind_pure]
+    rfl
+
+omit [SampleableType Stmt] in
 /-- **State-coupling for the NMA bridge** (genuine two-layer content). At a fixed key pair
 the single-cache hybrid run of `hybridExpAtKey`, *followed by its verification-and-freshness
 tail* `hybridVerifyCont`, is bounded by the run-normal-form of the managed-RO NMA
@@ -2534,19 +2609,100 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   -- needed: the redesigned projection carries the sign point in the inner slot whether or not it
   -- coincides with a prior live read.
   --
-  -- REMAINING ASSEMBLY (the verify-tail split). With (a)
+  -- ASSEMBLY (the verify-tail split, executed below). With (a)
   -- `map_run_simulateQ_ghostNmaImpl_overlay_empty` and (b)
   -- `evalDist_map_run_simulateQ_ghostNmaImpl_proj2` both PROVEN, the hybrid LHS run and the
   -- linked managed RHS run are both projections of the *same* layered ghost-tagged run
-  -- `(simulateQ ghostNmaImpl (adv.main pk)).run ((∅,∅), [])`. What remains is to (1) align the two
-  -- verify tails on this common run — on `msg ∈ signed` the freshness conjunct zeroes the hybrid
-  -- side (`probOutput_true_hybridVerifyCont_of_mem`), and on fresh forgeries the overlay
-  -- verification agrees with the live verification (`withCacheOverlay_verify_eq_of_miss`,
-  -- `hybridVerifyCont_cache_congr`) — and (2) thread the `linkReshape` / Option-B post-processing
-  -- regrouping (`managedRun_eq_link_run`). The state-projection content (the genuine multi-week
-  -- core) is closed; this residual is the verify-tail probabilistic split.
-  sorry
+  -- `(simulateQ ghostNmaImpl (adv.main pk)).run ((∅,∅), [])`. The two verify tails are aligned on
+  -- this common run by `probOutput_hybridVerifyCont_le_managed_verify` — on `msg ∈ signed` the
+  -- freshness conjunct zeroes the hybrid side (`probOutput_true_hybridVerifyCont_of_mem`), and on
+  -- fresh forgeries the overlay verification agrees with the live verification
+  -- (`withCacheOverlay_verify_eq_of_miss`, `hybridVerifyCont_cache_congr`), gated by the whole-run
+  -- ghost-domain invariant `ghostNmaImpl_run_signed_inv`. The `linkReshape` / Option-B
+  -- post-processing regrouping is threaded by `managedRun_eq_link_run` + `bind_map_left`.
+  --
+  -- Reduce the Option-B post-processing `pure` (re-simulated under `nmaInner`) to its value, and
+  -- pull the outer `(fun x => x.1) <$> _` past the head bind. The RHS is now `nestedManaged >>= K`
+  -- with `K a = (fun x => x.1) <$> (simulateQ nmaInner (withCacheOverlay (advCache a)
+  -- (verify pk a.1.1.1 a.1.1.2))).run a.2`.
+  simp only [simulateQ_pure, StateT.run_pure, pure_bind, map_bind]
+  -- The managed verify tail, expressed as a function of the *value × linked cache pair*. By
+  -- `proj2` it is the layered-run tail; by `linkReshape` it is the nested managed tail.
+  set RHSverify : (M × Option (Commit × Resp)) ×
+      ((unifSpec + (M × Commit →ₒ Chal)).QueryCache × (M × Commit →ₒ Chal).QueryCache) →
+      ProbComp Bool :=
+    fun p => (fun x : Bool × _ => x.1) <$>
+      (simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
+          (randomOracle : QueryImpl (M × Commit →ₒ Chal)
+            (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
+        (withCacheOverlay
+          (match p.1.2 with
+            | some (w', _) => Function.update p.2.1 (Sum.inr (p.1.1, w')) none
+            | none => p.2.1)
+          ((FiatShamirWithAbort ids hr M maxAttempts).verify pk p.1.1 p.1.2))).run p.2.2
+    with hRHSverify
+  -- LHS: rewrite the plain hybrid run as the overlay projection of the layered ghost run (a),
+  -- and push the projection through the bind (`map_bind`).
+  rw [← map_run_simulateQ_ghostNmaImpl_overlay_empty M maxAttempts sim pk sk (adv.main pk),
+    bind_map_left]
+  -- RHS: fold the unfolded handlers back to `nmaOuterImpl`/`nmaInnerImpl`, regroup the nested
+  -- managed run by `managedRun_eq_link_run` into `linkRun`, then transport `linkRun`'s
+  -- distribution back to the layered ghost run by sub-lemma (b).
+  have hRHS :
+      Pr[= true | (simulateQ (nmaInnerImpl M)
+            ((simulateQ (nmaOuterImpl M maxAttempts sim pk) (adv.main pk)).run ∅)).run ∅ >>=
+          fun a => RHSverify (a.1.1, (a.1.2, a.2))] =
+        Pr[= true | (simulateQ (ghostNmaImpl M maxAttempts sim pk sk) (adv.main pk)).run
+            ((∅, ∅), []) >>= fun g => RHSverify (g.1, proj2 M g.2)] := by
+    -- The ghost-side tail factors through `Prod.map id proj2`; the nested-side tail factors
+    -- through `linkReshape`. Rewriting both tails as `RHSverify <$> (the projected head)` via
+    -- `bind_map_left` lets sub-lemma (b) (`proj2 <$> ghostRun =𝒟 linkRun`) and the fusion
+    -- (`linkRun = linkReshape <$> nested`) line the two heads up.
+    have hproj2_empty : proj2 M (((∅ : (M × Commit →ₒ Chal).QueryCache),
+        (∅ : (M × Commit →ₒ Chal).QueryCache)), ([] : List M)) = (∅, ∅) := by
+      simp only [proj2, overlayCache_empty]
+      exact congrArg (·, ∅) (baseEmbed_empty M)
+    have hghost :
+        (simulateQ (ghostNmaImpl M maxAttempts sim pk sk) (adv.main pk)).run ((∅, ∅), []) >>=
+            (fun g => RHSverify (g.1, proj2 M g.2)) =
+          (Prod.map id (proj2 M) <$>
+              (simulateQ (ghostNmaImpl M maxAttempts sim pk sk) (adv.main pk)).run
+                ((∅, ∅), [])) >>= RHSverify := by
+      rw [bind_map_left]; rfl
+    have hnested :
+        (simulateQ (nmaInnerImpl M)
+              ((simulateQ (nmaOuterImpl M maxAttempts sim pk) (adv.main pk)).run ∅)).run ∅ >>=
+            (fun a => RHSverify (a.1.1, (a.1.2, a.2))) =
+          ((QueryImpl.Stateful.Frame.prod (unifSpec + (M × Commit →ₒ Chal)).QueryCache
+                ((M × Commit →ₒ Chal).QueryCache)).linkReshape (∅, ∅) <$>
+              (simulateQ (nmaInnerImpl M)
+                ((simulateQ (nmaOuterImpl M maxAttempts sim pk) (adv.main pk)).run ∅)).run ∅) >>=
+            RHSverify := by
+      rw [bind_map_left]; rfl
+    rw [hghost, hnested]
+    -- Reduce to the head-distribution equality, then bind with `RHSverify`.
+    have hhead :
+        𝒟[Prod.map id (proj2 M) <$>
+            (simulateQ (ghostNmaImpl M maxAttempts sim pk sk) (adv.main pk)).run ((∅, ∅), [])] =
+          𝒟[(QueryImpl.Stateful.Frame.prod (unifSpec + (M × Commit →ₒ Chal)).QueryCache
+                ((M × Commit →ₒ Chal).QueryCache)).linkReshape (∅, ∅) <$>
+              (simulateQ (nmaInnerImpl M)
+                ((simulateQ (nmaOuterImpl M maxAttempts sim pk) (adv.main pk)).run ∅)).run ∅] := by
+      rw [evalDist_map_run_simulateQ_ghostNmaImpl_proj2 M maxAttempts sim
+        pk sk (adv.main pk) ((∅, ∅), []), hproj2_empty,
+        managedRun_eq_link_run ids hr M maxAttempts sim adv pk]
+    refine OracleComp.probOutput_congr rfl ?_
+    rw [evalDist_bind, evalDist_bind, hhead]
+  -- Assemble: the goal RHS is `nestedManaged >>= K` (`= hRHS`'s LHS, defeq), so rewrite to the
+  -- common ghost run, then `probOutput_bind_mono` against the pointwise verify-tail split, gated
+  -- by the whole-run ghost-domain invariant.
+  refine le_trans ?_ (le_of_eq hRHS.symm)
+  refine probOutput_bind_mono fun a ha => ?_
+  obtain ⟨av, ⟨base, ghost⟩, signed⟩ := a
+  exact probOutput_hybridVerifyCont_le_managed_verify ids hr M maxAttempts pk av base ghost signed
+    (fun q hq => ghostNmaImpl_run_signed_inv M maxAttempts sim pk sk (adv.main pk) _ ha q hq)
 
+omit [SampleableType Stmt] in
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
 simulated single-cache hybrid (with the freshness check) is bounded by the run-normal-form
 of the managed-RO NMA experiment — the managed-cache run of `simulatedNmaAdv` followed by
@@ -2581,6 +2737,7 @@ lemma hybridExp_sim_le_managedRun_perKey
   rw [simulateQ_bind, StateT.run'_eq, StateT.run_bind]
   exact hybridSimRun_le_managedRun_verify ids hr M maxAttempts sim adv pk sk
 
+omit [SampleableType Stmt] in
 /-- NMA bridge: the success probability of the simulated hybrid (averaged over key
 generation, with the freshness check) is at most the success probability of
 `simulatedNmaAdv` in the managed-RO NMA experiment.
@@ -2650,38 +2807,6 @@ collapses the managed-RO NMA experiment onto the plain EUF-NMA experiment of the
 cache-forgetting adversary `simulatedEufNmaAdv`, making the bound
 `Pr[managedRoNmaExp simulatedNmaAdv] ≤ simulatedEufNmaAdv.advantage` sound. -/
 
-omit [SampleableType Stmt] [SampleableType Chal] in
-/-- If a cache misses at the forgery's verification point `Sum.inr (msg, w')`, the overlay
-verification of `FiatShamirWithAbort.verify pk msg (some (w', z))` agrees with the plain
-live verification: the single query at `Sum.inr (msg, w')` misses and is forwarded live.
-The `none` case is verification-free, so it is trivially overlay-insensitive. -/
-lemma withCacheOverlay_verify_eq_of_miss
-    (cache : (unifSpec + (M × Commit →ₒ Chal)).QueryCache) (pk : Stmt)
-    (msg : M) (σ : Option (Commit × Resp))
-    (hmiss : ∀ w' z, σ = some (w', z) → cache (Sum.inr (msg, w')) = none) :
-    withCacheOverlay cache
-        ((FiatShamirWithAbort (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
-          ids hr M maxAttempts).verify pk msg σ) =
-      (FiatShamirWithAbort (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
-        ids hr M maxAttempts).verify pk msg σ := by
-  cases σ with
-  | none => simp only [FiatShamirWithAbort, withCacheOverlay_pure]
-  | some wz =>
-      obtain ⟨w', z⟩ := wz
-      have hm : cache (Sum.inr (msg, w')) = none := hmiss w' z rfl
-      change withCacheOverlay _
-          ((query (Sum.inr (msg, w')) :
-            OracleComp (unifSpec + (M × Commit →ₒ Chal))
-              ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr (msg, w')))) >>=
-            fun c => pure (ids.verify pk w' c z)) =
-        (query (Sum.inr (msg, w')) :
-            OracleComp (unifSpec + (M × Commit →ₒ Chal))
-              ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr (msg, w')))) >>=
-            fun c => pure (ids.verify pk w' c z)
-      rw [withCacheOverlay_bind_pure, bind_pure_comp]
-      congr 1
-      exact withCacheOverlay_query_miss _ (Sum.inr (msg, w')) hm
-
 /-- The plain EUF-NMA adversary underlying `simulatedNmaAdv`: run the same managed
 simulation of the CMA adversary, but forget the returned cache and verify in the plain
 random-oracle model. By Option B (`withCacheOverlay_verify_eq_of_miss`) the managed-RO NMA
@@ -2729,6 +2854,7 @@ lemma managedRoNmaExp_simulatedNmaAdv_eq_eufNmaExp :
 
 /-! ## Assembly -/
 
+omit [SampleableType Stmt] in
 /-- **CMA-to-NMA reduction for Fiat-Shamir with aborts** (after Theorem 3, CRYPTO 2023),
 at the managed-RO NMA interface: for any EUF-CMA adversary making at most `qS` signing
 and `qH` hash queries, the CMA advantage is bounded by the managed-RO NMA success

@@ -1724,6 +1724,16 @@ omit [SampleableType Stmt] [DecidableEq Commit] [DecidableEq M] [SampleableType 
 @[simp] lemma baseEmbed_inl (base : (M × Commit →ₒ Chal).QueryCache)
     (n : unifSpec.Domain) : baseEmbed M base (.inl n) = none := rfl
 
+omit [SampleableType Stmt] [DecidableEq Commit] [DecidableEq M] [SampleableType Chal] in
+/-- The embedding of the empty base cache is the empty outer cache. -/
+@[simp] lemma baseEmbed_empty :
+    baseEmbed M (∅ : (M × Commit →ₒ Chal).QueryCache) =
+      (∅ : (unifSpec + (M × Commit →ₒ Chal)).QueryCache) := by
+  funext t
+  cases t with
+  | inl n => rfl
+  | inr mc => rfl
+
 omit [SampleableType Stmt] [SampleableType Chal] in
 /-- Embedding commutes with caching a random-oracle point: `baseEmbed` of a base cache
 extended at `mc` equals the outer cache extended at the `.inr mc` slot. -/
@@ -1828,6 +1838,26 @@ lemma ghostNmaImpl_preserves_signed_inv (pk : Stmt) (sk : Wit)
       with hgh | hmsg
     · exact List.mem_cons_of_mem _ (hs q hgh)
     · exact hmsg ▸ List.mem_cons_self
+
+omit [SampleableType Stmt] in
+/-- **Whole-run ghost-domain invariant.** Lifting `ghostNmaImpl_preserves_signed_inv` through
+the full simulated run via `simulateQ_run_preserves_inv_of_query`: starting from the empty
+layered state `((∅, ∅), [])`, every output state `z` in the support of the layered ghost-tagged
+NMA run records each ghost-layer point's message in the signed list. This is the support fact
+gating the verify-tail split (`hybridVerifyCont_cache_congr`): on a fresh forgery `msg ∉ z.2.2`
+the ghost layer misses at every `(msg, w)`, so the overlay agrees with the base layer there. -/
+lemma ghostNmaImpl_run_signed_inv (pk : Stmt) (sk : Wit) {β : Type}
+    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) +
+      (M →ₒ Option (Commit × Resp))) β) :
+    ∀ z ∈ support ((simulateQ (ghostNmaImpl M maxAttempts sim pk sk) oa).run ((∅, ∅), [])),
+      ∀ q : M × Commit, z.2.1.2 q ≠ none → q.1 ∈ z.2.2 := by
+  refine simulateQ_run_preserves_inv_of_query
+    (ghostNmaImpl M maxAttempts sim pk sk)
+    (inv := fun s => ∀ q : M × Commit, s.1.2 q ≠ none → q.1 ∈ s.2)
+    (fun t s hs => ghostNmaImpl_preserves_signed_inv M maxAttempts sim pk sk t s hs)
+    oa ((∅, ∅), []) ?_
+  intro q hq
+  exact absurd rfl hq
 
 omit [SampleableType Stmt] in
 /-- **Sub-lemma (a): overlay projection of the layered NMA handler.** Each step of the
