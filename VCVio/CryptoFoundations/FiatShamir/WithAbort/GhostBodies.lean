@@ -1072,6 +1072,186 @@ lemma probOutput_lazyGhostFire_one (pk : Stmt) (sk : Wit) (w' : Commit) :
   · intro b hb
     simp [probOutput_pure, hb]
 
+omit [SampleableType Stmt] in
+/-- **Eager read bad-fire indicator.** Starting from a state with the bad flag unset, the
+eager ghost handler's adversarial random-oracle read at `mc` sets the bad flag with mass
+exactly `1` if `mc` lies in the ghost-cache domain and mass `0` otherwise: on a ghost hit
+the handler returns `pure (v, (s.1, true))`, and on a ghost miss it runs `roStep` which
+leaves the (already-unset) bad flag untouched. This is the deterministic eager flip whose
+upstream-averaged marginal the deferred-sampling commutation must reproduce. -/
+lemma probOutput_ghostHybridImpl_read_bad
+    (pk : Stmt) (sk : Wit) (mc : M × Commit)
+    (s : ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M) :
+    Pr[fun z : Chal × GhostState M Commit Chal => z.2.2 = true |
+        (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run (s, false)] =
+      if s.1.2 mc = none then 0 else 1 := by
+  simp only [ghostHybridImpl, StateT.run_mk]
+  cases hgh : s.1.2 mc with
+  | some v =>
+      simp only [↓reduceIte]
+      simp
+  | none =>
+      simp [probEvent_eq_zero]
+
+omit [SampleableType Stmt] in
+/-- **Single-pending deferred-sampling commutation** (the inductive base case of #228, B1).
+
+The eager handler reads the *already-sampled* ghost key `w` from the ghost cache and fires
+the bad flag deterministically iff the adversary's read point `mc` matches the written entry
+`(msg, w)`. Marginalizing over the single signing-time commit draw of `w` (which wrote
+`(msg, w)` into an initially-empty ghost layer over an arbitrary real layer `re` at challenge
+`c`), the eager bad-fire mass equals the deferred read `lazyGhostFire … 1`, in which the same
+commitment is *redrawn at read time*. Concretely both equal `Pr[= mc.2 | commit]` when the
+read point lies under `msg` (and `0` otherwise): the eager structural hit `w = mc.2` over the
+signing-time draw and the lazy fresh draw `w = mc.2` at read time have the *same* marginal.
+
+This is the formal statement that moves the sampling site from signing time (eager) to read
+time (lazy) for a single pending key. The averaging over the upstream draw — not the
+per-state eager value — is what reproduces the lazy mass: at a *fixed* drawn `w` the eager
+read is deterministic `0`/`1`, but its expectation over `w ← commit` is exactly the lazy
+`lazyGhostFire … 1` firing probability. The general leaf iterates this peel over the random
+number of pending keys (B2). -/
+lemma probEvent_ghostHybridImpl_read_bad_single_eq_lazyFire
+    (pk : Stmt) (sk : Wit) (msg : M) (mc : M × Commit) (hmc : mc.1 = msg)
+    (re : (M × Commit →ₒ Chal).QueryCache) (c : Chal) :
+    Pr[fun z : Chal × GhostState M Commit Chal => z.2.2 = true |
+        (Prod.fst <$> ids.commit pk sk) >>= fun w =>
+          (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run
+            (((re, (∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery (msg, w) c), []), false)] =
+      Pr[= true | lazyGhostFire ids pk sk mc.2 1] := by
+  -- Reduce the eager single-write read to its bad-fire indicator, which collapses to
+  -- `if w = mc.2 then 1 else 0` (membership of `mc` in the single-entry ghost cache).
+  have hind : ∀ w : Commit,
+      (if ((((re, (∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery (msg, w) c), [])
+            : ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M).1.2
+              mc = none) then (0 : ℝ≥0∞) else 1) = if w = mc.2 then 1 else 0 := by
+    intro w
+    by_cases hw : w = mc.2
+    · subst hw
+      have hmceq : (mc : M × Commit) = (msg, mc.2) := Prod.ext hmc rfl
+      conv_lhs => rw [show ((mc : M × Commit)) = (msg, mc.2) from hmceq]
+      simp
+    · have hne : (mc : M × Commit) ≠ (msg, w) := by
+        intro h; exact hw (by rw [← hmc] at h; exact (Prod.ext_iff.mp h).2.symm)
+      simp only [QueryCache.cacheQuery_of_ne _ _ hne]
+      simp [hw]
+  rw [probEvent_bind_eq_tsum]
+  simp only [probOutput_ghostHybridImpl_read_bad ids M maxAttempts pk sk mc, hind]
+  rw [probOutput_lazyGhostFire_one]
+  rw [tsum_eq_single mc.2 (by intro w hw; simp [hw])]
+  simp
+
+omit [SampleableType Stmt] in
+/-- **Eager multi-pending ghost read marginal** (the deferred-sampling iteration of #228, B2).
+
+The eager read at a ghost cache holding the entries `(msg, w_i)` for `n` signing-time-drawn
+keys fires the bad flag iff the adversary's read point `mc` matches one of those `n` entries.
+Marginalizing over the `n` signing-time draws (each fresh `w ← Prod.fst <$> ids.commit`, the
+ghost cache built over an arbitrary real layer `re` at challenges `c`), the eager bad-fire
+mass equals the deferred read `lazyGhostFire … n`, in which all `n` commitments are *redrawn at
+read time*.
+
+This is the iteration of the single-pending commutation
+`probEvent_ghostHybridImpl_read_bad_single_eq_lazyFire` (B1) over the number of pending keys:
+the membership event `mc ∈ {(msg, w_i)}` is the union `∃ i, w_i = mc.2`, whose marginal over
+iid draws is exactly the union event of `lazyGhostFire`. The induction peels one draw — the
+freshly written entry decides one disjunct (`decide (w = mc.2)`), the remaining `n` entries
+recurse — matching `lazyGhostFire`'s `decide (w = w') || b` step verbatim.
+
+`eagerMultiReadBad re n` is the eager bad-fire flag at an `n`-pending cache, written as the
+deferred draw whose `decide`-or fold tracks the membership; each draw writes `(msg, w)` over
+`re` and the read is the deterministic eager indicator
+`probOutput_ghostHybridImpl_read_bad`. -/
+noncomputable def eagerMultiReadBad (pk : Stmt) (sk : Wit) (msg : M) (mc : M × Commit)
+    (re : (M × Commit →ₒ Chal).QueryCache) (c : Chal) :
+    ℕ → ProbComp Bool
+  | 0 => pure (decide (re mc ≠ none))
+  | n + 1 => do
+    let w ← Prod.fst <$> ids.commit pk sk
+    eagerMultiReadBad pk sk msg mc (re.cacheQuery (msg, w) c) c n
+
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- **Eager multi-pending read = lazy fire (union form)** (the B2 iteration core).
+
+By induction on the pending count `n`, the eager `n`-write membership read over an arbitrary
+base layer `re` equals the deferred `lazyGhostFire … n` *or-ed* with the base-layer membership
+`re mc ≠ none`. Each induction step peels one signing-time draw `w ← commit`: the freshly
+written entry `(msg, w)` contributes the disjunct `decide (w = mc.2)` (since `mc.1 = msg`,
+membership of `mc` in the one-key extension `re.cacheQuery (msg, w) c` is `w = mc.2 ∨ mc ∈ re`),
+matching `lazyGhostFire`'s `decide (w = w') || b` step verbatim. This is the deferred-sampling
+commutation iterated over all pending keys — moving every signing-time draw to read time —
+proved entirely locally (no adversary fold). -/
+lemma probOutput_eagerMultiReadBad_eq_lazyFire_or
+    (pk : Stmt) (sk : Wit) (msg : M) (mc : M × Commit) (hmc : mc.1 = msg) (c : Chal) :
+    ∀ (n : ℕ) (re : (M × Commit →ₒ Chal).QueryCache),
+      Pr[= true | eagerMultiReadBad ids M pk sk msg mc re c n] =
+        Pr[= true | lazyGhostFire ids pk sk mc.2 n >>= fun b =>
+          pure (b || decide (re mc ≠ none))] := by
+  intro n
+  induction n with
+  | zero =>
+      intro re
+      simp [eagerMultiReadBad, lazyGhostFire]
+  | succ n ih =>
+      intro re
+      -- Peel one signing-time draw on both sides and rewrite the membership disjunct.
+      have hcache : ∀ w : Commit,
+          decide ((re.cacheQuery (msg, w) c) mc ≠ none) =
+            (decide (w = mc.2) || decide (re mc ≠ none)) := by
+        intro w
+        by_cases hw : w = mc.2
+        · subst hw
+          have hmceq : (mc : M × Commit) = (msg, mc.2) := Prod.ext hmc rfl
+          rw [hmceq, QueryCache.cacheQuery_self]
+          simp
+        · have hne : (mc : M × Commit) ≠ (msg, w) := by
+            intro h; exact hw (by rw [← hmc] at h; exact (Prod.ext_iff.mp h).2.symm)
+          rw [QueryCache.cacheQuery_of_ne _ _ hne]
+          simp [hw]
+      -- LHS: `eagerMultiReadBad (n+1)` draws `w` then recurses; apply `ih` on the extended cache.
+      rw [show eagerMultiReadBad ids M pk sk msg mc re c (n + 1) =
+            (Prod.fst <$> ids.commit pk sk) >>= fun w =>
+              eagerMultiReadBad ids M pk sk msg mc (re.cacheQuery (msg, w) c) c n
+          from rfl]
+      rw [probOutput_bind_eq_tsum]
+      -- RHS: `lazyGhostFire (n+1)` draws `w`, then `lazyGhostFire n` and or-s `decide (w = mc.2)`.
+      rw [show (lazyGhostFire ids pk sk mc.2 (n + 1) >>= fun b => pure (b || decide (re mc ≠ none)))
+            = (Prod.fst <$> ids.commit pk sk) >>= fun w =>
+                (lazyGhostFire ids pk sk mc.2 n >>= fun b =>
+                  pure (b || decide ((re.cacheQuery (msg, w) c) mc ≠ none)))
+          from ?_]
+      · rw [probOutput_bind_eq_tsum]
+        refine tsum_congr fun w => ?_
+        rw [ih (re.cacheQuery (msg, w) c)]
+      · -- The two read-time draw shapes agree by `hcache` and Boolean-or associativity.
+        rw [show (lazyGhostFire ids pk sk mc.2 (n + 1)) =
+              (Prod.fst <$> ids.commit pk sk) >>= fun w =>
+                lazyGhostFire ids pk sk mc.2 n >>= fun b => pure (decide (w = mc.2) || b)
+            from rfl]
+        rw [bind_assoc]
+        refine bind_congr fun w => ?_
+        rw [bind_assoc]
+        refine bind_congr fun b => ?_
+        rw [pure_bind, hcache w]
+        congr 1
+        cases b <;> cases (decide (w = mc.2)) <;> cases (decide (re mc ≠ none)) <;> rfl
+
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- **Eager multi-pending read = lazy fire** (B2, empty base case). With an *empty* base layer
+(`re = ∅`, the actual initial real cache of the leaf), the eager `n`-write membership read has
+exactly the firing probability of the deferred read `lazyGhostFire … n`: the union over the
+`n` signing-time draws equals the union over the `n` read-time redraws. -/
+lemma probOutput_eagerMultiReadBad_empty_eq_lazyFire
+    (pk : Stmt) (sk : Wit) (msg : M) (mc : M × Commit) (hmc : mc.1 = msg) (c : Chal) (n : ℕ) :
+    Pr[= true | eagerMultiReadBad ids M pk sk msg mc
+        (∅ : (M × Commit →ₒ Chal).QueryCache) c n] =
+      Pr[= true | lazyGhostFire ids pk sk mc.2 n] := by
+  rw [probOutput_eagerMultiReadBad_eq_lazyFire_or ids M pk sk msg mc hmc c n]
+  congr 1
+  rw [show (fun b => pure (b || decide ((∅ : (M × Commit →ₒ Chal).QueryCache) mc ≠ none)))
+        = (fun b : Bool => pure b) from funext fun b => by simp]
+  rw [bind_pure]
+
 omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] in
 /-- Boolean-or read shape: appending one fresh `decide (w = w')` flag to a Boolean draw
 raises the firing probability by at most `1` (when the fresh flag is set) over the residual
