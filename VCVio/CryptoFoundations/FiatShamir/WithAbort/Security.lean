@@ -2004,6 +2004,34 @@ lemma hproj2_ro (pk : Stmt) (sk : Wit) (mc : M × Commit) (v : Chal)
   rfl
 
 omit [SampleableType Stmt] in
+/-- **Sub-lemma (b), random-oracle step — ghost-hit sub-case.** On a random-oracle query at a
+point `mc` whose ghost layer already holds a value `v` (`hgh : s.1.2 mc = some v`), the layered
+ghost-tagged handler `ghostNmaImpl`, projected by `proj2`, matches the linked managed handler
+`nmaLinkImpl` applied to the projected state. `ghostNmaImpl` returns the ghost value leaving its
+state untouched; under the *redesigned* `proj2` the inner managed cache is `baseEmbed (overlay
+base ghost)`, which carries the ghost value at `.inr mc` (`overlayCache_apply_ghost_some`), so the
+linked `roSim` finds it and short-circuits without touching either layer. (Under the earlier
+`proj2 = (baseEmbed base, …)` this case diverged — the inner cache did not hold ghost points — and
+needed a reachability invariant; the redesign makes it exact.) -/
+lemma hproj2_ro_ghost_hit (pk : Stmt) (sk : Wit) (mc : M × Commit) (v : Chal)
+    (s : NmaGhostState M Commit Chal) (hgh : s.1.2 mc = some v) :
+    Prod.map id (proj2 M) <$> (ghostNmaImpl M maxAttempts sim pk sk (.inl (.inr mc))).run s =
+      (nmaLinkImpl M maxAttempts sim pk (.inl (.inr mc))).run (proj2 M s) := by
+  rw [ghostNmaImpl_run_ro, nmaLinkImpl, QueryImpl.Stateful.link_impl_apply_run]
+  simp only [nmaOuterImpl, QueryImpl.add_apply_inl, QueryImpl.add_apply_inr, proj2]
+  rw [hgh]
+  -- The overlay holds the ghost value at `mc`, so the inner managed cache `baseEmbed (overlay
+  -- base ghost)` does too; `roSim` short-circuits.
+  have hov : overlayCache M s.1.1 s.1.2 mc = some v :=
+    overlayCache_apply_ghost_some (M := M) s.1.1 hgh
+  erw [StateT.run_bind, StateT.run_get]
+  simp only [pure_bind, baseEmbed_inr, hov, map_pure, nmaInnerImpl]
+  erw [StateT.run_pure]
+  simp only [map_pure, QueryImpl.Stateful.Frame.linkReshape, QueryImpl.Stateful.Frame.prod,
+    PFunctor.Lens.State.fst, PFunctor.Lens.State.snd, Prod.map, id_eq, proj2]
+  rfl
+
+omit [SampleableType Stmt] in
 /-- **Sub-lemma (b), random-oracle step — fresh-live-read sub-case.** On a random-oracle
 query at a point `mc` whose ghost layer misses (`hgm`) and whose base layer also misses
 (`hbm : s.1.1 mc = none`), the layered ghost-tagged handler `ghostNmaImpl`, projected by
@@ -2168,6 +2196,96 @@ lemma hproj2_sign (pk : Stmt) (sk : Wit) (msg : M)
       -- component carries the full overlay, so the sign point lands in the same inner slot whether
       -- or not it coincides with a prior live read.
       rw [overlayCache_cacheQuery_ghost, baseEmbed_cacheQuery]
+
+omit [SampleableType Stmt] in
+/-- **Sub-lemma (b), unified per-step `evalDist` coupling.** For *every* oracle query `t` and
+every layered state `s`, the `proj2`-projected layered NMA step has the same output/state
+distribution as the linked managed step on the projected state. This bundles the four per-step
+lemmas (`hproj2_unif`, `hproj2_ro`/`hproj2_ro_ghost_hit`/`hproj2_ro_fresh`, `hproj2_sign`): under
+the redesigned `proj2 ((base, ghost), signed) = (baseEmbed (overlayCache base ghost), base)` each
+step is an exact equality (the random-oracle and signing steps no longer depend on any reachability
+or no-collision side condition), so the coupling holds unconditionally on all of `t`. This is the
+per-query hypothesis for the whole-run state-projection `relTriple_simulateQ_run`. -/
+lemma hproj2_evalDist (pk : Stmt) (sk : Wit)
+    (t : ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp))).Domain)
+    (s : NmaGhostState M Commit Chal) :
+    𝒟[Prod.map id (proj2 M) <$> (ghostNmaImpl M maxAttempts sim pk sk t).run s] =
+      𝒟[(nmaLinkImpl M maxAttempts sim pk t).run (proj2 M s)] := by
+  rcases t with (n | mc) | msg
+  · exact congrArg _ (hproj2_unif M maxAttempts sim pk sk n s)
+  · rcases hgh : s.1.2 mc with _ | v
+    · rcases hbh : s.1.1 mc with _ | w
+      · exact congrArg _ (hproj2_ro_fresh M maxAttempts sim pk sk mc s hgh hbh)
+      · exact congrArg _ (hproj2_ro M maxAttempts sim pk sk mc w s hgh hbh)
+    · exact congrArg _ (hproj2_ro_ghost_hit M maxAttempts sim pk sk mc v s hgh)
+  · exact hproj2_sign M maxAttempts sim pk sk msg s
+
+/-- **Graph coupling along a function.** If pushing `oa` forward through `F` matches `ob` in
+distribution, then `oa` and `ob` are related (as a `RelTriple`) by the graph relation
+`fun a b => F a = b`. This is the reverse direction of `evalDist_map_eq_of_relTriple`: the
+witnessing coupling is the deterministic coupling `𝒟[oa] >>= fun a => pure (a, F a)`, whose first
+marginal is `𝒟[oa]` and whose second marginal is `𝒟[F <$> oa] = 𝒟[ob]`, supported on the graph. -/
+private lemma relTriple_graph_of_evalDist_map_eq
+    {ι₁ ι₂ : Type} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
+    {α' σ' : Type} (F : α' → σ')
+    (oa : OracleComp spec₁ α') (ob : OracleComp spec₂ σ')
+    (h : 𝒟[F <$> oa] = 𝒟[ob]) :
+    OracleComp.ProgramLogic.Relational.RelTriple oa ob (fun a b => F a = b) := by
+  apply (OracleComp.ProgramLogic.Relational.relTriple_iff_relWP
+    (oa := oa) (ob := ob) (R := fun a b => F a = b)).2
+  refine ⟨⟨𝒟[oa] >>= fun a => pure (a, F a), ?_, ?_⟩, ?_⟩
+  · rw [map_bind]; simp
+  · rw [← h, evalDist_map, map_bind]; simp [Function.comp]
+  · intro z hz
+    rcases (mem_support_bind_iff
+      (𝒟[oa]) (fun a => (pure (a, F a) : SPMF (α' × σ'))) z).1 hz with ⟨a, _, hz'⟩
+    have hzEq : z = (a, F a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    simp [hzEq]
+
+omit [SampleableType Stmt] in
+/-- **Sub-lemma (b), whole-run state projection.** The full layered ghost-tagged NMA run
+`(simulateQ ghostNmaImpl (adv.main pk)).run s`, projected by `proj2`, has the same output/state
+distribution as the linked managed run `(simulateQ nmaLinkImpl (adv.main pk)).run (proj2 s)`. This
+lifts the per-step coupling `hproj2_evalDist` through `relTriple_simulateQ_run` with the state
+relation `R s' p := proj2 s' = p` (output-equal, `proj2`-related states), the per-step `RelTriple`
+being recovered from the per-step `evalDist`-map equality by the graph coupling
+`relTriple_graph_of_evalDist_map_eq`. -/
+lemma evalDist_map_run_simulateQ_ghostNmaImpl_proj2 {β : Type} (pk : Stmt) (sk : Wit)
+    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) +
+      (M →ₒ Option (Commit × Resp))) β)
+    (s : NmaGhostState M Commit Chal) :
+    𝒟[Prod.map id (proj2 M) <$> (simulateQ (ghostNmaImpl M maxAttempts sim pk sk) oa).run s] =
+      𝒟[(simulateQ (nmaLinkImpl M maxAttempts sim pk) oa).run (proj2 M s)] := by
+  -- State relation: `s'` and `p` are related iff `p` is the `proj2`-projection of `s'`.
+  have hrel := OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run
+    (impl₁ := ghostNmaImpl M maxAttempts sim pk sk)
+    (impl₂ := nmaLinkImpl M maxAttempts sim pk)
+    (R_state := fun (s' : NmaGhostState M Commit Chal) p => proj2 M s' = p)
+    (oa := oa)
+    (himpl := fun t s₁ s₂ hs => ?_)
+    (s₁ := s) (s₂ := proj2 M s) rfl
+  · -- The whole-run `RelTriple` carries `p₁.1 = p₂.1 ∧ proj2 p₁.2 = p₂.2`, i.e. the graph of
+    -- `Prod.map id proj2`. Re-express it as a graph relation and extract the `map`-equality.
+    have hrel' : OracleComp.ProgramLogic.Relational.RelTriple
+        ((simulateQ (ghostNmaImpl M maxAttempts sim pk sk) oa).run s)
+        ((simulateQ (nmaLinkImpl M maxAttempts sim pk) oa).run (proj2 M s))
+        (fun p₁ p₂ => Prod.map id (proj2 M) p₁ = p₂) :=
+      OracleComp.ProgramLogic.Relational.relTriple_post_mono hrel
+        (fun p₁ p₂ ⟨h1, h2⟩ => Prod.ext h1 h2)
+    have := OracleComp.ProgramLogic.Relational.evalDist_map_eq_of_relTriple
+      (f := Prod.map id (proj2 M)) (g := id) hrel'
+    simpa using this
+  · -- Per-step coupling from the unified per-step `evalDist`-map equality, via the graph coupling.
+    subst hs
+    refine OracleComp.ProgramLogic.Relational.relTriple_post_mono
+      (relTriple_graph_of_evalDist_map_eq (F := Prod.map id (proj2 M))
+        ((ghostNmaImpl M maxAttempts sim pk sk t).run s₁)
+        ((nmaLinkImpl M maxAttempts sim pk t).run (proj2 M s₁))
+        (hproj2_evalDist M maxAttempts sim pk sk t s₁)) ?_
+    rintro p₁ p₂ rfl
+    exact ⟨rfl, rfl⟩
 
 
 /-- The managed-RO NMA reduction for Fiat-Shamir with aborts: run the CMA adversary,
