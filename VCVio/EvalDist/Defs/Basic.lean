@@ -273,26 +273,14 @@ variable [MonadLiftT m SetM] [EvalDistCompatible m]
 
 lemma probEvent_eq_tsum_subtype_mem_support (mx : m α) (p : α → Prop) :
     Pr[ p | mx] = ∑' x : {x ∈ support mx | p x}, Pr[= x | mx] := by
-  simp_rw [probEvent_eq_tsum_subtype, tsum_subtype]
-  refine tsum_congr (fun x ↦ ?_)
-  by_cases hpx : p x
-  · refine (if_pos hpx).trans ?_
-    by_cases hx : x ∈ support mx
-    · simp only [Set.indicator, Set.mem_setOf_eq, hx, hpx, and_self, ↓reduceIte]
-    · simp only [Set.indicator, Set.mem_setOf_eq, hx, hpx, and_true, ↓reduceIte,
-      probOutput_eq_zero_iff, not_false_eq_true]
-  · exact (if_neg hpx).trans (by simp [Set.indicator, hpx])
+  rw [probEvent_eq_tsum_subtype, tsum_subtype, tsum_subtype, ← support_probOutput,
+    ← Set.indicator_inter_support]
+  simp [Set.inter_def, and_comm]
 
 lemma probEvent_eq_tsum_subtype_support_ite (mx : m α) (p : α → Prop) [DecidablePred p] :
-    Pr[ p | mx] = ∑' x : support mx, if p x then Pr[= x | mx] else 0 :=
-calc
-  Pr[ p | mx] = (∑' x, if p x then Pr[= x | mx] else 0) := by rw [probEvent_eq_tsum_ite mx p]
-  _ = ∑' x, (support mx).indicator (fun x ↦ if p x then Pr[= x | mx] else 0) x := by
-    refine tsum_congr (fun x ↦ ?_)
-    unfold Set.indicator
-    split_ifs with h1 h2 h2 <;> simp [h1, h2]
-  _ = ∑' x : support mx, if p x then Pr[= x | mx] else 0 := by
-    rw [tsum_subtype (support mx) (fun x ↦ if p x then Pr[= x | mx] else 0)]
+    Pr[ p | mx] = ∑' x : support mx, if p x then Pr[= x | mx] else 0 := by
+  rw [probEvent_eq_tsum_ite, ← tsum_subtype_eq_of_support_subset (s := support mx)]
+  grind [Function.support_subset_iff]
 
 lemma probEvent_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (p : α → Prop) [DecidablePred p] :
@@ -399,8 +387,7 @@ lemma evalDist_eq_liftM [MonadLiftT m SPMF] {mx : m α} {p : PMF α}
 
 @[simp]
 lemma evalDist_apply_eq_zero_iff [MonadLiftT m SPMF] [MonadLiftT m SetM]
-    [EvalDistCompatible m] (mx : m α)
-    (x : Option α) :
+    [EvalDistCompatible m] (mx : m α) (x : Option α) :
     (𝒟[mx]).run x = 0 ↔ x.rec (Pr[⊥ | mx] = 0) (· ∉ support mx) := by
   induction x with
   | none => simp [probFailure_def]
@@ -551,13 +538,9 @@ lemma probOutput_eq_one_of_support_subset_singleton [MonadLiftT m SPMF] [MonadLi
     [EvalDistCompatible m]
     (hnf : Pr[⊥ | mx] = 0) (huniq : ∀ y ∈ support mx, y = x) :
     Pr[= x | mx] = 1 := by
-  have hnot : ∀ y ≠ x, Pr[= y | mx] = 0 :=
-    fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
-  have hsum : ∑' y, Pr[= y | mx] = Pr[= x | mx] :=
-    tsum_eq_single x hnot
-  have htot := probFailure_add_tsum_probOutput mx
-  rw [hnf, hsum, zero_add] at htot
-  exact htot
+  simpa [hnf, tsum_eq_single (f := (Pr[= · | mx])) x
+    fun y hy ↦ (probOutput_eq_zero_iff _ _).mpr fun hmem ↦ hy (huniq y hmem)]
+    using probFailure_add_tsum_probOutput mx
 
 end bounds
 
@@ -700,8 +683,7 @@ variable {α β γ : Type u} {m : Type u → Type v}
 /-- A computation interpreted via a `PMF` lift has zero failure probability. -/
 @[simp, grind =]
 lemma probFailure_of_liftM_PMF (mx : m α) : Pr[⊥ | mx] = 0 := by
-  rw [probFailure_def, show 𝒟[mx] = (liftM (liftM mx : PMF α) : SPMF α) from rfl,
-    SPMF.run_eq_toPMF]
+  rw [probFailure_def, SPMF.run_eq_toPMF]
   change (some <$> (liftM mx : PMF α)) none = 0
   simp [PMF.monad_map_eq_map, PMF.map_apply]
 
@@ -709,8 +691,7 @@ lemma tsum_probOutput_of_liftM_PMF (mx : m α) :
     ∑' x, Pr[= x | mx] = 1 := by simp
 
 lemma tsum_support_probOutput_of_liftM_PMF [MonadLiftT m SetM] [EvalDistCompatible m]
-    (mx : m α) :
-    ∑' x : support mx, Pr[= x | mx] = 1 := by simp
+    (mx : m α) : ∑' x : support mx, Pr[= x | mx] = 1 := by simp
 
 lemma sum_probOutput_of_liftM_PMF [Fintype α] (mx : m α) :
     ∑ x : α, Pr[= x | mx] = 1 := by simp
@@ -728,19 +709,13 @@ lemma finSupport_nonempty_of_liftM_PMF [MonadLiftT m SetM] [EvalDistCompatible m
   exact zero_ne_one hsum
 
 lemma probOutput_eq_inv_finSupport_card_of_liftM_PMF [MonadLiftT m SetM] [EvalDistCompatible m]
-    [HasEvalFinset m] [DecidableEq α]
-    {mx : m α} {c : ENNReal}
+    [HasEvalFinset m] [DecidableEq α] {mx : m α} {c : ENNReal}
     (hconst : ∀ x ∈ support mx, Pr[= x | mx] = c) :
     c = 1 / (finSupport mx).card := by
-  have hconst' : ∀ x ∈ finSupport mx, Pr[= x | mx] = c :=
-    fun x hx => hconst x (mem_support_of_mem_finSupport hx)
-  have hcard_mul : ((finSupport mx).card : ENNReal) * c = 1 := by
-    have h := sum_finSupport_probOutput_of_liftM_PMF (m := m) mx
-    rwa [show ∑ x ∈ finSupport mx, Pr[= x | mx] = ∑ x ∈ finSupport mx, c from
-      Finset.sum_congr rfl fun x hx => hconst' x hx, Finset.sum_const, nsmul_eq_mul] at h
-  have : c * ((finSupport mx).card : ENNReal) = 1 := by rwa [mul_comm] at hcard_mul
-  calc c = ((finSupport mx).card : ENNReal)⁻¹ := ENNReal.eq_inv_of_mul_eq_one_left this
-    _ = 1 / (finSupport mx).card := by rw [one_div]
+  have h := sum_finSupport_probOutput_of_liftM_PMF (m := m) mx
+  rw [Finset.sum_congr rfl fun x hx => hconst x (mem_support_of_mem_finSupport hx),
+    Finset.sum_const, nsmul_eq_mul, mul_comm] at h
+  simpa using ENNReal.eq_inv_of_mul_eq_one_left h
 
 end pmf_denotation
 
@@ -752,10 +727,8 @@ variable [MonadLiftT m SPMF]
 lemma probEvent_compl (mx : m α) (p : α → Prop) :
     Pr[ p | mx] + Pr[ fun x => ¬p x | mx] = 1 - Pr[⊥ | mx] := by
   have := Classical.decPred p
-  rw [probEvent_eq_tsum_ite mx p, probEvent_eq_tsum_ite mx (fun x => ¬p x)]
-  rw [← ENNReal.tsum_add, ← tsum_probOutput_eq_sub]
-  refine tsum_congr fun x => ?_
-  split_ifs <;> simp_all
+  simp only [probEvent_eq_tsum_ite, ← ENNReal.tsum_add, ← tsum_probOutput_eq_sub]
+  exact tsum_congr fun x => by split_ifs <;> simp_all
 
 /-- Union bound: the probability of `p ∨ q` is at most the sum of probabilities. -/
 lemma probEvent_or_le (mx : m α) (p q : α → Prop) :
@@ -772,11 +745,11 @@ lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[ p | mx] ≤ P
   have := Classical.decPred p; have := Classical.decPred q
   simp only [probEvent_eq_tsum_ite]
   refine ENNReal.tsum_le_tsum fun x => ?_
-  split_ifs with hp hq
-  · exact le_rfl
-  · exact le_of_eq (probOutput_eq_zero_of_not_mem_support (fun hx => hq (h x hx hp)))
-  · exact zero_le
-  · exact le_rfl
+  split_ifs with hp hq <;>
+    first
+    | rfl
+    | exact zero_le
+    | exact le_of_eq (probOutput_eq_zero_of_not_mem_support fun hx => hq (h x hx hp))
 
 /-- If `p` implies `q` on the `finSupport` of a computation then it is more likely to happen. -/
 lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
@@ -791,32 +764,13 @@ lemma probEvent_mono'' (h : ∀ x, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
 @[simp low, grind =]
 lemma probEvent_eq_one_iff :
     Pr[ p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
-  constructor
-  · intro h
-    have hcompl := probEvent_compl mx p
-    rw [h] at hcompl
-    have hfail : Pr[⊥ | mx] = 0 := by
-      by_contra hne
-      have h1 : 1 - Pr[⊥ | mx] < 1 :=
-        ENNReal.sub_lt_self one_ne_top one_ne_zero hne
-      exact not_lt.mpr (hcompl ▸ le_add_right le_rfl) h1
-    refine ⟨hfail, fun x hx => ?_⟩
-    rw [hfail, tsub_zero] at hcompl
-    have h3 : Pr[ fun x => ¬p x | mx] = 0 := by
-      have hcancel : AddLECancellable (1 : ℝ≥0∞) :=
-        WithTop.addLECancellable_iff_ne_top.mpr one_ne_top
-      exact le_antisymm (hcancel (by rw [add_zero]; exact hcompl.le)) (zero_le)
-    rw [probEvent_eq_zero_iff] at h3
-    exact by_contra (h3 x hx)
-  · intro ⟨hf, hp⟩
-    have := Classical.decPred p
-    rw [probEvent_eq_tsum_ite]
-    conv_rhs => rw [show (1 : ℝ≥0∞) = 1 - Pr[⊥ | mx] from by simp [hf]]
-    rw [← tsum_probOutput_eq_sub]
-    refine tsum_congr fun x => ?_
-    split_ifs with hpx
-    · rfl
-    · exact (probOutput_eq_zero_of_not_mem_support (fun hx' => hpx (hp x hx'))).symm
+  rw [show (∀ x ∈ support mx, p x) ↔ Pr[ fun x => ¬p x | mx] = 0 by
+    simp [probEvent_eq_zero_iff]]
+  have hadd : Pr[ p | mx] + (Pr[ fun x => ¬p x | mx] + Pr[⊥ | mx]) = 1 := by
+    rw [← add_assoc, probEvent_compl mx p, tsub_add_cancel_of_le probFailure_le_one]
+  refine ⟨fun h => ?_, fun ⟨hf, hb⟩ => by simpa [hf, hb] using hadd⟩
+  rw [h] at hadd
+  exact and_comm.1 (add_eq_zero.1 (by simpa using hadd))
 
 alias ⟨_, probEvent_eq_one⟩ := probEvent_eq_one_iff
 
