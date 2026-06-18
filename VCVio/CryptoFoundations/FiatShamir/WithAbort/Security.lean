@@ -1251,33 +1251,39 @@ lemma avgBadM_ghostHybridImpl_le_threaded
                   Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n]) = 1 :=
                 tsum_probOutput_eq_one' (by simp)
               rw [h1, one_mul]
-      · -- Read step (`t = .inl (.inr mc)`): from `hqH` the read consumes one read unit
-        -- (`0 < qHb`, cont bounded by `qHb - 1`); `hqS` leaves the sign budget `qSb` unchanged.
-        -- Banked (b) `tsum_ghostHybridImpl_read_step_charge_le` bounds the per-`p` read
-        -- contribution by `memCharge (p.1.1.2) mc + miss-continuation`; averaging over `ν` gives
-        -- `C(ν, mc) + (miss telescoped to IH at qHb-1)`. With `C(ν, mc) ≤ curCeil ν` (`le_iSup`)
-        -- and reads preserving the ghost charge (`curCeil ν' ≤ curCeil ν`), the IH at `qHb-1`
-        -- closes: `curCeil ν + (qHb-1)·(curCeil ν + qSb·Sε) ≤ qHb·(curCeil ν + qSb·Sε)`.
-        -- RESIDUAL: the read-step assembly (banked (b) + `le_iSup` + the `qHb-1 → qHb` fold).
+      · -- Read step (`t = .inl (.inr mc)`).
+        -- Output-grouping (`avgBadM_query_bind_eq_tsum_output`, added this campaign) regroups the
+        -- inner telescope as `∑'u avgBadM (postStepOutM ν (read mc) u) (cont u)`, applying the IH
+        -- once per output `u` at the genuine per-output state *measure* `νu := postStepOutM …`
+        -- (not a Dirac — this is what avoids the per-state `∑`-of-`⨆` blow-up). The IH at
+        -- `(qHb-1, qSb)` per `u`, reads preserving the ghost charge, would fold the read HIT
+        -- charge `≤ curCeil ν` into the `qHb-1 → qHb` step.
+        --
+        -- RESIDUAL (framework redesign, NOT assembly): summing the per-`u` IH bound over `u`
+        -- does **not** close with the current bound shape. Both the ceiling term `qHb·curCeil νu`
+        -- and the absolute term `qHb·qSb·Sε` are *unweighted by the per-output mass*, so summing
+        -- over the (in general infinite) output type `u` diverges: `∑'u curCeil νu` is a
+        -- `∑`-of-`⨆` that exceeds `curCeil ν` (the read-charge `∑'u C(νu,mc') ≤ C(ν,mc')` holds
+        -- only under a single `⨆mc'`, the wrong way for `∑'u ⨆mc'`), and `∑'u qHb·qSb·Sε = ∞`.
+        -- Threading `hν : ∑'p ν p ≤ 1` is necessary but not sufficient: closing requires
+        -- re-deriving the engine bound with the charge terms *mass-weighted* (proportional to
+        -- `∑'p νu p`) so they are additive across the output branches — the extended-accumulator
+        -- framework step described in `probEvent_ghostRead_bad_le_charge`. See the campaign note.
         sorry
-      · -- Sign step (`t = .inr msg`): `hqS` gives `0 < qSb` and `cont` bounded by `qSb - 1`;
-        -- `hqH` leaves the read budget `qHb` unchanged. The sign preserves the bad flag (so
-        -- `carriedBad` is unchanged) and raises the per-target charge by `≤ Sε` (banked (a)
-        -- `tsum_probOutput_run_ghostSignBody_mul_memCharge_le` + (c) `geomAttemptSum_le`,
-        -- `∑'u C(ν_u, mc) ≤ C(ν, mc) + Sε` for each fixed `mc`). The decremented sign budget
-        -- `qSb - 1` then absorbs the `+Sε`: `curCeil(ν_u) + (qSb-1)·Sε`, summed against the IH,
-        -- telescopes to `curCeil ν + qSb·Sε`.
-        -- The `⨆mc` charge bound DOES suffice here: for each fixed `mc`, the per-`u`
-        -- term `C(ν_u, mc)` is a single summand of the (a)-sum `∑'u C(ν_u, mc) ≤ C(ν,mc)+Sε`,
-        -- so `C(ν_u, mc) ≤ C(ν,mc)+Sε ≤ curCeil ν + Sε`, giving `curCeil ν_u ≤ curCeil ν + Sε`
-        -- per `u`. The IH at `(qHb, qSb-1)` then yields, per `u`,
-        --   `avgBadM ν_u (cont u) ≤ carriedBad ν_u + qHb·(curCeil ν + qSb·Sε)`,
-        -- and summing over `u` (with `∑'u (mass ν_u) = ∑'p ν p ≤ 1` for the constant term, and
-        -- `∑'u carriedBad ν_u = carriedBad ν` since signing preserves the flag) gives the bound.
-        -- RESIDUAL: the helper must additionally carry the sub-probability mass invariant
-        -- `∑' p, ν p ≤ 1` (holds at the empty Dirac start, preserved by reads/uniform, only
-        -- decreased by an aborting sign). Add it as a hypothesis `hν` and thread it; then the
-        -- assembly above (banked (a)+(c), `le_iSup`, single-term ≤ sum) closes the sign step.
+      · -- Sign step (`t = .inr msg`). Same output-grouping route
+        -- (`avgBadM_query_bind_eq_tsum_output`): `∑'u avgBadM (postStepOutM ν (sign) u) (cont u)`,
+        -- IH at `(qHb, qSb-1)` per output `u`. Banked (a)
+        -- `tsum_probOutput_run_ghostSignBody_mul_memCharge_le` + (c) `geomAttemptSum_le` give
+        -- `∑'u C(νu, mc') ≤ C(ν, mc') + Sε` per fixed `mc'`, hence (single-summand ≤ sum, then
+        -- `⨆mc'`) `curCeil νu ≤ curCeil ν + Sε` per `u`; the decremented `qSb-1` then absorbs the
+        -- `+Sε`.
+        --
+        -- RESIDUAL (framework redesign, NOT assembly): identical obstruction to the read step.
+        -- The per-`u` IH bound `carriedBad νu + qHb·(curCeil ν + qSb·Sε)` has the constant term
+        -- `qHb·(curCeil ν + qSb·Sε)` unweighted by `mass νu`, so `∑'u` of it diverges over an
+        -- infinite output type; and `∑'u curCeil νu` is a `∑`-of-`⨆` not bounded by
+        -- `curCeil ν + Sε`. Closing needs the mass-weighted engine bound (charge terms scaled by
+        -- `∑'p νu p`, summing via `hν : ∑'p ν p ≤ 1`). See the campaign note.
         sorry
 
 open scoped Classical in

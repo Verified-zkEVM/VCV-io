@@ -3481,6 +3481,35 @@ lemma avgBadM_telescope_eq_tsum_postStep
   refine tsum_congr fun p => ?_
   rw [mul_assoc]
 
+/-- **Per-output post-step state measure.** Grouping the post-step joint measure
+`postStepJointM impl ν t` by the query *output* `u`: the resulting state measure assigns to
+each post-state `s` the joint mass of producing `(u, s)`. The state coordinate of the
+output-`u` slice of the post-step joint measure. -/
+noncomputable def postStepOutM
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (u : spec.Range t) (s : σ × Bool) : ℝ≥0∞ :=
+  postStepJointM impl ν t (u, s)
+
+open scoped Classical in
+/-- **Output-grouped one-step telescoping of `avgBadM`.** The telescoped one-step average
+regroups as a `tsum` over the query *output* `u`, each weighted by the averaged bad mass of
+the continuation `cont u` run from the per-output post-step state measure
+`postStepOutM impl ν t u`. This is the form the threaded-charge induction consumes: it
+applies the inductive hypothesis once per output, at a genuine state *measure* (not a Dirac),
+so the per-target charge of the post-step measure can be bounded as a measure (avoiding the
+`∑`-of-`⨆` blow-up of the per-post-state Dirac grouping). -/
+lemma avgBadM_query_bind_eq_tsum_output
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (cont : spec.Range t → OracleComp spec γ) :
+    avgBadM impl ν (query t >>= cont) =
+      ∑' u : spec.Range t, avgBadM impl (postStepOutM impl ν t u) (cont u) := by
+  classical
+  rw [avgBadM_query_bind_eq, avgBadM_telescope_eq_tsum_postStep, ENNReal.tsum_prod']
+  refine tsum_congr fun u => ?_
+  rw [avgBadM_eq_tsum_pure]
+  refine tsum_congr fun s => ?_
+  rw [postStepOutM]
+
 /-- **Bare-measure averaged-bad telescoping with a state-measure invariant.** Bare-measure
 analogue of `avgBad_le_of_steps_inv`: threads a predicate `Inv : (σ × Bool → ℝ≥0∞) → Prop`
 on the state *measure* through the free-monad induction. The conclusion holds for every
