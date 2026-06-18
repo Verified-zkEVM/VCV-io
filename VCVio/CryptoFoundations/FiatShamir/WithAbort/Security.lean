@@ -1482,6 +1482,20 @@ lemma avgBadM_ghostHybridImpl_threaded_inv
     ghostChargeInv M ε
       (OracleComp.ProgramLogic.Relational.postStepOutM
         (ghostHybridImpl ids M maxAttempts true pk sk) ν t u) := by
+  classical
+  -- RESIDUAL (genuine distributional obstruction, NOT assembly). The per-output invariant
+  -- `C(νu, mc) ≤ K(νu)·ε` with the *linear* enncard accumulator `K = ghostChargeK` is
+  -- preserved by the uniform and read steps (ghost layer untouched ⇒ both `C` and `K` scale by
+  -- the same per-output output-probability factor, so `hInv` transfers), but it is **false per
+  -- output** for the SIGN step: a single sign output that writes a fresh ghost entry at `mc`
+  -- has `C(νu, mc) = mass(νu)` (membership indicator `1`) yet `K(νu)·ε = mass(νu)·enncard·ε`,
+  -- and `enncard·ε < 1` for small `ε`. The invariant `∑'u C(νu, mc) ≤ C(ν, mc) + Sε` (banked
+  -- (a)) holds only *averaged over the sign outputs* (high-charge branches carry low mass); it
+  -- does not hold for an individual conditional output measure. Closing this is the
+  -- mass-weighted PMF×PMF distributional-coupling step (the multi-week obstruction recorded in
+  -- the campaign notes), not an arithmetic gap in the linear-accumulator framework: the
+  -- framework, `h_carry`, and `h_K` are all proven; only this per-output `Inv` preservation for
+  -- the sign branch is open.
   sorry
 
 open scoped Classical in
