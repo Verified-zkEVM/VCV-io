@@ -1145,6 +1145,28 @@ noncomputable def lazyGhostHybridImpl (pk : Stmt) (sk : Wit) :
       (fun alc => (alc.1, ((alc.2, msg :: s.1.2), s.2))) <$>
         (ghostSignBody ids M pk sk msg maxAttempts).run s.1.1
 
+omit [SampleableType Stmt] in
+/-- The eager (`ghostHybridImpl … true`) and lazy (`lazyGhostHybridImpl`) ghost handlers
+are *definitionally identical* on uniform queries: both forward the query and leave the
+state untouched. The two handlers differ only in the adversarial random-oracle read step
+(`.inl (.inr _)`), where the eager handler reads the pre-populated ghost cache and flips
+the bad flag deterministically while the lazy handler answers from the real layer and
+fires the flag via the deferred-sampling draw `lazyGhostFire`. -/
+lemma lazyGhostHybridImpl_run_unif_eq (pk : Stmt) (sk : Wit) (n : unifSpec.Domain)
+    (s : GhostState M Commit Chal) :
+    (lazyGhostHybridImpl ids M maxAttempts pk sk (.inl (.inl n))).run s =
+      (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inl n))).run s := rfl
+
+omit [SampleableType Stmt] in
+/-- The eager and lazy ghost handlers are *definitionally identical* on signing queries:
+both run `ghostSignBody` on the cache layers, prepend `msg` to the signed-message list, and
+leave the bad flag untouched. Together with `lazyGhostHybridImpl_run_unif_eq`, this isolates
+the entire eager↔lazy distributional gap to the random-oracle read step. -/
+lemma lazyGhostHybridImpl_run_sign_eq (pk : Stmt) (sk : Wit) (msg : M)
+    (s : GhostState M Commit Chal) :
+    (lazyGhostHybridImpl ids M maxAttempts pk sk (.inr msg)).run s =
+      (ghostHybridImpl ids M maxAttempts true pk sk (.inr msg)).run s := rfl
+
 /-! ### The two body-level cores of the Sign → Prog hop -/
 
 omit [SampleableType Stmt] in

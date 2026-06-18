@@ -691,7 +691,7 @@ one unit of slack for a verification read, which the freshness check already rul
 hypothesis `hAbort` forces rejection-free signing, so the ghost layer stays empty and
 the left-hand side vanishes. -/
 lemma probEvent_ghostRead_bad_le
-    (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abort < 1)
+    (qS qH : ℕ) (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (hε : 0 ≤ ε)
     (hQ : ∀ pk, FiatShamir.signHashQueryBound M
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
     (pk : Stmt) (sk : Wit)
@@ -704,92 +704,60 @@ lemma probEvent_ghostRead_bad_le
             ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
               List M), false)]
       ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) := by
-  -- REMAINING SUBGOAL. The fold piece (R3) is now PROVEN axiom-clean as
-  -- `OracleComp.ProgramLogic.Relational.expectedQuerySlack_charged_read_expected_growth_le`
-  -- (in `Relational/SimulateQ.lean`): with charged reads that do not grow the resource and
-  -- growth (signing) queries that grow it by `≤ g` in expectation, the accumulated slack is
-  -- `≤ qS_reads · (R s₀ + qS_sign · g) · β` — exactly the right shape, with no `(K choose 2)`
-  -- cross-term and no eager in-support growth charge. Instantiated here with
-  -- `R s := enncard s.1.2` (ghost cache), `β := ofReal ε`,
-  -- `g := ∑_{a<maxAttempts} ofReal p_abort ^ a` (and `g ≤ 1/(1-p_abort)` via the geometric
-  -- bound, `tsum_probOutput_commit_mul_abort_le` supplying the expected-growth hypothesis),
-  -- it yields `qH · (0 + qS · g) · ofReal ε ≤ ofReal (qS · (qH+1) · ε / (1-p_abort))`.
-  --
-  -- THE BLOCKER (R1) is the *charged-step premise* of the single-world accumulator
-  -- `probEvent_bad_simulateQ_run_le_expectedQuerySlack`. That premise requires, for EVERY
-  -- reachable non-bad state `s` and every continuation `k`,
-  --   `Pr[bad | (impl (.inl (.inr mc))).run (s,false) >>= k]
-  --       ≤ enncard s.1.2 · ofReal ε + (good-continuation tsum)`.
-  -- For the EAGER handler `ghostHybridImpl … true`, a read at `mc` with `s.1.2 mc = some v`
-  -- runs `pure (v, (s.1, true))` — it flips the bad flag DETERMINISTICALLY (mass 1). Its
-  -- single support point is bad, so the good-continuation tsum is `0`, and the premise reduces
-  -- to `Pr[bad | k (v, (s.1, true))] ≤ enncard s.1.2 · ofReal ε`, i.e. (taking `k` that stays
-  -- bad) `1 ≤ enncard s.1.2 · ofReal ε`, which is FALSE for small `enncard`/`ε`. (Verified by
-  -- unfolding via `ghostHybridImpl_run_ro_ghost_some`: the run is `pure (v, s.1, true)`.)
-  --
-  -- The accumulator's `h_charged_step` thus does NOT hold for the eager ghost run: the per-read
-  -- flip is deterministic, not amortized by `enncard · ε`. `probEvent_commit_hit_le` bounds the
-  -- *deferred-sampling* event (a random commitment landing in the cache), not the eager-state
-  -- read event. Closing R1 needs a deferred-sampling rewrite: a lazy variant of
-  -- `ghostHybridImpl` whose ghost reads resample, plus a distributional-equivalence bridge from
-  -- the eager run to that variant (the genuine probabilistic content described in the docstring
-  -- above). That bridge is a multi-week deferred-sampling rewrite, not a local discharge; it is
-  -- the single remaining blocker. R3 (the fold) and R2 (free-step bad-freedom) are not blockers.
-  --
-  -- TRANSFER VERDICT (does the `feat/first-fire-library` probe oracle close R1?): NO. The probe
-  -- library's deferred-sampling equivalence `evalDist_genTable_bind_eagerProbeImpl` and its
-  -- first-fire bound `probEvent_genTable_bind_eagerProbeImpl_le` (in
-  -- `OracleComp/QueryTracking/RandomOracle/ProbeEquiv.lean`) model a *range-uniform* firing:
-  -- cells `D → R` are pre-sampled via `genTable K` (uniform on each cell's allowed `Finset R`),
-  -- a `ProbeOp.probe d a` fires iff the FRESH UNIFORM cell value `g d` equals the adversary's
-  -- target `a`, and the bound is the uniform `q / (|R| − m)`. The ghost firing is the DUAL and
-  -- non-uniform: the fresh draw is the cache KEY commitment `w ← ids.commit` (bounded only by the
-  -- arbitrary guessing bound `hGuess : Pr[= cm | fst <$> ids.commit] ≤ ofReal ε`, NOT `1/|R|`),
-  -- the cache VALUE (a uniform `Chal`) is irrelevant to firing, and the event is the adversary's
-  -- read point `(msg, w')` matching a ghost-cached key `(msg, w)`. The bridge pre-samples a fixed
-  -- `g : D → R` and has no mechanism to randomize cache KEYS post-hoc nor any slot to inject the
-  -- `hGuess` commitment bound; its firing probability is intrinsically `1/(|R|−m)`. So the
-  -- library is structurally inapplicable. The CLOSEST in-repo lemma is the native commitment-hit
-  -- bound `probEvent_commit_hit_le` (GhostBodies.lean): one commit lands on a cached point with
-  -- prob `≤ enncard c · ofReal ε` — exactly the ghost firing mechanism, and already used by the
-  -- proven Sign→Prog TV induction `ofReal_tvDist_run_fsAbortSignLoop_progSignBody_le`. The
-  -- MISSING piece is a Prog→Trans deferred-sampling bridge built on `probEvent_commit_hit_le`
-  -- (not on the probe library): a lazy ghost handler whose reads test commitment membership at
-  -- read time, plus a distributional equivalence from the eager `ghostHybridImpl … true` run to
-  -- it, so that the per-attempt commit-hit charge can be amortized over later reads via R3's fold.
-  -- This is the multi-week rewrite; no existing library shortcuts it.
-  --
-  -- R14 BANKED INFRASTRUCTURE (all axiom-clean, in GhostBodies.lean):
-  --  * `lazyGhostHybridImpl` : the deferred-sampling handler. Same `GhostState` and same
-  --    `ghostSignBody` signing as `ghostHybridImpl … true`, but the adversarial read step
-  --    draws `lazyGhostFire` over the pending ghost count `enncard (ghost cache)` and fires
-  --    the bad flag with prob `≤ enncard · ε` (via `probOutput_lazyGhostFire_true_le_enncard`),
-  --    answering the adversary from the real layer through `roStep`. This is the handler for
-  --    which the accumulator's `h_charged_step` is TRUE (the eager handler's deterministic flip
-  --    is replaced by the amortizable lazy draw).
-  --  * `tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le` : the ghost-layer growth law —
-  --    a rejected attempt adds ≤ 1 ghost point, an accepted attempt only removes one
-  --    (`enncard_uncacheQuery_le`), so the expected ghost size grows by `≤ ∑_{a<n} p^a` per
-  --    signing query. This is the fold's `h_growth` for `R s := enncard (ghost cache)`,
-  --    `g := ∑_{a<n} p^a` (with `tsum_probOutput_commit_mul_abort_le` supplying the
-  --    per-attempt rejection bound). Supporting: `run_ghostSignBody_succ`,
-  --    `toSet_uncacheQuery_subset`, `enncard_uncacheQuery_le`.
-  --
-  -- REMAINING RESIDUAL (the single blocker, unchanged in nature):
-  --  (A) The lazy-side bound `Pr[bad | (simulateQ lazyGhostHybridImpl (adv.main pk)).run init]
-  --      ≤ ofReal (qS·(qH+1)·ε/(1-p))` via `probEvent_bad_simulateQ_run_le_expectedQuerySlack`
-  --      (charged-read budget `qH+1`, growth-sign budget `qS`) chained with the now-proven fold
-  --      `expectedQuerySlack_charged_read_expected_growth_le` using the two banked laws above.
-  --      The only open premise is the accumulator's `h_charged_step` for the lazy read: a
-  --      `lazyFire >>= roStep` bind whose `fired = true` mass is `≤ enncard · ε`
-  --      (`probOutput_lazyGhostFire_true_le_enncard`) and whose `fired = false` mass passes
-  --      unchanged to the continuation. This is a finite distributional bookkeeping step.
-  --  (B) The eager↔lazy bad-flag equivalence `Pr[bad | eager run] = Pr[bad | lazy run]` by a
-  --      never-read-before-write deferred-sampling commutation (the programmed ghost point is
-  --      only ever READ, never re-keyed). This is the genuine multi-week probabilistic content;
-  --      mirror `run_ghostSignBody_overlay` / `run_ghostSignBody_fst` in GhostBodies.lean.
-  -- Closing :252 = (B) ∘ (A); both must land. (A) is now fully scaffolded by the banked laws.
-  sorry
+  classical
+  -- (A) is PROVEN: the deferred-sampling (lazy) handler's bad-flag probability is bounded.
+  have h_lazy :
+      Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+          (simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (adv.main pk)).run
+            ((((∅, ∅), []) :
+              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+                List M), false)]
+        ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) :=
+    probEvent_lazyGhostHybridImpl_bad_le ids hr M maxAttempts adv qS qH ε p_abort
+      hp₀ hp hε hQ pk sk hGuess hAbort
+  -- (B) RESIDUAL: the eager↔lazy bad-flag equivalence. The eager handler
+  -- `ghostHybridImpl … true` and the deferred-sampling handler `lazyGhostHybridImpl` are
+  -- definitionally identical on uniform queries (`lazyGhostHybridImpl_run_unif_eq`) and on
+  -- signing queries (`lazyGhostHybridImpl_run_sign_eq`); the *entire* distributional gap is
+  -- the adversarial random-oracle read step `.inl (.inr mc)`:
+  --   * eager: a ghost hit `s.1.1.2 mc = some v` runs `pure (v, (s.1, true))` — the bad flag
+  --     flips DETERMINISTICALLY (mass 1) on the structural cache match, the cache key `w` of
+  --     which was sampled `w ← ids.commit` during a rejected signing attempt;
+  --   * lazy: the read draws `lazyGhostFire (enncard ghost)` and fires with prob `≤ enncard·ε`,
+  --     answering from the real layer via `roStep`.
+  -- These two read steps have the SAME bad-flag marginal under the never-read-before-write
+  -- deferred-sampling commutation: a programmed ghost point `(msg, w)` is only ever READ
+  -- (never re-keyed/overwritten — see `ghostHybridImpl_preserves_signed_inv`), so postponing
+  -- its draw `w ← ids.commit` from signing time to read time preserves the joint law of the
+  -- bad flag. Closing this requires a global induction on `adv.main pk` carrying a deferred-
+  -- sampling invariant relating the eager ghost cache (concrete sampled keys) to the lazy
+  -- pending count, in the term-equality style of `run_ghostSignBody_overlay` /
+  -- `run_ghostSignBody_fst`. It is NOT reducible to a per-state handler equality
+  -- (`probOutput_simulateQ_run_eq_of_impl_eq_preservesInv`) — the read handlers genuinely
+  -- diverge on the bad-flag marginal at every reachable non-empty-ghost state — nor to a
+  -- per-query state coupling (`relTriple_simulateQ_run`), since the eager world has already
+  -- committed the sampled keys into the state; the commutation moves the *sampling site*,
+  -- changing the structure of the computation, not merely the state relation. This is the
+  -- single remaining blocker, the genuine multi-week probabilistic content. Bounding the
+  -- eager probability by the lazy one suffices to close the leaf via `h_lazy`.
+  have h_eager_le_lazy :
+      Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+          (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
+            ((((∅, ∅), []) :
+              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+                List M), false)]
+        ≤ Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
+            (simulateQ (lazyGhostHybridImpl ids M maxAttempts pk sk) (adv.main pk)).run
+              ((((∅, ∅), []) :
+                ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
+                  List M), false)] := by
+    -- DEFERRED-SAMPLING COMMUTATION (the eager↔lazy bad-flag equivalence). See the comment
+    -- block above for the full statement of the residual and why no existing infrastructure
+    -- (`probOutput_simulateQ_run_eq_of_impl_eq_preservesInv`, `relTriple_simulateQ_run`,
+    -- the first-fire probe library) discharges it. The handlers agree off the read step
+    -- (`lazyGhostHybridImpl_run_unif_eq`, `lazyGhostHybridImpl_run_sign_eq`).
+    sorry
+  exact h_eager_le_lazy.trans h_lazy
 
 /-! ## Hop lemmas
 
@@ -1472,7 +1440,7 @@ freshness check and the ghost-domain invariant
 (`ghostHybridImpl_preserves_signed_inv`), and the firing probability is bounded by the
 ghost-read collision charge `probEvent_ghostRead_bad_le`. -/
 lemma probOutput_hybridExpAtKey_prog_le_trans
-    (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abort < 1)
+    (qS qH : ℕ) (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (hε : 0 ≤ ε)
     (hQ : ∀ pk, FiatShamir.signHashQueryBound M
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
     (pk : Stmt) (sk : Wit)
@@ -1582,7 +1550,7 @@ lemma probOutput_hybridExpAtKey_prog_le_trans
   have h_tv : tvDist (runP >>= gP) (runT >>= gP) ≤ Pbad.toReal :=
     le_trans (tvDist_bind_right_le gP runP runT) h_bad
   have h_badBound : Pbad ≤ ENNReal.ofReal (qS * (qH + 1) * ε / (1 - p_abort)) :=
-    probEvent_ghostRead_bad_le ids hr M maxAttempts adv qS qH ε p_abort hp hQ pk sk
+    probEvent_ghostRead_bad_le ids hr M maxAttempts adv qS qH ε p_abort hp₀ hp hε hQ pk sk
       hGuess hAbort
   have h_real : Pr[= true | runP >>= gP].toReal ≤
       Pr[= true | runT >>= gT].toReal + Pbad.toReal := by
@@ -2343,7 +2311,7 @@ theorem euf_cma_to_nma
     have step1 := probOutput_hybridExpAtKey_real_le_prog ids hr M maxAttempts adv qS qH ε p_abort
       hp₀ hp hQ pk sk (hGuess pk sk hgood) (hAbort pk sk hgood)
     have step2 := probOutput_hybridExpAtKey_prog_le_trans ids hr M maxAttempts adv qS qH ε p_abort
-      hp hQ pk sk (hGuess pk sk hgood) (hAbort pk sk hgood)
+      hp₀ hp hε hQ pk sk (hGuess pk sk hgood) (hAbort pk sk hgood)
     have step3 := probOutput_hybridExpAtKey_trans_le_sim ids hr M maxAttempts sim adv ζ_zk hζ hhvzk
       qS qH p_abort hp₀ hp hQ pk sk hrel (hAbortSim pk sk hgood)
     -- Chain the three hops and collapse the `ofReal` sums (slack pieces nonneg).
