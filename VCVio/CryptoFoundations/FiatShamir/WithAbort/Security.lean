@@ -1130,6 +1130,134 @@ lemma tsum_probOutput_map_state_fixed {R G : Type} (oa : ProbComp R) (p : G)
     obtain ⟨u', _, hu'⟩ := hmem
     exact hg (Prod.ext_iff.mp hu').2.symm
 
+omit [SampleableType Stmt] in
+/-- Uniform step preserves the per-state expected ghost size: the handler returns `(u, p)`
+fixing the state, so the post-step ghost layer is always `p`'s. -/
+lemma ghostHybridImpl_unif_expected_enncard (pk : Stmt) (sk : Wit)
+    (n : unifSpec.Domain) (p : GhostState M Commit Chal) :
+    (∑' z : unifSpec.Range n × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inl n))).run p] *
+          QueryCache.enncard (z.2.1.1.2))
+      = QueryCache.enncard (p.1.1.2) := by
+  classical
+  calc (∑' z : unifSpec.Range n × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inl n))).run p] *
+          QueryCache.enncard (z.2.1.1.2))
+      = ∑' u : unifSpec.Range n,
+          Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] *
+            QueryCache.enncard (p.1.1.2) :=
+        tsum_probOutput_map_state_fixed
+          ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n) p
+          (fun z => QueryCache.enncard (z.2.1.1.2))
+    _ = QueryCache.enncard (p.1.1.2) := by
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_one' (by simp), one_mul]
+
+omit [SampleableType Stmt] in
+/-- Read step preserves the per-state expected ghost size: the eager read writes only the
+*base* cache layer (or flips the bad flag), never the ghost layer. -/
+lemma ghostHybridImpl_read_expected_enncard (pk : Stmt) (sk : Wit)
+    (mc : M × Commit) (p : GhostState M Commit Chal) :
+    (∑' z : Chal × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+          QueryCache.enncard (z.2.1.1.2))
+      = QueryCache.enncard (p.1.1.2) := by
+  classical
+  have hghost : ∀ z : Chal × GhostState M Commit Chal,
+      z ∈ support ((ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p) →
+      z.2.1.1.2 = p.1.1.2 := by
+    intro z hz
+    simp only [ghostHybridImpl, StateT.run_mk] at hz
+    rcases hgh : p.1.1.2 mc with _ | v
+    · simp only [hgh, support_map] at hz
+      obtain ⟨cu, _, rfl⟩ := hz; rfl
+    · simp only [hgh] at hz
+      simp only [↓reduceIte, support_pure, Set.mem_singleton_iff] at hz
+      subst hz; rfl
+  have hconst : (∑' z : Chal × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+          QueryCache.enncard (z.2.1.1.2))
+      = ∑' z : Chal × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+          QueryCache.enncard (p.1.1.2) := by
+    refine tsum_congr fun z => ?_
+    by_cases hz : z ∈ support ((ghostHybridImpl ids M maxAttempts true pk sk
+        (.inl (.inr mc))).run p)
+    · congr 1
+      exact congrArg QueryCache.enncard (hghost z hz)
+    · have h0 : Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p]
+          = 0 := probOutput_eq_zero_of_not_mem_support hz
+      rw [h0, zero_mul, zero_mul]
+  rw [hconst, ENNReal.tsum_mul_right]
+  have hone : (∑' z : Chal × GhostState M Commit Chal,
+      Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p]) = 1 := by
+    refine tsum_probOutput_eq_one' ?_
+    simp only [ghostHybridImpl, StateT.run_mk]
+    rcases hgh : p.1.1.2 mc with _ | v
+    · simp only [hgh, roStep]
+      rcases p.1.1.1 mc with _ | v' <;> simp
+    · simp [hgh]
+  rw [hone, one_mul]
+
+omit [SampleableType Stmt] in
+/-- Sign step grows the per-state expected ghost size by at most `∑ attempts ≤ 1/(1-p)`: the
+signing body's accepted-transcript / rejected-attempt programming writes to the ghost layer
+(banked `tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le` plus the geometric fold). -/
+lemma ghostHybridImpl_sign_expected_enncard_le (pk : Stmt) (sk : Wit) (msg : M)
+    {p_abort : ℝ}
+    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (p : GhostState M Commit Chal) :
+    (∑' z : Option (Commit × Resp) × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inr msg)).run p] *
+          QueryCache.enncard (z.2.1.1.2))
+      ≤ QueryCache.enncard (p.1.1.2) + ENNReal.ofReal (1 / (1 - p_abort)) := by
+  classical
+  -- The handler maps the `ghostSignBody` output state into the ghost layer; the expected
+  -- ghost size of the result equals that of the `ghostSignBody` output's ghost component.
+  have hmap : (∑' z : Option (Commit × Resp) × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inr msg)).run p] *
+          QueryCache.enncard (z.2.1.1.2))
+      = ∑' w : Option (Commit × Resp) ×
+          ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache),
+        Pr[= w | (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1] *
+          QueryCache.enncard (w.2.2) := by
+    rw [show (ghostHybridImpl ids M maxAttempts true pk sk (.inr msg)).run p
+          = (fun alc => (alc.1, ((alc.2, msg :: p.1.2), p.2))) <$>
+            (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1 from rfl]
+    -- Reindex the post-step sum over the injective map `alc ↦ (alc.1, ((alc.2, …), …))`.
+    set g : Option (Commit × Resp) ×
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) →
+        Option (Commit × Resp) × GhostState M Commit Chal :=
+      fun alc => (alc.1, ((alc.2, msg :: p.1.2), p.2)) with hg
+    have hginj : Function.Injective g := by
+      intro a b hab
+      simp only [hg, Prod.mk.injEq] at hab
+      exact Prod.ext hab.1 hab.2.1.1
+    refine tsum_eq_tsum_of_ne_zero_bij (fun w => g w.1) ?_ ?_ ?_
+    · intro a b hab
+      exact Subtype.ext (hginj hab)
+    · intro z hz
+      simp only [Function.mem_support, ne_eq, mul_eq_zero, not_or] at hz
+      have hzs : z ∈ support (g <$> (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1) :=
+        (mem_support_iff _ z).mpr hz.1
+      rw [support_map] at hzs
+      obtain ⟨w, hw, rfl⟩ := hzs
+      refine ⟨⟨w, ?_⟩, rfl⟩
+      simp only [Function.mem_support, ne_eq, mul_eq_zero, not_or]
+      refine ⟨probOutput_ne_zero_of_mem_support hw, ?_⟩
+      have heq : ((g w).2.1.1.2) = w.2.2 := rfl
+      rw [heq] at hz; exact hz.2
+    · rintro ⟨w, hw⟩
+      show Pr[= g w | g <$> (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1] *
+          QueryCache.enncard ((g w).2.1.1.2)
+        = Pr[= w | (ghostSignBody ids M pk sk msg maxAttempts).run p.1.1] *
+          QueryCache.enncard (w.2.2)
+      rw [probOutput_map_injective _ hginj]
+  rw [hmap]
+  refine le_trans (tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le ids M pk sk msg
+    hAbort maxAttempts p.1.1.1 p.1.1.2) ?_
+  gcongr
+  exact geomAttemptSum_le maxAttempts hp₀ hp
+
 /-- **Per-state ghost charge accumulator** for the threaded eager-charge bound: the
 mass-weighted total size of the ghost cache layer. Linear in the state measure `ν`, preserved
 by read/uniform steps (which never write the ghost layer) and grown additively by sign steps
@@ -1193,7 +1321,42 @@ lemma avgBadM_ghostHybridImpl_threaded_K
           (if (t matches Sum.inr _) then
             ENNReal.ofReal (1 / (1 - p_abort)) *
               (∑' p : GhostState M Commit Chal, ν p) else 0) := by
-  sorry
+  classical
+  -- Rewrite `∑'u K(postStepOutM ν t u)` as the weighted post-step charge for `F := enncard ∘ ghost`.
+  have hrw : (∑' u : ((unifSpec + (M × Commit →ₒ Chal)) +
+        (M →ₒ Option (Commit × Resp))).Range t,
+        ghostChargeK M
+          (OracleComp.ProgramLogic.Relational.postStepOutM
+            (ghostHybridImpl ids M maxAttempts true pk sk) ν t u))
+      = ∑' p : GhostState M Commit Chal, ν p *
+          ∑' z : (((unifSpec + (M × Commit →ₒ Chal)) +
+              (M →ₒ Option (Commit × Resp))).Range t) × GhostState M Commit Chal,
+            Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk t).run p] *
+              QueryCache.enncard (z.2.1.1.2) := by
+    rw [← OracleComp.ProgramLogic.Relational.tsum_tsum_postStepOutM_mul
+      (ghostHybridImpl ids M maxAttempts true pk sk) ν t (fun s => QueryCache.enncard s.1.1.2)]
+    rfl
+  rw [hrw, ghostChargeK]
+  -- Per-state inner charge bound, then `tsum`-monotone fold.
+  rcases t with (n | mc) | msg
+  · -- Uniform step: state untouched, ghost charge preserved.
+    rw [if_neg (by simp), add_zero]
+    refine ENNReal.tsum_le_tsum fun p => ?_
+    exact le_of_eq (congrArg (ν p * ·)
+      (ghostHybridImpl_unif_expected_enncard ids M maxAttempts pk sk n p))
+  · -- Read step: writes only the base layer, ghost charge preserved.
+    rw [if_neg (by simp), add_zero]
+    refine ENNReal.tsum_le_tsum fun p => ?_
+    exact le_of_eq (congrArg (ν p * ·)
+      (ghostHybridImpl_read_expected_enncard ids M maxAttempts pk sk mc p))
+  · -- Sign step: ghostSignBody grows the ghost size by `≤ ∑ attempts ≤ 1/(1-p)`.
+    rw [if_pos (by simp)]
+    rw [mul_comm (ENNReal.ofReal (1 / (1 - p_abort))) _, ← ENNReal.tsum_mul_right,
+      ← ENNReal.tsum_add]
+    refine ENNReal.tsum_le_tsum fun p => ?_
+    rw [← mul_add]
+    refine mul_le_mul_left' ?_ _
+    exact ghostHybridImpl_sign_expected_enncard_le ids M maxAttempts pk sk msg hAbort hp₀ hp p
 
 open scoped Classical in
 omit [SampleableType Stmt] in

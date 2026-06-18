@@ -3909,6 +3909,36 @@ lemma tsum_tsum_postStepOutM_le
     _ ≤ ∑' p : σ × Bool, ν p :=
         ENNReal.tsum_le_tsum fun p => mul_le_of_le_one_right zero_le' tsum_probOutput_le_one
 
+open scoped Classical in
+/-- **Weighted post-step rearrangement.** Summing any post-state functional `F` against the
+post-step measure (over output `u` and post-state `s`) equals the `ν`-average of the per-state
+expected value of `F` after one impl step. The Fubini bridge used to push a per-state charge
+bound (e.g. ghost-size or membership-charge growth) through the post-step measure. -/
+lemma tsum_tsum_postStepOutM_mul
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (ν : σ × Bool → ℝ≥0∞) (t : spec.Domain) (F : σ × Bool → ℝ≥0∞) :
+    (∑' u : spec.Range t, ∑' s : σ × Bool, postStepOutM impl ν t u s * F s)
+      = ∑' p : σ × Bool, ν p *
+          ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run p] * F z.2 := by
+  classical
+  calc (∑' u : spec.Range t, ∑' s : σ × Bool, postStepOutM impl ν t u s * F s)
+      = ∑' z : spec.Range t × σ × Bool, postStepJointM impl ν t z * F z.2 := by
+        simp only [postStepOutM]
+        rw [ENNReal.tsum_prod' (f := fun z => postStepJointM impl ν t z * F z.2)]
+    _ = ∑' z : spec.Range t × σ × Bool,
+          (∑' p : σ × Bool, ν p * Pr[= z | (impl t).run p]) * F z.2 := by
+        refine tsum_congr fun z => ?_
+        rw [postStepJointM]
+    _ = ∑' z : spec.Range t × σ × Bool,
+          ∑' p : σ × Bool, ν p * (Pr[= z | (impl t).run p] * F z.2) := by
+        refine tsum_congr fun z => ?_
+        rw [← ENNReal.tsum_mul_right]
+        exact tsum_congr fun p => by ring
+    _ = ∑' p : σ × Bool, ν p *
+          ∑' z : spec.Range t × σ × Bool, Pr[= z | (impl t).run p] * F z.2 := by
+        rw [ENNReal.tsum_comm]
+        exact tsum_congr fun p => ENNReal.tsum_mul_left
+
 /-- **Threaded linear (mass-weighted) accumulator bound for `avgBadM`.** A reusable
 free-monad telescoping that, unlike `avgBadM_le_of_steps_inv`, bakes in a *linear,
 mass-weighted, additive* bound shape so it telescopes across the output-branching of a
