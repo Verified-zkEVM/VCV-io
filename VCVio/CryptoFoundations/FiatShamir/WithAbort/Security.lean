@@ -784,22 +784,85 @@ lemma eagerGhostRead_bad_le_lazyGhostRead_bad (pk : Stmt) (sk : Wit) :
               ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) ×
                 List M), false)] := by
   classical
-  -- BESPOKE JOINT-LAW INDUCTION (skeleton; the read-step recoupling is the sole residual).
+  -- BESPOKE COUPLING SKELETON (uniform/sign branches CLOSED; read-step recoupling is the sole
+  -- residual). The proof reduces the bad-flag probability inequality to a *coupling* between
+  -- the eager and lazy whole-run distributions whose post-relation carries the bad-flag
+  -- implication `eager.bad = true → lazy.bad = true` (`probEvent_le_of_relTriple_imp`). The
+  -- coupling is built query-by-query through the relational `simulateQ` driver
+  -- `relTriple_simulateQ_run`, which carries a *state relation* `R_state` and runs the
+  -- free-monad induction internally.
   --
-  -- The intended proof is an induction on `oa := adv.main pk` carrying, as auxiliary data,
-  -- the joint law `(pending ghost-draw multiset, partial commit measure)` together with the
-  -- eager pre-drawn ghost cache as a sample-consistent realization of that law. Concretely:
-  --   * `pure`: bad marginals are the two point masses, equal by the carried law;
-  --   * uniform / signing steps: `lazyGhostHybridImpl_run_unif_eq` /
-  --     `lazyGhostHybridImpl_run_sign_eq` make the two steps identical, so the carried law is
-  --     advanced by the *same* transition and the IH applies at the (coupled) successor;
-  --   * read step `.inl (.inr mc)`: rewrite both sides' bad-flag probability as a
-  --     `tsum`/expectation over the pending multiset and apply `probOutput_lazyGhostFire_one`
-  --     (= `Pr[= w' | commit]`) to dominate the eager correlated-key hit by the lazy fresh
-  --     redraw, then recouple the diverged real-cache continuations through the carried law.
-  --
-  -- The residual below is exactly that read-step recoupling, the genuine multi-week content.
-  sorry
+  -- The carried state relation is `s₁.1.1 = s₂.1.1 ∧ (s₁.2 = true → s₂.2 = true)`: the eager
+  -- and lazy real caches stay *equal* on the uniform/sign steps (where the two handlers act
+  -- identically on equal caches) and the bad-flag implication is preserved. Concretely:
+  --   * uniform `.inl (.inl n)` / signing `.inr msg`: the two handlers are definitionally
+  --     identical (`lazyGhostHybridImpl_run_unif_eq` / `lazyGhostHybridImpl_run_sign_eq`); on
+  --     equal real caches (`hcache`) the shared body couples by reflexivity, the wrappers pair
+  --     up with equal outputs, the real cache stays equal, and the bad flag is carried — both
+  --     branches are CLOSED below;
+  --   * read `.inl (.inr mc)`: the eager handler flips bad deterministically on a structural
+  --     ghost hit `gh₁ mc = some v` (and leaves the real cache untouched) while the lazy
+  --     handler fires with sub-unit mass via `lazyGhostFire … (enncard gh₂)` (and updates the
+  --     real cache via `roStep`). This is the genuine residual: it breaks BOTH legs of the
+  --     carried relation (real-cache equality and the equal-output bad-flag dominance) and the
+  --     dominance is recovered only by deferring the signing-time draw of the ghost key to read
+  --     time (`probOutput_lazyGhostFire_one` = `Pr[= w' | commit]`), threading the joint commit
+  --     law as auxiliary data. The per-state equal-output coupling cannot perform this; the
+  --     read-branch coupling is the sole `sorry` below. (This is also why the equal-output
+  --     driver `relTriple_simulateQ_run` cannot by itself close the leaf: real-cache equality
+  --     is not re-establishable at the read step, so the residual is genuine.)
+  refine OracleComp.ProgramLogic.Relational.probEvent_le_of_relTriple_imp
+    (R := fun p₁ p₂ : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
+      p₁.1 = p₂.1 ∧ (p₁.2.1.1 = p₂.2.1.1 ∧ (p₁.2.2 = true → p₂.2.2 = true)))
+    (P := fun p₁ => p₁.2.2 = true) (Q := fun p₂ => p₂.2.2 = true)
+    (OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run
+      (ghostHybridImpl ids M maxAttempts true pk sk)
+      (lazyGhostHybridImpl ids M maxAttempts pk sk)
+      (R_state := fun s₁ s₂ : GhostState M Commit Chal =>
+        s₁.1.1 = s₂.1.1 ∧ (s₁.2 = true → s₂.2 = true))
+      (adv.main pk) ?_
+      ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+      ((((∅, ∅), []) :
+        ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M), false)
+      (by simp))
+    (fun _ _ h hP => h.2.2 hP)
+  -- PER-QUERY COUPLING (`himpl`): at each related state pair, an equal-output coupling
+  -- preserving real-cache equality and the bad-flag implication.
+  rintro t s₁ s₂ hs
+  obtain ⟨hcache, hbad⟩ := hs
+  rcases t with (n | mc) | msg
+  · -- Uniform branch: both handlers run the *same* forwarded uniform query and only differ in
+    -- the (untouched) state wrapper, so couple the shared query by reflexivity and pair the two
+    -- pure wrappers; equal outputs and the carried relation (`hcache`, `hbad`) survive.
+    rw [lazyGhostHybridImpl_run_unif_eq ids M maxAttempts pk sk n s₂]
+    simp only [ghostHybridImpl, StateT.run_mk]
+    rw [map_eq_bind_pure_comp, map_eq_bind_pure_comp]
+    refine OracleComp.ProgramLogic.Relational.relTriple_bind
+      (OracleComp.ProgramLogic.Relational.relTriple_refl _) ?_
+    rintro a b rfl
+    exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure ⟨rfl, hcache, hbad⟩
+  · -- Read branch: THE SOLE RESIDUAL (deferred-sampling read-step recoupling).
+    -- At a ghost-hit state `gh₁ mc = some v` the eager read sets bad `= true` with mass `1`
+    -- (`pure (v, (s₁.1, true))`), while the lazy read fires with probability
+    -- `Pr[= true | lazyGhostFire … (enncard gh₂)] ≤ enncard gh₂ · ε < 1`. No equal-output
+    -- state coupling at this fixed pair makes the lazy bad flag `true` with mass `≥ 1`; the
+    -- dominance is recovered only by deferring the signing-time draw of `v`'s key to read
+    -- time (`probOutput_lazyGhostFire_one`), threading the joint commit law as auxiliary data.
+    -- This is the genuine multi-week probabilistic content, isolated to this single coupling.
+    sorry
+  · -- Signing branch: both handlers run the *same* `ghostSignBody`, and on equal real caches
+    -- (`hcache`) the two cache layers `s₁.1.1` / `s₂.1.1` coincide, so the shared body couples
+    -- by reflexivity. The wrappers pair up with equal outputs; the output real cache is `a.2.1`
+    -- on both sides (equal), and the output bad flag is the carried `s₁.2` / `s₂.2` (`hbad`).
+    rw [lazyGhostHybridImpl_run_sign_eq ids M maxAttempts pk sk msg s₂]
+    simp only [ghostHybridImpl, StateT.run_mk]
+    rw [← hcache]
+    rw [map_eq_bind_pure_comp, map_eq_bind_pure_comp]
+    refine OracleComp.ProgramLogic.Relational.relTriple_bind
+      (OracleComp.ProgramLogic.Relational.relTriple_refl _) ?_
+    rintro a b rfl
+    exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure ⟨rfl, rfl, hbad⟩
 
 omit [SampleableType Stmt] in
 /-- **Ghost-read collision bound** for the Prog → Trans hop: the probability that the
