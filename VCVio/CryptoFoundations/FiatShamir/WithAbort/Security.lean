@@ -249,9 +249,9 @@ omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] [Decidable
 `false`, then the bad probability of `oa >>= k` is carried entirely by `oa`'s (good)
 outputs: it equals the resource-weighted sum the accumulator's free/charged step premises
 require, with no extra bad mass introduced by `oa` itself. -/
-lemma probEvent_bad_bind_eq_tsum_false {γ' σ' : Type}
+lemma probEvent_bad_bind_eq_tsum_false {γ' σ' δ' τ' : Type}
     (oa : ProbComp (γ' × σ' × Bool))
-    (k : γ' × σ' × Bool → ProbComp (γ' × σ' × Bool))
+    (k : γ' × σ' × Bool → ProbComp (δ' × τ' × Bool))
     (hbf : ∀ z ∈ support oa, z.2.2 = false) :
     Pr[fun w => w.2.2 = true | oa >>= k]
       = ∑' z : γ' × σ',
@@ -488,7 +488,7 @@ signing query via `tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le`), wit
 charged-read budget `qH+1` and the growth-query budget `qS` from `hQ`, the empty starting
 ghost cache contributing `R = 0`, and `g ≤ 1/(1-p)`. -/
 lemma probEvent_lazyGhostHybridImpl_bad_le
-    (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abort < 1) (hε : 0 ≤ ε)
+    (qS qH : ℕ) (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (hε : 0 ≤ ε)
     (hQ : ∀ pk, FiatShamir.signHashQueryBound M
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
     (pk : Stmt) (sk : Wit)
@@ -538,13 +538,137 @@ lemma probEvent_lazyGhostHybridImpl_bad_le
   --     via `ENNReal.ofReal` push-through (cf. the closing block of
   --     `probEvent_charge_signCollision_le`).
   --
-  -- BLOCKER: instantiating the accumulator (1) at these nested product state/output types
-  -- (`σ = (cache×cache)×List M`, `γ = M × Option (Commit×Resp)`) drives a `whnf` divergence
-  -- in the elaborator (deterministic timeout even at 4 000 000 heartbeats), independent of
-  -- the proof tactics. The math is fully scaffolded by the PROVEN lemmas above; closing this
-  -- needs the accumulator/fold re-stated in a `whnf`-friendly form (e.g. abbreviated state
-  -- types or a bespoke specialisation of the accumulator at this handler), not new content.
-  sorry
+  refine (OracleComp.ProgramLogic.Relational.probEvent_bad_simulateQ_run_le_expectedQuerySlack
+    (impl := lazyGhostHybridImpl ids M maxAttempts pk sk)
+    (charged := fun t => t matches Sum.inl (Sum.inr _))
+    (R := fun s => QueryCache.enncard s.1.2) (ε := ENNReal.ofReal ε)
+    ?_ ?_ (adv.main pk) (qS := qH + 1) ?_ (((∅, ∅), []))).trans ?_
+  · -- h_charged_step: a charged random-oracle read pays `enncard · ofReal ε`.
+    rintro t s ht k
+    obtain ⟨mc, rfl⟩ : ∃ mc, t = Sum.inl (Sum.inr mc) := by
+      revert ht; rcases t with (n | mc) | msg <;> simp
+    exact probEvent_lazyGhostHybridImpl_charged_step ids M maxAttempts pk sk hGuess mc s k
+  · -- h_free_step: a non-charged (uniform or signing) query introduces no bad mass.
+    rintro t s ht k
+    rcases t with (n | mc) | msg
+    · exact le_of_eq (probEvent_bad_bind_eq_tsum_false
+        (oa := (lazyGhostHybridImpl ids M maxAttempts pk sk (Sum.inl (Sum.inl n))).run (s, false))
+        (k := k)
+        (lazyGhostHybridImpl_run_unif_bad_false ids M maxAttempts pk sk n (s, false) rfl))
+    · exact absurd rfl ht
+    · exact le_of_eq (probEvent_bad_bind_eq_tsum_false
+        (oa := (lazyGhostHybridImpl ids M maxAttempts pk sk (Sum.inr msg)).run (s, false))
+        (k := k)
+        (lazyGhostHybridImpl_run_sign_bad_false ids M maxAttempts pk sk msg (s, false) rfl))
+  · -- charged-read budget `qH + 1`: from the RO-read bound `qH`, weakened by `+1`.
+    have h := (hQ pk).2.mono (Nat.le_succ qH)
+    convert h using 3 with x
+    rcases x with (_ | _) | _ <;> rfl
+  · -- (2)+(3): the charged-read / expected-growth fold, then arithmetic.
+    set g : ℝ≥0∞ := ∑ a ∈ Finset.range maxAttempts, ENNReal.ofReal p_abort ^ a with hg
+    -- The fold bound: `expectedQuerySlack ≤ (qH+1)·(R init + qS·g)·ofReal ε`.
+    have h_fold :
+        OracleComp.ProgramLogic.Relational.expectedQuerySlack
+            (lazyGhostHybridImpl ids M maxAttempts pk sk)
+            (fun t => t matches Sum.inl (Sum.inr _))
+            (fun s => QueryCache.enncard s.1.2 * ENNReal.ofReal ε) (adv.main pk) (qH + 1)
+            ((((∅, ∅), []) :
+              ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M),
+                false)
+          ≤ ((qH + 1 : ℕ) : ℝ≥0∞) *
+              (QueryCache.enncard (∅ : (M × Commit →ₒ Chal).QueryCache) + (qS : ℝ≥0∞) * g) *
+              ENNReal.ofReal ε := by
+      refine OracleComp.ProgramLogic.Relational.expectedQuerySlack_charged_read_expected_growth_le
+        (lazyGhostHybridImpl ids M maxAttempts pk sk)
+        (chargedQuery := fun t => t matches Sum.inl (Sum.inr _))
+        (growthQuery := fun t => t matches Sum.inr _)
+        (R := fun s => QueryCache.enncard s.1.2) (β := ENNReal.ofReal ε) (g := g)
+        ?_ ?_ ?_ (adv.main pk) ?_ ?_ _
+      · -- h_charged: a charged RO read leaves the ghost cache (`R`) unchanged.
+        rintro t p hp ht z hz
+        rcases t with (n | mc) | msg
+        · exact absurd ht (by simp)
+        · rw [show (lazyGhostHybridImpl ids M maxAttempts pk sk (Sum.inl (Sum.inr mc))).run p =
+              lazyGhostFire ids pk sk mc.2 p.1.1.2.toSet.encard.toNat >>= fun fired =>
+                (fun cu => (cu.1, (((cu.2, p.1.1.2), p.1.2), p.2 || fired))) <$>
+                  roStep M p.1.1.1 mc from rfl] at hz
+          obtain ⟨fired, _, hz⟩ := (mem_support_bind_iff _ _ _).1 hz
+          obtain ⟨cu, _, heq⟩ :=
+            (support_map (fun cu : Chal × (M × Commit →ₒ Chal).QueryCache =>
+                (cu.1, (((cu.2, p.1.1.2), p.1.2), p.2 || fired)))
+              (roStep M p.1.1.1 mc) ▸ hz)
+          rw [← heq]
+        · exact absurd ht (by simp)
+      · -- h_growth: the ghost-layer growth law for a signing query.
+        rintro t p hp ht ht2
+        rcases t with (n | mc) | msg
+        · exact absurd ht2 (by simp)
+        · exact absurd ht2 (by simp)
+        · obtain ⟨⟨⟨re, gh⟩, list⟩, b⟩ := p
+          rw [show b = false from hp]
+          change ∑' z : (Option (Commit × Resp)) ×
+              (((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache) × List M) × Bool,
+              Pr[= z | (lazyGhostHybridImpl ids M maxAttempts pk sk (Sum.inr msg)).run
+                (((re, gh), list), false)] * QueryCache.enncard z.2.1.1.2
+            ≤ QueryCache.enncard gh + g
+          rw [show (lazyGhostHybridImpl ids M maxAttempts pk sk (Sum.inr msg)).run
+                (((re, gh), list), false) =
+              (ghostSignBody ids M pk sk msg maxAttempts).run (re, gh) >>= fun alc =>
+                pure (alc.1, ((alc.2, msg :: list), false)) from rfl]
+          have heq := tsum_probOutput_bind_mul
+            ((ghostSignBody ids M pk sk msg maxAttempts).run (re, gh))
+            (fun alc => (pure (alc.1, ((alc.2, msg :: list), false)) : ProbComp _))
+            (fun z => QueryCache.enncard z.2.1.1.2)
+          refine le_trans (le_of_eq heq) ?_
+          refine le_trans (ENNReal.tsum_le_tsum fun alc => ?_)
+            (tsum_probOutput_run_ghostSignBody_mul_ghost_enncard_le ids M pk sk msg hAbort
+              maxAttempts re gh)
+          rw [tsum_probOutput_pure_mul]
+      · -- h_free: a uniform query leaves the ghost cache (`R`) unchanged.
+        rintro t p hp ht ht2 z hz
+        rcases t with (n | mc) | msg
+        · rw [show (lazyGhostHybridImpl ids M maxAttempts pk sk (Sum.inl (Sum.inl n))).run p =
+              (fun u => (u, p)) <$>
+                (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n from rfl] at hz
+          obtain ⟨u, _, heq⟩ :=
+            (support_map (fun u => (u, p))
+              ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n) ▸ hz)
+          rw [← heq]
+        · exact absurd ht (by simp)
+        · exact absurd ht2 (by simp)
+      · -- charged budget `qH + 1`.
+        have h := (hQ pk).2.mono (Nat.le_succ qH)
+        convert h using 3 with x
+        rcases x with (_ | _) | _ <;> rfl
+      · -- growth budget `qS`.
+        have h := (hQ pk).1
+        convert h using 3 with x
+        rcases x with (_ | _) | _ <;> rfl
+    refine h_fold.trans ?_
+    -- (3) Arithmetic: `enncard ∅ = 0`, `g = ofReal S` with `S = ∑ pᵃ ≤ 1/(1-p)`.
+    have h1p : (0 : ℝ) < 1 - p_abort := by linarith
+    set S : ℝ := ∑ a ∈ Finset.range maxAttempts, p_abort ^ a with hSdef
+    have hSnn : 0 ≤ S := Finset.sum_nonneg fun a _ => pow_nonneg hp₀ a
+    have hg_eq : g = ENNReal.ofReal S := by
+      rw [hg, hSdef, ENNReal.ofReal_sum_of_nonneg (fun a _ => pow_nonneg hp₀ a)]
+      exact Finset.sum_congr rfl fun a _ => by rw [← ENNReal.ofReal_pow hp₀]
+    have hSgeo : S ≤ 1 / (1 - p_abort) := by
+      rw [hSdef, le_div_iff₀ h1p]
+      have hmul := geom_sum_mul p_abort maxAttempts
+      nlinarith [pow_nonneg hp₀ maxAttempts]
+    rw [QueryCache.enncard_empty, zero_add, hg_eq,
+      show ((qH + 1 : ℕ) : ℝ≥0∞) = ENNReal.ofReal ((qH : ℝ) + 1) from by
+        rw [← ENNReal.ofReal_natCast (qH + 1)]; push_cast; ring_nf,
+      show (qS : ℝ≥0∞) = ENNReal.ofReal qS from (ENNReal.ofReal_natCast qS).symm]
+    rw [← ENNReal.ofReal_mul (by positivity), ← ENNReal.ofReal_mul (by positivity),
+      ← ENNReal.ofReal_mul (by positivity)]
+    refine ENNReal.ofReal_le_ofReal ?_
+    have hqS : (0 : ℝ) ≤ qS := Nat.cast_nonneg qS
+    have hqH1 : (0 : ℝ) ≤ (qH : ℝ) + 1 := by positivity
+    calc ((qH : ℝ) + 1) * (qS * S) * ε
+        ≤ ((qH : ℝ) + 1) * (qS * (1 / (1 - p_abort))) * ε := by
+          gcongr
+      _ = qS * ((qH : ℝ) + 1) * ε / (1 - p_abort) := by ring
 
 /-! ## The ghost-read collision charge (open) -/
 
