@@ -1846,6 +1846,46 @@ lemma ghostNmaImpl_proj_hybrid (pk : Stmt) (sk : Wit)
     · exact (hybridSignImpl_run M (simSignBody M maxAttempts sim pk sk) msg
         (overlayCache M s.1.1 s.1.2) s.2).symm
 
+/-! ### Live-read / sign-program collision event (sub-lemma (b) reframe)
+
+The per-step state-projection equality `hproj2_sign` is *provably impossible*: a
+sign-programmed transcript point `(msg, w)` can coincide with a point already written into the
+base (live-read) layer by a prior adversary random-oracle query, and the projection
+`proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base ghost)` cannot recover the
+linked managed handler's separate inner/outer cache split from `(base, ghost)` alone at such a
+point (a `(msg, w)` in the overlay could have arrived via a live read — present in the outer
+cache — or via signing — absent from the outer cache — and the layered state records no flag
+distinguishing the two).
+
+`signLiveCollisionState` is the exact state-level event distinguishing the two runs: at the
+*start of a sign step* for message `msg`, the simulator's accepted commitment `w` lands on a
+point `(msg, w)` already live in the base layer. Off this event (`base (msg, w) = none` for the
+drawn `w`), the sign step's projection *is* a function of the state and the per-step coupling is
+exact. On this event the two runs diverge, and — because the headline bound
+`hybridSimRun_le_managedRun_verify` is an *inequality* (`≤`) — the divergence may be paid on the
+bad side via the commit-guessing charge `probEvent_commit_hit_le` (the base layer's live-read
+count times the per-commit guessing bound `ε`), exactly the charge class already used for the
+ghost-read collision in `probEvent_ghostRead_bad_le`. -/
+
+omit [SampleableType Stmt] [SampleableType Chal] in
+/-- The live-read / sign-program collision predicate at a sign step. For a base (live-read)
+cache `base` and a drawn accepted commitment `w` for message `msg`, the collision fires iff the
+sign-programmed point `(msg, w)` is already present in the base layer (i.e. the simulator's
+commitment landed on a previously live-read random-oracle point). This is the *exact* event off
+which the layered NMA run and the linked managed run agree: when `base (msg, w) = none` the
+sign-step projection `proj₂` is a function of the state, so the per-step coupling is an exact
+equality; when it holds the two runs diverge and the gap is charged by
+`probEvent_commit_hit_le`. -/
+def signLiveCollision (base : (M × Commit →ₒ Chal).QueryCache) (msg : M) (w : Commit) : Prop :=
+  base (msg, w) ≠ none
+
+omit [SampleableType Stmt] [SampleableType Chal] [DecidableEq Commit] [DecidableEq M] in
+/-- The collision is decidable and its negation is exactly the no-collision hypothesis
+`base (msg, w) = none` under which the sign-step projection is exact. -/
+lemma not_signLiveCollision_iff (base : (M × Commit →ₒ Chal).QueryCache) (msg : M) (w : Commit) :
+    ¬ signLiveCollision M base msg w ↔ base (msg, w) = none := by
+  simp [signLiveCollision]
+
 omit [SampleableType Stmt] in
 /-- **Sub-lemma (a), full-run form.** The full simulated run of the layered ghost-tagged NMA
 handler `ghostNmaImpl`, projected by overlaying the ghost layer onto the base layer, equals

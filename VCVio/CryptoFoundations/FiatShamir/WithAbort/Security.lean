@@ -1739,6 +1739,47 @@ These were previously inline `letI` bindings inside `simulatedNmaAdv` and
 `managedRun_eq_link_run`; promoting them to top level makes `nmaLinkImpl pk` a nameable
 handler so the coupling can be stated and proved one query step at a time. -/
 
+omit [SampleableType Stmt] [DecidableEq Commit] [SampleableType Chal] [DecidableEq M] in
+/-- **Uniform-only nested-simulation collapse (sub-lemma (b), part (i) — PROVEN, axiom-clean).**
+The simulator loop inside `sigSim`/`nmaOuterImpl` is run under the inner managed handler's
+uniform branch `unifSim n = fwd (.inl n)`, which forwards each uniform draw transparently into
+the sum spec without touching the managed cache. Hence simulating any `unifSpec`-only
+computation `oa` under `unifSim` and running the resulting `StateT` at a cache `cache` returns
+`oa` lifted into the sum spec with the cache threaded *unchanged*: `(simulateQ unifSim oa).run
+cache = (·, cache) <$> liftComp oa _`. This collapses the `simulateQ unifSim (firstSome (sim
+pk) maxAttempts)` nested simulation in the sign step back to the bare lifted `firstSome` loop —
+the part of `hproj2_sign` that is independent of the live-read/sign collision. -/
+lemma simulateQ_unifSim_run {α : Type}
+    (oa : OracleComp unifSpec α)
+    (cache : (unifSpec + (M × Commit →ₒ Chal)).QueryCache) :
+    let spec := unifSpec + (M × Commit →ₒ Chal)
+    let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
+    let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
+      fun n => fwd (.inl n)
+    (simulateQ unifSim oa).run cache =
+      (fun r => (r, cache)) <$> (liftComp oa (unifSpec + (M × Commit →ₒ Chal))) := by
+  intro spec fwd unifSim
+  induction oa using OracleComp.inductionOn generalizing cache with
+  | pure x => simp [unifSim, fwd]
+  | query_bind t k ih =>
+      rw [simulateQ_bind, StateT.run_bind, simulateQ_query]
+      simp only [OracleQuery.input_query, OracleQuery.cont_query, id_map]
+      -- `unifSim t` forwards the uniform query `t` straight through into the sum spec, leaving
+      -- the cache untouched.
+      have hstep : (unifSim t).run cache
+          = (liftComp (query t : OracleComp unifSpec _) spec) >>= fun u => pure (u, cache) := by
+        simp only [unifSim, fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply]
+        change ((liftM (query (Sum.inl t)) :
+            StateT (unifSpec + (M × Commit →ₒ Chal)).QueryCache
+              (OracleComp (unifSpec + (M × Commit →ₒ Chal))) _)).run cache = _
+        rw [OracleComp.liftM_run_StateT]
+        refine congrArg (· >>= fun u => pure (u, cache)) ?_
+        rfl
+      rw [hstep, liftComp_bind, map_bind, bind_assoc]
+      simp only [pure_bind]
+      exact bind_congr (fun u => ih u cache)
+
 /-- The inner *managed* handler of the NMA reduction: forward uniform queries to the live
 spec (`unifSim`), answer hash queries through the managed cache (`roSim`, forwarding misses
 to the live oracle), and answer signing queries with the simulator loop (`sigSim`), programming
@@ -1909,20 +1950,52 @@ lemma hproj2_ro_fresh (pk : Stmt) (sk : Wit) (mc : M × Commit)
   rw [baseEmbed_cacheQuery, overlayCache_cacheQuery_real_of_ghost_none (M := M) s.1.1 hgm]
 
 omit [SampleableType Stmt] in
-/-- **Sub-lemma (b), signing-query step — STILL OPEN (genuine multi-week content).** On a
-signing query the layered ghost-tagged handler `ghostNmaImpl` runs `simGhostSignBody` (a
-`liftM (firstSome (sim pk) maxAttempts)` followed by `ghostSignProgramCont`), while the linked
-managed handler `nmaLinkImpl` runs `sigSim`, which is the *nested* simulation
-`simulateQ nmaInnerImpl ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` re-folded
-through the outer runtime. Collapsing that nested simulation back to the lifted `firstSome`
-loop and matching the accepted-transcript programming (ghost-layer `cacheQuery (msg, w) c`
-vs inner-cache `cacheQuery (.inr (msg, w)) c`, base/outer layers untouched) is the remaining
-multi-week content of the NMA bridge. -/
+/-- **Sub-lemma (b), signing-query step.**
+
+PROVEN IMPOSSIBLE AS A PER-STEP EQUALITY. This unconditional projection equality is *false* at
+reachable states: a sign-programmed transcript point `(msg, w)` can coincide with a point
+already live in the base layer from a prior adversary random-oracle read, and the projection
+`proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base ghost)` cannot then recover
+the linked managed handler's separate inner/outer cache split from `(base, ghost)` alone (see
+`signLiveCollision` in `GhostBodies.lean`). The statement is kept for the documented
+nested-simulation reduction it carries and as the pivot point for the collision-accounting
+reframe (`hybridSimRun_le_managedRun_verify`); it is NOT used to close the leaf.
+
+BANKED MECHANICAL REDUCTION (the proof body below, sorry-terminated). `link_impl_apply_run`
+exposes the linked RHS as the *nested* simulation
+`simulateQ nmaInnerImpl ((nmaOuterImpl pk (.inr msg)).run outerCache)`, and `simp [nmaOuterImpl]`
+reduces the outer step to the `sigSim` body: a nested `simulateQ unifSim (firstSome (sim pk)
+maxAttempts)` followed by the inner-cache programming `cacheQuery (.inr (msg, w)) c`. The LHS is
+already `simGhostSignBody` (`liftM (firstSome (sim pk) maxAttempts)` then ghost-layer
+`cacheQuery (msg, w) c`). The exposed residual goal is therefore precisely:
+
+  (i)  the uniform-only nested-simulation collapse
+       `(simulateQ unifSim (firstSome (sim pk) maxAttempts)).run cache
+          = (·, cache) <$> liftM (firstSome (sim pk) maxAttempts)`
+       (the simulator loop touches no cache layer; `unifSim n = fwd (.inl n)` forwards each
+       uniform draw transparently), then
+  (ii) matching the accepted-transcript programming: ghost-layer `cacheQuery (msg, w) c` against
+       inner-cache `cacheQuery (.inr (msg, w)) c` under `proj₂`, which is exact *iff*
+       `¬ signLiveCollision base msg w` (off the collision event), and otherwise diverges by the
+       collision charge.
+
+The reframe routes around the unconditional version via `relTriple_simulateQ_run_mono` +
+`probEvent_le_of_relTriple_imp` (the GHOST-leaf machinery), paying (ii)'s collision on the bad
+side. The remaining open content is the uniform-only collapse (i), independent of the
+collision. -/
 lemma hproj2_sign (pk : Stmt) (sk : Wit) (msg : M)
     (s : NmaGhostState M Commit Chal)
     (hs : ∀ q : M × Commit, s.1.2 q ≠ none → q.1 ∈ s.2) :
     Prod.map id (proj2 M) <$> (ghostNmaImpl M maxAttempts sim pk sk (.inr msg)).run s =
       (nmaLinkImpl M maxAttempts sim pk (.inr msg)).run (proj2 M s) := by
+  rw [ghostNmaImpl_run_sign, nmaLinkImpl, QueryImpl.Stateful.link_impl_apply_run]
+  -- Reduce the linked RHS's outer step `nmaOuterImpl pk (.inr msg)` to the simulator body
+  -- `sigSim msg`: a nested simulation `simulateQ unifSim (firstSome (sim pk) maxAttempts)`
+  -- followed by inner-cache programming of the accepted transcript. After this the residual is
+  -- the uniform-only nested-simulation collapse (i) above; the per-step equality then fails
+  -- exactly on `signLiveCollision`, which the leaf's collision-accounting reframe pays on the
+  -- bad side rather than discharging here.
+  simp only [nmaOuterImpl, QueryImpl.add_apply_inr]
   sorry
 
 /-- The managed-RO NMA reduction for Fiat-Shamir with aborts: run the CMA adversary,
@@ -2154,19 +2227,50 @@ lemma hybridSimRun_le_managedRun_verify (pk : Stmt) (sk : Wit) :
   --     sum spec), i.e. the left component of `proj₂ ((base,ghost),signed) = (baseEmbed base,
   --     overlayCache base ghost)`; `baseEmbed_cacheQuery` provides the RO-step algebra
   --     `baseEmbed (base.cacheQuery mc v) = (baseEmbed base).cacheQuery (.inr mc) v`.
-  -- DONE part (i): the local `outer`/`inner`/`roSim`/`sigSim`/`unifSim` lets of
+  -- DONE: the local `outer`/`inner`/`roSim`/`sigSim`/`unifSim` lets of
   -- `simulatedNmaAdv`/`managedRun_eq_link_run` are now top-level handlers `nmaOuterImpl`,
   -- `nmaInnerImpl`, and `nmaLinkImpl := (nmaOuterImpl …).link (nmaInnerImpl …)`, so the linked
   -- handler is nameable; `managedRun_eq_link_run` is re-expressed in terms of them and stays
-  -- axiom-clean. The next-round per-step coupling can therefore be stated directly as
+  -- axiom-clean. The per-step coupling is stated as
   --   `hproj₂ : Prod.map id proj₂ <$> (ghostNmaImpl t).run s
   --              = (nmaLinkImpl M maxAttempts sim pk t).run (proj₂ s)`
-  -- with `proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base ghost)`.
-  -- STILL OPEN part (ii): the nested-simulation collapse
-  -- `simulateQ (nmaInnerImpl …) ((simulateQ unifSim (firstSome (sim pk) maxAttempts)).run _)` to
-  -- the lifted `firstSome` loop so the sign step matches `simGhostSignBody`. That is the
-  -- remaining multi-week content; (a), the verify-tail toolkit (c), the invariant gate, the
-  -- `baseEmbed` algebra, and now the named/linked handlers are in place.
+  -- with `proj₂ ((base, ghost), signed) = (baseEmbed base, overlayCache base ghost)`, split into
+  -- `hproj2_unif`, `hproj2_ro`, `hproj2_ro_fresh` (all PROVEN, axiom-clean) and `hproj2_sign`.
+  --
+  -- R19 REFRAME (collision-accounting; the per-step sign equality is PROVEN IMPOSSIBLE). The
+  -- unconditional sign-step equality `hproj2_sign` is *false*: a sign-programmed `(msg, w)` can
+  -- coincide with a base-layer live read (the `signLiveCollision` event, `GhostBodies.lean`),
+  -- and `proj₂` cannot recover the linked inner/outer split from `(base, ghost)` at such a point.
+  -- Since this leaf is an *inequality* (`≤`), the route is the GHOST-leaf machinery
+  -- (`relTriple_simulateQ_run_mono` + `probEvent_le_of_relTriple_imp`): an *exact coupling off
+  -- the collision event* (where `proj₂` IS a state function, so the per-step coupling is an
+  -- equality) PLUS the collision probability paid on the bad side via the commit-guessing charge
+  -- `probEvent_commit_hit_le` (live-read count · ε) — the SAME charge class as the ghost-read
+  -- collision `probEvent_ghostRead_bad_le`.
+  --
+  -- BANKED THIS ROUND (axiom-clean):
+  --   * `signLiveCollision` / `not_signLiveCollision_iff` (`GhostBodies.lean`) — the exact
+  --     state-level collision event distinguishing the two runs, and its no-collision negation
+  --     `base (msg, w) = none` under which the sign-step projection is exact.
+  --   * `simulateQ_unifSim_run` (above) — sub-lemma (b) PART (i), the uniform-only
+  --     nested-simulation collapse `(simulateQ unifSim oa).run cache = (·, cache) <$> liftComp oa`
+  --     for any `unifSpec`-only `oa`. This collapses the `simulateQ unifSim (firstSome (sim pk)
+  --     maxAttempts)` loop inside `sigSim`/`nmaOuterImpl` back to the bare lifted `firstSome`
+  --     loop, exactly the collision-independent half of `hproj2_sign`. `hproj2_sign`'s proof body
+  --     now executes the `link_impl_apply_run` + `nmaOuterImpl` reduction exposing this
+  --     nested loop as its residual goal.
+  --
+  -- EXACT REMAINING RESIDUAL. (1) Finish `hproj2_sign` *conditioned on no collision*
+  -- (`¬ signLiveCollision base msg w`): push `simulateQ nmaInnerImpl` through the collapsed
+  -- `firstSome` loop (via `simulateQ_unifSim_run`) and match the ghost-layer `cacheQuery (msg, w)
+  -- c` against the inner-cache `cacheQuery (.inr (msg, w)) c` under `proj₂` (exact off-collision).
+  -- (2) Assemble the off-collision per-step couplings (`hproj2_unif`/`_ro`/`_ro_fresh` plus the
+  -- conditional sign step) into a global `relTriple_simulateQ_run_mono` coupling whose
+  -- post-implication pays the collision mass through `probEvent_commit_hit_le`, then split the
+  -- verify tail on `msg ∈ signed` (`probOutput_true_hybridVerifyCont_of_mem`,
+  -- `withCacheOverlay_verify_eq_of_miss`, `hybridVerifyCont_cache_congr`). The fusion (Step 1),
+  -- sub-lemma (a), the invariant gate, the `baseEmbed` algebra, part (i), the collision predicate,
+  -- and the verify-tail toolkit are all in place.
   sorry
 
 /-- **Per-key cache-overlay invariant** (core of the NMA bridge): at a fixed key pair the
