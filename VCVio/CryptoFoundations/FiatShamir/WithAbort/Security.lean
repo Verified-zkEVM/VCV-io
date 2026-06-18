@@ -1125,13 +1125,13 @@ exact analogue, for the averaged eager charge, of the per-state resource accumul
 `probEvent_lazyGhostHybridImpl_bad_le`). The hypothesis `hAcc` states exactly that
 accumulator's conclusion: the averaged eager bad mass is bounded by `(qH+1)·K·ε`. -/
 lemma probEvent_ghostRead_bad_le_charge
-    (qS qH : ℕ) (ε p_abort : ℝ) (hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (hε : 0 ≤ ε)
-    (hQ : ∀ pk, FiatShamir.signHashQueryBound M
+    (qS qH : ℕ) (ε p_abort : ℝ) (_hp₀ : 0 ≤ p_abort) (hp : p_abort < 1) (_hε : 0 ≤ ε)
+    (_hQ : ∀ pk, FiatShamir.signHashQueryBound M
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH)
     (pk : Stmt) (sk : Wit)
-    (hGuess : ∀ cm : Commit,
+    (_hGuess : ∀ cm : Commit,
       Pr[= cm | Prod.fst <$> ids.commit pk sk] ≤ ENNReal.ofReal ε)
-    (hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
+    (_hAbort : Pr[= none | ids.honestExecution pk sk] ≤ ENNReal.ofReal p_abort)
     (hAcc :
       OracleComp.ProgramLogic.Relational.avgBadM
         (ghostHybridImpl ids M maxAttempts true pk sk)

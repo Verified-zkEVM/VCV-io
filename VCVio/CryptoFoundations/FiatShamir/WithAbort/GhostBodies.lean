@@ -2140,9 +2140,8 @@ lemma tsum_ghostHybridImpl_read_step_charge_le
   unfold memCharge
   cases h : p.1.1.2 mc with
   | some v =>
-      rw [if_neg (by simp)]
-      simpa using probOutput_le_one (p := fun _ : (M × Option (Commit × Resp)) ×
-        GhostState M Commit Chal => True)
+      rw [if_neg (by simp), add_zero]
+      exact probEvent_le_one
   | none =>
       rw [if_pos rfl, zero_add]
 
