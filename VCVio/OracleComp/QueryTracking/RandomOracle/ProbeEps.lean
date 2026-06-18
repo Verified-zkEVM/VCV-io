@@ -289,4 +289,51 @@ theorem probEvent_hiddenReadList_le {oa : ProbComp R} {ε : ℝ≥0∞} (hε : �
           add_le_add (probEvent_hiddenReadMany_le hε q σ) (le_trans h2 ih)
       _ = (↑(n + 1) : ℝ≥0∞) * ((q : ℝ≥0∞) * ε) := by push_cast; ring
 
+/-! ## Averaging the key count and the run-factorization bridge
+
+The multi-key bound `probEvent_hiddenReadList_le` is stated for a *fixed* number of keys `n`. In
+the intended application the key count is itself random (one ghost key is drawn per *rejected*
+signing attempt), so the closing step averages the bound over a key-count distribution
+`kn : ProbComp ℕ`, yielding `E[n] · q · ε`. The final bridge
+`probEvent_le_of_eq_bind_hiddenReadList`
+packages the union-bound side of the *direct route*: once a run's bad marginal is exhibited as a
+`kn >>= hiddenReadList oa q σ` game (the deferred-sampling factorization), the bound is immediate.
+-/
+
+/-- **Averaged multi-key hidden-target bound.** When the number of independently drawn hidden keys
+is itself sampled from `kn : ProbComp ℕ`, the firing probability of the multi-key game is at most
+`E[n] · q · ε`, where `E[n] = ∑' n, Pr[= n | kn] · n` is the expected key count. This is the
+averaging step (`C3`) of the direct route: it folds the fixed-`n` bound
+`probEvent_hiddenReadList_le` against the key-count distribution. Combined with an expected-count
+bound `E[n] ≤ qS / (1 - p)` it gives the target `qS · q · ε / (1 - p)`. -/
+theorem probEvent_bind_hiddenReadList_le {oa : ProbComp R} {ε : ℝ≥0∞}
+    (hε : ∀ r : R, Pr[= r | oa] ≤ ε) (q : ℕ) (σ : List Bool → R) (kn : ProbComp ℕ) :
+    Pr[(fun b : Bool => b = true) | kn >>= fun n => hiddenReadList oa q σ n]
+      ≤ (∑' n : ℕ, Pr[= n | kn] * (n : ℝ≥0∞)) * ((q : ℝ≥0∞) * ε) := by
+  rw [probEvent_bind_eq_tsum, ← ENNReal.tsum_mul_right]
+  refine ENNReal.tsum_le_tsum fun n => ?_
+  rw [mul_assoc]
+  gcongr
+  exact probEvent_hiddenReadList_le hε q σ n
+
+/-- **Direct-route union-bound bridge.** If an arbitrary run `run : ProbComp β` with a bad
+event `bad : β → Prop` has its bad marginal exhibited as the averaged multi-key hidden-target game
+`kn >>= hiddenReadList oa q σ` — i.e. the deferred-sampling factorization that pulls the run's
+hidden key draws into an independent front block, reading each off as a `hiddenReadMany` target
+probed by the `q` subsequent adaptive reads — then the run's bad probability is bounded by the
+expected-count union bound `E[n] · q · ε`.
+
+This is the reusable closing lemma of the direct route: the entire remaining content is supplied as
+the hypothesis `hfac`, the distributional equality between the run's bad indicator and the abstract
+game. Establishing `hfac` is the deferred-sampling commutation (factoring the run's per-key draws to
+the front so the pre-first-hit reads become the deterministic strategy `σ`); the union-bound side it
+feeds into is fully discharged here via `probEvent_bind_hiddenReadList_le`. -/
+theorem probEvent_le_of_eq_bind_hiddenReadList {β : Type} {run : ProbComp β} {bad : β → Prop}
+    {oa : ProbComp R} {ε : ℝ≥0∞} (hε : ∀ r : R, Pr[= r | oa] ≤ ε)
+    (q : ℕ) (σ : List Bool → R) (kn : ProbComp ℕ)
+    (hfac : Pr[bad | run]
+      ≤ Pr[(fun b : Bool => b = true) | kn >>= fun n => hiddenReadList oa q σ n]) :
+    Pr[bad | run] ≤ (∑' n : ℕ, Pr[= n | kn] * (n : ℝ≥0∞)) * ((q : ℝ≥0∞) * ε) :=
+  hfac.trans (probEvent_bind_hiddenReadList_le hε q σ kn)
+
 end OracleComp

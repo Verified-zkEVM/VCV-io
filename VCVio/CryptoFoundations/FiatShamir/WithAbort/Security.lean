@@ -792,7 +792,18 @@ signing-time key draw is read off as a `hiddenReadMany` target probed by the (�
 subsequent adversarial reads (`OracleComp.readManyList` for the accumulating ghost cache).
 That factoring is the same deferred-sampling commutation as the bespoke route above — it
 moves the per-key draw to the front and makes the eager reads deterministic — and is the
-genuine multi-week content; the primitive that discharges its union-bound half is banked. -/
+genuine multi-week content; the primitive that discharges its union-bound half is banked.
+
+The *entire union-bound side* of the direct route is now banked and axiom-clean as the pair
+`OracleComp.probEvent_bind_hiddenReadList_le` (averaging the random key count `n ← kn` against
+the fixed-`n` bound `probEvent_hiddenReadList_le`, giving `E[n]·q·ε`) and the closing bridge
+`OracleComp.probEvent_le_of_eq_bind_hiddenReadList`. The latter reduces the direct route to a
+single, lazy-world-free obligation `hfac`: the *factorization* exhibiting the eager run's bad
+marginal as the abstract game `kn >>= hiddenReadList oa (qH+1) σ` with `oa := Prod.fst <$>
+ids.commit pk sk` (whence `ε` via `hGuess`), `kn` the rejected-attempt-count distribution (whence
+`E[n] ≤ qS/(1−p)` via `tsum_probOutput_commit_mul_abort_le`), and `σ` the adversary's all-miss
+read strategy. Establishing `hfac` is the deferred-sampling commutation; every step downstream of
+it is now a banked `le_trans`. -/
 lemma eagerGhostRead_bad_le_lazyGhostRead_bad (pk : Stmt) (sk : Wit) :
     Pr[fun z : (M × Option (Commit × Resp)) × GhostState M Commit Chal => z.2.2 = true |
         (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (adv.main pk)).run
