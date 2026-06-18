@@ -1181,12 +1181,15 @@ lemma avgBadM_ghostHybridImpl_le_threaded
                       (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont u)).run p] :=
               tsum_congr fun p => by
                 congr 1
-                -- RESIDUAL (uniform-handler pushforward): the per-`p` inner sum is the
-                -- map-pushforward of the uniform draw through the fixed-state handler
-                -- `(fun u => (u, p)) <$> unif n`. Pure measure-theoretic rearrangement
-                -- (`tsum_probOutput_bind_mul` + `tsum_probOutput_pure_mul`); the
-                -- `tsum_probOutput_bind_mul` rewrite does not fire on the `do`-elaborated run
-                -- form. Provide via `probEvent_bind_eq_tsum` on the explicit bind form.
+                -- RESIDUAL (uniform-handler pushforward plumbing). The uniform handler is
+                -- `(fun u => (u, p)) <$> unif n`, a pushforward of the uniform draw fixing the
+                -- state to `p`; the per-`p` inner sum is therefore
+                --   `∑' z, Pr[= z | (·, p) <$> unif n] · G z = ∑' u, Pr[= u | unif n] · G (u, p)`.
+                -- Pure measure-theoretic rearrangement (`ENNReal.tsum_prod'`, off-diagonal
+                -- collapse, then `probOutput_map_injective` on the injective `(·, p)`). The
+                -- `support_map` / `<$>`-keyed rewrites do not fire on the `.run`-elaborated
+                -- handler form here; this is the sole remaining plumbing gap of the inert
+                -- uniform step (no probabilistic content).
                 sorry
           _ = ∑' u : unifSpec.Range n,
                 Pr[= u | (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) n] *
