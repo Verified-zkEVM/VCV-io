@@ -670,6 +670,39 @@ lemma probEvent_lazyGhostHybridImpl_bad_le
           gcongr
       _ = qS * ((qH : ℝ) + 1) * ε / (1 - p_abort) := by ring
 
+/-! ## Direct route: averaged multi-key hidden-read fold to the target
+
+The direct route bounds the eager ghost-read bad probability by the banked multi-key
+hidden-target first-fire bound `OracleComp.probEvent_hiddenReadList_le` (`≤ n·(qH+1)·ε`
+for `n` ghost keys), then averages the per-key-count bound over the run's key-count law.
+The averaging step is the pure-`ℝ≥0∞` arithmetic fold `hiddenReadList_fold_le_target`
+below: it takes any sub-probability weight `P : ℕ → ℝ≥0∞` over the number of ghost keys
+whose mean is bounded by the expected attempt count `qS/(1-p)` (the banked
+`tsum_probOutput_commit_mul_abort_le` aggregate) and folds the per-count bound
+`k·(qH+1)·ε` into the target `qS·(qH+1)·ε/(1-p)`. It is the closed `[fold]` step of the
+direct chain `Pr[eager bad] ≤[D1] Pr[readManyList …] =[D2] Pr[hiddenReadList …] ≤ n·(qH+1)·ε
+≤[fold] target`; the remaining `[D1]`/`[D2]` connection is the deferred-sampling
+commutation isolated in `eagerGhostRead_bad_le_lazyGhostRead_bad`. -/
+lemma hiddenReadList_fold_le_target (qS qH : ℕ) (ε p_abort : ℝ) (hp : p_abort < 1)
+    (P : ℕ → ℝ≥0∞)
+    (hmean : ∑' k : ℕ, P k * (k : ℝ≥0∞) ≤ ENNReal.ofReal (qS / (1 - p_abort))) :
+    (∑' k : ℕ, P k * ((k : ℝ≥0∞) * (((qH : ℝ≥0∞) + 1) * ENNReal.ofReal ε)))
+      ≤ ENNReal.ofReal (qS * ((qH : ℝ) + 1) * ε / (1 - p_abort)) := by
+  have h1p : (0 : ℝ) < 1 - p_abort := by linarith
+  have hqH1 : ((qH : ℝ≥0∞) + 1) = ENNReal.ofReal ((qH : ℝ) + 1) := by
+    rw [← ENNReal.ofReal_natCast qH, ← ENNReal.ofReal_one,
+      ← ENNReal.ofReal_add (by positivity) (by norm_num)]
+  have h1 : (∑' k : ℕ, P k * ((k : ℝ≥0∞) * (((qH : ℝ≥0∞) + 1) * ENNReal.ofReal ε)))
+      = (∑' k : ℕ, P k * (k : ℝ≥0∞)) * (ENNReal.ofReal ((qH : ℝ) + 1) * ENNReal.ofReal ε) := by
+    rw [← ENNReal.tsum_mul_right]; congr 1; ext k; rw [hqH1]; ring
+  rw [h1, ← ENNReal.ofReal_mul (by positivity)]
+  calc (∑' k : ℕ, P k * (k : ℝ≥0∞)) * ENNReal.ofReal (((qH : ℝ) + 1) * ε)
+      ≤ ENNReal.ofReal (qS / (1 - p_abort)) * ENNReal.ofReal (((qH : ℝ) + 1) * ε) := by gcongr
+    _ = ENNReal.ofReal (qS / (1 - p_abort) * (((qH : ℝ) + 1) * ε)) := by
+        rw [← ENNReal.ofReal_mul (by positivity)]
+    _ ≤ ENNReal.ofReal (qS * ((qH : ℝ) + 1) * ε / (1 - p_abort)) := by
+        apply ENNReal.ofReal_le_ofReal; apply le_of_eq; field_simp
+
 /-! ## Deferred-sampling eager↔lazy coupling (ghost-read leaf) -/
 
 omit [SampleableType Stmt] in
@@ -981,6 +1014,19 @@ lemma probEvent_ghostRead_bad_le
     -- neither banked framework induction discharges it — is documented in one place rather
     -- than diffused across two per-branch `sorry`s inside a provably-insufficient framework
     -- call. See that lemma's docstring for the full obstruction analysis.
+    --
+    -- Direct-route note. The mandated alternative replaces this `eager ≤ lazy` detour by
+    -- `eager ≤ hiddenReadList ≤ target`, where the right-hand arithmetic step is the banked,
+    -- axiom-clean `hiddenReadList_fold_le_target` (`∑ₖ P k · k·(qH+1)·ε ≤ target` when the
+    -- key-count mean is `≤ qS/(1-p)`) composed with the banked multi-key first-fire bound
+    -- `OracleComp.probEvent_hiddenReadList_le` (`≤ n·(qH+1)·ε`). That direct route does *not*
+    -- close the leaf either: its `eager ≤ hiddenReadList` connection (the bad-event
+    -- over-approximation `[D1]` plus the draw-deferral factorization `[D2]`) is the *same*
+    -- deferred-sampling commutation as this `eager ≤ lazy` dominance — both move the
+    -- signing-time ghost-key sampling site past the opaque `simulateQ (adv.main pk)` fold to
+    -- read time, the multi-week PMF×PMF distributional-coupling content. The fold half of the
+    -- direct route is banked (`hiddenReadList_fold_le_target`); the connection half coincides
+    -- with this residual.
     exact eagerGhostRead_bad_le_lazyGhostRead_bad ids hr M maxAttempts adv pk sk
   exact h_eager_le_lazy.trans h_lazy
 
