@@ -2105,6 +2105,47 @@ lemma tsum_probOutput_run_ghostSignBody_mul_memCharge_le (pk : Stmt) (sk : Wit) 
               mul_le_mul_left (tsum_probOutput_commit_mul_abort_le ids pk sk hAbort) _
           _ = ENNReal.ofReal p_abort * S * ENNReal.ofReal ε := by rw [mul_assoc]
 
+omit [SampleableType Stmt] in
+/-- **(b) Eager read-step charge bound.** At any starting state `p`, the eager read's
+contribution to the telescoped bad average is at most the per-target ghost-membership charge
+`memCharge (p.1.1.2) mc` *plus* the miss-branch continuation charge.
+
+This is the read-step half of the charge route. On a ghost **hit** (`p.1.1.2 mc = some v`)
+the eager read forces the bad flag and the contribution is the continuation success mass
+`≤ 1 = memCharge` (the membership indicator is `1`), and the miss branch contributes `0`. On
+a **miss** the contribution is exactly the miss-branch continuation and `memCharge = 0`. Thus
+the read pays at most `memCharge` above its miss-branch continuation — and the `memCharge`
+term is precisely what the averaged charge invariant
+(`tsum_probOutput_run_ghostSignBody_mul_memCharge_le`) bounds by `attempts · ε`. Built on the
+banked HIT/MISS split `tsum_ghostHybridImpl_read_step_split`. -/
+lemma tsum_ghostHybridImpl_read_step_charge_le
+    (pk : Stmt) (sk : Wit) (mc : M × Commit)
+    (cont : Chal → OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
+      (M × Option (Commit × Resp)))
+    (p : GhostState M Commit Chal) :
+    (∑' z : Chal × GhostState M Commit Chal,
+        Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+          Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal => w.2.2 = true |
+            (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run z.2])
+      ≤ memCharge M p.1.1.2 mc +
+          (match p.1.1.2 mc with
+            | some _ => 0
+            | none => ∑' z : Chal × GhostState M Commit Chal,
+                Pr[= z | (ghostHybridImpl ids M maxAttempts true pk sk (.inl (.inr mc))).run p] *
+                  Pr[fun w : (M × Option (Commit × Resp)) × GhostState M Commit Chal =>
+                      w.2.2 = true |
+                    (simulateQ (ghostHybridImpl ids M maxAttempts true pk sk) (cont z.1)).run
+                      z.2]) := by
+  rw [tsum_ghostHybridImpl_read_step_split ids M maxAttempts pk sk mc cont p]
+  unfold memCharge
+  cases h : p.1.1.2 mc with
+  | some v =>
+      rw [if_neg (by simp)]
+      simpa using probOutput_le_one (p := fun _ : (M × Option (Commit × Resp)) ×
+        GhostState M Commit Chal => True)
+  | none =>
+      rw [if_pos rfl, zero_add]
+
 
 /-! ## Layered ghost-tagged NMA handler
 
