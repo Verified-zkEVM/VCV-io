@@ -5,15 +5,15 @@ Authors: Quang Dao
 -/
 
 import Std.Tactic.Do
-import VCVio.ProgramLogic.Unary.StdDoBridge
-import VCVio.ProgramLogic.Unary.WriterTBridge
 import VCVio.OracleComp.QueryTracking.CachingLoggingOracle
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
-import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 import VCVio.OracleComp.SimSemantics.WriterT.PreservesInv
+import VCVio.ProgramLogic.Unary.StdDoBridge
+import VCVio.ProgramLogic.Unary.WriterTBridge
 
 /-!
 # `Std.Do` handler specifications for `OracleComp` simulators
@@ -189,8 +189,6 @@ theorem simulateQ_triple_preserves_invariant {σ α : Type}
   -- For now, bail out once to the support layer and induct directly on
   -- `oa`. Downstream consumers stay in the `Std.Do` world.
   rw [triple_stateT_iff_forall_support]
-  intro s hs a s' hmem
-  revert s s' a
   induction oa using OracleComp.inductionOn with
   | pure x =>
     intro s hs a s' hmem
@@ -205,8 +203,7 @@ theorem simulateQ_triple_preserves_invariant {σ α : Type}
     obtain ⟨⟨u, s₁⟩, hmem₁, hmem₂⟩ := hmem
     have hhand := hhandler t
     rw [triple_stateT_iff_forall_support] at hhand
-    have hI₁ : I s₁ := hhand s hs u s₁ hmem₁
-    exact ih u s₁ hI₁ a s' hmem₂
+    exact ih u s₁ (hhand s hs u s₁ hmem₁) a s' hmem₂
 
 /-- Specialized simulation triple: combine a starting-state precondition
 `s = s₀` with an invariant that holds of `s₀`. The invariant is threaded
@@ -225,9 +222,8 @@ theorem simulateQ_triple_of_state_and_invariant {σ α : Type}
   rw [triple_stateT_iff_forall_support]
   intro s hs a s' hmem
   rw [hs] at hmem
-  have hbase := simulateQ_triple_preserves_invariant handler I hhandler oa
-  rw [triple_stateT_iff_forall_support] at hbase
-  exact hbase s₀ hI a s' hmem
+  exact (triple_stateT_iff_forall_support ..).mp
+    (simulateQ_triple_preserves_invariant handler I hhandler oa) s₀ hI a s' hmem
 
 /-- `WriterT` analogue of `simulateQ_triple_preserves_invariant`.
 
@@ -252,14 +248,10 @@ theorem simulateQ_writerT_triple_preserves_invariant {ω α : Type} [Monoid ω]
       (spred(fun s => ⌜I s⌝))
       (⇓ _ s' => ⌜I s'⌝) := by
   rw [triple_writerT_iff_forall_support_monoid]
-  intro s hs a w hmem
-  have hpres : QueryImpl.WriterPreservesInv handler I := by
-    intro t s₀ hs₀ z hz
-    have hh := hhandler t
-    rw [triple_writerT_iff_forall_support_monoid] at hh
-    exact hh s₀ hs₀ z.1 z.2 hz
-  exact
-    OracleComp.simulateQ_run_writerPreservesInv handler I hpres oa s hs (a, w) hmem
+  refine fun s hs a w hmem =>
+    OracleComp.simulateQ_run_writerPreservesInv handler I ?_ oa s hs (a, w) hmem
+  exact fun t s₀ hs₀ z hz =>
+    (triple_writerT_iff_forall_support_monoid ..).mp (hhandler t) s₀ hs₀ z.1 z.2 hz
 
 section cachingOracle
 
@@ -300,8 +292,7 @@ example (t₁ t₂ : spec.Domain) (cache₀ : QueryCache spec) :
         StateT (QueryCache spec) (OracleComp spec) (spec.Range t₂))
       (spred(fun cache => ⌜cache₀ ≤ cache⌝))
       (⇓ v cache' => ⌜cache₀ ≤ cache' ∧ cache' t₂ = some v⌝) := by
-  mvcgen [cachingOracle_triple]
-  all_goals grind
+  mvcgen [cachingOracle_triple]; grind
 
 /-- `mvcgen` example: a 4-query `cachingOracle` block preserves cache
 monotonicity. Demonstrates that the chain length doesn't change the proof
@@ -317,8 +308,7 @@ example (t₁ t₂ t₃ t₄ : spec.Domain) (cache₀ : QueryCache spec) :
         StateT (QueryCache spec) (OracleComp spec) (spec.Range t₄))
       (spred(fun cache => ⌜cache₀ ≤ cache⌝))
       (⇓ v cache' => ⌜cache₀ ≤ cache' ∧ cache' t₄ = some v⌝) := by
-  mvcgen [cachingOracle_triple]
-  all_goals grind
+  mvcgen [cachingOracle_triple]; grind
 
 /-- Global cache-monotonicity for `simulateQ cachingOracle`: an arbitrary
 `OracleComp` simulated under caching never shrinks the cache. Derived via the
@@ -332,10 +322,10 @@ theorem simulateQ_cachingOracle_preserves_cache_le {α : Type}
       (⇓ _ cache' => ⌜cache₀ ≤ cache'⌝) := by
   refine simulateQ_triple_preserves_invariant cachingOracle (fun c => cache₀ ≤ c) ?_ oa
   intro t
-  have := cachingOracle_triple t cache₀
-  rw [triple_stateT_iff_forall_support] at this ⊢
+  rw [triple_stateT_iff_forall_support]
   intro s hs a s' hmem
-  exact (this s hs a s' hmem).1
+  exact ((triple_stateT_iff_forall_support ..).mp
+    (cachingOracle_triple t cache₀) s hs a s' hmem).1
 
 end cachingOracle
 
@@ -369,19 +359,16 @@ theorem seededOracle_triple (t : spec.Domain) (seed₀ : QuerySeed spec) :
   simp only [seededOracle.apply_eq, StateT.run, StateT.mk] at hmem
   cases hst : seed₀ t with
   | nil =>
-    left
     rw [hst] at hmem
     simp only [support_map, support_query, Set.image_univ, Set.mem_range,
       Prod.mk.injEq] at hmem
     obtain ⟨_, _, hseed'⟩ := hmem
-    exact ⟨rfl, hseed'.symm⟩
+    exact .inl ⟨rfl, hseed'.symm⟩
   | cons u us =>
-    right
     rw [hst] at hmem
     simp only [support_pure, Set.mem_singleton_iff, Prod.mk.injEq] at hmem
     obtain ⟨hv, hseed'⟩ := hmem
-    subst hv
-    exact ⟨us, rfl, hseed'⟩
+    exact .inr ⟨us, hv ▸ rfl, hseed'⟩
 
 /-- Specialized spec: if the seed has at least one value at `t`, `seededOracle t`
 deterministically pops the head and updates the state.
@@ -404,9 +391,8 @@ theorem seededOracle_triple_of_cons (t : spec.Domain)
   rw [triple_stateT_iff_forall_support]
   intro seed hseed v seed' hmem
   rw [hseed] at hmem
-  simp only [seededOracle.apply_eq, StateT.run, StateT.mk, h, support_pure,
-    Set.mem_singleton_iff, Prod.mk.injEq] at hmem
-  exact ⟨hmem.1, hmem.2⟩
+  simpa only [seededOracle.apply_eq, StateT.run, StateT.mk, h, support_pure,
+    Set.mem_singleton_iff, Prod.mk.injEq] using hmem
 
 /-- Specialized spec: if the seed is empty at `t`, `seededOracle t` makes a live
 query and leaves the state untouched. -/
@@ -421,8 +407,7 @@ theorem seededOracle_triple_of_nil (t : spec.Domain) (seed₀ : QuerySeed spec)
   rw [hseed] at hmem
   simp only [seededOracle.apply_eq, StateT.run, StateT.mk, h, support_map,
     support_query, Set.image_univ, Set.mem_range, Prod.mk.injEq] at hmem
-  obtain ⟨_, _, hseed'⟩ := hmem
-  exact hseed'.symm
+  exact hmem.choose_spec.2.symm
 
 /-- `mvcgen` example: two consecutive `seededOracle` calls from an empty seed
 both fall through to live queries, leaving the seed unchanged. The two
@@ -434,8 +419,7 @@ example (t₁ t₂ : spec.Domain) (seed₀ : QuerySeed spec)
         StateT (QuerySeed spec) (OracleComp spec) (spec.Range t₂))
       (spred(fun seed => ⌜seed = seed₀⌝))
       (⇓ _ seed' => ⌜seed' = seed₀⌝) := by
-  mvcgen [seededOracle_triple_of_nil]
-  all_goals grind
+  mvcgen [seededOracle_triple_of_nil]; grind
 
 end seededOracle
 
@@ -461,8 +445,7 @@ theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
   unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.postInsert
     QueryImpl.ofLift
   mvcgen
-  rename_i s _ heq
-  subst heq
+  subst_vars
   rw [wpProp_iff_forall_support]
   intro a _
   mvcgen
@@ -478,12 +461,11 @@ theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
   unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.postInsert
     QueryImpl.ofLift
   mvcgen
-  rename_i s _ heq
-  subst heq
+  subst_vars
   rw [wpProp_iff_forall_support]
   intro a _
   mvcgen
-  exact ⟨[⟨t, a⟩], rfl⟩
+  exact List.prefix_append _ _
 
 /-- `mvcgen` example: two consecutive logged queries extend the log with
 both entries in order. The full proof is `mvcgen [loggingOracle_triple]`
@@ -494,8 +476,7 @@ example (t₁ t₂ : spec.Domain) (log₀ : QueryLog spec) :
         WriterT (QueryLog spec) (OracleComp spec) (spec.Range t₁ × spec.Range t₂))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ p log' => ⌜log' = log₀ ++ [⟨t₁, p.1⟩, ⟨t₂, p.2⟩]⌝) := by
-  mvcgen [loggingOracle_triple]
-  all_goals grind
+  mvcgen [loggingOracle_triple]; grind
 
 end loggingOracle
 
@@ -523,7 +504,6 @@ theorem countingOracle_triple (t : spec.Domain) (qc₀ : QueryCount ι) :
   rw [triple_writerT_iff_forall_support_monoid]
   intro qc hqc v w hmem
   subst hqc
-  -- Reduce the run to `(fun x => (x, QueryCount.single t * 1)) <$> query t`.
   have hrun : (countingOracle t :
       WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run =
         (fun x => (x, QueryCount.single t * (1 : QueryCount ι))) <$>
@@ -534,8 +514,6 @@ theorem countingOracle_triple (t : spec.Domain) (qc₀ : QueryCount ι) :
   simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
   cases hw
-  -- After `cases` the state is `qc * (QueryCount.single t * 1)` which simps
-  -- to `qc + QueryCount.single t` via `QueryCount.monoid_mul_def`.
   simp
 
 /-- `mvcgen` example: two consecutive `countingOracle` calls increment the
@@ -548,8 +526,7 @@ example (t₁ t₂ : spec.Domain) (qc₀ : QueryCount ι) :
       (spred(fun qc => ⌜qc = qc₀⌝))
       (⇓ _ qc' =>
         ⌜qc' = qc₀ + QueryCount.single t₁ + QueryCount.single t₂⌝) := by
-  mvcgen [countingOracle_triple]
-  all_goals grind
+  mvcgen [countingOracle_triple]; grind
 
 /-- Whole-program monotonicity for `countingOracle`: the accumulated query
 count under `simulateQ countingOracle oa` only ever grows. Derived from the
@@ -567,13 +544,8 @@ theorem simulateQ_countingOracle_preserves_ge {α : Type}
   intro t
   rw [triple_writerT_iff_forall_support_monoid]
   intro qc hqc _ w hmem
-  have hh := countingOracle_triple t qc
-  rw [triple_writerT_iff_forall_support_monoid] at hh
-  have := hh qc rfl _ w hmem
-  -- `this : qc * w = qc + QueryCount.single t` (`QueryCount` is additive).
-  rw [this]
-  intro i
-  exact (hqc i).trans (Nat.le_add_right _ _)
+  rw [(triple_writerT_iff_forall_support_monoid ..).mp (countingOracle_triple t qc) qc rfl _ w hmem]
+  exact fun i => (hqc i).trans (Nat.le_add_right _ _)
 
 end countingOracle
 
@@ -585,14 +557,14 @@ variable {ω : Type} [Monoid ω]
 the cost accumulates by exactly `costFn t`. Generalises
 `countingOracle_triple` to arbitrary monoidal cost functions. -/
 @[spec]
-theorem costOracle_triple (costFn : spec.Domain → ω)
-    (t : spec.Domain) (s₀ : ω) :
+theorem costOracle_triple (costFn : spec.Domain → ω) (t : spec.Domain) (s₀ : ω) :
     Std.Do.Triple
       (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t))
       (spred(fun s => ⌜s = s₀⌝))
       (⇓ _ s' => ⌜s' = s₀ * costFn t⌝) := by
   rw [triple_writerT_iff_forall_support_monoid]
   intro s hs v w hmem
+  subst hs
   have hrun : (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run =
       (fun x => (x, costFn t * (1 : ω))) <$>
         (HasQuery.query t : OracleComp spec _) := by
@@ -602,8 +574,7 @@ theorem costOracle_triple (costFn : spec.Domain → ω)
   simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
   cases hw
-  change s * (costFn t * (1 : ω)) = s₀ * costFn t
-  rw [hs, mul_one]
+  simp
 
 /-- `mvcgen` example: two consecutive `costOracle` calls accumulate costs
 `costFn t₁ * costFn t₂` in order. -/
@@ -613,8 +584,7 @@ example (costFn : spec.Domain → ω) (t₁ t₂ : spec.Domain) (s₀ : ω) :
         WriterT ω (OracleComp spec) (spec.Range t₂))
       (spred(fun s => ⌜s = s₀⌝))
       (⇓ _ s' => ⌜s' = s₀ * costFn t₁ * costFn t₂⌝) := by
-  mvcgen [costOracle_triple]
-  all_goals grind
+  mvcgen [costOracle_triple]; grind
 
 /-- Whole-program submonoid closure for `costOracle`: if `costFn t ∈ S`
 for every query `t` (where `S : Submonoid ω`), then the accumulated cost
@@ -634,10 +604,8 @@ theorem simulateQ_costOracle_preserves_submonoid {α : Type}
   intro t
   rw [triple_writerT_iff_forall_support_monoid]
   intro s hs _ w hmem
-  have hh := costOracle_triple costFn t s
-  rw [triple_writerT_iff_forall_support_monoid] at hh
-  have := hh s rfl _ w hmem
-  rw [this]
+  rw [(triple_writerT_iff_forall_support_monoid ..).mp
+    (costOracle_triple costFn t s) s rfl _ w hmem]
   exact S.mul_mem hs (hcost t)
 
 end costOracle
@@ -686,21 +654,16 @@ theorem cachingLoggingOracle_triple
       (⇓ v s' => ⌜cache₀ ≤ s'.1 ∧ s'.1 t = some v ∧ s'.2 = log₀ ++ [⟨t, v⟩]⌝) := by
   rw [cachingLoggingOracle.apply_eq]
   mvcgen
-  · -- some-branch: cache hit
-    rename_i s hcond v hsome _t
+  · rename_i s hcond v hsome _t
     obtain ⟨hle, hlog⟩ := hcond
-    change cache₀ ≤ s.1 ∧ s.1 t = some v ∧ s.2 ++ [⟨t, v⟩] = log₀ ++ [⟨t, v⟩]
-    exact ⟨hle, hsome, by rw [hlog]⟩
-  · -- none-branch: cache miss, falls through to query
-    rename_i s hcond hnone
+    exact ⟨hle, hsome, hlog ▸ rfl⟩
+  · rename_i s hcond hnone
     obtain ⟨hle, hlog⟩ := hcond
     rw [wpProp_iff_forall_support]
     intro v _
     mvcgen
-    change cache₀ ≤ s.1.cacheQuery t v ∧ (s.1.cacheQuery t v) t = some v ∧
-      s.2 ++ [⟨t, v⟩] = log₀ ++ [⟨t, v⟩]
     exact ⟨le_trans hle (QueryCache.le_cacheQuery _ hnone),
-      QueryCache.cacheQuery_self _ t v, by rw [hlog]⟩
+      QueryCache.cacheQuery_self _ t v, hlog ▸ rfl⟩
 
 /-- `mvcgen` example: two consecutive `cachingLoggingOracle` calls extend the
 log with both query/response entries in order, while the cache continues to
@@ -718,8 +681,7 @@ example (t₁ t₂ : spec.Domain)
       (spred(fun s => ⌜cache₀ ≤ s.1 ∧ s.2 = log₀⌝))
       (⇓ p s' =>
         ⌜cache₀ ≤ s'.1 ∧ s'.2 = log₀ ++ [⟨t₁, p.1⟩, ⟨t₂, p.2⟩]⌝) := by
-  mvcgen [cachingLoggingOracle_triple]
-  all_goals grind
+  mvcgen [cachingLoggingOracle_triple]; grind
 
 /-- Whole-program lift: `simulateQ cachingLoggingOracle oa` preserves cache
 monotonicity for any `oa`. Derived via the generic
@@ -736,9 +698,8 @@ theorem simulateQ_cachingLoggingOracle_preserves_cache_le {α : Type}
   intro t
   rw [triple_stateT_iff_forall_support]
   intro s hs a s' hmem
-  have hh := cachingLoggingOracle_triple t s.1 s.2
-  rw [triple_stateT_iff_forall_support] at hh
-  exact (hh s ⟨le_refl _, rfl⟩ a s' hmem).1.trans' hs
+  exact ((triple_stateT_iff_forall_support ..).mp
+    (cachingLoggingOracle_triple t s.1 s.2) s ⟨le_refl _, rfl⟩ a s' hmem).1.trans' hs
 
 /-- Whole-program lift: `simulateQ cachingLoggingOracle oa` preserves the
 log-prefix invariant (the log only grows). -/
@@ -753,11 +714,11 @@ theorem simulateQ_cachingLoggingOracle_preserves_log_prefix {α : Type}
     (fun s => log₀ <+: s.2) ?_ oa
   intro t
   rw [triple_stateT_iff_forall_support]
-  rintro s ⟨k, hk⟩ v s' hmem
-  have hh := cachingLoggingOracle_triple t s.1 s.2
-  rw [triple_stateT_iff_forall_support] at hh
-  have hpost := hh s ⟨le_refl _, rfl⟩ v s' hmem
-  exact ⟨k ++ [⟨t, v⟩], by rw [hpost.2.2, ← hk, List.append_assoc]⟩
+  intro s hs v s' hmem
+  change log₀ <+: s'.2
+  rw [((triple_stateT_iff_forall_support ..).mp
+    (cachingLoggingOracle_triple t s.1 s.2) s ⟨le_refl _, rfl⟩ v s' hmem).2.2]
+  exact List.prefix_append_of_prefix hs
 
 end stackedHandlers
 
