@@ -28,6 +28,10 @@ import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.GhostBodies
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
 import VCVio.CryptoFoundations.Fischlin
+import VCVio.CryptoFoundations.Fischlin.Completeness
+import VCVio.CryptoFoundations.Fischlin.CostAccounting
+import VCVio.CryptoFoundations.Fischlin.Defs
+import VCVio.CryptoFoundations.Fischlin.KnowledgeSoundness
 import VCVio.CryptoFoundations.FujisakiOkamoto
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
