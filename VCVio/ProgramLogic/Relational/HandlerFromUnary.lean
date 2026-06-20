@@ -89,11 +89,8 @@ theorem relTriple_run_of_triple
   refine relTriple_prod
     (P := fun (p : α × σ₁) => Q₁ p.1 p.2)
     (Q := fun (p : β × σ₂) => Q₂ p.1 p.2)
-    ?_ ?_
-  · rintro ⟨a, s'⟩ hmem
-    exact h₁ s₁ hP₁ a s' hmem
-  · rintro ⟨b, s'⟩ hmem
-    exact h₂ s₂ hP₂ b s' hmem
+    (fun ⟨a, s'⟩ hmem => h₁ s₁ hP₁ a s' hmem)
+    (fun ⟨b, s'⟩ hmem => h₂ s₂ hP₂ b s' hmem)
 
 /-- `WriterT` analogue of `relTriple_run_of_triple`.
 
@@ -128,11 +125,8 @@ theorem relTriple_run_writerT_of_triple
   refine relTriple_prod
     (P := fun (p : α × ω₁) => Q₁ p.1 (s₁ ++ p.2))
     (Q := fun (p : β × ω₂) => Q₂ p.1 (s₂ ++ p.2))
-    ?_ ?_
-  · rintro ⟨a, w⟩ hmem
-    exact h₁ s₁ hP₁ a w hmem
-  · rintro ⟨b, w⟩ hmem
-    exact h₂ s₂ hP₂ b w hmem
+    (fun ⟨a, w⟩ hmem => h₁ s₁ hP₁ a w hmem)
+    (fun ⟨b, w⟩ hmem => h₂ s₂ hP₂ b w hmem)
 
 /-- `Monoid`-variant of `relTriple_run_writerT_of_triple`.
 
@@ -161,11 +155,8 @@ theorem relTriple_run_writerT_of_triple_monoid
   refine relTriple_prod
     (P := fun (p : α × ω₁) => Q₁ p.1 (s₁ * p.2))
     (Q := fun (p : β × ω₂) => Q₂ p.1 (s₂ * p.2))
-    ?_ ?_
-  · rintro ⟨a, w⟩ hmem
-    exact h₁ s₁ hP₁ a w hmem
-  · rintro ⟨b, w⟩ hmem
-    exact h₂ s₂ hP₂ b w hmem
+    (fun ⟨a, w⟩ hmem => h₁ s₁ hP₁ a w hmem)
+    (fun ⟨b, w⟩ hmem => h₂ s₂ hP₂ b w hmem)
 
 /-- Whole-program handler lift: given matching unary handler triples on
 two simulators with parametric pre/postconditions and a synchronization
@@ -205,15 +196,12 @@ theorem relTriple_simulateQ_run_of_triples
       (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2) := by
   refine relTriple_simulateQ_run impl₁ impl₂ R_state oa ?_ s₁ s₂ hs
   intro t s₁' s₂' hs'
-  have hcombine := relTriple_run_of_triple
-    (mx₁ := impl₁ t) (mx₂ := impl₂ t)
-    (s₁ := s₁') (s₂ := s₂')
-    (P₁ := fun s => s = s₁') (P₂ := fun s => s = s₂')
-    (Q₁ := Q₁ t s₁') (Q₂ := Q₂ t s₂')
-    rfl rfl (h₁ t s₁') (h₂ t s₂')
-  refine relTriple_post_mono hcombine ?_
-  rintro ⟨a₁, s₁''⟩ ⟨a₂, s₂''⟩ ⟨hQ₁, hQ₂⟩
-  exact hsync t s₁' s₂' hs' a₁ s₁'' a₂ s₂'' hQ₁ hQ₂
+  exact relTriple_post_mono
+    (relTriple_run_of_triple (mx₁ := impl₁ t) (mx₂ := impl₂ t) (s₁ := s₁') (s₂ := s₂')
+      (P₁ := fun s => s = s₁') (P₂ := fun s => s = s₂')
+      (Q₁ := Q₁ t s₁') (Q₂ := Q₂ t s₂') rfl rfl (h₁ t s₁') (h₂ t s₂'))
+    (fun ⟨a₁, s₁''⟩ ⟨a₂, s₂''⟩ ⟨hQ₁, hQ₂⟩ =>
+      hsync t s₁' s₂' hs' a₁ s₁'' a₂ s₂'' hQ₁ hQ₂)
 
 /-- `WriterT` analogue of `relTriple_simulateQ_run_of_triples` (monoid variant).
 
@@ -257,13 +245,12 @@ theorem relTriple_simulateQ_run_writerT_of_triples
   refine relTriple_simulateQ_run_writerT
     impl₁ impl₂ R_writer hR_one hR_mul oa ?_
   intro t
-  have hcombine := relTriple_run_writerT_of_triple_monoid
+  refine relTriple_post_mono (relTriple_run_writerT_of_triple_monoid
     (mx₁ := impl₁ t) (mx₂ := impl₂ t)
     (s₁ := (1 : ω₁)) (s₂ := (1 : ω₂))
     (P₁ := fun s => s = 1) (P₂ := fun s => s = 1)
     (Q₁ := Q₁ t) (Q₂ := Q₂ t)
-    rfl rfl (h₁ t) (h₂ t)
-  refine relTriple_post_mono hcombine ?_
+    rfl rfl (h₁ t) (h₂ t)) ?_
   rintro ⟨a₁, w₁⟩ ⟨a₂, w₂⟩ ⟨hQ₁, hQ₂⟩
   rw [one_mul] at hQ₁ hQ₂
   exact hsync t a₁ w₁ a₂ w₂ hQ₁ hQ₂
@@ -297,12 +284,8 @@ theorem relTriple_simulateQ_run_writerT'_of_triples
       (Prod.fst <$> (simulateQ impl₁ oa).run)
       (Prod.fst <$> (simulateQ impl₂ oa).run)
       (EqRel α) := by
-  have hfull := relTriple_simulateQ_run_writerT_of_triples
-    impl₁ impl₂ R_writer hR_one hR_mul oa Q₁ Q₂ h₁ h₂ hsync
-  have hweak : RelTriple (simulateQ impl₁ oa).run (simulateQ impl₂ oa).run
-      (fun p₁ p₂ => (EqRel α) p₁.1 p₂.1) :=
-    relTriple_post_mono hfull (fun _ _ hp => hp.1)
-  exact relTriple_map hweak
+  exact relTriple_map (relTriple_post_mono (relTriple_simulateQ_run_writerT_of_triples
+    impl₁ impl₂ R_writer hR_one hR_mul oa Q₁ Q₂ h₁ h₂ hsync) (fun _ _ hp => hp.1))
 
 /-- Output-projection variant of `relTriple_simulateQ_run_of_triples`.
 
@@ -336,13 +319,8 @@ theorem relTriple_simulateQ_run'_of_triples
       ((simulateQ impl₁ oa).run' s₁)
       ((simulateQ impl₂ oa).run' s₂)
       (EqRel α) := by
-  have hfull := relTriple_simulateQ_run_of_triples
-    impl₁ impl₂ R_state oa Q₁ Q₂ h₁ h₂ hsync s₁ s₂ hs
-  have hweak : RelTriple ((simulateQ impl₁ oa).run s₁) ((simulateQ impl₂ oa).run s₂)
-      (fun p₁ p₂ => (EqRel α) p₁.1 p₂.1) := by
-    apply relTriple_post_mono hfull
-    intro _ _ hp; exact hp.1
-  exact relTriple_map hweak
+  exact relTriple_map (relTriple_post_mono (relTriple_simulateQ_run_of_triples
+    impl₁ impl₂ R_state oa Q₁ Q₂ h₁ h₂ hsync s₁ s₂ hs) (fun _ _ hp => hp.1))
 
 /-! ### Bridge to support-based simulation lemmas
 
@@ -372,10 +350,8 @@ theorem support_preservesInv_of_triple
     ∀ (t : spec.Domain) (s : σ), Inv s →
       ∀ z ∈ support ((impl t).run s), Inv z.2 := by
   intro t s hs z hz
-  have htriple := h t
-  rw [OracleComp.ProgramLogic.StdDo.triple_stateT_iff_forall_support] at htriple
-  rcases z with ⟨a, s'⟩
-  exact htriple s hs a s' hz
+  exact (OracleComp.ProgramLogic.StdDo.triple_stateT_iff_forall_support ..).mp
+    (h t) s hs z.1 z.2 hz
 
 /-- `WriterT` analogue of `support_preservesInv_of_triple`. Converts a
 unary `Std.Do.Triple` invariant-preservation spec for a `WriterT`-based
@@ -396,9 +372,8 @@ theorem writerPreservesInv_of_triple
       (⇓_ s' => ⌜Inv s'⌝)) :
     QueryImpl.WriterPreservesInv impl Inv := by
   intro t s₀ hs₀ z hz
-  have htriple := h t
-  rw [OracleComp.ProgramLogic.StdDo.triple_writerT_iff_forall_support_monoid] at htriple
-  exact htriple s₀ hs₀ z.1 z.2 hz
+  exact (OracleComp.ProgramLogic.StdDo.triple_writerT_iff_forall_support_monoid ..).mp
+    (h t) s₀ hs₀ z.1 z.2 hz
 
 /-- Whole-program equality coupling when two handlers agree pointwise on
 an invariant `Inv` and the target handler preserves `Inv`. This is the
@@ -424,8 +399,7 @@ theorem relTriple_simulateQ_run_of_impl_eq_triple
       (EqRel (α × σ)) :=
   relTriple_simulateQ_run_eqRel_of_impl_eq_preservesInv
     impl₁ impl₂ Inv oa himpl_eq
-    (support_preservesInv_of_triple (spec₁ := unifSpec)
-      (σ := σ) (impl := impl₂) (Inv := Inv) hpres₂)
+    (support_preservesInv_of_triple impl₂ Inv hpres₂)
     s hs
 
 /-! ## Smoke tests -/
@@ -472,8 +446,8 @@ private example
         StateT (QuerySeed spec) (OracleComp spec) (spec.Range t)).run seed₀)
       ((seededOracle t :
         StateT (QuerySeed spec) (OracleComp spec) (spec.Range t)).run seed₀)
-      (fun p₁ p₂ => p₁ = p₂) := by
-  refine relTriple_post_mono
+      (fun p₁ p₂ => p₁ = p₂) :=
+  relTriple_post_mono
     (relTriple_run_of_triple
       (mx₁ := seededOracle t) (mx₂ := seededOracle t)
       (s₁ := seed₀) (s₂ := seed₀)
@@ -483,9 +457,8 @@ private example
       rfl rfl
       (OracleComp.ProgramLogic.StdDo.seededOracle_triple_of_cons t u us seed₀ h)
       (OracleComp.ProgramLogic.StdDo.seededOracle_triple_of_cons t u us seed₀ h))
-    ?_
-  rintro ⟨v₁, seed₁'⟩ ⟨v₂, seed₂'⟩ ⟨⟨hv₁, hseed₁'⟩, ⟨hv₂, hseed₂'⟩⟩
-  exact Prod.ext (hv₁.trans hv₂.symm) (hseed₁'.trans hseed₂'.symm)
+    (fun _ _ ⟨⟨hv₁, hseed₁'⟩, hv₂, hseed₂'⟩ =>
+      Prod.ext (hv₁.trans hv₂.symm) (hseed₁'.trans hseed₂'.symm))
 
 /-- Smoke test: independent product coupling for two `loggingOracle` runs.
 The log-extension postcondition (`log' = log₀ ++ [⟨t, v⟩]`) holds on each
@@ -526,9 +499,6 @@ private example
       (fun p₁ p₂ =>
         (qc_a : QueryCount ι) + p₁.2 = qc_a + QueryCount.single t ∧
         (qc_b : QueryCount ι) + p₂.2 = qc_b + QueryCount.single t) := by
-  have hmul : ∀ x y : QueryCount ι,
-      (@HMul.hMul (QueryCount ι) (QueryCount ι) (QueryCount ι)
-        (@instHMul _ (Monoid.toMulOneClass.toMul)) x y) = x + y := fun _ _ => rfl
   refine relTriple_post_mono
     (relTriple_run_writerT_of_triple_monoid
       (mx₁ := (countingOracle t : WriterT _ (OracleComp spec) _))
@@ -540,9 +510,7 @@ private example
       rfl rfl
       (OracleComp.ProgramLogic.StdDo.countingOracle_triple t qc_a)
       (OracleComp.ProgramLogic.StdDo.countingOracle_triple t qc_b))
-    ?_
-  rintro ⟨_, w₁⟩ ⟨_, w₂⟩ ⟨h₁, h₂⟩
-  exact ⟨(hmul qc_a w₁).symm.trans h₁, (hmul qc_b w₂).symm.trans h₂⟩
+    (fun ⟨_, w₁⟩ ⟨_, w₂⟩ ⟨h₁, h₂⟩ => ⟨h₁, h₂⟩)
 
 /-- Smoke test: independent product coupling for two `costOracle` runs
 with the same cost function `costFn`. Each side's accumulator multiplies
@@ -554,17 +522,17 @@ private example {ω : Type} [Monoid ω]
       (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run
       (fun p₁ p₂ =>
         s_a * p₁.2 = s_a * costFn t ∧
-        s_b * p₂.2 = s_b * costFn t) := by
-  refine relTriple_run_writerT_of_triple_monoid
+        s_b * p₂.2 = s_b * costFn t) :=
+  relTriple_run_writerT_of_triple_monoid
     (mx₁ := (costOracle costFn t : WriterT _ (OracleComp spec) _))
     (mx₂ := (costOracle costFn t : WriterT _ (OracleComp spec) _))
     (s₁ := s_a) (s₂ := s_b)
     (P₁ := fun s => s = s_a) (P₂ := fun s => s = s_b)
     (Q₁ := fun _v s' => s' = s_a * costFn t)
     (Q₂ := fun _v s' => s' = s_b * costFn t)
-    rfl rfl ?_ ?_
-  · exact OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_a
-  · exact OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_b
+    rfl rfl
+    (OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_a)
+    (OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_b)
 
 /-! ### Whole-program `WriterT` smoke tests -/
 
@@ -592,8 +560,7 @@ private example {α : Type} (oa : OracleComp spec α) :
       (oa := (countingOracle t :
         WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run)) ?_
   rintro ⟨a, w⟩ ⟨b, w'⟩ heq
-  simp only [EqRel, Prod.mk.injEq] at heq
-  exact heq
+  simpa only [EqRel, Prod.mk.injEq] using heq
 
 /-- Smoke test: two `costOracle` simulations on the same program `oa`
 with the same cost function agree on outputs and on accumulated costs
@@ -618,8 +585,7 @@ private example {ω : Type} [Monoid ω]
       (oa := (costOracle costFn t :
         WriterT ω (OracleComp spec) (spec.Range t)).run)) ?_
   rintro ⟨a, w⟩ ⟨b, w'⟩ heq
-  simp only [EqRel, Prod.mk.injEq] at heq
-  exact heq
+  simpa only [EqRel, Prod.mk.injEq] using heq
 
 /-- Smoke test: `relTriple_simulateQ_run_writerT_of_impl_eq` gives a
 trivial, single-line proof of diagonal coupling when the two handlers
