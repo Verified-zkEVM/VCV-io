@@ -151,47 +151,30 @@ lemma runState_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I))
     QueryImpl.Stateful.runState (ofStateless h) PUnit.unit A =
       (·, PUnit.unit) <$> simulateQ h A := by
   induction A using OracleComp.inductionOn with
-  | pure x => simp [runState, simulateQ_pure, StateT.run_pure]
-  | query_bind t k ih =>
-    simp only [runState, simulateQ_query_bind, StateT.run_bind,
-      OracleQuery.input_query]
-    change
-      (liftM (h t) : StateT PUnit.{v + 1} (OracleComp I) (E.Range t)).run PUnit.unit >>=
-          (fun p => (simulateQ (ofStateless h) (k p.1)).run p.2) =
-        (fun x => (x, PUnit.unit)) <$> (h t >>= fun u => simulateQ h (k u))
-    rw [StateT.run_monadLift]
-    simp only [monad_norm]
-    refine bind_congr fun u => ?_
-    exact ih u
+  | pure x => simp [runState, ofStateless]
+  | query_bind t k ih => simp [runState, ofStateless, monad_norm]
 
 @[simp]
 lemma run_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I)) (A : OracleComp E α) :
     QueryImpl.Stateful.run (ofStateless h) PUnit.unit A = simulateQ h A := by
-  change (simulateQ (ofStateless h) A).run' PUnit.unit = simulateQ h A
-  rw [StateT.run'_eq]
-  have hrun := runState_ofStateless h A
-  change (simulateQ (ofStateless h) A).run PUnit.unit =
-    (fun x => (x, PUnit.unit)) <$> simulateQ h A at hrun
-  rw [hrun, ← Functor.map_map]
-  simp
+  simp [run, ofStateless]
 
 @[simp]
 lemma run_pure {α : Type v} (h : QueryImpl.Stateful I E σ) (s₀ : σ) (x : α) :
     h.run s₀ (pure x) = pure x := by
-  simp [run, simulateQ_pure, StateT.run'_eq, StateT.run_pure]
+  simp [run]
 
 @[simp]
 lemma runState_pure {α : Type v} (h : QueryImpl.Stateful I E σ) (s₀ : σ) (x : α) :
     h.runState s₀ (pure x) = pure (x, s₀) := by
-  simp [runState, simulateQ_pure, StateT.run_pure]
+  simp [runState]
 
 @[simp]
-lemma runState_bind {α β : Type v}
-    (h : QueryImpl.Stateful I E σ) (s₀ : σ) (A : OracleComp E α)
-    (f : α → OracleComp E β) :
+lemma runState_bind {α β : Type v} (h : QueryImpl.Stateful I E σ) (s₀ : σ)
+    (A : OracleComp E α) (f : α → OracleComp E β) :
     h.runState s₀ (A >>= f) =
       h.runState s₀ A >>= fun (a, s) => (simulateQ h (f a)).run s := by
-  simp [runState, simulateQ_bind, StateT.run_bind]
+  simp [runState]
 
 /-- A stateful handler that transparently forwards lifted queries also
 forwards every lifted computation.
@@ -211,33 +194,10 @@ theorem simulateQ_liftComp_run_of_query
     (simulateQ h (OracleComp.liftComp oa M₀)).run s =
       (fun a => (a, s)) <$> oa := by
   induction oa using OracleComp.inductionOn generalizing s with
-  | pure x =>
-      simp
+  | pure x => simp
   | query_bind t k ih =>
-      simp only [OracleComp.liftComp_bind, simulateQ_bind, StateT.run_bind]
-      calc
-        (simulateQ h (OracleComp.liftComp
-              (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t)) M₀)).run s >>=
-            (fun p => (simulateQ h (OracleComp.liftComp (k p.1) M₀)).run p.2)
-            = (((fun a => (a, s)) <$>
-                (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t))) >>=
-                (fun p => (simulateQ h (OracleComp.liftComp (k p.1) M₀)).run p.2)) := by
-                rw [hquery t s]
-        _ = (fun a => (a, s)) <$>
-              ((liftM (I₀.query t) : OracleComp I₀ (I₀.Range t)) >>= k) := by
-                rw [bind_map_left]
-                calc
-                  (do
-                    let u ← (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t))
-                    (simulateQ h (OracleComp.liftComp (k u) M₀)).run s)
-                      = (do
-                        let u ← (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t))
-                        (fun a => (a, s)) <$> k u) := by
-                          refine bind_congr fun u => ?_
-                          exact ih u s
-                  _ = (fun a => (a, s)) <$>
-                        ((liftM (I₀.query t) : OracleComp I₀ (I₀.Range t)) >>= k) := by
-                          simp [map_bind]
+      simp only [OracleComp.liftComp_bind, simulateQ_bind, StateT.run_bind, hquery,
+        bind_map_left, map_bind, ih]
 
 /-- Transport a stateful handler along a state equivalence. -/
 def transportState (h : QueryImpl.Stateful I E σ) (φ : σ ≃ σ') :
@@ -294,56 +254,19 @@ theorem simulateQ_linkWith_run {α : Type v} (F : Frame σ σ₁ σ₂)
       F.linkReshape s <$>
         (simulateQ inner ((simulateQ outer A).run (F.left.get s))).run (F.right.get s) := by
   induction A using OracleComp.inductionOn generalizing s with
-  | pure x =>
-    change (pure (x, s) : OracleComp I (α × σ)) =
-      F.linkReshape s <$>
-        (simulateQ inner (pure (x, F.left.get s))).run (F.right.get s)
-    rw [simulateQ_pure, StateT.run_pure, map_pure]
-    simp [Frame.linkReshape, PFunctor.Lens.State.put_get]
+  | pure x => simp [Frame.linkReshape, PFunctor.Lens.State.put_get]
   | query_bind t k ih =>
-    have hLHS :
-        (simulateQ (outer.linkWith F inner) (liftM (query t) >>= k)).run s =
-          (simulateQ inner ((outer t).run (F.left.get s))).run (F.right.get s) >>=
-            fun (p : (E.Range t × σ₁) × σ₂) =>
-              (simulateQ (outer.linkWith F inner) (k p.1.1)).run
-                (F.right.put p.2 (F.left.put p.1.2 s)) := by
-      simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
-        OracleQuery.input_query, id_map]
-      change ((outer.linkWith F inner t >>=
-          fun a => simulateQ (outer.linkWith F inner) (k a)).run s) = _
-      rw [StateT.run_bind, linkWith_apply_run, bind_map_left]
-    have hRHS :
-        (simulateQ inner
-            ((simulateQ outer (liftM (query t) >>= k)).run (F.left.get s))).run
-          (F.right.get s) =
-          (simulateQ inner ((outer t).run (F.left.get s))).run (F.right.get s) >>=
-            fun (p : (E.Range t × σ₁) × σ₂) =>
-              (simulateQ inner ((simulateQ outer (k p.1.1)).run p.1.2)).run p.2 := by
-      simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
-        OracleQuery.input_query, id_map]
-      change (simulateQ inner
-          ((outer t >>= fun a => simulateQ outer (k a)).run (F.left.get s))).run
-        (F.right.get s) = _
-      rw [StateT.run_bind, simulateQ_bind, StateT.run_bind]
-    rw [hLHS, hRHS, map_bind]
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+      OracleQuery.input_query, id_map, StateT.run_bind, linkWith_apply_run, bind_map_left,
+      map_bind]
     refine bind_congr fun p => ?_
-    rw [ih p.1.1 (F.right.put p.2 (F.left.put p.1.2 s))]
-    have hleft :
-        F.left.get (F.right.put p.2 (F.left.put p.1.2 s)) = p.1.2 := by
-      rw [PFunctor.Lens.State.left_get_put_right, PFunctor.Lens.State.get_put]
-    have hright :
-        F.right.get (F.right.put p.2 (F.left.put p.1.2 s)) = p.2 := by
-      rw [PFunctor.Lens.State.get_put]
-    have hreshape :
-        (Frame.linkReshape (α := α) F (F.right.put p.2 (F.left.put p.1.2 s))) =
-          Frame.linkReshape (α := α) F s := by
-      funext z
-      simp only [Frame.linkReshape]
-      congr 1
-      rw [PFunctor.Lens.State.put_comm (L := F.left) (R := F.right),
-        PFunctor.Lens.State.put_put (L := F.left),
-        PFunctor.Lens.State.put_put (L := F.right)]
-    rw [hleft, hright, hreshape]
+    rw [ih p.1.1 (F.right.put p.2 (F.left.put p.1.2 s)),
+      PFunctor.Lens.State.left_get_put_right, PFunctor.Lens.State.get_put,
+      PFunctor.Lens.State.get_put]
+    congr 1
+    funext z
+    simp [Frame.linkReshape, PFunctor.Lens.State.put_comm (L := F.left) (R := F.right),
+      PFunctor.Lens.State.put_put]
 
 /-- Structural form of linked simulation as nested simulations. -/
 theorem simulateQ_link_run {α : Type v}
@@ -351,8 +274,8 @@ theorem simulateQ_link_run {α : Type v}
     (A : OracleComp E α) (s₁ : σ₁) (s₂ : σ₂) :
     (simulateQ (outer.link inner) A).run (s₁, s₂) =
       (Frame.prod σ₁ σ₂).linkReshape (s₁, s₂) <$>
-        (simulateQ inner ((simulateQ outer A).run s₁)).run s₂ := by
-  exact simulateQ_linkWith_run (Frame.prod σ₁ σ₂) outer inner A (s₁, s₂)
+        (simulateQ inner ((simulateQ outer A).run s₁)).run s₂ :=
+  simulateQ_linkWith_run (Frame.prod σ₁ σ₂) outer inner A (s₁, s₂)
 
 /-- Absorb a stateful outer handler and starting state into the client
 computation. -/
@@ -368,25 +291,20 @@ lemma shiftLeft_pure (outer : QueryImpl.Stateful M E σ₁) (s₀ : σ₁) {α :
 lemma shiftLeft_map (outer : QueryImpl.Stateful M E σ₁) (s₀ : σ₁)
     {α β : Type v} (f : α → β) (A : OracleComp E α) :
     outer.shiftLeft s₀ (f <$> A) = f <$> outer.shiftLeft s₀ A := by
-  unfold shiftLeft run
-  rw [simulateQ_map, StateT.run'_eq, StateT.run'_eq, StateT.run_map, Functor.map_map]
-  simp
+  simp [shiftLeft, run]
 
 /-- Program-level linked-game reduction with explicit initial states. -/
 theorem run_link_eq_run_shiftLeft {α : Type v}
     (outer : QueryImpl.Stateful M E σ₁) (inner : QueryImpl.Stateful I M σ₂)
     (s₁ : σ₁) (s₂ : σ₂) (A : OracleComp E α) :
     (outer.link inner).run (s₁, s₂) A = inner.run s₂ (outer.shiftLeft s₁ A) := by
-  unfold run shiftLeft
-  rw [StateT.run'_eq, StateT.run'_eq, simulateQ_link_run]
-  simp [run, StateT.run'_eq, simulateQ_map, StateT.run_map, Functor.map_map]
+  simp [run, shiftLeft, simulateQ_link_run]
 
 theorem run_link_left_ofStateless {α : Type v}
     (h : QueryImpl E (OracleComp M)) (inner : QueryImpl.Stateful I M σ₂)
     (s₂ : σ₂) (A : OracleComp E α) :
     ((ofStateless h).link inner).run (PUnit.unit, s₂) A = inner.run s₂ (simulateQ h A) := by
-  rw [run_link_eq_run_shiftLeft]
-  simp [shiftLeft]
+  simp [run_link_eq_run_shiftLeft, shiftLeft]
 
 @[simp]
 theorem run_link_ofStateless {α : Type v}
@@ -471,16 +389,13 @@ def toLawfulExportRoute
   target_injective := by
     intro t₁ t₂ h
     apply R.targetEquiv.injective
-    rw [← R.target_eq t₁, ← R.target_eq t₂]
-    exact h
+    rwa [← R.target_eq t₁, ← R.target_eq t₂]
 
 /-- The canonical equivalence route for the sum of two export interfaces. -/
 def sum : ExportRouteEquiv (E₁ + E₂) E₁ E₂ where
   toExportRoute := ExportRoute.sum
   targetEquiv := Equiv.refl _
-  target_eq := by
-    intro t
-    cases t <;> rfl
+  target_eq t := by cases t <;> rfl
 
 end ExportRouteEquiv
 
