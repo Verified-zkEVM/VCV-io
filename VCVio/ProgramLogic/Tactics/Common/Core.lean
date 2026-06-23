@@ -365,7 +365,8 @@ def isPureExpr (e : Expr) : Bool :=
   e.consumeMData.getAppFn.isConstOf ``Pure.pure
 
 def isIfExpr (e : Expr) : Bool :=
-  e.consumeMData.getAppFn.isConstOf ``ite || e.consumeMData.getAppFn.isConstOf ``dite
+  let fn := e.consumeMData.getAppFn
+  fn.isConstOf ``ite || fn.isConstOf ``dite
 
 def isMapExpr (e : Expr) : Bool :=
   e.consumeMData.getAppFn.isConstOf ``Functor.map
