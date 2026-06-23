@@ -3,9 +3,9 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.SimSemantics.SimulateQ
 
 /-!
 # Basic Constructions of Simulation Oracles
@@ -68,9 +68,7 @@ lemma apply_compose (so' : QueryImpl spec' m) (so : QueryImpl spec (OracleComp s
 lemma simulateQ_compose [LawfulMonad m] (so' : QueryImpl spec' m)
     (so : QueryImpl spec (OracleComp spec'))
     (oa : OracleComp spec α) : simulateQ (so' ∘ₛ so) oa = simulateQ so' (simulateQ so oa) := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t mx h => simp [h]
+  induction oa using OracleComp.inductionOn <;> simp_all
 
 @[simp]
 lemma compose_id' [LawfulMonad m] (so : QueryImpl spec m) :
@@ -360,10 +358,7 @@ lemma simulateQ_postInsert_const_pure
     [LawfulMonad m] [LawfulMonad n] [LawfulMonadLiftT m n]
     (so : QueryImpl spec m) (x : α) (oa : OracleComp spec β) :
     simulateQ (so.postInsert (fun _ _ => (pure x : n α))) oa = liftM (simulateQ so oa) := by
-  have h : so.postInsert (fun _ _ => (pure x : n α)) = so.liftTarget n := by
-    funext t
-    change (do let u ← liftM (so t); let _ ← (pure x : n α); return u) = liftM (so t)
-    simp [bind_pure]
+  have h : so.postInsert (fun _ _ => (pure x : n α)) = so.liftTarget n := by funext t; simp
   rw [h, simulateQ_liftTarget]
 
 /-! #### `evalDist` / `probOutput` / `support` bridges for `postInsert` -/
