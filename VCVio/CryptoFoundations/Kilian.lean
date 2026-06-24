@@ -154,7 +154,14 @@ Modeling choices for this definition (correctness/soundness are deferred):
 - `boolRel` is the `Bool`-valued relation of the resulting protocol; relating it to `pcp.rel` is
   part of the deferred security analysis.
 
-The monad is `ProbComp` (the prover's only randomness is the PCP prover's). -/
+The monad is `ProbComp` (the prover's only randomness is the PCP prover's).
+
+TODOs:
+
+- Instead of a Merkle Tree, create an abstract vector commitment interface
+- Make `KilianTransformation` monadic over the vector commitment's monad.
+
+-/
 noncomputable def KilianTransformation
     (pcp : PCP Stmt Wit rel) [DecidableEq pcp.Symbol]
     (s : Skeleton) (e : Fin pcp.length ≃ SkeletonLeafIndex s)
