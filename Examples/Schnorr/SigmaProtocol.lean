@@ -78,7 +78,7 @@ variable (G : Type) [AddCommGroup G] [Module F G] [SampleableType G] [DecidableE
 /-- Standard Schnorr Σ-protocol for knowledge of discrete log.
 Challenge space is the full scalar field `F`. -/
 def sigma (g : G) : SigmaProtocol G F G F F F
-    (fun pk sk => decide (sk • g = pk)) where
+    (fun pk sk => decide (sk • g = pk)) ProbComp where
   commit _pk _sk := do
     let r ← $ᵗ F
     return (r • g, r)
@@ -86,6 +86,7 @@ def sigma (g : G) : SigmaProtocol G F G F F F
   verify pk R c z := decide (z • g = R + c • pk)
   sim _pk := $ᵗ G
   extract c₁ z₁ c₂ z₂ := pure ((z₁ - z₂) * (c₁ - c₂)⁻¹)
+  sampleChal := $ᵗ F
 
 /-! ## Textbook Σ-protocol security properties
 

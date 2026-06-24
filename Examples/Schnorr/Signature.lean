@@ -135,7 +135,7 @@ theorem signature_complete (g : G) (M : Type) [DecidableEq M] :
     SignatureAlg.PerfectlyComplete
       (signature F G g M)
       (FiatShamir.runtime (Commit := G) (Chal := F) M) :=
-  FiatShamir.perfectlyCorrect _ _ M (Schnorr.sigma_complete F G g)
+  FiatShamir.perfectlyCorrect _ _ M rfl (Schnorr.sigma_complete F G g)
 
 omit [Fintype F] [SampleableType G] in
 /-- The DLog hard-relation experiment (`hardRelationExp` for `dlogGenerable`)
@@ -200,6 +200,7 @@ theorem signature_euf_cma (g : G)
   haveI : Inhabited G := ⟨(0 : F) • g⟩
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound
     (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
+    rfl
     (Schnorr.sigma_speciallySound F G g)
     (by intro ω₁ p₁ ω₂ p₂; simp [Schnorr.sigma])
     (Schnorr.simTranscript F G g)

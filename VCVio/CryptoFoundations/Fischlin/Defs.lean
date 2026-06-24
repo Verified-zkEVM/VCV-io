@@ -101,7 +101,7 @@ the prover queries `H` on each input and keeps the best. -/
 def fischlinSearchAux {Stmt Wit Commit PrvState Chal Resp M : Type}
     {rel : Stmt → Wit → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     [MonadLiftT ProbComp m] [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) m]
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ) :
     List Chal → Option (Chal × Resp × Fin (2 ^ b)) → m (Option (Chal × Resp))
@@ -140,7 +140,7 @@ sigma-protocol verification for each repetition, and verifies that the sum of ha
 values is at most `S`. -/
 def Fischlin
     {m : Type → Type v} [Monad m]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hr : GenerableRelation Stmt Wit rel) (ρ b S : ℕ) (M : Type)
     [DecidableEq M] [MonadLiftT ProbComp m]
     [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) m] :

@@ -26,7 +26,7 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
     [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
     [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
     {rel : Stmt → Wit → Bool}
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 noncomputable local instance instIsUniformSpecChalSingleton :
@@ -57,6 +57,7 @@ theorem cma_to_nma_advantage_bound
     [DecidableEq M] [DecidableEq Commit] [SampleableType Stmt] [SampleableType Wit]
     [Finite Stmt] [Finite Commit] [Finite Resp]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (hsc : σ.sampleChal = ($ᵗ Chal : ProbComp Chal))
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hHVZK : σ.HVZK simTranscript ζ_zk)
@@ -74,7 +75,7 @@ theorem cma_to_nma_advantage_bound
           ENNReal.ofReal ((qS : ℝ) * ζ_zk) + (qS : ENNReal) * (qS + qH) * β := by
   refine ⟨Stateful.nmaAdvFromCmaWithFinalQuery σ hr M adv simTranscript, ?_⟩
   exact Stateful.cma_advantage_le_fork_bound_of_h1h2 σ hr M
-    simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
+    hsc simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
     (by
       have hFresh :
           adv.advantage (_root_.FiatShamir.runtime M) ≤

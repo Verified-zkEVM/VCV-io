@@ -29,7 +29,7 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
     -- [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
     -- [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
     {rel : Stmt → Wit → Bool}
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 variable [DecidableEq M] [DecidableEq Commit]
