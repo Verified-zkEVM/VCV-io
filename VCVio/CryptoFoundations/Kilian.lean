@@ -24,7 +24,7 @@ zero-knowledge proof more efficient while keeping zero knowledge by implementing
 "notarized envelope" primitive. But I think this file should just focus on the succinctness part.
 -/
 
-open OracleComp OracleSpec
+open OracleComp OracleSpec BinaryTree InductiveMerkleTree
 
 namespace PCP
 
@@ -39,15 +39,24 @@ end PCP
 /-- A **Probabilistically Checkable Proof (PCP)** system for a relation `rel : Stmt → Wit → Prop`.
 
   The honest prover turns a statement and witness into a proof string of `length` symbols over the
-  alphabet `Symbol`. The verifier is a probabilistic oracle computation: it may toss random coins
-  (modeled by `unifSpec`) and adaptively query positions of the proof string (modeled by
-  `PCP.spec Symbol length`), and outputs a single accept/reject bit. -/
+  alphabet `Symbol`.
+
+  The verifier draws random coins of type `Coins` (sampled by `sampleCoins`); *given* its coins it
+  is the deterministic oracle computation `Verifier stmt coins`, which adaptively queries positions
+  of the proof string (modeled by `PCP.spec Symbol length`) and outputs a single accept/reject bit.
+
+  Separating the coins from the proof queries — rather than folding both into a single
+  `OracleComp (unifSpec + PCP.spec …)` — matches the public-coin structure used by the Kilian
+  transformation: the verifier *sends* its coins, and the prover then simulates `Verifier stmt
+  coins` to learn exactly which positions to open. -/
 structure PCP (Stmt Wit : Type) (rel : Stmt → Wit → Prop) where
   Symbol : Type
   [finSymbol : Fintype Symbol]
   length : ℕ
+  Coins : Type
+  sampleCoins : ProbComp Coins
   Prover : Stmt → Wit → ProbComp (List.Vector Symbol length)
-  Verifier : Stmt → OracleComp (unifSpec + PCP.spec Symbol length) Bool
+  Verifier : Stmt → Coins → OracleComp (PCP.spec Symbol length) Bool
 
 namespace PCP
 
@@ -55,14 +64,14 @@ open scoped NNReal
 
 variable {Stmt Wit : Type} {rel : Stmt → Wit → Prop}
 
-/-- Run the PCP verifier on statement `stmt` against a concrete proof string `proof`, answering
-  each oracle query for position `i` with `proof.get i` and leaving the verifier's coin tosses as
-  an ordinary probabilistic computation. -/
-noncomputable def runVerifier (pcp : PCP Stmt Wit rel) (stmt : Stmt)
-    (proof : List.Vector pcp.Symbol pcp.length) : ProbComp Bool :=
-  simulateQ (QueryImpl.id' unifSpec +
-      (fun i => pure (proof.get i) : QueryImpl (PCP.spec pcp.Symbol pcp.length) ProbComp))
-    (pcp.Verifier stmt)
+/-- Run the PCP verifier on statement `stmt` with fixed coins `coins` against a concrete proof
+  string `proof`, answering each oracle query for position `i` with `proof.get i`. Since the coins
+  are fixed and the proof is concrete, the result is a deterministic accept/reject bit. -/
+def runVerifier (pcp : PCP Stmt Wit rel) (stmt : Stmt) (coins : pcp.Coins)
+    (proof : List.Vector pcp.Symbol pcp.length) : Bool :=
+  Id.run <| simulateQ
+    (fun i => pure (proof.get i) : QueryImpl (PCP.spec pcp.Symbol pcp.length) Id)
+    (pcp.Verifier stmt coins)
 
 /-- A PCP system satisfies **correctness** with error `correctnessError` if for every
   statement/witness pair `(stmt, wit)` in the relation, the honest verifier accepts a proof
@@ -73,7 +82,8 @@ noncomputable def correctness (pcp : PCP Stmt Wit rel) (correctnessError : ℝ�
     rel stmt wit →
       Pr[ fun accept => accept | do
           let proof ← pcp.Prover stmt wit
-          pcp.runVerifier stmt proof] ≥ 1 - correctnessError
+          let coins ← pcp.sampleCoins
+          return pcp.runVerifier stmt coins proof] ≥ 1 - correctnessError
 
 /-- A PCP system satisfies **perfect correctness** if it satisfies correctness with no error. -/
 noncomputable def perfectCorrectness (pcp : PCP Stmt Wit rel) : Prop :=
@@ -90,7 +100,9 @@ noncomputable def soundness (pcp : PCP Stmt Wit rel) (soundnessError : ℝ≥0) 
   ∀ stmt : Stmt,
     (¬ ∃ wit : Wit, rel stmt wit) →
   ∀ proof : List.Vector pcp.Symbol pcp.length,
-    Pr[ fun accept => accept | pcp.runVerifier stmt proof] ≤ soundnessError
+    Pr[ fun accept => accept | do
+        let coins ← pcp.sampleCoins
+        return pcp.runVerifier stmt coins proof] ≤ soundnessError
 
 /-- A PCP system satisfies **perfect soundness** if it satisfies soundness with no error, i.e. the
   verifier never accepts a proof for a statement outside the language. -/
@@ -103,30 +115,79 @@ end PCP
 
 section KilianTransformation
 
-/-!
-The Kilian transformation turns a `PCP` into a succinct public-coin interactive argument, which we
-model as a `ChallengeVerifyProtocol` (this PR's own commit–challenge–response abstraction, see
-`VCVio.CryptoFoundations.ChallengeVerifyProtocol`).
+/-- Build the leaf data of a Merkle tree of skeleton `s` from a function assigning a value to each
+leaf position. -/
+def leafDataOfFn {α : Type _} : (s : Skeleton) → (SkeletonLeafIndex s → α) → LeafData α s
+  | Skeleton.leaf, f => LeafData.leaf (f SkeletonLeafIndex.ofLeaf)
+  | Skeleton.internal _ _, f =>
+      LeafData.internal
+        (leafDataOfFn _ fun i => f (SkeletonLeafIndex.ofLeft i))
+        (leafDataOfFn _ fun i => f (SkeletonLeafIndex.ofRight i))
 
-The intended instantiation:
+variable {Stmt Wit : Type} {rel : Stmt → Wit → Prop}
 
-- `Commit` is a Merkle root committing to the PCP proof string (built with the inductive Merkle
-  tree of `VCVio.CryptoFoundations.MerkleTree.Inductive.Defs`);
-- `PrvState` retains the full proof string together with the Merkle tree, so the prover can open
-  queried positions;
-- `Chal` is the verifier's randomness, which (via `pcp.Verifier`) determines the queried positions;
-- `Resp` carries the opened symbols together with their Merkle authentication paths;
-- `verify` checks each authentication path against the committed root and then runs the PCP
-  verifier's decision on the opened symbols;
-- the prover runs in a monad with access to the Merkle/hash oracle, which is exactly why
-  `ChallengeVerifyProtocol` is parameterized over an arbitrary monad `m` rather than fixed to
-  `ProbComp`.
+/-- **The Kilian transformation.**
 
-`PCP.rel` is `Stmt → Wit → Prop`, whereas `ChallengeVerifyProtocol` uses a `Bool`-valued relation;
-the construction will fix a decidable bridge between the two.
+Turn a `PCP` into a (public-coin) succinct `ChallengeVerifyProtocol`, the interactive argument at
+the heart of Kilian's protocol:
 
-TODO: construct the transformation and prove that PCP correctness/soundness lift to completeness and
-(knowledge) soundness of the resulting `ChallengeVerifyProtocol`.
--/
+1. the prover Merkle-commits to its PCP proof string (`commit`);
+2. the verifier sends random coins (`sampleChal := pcp.sampleCoins`);
+3. the prover simulates `pcp.Verifier stmt coins` against its proof to learn exactly which positions
+   the verifier reads, and opens *only those* leaves with their Merkle authentication paths
+   (`respond`);
+4. the verifier replays `pcp.Verifier stmt coins`, answering each position query from the prover's
+   opening while checking that opening's authentication path against the committed root, and accepts
+   iff every queried position was opened authentically and the PCP verifier accepts (`verify`).
+
+Modeling choices for this definition (correctness/soundness are deferred):
+
+- The committed proof string is laid out on a caller-supplied Merkle skeleton `s` via the
+  position-to-leaf equivalence `e : Fin pcp.length ≃ SkeletonLeafIndex s`.
+- `hashFn` is the (collision-resistant) two-to-one hash compressing the tree; the construction is in
+  the standard-model / CRH formulation, so hashing is the pure function `hashFn` and `verify` is
+  deterministic.
+- `Resp` is the *partial* opening map: `resp i = some (symbol, path)` exactly for the positions the
+  prover opens, and `none` elsewhere. Succinctness is what makes Kilian interesting: only the
+  positions the verifier actually queries are opened, and `verify` rejects (via the `none` branch)
+  if it ever reads an unopened position.
+- `boolRel` is the `Bool`-valued relation of the resulting protocol; relating it to `pcp.rel` is
+  part of the deferred security analysis.
+
+The monad is `ProbComp` (the prover's only randomness is the PCP prover's). -/
+noncomputable def KilianTransformation
+    (pcp : PCP Stmt Wit rel) [DecidableEq pcp.Symbol]
+    (s : Skeleton) (e : Fin pcp.length ≃ SkeletonLeafIndex s)
+    (hashFn : pcp.Symbol → pcp.Symbol → pcp.Symbol)
+    (boolRel : Stmt → Wit → Bool) :
+    ChallengeVerifyProtocol Stmt Wit
+      pcp.Symbol                                          -- Commit: the Merkle root
+      (FullData pcp.Symbol s)                             -- PrvState: the committed tree
+      pcp.Coins                                           -- Chal: the verifier's coins
+      ((i : Fin pcp.length) → Option (pcp.Symbol × List.Vector pcp.Symbol (e i).depth))  -- Resp
+      boolRel ProbComp where
+  commit stmt wit := do
+    let proof ← pcp.Prover stmt wit
+    let tree := buildMerkleTreeWithHash (leafDataOfFn s fun i => proof.get (e.symm i)) hashFn
+    return (tree.getRootValue, tree)
+  sampleChal := pcp.sampleCoins
+  respond stmt _wit tree coins := do
+    -- Simulate the verifier against the committed proof, logging the positions it reads.
+    let logImpl : QueryImpl (PCP.spec pcp.Symbol pcp.length) (StateT (List (Fin pcp.length)) Id) :=
+      fun i => do modify (i :: ·); pure (tree.toLeafData.get (e i))
+    let queried : List (Fin pcp.length) :=
+      (Id.run ((simulateQ logImpl (pcp.Verifier stmt coins)).run [])).2
+    -- Open exactly the queried positions, each with its authentication path.
+    return fun j =>
+      if j ∈ queried then some (tree.toLeafData.get (e j), generateProof tree (e j)) else none
+  verify stmt root coins resp :=
+    -- Replay the verifier, answering each position from its opening while checking the
+    -- authentication path; an unopened or mis-authenticated position fails the whole run.
+    let answerImpl : QueryImpl (PCP.spec pcp.Symbol pcp.length) (OptionT Id) :=
+      fun i => match resp i with
+        | none => failure
+        | some (sym, path) =>
+            if getPutativeRootWithHash (e i) sym path hashFn = root then pure sym else failure
+    decide (Id.run (simulateQ answerImpl (pcp.Verifier stmt coins)).run = some true)
 
 end KilianTransformation
