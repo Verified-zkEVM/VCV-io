@@ -73,9 +73,8 @@ def AdvBound (game : OracleComp spec₁ Bool) (ε : ℝ) : Prop :=
   Eq.trans h₁ h₂
 
 theorem GameEquiv.probOutput_eq {g₁ g₂ : OracleComp spec₁ α}
-    (h : GameEquiv g₁ g₂) (x : α) : Pr[= x | g₁] = Pr[= x | g₂] := by
-  change 𝒟[g₁] x = 𝒟[g₂] x
-  rw [h]
+    (h : GameEquiv g₁ g₂) (x : α) : Pr[= x | g₁] = Pr[= x | g₂] :=
+  probOutput_congr_evalDist h x
 
 /-! ## Prop-to-ℝ≥0∞ indicator -/
 
@@ -88,44 +87,32 @@ noncomputable def propInd (P : Prop) : ℝ≥0∞ := if P then 1 else 0
 @[simp] lemma propInd_true : propInd True = 1 := if_pos trivial
 @[simp] lemma propInd_false : propInd False = 0 := if_neg id
 
-lemma propInd_eq_ite {P : Prop} [Decidable P] : propInd P = if P then 1 else 0 := by
-  simp [propInd]
+lemma propInd_eq_ite {P : Prop} [Decidable P] : propInd P = if P then 1 else 0 := by simp [propInd]
 
 open scoped Classical in
 @[simp] lemma propInd_and {P Q : Prop} : propInd (P ∧ Q) = propInd P * propInd Q := by
-  unfold propInd
-  split_ifs with hpq hp hq <;> simp_all
+  unfold propInd; split_ifs <;> simp_all
 
 open scoped Classical in
 lemma propInd_mono {P Q : Prop} (h : P → Q) : propInd P ≤ propInd Q := by
-  unfold propInd
-  split_ifs with hp hq
-  · exact le_refl 1
-  · exact absurd (h hp) hq
-  · exact zero_le
-  · exact le_refl 0
+  unfold propInd; split_ifs <;> simp_all
 
 lemma propInd_le_one (P : Prop) : propInd P ≤ 1 := by
-  unfold propInd
-  split_ifs <;> simp
+  unfold propInd; split_ifs <;> simp
 
 open scoped Classical in
-lemma propInd_eq_one_iff {P : Prop} : propInd P = 1 ↔ P := by
-  by_cases hP : P <;> simp [propInd, hP]
+lemma propInd_eq_one_iff {P : Prop} : propInd P = 1 ↔ P := by simp [propInd]
 
 open scoped Classical in
-lemma propInd_eq_zero_iff {P : Prop} : propInd P = 0 ↔ ¬P := by
-  by_cases hP : P <;> simp [propInd, hP]
+lemma propInd_eq_zero_iff {P : Prop} : propInd P = 0 ↔ ¬P := by simp [propInd]
 
 open scoped Classical in
 lemma propInd_or_le {P Q : Prop} : propInd (P ∨ Q) ≤ propInd P + propInd Q := by
-  unfold propInd
-  split_ifs <;> simp_all
+  unfold propInd; split_ifs <;> simp_all
 
 open scoped Classical in
 lemma propInd_not {P : Prop} : propInd (¬P) = 1 - propInd P := by
-  unfold propInd
-  by_cases hp : P <;> simp [hp]
+  unfold propInd; split_ifs <;> simp_all
 
 /-! ## Notation -/
 
@@ -180,20 +167,16 @@ macro_rules
 /-! ## Bridge lemmas: numeric indicators and existing API -/
 
 /-- `probEvent` equals WP of propInd postcondition. -/
-lemma probEvent_eq_wp_propInd {ι : Type u} {spec : OracleSpec ι}
-    [IsUniformSpec spec] {α : Type}
+lemma probEvent_eq_wp_propInd {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Pr[ p | oa] = wp oa (fun x => 𝟙⟦p x⟧) := by
   classical
-  have h := probEvent_eq_wp_indicator oa p
-  simp only [propInd_eq_ite] at *
-  exact h
+  simpa only [propInd_eq_ite] using probEvent_eq_wp_indicator oa p
 
 /-- `RelPost.indicator` is pointwise `𝟙⟦_⟧`. -/
 lemma Relational.RelPost.indicator_eq_propInd {α β : Type}
     (R : Relational.RelPost α β) (a : α) (b : β) :
-    Relational.RelPost.indicator R a b = 𝟙⟦R a b⟧ := by
-  simp [Relational.RelPost.indicator, propInd]
+    Relational.RelPost.indicator R a b = 𝟙⟦R a b⟧ := rfl
 
 /-- Almost-sure correctness: `Triple 𝟙⟦True⟧ c (fun x => 𝟙⟦p x⟧)` iff
 `Pr[ p | c] = 1`. -/
@@ -215,8 +198,7 @@ lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
 /-! ## Expectation-level bridge lemmas -/
 
 /-- WP of a disjunction indicator is bounded by the sum of individual WP indicators. -/
-theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι}
-    [IsUniformSpec spec] {α : Type}
+theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p q : α → Prop) :
     wp oa (fun x => 𝟙⟦p x ∨ q x⟧) ≤
         wp oa (fun x => 𝟙⟦p x⟧) +
@@ -225,29 +207,26 @@ theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι}
   exact probEvent_or_le _ _ _
 
 /-- Monotonicity for event probabilities, exposed through the program-logic namespace. -/
-theorem probEvent_mono {ι : Type u} {spec : OracleSpec ι}
-    [IsUniformSpec spec] {α : Type}
+theorem probEvent_mono {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) {p q : α → Prop}
     (h : ∀ x, p x → q x) :
     Pr[ p | oa] ≤ Pr[ q | oa] :=
   _root_.probEvent_mono (mx := oa) (fun x _ => h x)
 
 /-- Markov inequality: if `a ≤ f x` whenever `p x`, then `a * Pr[ p | oa] ≤ E[f | oa]`. -/
-theorem markov_bound {ι : Type u} {spec : OracleSpec ι}
-    [IsUniformSpec spec] {α : Type}
-    (oa : OracleComp spec α) (f : α → ℝ≥0∞) (a : ℝ≥0∞)
-    (p : α → Prop) (hf : ∀ x, p x → a ≤ f x) :
+theorem markov_bound {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α : Type}
+    (oa : OracleComp spec α) (f : α → ℝ≥0∞) (a : ℝ≥0∞) (p : α → Prop)
+    (hf : ∀ x, p x → a ≤ f x) :
     a * Pr[ p | oa] ≤ wp oa f := by
   rw [probEvent_eq_wp_propInd, ← wp_mul_const]
-  exact wp_mono oa fun x => by
-    unfold propInd
-    split_ifs with hp
-    · simpa using hf x hp
-    · simp
+  refine wp_mono oa fun x => ?_
+  unfold propInd
+  split_ifs with hp
+  · simpa using hf x hp
+  · simp
 
 /-- `Triple` with precondition `1` and indicator postcondition when the event is almost sure. -/
-theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι}
-    [IsUniformSpec spec] {α : Type}
+theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (h : ∀ x ∈ support oa, p x) :
     Triple (1 : ℝ≥0∞) oa (fun x => 𝟙⟦p x⟧) := by
   rw [show (1 : ℝ≥0∞) = 𝟙⟦True⟧ from propInd_true.symm]
@@ -257,8 +236,7 @@ theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι}
 /-! ## Bridge lemmas: game equivalence and advantage -/
 
 /-- Game equivalence from basic pRHL equality coupling. -/
-theorem GameEquiv.of_relTriple
-    {g₁ g₂ : OracleComp spec₁ α}
+theorem GameEquiv.of_relTriple {g₁ g₂ : OracleComp spec₁ α}
     (h : Relational.RelTriple (spec₁ := spec₁) (spec₂ := spec₁) g₁ g₂
       (Relational.EqRel α)) :
     GameEquiv g₁ g₂ :=
@@ -279,34 +257,22 @@ theorem GameEquiv.bind_congr {g₁ g₂ : OracleComp spec₁ α}
     {f₁ f₂ : α → OracleComp spec₁ β}
     (hg : GameEquiv g₁ g₂) (hf : ∀ a, GameEquiv (f₁ a) (f₂ a)) :
     GameEquiv (g₁ >>= f₁) (g₂ >>= f₂) := by
-  simp only [GameEquiv, evalDist_bind] at *
-  rw [hg]
-  congr 1
-  funext a
-  exact hf a
+  rw [GameEquiv, evalDist_bind, evalDist_bind, hg, funext hf]
 
 /-- Game equivalence is a congruence for map. -/
 theorem GameEquiv.map_congr {g₁ g₂ : OracleComp spec₁ α} (f : α → β)
     (hg : GameEquiv g₁ g₂) :
     GameEquiv (f <$> g₁) (f <$> g₂) := by
-  simp only [GameEquiv, evalDist_map] at *
-  rw [hg]
+  rw [GameEquiv, evalDist_map, evalDist_map, hg]
 
 /-- Advantage bound via TV distance. -/
-theorem AdvBound.of_tvDist
-    {game₁ game₂ : OracleComp spec₁ Bool}
-    {ε₁ ε₂ : ℝ}
-    (hbound : AdvBound game₁ ε₁)
-    (htv : tvDist game₁ game₂ ≤ ε₂) :
+theorem AdvBound.of_tvDist {game₁ game₂ : OracleComp spec₁ Bool} {ε₁ ε₂ : ℝ}
+    (hbound : AdvBound game₁ ε₁) (htv : tvDist game₁ game₂ ≤ ε₂) :
     AdvBound game₂ (ε₁ + ε₂) := by
+  have hdiff := abs_probOutput_toReal_sub_le_tvDist game₁ game₂
   unfold AdvBound at *
-  have hdiff :
-      |Pr[= true | game₁].toReal - Pr[= true | game₂].toReal| ≤ tvDist game₁ game₂ :=
-    abs_probOutput_toReal_sub_le_tvDist game₁ game₂
-  rw [abs_le] at hbound hdiff ⊢
-  obtain ⟨hd1, hd2⟩ := hdiff
-  obtain ⟨hb1, hb2⟩ := hbound
-  constructor <;> linarith
+  rw [abs_le] at *
+  constructor <;> linarith [hdiff.1, hdiff.2]
 
 /-- Transfer advantage bounds across equivalent games. -/
 theorem AdvBound.of_gameEquiv {g₁ g₂ : OracleComp spec₁ Bool} {ε : ℝ}
