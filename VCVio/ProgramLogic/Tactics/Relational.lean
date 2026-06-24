@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.ProgramLogic.Tactics.Relational.Internals
 import VCVio.ProgramLogic.Tactics.Common.Suggestions
+import VCVio.ProgramLogic.Tactics.Relational.Internals
 
 /-!
 # Relational VC Tactics
@@ -31,10 +31,6 @@ private def runRVCGenStepWithNames (names : Array Name) : TacticM Bool := do
     renameInaccessibleNames names
     return true
   return false
-
-private def runRVCGenStepUsingWithNames
-    (hint : TSyntax `term) (names : Array Name) : TacticM Bool := do
-  TacticInternals.Relational.runRVCGenStepUsingWithNames hint names
 
 private def runRVCGenStepWithTheoremNames
     (thm : TSyntax `term) (names : Array Name) : TacticM Bool := do
@@ -106,7 +102,7 @@ elab_rules : tactic
       TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep using $hint as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
-      if ← runRVCGenStepUsingWithNames hint names then
+      if ← TacticInternals.Relational.runRVCGenStepUsingWithNames hint names then
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
   | `(tactic| rvcstep with $thm as ⟨ $ids,* ⟩) => do
