@@ -33,7 +33,7 @@ lemma support_seq (mf : m (α → β)) (mx : m α) :
 
 lemma mem_support_seq_iff (mf : m (α → β)) (mx : m α) (y : β) :
     y ∈ support (mf <*> mx) ↔ ∃ f ∈ support mf, ∃ x ∈ support mx, f x = y := by
-  rw [support_seq]; simp
+  simp [support_seq]
 
 @[simp]
 lemma finSupport_seq [HasEvalFinset m]
@@ -168,8 +168,7 @@ lemma evalDist_seqRight (mx : m α) (my : m β) :
 @[simp, grind =_]
 lemma probOutput_seqRight (mx : m α) (my : m β) (y : β) :
     Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by
-  have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
-  rw [h, probOutput_bind_const]
+  simp [seqRight_eq, seq_eq_bind_map, probOutput_bind_const]
 
 @[simp, grind =_]
 lemma probFailure_seqRight (mx : m α) (my : m β) :
@@ -179,8 +178,7 @@ lemma probFailure_seqRight (mx : m α) (my : m β) :
 @[simp, grind =_]
 lemma probEvent_seqRight (mx : m α) (my : m β) (p : β → Prop) :
     Pr[ p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[ p | my] := by
-  have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
-  rw [h, probEvent_bind_const]
+  simp [seqRight_eq, seq_eq_bind_map, probEvent_bind_const]
 
 end spmf
 
@@ -233,10 +231,9 @@ lemma probOutput_seq_map_eq_mul_of_injective2 (hf : f.Injective2) (x : α) (y : 
   rw [probOutput_seq_map_eq_tsum]
   simp only [probOutput_pure_eq_indicator, Set.indicator, mul_ite, mul_zero]
   refine (tsum_eq_single x fun x' hx' => ?_).trans ?_
-  · exact ENNReal.tsum_eq_zero.mpr fun b =>
-      if_neg (show f x y ≠ f x' b from fun h' => hx' (hf h').1.symm)
+  · exact ENNReal.tsum_eq_zero.mpr fun b => if_neg fun h' => hx' (hf h').1.symm
   · refine (tsum_eq_single y fun y' hy' => ?_).trans ?_
-    · exact if_neg (show f x y ≠ f x y' from fun h' => hy' (hf h').2.symm)
+    · exact if_neg fun h' => hy' (hf h').2.symm
     · simp
 
 end injective2
@@ -247,17 +244,14 @@ lemma probOutput_seq_map_swap (z : γ) :
     Pr[= z | Function.swap f <$> my <*> mx] = Pr[= z | f <$> mx <*> my] := by
   simp only [probOutput_seq_map_eq_tsum, Function.swap]
   rw [ENNReal.tsum_comm]
-  refine tsum_congr fun x' => tsum_congr fun y' => ?_
-  rw [mul_comm (Pr[= y' | my])]
+  exact tsum_congr fun x' => tsum_congr fun y' => by ring
 
 lemma evalDist_seq_map_swap :
-    𝒟[Function.swap f <$> my <*> mx] = 𝒟[f <$> mx <*> my] := by
-  have : DecidableEq γ := Classical.decEq γ
-  exact evalDist_ext (probOutput_seq_map_swap mx my f)
+    𝒟[Function.swap f <$> my <*> mx] = 𝒟[f <$> mx <*> my] :=
+  evalDist_ext (probOutput_seq_map_swap mx my f)
 
 lemma probEvent_seq_map_swap (p : γ → Prop) :
     Pr[ p | Function.swap f <$> my <*> mx] = Pr[ p | f <$> mx <*> my] := by
-  have : DecidableEq γ := Classical.decEq γ
   simp only [probEvent_eq_tsum_indicator, probOutput_seq_map_swap]
 
 end swap
@@ -267,7 +261,7 @@ lemma probEvent_seq_map_eq_probEvent_comp_uncurry (p : γ → Prop) :
   rw [← probEvent_map]
   congr 1
   rw [map_seq, Functor.map_map]
-  congr 1
+  rfl
 
 lemma probEvent_seq_map_eq_probEvent (p : γ → Prop) :
     Pr[ p | f <$> mx <*> my] = Pr[ fun z => p (f z.1 z.2) | Prod.mk <$> mx <*> my] :=
@@ -290,12 +284,7 @@ lemma mem_finSupport_seq_map_iff_of_injective2 [HasEvalFinset m]
     [DecidableEq α] [DecidableEq β] [DecidableEq γ]
     (hf : f.Injective2) (x : α) (y : β) :
     f x y ∈ finSupport (f <$> mx <*> my) ↔ x ∈ finSupport mx ∧ y ∈ finSupport my := by
-  rw [finSupport_seq_map_eq_image2]
-  simp only [Finset.mem_image₂]
-  constructor
-  · rintro ⟨a, ha, b, hb, hab⟩
-    exact ⟨(hf hab).1 ▸ ha, (hf hab).2 ▸ hb⟩
-  · exact fun ⟨hx, hy⟩ => ⟨x, hx, y, hy, rfl⟩
+  rw [finSupport_seq_map_eq_image2, Finset.mem_image₂_iff hf]
 
 omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [EvalDistCompatible m] in
 lemma support_seq_map_swap :
@@ -313,7 +302,7 @@ lemma probEvent_seq_map_eq_mul (p : γ → Prop) (q1 : α → Prop) (q2 : β →
     (h : ∀ x ∈ support mx, ∀ y ∈ support my, p (f x y) ↔ q1 x ∧ q2 y) :
     Pr[ p | f <$> mx <*> my] = Pr[ q1 | mx] * Pr[ q2 | my] := by
   classical
-  rw [show f <$> mx <*> my = mx >>= fun x => f x <$> my from by simp [seq_eq_bind_map]]
+  rw [show f <$> mx <*> my = mx >>= fun x => f x <$> my by simp [seq_eq_bind_map]]
   rw [probEvent_bind_eq_tsum]
   simp only [probEvent_map]
   suffices hs : ∀ x, Pr[= x | mx] * Pr[ p ∘ f x | my] =
@@ -322,39 +311,21 @@ lemma probEvent_seq_map_eq_mul (p : γ → Prop) (q1 : α → Prop) (q2 : β →
     · exact tsum_congr hs
     · rw [ENNReal.tsum_mul_right]; symm; rw [probEvent_eq_tsum_ite]
   intro x
-  by_cases hx : x ∈ support mx <;> by_cases hq : q1 x
-  · simp only [if_pos hq]; congr 1
-    exact probEvent_ext fun y hy => (h x hx y hy).trans (by simp [hq])
-  · simp only [if_neg hq, zero_mul]
-    rw [probEvent_eq_zero fun y hy => (by
-      show ¬(p ∘ f x) y; simp only [Function.comp_apply]; rw [h x hx y hy]; simp [hq]), mul_zero]
-  · simp [probOutput_eq_zero_of_not_mem_support hx]
+  by_cases hx : x ∈ support mx
+  · by_cases hq : q1 x
+    · simp only [if_pos hq]; congr 1
+      exact probEvent_ext fun y hy => (h x hx y hy).trans (by simp [hq])
+    · simp only [if_neg hq, zero_mul]
+      rw [probEvent_eq_zero fun y hy => by
+        simp only [Function.comp_apply, h x hx y hy]; simp [hq], mul_zero]
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
 omit [LawfulMonadLiftT m SetM] in
 lemma probOutput_seq_map_eq_mul (x : α) (y : β) (z : γ)
     (h : ∀ x' ∈ support mx, ∀ y' ∈ support my, z = f x' y' ↔ x' = x ∧ y' = y) :
     Pr[= z | f <$> mx <*> my] = Pr[= x | mx] * Pr[= y | my] := by
-  have : DecidableEq γ := Classical.decEq γ
-  rw [probOutput_seq_map_eq_tsum_ite]
-  refine (tsum_eq_single x fun x' hx' => ?_).trans ?_
-  · refine ENNReal.tsum_eq_zero.mpr fun y' => ?_
-    by_cases hx's : x' ∈ support mx
-    · by_cases hy's : y' ∈ support my
-      · exact if_neg fun heq => hx' ((h x' hx's y' hy's).mp heq).1
-      · simp [probOutput_eq_zero_of_not_mem_support hy's]
-    · simp [probOutput_eq_zero_of_not_mem_support hx's]
-  · refine (tsum_eq_single y fun y' hy' => ?_).trans ?_
-    · by_cases hxs : x ∈ support mx
-      · by_cases hy's : y' ∈ support my
-        · exact if_neg fun heq => hy' ((h x hxs y' hy's).mp heq).2
-        · simp [probOutput_eq_zero_of_not_mem_support hy's]
-      · simp [probOutput_eq_zero_of_not_mem_support hxs]
-    · by_cases hxs : x ∈ support mx
-      · by_cases hys : y ∈ support my
-        · simp [(h x hxs y hys).mpr ⟨rfl, rfl⟩]
-        · simp [probOutput_eq_zero_of_not_mem_support hys]
-      · simp [probOutput_eq_zero_of_not_mem_support hxs]
+  simpa only [← probEvent_eq_eq_probOutput] using probEvent_seq_map_eq_mul mx my f
+    (· = z) (· = x) (· = y) fun x' hx' y' hy' => eq_comm.trans (h x' hx' y' hy')
 
 end mixed
 
