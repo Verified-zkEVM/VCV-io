@@ -212,7 +212,7 @@ The lifted full modular spec is also kept out of the build, since it
 depends directly on the disabled `barrett_reduce_spec`.
 
 ```lean
-theorem barrett_reduce_Lifted_spec [spec.Fintype] [spec.Inhabited]
+theorem barrett_reduce_Lifted_spec [IsUniformSpec spec]
     (value : i32) :
     ⦃⌜value.toInt64 ≥ -(4194304 : Int64) ∧
        value.toInt64 ≤ (4194304 : Int64)⌝⦄
@@ -250,7 +250,7 @@ section OracleComposition
 
 set_option mvcgen.warning false
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 /-- Query an oracle for a field coefficient (represented via `spec.Range t`
 and a user-supplied cast), then reduce it modulo `FIELD_MODULUS`. -/

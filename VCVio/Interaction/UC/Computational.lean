@@ -42,7 +42,7 @@ two resulting `SPMF Result` distributions.
 This lets the same framework express:
 
 * coin-flip-only protocols with `m = ProbComp` and
-  `SPMFSemantics.ofHasEvalSPMF ProbComp`;
+  `SPMFSemantics.ofMonadLift ProbComp`;
 * protocols with shared oracles where `m = OracleComp superSpec` and
   the internal semantic monad is `StateT σ ProbComp` via `simulateQ`;
 * observation-style semantics that deliberately introduce failure, for

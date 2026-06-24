@@ -119,7 +119,7 @@ namespace OracleComp
 
 variable {ι' : Type u} {spec' : OracleSpec ι'} {α : Type u}
 
-theorem IsQueryBoundP.simulateQ_run_withPregen
+theorem IsQueryBoundP.simulateQ_run_withPregen [IsUniformSpec spec']
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
     (so : QueryImpl spec (OracleComp spec'))
     {oa : OracleComp spec α} {n : ℕ}
@@ -133,7 +133,7 @@ theorem IsQueryBoundP.simulateQ_run_withPregen
     (fun t hnp s' => QueryImpl.isQueryBoundP_run_withPregen so t (hstep_np t hnp) s')
     seed
 
-theorem IsTotalQueryBound.simulateQ_run_withPregen
+theorem IsTotalQueryBound.simulateQ_run_withPregen [IsUniformSpec spec]
     (so : QueryImpl spec (OracleComp spec))
     {oa : OracleComp spec α} {n : ℕ}
     (h : IsTotalQueryBound oa n)
@@ -186,7 +186,7 @@ lemma probEvent_liftComp_uniformSample_eq_of_eq
     {ι : Type} {spec : OracleSpec ι}
     [(i : ι) → SampleableType (spec.Range i)]
     [unifSpec ⊂ₒ spec] [unifSpec ˡ⊂ₒ spec]
-    [spec.Fintype] [spec.Inhabited]
+    [IsUniformSpec spec]
     {i : ι} (u₀ : spec.Range i) :
     probEvent (liftComp (uniformSample (spec.Range i)) spec)
       (fun u => u₀ = u) =
@@ -220,7 +220,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α : Type} (oa : OracleComp spec₀ α) :
     𝒟[(do
@@ -363,7 +363,7 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (ob : α → OracleComp spec₀ β) (y : β) :
     Pr[= y | do
@@ -387,7 +387,7 @@ lemma probOutput_generateSeed_bind_map_simulateQ
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
     Pr[= y | (do
@@ -406,7 +406,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ j, SampleableType (spec₀.Range j)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (σ : QuerySeed spec₀) (i : ι₀) {α : Type} (oa : OracleComp spec₀ α) :
     𝒟[(do
       let u ← liftComp ($ᵗ spec₀.Range i) spec₀
@@ -421,7 +421,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
     apply evalDist_ext; intro a
     simp_rw [hrun']
     rw [probOutput_bind_const]
-    simp [HasEvalPMF.probFailure_eq_zero]
+    simp [probFailure_of_liftM_PMF]
   | query_bind t mx ih =>
     intro σ
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
@@ -520,7 +520,7 @@ lemma evalDist_liftComp_replicate_uniformSample_bind_simulateQ_run'_addValues
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ j, SampleableType (spec₀.Range j)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (i : ι₀) {α : Type} (oa : OracleComp spec₀ α) (n : ℕ) :
     ∀ (σ : QuerySeed spec₀),
     𝒟[(do
@@ -554,7 +554,7 @@ lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) :
     𝒟[(do
@@ -746,7 +746,7 @@ lemma probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
     Pr[= y | (do
@@ -773,7 +773,7 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
     [unifSpec ˡ⊂ₒ spec₀]
-    [spec₀.Fintype] [spec₀.Inhabited]
+    [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) (x : α)
     (h : QuerySeed spec₀ → ENNReal) :
@@ -1172,6 +1172,7 @@ end queryBounds
 Forward only — the reverse fails because pregenerated values strictly reduce the count. -/
 
 theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α} {n : ℕ}
     (h : OracleComp.IsTotalQueryBound oa n) (seed : QuerySeed spec₀) :
     OracleComp.IsTotalQueryBound ((simulateQ spec₀.seededOracle oa).run seed) n := by
@@ -1180,6 +1181,7 @@ theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec
     (fun t => (OracleComp.isQueryBound_query_iff t 1 _ _).mpr Nat.one_pos) seed
 
 theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α}
     {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
     (h : OracleComp.IsQueryBoundP oa p n) (seed : QuerySeed spec₀) :
@@ -1191,6 +1193,7 @@ theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ 
     seed
 
 theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
+    [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ}
     (h : OracleComp.IsPerIndexQueryBound oa qb) (seed : QuerySeed spec₀) :
     OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.seededOracle oa).run seed) qb := by
@@ -1204,7 +1207,8 @@ theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {s
 /-- State-preserving variant of `isPerIndexQueryBound_run'_zero`: when the seed covers `qb`
 at every index, the simulation makes zero further queries even with the seed in scope. -/
 theorem isPerIndexQueryBound_run_simulateQ_zero
-    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} {α : Type}
+    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} [IsUniformSpec spec₀]
+    {α : Type}
     {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ} {seed : QuerySeed spec₀}
     (hqb : OracleComp.IsPerIndexQueryBound oa qb)
     (hseed : ∀ t, qb t ≤ (seed t).length) :
@@ -1216,7 +1220,8 @@ theorem isPerIndexQueryBound_run_simulateQ_zero
 /-- State-preserving variant of `isPerIndexQueryBound_run'_of_seedCoverage`: any uncovered
 suffix of the seed becomes the residual budget in the result spec. -/
 theorem isPerIndexQueryBound_run_simulateQ_of_seedCoverage
-    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} {α : Type}
+    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀} [IsUniformSpec spec₀]
+    {α : Type}
     {oa : OracleComp spec₀ α} {qb residual : ι₀ → ℕ} {seed : QuerySeed spec₀}
     (hqb : OracleComp.IsPerIndexQueryBound oa qb)
     (hcover : ∀ t, qb t - residual t ≤ (seed t).length) :

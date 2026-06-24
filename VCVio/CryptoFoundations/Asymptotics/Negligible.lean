@@ -40,8 +40,8 @@ theorem negligible_of_le {f g : ℕ → ℝ≥0∞} (hfg : ∀ n, f n ≤ g n) (
     negligible f := by
   intro p
   apply tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds (hg p)
-  · intro n; exact zero_le _
-  · intro n; exact mul_le_mul_of_nonneg_left (hfg n) (zero_le _)
+  · intro n; exact zero_le
+  · intro n; exact mul_le_mul_of_nonneg_left (hfg n) (zero_le)
 
 /-- Sum of two negligible functions is negligible. -/
 theorem negligible_add {f g : ℕ → ℝ≥0∞} (hf : negligible f) (hg : negligible g) :

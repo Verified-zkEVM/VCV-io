@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Batteries.Data.ByteArray
+import Batteries.Data.Array.Lemmas
 import LatticeCrypto.Falcon.Arithmetic
-import Mathlib.Data.Array.Extract
 
 /-!
 # Concrete Falcon Encoding

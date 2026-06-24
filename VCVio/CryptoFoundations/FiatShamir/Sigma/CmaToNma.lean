@@ -33,7 +33,11 @@ open OracleComp OracleSpec
 
 namespace FiatShamir
 
-variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type}
+    [Fintype Chal] [Finite Commit] [Finite Resp]
+    [Inhabited Chal] [Inhabited Commit] [Inhabited Resp]
+    {rel : Stmt → Wit → Bool}
+
 variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
@@ -131,14 +135,16 @@ noncomputable def simulatedNmaAdv
       (Resp := Resp) simTranscript pk)
     (adv.main pk)).run ∅⟩
 
+omit [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Chal] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Hash-query bound for `simulatedNmaAdv`: if the CMA adversary makes at most
 `qS` signing-oracle queries and `qH` random-oracle queries, the NMA reduction
 makes at most `qH` live hash queries. The `qS` signing queries are absorbed
 into the managed cache rather than issued live. -/
 theorem simulatedNmaAdv_hashQueryBound
-    [DecidableEq M] [DecidableEq Commit]
+    [DecidableEq M] [DecidableEq Commit] [Finite Commit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    [Finite Resp]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
@@ -148,8 +154,11 @@ theorem simulatedNmaAdv_hashQueryBound
     ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := (simulatedNmaAdv (σ := σ) (hr := hr) (M := M)
         (simTranscript := simTranscript) (adv := adv)).main pk) qH := by
-  classical
-  letI : Fintype Chal := Fintype.ofFinite Chal
+  haveI : Fintype Chal := Fintype.ofFinite Chal
+  haveI : Fintype Resp := Fintype.ofFinite Resp
+  haveI : Fintype Commit := Fintype.ofFinite Commit
+  letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _

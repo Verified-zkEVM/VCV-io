@@ -85,14 +85,14 @@ lemma fst_map_writerT_run_simulateQ
     rw [this]
     exact ih a
 
-lemma probFailure_writerT_run_simulateQ [spec.Fintype] [spec.Inhabited]
+lemma probFailure_writerT_run_simulateQ [IsUniformSpec spec]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
     (oa : OracleComp spec α) : Pr[⊥ | (simulateQ so oa).run] = Pr[⊥ | oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t oa h => simp
 
-lemma NeverFail_writerT_run_simulateQ_iff [spec.Fintype] [spec.Inhabited]
+lemma NeverFail_writerT_run_simulateQ_iff [IsUniformSpec spec]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
     (oa : OracleComp spec α) :
     NeverFail ((simulateQ so oa).run : OracleComp spec _) ↔

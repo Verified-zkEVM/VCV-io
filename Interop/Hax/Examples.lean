@@ -108,15 +108,14 @@ one-liner workaround for the fact that `mvcgen`/`simp` normalises
 the hypothesis at `2^32`; the two are definitionally equal in `Nat`.
 
 VCVio's `WP (OracleComp spec) .pure` (in
-`VCVio.ProgramLogic.Unary.StdDoBridge`) requires `[spec.Fintype]` and
-`[spec.Inhabited]` for probability reasoning, so the Triple spec
-carries those constraints. -/
+`VCVio.ProgramLogic.Unary.StdDoBridge`) requires `[IsUniformSpec spec]`
+for probability reasoning, so the Triple spec carries that constraint. -/
 
 section TripleSpec
 
 set_option mvcgen.warning false
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 /-- `addOrPanicLifted` total-correctness spec. Under the no-overflow
 precondition, the lifted hax computation never panics, never diverges,
@@ -166,7 +165,7 @@ section OracleTripleSpec
 
 set_option mvcgen.warning false
 
-variable [spec.Fintype] [spec.Inhabited]
+variable [IsUniformSpec spec]
 
 /-- If the oracle's response can never push `x + coe y` above `2^32`,
 then `oracleThenAdd` always returns a value `≥ x`. The interesting part
@@ -192,8 +191,8 @@ end OracleTripleSpec
 
 Everything so far was a `Triple`: universal over oracle outcomes, with
 no probabilistic content. The point of dropping `Hax.RustM` into
-`RustOracleComp spec` is that the `OracleComp spec` layer also carries
-`HasEvalSPMF` (via the `ExceptT` / `OptionT` instances in
+`RustOracleComp spec` is that the `OracleComp spec` layer also admits
+`evalDist` / `Pr[…]` (via the `MonadLiftT … SPMF` instances in
 `VCVio.EvalDist.Instances.{ErrorT,OptionT}`), so quantitative claims
 like `Pr[= some (.error e) | tossedAdd.run.run] = 1/2` are well-defined
 and provable.
@@ -257,7 +256,7 @@ the `Hax.RustM` level has no oracle to sample at all. -/
 theorem tossedAdd_panic_prob :
     Pr[= some (Except.error Interop.Rust.Error.integerOverflow) |
         tossedAdd.run.run] = 2⁻¹ := by
-  rw [tossedAdd_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype]
+  rw [tossedAdd_run_run, probOutput_bind_eq_sum_fintype]
   -- ∑ x : Fin 2, Pr[= x | $[0..1]] * (if ... then 1 else 0).
   -- Both `Pr[= · | $[0..1]]` factors collapse to `(1 + 1 : ℝ≥0∞)⁻¹`, then the
   -- `x = 0` branch contributes `0` and the `x = 1` branch contributes the

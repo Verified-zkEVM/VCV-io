@@ -2,13 +2,13 @@
 
 ## Critical (Will Bite You Immediately)
 
-### 1. `[spec.Fintype]` and `[spec.Inhabited]` required for probability
+### 1. Probability semantics require the right spec class
 
-Any file using `evalDist`, `probOutput`, `probEvent`, or `Pr[...]` on `OracleComp spec` needs these instances on the spec. Without them, typeclass resolution silently fails with confusing errors.
+Any file using `evalDist`, `probOutput`, `probEvent`, or `Pr[...]` on `OracleComp spec` needs `[IsProbabilitySpec spec]`. Lemmas that use uniform cardinalities, `PMF.uniformOfFintype`, or connect `support` to nonzero probability need `[IsUniformSpec spec]`. Plain `support` works on arbitrary `OracleComp spec`.
 
-**Symptom**: "failed to synthesize instance" mentioning `Fintype` or `PFunctor.Fintype`.
+**Symptom**: "failed to synthesize instance" mentioning `MonadLiftT (OracleComp spec) SPMF`, `IsProbabilitySpec`, `IsUniformSpec`, or `EvalDistCompatible`.
 
-**Fix**: Add `[spec.Fintype] [spec.Inhabited]` to your variable/hypothesis list.
+**Fix**: Add `[IsProbabilitySpec spec]` for arbitrary per-query probability semantics, or `[IsUniformSpec spec]` for uniform oracle semantics. If you already have `[spec.Fintype] [spec.Inhabited]` and want uniform sampling, install a local instance with `IsUniformSpec.ofFintypeInhabited spec`.
 
 ### 2. `autoImplicit = false` is set globally in `lakefile.lean`
 
@@ -19,7 +19,7 @@ and do not add `set_option autoImplicit false` in individual files.
 
 ### 3. `evalDist` IS `simulateQ`
 
-They share the exact same code path: `evalDist` is `simulateQ` with `m = PMF` and uniform distributions as the oracle implementation. This identity is definitional (`rfl`).
+They share the exact same code path: `evalDist` is `simulateQ` with `m = PMF` and the `IsProbabilitySpec.toPMF` query implementation. Under `[IsUniformSpec spec]`, those query distributions are propositionally the uniform distributions. The `evalDist_eq_simulateQ` identity is definitional (`rfl`).
 
 ### 4. `++ₒ` is dead — use `+`
 
@@ -138,6 +138,11 @@ Building Mathlib from source takes hours. Always fetch the precompiled cache fir
 Do not add `set_option linter.* false`, `set_option weak.linter.* false`, or repo-level
 `leanOptions` that turn lints off just to get a clean build. Treat linter failures as real
 problems and fix the underlying declaration, proof, naming, or formatting issue instead.
+
+The one deliberate, documented exception is the text-based unicode allowlist linter, turned
+off via `weak.linter.unicodeLinter, false` in `lakefile.lean`. This is a policy choice, not a
+dodge: VCVio docstrings legitimately use FIPS-204 math notation (a combining tilde on `c`) and
+diacritics in cited author names, which the Mathlib allowlist would otherwise reject.
 
 ### 20. After adding new `.lean` files, run `./scripts/update-lib.sh`
 

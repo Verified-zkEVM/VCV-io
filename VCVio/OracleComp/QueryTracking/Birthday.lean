@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: James Waters
 -/
 import VCVio.OracleComp.QueryTracking.Collision
+import ToMathlib.Combinatorics.FinPairs
 import ToMathlib.Data.ENNReal.Gauss
 
 /-!
@@ -21,7 +22,7 @@ open scoped OracleSpec.PrimitiveQuery
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
-  [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+  [spec.DecidableEq] [IsUniformSpec spec]
 
 /-! ## Per-Pair Collision Bound (Textbook Step 3)
 
@@ -107,7 +108,7 @@ theorem probEvent_log_entry_eq_le {α : Type}
               (simulateQ loggingOracle (mx u)).run] = 0 :=
           fun u => probEvent_eq_zero fun _ _ => hne u
         simp only [hzero, mul_zero, tsum_zero]
-        exact zero_le _
+        exact zero_le
     | succ k' =>
       -- k > 0: decompose with probEvent_bind_eq_tsum, use ih.
       rw [probEvent_bind_eq_tsum]
@@ -161,7 +162,7 @@ theorem probEvent_log_output_match_le {α : Type}
   induction oa using OracleComp.inductionOn generalizing k with
   | pure _ =>
     simp only [simulateQ_pure]
-    refine le_of_eq_of_le (probEvent_eq_zero fun z hmem h => ?_) (zero_le _)
+    refine le_of_eq_of_le (probEvent_eq_zero fun z hmem h => ?_) (zero_le)
     simp only [WriterT.run_pure', List.empty_eq, support_pure,
       Set.mem_singleton_iff] at hmem; obtain ⟨_, rfl⟩ := hmem
     obtain ⟨s, v, hlog, _⟩ := h; simp at hlog
@@ -186,7 +187,7 @@ theorem probEvent_log_output_match_le {α : Type}
         · intro h; exact ⟨t, u', by simp, h⟩
       simp_rw [hpred]
       -- Inner Pr is constant: either 1 (if HEq u₀ u') or 0 (otherwise).
-      simp_rw [probEvent_const, HasEvalPMF.probFailure_eq_zero, tsub_zero]
+      simp_rw [probEvent_const, probFailure_of_liftM_PMF, tsub_zero]
       -- Goal: ∑' u', Pr[=u'|query t] * (if HEq u₀ u' then 1 else 0) ≤ 1/|Range default|
       simp_rw [probOutput_query]
       rw [ENNReal.tsum_mul_left]
@@ -391,12 +392,14 @@ theorem probEvent_pair_collision_le {α : Type}
 Collision = ∃ pair with collision. Union bound over C(n,2) pairs gives n²/(2|C|). -/
 
 omit [DecidableEq ι] in
-/-- **Birthday bound for `loggingOracle`** (total query bound):
-The probability of a collision in the query log is ≤ n²/(2|C|).
+/-- **Tight birthday bound for `loggingOracle`** (total query bound):
+The probability of a collision in the query log is ≤ `C(n,2)/|C|`, where `C(n,2)`
+is the exact number of unordered pairs of query positions.
 
 Proof: express collision as ∃ pair (i,j), then union bound using
-`probEvent_pair_collision_le` for each pair. -/
-theorem probEvent_logCollision_le_birthday_total {α : Type}
+`probEvent_pair_collision_le` for each pair. The number of pairs `{(i,j) : i < j}`
+in `Fin n × Fin n` is exactly `∑_{k<n} k = C(n,2)`. -/
+theorem probEvent_logCollision_le_birthday_total_tight {α : Type}
     [Inhabited ι]
     (oa : OracleComp spec α)
     (n : ℕ)
@@ -404,7 +407,7 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
     (hrange : ∀ t, Fintype.card (spec.Range default) ≤ Fintype.card (spec.Range t)) :
     Pr[fun z => LogHasCollision z.2 |
       (simulateQ loggingOracle oa).run] ≤
-      (n ^ 2 : ℝ≥0∞) / (2 * Fintype.card (spec.Range default)) := by
+      (Nat.choose n 2 : ℝ≥0∞) / (Fintype.card (spec.Range default)) := by
   -- Strategy: express LogHasCollision as ∃ (i,j) ∈ Fin n × Fin n with i < j,
   -- then apply union bound, bounding each pair by 1/|C|.
   -- Step 1: LogHasCollision z.2 implies there exist indices i < j < n
@@ -457,96 +460,45 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
               rw [getElem?_fin _ _ j.isLt, getElem?_fin _ _ i.isLt]
               change some _ = some _
               congr 1; exact propext ⟨fun _ => rfl, fun _ => ⟨Ne.symm hdist, heq.symm⟩⟩
-    _ ≤ (n ^ 2 : ℝ≥0∞) / (2 * C) := by
-        -- The sum of constant C⁻¹ over pairs = |pairs| * C⁻¹
-        rw [Finset.sum_const, nsmul_eq_mul]
-        -- Suffices to show |pairs| * C⁻¹ ≤ n²/(2C)
-        -- |pairs| = n*(n-1)/2, and n*(n-1)/2 ≤ n²/2
-        -- We use gauss_sum_inv_le: ∑ k < n, k * C⁻¹ ≤ n²/(2C)
-        -- Note ∑ k < n, k = n*(n-1)/2 = |pairs|
-        -- So it suffices to show |pairs| ≤ ∑ k < n, k ... actually they're equal!
-        -- |{(i,j) : Fin n × Fin n | i < j}| = ∑_{j<n} j = n(n-1)/2
-        have hcard_eq : ((Finset.univ.filter (fun p : Fin n × Fin n => p.1 < p.2)).card : ℝ≥0∞)
-            = ∑ k ∈ range n, (k : ℝ≥0∞) := by
-          -- |{(i,j) | i < j}| = ∑_{j<n} j = n*(n-1)/2
-          -- |{(i,j) : Fin n × Fin n | i < j}| = ∑_{k<n} k
-          -- Proved as a separate lemma for clarity.
-          have hcard_nat : ∀ m : ℕ,
-              (Finset.univ.filter (fun p : Fin m × Fin m => p.1 < p.2)).card =
-                ∑ k ∈ range m, k := by
-            intro m; induction m with
-            | zero => simp
-            | succ k ih =>
-              rw [Finset.sum_range_succ, ← ih]
-              -- Split the set of pairs in Fin (k+1) into:
-              -- (1) pairs (i,j) with both < k (embedded from Fin k), and
-              -- (2) pairs (i, last k) for i < last k
-              -- Count: |old pairs| + k
-              have hsplit :
-                  (Finset.univ.filter (fun p : Fin (k+1) × Fin (k+1) => p.1 < p.2)).card =
-                  (Finset.univ.filter (fun p : Fin k × Fin k => p.1 < p.2)).card + k := by
-                -- Define the embedding from Fin k pairs to Fin (k+1) pairs
-                let emb : Fin k × Fin k ↪ Fin (k+1) × Fin (k+1) :=
-                  ⟨fun p => (p.1.castSucc, p.2.castSucc), fun a b h => by
-                    simp only [Prod.ext_iff, Fin.castSucc_inj] at h; exact Prod.ext h.1 h.2⟩
-                -- Define the embedding for new pairs (i, last k)
-                let newEmb : Fin k ↪ Fin (k+1) × Fin (k+1) :=
-                  ⟨fun i => (i.castSucc, Fin.last k), fun a b h => by
-                    simp only [Prod.ext_iff, Fin.castSucc_inj, and_true] at h; exact h⟩
-                -- The filtered set splits as a disjoint union
-                have hunion :
-                    Finset.univ.filter (fun p : Fin (k+1) × Fin (k+1) => p.1 < p.2) =
-                    (Finset.univ.filter (fun p : Fin k × Fin k => p.1 < p.2)).map emb ∪
-                    Finset.univ.map newEmb := by
-                  ext ⟨i, j⟩
-                  simp only [Finset.mem_filter, Finset.mem_univ, true_and,
-                    Finset.mem_union, Finset.mem_map, emb, newEmb,
-                    Function.Embedding.coeFn_mk]
-                  constructor
-                  · intro hij
-                    by_cases hj : j = Fin.last k
-                    · subst hj; right
-                      exact ⟨i.castPred (Fin.ne_last_of_lt hij), by
-                        ext <;> simp [Fin.castSucc_castPred]⟩
-                    · left
-                      have hj' : j ≠ Fin.last k := hj
-                      have hi' : i ≠ Fin.last k :=
-                        Fin.ne_last_of_lt (lt_trans hij (lt_of_le_of_ne (Fin.le_last j) hj'))
-                      refine ⟨(i.castPred hi', j.castPred hj'), ?_, ?_⟩
-                      · exact Fin.castPred_lt_castPred hij hj'
-                      · ext <;> simp [Fin.castSucc_castPred]
-                  · intro hij
-                    rcases hij with ⟨⟨a, b⟩, hab, heq⟩ | ⟨a, heq⟩
-                    · have h1 := congr_arg Prod.fst heq
-                      have h2 := congr_arg Prod.snd heq
-                      simp only at h1 h2
-                      rw [← h1, ← h2]
-                      exact Fin.castSucc_lt_castSucc_iff.mpr hab
-                    · have h1 := congr_arg Prod.fst heq
-                      have h2 := congr_arg Prod.snd heq
-                      simp only at h1 h2
-                      rw [← h1, ← h2]
-                      exact Fin.castSucc_lt_last a
-                have hdisj : Disjoint
-                    ((Finset.univ.filter (fun p : Fin k × Fin k => p.1 < p.2)).map emb)
-                    (Finset.univ.map newEmb) := by
-                  rw [Finset.disjoint_left]
-                  intro ⟨x, y⟩ hmem1 hmem2
-                  simp only [Finset.mem_map, Finset.mem_filter, Finset.mem_univ, true_and,
-                    emb, newEmb, Function.Embedding.coeFn_mk] at hmem1 hmem2
-                  obtain ⟨⟨a, b⟩, _, heq1⟩ := hmem1
-                  obtain ⟨c, heq2⟩ := hmem2
-                  have h1 := congr_arg Prod.snd heq1
-                  have h2 := congr_arg Prod.snd heq2
-                  simp only at h1 h2
-                  rw [← h1] at h2
-                  exact absurd h2.symm (Fin.castSucc_ne_last b)
-                rw [hunion, Finset.card_union_of_disjoint hdisj,
-                  Finset.card_map, Finset.card_map, Finset.card_univ, Fintype.card_fin]
-              omega
-          have := hcard_nat n; push_cast [this]; rfl
-        rw [hcard_eq, Finset.sum_mul]
-        exact ENNReal.gauss_sum_inv_le n C
+    _ = (Nat.choose n 2 : ℝ≥0∞) / (Fintype.card (spec.Range default)) := by
+        -- The sum of constant C⁻¹ over pairs = |pairs| * C⁻¹, and the number of pairs
+        -- `{(i,j) : Fin n × Fin n | i < j}` is exactly `C(n,2)`.
+        rw [Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv]
+        congr 1
+        exact_mod_cast Finset.card_filter_fst_lt_snd n
+
+omit [DecidableEq ι] in
+/-- **Birthday bound for `loggingOracle`** (total query bound):
+The probability of a collision in the query log is ≤ n²/(2|C|).
+
+Derived from the tight bound `C(n,2)/|C|` via `2·C(n,2) = n*(n-1) ≤ n²`. -/
+theorem probEvent_logCollision_le_birthday_total {α : Type}
+    [Inhabited ι]
+    (oa : OracleComp spec α)
+    (n : ℕ)
+    (hbound : IsTotalQueryBound oa n)
+    (hrange : ∀ t, Fintype.card (spec.Range default) ≤ Fintype.card (spec.Range t)) :
+    Pr[fun z => LogHasCollision z.2 |
+      (simulateQ loggingOracle oa).run] ≤
+      (n ^ 2 : ℝ≥0∞) / (2 * Fintype.card (spec.Range default)) := by
+  calc Pr[fun z => LogHasCollision z.2 | (simulateQ loggingOracle oa).run]
+      ≤ (Nat.choose n 2 : ℝ≥0∞) / (Fintype.card (spec.Range default)) :=
+        probEvent_logCollision_le_birthday_total_tight oa n hbound hrange
+    _ ≤ (n ^ 2 : ℝ≥0∞) / (2 * Fintype.card (spec.Range default)) := by
+        have hchoose2 : 2 * Nat.choose n 2 = n * (n - 1) := by
+          rw [Nat.choose_two_right]
+          have h := Finset.sum_range_id_mul_two n
+          omega
+        -- Match denominators: `C(n,2)/|C| = 2·C(n,2)/(2|C|)`, then compare numerators.
+        rw [← ENNReal.mul_div_mul_left (c := 2) (↑(Nat.choose n 2))
+          (↑(Fintype.card (spec.Range default))) (by norm_num) (by norm_num)]
+        gcongr
+        calc (2 : ℝ≥0∞) * ↑(Nat.choose n 2)
+            = ((n * (n - 1) : ℕ) : ℝ≥0∞) := by rw [← hchoose2]; push_cast; ring
+          _ ≤ (↑n) ^ 2 := by
+              rw [← Nat.cast_pow]
+              exact_mod_cast (by rw [sq]; exact Nat.mul_le_mul_left n (Nat.sub_le n 1) :
+                n * (n - 1) ≤ n ^ 2)
 
 /-- **Tight birthday bound for `cachingOracle`** (total query bound):
 The probability of a collision in the cache is ≤ n*(n-1)/(2|C|). -/
@@ -607,10 +559,11 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
         (simulateQ cachingOracle (pure x)).run cache₀] = 0 := by
       rw [simulateQ_pure]
       refine probEvent_eq_zero fun z hz h => ?_
-      simp only [StateT.run] at hz
-      obtain ⟨rfl, rfl⟩ := hz
+      change z ∈ support (pure (x, cache₀) : OracleComp _ _) at hz
+      rw [support_pure, Set.mem_singleton_iff] at hz
+      subst hz
       exact hnocoll h
-    rw [this]; exact zero_le _
+    rw [this]; exact zero_le
   | query_bind t mx ih =>
     intro m k hm cache₀ hnocoll hbnd
     rw [isTotalQueryBound_query_bind_iff] at hm
@@ -676,8 +629,8 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
         -- Bound the bad set cardinality by k
         suffices hbad_le_k : (Finset.univ.filter
             (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card ≤ k by
-          calc (↑(Finset.univ.filter (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card
-                  : ℝ≥0∞) / ↑(Fintype.card (spec.Range t))
+          calc (↑(Finset.univ.filter (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card :
+                  ℝ≥0∞) / ↑(Fintype.card (spec.Range t))
               ≤ (k : ℝ≥0∞) / ↑(Fintype.card (spec.Range t)) := by
                 apply ENNReal.div_le_div_right
                 exact_mod_cast hbad_le_k

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence
-import VCVio.EvalDist.Defs.Basic
+import VCVio.EvalDist.Monad.Map
 
 /-!
 # Rényi Divergence for SPMFs and Monadic Computations
@@ -13,7 +13,7 @@ This file extends the Rényi divergence from `PMF` (defined in
 `ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence`) to:
 
 1. `SPMF.renyiDiv` — on sub-probability mass functions (via `toPMF`)
-2. `renyiDiv` — on any monad with `HasEvalSPMF` (via `evalDist`)
+2. `renyiDiv` — on any monad with `MonadLiftT m SPMF` (via `evalDist`)
 
 This mirrors the structure of `VCVio.EvalDist.TVDist`, which performs the same lift for
 total variation distance.
@@ -81,13 +81,14 @@ end SPMF
 
 section monadic
 
-variable {m : Type u → Type v} [Monad m] [HasEvalSPMF m] {α : Type u}
+variable {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α : Type u}
 
 /-- Rényi divergence between two monadic computations,
 defined via their evaluation distributions. -/
 noncomputable def renyiDiv (a : ℝ) (mx my : m α) : ℝ≥0∞ :=
   SPMF.renyiDiv a (𝒟[mx]) (𝒟[my])
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp]
 theorem renyiDiv_self (a : ℝ) (mx : m α) : renyiDiv a mx mx = 1 :=
   SPMF.renyiDiv_self _ _
@@ -95,17 +96,18 @@ theorem renyiDiv_self (a : ℝ) (mx : m α) : renyiDiv a mx mx = 1 :=
 theorem renyiDiv_map_le [LawfulMonad m] {β : Type u} (a : ℝ) (ha : 1 < a)
     (f : α → β) (mx my : m α) :
     renyiDiv a (f <$> mx) (f <$> my) ≤ renyiDiv a mx my := by
-  simp only [renyiDiv, evalDist_def, MonadHom.mmap_map]
+  simp only [renyiDiv, _root_.evalDist_map]
   exact SPMF.renyiDiv_map_le a ha f _ _
 
 theorem renyiDiv_bind_right_le [LawfulMonad m] {β : Type u} (a : ℝ) (ha : 1 < a)
     (f : α → m β) (mx my : m α) :
     renyiDiv a (mx >>= f) (my >>= f) ≤ renyiDiv a mx my := by
-  simp only [renyiDiv, evalDist_def, MonadHom.mmap_bind]
+  simp only [renyiDiv, _root_.evalDist_bind]
   exact SPMF.renyiDiv_bind_right_le a ha _ _ _
 
 /-! ### Rényi to Probability Bounds -/
 
+omit [Monad m] [LawfulMonadLiftT m SPMF] in
 /-- If the Rényi divergence between two computations is at most `R`, then for any
 output `x`, `Pr[= x | my] ≥ Pr[= x | mx]^{a/(a-1)} / R`. -/
 theorem probOutput_le_of_renyiDiv (a : ℝ) (ha : 1 < a) (mx my : m α)

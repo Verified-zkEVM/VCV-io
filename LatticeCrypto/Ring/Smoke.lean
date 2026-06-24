@@ -64,6 +64,7 @@ def piRing (Coeff : Type*) [CommRing Coeff] (n : Nat) :
   backend := piBackend Coeff n
   kernel := piKernel Coeff n
   zero := fun _ => 0
+  one  := fun i => if i.val = 0 then 1 else 0
   add := fun f g i => f i + g i
   sub := fun f g i => f i - g i
   neg := fun f i => -f i
@@ -73,14 +74,27 @@ def piRing (Coeff : Type*) [CommRing Coeff] (n : Nat) :
   zero_coeff _     := rfl
   neg_coeff  _ _   := rfl
 
-/-- Quotient semantics for the function-backed negacyclic ring. -/
-noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
+/-- Quotient semantics for the function-backed negacyclic ring (`n > 0`).
+For `n = 0`, `X^0 + 1 = 2` and `mk(0) = 1` fails for general `CommRing`. -/
+noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] {n : Nat} (hn : 0 < n) :
     NegacyclicRingSemantics (piRing Coeff n) where
   quotientOf := NegacyclicQuotient.ofBackend (piBackend Coeff n)
   zero_sound := by
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp [piBackend, piRing, Finset.sum_const_zero, map_zero]
     rfl
+  one_sound := by
+    simp only [NegacyclicQuotient.ofBackend, NegacyclicQuotient.ofPolynomial,
+               PolyBackend.toPolynomial]
+    have hcoeff : ∀ i : Fin n, (piBackend Coeff n).coeff (piRing Coeff n).one i =
+        if i.val = 0 then 1 else 0 := fun i => by simp [piBackend, piRing]
+    simp only [hcoeff, map_sum]
+    rw [Finset.sum_eq_single_of_mem ⟨0, hn⟩ (Finset.mem_univ _)]
+    · simp only [Polynomial.monomial_zero_left]
+      exact map_one _
+    · intro ⟨j, _⟩ _ hne
+      simp only [Fin.mk.injEq, ne_eq] at hne
+      simp [hne, map_zero]
   add_sound := by
     intro f g
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
@@ -106,9 +120,9 @@ Each function below exercises a specific path through the generic ring layer for
 a concrete scheme backend. They carry no runtime assertions — compilation success
 is the test. -/
 
-noncomputable def piQuotientRoundtrip (n : Nat) (f : (piRing (ZMod 17) n).Poly) :
-    NegacyclicRingSemantics.Quotient (piSemantics (ZMod 17) n) :=
-  (piSemantics (ZMod 17) n).quotientOf f
+noncomputable def piQuotientRoundtrip {n : Nat} (hn : 0 < n) (f : (piRing (ZMod 17) n).Poly) :
+    NegacyclicRingSemantics.Quotient (piSemantics (ZMod 17) hn) :=
+  (piSemantics (ZMod 17) hn).quotientOf f
 
 def piNegacyclicRoundtrip (n : Nat) (f g : (piRing (ZMod 17) n).Poly) :
     (piRing (ZMod 17) n).Poly :=
@@ -131,8 +145,8 @@ noncomputable def mlkemQuotientRoundtrip (ops : MLKEM.NTTRingOps) (f : MLKEM.Rq)
 def mlkemNegacyclicRoundtrip (f g : MLKEM.Rq) : MLKEM.Rq :=
   MLKEM.negacyclicMul f g
 
-noncomputable def falconQuotientRoundtrip {n : ℕ} (ops : Falcon.NTTRingOps n)
-    (f : Falcon.Rq n) : Falcon.Quotient n :=
+noncomputable def falconQuotientRoundtrip {n : ℕ} {hn : 0 < n} (ops : Falcon.NTTRingOps n)
+    (f : Falcon.Rq n) : Falcon.Quotient hn :=
   Falcon.quotientOfRq (ops.fromHat (ops.toHat f))
 
 def falconNegacyclicRoundtrip {n : ℕ} (f g : Falcon.Rq n) : Falcon.Rq n :=

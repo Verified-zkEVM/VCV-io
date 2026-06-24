@@ -233,8 +233,8 @@ noncomputable def runStepsAsync
         | .envTick e => do
             let es' ← envAction.react e st.envState
             pure ({ st with envState := es' } :
-              AsyncRuntimeState process.Proc State)
-        : m (AsyncRuntimeState process.Proc State))
+              AsyncRuntimeState process.Proc State) :
+        m (AsyncRuntimeState process.Proc State))
       let (final, tail) ← runStepsAsync process envAction
         procScheduler envScheduler n st'
       pure (final, event :: tail)
@@ -331,7 +331,7 @@ noncomputable def processSemanticsAsync
 
 /--
 Coin-flip-only specialization of `processSemanticsAsync` (`m = ProbComp`,
-`sem := SPMFSemantics.ofHasEvalSPMF ProbComp`). Companion of
+`sem := SPMFSemantics.ofMonadLift ProbComp`). Companion of
 `processSemanticsProbComp`.
 -/
 noncomputable def processSemanticsAsyncProbComp
@@ -349,7 +349,7 @@ noncomputable def processSemanticsAsyncProbComp
       p.Proc → State → RuntimeTrace Event → ProbComp Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
   processSemanticsAsync Party schedulerSampler
-    (SPMFSemantics.ofHasEvalSPMF ProbComp)
+    (SPMFSemantics.ofMonadLift ProbComp)
     envAction initEnvState
     init envScheduler fuel observe
 

@@ -259,10 +259,10 @@ theorem probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar
     rw [probOutput_bind_bind_swap]
     rw [probOutput_bind_of_const _ fun h _ =>
       probOutput_decide_smul_eq_inv_card g hg h]
-    simp [HasEvalPMF.probFailure_eq_zero]
+    simp [probFailure_of_liftM_PMF]
   rw [probOutput_bind_of_const _ fun a _ =>
     probOutput_bind_of_const _ fun b _ => key a b]
-  simp [HasEvalPMF.probFailure_eq_zero]
+  simp [probFailure_of_liftM_PMF]
 
 /-- Concrete form of the hardness implication `DDH ⇒ CDH`: a CDH solver can only beat the uniform
 DH-target baseline by the DDH distinguishing advantage of the associated adversary-map reduction. -/

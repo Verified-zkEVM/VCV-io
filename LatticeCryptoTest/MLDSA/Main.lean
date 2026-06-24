@@ -25,6 +25,8 @@ lake build mldsa_test
 set_option maxRecDepth 2048
 open MLDSA MLDSA.Concrete MLDSA.Test
 
+attribute [local instance] MLDSA.Concrete.concreteNTTRingOps
+
 /-- Entry point for the ML-DSA regression and interoperability test runner. -/
 def main : IO Unit := do
   let st ← IO.mkRef ({} : TestState)
@@ -163,7 +165,7 @@ def main : IO Unit := do
     let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     check st "mldsa-native keygen sizes" (pkRef.size == 1952 && skRef.size == 4032)
-    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
     let pkB := serializePK65 pk
     let skB := serializeSK65 sk
     check st "Lean pk size = 1952" (pkB.size == 1952)
@@ -179,7 +181,7 @@ def main : IO Unit := do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => i.toUInt8
     let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
-    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
     let msg : ByteArray := ⟨#[0x48, 0x65, 0x6C, 0x6C, 0x6F]⟩  -- "Hello"
     let rndZero : ByteArray := ⟨Array.replicate 32 0⟩
     let sigRef := MLDSA.Concrete.FFI.mldsa65SignInternal skRef msg rndZero
@@ -189,7 +191,7 @@ def main : IO Unit := do
     let mu := mldsa65Primitives.hashMessage sk.tr msg.toList
     let rnd : Bytes 32 := Vector.ofFn fun _ => 0
     let rhoDP := mldsa65Primitives.hashPrivateSeed sk.key rnd mu
-    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives concreteNTTRingOps
+    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives
       sk (mldsa65Primitives.expandA pk.rho) mu rhoDP 256
     match sigLean with
     | none => check st "Lean signing should succeed" false
@@ -198,8 +200,7 @@ def main : IO Unit := do
       check st "Lean sig size = 3309" (sigB.size == 3309)
       check st "sig: Lean spec = mldsa-native" (sigB == sigRef)
         s!"Lean={toHex sigB} ref={toHex sigRef}"
-      let leanVerify := fipsVerify mldsa65 mldsa65Primitives
-        concreteNTTRingOps pk msg.toList sig
+      let leanVerify := fipsVerify mldsa65 mldsa65Primitives pk msg.toList sig
       check st "Lean verify accepts Lean-signed sig" leanVerify
   IO.println ""
   -- ── 11. Second key pair (different seed) ──────────
@@ -208,7 +209,7 @@ def main : IO Unit := do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (0xFF - i).toUInt8
     let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
-    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
     let pkB := serializePK65 pk
     let skB := serializeSK65 sk
     check st "pk: Lean spec = mldsa-native (2nd)" (pkB == pkRef)
@@ -222,7 +223,7 @@ def main : IO Unit := do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (i * 3).toUInt8
     let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
-    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
     let msg : ByteArray := ⟨#[0x54, 0x65, 0x73, 0x74]⟩  -- "Test"
     let rndZero : ByteArray := ⟨Array.replicate 32 0⟩
     let sigRef := MLDSA.Concrete.FFI.mldsa65SignInternal skRef msg rndZero
@@ -232,7 +233,7 @@ def main : IO Unit := do
     let mu' := mldsa65Primitives.hashMessage sk.tr msg.toList
     let rnd' : Bytes 32 := Vector.ofFn fun _ => 0
     let rhoDP' := mldsa65Primitives.hashPrivateSeed sk.key rnd' mu'
-    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives concreteNTTRingOps
+    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives
       sk (mldsa65Primitives.expandA pk.rho) mu' rhoDP' 256
     match sigLean with
     | none =>
@@ -248,8 +249,7 @@ def main : IO Unit := do
         let corruptedSigLean :
             FIPSSignature mldsa65 mldsa65Primitives :=
           ⟨cTilde', z', h'⟩
-        let leanVer := fipsVerify mldsa65 mldsa65Primitives
-          concreteNTTRingOps pk msg.toList corruptedSigLean
+        let leanVer := fipsVerify mldsa65 mldsa65Primitives pk msg.toList corruptedSigLean
         check st "Lean rejects corrupted sig" (!leanVer)
   IO.println ""
   -- ── 13. NIST ACVP keygen vectors ──────────────────
@@ -258,7 +258,7 @@ def main : IO Unit := do
     for vec in ACVP.keyGenVectors do
       let seedBA := parseHex vec.seed
       let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => seedBA[i]!
-      let (pk, _sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+      let (pk, _sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
       let pkB := serializePK65 pk
       let pkExpFirst32 := parseHex vec.pkFirst32
       let pkFirst32 := pkB.extract 0 32
@@ -273,7 +273,7 @@ def main : IO Unit := do
   do
     let seed44 : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (i * 11 % 256).toUInt8
     let seedBA44 := vectorToByteArray seed44
-    let (pk44, sk44) := keyGenFromSeed mldsa44 mldsa44Primitives concreteNTTRingOps seed44
+    let (pk44, sk44) := keyGenFromSeed mldsa44 mldsa44Primitives seed44
     let (pkRef44, skRef44) := MLDSA.Concrete.FFI.mldsa44KeypairInternal seedBA44
     let enc44 := mldsa44Encoding
     let pkB44 : ByteArray := enc44.pkEncode pk44.rho pk44.t1
@@ -287,7 +287,7 @@ def main : IO Unit := do
     let rnd44 : Bytes 32 := Vector.ofFn fun _ => (0 : UInt8)
     let rhoDP44 := mldsa44Primitives.hashPrivateSeed sk44.key rnd44 mu44
     let aHat44 := mldsa44Primitives.expandA pk44.rho
-    let sigOpt44 := fipsSignLoop mldsa44 mldsa44Primitives concreteNTTRingOps
+    let sigOpt44 := fipsSignLoop mldsa44 mldsa44Primitives
       sk44 aHat44 mu44 rhoDP44 256
     match sigOpt44 with
     | none => check st "ML-DSA-44 sign should succeed" false
@@ -296,11 +296,11 @@ def main : IO Unit := do
       check st "ML-DSA-44 sig: Lean = native" (sigB44 == sigRef44)
       let verRef44 := MLDSA.Concrete.FFI.mldsa44VerifyInternal pkRef44 msg44 sigRef44
       check st "ML-DSA-44 native verify" (verRef44 == 1)
-      let ver44 := fipsVerify mldsa44 mldsa44Primitives concreteNTTRingOps pk44 msg44.toList sig44
+      let ver44 := fipsVerify mldsa44 mldsa44Primitives pk44 msg44.toList sig44
       check st "ML-DSA-44 Lean verify" ver44
     let seed87 : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (0xFF - (i * 9 % 256)).toUInt8
     let seedBA87 := vectorToByteArray seed87
-    let (pk87, sk87) := keyGenFromSeed mldsa87 mldsa87Primitives concreteNTTRingOps seed87
+    let (pk87, sk87) := keyGenFromSeed mldsa87 mldsa87Primitives seed87
     let (pkRef87, skRef87) := MLDSA.Concrete.FFI.mldsa87KeypairInternal seedBA87
     let enc87 := mldsa87Encoding
     let pkB87 : ByteArray := enc87.pkEncode pk87.rho pk87.t1
@@ -313,7 +313,7 @@ def main : IO Unit := do
     let rnd87 : Bytes 32 := Vector.ofFn fun _ => (0 : UInt8)
     let rhoDP87 := mldsa87Primitives.hashPrivateSeed sk87.key rnd87 mu87
     let aHat87 := mldsa87Primitives.expandA pk87.rho
-    let sigOpt87 := fipsSignLoop mldsa87 mldsa87Primitives concreteNTTRingOps
+    let sigOpt87 := fipsSignLoop mldsa87 mldsa87Primitives
       sk87 aHat87 mu87 rhoDP87 256
     match sigOpt87 with
     | none => check st "ML-DSA-87 sign should succeed" false
@@ -322,7 +322,7 @@ def main : IO Unit := do
       check st "ML-DSA-87 sig: Lean = native" (sigB87 == sigRef87)
       let verRef87 := MLDSA.Concrete.FFI.mldsa87VerifyInternal pkRef87 msg87 sigRef87
       check st "ML-DSA-87 native verify" (verRef87 == 1)
-      let ver87 := fipsVerify mldsa87 mldsa87Primitives concreteNTTRingOps pk87 msg87.toList sig87
+      let ver87 := fipsVerify mldsa87 mldsa87Primitives pk87 msg87.toList sig87
       check st "ML-DSA-87 Lean verify" ver87
   IO.println ""
   -- ── 15. ACVP signing vectors: Lean spec vs mldsa-native ──
@@ -333,14 +333,14 @@ def main : IO Unit := do
       let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => seedBA[i]!
       let msgBA := parseHex vec.message
       let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
-      let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+      let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
       let rndZero : ByteArray := ⟨Array.replicate 32 0⟩
       let sigRef := MLDSA.Concrete.FFI.mldsa65SignInternal skRef msgBA rndZero
       check st s!"sigGen tcId={vec.tcId} native sig size = 3309" (sigRef.size == 3309)
       let mu := mldsa65Primitives.hashMessage sk.tr msgBA.toList
       let rnd : Bytes 32 := Vector.ofFn fun _ => 0
       let rhoDP := mldsa65Primitives.hashPrivateSeed sk.key rnd mu
-      let sigLean := fipsSignLoop mldsa65 mldsa65Primitives concreteNTTRingOps
+      let sigLean := fipsSignLoop mldsa65 mldsa65Primitives
         sk (mldsa65Primitives.expandA pk.rho) mu rhoDP 256
       match sigLean with
       | none => check st s!"sigGen tcId={vec.tcId} Lean sign succeeds" false
@@ -350,7 +350,7 @@ def main : IO Unit := do
           s!"Lean={toHex sigB} ref={toHex sigRef}"
         let verRef := MLDSA.Concrete.FFI.mldsa65VerifyInternal pkRef msgBA sigRef
         check st s!"sigGen tcId={vec.tcId} native verify" (verRef == 1)
-        let leanVer := fipsVerify mldsa65 mldsa65Primitives concreteNTTRingOps pk msgBA.toList sig
+        let leanVer := fipsVerify mldsa65 mldsa65Primitives pk msgBA.toList sig
         check st s!"sigGen tcId={vec.tcId} Lean verify" leanVer
   IO.println ""
   -- ── 16. Cross-implementation verification ────────────
@@ -358,7 +358,7 @@ def main : IO Unit := do
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (i * 7 + 3).toUInt8
     let seedBA := vectorToByteArray seed
-    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
     let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let msg : ByteArray := ⟨#[0x43, 0x72, 0x6F, 0x73, 0x73]⟩
     let rndZero : ByteArray := ⟨Array.replicate 32 0⟩
@@ -370,13 +370,12 @@ def main : IO Unit := do
     | none => check st "Lean decode of native sig" false
     | some (cTilde, z, h) =>
       let nativeSig : FIPSSignature mldsa65 mldsa65Primitives := ⟨cTilde, z, h⟩
-      let leanVerNativeSig := fipsVerify mldsa65 mldsa65Primitives
-        concreteNTTRingOps pk msg.toList nativeSig
+      let leanVerNativeSig := fipsVerify mldsa65 mldsa65Primitives pk msg.toList nativeSig
       check st "native-signed, Lean-verified" leanVerNativeSig
     let mu := mldsa65Primitives.hashMessage sk.tr msg.toList
     let rnd : Bytes 32 := Vector.ofFn fun _ => 0
     let rhoDP := mldsa65Primitives.hashPrivateSeed sk.key rnd mu
-    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives concreteNTTRingOps
+    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives
       sk (mldsa65Primitives.expandA pk.rho) mu rhoDP 256
     match sigLean with
     | none => check st "Lean signing for cross-verify" false
@@ -416,7 +415,7 @@ def main : IO Unit := do
       let seed := seeds[i]!
       let msg := msgs[i]!
       let seedBA := vectorToByteArray seed
-      let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+      let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
       let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
       let pkB := serializePK65 pk
       let skB := serializeSK65 sk
@@ -427,7 +426,7 @@ def main : IO Unit := do
       let mu := mldsa65Primitives.hashMessage sk.tr msg.toList
       let rnd : Bytes 32 := Vector.ofFn fun _ => 0
       let rhoDP := mldsa65Primitives.hashPrivateSeed sk.key rnd mu
-      let sigLean := fipsSignLoop mldsa65 mldsa65Primitives concreteNTTRingOps
+      let sigLean := fipsSignLoop mldsa65 mldsa65Primitives
         sk (mldsa65Primitives.expandA pk.rho) mu rhoDP 256
       match sigLean with
       | none => check st s!"batch[{i}] Lean sign" false
@@ -436,7 +435,7 @@ def main : IO Unit := do
         check st s!"batch[{i}] sig: Lean = native" (sigB == sigRef)
         let verRef := MLDSA.Concrete.FFI.mldsa65VerifyInternal pkRef msg sigRef
         check st s!"batch[{i}] native verify" (verRef == 1)
-        let leanVer := fipsVerify mldsa65 mldsa65Primitives concreteNTTRingOps pk msg.toList sig
+        let leanVer := fipsVerify mldsa65 mldsa65Primitives pk msg.toList sig
         check st s!"batch[{i}] Lean verify" leanVer
   IO.println ""
   -- ── 18. Edge cases and negative tests ────────────────
@@ -444,7 +443,7 @@ def main : IO Unit := do
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (i * 11 + 5).toUInt8
     let seedBA := vectorToByteArray seed
-    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
+    let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives seed
     let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let rndZero : ByteArray := ⟨Array.replicate 32 0⟩
     let longMsg := ByteArray.mk (Array.replicate 10000 0xAB)
@@ -452,7 +451,7 @@ def main : IO Unit := do
     let muLong := mldsa65Primitives.hashMessage sk.tr longMsg.toList
     let rnd : Bytes 32 := Vector.ofFn fun _ => 0
     let rhoDPLong := mldsa65Primitives.hashPrivateSeed sk.key rnd muLong
-    let sigLeanLong := fipsSignLoop mldsa65 mldsa65Primitives concreteNTTRingOps
+    let sigLeanLong := fipsSignLoop mldsa65 mldsa65Primitives
       sk (mldsa65Primitives.expandA pk.rho) muLong rhoDPLong 256
     match sigLeanLong with
     | none => check st "long msg (10KB): Lean sign" false
@@ -461,11 +460,11 @@ def main : IO Unit := do
       check st "long msg (10KB): sig Lean = native" (sigB == sigRefLong)
       let verRef := MLDSA.Concrete.FFI.mldsa65VerifyInternal pkRef longMsg sigRefLong
       check st "long msg (10KB): native verify" (verRef == 1)
-      let leanVer := fipsVerify mldsa65 mldsa65Primitives concreteNTTRingOps pk longMsg.toList sig
+      let leanVer := fipsVerify mldsa65 mldsa65Primitives pk longMsg.toList sig
       check st "long msg (10KB): Lean verify" leanVer
     let seed2 : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (i * 19 + 7).toUInt8
     let seedBA2 := vectorToByteArray seed2
-    let (pk2, _sk2) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed2
+    let (pk2, _sk2) := keyGenFromSeed mldsa65 mldsa65Primitives seed2
     let (pkRef2, _skRef2) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA2
     let msg : ByteArray := ⟨#[0x57, 0x72, 0x6F, 0x6E, 0x67]⟩
     let sigRef := MLDSA.Concrete.FFI.mldsa65SignInternal skRef msg rndZero
@@ -474,13 +473,12 @@ def main : IO Unit := do
     let enc := mldsa65Encoding
     let mu := mldsa65Primitives.hashMessage sk.tr msg.toList
     let rhoDP := mldsa65Primitives.hashPrivateSeed sk.key rnd mu
-    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives concreteNTTRingOps
+    let sigLean := fipsSignLoop mldsa65 mldsa65Primitives
       sk (mldsa65Primitives.expandA pk.rho) mu rhoDP 256
     match sigLean with
     | none => check st "wrong key: Lean sign" false
     | some sig =>
-      let leanVerWrongKey := fipsVerify mldsa65 mldsa65Primitives
-        concreteNTTRingOps pk2 msg.toList sig
+      let leanVerWrongKey := fipsVerify mldsa65 mldsa65Primitives pk2 msg.toList sig
       check st "wrong key: Lean rejects" (!leanVerWrongKey)
     let sigRefTrunc := sigRef.extract 0 (sigRef.size - 1)
     let verTruncNative := MLDSA.Concrete.FFI.mldsa65VerifyInternal pkRef msg sigRefTrunc
@@ -489,8 +487,7 @@ def main : IO Unit := do
     | none => check st "truncated sig: Lean decode fails (expected)" true
     | some (cTilde, z, h) =>
       let truncSig : FIPSSignature mldsa65 mldsa65Primitives := ⟨cTilde, z, h⟩
-      let leanVerTrunc := fipsVerify mldsa65 mldsa65Primitives
-        concreteNTTRingOps pk msg.toList truncSig
+      let leanVerTrunc := fipsVerify mldsa65 mldsa65Primitives pk msg.toList truncSig
       check st "truncated sig: Lean rejects" (!leanVerTrunc)
     let corruptedMsg := msg.set! 0 (msg[0]! ^^^ 0xFF)
     let verCorruptMsgNative := MLDSA.Concrete.FFI.mldsa65VerifyInternal pkRef corruptedMsg sigRef
@@ -499,8 +496,7 @@ def main : IO Unit := do
     | none => check st "corrupted msg: Lean decode" false
     | some (cTilde, z, h) =>
       let origSig : FIPSSignature mldsa65 mldsa65Primitives := ⟨cTilde, z, h⟩
-      let leanVerCorruptMsg := fipsVerify mldsa65 mldsa65Primitives
-        concreteNTTRingOps pk corruptedMsg.toList origSig
+      let leanVerCorruptMsg := fipsVerify mldsa65 mldsa65Primitives pk corruptedMsg.toList origSig
       check st "corrupted msg: Lean rejects" (!leanVerCorruptMsg)
   IO.println ""
   let s ← st.get

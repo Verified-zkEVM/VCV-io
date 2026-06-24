@@ -41,7 +41,8 @@ private part `PrvState` (retained by the prover). Verifier challenges are drawn 
 via the `sampleChal` computation. Prover responses are in `Resp`.
 
 The prover's computations live in an arbitrary monad `m` carrying probability semantics
-(`[Monad m] [HasEvalSPMF m]`). Taking `m := ProbComp` recovers the usual notion of a
+(via the standard `MonadLiftT m SPMF` / `MonadLiftT m SetM` lifts and `EvalDistCompatible m`).
+Taking `m := ProbComp` recovers the usual notion of a
 Σ-protocol whose only randomness is uniform sampling, but a general `m` lets the prover and
 challenge sampler additionally query oracles (e.g. a hash oracle for the Kilian transform).
 The challenge sampler `sampleChal` is left fully abstract: it need not be uniform.
@@ -65,7 +66,9 @@ structure SigmaProtocol
 
 namespace SigmaProtocol
 
-variable {m : Type → Type} [Monad m] [HasEvalSPMF m]
+variable {m : Type → Type} [Monad m]
+  [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
   {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 
 section complete
@@ -96,6 +99,8 @@ def SpeciallySoundAt (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel 
 def SpeciallySound (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel m) : Prop :=
   ∀ x, SpeciallySoundAt σ x
 
+omit [Monad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonadLiftT m SetM]
+  [EvalDistCompatible m] in
 /-- Special soundness immediately validates any witness returned by the Σ-protocol extractor from
 two accepting transcripts with the same statement and commitment and with distinct challenges. -/
 theorem extract_sound_of_speciallySoundAt
@@ -141,6 +146,8 @@ def PerfectHVZK (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel m)
   ∀ x w, rel x w = true →
     𝒟[σ.realTranscript x w] = 𝒟[simTranscript x]
 
+omit [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+  [EvalDistCompatible m] in
 /-- The perfect HVZK property is equivalent to the approximate HVZK property with `ζ_zk = 0`. -/
 @[grind =]
 lemma perfectHVZK_iff_hvzk_zero
