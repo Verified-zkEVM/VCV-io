@@ -73,7 +73,7 @@ namespace OracleQuery
 
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι}
 
-/-- `OracleQuery spec` inherets the functorial structure from `PFunctor.Obj`. -/
+/-- `OracleQuery spec` inherits the functorial structure from `PFunctor.Obj`. -/
 instance {spec : OracleSpec ι} : Functor (OracleQuery spec) where
   map := spec.toPFunctor.map
 
@@ -93,7 +93,7 @@ def input {α} (q : OracleQuery spec α) : spec.Domain := q.1
 @[simp] lemma input_map' {α β} (q : OracleQuery spec α) (f : α → β) :
     OracleQuery.input (PFunctor.map spec.toPFunctor f q) = q.input := rfl
 
-/-- The continutation used for the result of an oracle query. -/
+/-- The continuation used for the result of an oracle query. -/
 @[inline, reducible]
 def cont {α} (q : OracleQuery spec α) (f : spec.Range q.input) : α := q.2 f
 
@@ -124,12 +124,11 @@ instance {α} [Inhabited ι] [Inhabited α] : Inhabited (OracleQuery spec α) :=
 instance {α} [h : IsEmpty ι] : IsEmpty (OracleQuery spec α) :=
   inferInstanceAs (IsEmpty ((t : spec.Domain) × (spec.Range t → α)))
 
-/-- If there is a at most one oracle and output, then ther is at most one query. -/
+/-- If there is at most one oracle and output, then there is at most one query. -/
 instance {α} [h : Subsingleton ι] [h' : Subsingleton α] : Subsingleton (OracleQuery spec α) where
   allEq := fun ⟨t, cont⟩ ⟨t', cont'⟩ => by
-    cases show t = t' from h.allEq t t'
-    have h' : Subsingleton (spec.Range t → α) := by infer_instance
-    exact OracleQuery.ext' t (h'.allEq cont cont')
+    obtain rfl := h.allEq t t'
+    exact OracleQuery.ext' t (Subsingleton.allEq cont cont')
 
 @[simp] lemma input_query (t : spec.Domain) : (OracleSpec.query t).input = t := rfl
 @[simp] lemma cont_query (t : spec.Domain) : (OracleSpec.query t).cont = id := rfl
@@ -145,12 +144,10 @@ instance {α} [h : Subsingleton ι] [h' : Subsingleton α] : Subsingleton (Oracl
 
 @[simp] lemma query_eq_mk_iff (t : spec.Domain) (cont : spec.Range t → spec.Range t) :
     OracleSpec.query t = OracleQuery.mk t cont ↔ cont = id := by
-  rw [OracleQuery.ext_iff]
-  aesop
+  simp [OracleQuery.ext_iff, eq_comm]
 
 @[simp] lemma mk_eq_query_iff (t : spec.Domain) (cont : spec.Range t → spec.Range t) :
     OracleQuery.mk t cont = OracleSpec.query t ↔ cont = id := by
-  rw [OracleQuery.ext_iff]
-  aesop
+  simp [OracleQuery.ext_iff, eq_comm]
 
 end OracleQuery
