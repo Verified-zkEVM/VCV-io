@@ -77,11 +77,9 @@ theorem replayOracle_triple_prefix (i t : ι) :
       (replayOracle i t :
         StateT (ReplayForkState spec i) (OracleComp spec) (spec.Range t))
       (spred(fun st => ⌜ReplayPrefixInvariant i st⌝))
-      (⇓ _ st' => ⌜ReplayPrefixInvariant i st'⌝) := by
-  rw [triple_stateT_iff_forall_support]
-  intro st hst v st' hmem
-  exact OracleComp.replayOracle_preservesPrefixInvariant (i := i) (t := t)
-    hst (z := (v, st')) hmem
+      (⇓ _ st' => ⌜ReplayPrefixInvariant i st'⌝) :=
+  triple_stateT_iff_forall_support .. |>.mpr fun _ hst v st' hmem =>
+    OracleComp.replayOracle_preservesPrefixInvariant (i := i) (t := t) hst (z := (v, st')) hmem
 
 /-- Triple form of `OracleComp.replayOracle_preservesReplacementInvariant`:
 each `replayOracle i t` step preserves the replay replacement invariant.
@@ -93,11 +91,9 @@ theorem replayOracle_triple_replacement (i t : ι) :
       (replayOracle i t :
         StateT (ReplayForkState spec i) (OracleComp spec) (spec.Range t))
       (spred(fun st => ⌜ReplayReplacementInvariant i st⌝))
-      (⇓ _ st' => ⌜ReplayReplacementInvariant i st'⌝) := by
-  rw [triple_stateT_iff_forall_support]
-  intro st hst v st' hmem
-  exact OracleComp.replayOracle_preservesReplacementInvariant (i := i) (t := t)
-    hst (z := (v, st')) hmem
+      (⇓ _ st' => ⌜ReplayReplacementInvariant i st'⌝) :=
+  triple_stateT_iff_forall_support .. |>.mpr fun _ hst v st' hmem =>
+    OracleComp.replayOracle_preservesReplacementInvariant (i := i) (t := t) hst (z := (v, st')) hmem
 
 /-- Triple form of `OracleComp.replayOracle_immutable_params`: each
 `replayOracle i t` step leaves `forkQuery`, `replacement`, and `trace`
@@ -113,11 +109,9 @@ theorem replayOracle_triple_immutable (i t : ι) (st₀ : ReplayForkState spec i
       (spred(fun st => ⌜st = st₀⌝))
       (⇓ _ st' => ⌜st'.forkQuery = st₀.forkQuery ∧
                    st'.replacement = st₀.replacement ∧
-                   st'.trace = st₀.trace⌝) := by
-  rw [triple_stateT_iff_forall_support]
-  intro st hst v st' hmem
-  rw [hst] at hmem
-  exact OracleComp.replayOracle_immutable_params (i := i) (t := t) (z := (v, st')) hmem
+                   st'.trace = st₀.trace⌝) :=
+  triple_stateT_iff_forall_support .. |>.mpr fun _ hst v st' hmem =>
+    OracleComp.replayOracle_immutable_params (i := i) (t := t) (z := (v, st')) (hst ▸ hmem)
 
 /-! ### Whole-program corollaries via `simulateQ_triple_preserves_invariant` -/
 
@@ -160,37 +154,14 @@ theorem simulateQ_replayOracle_preserves_immutable {α : Type}
       (⇓ _ st' => ⌜st'.forkQuery = st₀.forkQuery ∧
                    st'.replacement = st₀.replacement ∧
                    st'.trace = st₀.trace⌝) := by
-  -- Reduce to the support-based statement so we can induct on `oa` directly.
+  refine simulateQ_triple_of_state_and_invariant (handler := replayOracle i)
+    (I := fun st => st.forkQuery = st₀.forkQuery ∧ st.replacement = st₀.replacement ∧
+      st.trace = st₀.trace) (fun t => ?_) oa st₀ ⟨rfl, rfl, rfl⟩
   rw [triple_stateT_iff_forall_support]
-  intro s hs a s' hmem
-  rw [hs] at hmem
-  -- We prove the invariant `I st := st.forkQuery = st₀.forkQuery ∧ ...`
-  -- using the per-query immutability spec.
-  have hbase : Std.Do.Triple
-      (simulateQ (replayOracle i) oa :
-        StateT (ReplayForkState spec i) (OracleComp spec) α)
-      (spred(fun st => ⌜st.forkQuery = st₀.forkQuery ∧
-                        st.replacement = st₀.replacement ∧
-                        st.trace = st₀.trace⌝))
-      (⇓ _ st' => ⌜st'.forkQuery = st₀.forkQuery ∧
-                   st'.replacement = st₀.replacement ∧
-                   st'.trace = st₀.trace⌝) := by
-    refine simulateQ_triple_preserves_invariant
-      (handler := replayOracle i)
-      (I := fun st => st.forkQuery = st₀.forkQuery ∧
-                       st.replacement = st₀.replacement ∧
-                       st.trace = st₀.trace) ?_ oa
-    intro t
-    rw [triple_stateT_iff_forall_support]
-    intro st ⟨hfq, hrep, htr⟩ v st' hmem
-    have h₁ := OracleComp.replayOracle_immutable_params (i := i) (t := t)
-      (z := (v, st')) hmem
-    refine ⟨?_, ?_, ?_⟩
-    · exact h₁.1.trans hfq
-    · exact h₁.2.1.trans hrep
-    · exact h₁.2.2.trans htr
-  rw [triple_stateT_iff_forall_support] at hbase
-  exact hbase st₀ ⟨rfl, rfl, rfl⟩ a s' hmem
+  intro st ⟨hfq, hrep, htr⟩ v st' hmem
+  obtain ⟨h₁, h₂, h₃⟩ := OracleComp.replayOracle_immutable_params (i := i) (t := t)
+    (z := (v, st')) hmem
+  exact ⟨h₁.trans hfq, h₂.trans hrep, h₃.trans htr⟩
 
 /-! ### Worked examples -/
 
@@ -226,10 +197,9 @@ example {α : Type} (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
     (forkQuery : Nat) (replacement : spec.Range i)
     {z : α × ReplayForkState spec i}
     (hz : z ∈ support (replayRunWithTraceValue main i trace forkQuery replacement)) :
-    ReplayPrefixInvariant i z.2 := by
-  have hbase := simulateQ_replayOracle_preserves_prefix (i := i) main
-  rw [triple_stateT_iff_forall_support] at hbase
-  exact hbase
+    ReplayPrefixInvariant i z.2 :=
+  triple_stateT_iff_forall_support .. |>.mp
+    (simulateQ_replayOracle_preserves_prefix (i := i) main)
     (ReplayForkState.init trace forkQuery replacement)
     (ReplayPrefixInvariant.init trace forkQuery replacement)
     z.1 z.2 hz
