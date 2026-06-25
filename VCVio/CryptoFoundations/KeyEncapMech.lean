@@ -19,7 +19,6 @@ This file defines a type to represent protocols for key encapsulation mechanisms
 We also define basic correctness and security properties for these protocols.
 -/
 
-
 open OracleSpec OracleComp ENNReal
 
 universe u v
@@ -172,10 +171,6 @@ theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
     (runtime : ProbCompRuntime (OracleComp spec))
     (adversary : kem.IND_CPA_Adversary) :
     kem.IND_CPA_Game runtime adversary = kem.IND_CCA_Game runtime adversary.toIND_CCA := by
-  simp only [IND_CPA_Game, IND_CCA_Game, IND_CPA_Adversary.toIND_CCA,
-    IND_CCA_preChallengeImpl, IND_CCA_postChallengeImpl]
-  congr 1
-  simp only [IND_CCA_oracleSpec] at *
   have h : ∀ (impl₂ : QueryImpl (C →ₒ Option K) (OracleComp spec))
       {α : Type} (oa : OracleComp spec α),
       simulateQ ((HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)) + impl₂)
@@ -193,13 +188,8 @@ theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
           OracleQuery (spec + (C →ₒ Option K)) _)) = _
       simp [simulateQ_query]
     rw [this, simulateQ_id']
-  conv_rhs =>
-    arg 2; ext x; arg 1; rw [h]
-  conv_rhs =>
-    arg 2; ext x
-    arg 2; ext st; arg 2; ext b
-    arg 2; ext y; arg 2; ext kRand
-    arg 1; rw [h]
+  simp only [IND_CPA_Game, IND_CCA_Game, IND_CPA_Adversary.toIND_CCA,
+    IND_CCA_preChallengeImpl, IND_CCA_postChallengeImpl, IND_CCA_oracleSpec, h]
 
 end IND_CCA
 
