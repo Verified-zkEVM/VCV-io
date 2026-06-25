@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import ToMathlib.Data.IndexedBinaryTree.Basic
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 
 /-!
 # Inductive Merkle Trees
@@ -44,7 +44,6 @@ as defined in `ToMathlib.Data.IndexedBinaryTree`.
 
 -/
 
-
 namespace InductiveMerkleTree
 
 open List OracleSpec OracleComp BinaryTree
@@ -68,7 +67,6 @@ lemma domain_def : (spec α).Domain = (α × α) := rfl
 lemma range_def (z) : (spec α).Range z = α := rfl
 
 end spec
-
 
 variable {α : Type _}
 
@@ -107,22 +105,18 @@ is equivalent to running the functional version of `buildMerkleTreeWithHash`
 with the same oracle function.
 -/
 @[simp, grind =]
-lemma simulateQ_buildMerkleTree {s} (leaf_data_tree : LeafData α s)
-    (f : QueryImpl (spec α) Id) :
+lemma simulateQ_buildMerkleTree {s} (leaf_data_tree : LeafData α s) (f : QueryImpl (spec α) Id) :
     simulateQ f (buildMerkleTree leaf_data_tree)
     = buildMerkleTreeWithHash leaf_data_tree fun (left right : α) =>
       (f ⟨left, right⟩) := by
   induction s with
-  | leaf =>
-    match leaf_data_tree with
-    | LeafData.leaf a =>
-      rfl
+  | leaf => match leaf_data_tree with | LeafData.leaf a => rfl
   | internal s_left s_right left_ih right_ih =>
     match leaf_data_tree with
     | LeafData.internal left right =>
       simp only [buildMerkleTree, buildMerkleTreeWithHash, singleHash,
-        simulateQ_bind, simulateQ_pure]
-      rw [left_ih left, right_ih right]; rfl
+        simulateQ_bind, simulateQ_pure, left_ih, right_ih]
+      rfl
 
 /--
 Generate a Merkle proof for a leaf at a given idx
@@ -182,24 +176,16 @@ Running the monadic version of `getPutativeRoot` with an oracle function `f`,
 it is equivalent to running the functional version of `getPutativeRootWithHash`
 -/
 @[simp, grind =]
-lemma simulateQ_getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s)
-    (leafValue : α) (proof : List.Vector α idx.depth) (f : QueryImpl (spec α) Id) :
+lemma simulateQ_getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α)
+    (proof : List.Vector α idx.depth) (f : QueryImpl (spec α) Id) :
     simulateQ f (getPutativeRoot idx leafValue proof)
       =
     getPutativeRootWithHash idx leafValue proof fun (left right : α) => (f ⟨left, right⟩) := by
   induction idx generalizing leafValue with
-  | ofLeaf =>
-      rfl
-  | ofLeft idxLeft ih =>
-      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash,
-        simulateQ_bind]
-      rw [ih]
-      rfl
-  | ofRight idxRight ih =>
-      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash,
-        simulateQ_bind]
-      rw [ih]
-      rfl
+  | ofLeaf => rfl
+  | ofLeft idxLeft ih | ofRight idxRight ih =>
+    simp only [getPutativeRoot, getPutativeRootWithHash, singleHash, simulateQ_bind, ih]
+    rfl
 
 /--
 Verify a Merkle proof `proof` that a given `leaf` at index `i` is in the Merkle tree with given
@@ -208,8 +194,8 @@ Works by computing the putative root based on the branch, and comparing that to 
 Returns `true` if the proof is valid, and `false` otherwise.
 -/
 @[simp, grind]
-def verifyProof {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
-    [DecidableEq α] {s} (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α) (rootValue : α)
+def verifyProof {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m] [DecidableEq α]
+    {s} (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α) (rootValue : α)
     (proof : List.Vector α idx.depth) : m Bool := do
   let putative_root ← (getPutativeRoot idx leafValue proof : m α)
   return (putative_root == rootValue)
