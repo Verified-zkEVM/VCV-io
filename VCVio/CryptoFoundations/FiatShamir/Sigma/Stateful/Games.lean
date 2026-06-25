@@ -3,10 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Spec
 import VCVio.CryptoFoundations.FiatShamir.Sigma
-import VCVio.CryptoFoundations.SigmaProtocol
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Spec
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
@@ -169,13 +169,12 @@ direct named CMA game. -/
     (hr : GenerableRelation Stmt Wit rel)
     (pk : Stmt) (sk : Wit) :
     QueryImpl (signSpec M Commit Resp)
-      (StateT (RoCache M Commit Chal) ProbComp) := by
+      (StateT (RoCache M Commit Chal) ProbComp) :=
   letI : HasQuery (roSpec M Commit Chal)
       (StateT (RoCache M Commit Chal) ProbComp) :=
     (randomOracle : QueryImpl (roSpec M Commit Chal) _).toHasQuery
-  exact
-    (_root_.FiatShamir (m := StateT (RoCache M Commit Chal) ProbComp) sigma hr M).sign
-      pk sk
+  (_root_.FiatShamir (m := StateT (RoCache M Commit Chal) ProbComp) sigma hr M).sign
+    pk sk
 
 /-- Source-query part of the real CMA game over the full direct CMA state. -/
 @[fs_simp] noncomputable def cmaRealSourceFull
@@ -184,12 +183,8 @@ direct named CMA game. -/
     QueryImpl.Stateful unifSpec (cmaSourceSpec M Commit Chal Resp)
       (CmaState M Commit Chal Stmt Wit)
   | .unif n => StateT.mk fun s => do
-      let log := s.1.1
-      let cache := s.1.2.1
-      let keypair := s.1.2.2
-      let bad := s.2
       let r ← (unifSpec.query n : OracleComp unifSpec (Fin (n + 1)))
-      pure (r, ((log, cache, keypair), bad))
+      pure (r, s)
   | .ro mc => StateT.mk fun s =>
       let log := s.1.1
       let cache := s.1.2.1
