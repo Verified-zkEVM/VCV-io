@@ -440,23 +440,13 @@ lemma evalDist_idealCacheMapM_bind_uniformTable {D : Type} [DecidableEq D] [Fini
     exact funext fun r => ih r.2
 
 /-- Two probabilistic samples may be drawn in either order: the output distribution of drawing
-`mx` then `my` and combining is the same as drawing `my` then `mx`. Proven at the distribution
-level by `tsum` rearrangement; the underlying monads need not be commutative as terms. -/
+`mx` then `my` and combining is the same as drawing `my` then `mx`. The `ProbComp` specialization
+of the generic `evalDist_bind_bind_swap`; the underlying monads need not be commutative as terms. -/
 lemma evalDist_probComp_bind_comm {α₁ α₂ β : Type}
     (mx : ProbComp α₁) (my : ProbComp α₂) (F : α₁ → α₂ → ProbComp β) :
     𝒟[mx >>= fun a => my >>= fun b => F a b] =
-      𝒟[my >>= fun b => mx >>= fun a => F a b] := by
-  refine evalDist_ext fun y => ?_
-  rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-  have hL : ∀ a, Pr[= a | mx] * Pr[= y | my >>= fun b => F a b] =
-      ∑' b, Pr[= a | mx] * (Pr[= b | my] * Pr[= y | F a b]) := fun a => by
-    rw [probOutput_bind_eq_tsum, ENNReal.tsum_mul_left]
-  have hR : ∀ b, Pr[= b | my] * Pr[= y | mx >>= fun a => F a b] =
-      ∑' a, Pr[= b | my] * (Pr[= a | mx] * Pr[= y | F a b]) := fun b => by
-    rw [probOutput_bind_eq_tsum, ENNReal.tsum_mul_left]
-  rw [tsum_congr hL, tsum_congr hR, ENNReal.tsum_comm]
-  refine tsum_congr fun b => tsum_congr fun a => ?_
-  ring
+      𝒟[my >>= fun b => mx >>= fun a => F a b] :=
+  evalDist_bind_bind_swap mx my F
 
 omit [DecidableEq Digest] in
 /-- Computation-valued form of `evalDist_idealCacheStep_bind_uniformTable`: the continuation `Mψ`
