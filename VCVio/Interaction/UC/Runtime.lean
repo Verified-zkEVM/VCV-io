@@ -84,15 +84,15 @@ namespace Spec
 
 /--
 Uniform selection from a nonempty finite type as a `ProbComp` primitive,
-realized by reducing to uniform selection on `Fin (Fintype.card X)` via the
-classical equivalence `Fintype.equivFin`. This is the tree-node analogue of
-`PMF.uniformOfFintype`, landing in `ProbComp` so that it can be plugged
-directly into per-node components of a `Sampler ProbComp spec`.
+realized by sampling through the `SampleableType.ofFintype` bridge (which
+reduces to uniform selection on `Fin (Fintype.card X)` via `Fintype.equivFin`).
+This is the tree-node analogue of `PMF.uniformOfFintype`, landing in `ProbComp`
+so that it can be plugged directly into per-node components of a
+`Sampler ProbComp spec`.
 -/
-noncomputable def probCompUniformOfFintype
-    (X : Type) [Fintype X] [Nonempty X] : ProbComp X :=
-  haveI : NeZero (Fintype.card X) := ⟨Fintype.card_ne_zero⟩
-  (Fintype.equivFin X).symm <$> ($ᵗ Fin (Fintype.card X))
+noncomputable def probCompUniformOfFintype (X : Type) [Fintype X] [Nonempty X] : ProbComp X :=
+  letI := SampleableType.ofFintype X
+  $ᵗ X
 
 /--
 Canonical uniform sampler on a `Spec.Fintype`-ornamented spec, built by
@@ -111,10 +111,7 @@ noncomputable def Sampler.uniform :
     (spec : Spec.{0}) → Spec.Fintype spec → Sampler ProbComp spec
   | .done, _ => ⟨⟩
   | .node X rest, .node hFin hNon hRec =>
-      haveI := hFin
-      haveI := hNon
-      (probCompUniformOfFintype X,
-        fun x => Sampler.uniform (rest x) (hRec x))
+      (@probCompUniformOfFintype X hFin hNon, fun x => Sampler.uniform (rest x) (hRec x))
 
 /-- Instance-argument form of `Sampler.uniform`. -/
 @[reducible]
@@ -144,9 +141,8 @@ spec and applying the continuation to get the next state.
 -/
 noncomputable def StepOver.sample {m : Type → Type} [Monad m]
     {Γ : Spec.Node.Context} {P : Type}
-    (step : StepOver Γ P) (sampler : Spec.Sampler m step.spec) : m P := do
-  let tr ← Spec.sampleTranscript step.spec sampler
-  return step.next tr
+    (step : StepOver Γ P) (sampler : Spec.Sampler m step.spec) : m P :=
+  step.next <$> Spec.sampleTranscript step.spec sampler
 
 /--
 Run `fuel` steps of a process, starting from state `s`, using a
@@ -158,9 +154,7 @@ noncomputable def ProcessOver.runSteps {m : Type → Type} [Monad m]
     (sampler : (p : process.Proc) → Spec.Sampler m (process.step p).spec) :
     ℕ → process.Proc → m process.Proc
   | 0, s => pure s
-  | n + 1, s => do
-    let s' ← (process.step s).sample (sampler s)
-    runSteps process sampler n s'
+  | n + 1, s => (process.step s).sample (sampler s) >>= runSteps process sampler n
 
 end Concurrent
 
@@ -168,8 +162,7 @@ namespace UC
 
 open Concurrent
 
-private abbrev Closed (Party : Type u) (m : Type → Type)
-    (schedulerSampler : m (ULift Bool)) :=
+private abbrev Closed (Party : Type u) (m : Type → Type) (schedulerSampler : m (ULift Bool)) :=
   (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Closed
 
 /--
@@ -185,23 +178,17 @@ bundled `sem` then collapses the `m Result` game into a visible `SPMF` via
 See `processSemanticsProbComp` for the coin-flip-only specialization
 and `processSemanticsOracle` for the shared-oracle specialization.
 -/
-noncomputable def processSemantics (Party : Type u)
-    {m : Type → Type} [Monad m]
-    {Result : Type}
-    (schedulerSampler : m (ULift Bool))
-    (sem : SPMFSemantics.{0, 0, 0} m)
-    (init : ∀ (p : Closed Party m schedulerSampler), p.Proc)
-    (fuel : ℕ)
+noncomputable def processSemantics (Party : Type u) {m : Type → Type} [Monad m] {Result : Type}
+    (schedulerSampler : m (ULift Bool)) (sem : SPMFSemantics.{0, 0, 0} m)
+    (init : ∀ (p : Closed Party m schedulerSampler), p.Proc) (fuel : ℕ)
     (observe : ∀ (p : Closed Party m schedulerSampler), p.Proc → m Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler) where
   Result := Result
   m := m
   instMonad := inferInstance
   sem := sem
-  run process := do
-    let finalState ←
-      process.toProcess.runSteps process.stepSampler fuel (init process)
-    observe process finalState
+  run process :=
+    process.toProcess.runSteps process.stepSampler fuel (init process) >>= observe process
 
 /--
 `processSemanticsProbComp` is the specialization of `processSemantics`
@@ -210,13 +197,10 @@ for `m = ProbComp` with its canonical `SPMFSemantics`
 This is the right entry point for coin-flip-only protocols with no
 shared oracles and no deliberate failure mass.
 -/
-noncomputable def processSemanticsProbComp (Party : Type u)
-    {Result : Type}
+noncomputable def processSemanticsProbComp (Party : Type u) {Result : Type}
     (schedulerSampler : ProbComp (ULift Bool))
-    (init : ∀ (p : Closed Party ProbComp schedulerSampler), p.Proc)
-    (fuel : ℕ)
-    (observe : ∀ (p : Closed Party ProbComp schedulerSampler),
-      p.Proc → ProbComp Result) :
+    (init : ∀ (p : Closed Party ProbComp schedulerSampler), p.Proc) (fuel : ℕ)
+    (observe : ∀ (p : Closed Party ProbComp schedulerSampler), p.Proc → ProbComp Result) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
   processSemantics Party schedulerSampler (SPMFSemantics.ofMonadLift ProbComp)
     init fuel observe
@@ -237,19 +221,14 @@ For a protocol in the random oracle model, a typical instantiation is:
   (identity on `unifSpec`, lazy-cached on the hash)
 * `initOracle := ∅` (empty random oracle cache)
 -/
-noncomputable def processSemanticsOracle (Party : Type u)
-    {ι : Type} {superSpec : OracleSpec.{0, 0} ι} {σ : Type}
-    {Result : Type}
+noncomputable def processSemanticsOracle (Party : Type u) {ι : Type}
+    {superSpec : OracleSpec.{0, 0} ι} {σ : Type} {Result : Type}
     (schedulerSampler : OracleComp superSpec (ULift Bool))
-    (impl : QueryImpl superSpec (StateT σ ProbComp))
-    (initOracle : σ)
-    (init : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler),
-      p.Proc)
-    (fuel : ℕ)
+    (impl : QueryImpl superSpec (StateT σ ProbComp)) (initOracle : σ)
+    (init : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler), p.Proc) (fuel : ℕ)
     (observe : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler),
       p.Proc → OracleComp superSpec Result) :
-    Semantics
-      (openTheory.{u, 0, 0, 0} Party (OracleComp superSpec) schedulerSampler) :=
+    Semantics (openTheory.{u, 0, 0, 0} Party (OracleComp superSpec) schedulerSampler) :=
   let oracleSem : SPMFSemantics.{0, 0, 0} (OracleComp superSpec) :=
     { Sem := StateT σ ProbComp
       instMonadSem := inferInstance

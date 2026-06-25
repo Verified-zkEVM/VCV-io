@@ -3,10 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.OracleComp.QueryTracking.CountingOracle
+import ToMathlib.Control.WriterT
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.HasQuery.Basic
-import ToMathlib.Control.WriterT
+import VCVio.OracleComp.QueryTracking.CountingOracle
 
 /-!
 # Observation Oracle for Side-Channel Leakage Modeling
@@ -111,13 +111,11 @@ def eraseObs (base : QueryImpl spec m) (oa : OracleComp (spec + ObsSpec Ev) α) 
 
 @[simp]
 lemma eraseObs_pure (base : QueryImpl spec m) (x : α) :
-    eraseObs (Ev := Ev) base (pure x) = pure x := by
-  simp [eraseObs]
+    eraseObs (Ev := Ev) base (pure x) = pure x := rfl
 
 @[simp]
 lemma eraseObs_bind [LawfulMonad m] (base : QueryImpl spec m)
-    (oa : OracleComp (spec + ObsSpec Ev) α)
-    (ob : α → OracleComp (spec + ObsSpec Ev) β) :
+    (oa : OracleComp (spec + ObsSpec Ev) α) (ob : α → OracleComp (spec + ObsSpec Ev) β) :
     eraseObs base (oa >>= ob) = eraseObs base oa >>= fun x => eraseObs base (ob x) := by
   simp [eraseObs]
 
@@ -142,24 +140,19 @@ def runObs (base : QueryImpl spec m) (encode : Ev → ω)
 
 @[simp]
 lemma runObs_pure (base : QueryImpl spec m) (encode : Ev → ω) (x : α) :
-    runObs base encode (pure x) = pure (x, 1) := by
-  simp [runObs]
+    runObs base encode (pure x) = pure (x, 1) := rfl
 
 /-- Erasure theorem: projecting away the observation trace recovers the erased computation. -/
 theorem fst_map_runObs [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
     (oa : OracleComp (spec + ObsSpec Ev) α) :
-    (fun z : α × ω => z.1) <$> runObs base encode oa = eraseObs base oa := by
-  change Prod.fst <$> (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode)) oa).run =
-    simulateQ (eraseObsImpl base) oa
-  exact QueryImpl.fst_map_run_withCost (eraseObsImpl base) (obsCostFn encode) oa
+    (fun z : α × ω => z.1) <$> runObs base encode oa = eraseObs base oa :=
+  QueryImpl.fst_map_run_withCost (eraseObsImpl base) (obsCostFn encode) oa
 
 /-- Failure preservation: observations do not change the probability of failure. -/
 theorem probFailure_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
     Pr[⊥ | runObs base encode oa] = Pr[⊥ | eraseObs base oa] := by
-  rw [show Pr[⊥ | runObs base encode oa] =
-    Pr[⊥ | (fun z : α × ω => z.1) <$> runObs base encode oa] from
-    (probFailure_map _ _).symm, fst_map_runObs]
+  rw [← fst_map_runObs base encode oa, probFailure_map]
 
 /-- `NeverFail` is preserved by observation. -/
 theorem NeverFail_runObs_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
@@ -174,24 +167,18 @@ of `eraseObs`, enabling direct probability-level reasoning about traces without 
 to manually simplify the traced computation into its concrete form. -/
 
 lemma evalDist_fst_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
-    (base : QueryImpl spec m) (encode : Ev → ω)
-    (oa : OracleComp (spec + ObsSpec Ev) α) :
-    𝒟[(fun z : α × ω => z.1) <$> runObs base encode oa] =
-      𝒟[eraseObs base oa] := by
+    (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
+    𝒟[(fun z : α × ω => z.1) <$> runObs base encode oa] = 𝒟[eraseObs base oa] := by
   rw [fst_map_runObs]
 
 lemma probOutput_fst_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
-    (base : QueryImpl spec m) (encode : Ev → ω)
-    (oa : OracleComp (spec + ObsSpec Ev) α) (x : α) :
-    Pr[= x | (fun z : α × ω => z.1) <$> runObs base encode oa] =
-      Pr[= x | eraseObs base oa] := by
+    (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) (x : α) :
+    Pr[= x | (fun z : α × ω => z.1) <$> runObs base encode oa] = Pr[= x | eraseObs base oa] := by
   rw [fst_map_runObs]
 
 lemma support_fst_runObs [LawfulMonad m] [MonadLiftT m SetM]
-    (base : QueryImpl spec m) (encode : Ev → ω)
-    (oa : OracleComp (spec + ObsSpec Ev) α) :
-    support ((fun z : α × ω => z.1) <$> runObs base encode oa) =
-      support (eraseObs base oa) := by
+    (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
+    support ((fun z : α × ω => z.1) <$> runObs base encode oa) = support (eraseObs base oa) := by
   rw [fst_map_runObs]
 
 /-! ### Structural Lemmas for `runObs` -/
@@ -203,9 +190,7 @@ lemma runObs_bind [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
       let ⟨a, w₁⟩ ← runObs base encode oa
       let ⟨b, w₂⟩ ← runObs base encode (ob a)
       return (b, w₁ * w₂) := by
-  simp only [runObs, simulateQ_bind, WriterT.run_bind]
-  congr 1; ext ⟨a, w₁⟩
-  simp
+  simp [runObs, simulateQ_bind, WriterT.run_bind]
 
 @[simp]
 lemma runObs_map [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
@@ -237,12 +222,7 @@ lemma runObs_liftComp [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev →
     simp only [OracleComp.liftComp_bind, OracleComp.liftComp_query,
       OracleQuery.cont_query, id_map, OracleQuery.input_query, runObs_bind,
       simulateQ_bind, simulateQ_query, map_bind, bind_map_left, ih]
-    have hquery : runObs base encode
-        ((liftM (OracleSpec.query t : OracleQuery spec _) :
-          OracleComp (spec + ObsSpec Ev) _)) =
-        (·, 1) <$> base t := runObs_liftM_query_inl base encode t
-    rw [hquery]
-    simp
+    simp [runObs_liftM_query_inl]
 
 /-- `runObs` on `observe e`: the result is `PUnit.unit` with trace `encode e`. -/
 @[simp]
