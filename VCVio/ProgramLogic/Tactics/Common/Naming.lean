@@ -23,17 +23,10 @@ def mkSupportHypName (name : Name) : Name :=
   Name.mkSimple s!"h{toString name}"
 
 private def indexedUserName (base : Name) (idx : Nat) : Name :=
-  if idx = 0 then
-    base
-  else
-    base.appendIndexAfter (idx + 1)
+  if idx = 0 then base else base.appendIndexAfter (idx + 1)
 
 def freshUserNameLike (base : Name) : TacticM Name := do
-  let base :=
-    if base.isAnonymous then
-      Name.mkSimple "x"
-    else
-      base
+  let base := if base.isAnonymous then Name.mkSimple "x" else base
   let lctx ← getLCtx
   let mut idx := 0
   let mut fresh := indexedUserName base idx
@@ -47,11 +40,7 @@ def freshenSuggestedNames (names : Array Name) : TacticM (Array Name) := do
   let mut used : List Name := []
   let mut result := #[]
   for name in names do
-    let base :=
-      if name.isAnonymous then
-        Name.mkSimple "x"
-      else
-        name
+    let base := if name.isAnonymous then Name.mkSimple "x" else name
     let mut idx := 0
     let mut fresh := base
     let mut searching := true
@@ -73,9 +62,7 @@ def binderNameFromExpr? (e : Expr) : Option Name :=
 
 def getBindLambdaName? (comp : Expr) : Option Name := do
   guard (isBindExpr comp)
-  let args := comp.consumeMData.getAppArgs
-  let lam := args[args.size - 1]!
-  binderNameFromExpr? lam
+  binderNameFromExpr? comp.consumeMData.getAppArgs.back!
 
 def probGoalComp? (target : Expr) : Option Expr := do
   let app ← findAppWithHead? ``probEvent target <|> findAppWithHead? ``probOutput target
@@ -86,12 +73,7 @@ partial def getLeadingBinderNames (target : Expr) : Array Name :=
   let rec go (e : Expr) (acc : Array Name) :=
     match e.consumeMData with
     | .forallE name _ body _ =>
-        let acc :=
-          if isUsableBinderName name then
-            acc.push name
-          else
-            acc
-        go body acc
+        go body (if isUsableBinderName name then acc.push name else acc)
     | _ => acc
   go target #[]
 
@@ -110,16 +92,8 @@ def getSuggestedIntroNames (count : Nat) : TacticM (Array Name) := do
   let baseNames :=
     if explicit.isEmpty then
       match bindName? with
-      | some name =>
-          if count = 1 then
-            #[name]
-          else
-            #[name, mkSupportHypName name]
-      | none =>
-          if count = 1 then
-            #[Name.mkSimple "x"]
-          else
-            #[Name.mkSimple "x", Name.mkSimple "hx"]
+      | some name => if count = 1 then #[name] else #[name, mkSupportHypName name]
+      | none => if count = 1 then #[Name.mkSimple "x"] else #[Name.mkSimple "x", Name.mkSimple "hx"]
     else
       explicit
   let names :=
@@ -136,26 +110,13 @@ def getSuggestedIntroNames (count : Nat) : TacticM (Array Name) := do
 def getProbCongrNames (supportSensitive : Bool) : TacticM (Array Name) := do
   let count := if supportSensitive then 2 else 1
   let target ← instantiateMVars (← getMainTarget)
-  let bindName? := do
-    let comp ← probGoalComp? target
-    getBindLambdaName? comp
+  let bindName? := probGoalComp? target >>= getBindLambdaName?
   let names :=
     match bindName? with
-    | some name =>
-        if supportSensitive then
-          #[name, mkSupportHypName name]
-        else
-          #[name]
+    | some name => if supportSensitive then #[name, mkSupportHypName name] else #[name]
     | none =>
-        if supportSensitive then
-          #[Name.mkSimple "x", Name.mkSimple "hx"]
-        else
-          #[Name.mkSimple "x"]
-  let names :=
-    if names.size < count then
-      names.push (Name.mkSimple "hx")
-    else
-      names
+        if supportSensitive then #[Name.mkSimple "x", Name.mkSimple "hx"] else #[Name.mkSimple "x"]
+  let names := if names.size < count then names.push (Name.mkSimple "hx") else names
   freshenSuggestedNames names
 
 def getRelBindNames : TacticM (Array Name) := do
