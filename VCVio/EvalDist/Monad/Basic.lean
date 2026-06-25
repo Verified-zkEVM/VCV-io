@@ -707,33 +707,25 @@ lemma probEvent_bind_congr_le_add {mx : m α} {my oc : α → m β}
 
 end congr_mono
 
-/-! ## Complement swapping and union bounds -/
+/-! ## Swapping independent draws -/
 
 section swap_compl
 
 variable [MonadLiftT m SPMF]
 
-/-- Swapping two independent random draws preserves the output distribution. Although
-`mx >>= fun a => my >>= fun b => f a b` and `my >>= fun b => mx >>= fun a => f a b` are not
-definitionally equal — and for a non-commutative `m` are genuinely different `m`-computations —
-their output distributions agree, since the two samples are independent. The proof manipulates only
-the `SPMF` image, reducing to `ENNReal.tsum_comm`; the `probEvent`/`probOutput` corollaries
-(`probEvent_bind_bind_swap`, `probOutput_bind_bind_swap`) follow by congruence. -/
+/-- Swapping two independent random draws preserves the output distribution: although
+`mx >>= fun a => my >>= fun b => f a b` and `my >>= fun b => mx >>= fun a => f a b` need not be
+equal as `m`-computations when `m` is non-commutative, the two draws are independent, so their
+output distributions agree. The `probEvent`/`probOutput` forms (`probEvent_bind_bind_swap`,
+`probOutput_bind_bind_swap`) are corollaries. -/
 lemma evalDist_bind_bind_swap [LawfulMonadLiftT m SPMF]
     (mx : m α) (my : m β) (f : α → β → m γ) :
     𝒟[mx >>= fun a => my >>= fun b => f a b] =
       𝒟[my >>= fun b => mx >>= fun a => f a b] := by
   refine evalDist_ext fun x => ?_
-  simp only [probOutput_bind_eq_tsum]
-  rw [show (∑' a, Pr[= a | mx] * ∑' b, Pr[= b | my] * Pr[= x | f a b]) =
-        ∑' a, ∑' b, Pr[= a | mx] * (Pr[= b | my] * Pr[= x | f a b]) from
-      tsum_congr fun a => (ENNReal.tsum_mul_left).symm,
-    show (∑' b, Pr[= b | my] * ∑' a, Pr[= a | mx] * Pr[= x | f a b]) =
-        ∑' b, ∑' a, Pr[= b | my] * (Pr[= a | mx] * Pr[= x | f a b]) from
-      tsum_congr fun b => (ENNReal.tsum_mul_left).symm]
+  simp only [probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left]
   rw [ENNReal.tsum_comm]
-  refine tsum_congr fun b => tsum_congr fun a => ?_
-  rw [← mul_assoc, ← mul_assoc, mul_comm (Pr[= b | my]) (Pr[= a | mx])]
+  exact tsum_congr fun b => tsum_congr fun a => mul_left_comm _ _ _
 
 /-- Swapping two independent random draws preserves probability of any event. Corollary of
 `evalDist_bind_bind_swap`. -/
@@ -750,6 +742,8 @@ lemma probOutput_bind_bind_swap [LawfulMonadLiftT m SPMF]
     Pr[= z | mx >>= fun a => my >>= fun b => f a b] =
       Pr[= z | my >>= fun b => mx >>= fun a => f a b] := by
   rw [probOutput_def, probOutput_def, evalDist_bind_bind_swap]
+
+/-! ## Complement bounds -/
 
 omit [Monad m] in
 /-- If `Pr[ p | mx] ≥ 1 - ε` and `mx` never fails, then `Pr[ ¬p | mx] ≤ ε`. -/
@@ -792,6 +786,8 @@ lemma probEvent_ge_of_compl_le
   exact tsub_le_tsub_left h _
 
 end swap_compl
+
+/-! ## Union bounds -/
 
 section union_bound
 
