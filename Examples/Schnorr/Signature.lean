@@ -212,6 +212,7 @@ theorem signature_euf_cma (g : G)
   exact ⟨fun _ pk => red pk,
     hred.trans (le_of_eq (hardRelationExp_dlogGenerable_eq_dlogExp F G g hg red))⟩
 
+#guard_msgs (drop info) in
 #print axioms signature_euf_cma
 
 end Schnorr

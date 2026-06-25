@@ -55,7 +55,7 @@ variable {ι₁' : Type} {ι₂' : Type}
   {α : Type} {m' : Type → Type v} [Monad m'] [LawfulMonad m']
   (impl₁' : QueryImpl spec₁' m') (impl₂' : QueryImpl spec₂' m')
 
-private lemma simulateQ_add_liftM_left (t : spec₁'.Domain) :
+private lemma simulateQ_add_liftM_query_left (t : spec₁'.Domain) :
     simulateQ (impl₁' + impl₂')
       (liftM (spec₁'.query t) : OracleComp (spec₁' + spec₂') _) =
     impl₁' t := by
@@ -63,7 +63,7 @@ private lemma simulateQ_add_liftM_left (t : spec₁'.Domain) :
     (liftM (liftM (spec₁'.query t) : OracleQuery (spec₁' + spec₂') _)) = _
   simp [simulateQ_query]
 
-private lemma simulateQ_add_liftM_right (t : spec₂'.Domain) :
+private lemma simulateQ_add_liftM_query_right (t : spec₂'.Domain) :
     simulateQ (impl₁' + impl₂')
       (liftM (spec₂'.query t) : OracleComp (spec₁' + spec₂') _) =
     impl₂' t := by
@@ -78,7 +78,7 @@ lemma simulateQ_add_liftComp_left (oa : OracleComp spec₁' α) :
   rw [OracleComp.liftComp_def, ← simulateQ_compose]
   congr 1
   funext t
-  exact simulateQ_add_liftM_left impl₁' impl₂' t
+  exact simulateQ_add_liftM_query_left impl₁' impl₂' t
 
 @[simp]
 lemma simulateQ_add_liftComp_right (ob : OracleComp spec₂' α) :
@@ -87,7 +87,29 @@ lemma simulateQ_add_liftComp_right (ob : OracleComp spec₂' α) :
   rw [OracleComp.liftComp_def, ← simulateQ_compose]
   congr 1
   funext t
-  exact simulateQ_add_liftM_right impl₁' impl₂' t
+  exact simulateQ_add_liftM_query_right impl₁' impl₂' t
+
+/-- `liftM`-normal-form companion of `simulateQ_add_liftComp_left`. Because `liftComp_eq_liftM`
+normalizes `liftComp → liftM` under `simp`, the `liftComp`-keyed lemma never fires inside `simp`;
+this `liftM`-keyed form is what `simp` actually needs.
+
+Deliberately **not** `@[simp]`: as a global rule it shifts the normal form of `simulateQ` over an
+added handler applied to a lifted-in computation, which pre-empts and breaks existing proofs that
+manage that reduction themselves. Pass it explicitly, e.g.
+`simp [myHandler, simulateQ_add_liftM_left, simulateQ_toQueryImpl]`. -/
+lemma simulateQ_add_liftM_left (oa : OracleComp spec₁' α) :
+    simulateQ (impl₁' + impl₂') (liftM oa : OracleComp (spec₁' + spec₂') α) =
+      simulateQ impl₁' oa := by
+  rw [← OracleComp.liftComp_eq_liftM]
+  exact simulateQ_add_liftComp_left impl₁' impl₂' oa
+
+/-- `liftM`-normal-form companion of `simulateQ_add_liftComp_right`; opt-in, see
+`simulateQ_add_liftM_left`. -/
+lemma simulateQ_add_liftM_right (ob : OracleComp spec₂' α) :
+    simulateQ (impl₁' + impl₂') (liftM ob : OracleComp (spec₁' + spec₂') α) =
+      simulateQ impl₂' ob := by
+  rw [← OracleComp.liftComp_eq_liftM]
+  exact simulateQ_add_liftComp_right impl₁' impl₂' ob
 
 lemma simulateQ_liftComp_left_eq_of_apply
     (impl : QueryImpl (spec₁' + spec₂') m') (impl₁ : QueryImpl spec₁' m')
@@ -134,6 +156,20 @@ lemma simulateQ_liftComp_right_eq_of_apply
       exact bind_congr fun u => ih u
 
 end simulateQ_add_liftComp
+
+/-- Simulating the trivial `HasQuery.toQueryImpl` handler back into `OracleComp spec` is the
+identity (the composite of `HasQuery.toQueryImpl_eq_id'` and `simulateQ_id'`).
+
+Like `toQueryImpl_eq_id'`, this is deliberately **not** `@[simp]`: globally it lets `simulateQ`
+of a `unifFwdImpl`-style `toQueryImpl.liftTarget` handler fully reduce, which can re-enable a
+backward induction-hypothesis rewrite and diverge. Pass it explicitly to `simp` (alongside the
+opaque handler definition) to discharge a lifted-in computation, e.g.
+`simp [myHandler, simulateQ_toQueryImpl]`; the `simulateQ_add_liftM_left`/`_right` and
+`simulateQ_liftTarget` rungs are `@[simp]` and fire on their own. -/
+lemma simulateQ_toQueryImpl {ι : Type*} {spec : OracleSpec ι} {α : Type u}
+    (mx : OracleComp spec α) :
+    simulateQ (HasQuery.toQueryImpl : QueryImpl spec (OracleComp spec)) mx = mx := by
+  rw [HasQuery.toQueryImpl_eq_id', simulateQ_id']
 
 section simulateQ_liftM
 

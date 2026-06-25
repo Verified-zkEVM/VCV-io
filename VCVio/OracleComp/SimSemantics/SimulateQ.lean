@@ -175,6 +175,13 @@ lemma simulateQ_ite (p : Prop) [Decidable p] (mx mx' : OracleComp spec α) :
   split_ifs <;> rfl
 
 @[simp]
+lemma simulateQ_dite (p : Prop) [Decidable p]
+    (mx : p → OracleComp spec α) (mx' : ¬p → OracleComp spec α) :
+    simulateQ impl (dite p mx mx') =
+      dite p (fun h => simulateQ impl (mx h)) (fun h => simulateQ impl (mx' h)) := by
+  split <;> rfl
+
+@[simp]
 lemma simulateQ_liftTarget {m : Type u → Type v} {n : Type u → Type w}
     [Monad m] [LawfulMonad m] [Monad n] [LawfulMonad n]
     [MonadLiftT m n] [LawfulMonadLiftT m n]

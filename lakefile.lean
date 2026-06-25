@@ -10,7 +10,11 @@ package VCVio where
     ⟨`relaxedAutoImplicit, false⟩,
     ⟨`weak.linter.mathlibStandardSet, true⟩,
     ⟨`weak.linter.modulesUpperCamelCase, true⟩,
-    ⟨`weak.linter.style.whitespace, true⟩
+    ⟨`weak.linter.style.whitespace, true⟩,
+    -- Disable the unicode allowlist linter: VCVio docstrings legitimately use
+    -- FIPS-204 math notation (combining tilde `c̃`) and cited author names with
+    -- diacritics (e.g. `Cătălin Hriţcu`).
+    ⟨`weak.linter.unicodeLinter, false⟩
   ]
 
 /-
@@ -75,6 +79,11 @@ lean_lib FFI
 
 /-- Lattice-based cryptography: ring arithmetic, hardness assumptions, and scheme definitions. -/
 lean_lib LatticeCrypto
+
+/-- Hash-based signatures: SLH-DSA (SPHINCS+, FIPS 205) proof-level specs and security.
+Peer of `LatticeCrypto`; may depend on `VCVio`/`ToMathlib` (and Mathlib), but nothing in
+`VCVio`/`ToMathlib`/`FFI`/`Interop` may import it. -/
+lean_lib HashSig
 
 /-- Example constructions of cryptographic primitives. -/
 lean_lib Examples
@@ -180,6 +189,10 @@ private def mldsaCFlagsForSet (pkg : NPackage __name__) (paramSet : Nat) :
     "-I", mldsaDir.toString,
     "-I", (mldsaDir / "src").toString,
     s!"-DMLD_CONFIG_PARAMETER_SET={paramSet}",
+    -- Exclude the randomized signing API (mirrors mlkem's `MLK_CONFIG_NO_RANDOMIZED_API`):
+    -- it pulls in an undefined `randombytes` symbol that fails to link on Linux, and the
+    -- FFI tests only exercise the internal deterministic API.
+    "-DMLD_CONFIG_NO_RANDOMIZED_API",
     "-std=c99", "-O2"]
   return (weakArgs, #["-fPIC"])
 
@@ -240,7 +253,10 @@ private def falconCFlags (pkg : NPackage __name__) :
   let weakArgs := #[
     "-I", (← getLeanIncludeDir).toString,
     "-I", fndsaDir.toString,
-    "-std=c99", "-O2"]
+    -- `_GNU_SOURCE` is required on glibc: under `-std=c99` it otherwise hides
+    -- `getentropy` / `O_CLOEXEC`, which `third_party/c-fn-dsa/sysrng.c` uses, so
+    -- the Falcon RNG fails to compile on Linux (macOS exposes them regardless).
+    "-D_GNU_SOURCE", "-std=c99", "-O2"]
   return (weakArgs, #["-fPIC"])
 
 target fndsa.o pkg : System.FilePath := do
@@ -267,6 +283,13 @@ lean_lib VCVioTest
 /-- Lattice crypto test support modules (helpers, ACVP vectors). -/
 lean_lib LatticeCryptoTest
 
+/-- SLH-DSA known-answer test executables (differential tests vs external reference signers).
+Test-only and deliberately kept out of the `HashSig` library aggregate: each KAT module carries a
+root-level `main`, and a `submodules` glob builds them independently so the entry points never
+collide. -/
+lean_lib HashSigTest where
+  globs := #[.submodules `HashSigTest]
+
 /-- Smoke test: imports VCVio and prints OK. -/
 lean_exe smoke_test where
   root := `VCVioTest.Smoke
@@ -282,3 +305,11 @@ lean_exe mldsa_test where
 /-- Falcon test executable (links against c-fn-dsa FFI). -/
 lean_exe falcon_test where
   root := `LatticeCryptoTest.Falcon.Main
+
+/-- SLH-DSA-SHA2-128-24 known-answer test: pure-Lean concrete verify vs the C reference vector. -/
+lean_exe slhdsa_kat where
+  root := `HashSigTest.SLHDSA.Sha2KAT
+
+/-- C13 known-answer test: pure-Lean keccak256 concrete verify vs the reference signer vector. -/
+lean_exe slhdsa_c13_kat where
+  root := `HashSigTest.SLHDSA.C13KAT

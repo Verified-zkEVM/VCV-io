@@ -130,14 +130,14 @@ theorem log_entry_in_cache_and_mono {α : Type}
     rw [show simulateQ cachingOracle
           ((query t : OracleComp spec _) >>= fun u =>
             (fun p : α × QueryLog spec =>
-                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
-                  :: p.2))
+                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) ::
+                  p.2))
               <$> (simulateQ loggingOracle (mx u)).run) =
           ((cachingOracle t >>= fun u =>
             simulateQ cachingOracle
               ((fun p : α × QueryLog spec =>
-                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
-                    :: p.2))
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) ::
+                    p.2))
                 <$> (simulateQ loggingOracle (mx u)).run)) :
             StateT (QueryCache spec) (OracleComp spec) _)
         from by simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
@@ -145,15 +145,15 @@ theorem log_entry_in_cache_and_mono {α : Type}
     have hbind_rw : (cachingOracle t >>= fun u =>
             simulateQ cachingOracle
               ((fun p : α × QueryLog spec =>
-                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
-                    :: p.2))
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) ::
+                    p.2))
                 <$> (simulateQ loggingOracle (mx u)).run) :
             StateT (QueryCache spec) (OracleComp spec) _) =
           (cachingOracle t >>= fun u =>
             StateT.map
               (fun p : α × QueryLog spec =>
-                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
-                  :: p.2))
+                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) ::
+                  p.2))
               (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))) := by
       congr 1; ext u s
       simp only [StateT.map, StateT.run, map_eq_bind_pure_comp, simulateQ_bind,
@@ -241,8 +241,8 @@ theorem cache_entry_in_log_or_initial {α : Type}
           ((cachingOracle t >>= fun u =>
             simulateQ cachingOracle
               ((fun p : α × QueryLog spec =>
-                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
-                    :: p.2))
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) ::
+                    p.2))
                 <$> (simulateQ loggingOracle (mx u)).run)) :
             StateT (QueryCache spec) (OracleComp spec) _)
         from by simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
@@ -250,15 +250,15 @@ theorem cache_entry_in_log_or_initial {α : Type}
     have hbind_rw : (cachingOracle t >>= fun u =>
             simulateQ cachingOracle
               ((fun p : α × QueryLog spec =>
-                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
-                    :: p.2))
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) ::
+                    p.2))
                 <$> (simulateQ loggingOracle (mx u)).run) :
             StateT (QueryCache spec) (OracleComp spec) _) =
           (cachingOracle t >>= fun u =>
             StateT.map
               (fun p : α × QueryLog spec =>
-                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
-                  :: p.2))
+                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) ::
+                  p.2))
               (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))) := by
       congr 1; ext u s
       simp only [StateT.map, StateT.run, map_eq_bind_pure_comp, simulateQ_bind,

@@ -27,6 +27,10 @@ import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
 import VCVio.CryptoFoundations.Fischlin
+import VCVio.CryptoFoundations.Fischlin.Completeness
+import VCVio.CryptoFoundations.Fischlin.CostAccounting
+import VCVio.CryptoFoundations.Fischlin.Defs
+import VCVio.CryptoFoundations.Fischlin.KnowledgeSoundness
 import VCVio.CryptoFoundations.FujisakiOkamoto
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
@@ -37,6 +41,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.CollisionResistance
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.CryptoFoundations.HardnessAssumptions.MultiTarget
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 import VCVio.CryptoFoundations.HashCommitment
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
@@ -61,6 +66,7 @@ import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
+import VCVio.CryptoFoundations.TweakableHash
 import VCVio.EvalDist.BitVec
 import VCVio.EvalDist.Bool
 import VCVio.EvalDist.Defs.AlternativeMonad
