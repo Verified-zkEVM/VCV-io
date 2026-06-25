@@ -92,13 +92,8 @@ theorem probLeakFree_iff_leakageBound_zero
     [IsUniformSpec spec₁] [IsUniformSpec spec₂]
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)} :
     ProbLeakFree oa₁ oa₂ ↔ LeakageBound 0 oa₁ oa₂ := by
-  simp only [ProbLeakFree, LeakageBound]
-  constructor
-  · intro h; rw [h]; simp [SPMF.tvDist_self]
-  · intro h
-    have h0 := SPMF.tvDist_nonneg (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₂])
-    have := le_antisymm h h0
-    rwa [SPMF.tvDist_eq_zero_iff, SPMF.toPMF_inj] at this
+  rw [ProbLeakFree, LeakageBound, ← SPMF.toPMF_inj, ← SPMF.tvDist_eq_zero_iff]
+  exact ⟨fun h => h.le, fun h => le_antisymm h (SPMF.tvDist_nonneg _ _)⟩
 
 /-- Transitivity of `LeakageBound` for game-hopping: if the first pair of computations
 has leakage at most `ε₁` and the second pair at most `ε₂`, then the outer pair has
@@ -112,11 +107,7 @@ theorem leakageBound_triangle
     (h₁₂ : LeakageBound ε₁ oa₁ oa₂) (h₂₃ : LeakageBound ε₂ oa₂ oa₃) :
     LeakageBound (ε₁ + ε₂) oa₁ oa₃ := by
   unfold LeakageBound at *
-  calc SPMF.tvDist (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₃])
-      ≤ SPMF.tvDist (𝒟[Prod.snd <$> oa₁]) (𝒟[Prod.snd <$> oa₂]) +
-        SPMF.tvDist (𝒟[Prod.snd <$> oa₂]) (𝒟[Prod.snd <$> oa₃]) :=
-          SPMF.tvDist_triangle _ _ _
-    _ ≤ ε₁ + ε₂ := add_le_add h₁₂ h₂₃
+  exact (SPMF.tvDist_triangle _ _ _).trans (add_le_add h₁₂ h₂₃)
 
 /-- `ProbLeakFree` is reflexive. -/
 @[simp]
@@ -144,7 +135,7 @@ theorem probLeakFree_of_leakageBound_zero
 theorem leakageBound_refl [IsUniformSpec spec₁]
     (oa : OracleComp spec₁ (α × ω)) :
     LeakageBound 0 oa oa := by
-  unfold LeakageBound; simp
+  simp [LeakageBound]
 
 /-- `LeakageBound` is symmetric. -/
 theorem leakageBound_symm
@@ -171,8 +162,7 @@ theorem probLeakFree_map_fst
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : ProbLeakFree oa₁ oa₂) {δ : Type} (f₁ : α → γ) (f₂ : β → δ) :
     ProbLeakFree (Prod.map f₁ id <$> oa₁) (Prod.map f₂ id <$> oa₂) := by
-  unfold ProbLeakFree at *
-  simp only [Functor.map_map]; exact h
+  simpa only [ProbLeakFree, Functor.map_map] using h
 
 /-- Mapping the result component preserves approximate trace independence. -/
 theorem leakageBound_map_fst
@@ -180,8 +170,7 @@ theorem leakageBound_map_fst
     {ε : ℝ} {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound ε oa₁ oa₂) {δ : Type} (f₁ : α → γ) (f₂ : β → δ) :
     LeakageBound ε (Prod.map f₁ id <$> oa₁) (Prod.map f₂ id <$> oa₂) := by
-  unfold LeakageBound at *
-  simp only [Functor.map_map]; exact h
+  simpa only [LeakageBound, Functor.map_map] using h
 
 /-- Mapping the result component preserves trace noninterference. -/
 theorem traceNoninterference_map_fst
@@ -189,8 +178,7 @@ theorem traceNoninterference_map_fst
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : TraceNoninterference oa₁ oa₂) {δ : Type} (f₁ : α → γ) (f₂ : β → δ) :
     TraceNoninterference (Prod.map f₁ id <$> oa₁) (Prod.map f₂ id <$> oa₂) := by
-  unfold TraceNoninterference at *
-  rw [ProgramLogic.Relational.relTriple'_iff_relTriple] at h ⊢
+  simp only [TraceNoninterference, ProgramLogic.Relational.relTriple'_iff_relTriple] at h ⊢
   exact ProgramLogic.Relational.relTriple_map h
 
 /-- Mapping the trace component with the same function preserves distributional trace
@@ -200,8 +188,7 @@ theorem probLeakFree_map_snd
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : ProbLeakFree oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     ProbLeakFree (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
-  unfold ProbLeakFree at *
-  simp only [snd_map_prod_map_eq_map, evalDist_map] at h ⊢
+  simp only [ProbLeakFree, snd_map_prod_map_eq_map, evalDist_map] at h ⊢
   exact congrArg (Functor.map g) h
 
 /-- Mapping the trace component with the same function preserves approximate trace
@@ -211,8 +198,7 @@ theorem leakageBound_map_snd
     {ε : ℝ} {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : LeakageBound ε oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     LeakageBound ε (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
-  unfold LeakageBound at *
-  simp only [snd_map_prod_map_eq_map, evalDist_map] at h ⊢
+  simp only [LeakageBound, snd_map_prod_map_eq_map, evalDist_map] at h ⊢
   exact le_trans (SPMF.tvDist_map_le g _ _) h
 
 /-- Mapping the trace component with the same function preserves trace noninterference. -/
@@ -221,11 +207,9 @@ theorem traceNoninterference_map_snd
     {oa₁ : OracleComp spec₁ (α × ω)} {oa₂ : OracleComp spec₂ (β × ω)}
     (h : TraceNoninterference oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     TraceNoninterference (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
-  unfold TraceNoninterference at *
-  rw [ProgramLogic.Relational.relTriple'_iff_relTriple] at h ⊢
+  simp only [TraceNoninterference, ProgramLogic.Relational.relTriple'_iff_relTriple] at h ⊢
   exact ProgramLogic.Relational.relTriple_map
-    (ProgramLogic.Relational.relTriple_post_mono h fun {_ _} hw =>
-      congrArg g hw)
+    (ProgramLogic.Relational.relTriple_post_mono h fun {_ _} hw => congrArg g hw)
 
 /-! ### Compositional Lemmas: Bind -/
 
@@ -247,10 +231,8 @@ theorem traceNoninterference_bind
     (h : TraceNoninterference oa₁ oa₂)
     (hf : ∀ a b w, TraceNoninterference (f₁ (a, w)) (f₂ (b, w))) :
     TraceNoninterference (oa₁ >>= f₁) (oa₂ >>= f₂) := by
-  unfold TraceNoninterference at *
-  rw [ProgramLogic.Relational.relTriple'_iff_relTriple] at h ⊢
-  refine ProgramLogic.Relational.relTriple_bind h fun z₁ z₂ hw => ?_
-  obtain ⟨a, w₁⟩ := z₁; obtain ⟨b, w₂⟩ := z₂
+  simp only [TraceNoninterference, ProgramLogic.Relational.relTriple'_iff_relTriple] at h ⊢
+  refine ProgramLogic.Relational.relTriple_bind h fun ⟨a, w₁⟩ ⟨b, w₂⟩ hw => ?_
   subst hw
   exact ProgramLogic.Relational.relTriple'_iff_relTriple.mp (hf a b w₁)
 
@@ -264,9 +246,8 @@ theorem probLeakFree_bind_of_trace_only
     {f : ω → OracleComp spec₁ (γ × ω')} {g : ω → OracleComp spec₂ (δ × ω')}
     (hfg : ∀ w, ProbLeakFree (f w) (g w)) :
     ProbLeakFree (oa₁ >>= fun z => f z.2) (oa₂ >>= fun z => g z.2) := by
-  unfold ProbLeakFree at *
-  rw [snd_map_bind_snd _ f, snd_map_bind_snd _ g, evalDist_bind, evalDist_bind, h]
-  congr 1; funext w; exact hfg w
+  rw [ProbLeakFree, snd_map_bind_snd _ f, snd_map_bind_snd _ g, evalDist_bind, evalDist_bind, h]
+  exact congrArg _ (funext hfg)
 
 /-- Approximate trace independence is preserved by bind when the continuation depends
 only on the trace and produces identical trace distributions. -/
@@ -278,10 +259,8 @@ theorem leakageBound_bind_of_trace_only
     {f : ω → OracleComp spec₁ (γ × ω')} {g : ω → OracleComp spec₂ (δ × ω')}
     (hfg : ∀ w, ProbLeakFree (f w) (g w)) :
     LeakageBound ε (oa₁ >>= fun z => f z.2) (oa₂ >>= fun z => g z.2) := by
-  unfold LeakageBound ProbLeakFree at *
-  rw [snd_map_bind_snd _ f, snd_map_bind_snd _ g, evalDist_bind, evalDist_bind]
-  rw [show (fun w => 𝒟[Prod.snd <$> f w]) =
-      fun w => 𝒟[Prod.snd <$> g w] from funext hfg]
+  rw [LeakageBound, snd_map_bind_snd _ f, snd_map_bind_snd _ g, evalDist_bind, evalDist_bind,
+    show (fun w => 𝒟[Prod.snd <$> f w]) = fun w => 𝒟[Prod.snd <$> g w] from funext hfg]
   exact le_trans (SPMF.tvDist_bind_right_le _ _ _) h
 
 end OracleComp.Leakage
