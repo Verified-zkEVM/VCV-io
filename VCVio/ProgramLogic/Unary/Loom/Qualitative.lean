@@ -79,21 +79,10 @@ participates in synthesis when the user `open`s this namespace,
 sidestepping the conflict with the default `ℝ≥0∞` carrier. -/
 noncomputable scoped instance (priority := 1100) instWP :
     Std.Do'.WP (OracleComp spec) Prop Std.Do'.EPost.nil where
-  wpTrans x := ⟨fun post _epost =>
-    MAlgOrdered.wp (m := OracleComp spec) (l := Prop) x post⟩
-  wp_trans_pure x := by
-    intro post _epost
-    change post x ≤ MAlgOrdered.wp (m := OracleComp spec) (l := Prop) (pure x) post
-    rw [MAlgOrdered.wp_pure]
-  wp_trans_bind x f := by
-    intro post _epost
-    change MAlgOrdered.wp (m := OracleComp spec) (l := Prop) x
-            (fun a => MAlgOrdered.wp (m := OracleComp spec) (l := Prop) (f a) post) ≤
-          MAlgOrdered.wp (m := OracleComp spec) (l := Prop) (x >>= f) post
-    rw [MAlgOrdered.wp_bind]
-  wp_trans_monotone x := by
-    intro post post' _epost _epost' _hepost hpost
-    exact MAlgOrdered.wp_mono (m := OracleComp spec) (l := Prop) x hpost
+  wpTrans x := ⟨fun post _epost => MAlgOrdered.wp (l := Prop) x post⟩
+  wp_trans_pure x := fun post _epost => (MAlgOrdered.wp_pure (l := Prop) x post).ge
+  wp_trans_bind x f := fun post _epost => (MAlgOrdered.wp_bind (l := Prop) x f post).ge
+  wp_trans_monotone x := fun _ _ _ _ _ hpost => MAlgOrdered.wp_mono (l := Prop) x hpost
 
 /-! ## Definitional alignment with `MAlgOrdered.wp` (Prop)
 
@@ -103,8 +92,7 @@ theorem in `HoarePropTriple.lean` (and the support-style lemma
 `wp_iff_forall_support`) transports for free when the user rewrites
 `Std.Do'.wp _ _ _ ↦ MAlgOrdered.wp (l := Prop) _ _`. -/
 
-theorem wp_eq_mAlgOrdered_wp_prop
-    (oa : OracleComp spec α) (post : α → Prop) :
+theorem wp_eq_mAlgOrdered_wp_prop (oa : OracleComp spec α) (post : α → Prop) :
     Std.Do'.wp oa post Lean.Order.bot =
       MAlgOrdered.wp (m := OracleComp spec) (l := Prop) oa post := rfl
 
