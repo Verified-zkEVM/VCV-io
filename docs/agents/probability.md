@@ -159,15 +159,29 @@ needs to reason about a computation failing (or not) with probability one.
 `support_uniformSample_nonempty` (`(support ($ᵗ α)).Nonempty`, `@[grind]`) closes the loop, letting
 `grind` conclude e.g. `Pr[⊥ | $ᵗ α] ≠ 1` end-to-end.
 
+**Monad/functor laws normalise structure for `grind`.** `bind_pure`, `pure_bind`, `bind_assoc`, and
+`map_pure` are tagged `@[grind =]` (in `EvalDist/Monad/Basic.lean`). They are confluent rewrites, so
+`grind` collapses a computation's structure (`mx >>= pure = mx`, `pure a >>= f = f a`, …) *before*
+falling into `probOutput`/`tsum` expansion — turning what would otherwise be a `grind` *explosion* on
+a `bind`/`pure`-shaped probability/support/distribution equality into a quick solve
+(`Pr[= x | mx >>= pure] = Pr[= x | mx]`, `𝒟[do let x ← mx; pure x] = 𝒟[mx]`,
+`support (do let b ← $ᵗ Bool; pure b) = Set.univ` all close by bare `grind`). `bind_pure_comp` /
+`map_eq_bind` are omitted (function argument under a binder, unindexable). A *non-trivial*
+`<$>` / `if` / `<*>` does not normalise to a `pure`, so those structured equalities stay
+`simp`-terminal.
+
 **`grind` cannot factor an independent product.** `Pr[= z | (·, ·) <$> mx <*> my]` or its `bind`
 spelling does not reduce under `grind`: the second factor `my` is a free variable under a binder
 (`Seq.seq`'s `Unit → _` thunk, or `bind`'s continuation), which `grind`'s pattern compiler cannot
 index — tagging the factorization lemma yields an "invalid pattern" error. Factor with `simp`
 (`probOutput_seq_map_prod_mk_eq_mul` is `@[simp high]`), then hand the resulting goal to `grind`.
 
-`VCVioTest/ProbabilityTactics.lean` is the living benchmark for this: a curated corpus of
-high-school-probability facts, each closed by the weakest of `simp` / `grind` / `simp; grind`, with
-`target(grind)` markers where `grind` is not yet enough.
+`VCVioTest/ProbabilityTactics.lean` is the living benchmark and **gate** for all of this: a broad
+corpus of probability / event / failure / support / distribution facts organised by category, each
+closed by a single *terminal* tactic. Where a fact closes by **both** `simp` and `grind`, both are
+kept (the mirror), so each tactic stays exercised on that shape; where only one closes, the gap is a
+`target(simp)` / `target(grind)` note. A regression in either tactic surfaces there in isolation.
+When adding probability automation, add the corresponding battery rows.
 
 ## Common Mistakes
 
