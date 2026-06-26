@@ -94,9 +94,15 @@ def classifyVCSpecCompForm (comp : Expr) : VCSpecCompForm :=
   else
     .other
 
+/-- Wrap the `classifyVCSpecCompForm` summary of a single computation slot into
+a `.unary` `VCSpecCompPattern`, the comp-pattern shape used by non-relational
+(unary) `@[vcspec]` rules. -/
 def classifyUnaryCompPattern (comp : Expr) : VCSpecCompPattern :=
   .unary (classifyVCSpecCompForm comp)
 
+/-- Pair the `classifyVCSpecCompForm` summaries of the two computation slots
+`oa`/`ob` into a `.relational` `VCSpecCompPattern`, the comp-pattern shape used
+by relational `@[vcspec]` rules. -/
 def classifyRelationalCompPattern (oa ob : Expr) : VCSpecCompPattern :=
   .relational (classifyVCSpecCompForm oa) (classifyVCSpecCompForm ob)
 

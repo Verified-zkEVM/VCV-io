@@ -72,26 +72,19 @@ lemma fst_map_writerT_run_simulateQ
   induction oa using OracleComp.inductionOn with
   | pure x => simp [WriterT.run_pure]
   | query_bind t oa ih =>
-    rw [simulateQ_bind, simulateQ_query, WriterT.run_bind, map_bind]
-    have heq : ((query t).cont <$> so (query t).input) = so t := by
-      simp only [OracleQuery.cont_query, id_map, OracleQuery.input_query]
-    rw [heq]
-    refine (bind_congr fun x => ?_).trans (by rw [← bind_map_left, hso t])
-    obtain ⟨a, w₁⟩ := x
-    dsimp only []
-    rw [← LawfulFunctor.comp_map]
-    have : Prod.fst ∘ (fun x : α × ω ↦ (x.1, w₁ * x.2)) = Prod.fst :=
-      funext fun ⟨_, _⟩ => rfl
-    rw [this]
-    exact ih a
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, id_map,
+      OracleQuery.input_query, WriterT.run_bind, map_bind]
+    refine (bind_congr fun ⟨a, w₁⟩ => ?_).trans (by rw [← bind_map_left, hso t])
+    simpa [← LawfulFunctor.comp_map] using ih a
 
+/-- Running a writer-instrumented simulation preserves the failure probability of the
+underlying computation. -/
 lemma probFailure_writerT_run_simulateQ [IsUniformSpec spec]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
     (oa : OracleComp spec α) : Pr[⊥ | (simulateQ so oa).run] = Pr[⊥ | oa] := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t oa h => simp
+  induction oa using OracleComp.inductionOn <;> simp
 
+/-- A writer-instrumented simulation never fails iff the underlying computation never fails. -/
 lemma NeverFail_writerT_run_simulateQ_iff [IsUniformSpec spec]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
     (oa : OracleComp spec α) :
