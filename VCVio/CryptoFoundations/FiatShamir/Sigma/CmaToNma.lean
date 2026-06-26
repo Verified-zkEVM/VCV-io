@@ -70,7 +70,7 @@ noncomputable def simulatedNmaRoSim
     [DecidableEq M] [DecidableEq Commit] :
     QueryImpl (M × Commit →ₒ Chal)
       (StateT (fsRoSpec M Commit Chal).QueryCache
-        (OracleComp (fsRoSpec M Commit Chal))):= fun mc => do
+        (OracleComp (fsRoSpec M Commit Chal))) := fun mc => do
   let cache ← get
   match cache (.inr mc) with
   | some v => pure v
@@ -135,6 +135,72 @@ noncomputable def simulatedNmaAdv
       (Resp := Resp) simTranscript pk)
     (adv.main pk)).run ∅⟩
 
+omit [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Chal] [Inhabited Commit] in
+omit [SampleableType Stmt] [SampleableType Wit] in
+private theorem simulatedNmaFwd_run_hashQueryBound
+    [DecidableEq M] [DecidableEq Commit]
+    (t : (fsRoSpec M Commit Chal).Domain) (s : (fsRoSpec M Commit Chal).QueryCache) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (simulatedNmaFwd (M := M) (Commit := Commit) (Chal := Chal) t).run s)
+      (match t with | .inl _ => 0 | .inr _ => 1) := by
+  cases t with
+  | inl n =>
+      simpa [simulatedNmaFwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply] using
+        nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+          ((nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
+            (.inl n) 0).2 trivial)
+          fun u => show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := pure (u, s)) 0 from trivial
+  | inr mc =>
+      simpa [simulatedNmaFwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply] using
+        nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+          ((nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
+            (.inr mc) 1).2 (Nat.succ_pos 0))
+          fun u => show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := pure (u, s)) 0 from trivial
+
+omit [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Chal] [Inhabited Commit] in
+omit [SampleableType Stmt] [SampleableType Wit] in
+private theorem simulatedNmaRoSim_run_hashQueryBound
+    [DecidableEq M] [DecidableEq Commit]
+    (mc : M × Commit) (s : (fsRoSpec M Commit Chal).QueryCache) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (simulatedNmaRoSim (M := M) (Commit := Commit) (Chal := Chal) mc).run s) 1 := by
+  cases hs : s (.inr mc) with
+  | some v => simp [simulatedNmaRoSim, hs, nmaHashQueryBound]
+  | none =>
+      simpa [simulatedNmaRoSim, hs, nmaHashQueryBound, isQueryBoundP_map_iff] using
+        simulatedNmaFwd_run_hashQueryBound (M := M) (.inr mc) s
+
+omit [Fintype Chal] [Finite Commit] [Finite Resp] [Inhabited Resp] [Inhabited Commit] in
+omit [SampleableType Stmt] [SampleableType Wit] in
+private theorem simulatedNmaSigSim_run_hashQueryBound
+    [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt)
+    (msg : M) (s : (fsRoSpec M Commit Chal).QueryCache) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (simulatedNmaSigSim (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) simTranscript pk msg).run s) 0 := by
+  have : Fintype Chal := Fintype.ofFinite Chal
+  let : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+    IsUniformSpec.ofFintypeInhabited _
+  simpa [simulatedNmaSigSim, nmaHashQueryBound] using
+    (OracleComp.isQueryBoundP_map_iff
+      (oa := (simulateQ (simulatedNmaUnifSim (M := M) (Commit := Commit) (Chal := Chal))
+        (simTranscript pk)).run s)
+      (f := fun a : (Commit × Chal × Resp) × (fsRoSpec M Commit Chal).QueryCache =>
+        match a.2 (.inr (msg, a.1.1)) with
+        | some _ => ((a.1.1, a.1.2.2), a.2)
+        | none => ((a.1.1, a.1.2.2),
+            QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
+      (n := 0)).2
+      (OracleComp.IsQueryBoundP.simulateQ_run_of_step (p := fun _ : ℕ => False)
+        (OracleComp.isQueryBoundP_false _ _) (fun _ h _ => h.elim)
+        (fun n _ s' => by
+          simpa [simulatedNmaUnifSim, nmaHashQueryBound] using
+            simulatedNmaFwd_run_hashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+              (.inl n) s') s)
+
 omit [Finite Commit] [Finite Resp] [Fintype Chal] [Inhabited Chal] in
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Hash-query bound for `simulatedNmaAdv`: if the CMA adversary makes at most
@@ -154,132 +220,25 @@ theorem simulatedNmaAdv_hashQueryBound
     ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := (simulatedNmaAdv (σ := σ) (hr := hr) (M := M)
         (simTranscript := simTranscript) (adv := adv)).main pk) qH := by
-  haveI : Fintype Chal := Fintype.ofFinite Chal
-  haveI : Fintype Resp := Fintype.ofFinite Resp
-  haveI : Fintype Commit := Fintype.ofFinite Commit
-  letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
+  have : Fintype Chal := Fintype.ofFinite Chal
+  have : Fintype Resp := Fintype.ofFinite Resp
+  have : Fintype Commit := Fintype.ofFinite Commit
+  let : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
     IsUniformSpec.ofFintypeInhabited _
-  let spec := unifSpec + (M × Commit →ₒ Chal)
-  let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-  let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
-    fun n => fwd (.inl n)
-  let roSim : QueryImpl (M × Commit →ₒ Chal)
-      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
-    let cache ← get
-    match cache (.inr mc) with
-    | some v => pure v
-    | none => do
-        let v ← fwd (.inr mc)
-        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
-  let baseSim : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-    unifSim + roSim
-  let sigSim : Stmt → QueryImpl (M →ₒ (Commit × Resp))
-      (StateT spec.QueryCache (OracleComp spec)) := fun pk msg => do
-    let (c, ω, s) ← simulateQ unifSim (simTranscript pk)
-    modifyGet fun cache =>
-      match cache (.inr (msg, c)) with
-      | some _ => ((c, s), cache)
-      | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
   intro pk
-  -- Step bound for `fwd`: 0 hash queries on `.inl`, ≤ 1 on `.inr`.
-  have hfwd :
-      ∀ (t : spec.Domain) (s : spec.QueryCache),
-        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := (fwd t).run s) (match t with
-            | .inl _ => 0
-            | .inr _ => 1) := by
-    intro t s
-    cases t with
-    | inl n =>
-        simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
-          OracleComp.liftM_run_StateT] using
-          (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-            (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-              (oa := liftM (spec.query (.inl n))) 0 by
-                exact
-                  (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
-                    (.inl n) 0).2 trivial)
-            (fun u =>
-              show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := pure (u, s)) 0 by
-                  trivial))
-    | inr mc =>
-        simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
-          OracleComp.liftM_run_StateT] using
-          (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-            (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-              (oa := liftM (spec.query (.inr mc))) 1 by
-                exact
-                  (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
-                    (.inr mc) 1).2 (Nat.succ_pos 0))
-            (fun u =>
-              show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := pure (u, s)) 0 by
-                  trivial))
-  have hro :
-      ∀ (mc : M × Commit) (s : spec.QueryCache),
-        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := (roSim mc).run s) 1 := by
-    intro mc s
-    cases hs : s (.inr mc) with
-    | some v =>
-        simp [roSim, hs, nmaHashQueryBound]
-    | none =>
-        simp only [nmaHashQueryBound, Sum.forall, Prod.forall, StateT.run_bind, StateT.run_get,
-          pure_bind, hs, StateT.run_modifyGet, bind_pure_comp, isQueryBoundP_map_iff,
-          roSim] at ⊢ hfwd
-        exact hfwd.2 mc.1 mc.2 s
-  -- Step bound for `sigSim`: signing-oracle simulation issues no live hash queries.
-  -- The transcript is sampled under `unifSim` (uniform-only) and then cached, neither of
-  -- which touches the random oracle.
-  have hsig :
-      ∀ (msg : M) (s : spec.QueryCache),
-        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := (sigSim pk msg).run s) 0 := by
-    intro msg s
-    have htranscript :
-        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := (simulateQ unifSim (simTranscript pk)).run s) 0 := by
-      unfold nmaHashQueryBound
-      refine OracleComp.IsQueryBoundP.simulateQ_run_of_step
-        (p := fun _ : ℕ => False) (impl := unifSim) (oa := simTranscript pk)
-        (OracleComp.isQueryBoundP_false _ _)
-        (fun _ h _ => h.elim)
-        ?_ s
-      intro n _ s'
-      have := hfwd (.inl n) s'
-      simpa [unifSim, nmaHashQueryBound] using this
-    change OracleComp.IsQueryBoundP _ _ _ at htranscript
-    simpa [sigSim, nmaHashQueryBound] using
-      (OracleComp.isQueryBoundP_map_iff
-          (oa := (simulateQ unifSim (simTranscript pk)).run s)
-          (f := fun a : (Commit × Chal × Resp) × spec.QueryCache =>
-            match a.2 (.inr (msg, a.1.1)) with
-            | some _ => ((a.1.1, a.1.2.2), a.2)
-            | none =>
-                ((a.1.1, a.1.2.2),
-                  QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
-          (n := 0)).2 htranscript
-  -- The source `signHashQueryBound` predicate `(· matches .inl (.inr _))` is uniformly
-  -- false on the signing-oracle (`.inr _`) component, so we apply the left-only sum
-  -- transfer lemma. Inside the `.inl _` arm we case on the inner sum and dispatch to
-  -- `hfwd` / `hro`.
   change nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
     (oa := (simulateQ (simulatedNmaImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) simTranscript pk) (adv.main pk)).run ∅) qH
   unfold nmaHashQueryBound simulatedNmaImpl
   refine OracleComp.IsQueryBoundP.simulateQ_run_add_inl_of_step
     (fun _ => Bool.false_ne_true) (hQ pk).2 ?_ ?_ ?_ ∅
-  · intro t hp s'
-    cases t with
-    | inl _ => simp at hp
-    | inr mc => exact hro mc s'
-  · intro t hnp s'
-    cases t with
-    | inl n => exact hfwd (.inl n) s'
-    | inr _ => simp at hnp
+  · rintro (_ | mc) hp s'
+    · simp at hp
+    · exact simulatedNmaRoSim_run_hashQueryBound (M := M) mc s'
+  · rintro (n | _) hnp s'
+    · exact simulatedNmaFwd_run_hashQueryBound (M := M) (.inl n) s'
+    · simp at hnp
   · intro msg s'
-    exact hsig msg s'
+    exact simulatedNmaSigSim_run_hashQueryBound (M := M) (Resp := Resp) simTranscript pk msg s'
 
 end FiatShamir

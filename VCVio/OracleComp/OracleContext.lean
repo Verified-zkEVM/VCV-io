@@ -10,17 +10,15 @@ import VCVio.OracleComp.SimSemantics.Append
 
 This file defines a type `OracleContext ι m` that provides an ambient set of oracles,
 along with an implementation of those oracles in the monad `m`.
-
 -/
 
-universe u v w z
+universe u v w
 
-open OracleSpec OracleComp Polynomial MvPolynomial
+open OracleSpec OracleComp
 
 /-- An `OracleContext ι m` bundles a specification `spec` of oracles with input set `ι`
 and an implementation of the oracles in terms of the monad `m`. -/
-structure OracleContext (ι : Type u) (m : Type v → Type w) :
-      Type (max u v w + 1) where
+structure OracleContext (ι : Type u) (m : Type v → Type w) : Type (max u v w + 1) where
   spec : OracleSpec.{u,v} ι
   impl : QueryImpl spec m
 
@@ -52,17 +50,16 @@ oracles and implementing queries to each independently. -/
   spec := O.spec + O'.spec
   impl := O.impl + O'.impl
 
-instance : HAdd (OracleContext ι m) (OracleContext ι' m)
-    (OracleContext (ι ⊕ ι') m) where
+instance : HAdd (OracleContext ι m) (OracleContext ι' m) (OracleContext (ι ⊕ ι') m) where
   hAdd := OracleContext.add
 
 @[simp] lemma add_def (O : OracleContext ι m) (O' : OracleContext ι' m) :
     O + O' = O.add O' := rfl
 
 lemma spec_add (O : OracleContext ι m) (O' : OracleContext ι' m) :
-    (O + O').spec = O.spec + O'.spec := by simp
+    (O + O').spec = O.spec + O'.spec := rfl
 
 lemma impl_add (O : OracleContext ι m) (O' : OracleContext ι' m) :
-    (O + O').impl = O.impl + O'.impl := by simp
+    (O + O').impl = O.impl + O'.impl := rfl
 
 end OracleContext

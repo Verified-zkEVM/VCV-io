@@ -14,7 +14,6 @@ Wraps the probabilistic seeded forking lemma bounds from
 program logic framework.
 -/
 
-
 open OracleSpec OracleComp ENNReal
 
 namespace OracleComp.ProgramLogic
@@ -36,12 +35,8 @@ theorem triple_seededFork :
        acc * (acc / q - h⁻¹))
       (seededFork main qb js i cf)
       (fun r => if r.isSome then 1 else 0) :=
-  triple_ofLE
-    (le_trans
-      (OracleComp.le_probEvent_isSome_seededFork
-        (main := main) (qb := qb) (js := js) (i := i) (cf := cf))
-      (triple_toLE
-        (triple_probEvent_indicator
-          (oa := seededFork main qb js i cf) (p := fun r => r.isSome))))
+  triple_ofLE <| le_trans
+    (OracleComp.le_probEvent_isSome_seededFork main qb js i cf)
+    (triple_toLE (triple_probEvent_indicator (seededFork main qb js i cf) fun r => r.isSome))
 
 end OracleComp.ProgramLogic

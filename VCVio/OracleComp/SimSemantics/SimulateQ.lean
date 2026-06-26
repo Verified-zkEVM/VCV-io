@@ -48,7 +48,7 @@ def simulateQ' [LawfulMonad r] (impl : QueryImpl spec r) : OracleComp spec →�
 @[simp, grind =, game_rule]
 lemma simulateQ_query [LawfulMonad r] (q : OracleQuery spec α) :
     simulateQ impl (liftM q) = q.cont <$> (impl q.input) := by
-  unfold simulateQ; simp [OracleComp.liftM_def]
+  simp [simulateQ, OracleComp.liftM_def]
 
 /-- Specialized form of `simulateQ_query` for the canonical `spec.query t`
 constructor: `simulateQ impl (liftM (spec.query t)) = impl t`.
@@ -64,7 +64,7 @@ explicit `spec.query t`. -/
 @[simp, grind =]
 lemma simulateQ_spec_query [LawfulMonad r] (t : spec.Domain) :
     simulateQ impl (liftM (spec.query t)) = impl t := by
-  rw [simulateQ_query]; simp
+  simp [simulateQ_query]
 
 /-- Evaluate an oracle computation by answering each query with a total answer function.
 
@@ -89,8 +89,7 @@ theorem evalWithAnswerFn_bind {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id
 theorem evalWithAnswerFn_query {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
     (t : spec.Domain) :
     evalWithAnswerFn f (query t : OracleComp spec _) = f t := by
-  change simulateQ f (liftM (spec.query t)) = f t
-  rw [simulateQ_spec_query]
+  simp [evalWithAnswerFn]
 
 @[simp]
 lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
@@ -154,7 +153,7 @@ variable {ι} {spec : OracleSpec ι} {n : Type u → Type v}
 lemma simulateQ_def (impl : QueryImpl spec n) (mx : OracleComp spec α) :
     simulateQ impl mx = PFunctor.FreeM.mapMHom impl mx := rfl
 
-/-- `QueryImpl.id'` is an identity for `simulateQ` with implementaiton in `OracleComp spec`. -/
+/-- `QueryImpl.id'` is an identity for `simulateQ` with implementation in `OracleComp spec`. -/
 @[simp, grind =]
 lemma simulateQ_id' (mx : OracleComp spec α) :
     simulateQ (QueryImpl.id' spec) mx = mx := by
@@ -263,8 +262,7 @@ theorem simulateQ_StateT_compose
   induction oa using OracleComp.inductionOn generalizing s with
   | pure x => simp [StateT.run_pure]
   | query_bind t f ih =>
-    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query]
-    rw [bridge t s]
+    simp only [simulateQ_bind, StateT.run_bind, simulateQ_spec_query, bridge t s]
     exact bind_congr fun p => ih p.1 p.2
 
 /-- Three-layer simulation collapse: if a "reduction" `red : QueryImpl spec₁ (StateT σ

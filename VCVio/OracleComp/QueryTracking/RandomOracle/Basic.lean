@@ -15,9 +15,7 @@ This is `uniformSampleImpl.withCaching`.
 
 open OracleComp OracleSpec
 
-/-- The (lazy) random oracle: uniform sampling with caching.
-On query `t`, returns the cached value if present, otherwise samples `$ᵗ spec.Range t`
-uniformly and caches the result. This ensures consistency: same input → same output. -/
+/-- The (lazy) random oracle: uniform sampling with caching. -/
 @[inline, reducible] def OracleSpec.randomOracle {ι} [DecidableEq ι] {spec : OracleSpec ι}
     [∀ t : spec.Domain, SampleableType (spec.Range t)] :
     QueryImpl spec (StateT spec.QueryCache ProbComp) :=

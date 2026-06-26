@@ -31,17 +31,8 @@ theorem advantage_hybrid {σ : ℕ → Type}
   induction n with
   | zero => simp
   | succ n ih =>
-    calc (h 0).advantage (s 0) (h (n + 1)) (s (n + 1)) A
-        ≤ (h 0).advantage (s 0) (h n) (s n) A
-            + (h n).advantage (s n) (h (n + 1)) (s (n + 1)) A :=
-          advantage_triangle _ _ _ _ _ _ _
-      _ ≤ (∑ i ∈ Finset.range n,
-            (h i).advantage (s i) (h (i + 1)) (s (i + 1)) A)
-            + (h n).advantage (s n) (h (n + 1)) (s (n + 1)) A := by
-          gcongr
-      _ = ∑ i ∈ Finset.range (n + 1),
-            (h i).advantage (s i) (h (i + 1)) (s (i + 1)) A := by
-          rw [Finset.sum_range_succ]
+    rw [Finset.sum_range_succ]
+    exact (advantage_triangle _ _ _ _ _ _ _).trans (by gcongr)
 
 variable {ιₘ : Type uₘ}
   {M : OracleSpec.{uₘ, 0} ιₘ} {σP σ₀ σ₁ : Type}
@@ -56,6 +47,6 @@ theorem advantage_link_left_eq_advantage_shiftLeft
     (outer.link inner₀).advantage (sP, s₀) (outer.link inner₁) (sP, s₁) A =
       inner₀.advantage s₀ inner₁ s₁ (outer.shiftLeft sP A) := by
   unfold advantage runProb
-  rw [run_link_eq_run_shiftLeft, run_link_eq_run_shiftLeft]
+  simp only [run_link_eq_run_shiftLeft]
 
 end QueryImpl.Stateful

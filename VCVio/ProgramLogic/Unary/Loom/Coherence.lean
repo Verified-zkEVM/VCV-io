@@ -91,7 +91,7 @@ theorem wp_qual_iff_wp_prob_indicator_eq_one
   change (∀ x ∈ support oa, post x) ↔
         wp oa (fun a => if post a then 1 else 0) = 1
   rw [← probEvent_eq_wp_indicator, probEvent_eq_one_iff]
-  exact ⟨fun h => ⟨probFailure_eq_zero (mx := oa), h⟩, fun h => h.2⟩
+  exact (and_iff_right probFailure_eq_zero).symm
 
 /-- Convenience: the `Prob`-valued indicator-as-`wp` form of the
 coherence lemma, for users who have already lifted their post to `Prob`
@@ -100,8 +100,7 @@ theorem wp_qual_iff_wp_prob_indicator_val_eq_one
     (oa : OracleComp spec α) (post : α → Prop) [DecidablePred post] :
     MAlgOrdered.wp (m := OracleComp spec) (l := Prop) oa post ↔
       MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa
-          (fun a => (Prob.indicator (post a)).val) = 1 := by
-  simp only [Prob.val_indicator]
-  exact wp_qual_iff_wp_prob_indicator_eq_one oa post
+          (fun a => (Prob.indicator (post a)).val) = 1 :=
+  wp_qual_iff_wp_prob_indicator_eq_one oa post
 
 end OracleComp.Loom.Coherence

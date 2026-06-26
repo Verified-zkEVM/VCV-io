@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.OracleComp.SimSemantics.StateT.Basic
 import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
 # State-Projection Lemmas for `simulateQ`
@@ -68,25 +68,8 @@ theorem map_run_simulateQ_eq_of_query_map_eq
   | query_bind t oa ih =>
       simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
         OracleQuery.cont_query, id_map, StateT.run_bind, map_bind]
-      calc
-        ((impl₁ t).run s >>= fun x =>
-            Prod.map id proj <$> (simulateQ impl₁ (oa x.1)).run x.2)
-            =
-            ((impl₁ t).run s >>= fun x =>
-              (simulateQ impl₂ (oa x.1)).run (proj x.2)) := by
-                  refine bind_congr fun x => ?_
-                  simpa using ih x.1 x.2
-        _ =
-            ((Prod.map id proj <$> (impl₁ t).run s) >>= fun x =>
-              (simulateQ impl₂ (oa x.1)).run x.2) := by
-                  exact
-                    (bind_map_left (m := m) (Prod.map id proj)
-                      ((impl₁ t).run s)
-                      (fun y => (simulateQ impl₂ (oa y.1)).run y.2)).symm
-        _ =
-            ((impl₂ t).run (proj s) >>= fun x =>
-              (simulateQ impl₂ (oa x.1)).run x.2) := by
-                  rw [hproj t s]
+      rw [← hproj t s, bind_map_left]
+      exact bind_congr fun x => by simpa using ih x.1 x.2
 
 /-- `run'` projection corollary of `map_run_simulateQ_eq_of_query_map_eq`. -/
 theorem run'_simulateQ_eq_of_query_map_eq
@@ -100,8 +83,8 @@ theorem run'_simulateQ_eq_of_query_map_eq
       Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
     (oa : OracleComp spec α) (s : σ₁) :
     (simulateQ impl₁ oa).run' s = (simulateQ impl₂ oa).run' (proj s) := by
-  have hrun := map_run_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s
-  have hmap := congrArg (fun p => Prod.fst <$> p) hrun
+  have hmap := congrArg (fun p => Prod.fst <$> p)
+    (map_run_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s)
   simpa [StateT.run'] using hmap
 
 /-! ## State-projection: invariant-gated -/
@@ -130,34 +113,9 @@ theorem map_run_simulateQ_eq_of_query_map_eq_inv'
   | query_bind t oa ih =>
       simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
         OracleQuery.cont_query, id_map, StateT.run_bind, map_bind]
-      have hbind :
-          (do
-              let x ← (impl₁ t).run s
-              Prod.map id proj <$> (simulateQ impl₁ (oa x.1)).run x.2 :
-                OracleComp spec' (α × σ₂)) =
-            (do
-              let x ← (impl₁ t).run s
-              (simulateQ impl₂ (oa x.1)).run (proj x.2)) :=
-        bind_congr_of_forall_mem_support
-          (mx := ((impl₁ t).run s : OracleComp spec' (spec.Range t × σ₁)))
-          (fun x hx => ih x.1 x.2 (hinv t s hs x hx))
-      calc
-        ((impl₁ t).run s >>= fun x =>
-            Prod.map id proj <$> (simulateQ impl₁ (oa x.1)).run x.2)
-            =
-            ((impl₁ t).run s >>= fun x =>
-              (simulateQ impl₂ (oa x.1)).run (proj x.2)) := hbind
-        _ =
-            ((Prod.map id proj <$> (impl₁ t).run s) >>= fun x =>
-              (simulateQ impl₂ (oa x.1)).run x.2) := by
-                  exact
-                    (bind_map_left (m := OracleComp spec') (Prod.map id proj)
-                      ((impl₁ t).run s)
-                      (fun y => (simulateQ impl₂ (oa y.1)).run y.2)).symm
-        _ =
-            ((impl₂ t).run (proj s) >>= fun x =>
-              (simulateQ impl₂ (oa x.1)).run x.2) := by
-                  rw [hproj t s hs]
+      rw [← hproj t s hs, bind_map_left]
+      exact bind_congr_of_forall_mem_support _ fun x hx => by
+        simpa using ih x.1 x.2 (hinv t s hs x hx)
 
 /-- Query-step invariant preservation lifts to any full simulation. This is the
 support-preservation half of `map_run_simulateQ_eq_of_query_map_eq_inv'`,
@@ -173,15 +131,12 @@ theorem simulateQ_run_preserves_inv_of_query
     (oa : OracleComp spec α) (s : σ) (hs : inv s) :
     ∀ y ∈ support (m := OracleComp spec') ((simulateQ impl oa).run s), inv y.2 := by
   induction oa using OracleComp.inductionOn generalizing s with
-  | pure x =>
-      intro y hy
-      have hy' : y = (x, s) := by simpa using hy
-      simpa [hy'] using hs
+  | pure x => simpa using hs
   | query_bind t oa ih =>
       intro y hy
       simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-        OracleQuery.cont_query, id_map, StateT.run_bind] at hy
-      rcases (mem_support_bind_iff _ _ _).1 hy with ⟨x, hx, hyx⟩
+        OracleQuery.cont_query, id_map, StateT.run_bind, mem_support_bind_iff] at hy
+      obtain ⟨x, hx, hyx⟩ := hy
       exact ih x.1 x.2 (hinv t s hs x hx) y hyx
 
 /-- Invariant-gated state-projection theorem for a simulated prefix followed by
@@ -206,35 +161,10 @@ theorem map_run_simulateQ_bind_eq_of_query_map_eq_inv'
     Prod.map id proj <$> ((simulateQ impl₁ oa >>= k₁).run s) =
       ((simulateQ impl₂ oa >>= k₂).run (proj s)) := by
   simp only [StateT.run_bind, map_bind]
-  have hpres :=
-    simulateQ_run_preserves_inv_of_query impl₁ inv hinv oa s hs
-  have hcont :
-      ((simulateQ impl₁ oa).run s >>= fun x =>
-          Prod.map id proj <$> (k₁ x.1).run x.2) =
-        ((simulateQ impl₁ oa).run s >>= fun x =>
-          (k₂ x.1).run (proj x.2)) :=
-    bind_congr_of_forall_mem_support
-      (mx := ((simulateQ impl₁ oa).run s :
-        OracleComp spec' (α × σ₁)))
-      (fun x hx => hk x.1 x.2 (hpres x hx))
-  calc
-    ((simulateQ impl₁ oa).run s >>= fun x =>
-        Prod.map id proj <$> (k₁ x.1).run x.2)
-        =
-        ((simulateQ impl₁ oa).run s >>= fun x =>
-          (k₂ x.1).run (proj x.2)) := hcont
-    _ =
-        ((Prod.map id proj <$> (simulateQ impl₁ oa).run s) >>= fun x =>
-          (k₂ x.1).run x.2) := by
-              exact
-                (bind_map_left (m := OracleComp spec') (Prod.map id proj)
-                  ((simulateQ impl₁ oa).run s)
-                  (fun y => (k₂ y.1).run y.2)).symm
-    _ =
-        ((simulateQ impl₂ oa).run (proj s) >>= fun x =>
-          (k₂ x.1).run x.2) := by
-              rw [map_run_simulateQ_eq_of_query_map_eq_inv'
-                impl₁ impl₂ inv proj hinv hproj oa s hs]
+  have hpres := simulateQ_run_preserves_inv_of_query impl₁ inv hinv oa s hs
+  rw [← map_run_simulateQ_eq_of_query_map_eq_inv' impl₁ impl₂ inv proj hinv hproj oa s hs,
+    bind_map_left]
+  exact bind_congr_of_forall_mem_support _ fun x hx => hk x.1 x.2 (hpres x hx)
 
 /-- `run'` projection corollary of `map_run_simulateQ_eq_of_query_map_eq_inv'`. -/
 theorem run'_simulateQ_eq_of_query_map_eq_inv'
@@ -250,9 +180,8 @@ theorem run'_simulateQ_eq_of_query_map_eq_inv'
       Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
     (oa : OracleComp spec α) (s : σ₁) (hs : inv s) :
     (simulateQ impl₁ oa).run' s = (simulateQ impl₂ oa).run' (proj s) := by
-  have hrun :=
-    map_run_simulateQ_eq_of_query_map_eq_inv' impl₁ impl₂ inv proj hinv hproj oa s hs
-  have hmap := congrArg (fun p => Prod.fst <$> p) hrun
+  have hmap := congrArg (fun p => Prod.fst <$> p)
+    (map_run_simulateQ_eq_of_query_map_eq_inv' impl₁ impl₂ inv proj hinv hproj oa s hs)
   simpa [StateT.run'] using hmap
 
 end OracleComp
@@ -296,10 +225,7 @@ theorem run_eq {α : Type}
     Prod.map id orn.proj <$> (simulateQ decorated oa).run s =
       (simulateQ base oa).run (orn.proj s) :=
   OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'
-    decorated base orn.inv orn.proj
-    (fun t s hs => orn.preserves_inv t s hs)
-    (fun t s hs => orn.project_step t s hs)
-    oa s hs
+    decorated base orn.inv orn.proj orn.preserves_inv orn.project_step oa s hs
 
 /-- Output-only corollary of `QueryImpl.StateOrnament.run_eq`. -/
 theorem run'_eq {α : Type}
@@ -307,8 +233,7 @@ theorem run'_eq {α : Type}
     (oa : OracleComp spec α) (s : σ) (hs : orn.inv s) :
     (simulateQ decorated oa).run' s =
       (simulateQ base oa).run' (orn.proj s) := by
-  have h := orn.run_eq oa s hs
-  have hmap := congrArg (fun p => Prod.fst <$> p) h
+  have hmap := congrArg (fun p => Prod.fst <$> p) (orn.run_eq oa s hs)
   simpa [StateT.run'] using hmap
 
 end StateOrnament
@@ -355,15 +280,10 @@ theorem simulateQ_run_eq_of_snd_invariant
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
       OracleQuery.cont_query, id_map, StateT.run_bind]
     rw [map_bind]
-    conv_rhs =>
-      rw [show (QueryImpl.fixSndStateT impl q₀ t).run s =
-        Prod.map id Prod.fst <$> (impl t).run (s, q₀) from rfl]
-    rw [bind_map_left]
+    simp only [QueryImpl.fixSndStateT, StateT.run, StateT.mk, bind_map_left]
     refine OracleComp.bind_congr_of_forall_mem_support _ (fun ⟨u, s', q'⟩ hx => ?_)
-    have hq : q' = q₀ := h_inv t s ⟨u, s', q'⟩ hx
-    subst hq
-    simp only [Prod.map, id]
-    exact ih u s'
+    obtain rfl := h_inv t s ⟨u, s', q'⟩ hx
+    simpa [Prod.map, id] using ih u s'
 
 /-- `run'` projection corollary of `simulateQ_run_eq_of_snd_invariant`. -/
 theorem simulateQ_run'_eq_of_snd_invariant
@@ -375,10 +295,8 @@ theorem simulateQ_run'_eq_of_snd_invariant
     (oa : OracleComp spec α) (s : σ) :
     (simulateQ impl oa).run' (s, q₀) =
     (simulateQ (QueryImpl.fixSndStateT impl q₀) oa).run' s := by
-  have hrun := simulateQ_run_eq_of_snd_invariant impl q₀ h_inv oa s
-  change Prod.fst <$> (simulateQ impl oa).run (s, q₀) =
-    Prod.fst <$> (simulateQ (QueryImpl.fixSndStateT impl q₀) oa).run s
-  rw [hrun, Functor.map_map]
+  simpa [StateT.run'] using congrArg (fun p => Prod.fst <$> p)
+    (simulateQ_run_eq_of_snd_invariant impl q₀ h_inv oa s)
 
 end OracleComp
 
@@ -454,12 +372,6 @@ theorem extendState_run_proj_eq
     (impl₁ := QueryImpl.extendState so aux) (impl₂ := so)
     (proj := Prod.fst) ?_ oa (s, q)
   intro t ⟨s', q'⟩
-  change Prod.map id Prod.fst <$>
-      ((so t).run s' >>= fun p => pure (p.1, (p.2, aux t s' p.1 p.2 q'))) =
-      (so t).run s'
-  rw [map_bind]
-  conv_rhs => rw [← bind_pure ((so t).run s')]
-  refine bind_congr fun ⟨u, s''⟩ => ?_
   simp
 
 /-- `run'` projection corollary of `extendState_run_proj_eq`: dropping both the auxiliary `Q`
@@ -473,8 +385,7 @@ theorem extendState_run'_eq
     (oa : OracleComp spec α) (s : σ) (q : Q) :
     (simulateQ (QueryImpl.extendState so aux) oa).run' (s, q) =
       (simulateQ so oa).run' s := by
-  have h := extendState_run_proj_eq so aux oa s q
-  have hmap := congrArg (fun p => Prod.fst <$> p) h
+  have hmap := congrArg (fun p => Prod.fst <$> p) (extendState_run_proj_eq so aux oa s q)
   simpa [StateT.run'] using hmap
 
 /-- Forgetting the left auxiliary `Q` component commutes with the full
@@ -491,12 +402,6 @@ theorem extendStateLeft_run_proj_eq
     (impl₁ := QueryImpl.extendStateLeft so aux) (impl₂ := so)
     (proj := Prod.snd) ?_ oa (q, s)
   intro t ⟨q', s'⟩
-  change Prod.map id Prod.snd <$>
-      ((so t).run s' >>= fun p => pure (p.1, (aux t s' p.1 p.2 q', p.2))) =
-      (so t).run s'
-  rw [map_bind]
-  conv_rhs => rw [← bind_pure ((so t).run s')]
-  refine bind_congr fun ⟨u, s''⟩ => ?_
   simp
 
 /-- `run'` projection corollary of `extendStateLeft_run_proj_eq`. -/
@@ -508,8 +413,7 @@ theorem extendStateLeft_run'_eq
     (oa : OracleComp spec α) (s : σ) (q : Q) :
     (simulateQ (QueryImpl.extendStateLeft so aux) oa).run' (q, s) =
       (simulateQ so oa).run' s := by
-  have h := extendStateLeft_run_proj_eq so aux oa s q
-  have hmap := congrArg (fun p => Prod.fst <$> p) h
+  have hmap := congrArg (fun p => Prod.fst <$> p) (extendStateLeft_run_proj_eq so aux oa s q)
   simpa [StateT.run'] using hmap
 
 end OracleComp

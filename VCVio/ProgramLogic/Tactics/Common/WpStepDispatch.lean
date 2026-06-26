@@ -65,8 +65,7 @@ private def traceWpStepCacheEvent (event : String) (declName : Name) : MetaM Uni
   if vcvio.vcgen.traceCachedRules.get (← getOptions) then
     logInfo m!"[wpstep cache] {event} `{declName}`"
 
-private def getWpStepRewriteRuleCached (declName : Name) :
-    MetaM Lean.Meta.Sym.Simp.Theorem := do
+private def getWpStepRewriteRuleCached (declName : Name) : MetaM Lean.Meta.Sym.Simp.Theorem := do
   let cache ← wpStepRewriteRuleCache.get
   match cache[declName]? with
   | some thm =>
@@ -86,8 +85,7 @@ private def getWpStepRewriteRuleCached (declName : Name) :
       wpStepRewriteRuleCache.modify fun cache => cache.insert declName thm
       return thm
 
-private def wpStepMethods (thm : Lean.Meta.Sym.Simp.Theorem) :
-    Lean.Meta.Sym.Simp.Methods :=
+private def wpStepMethods (thm : Lean.Meta.Sym.Simp.Theorem) : Lean.Meta.Sym.Simp.Methods :=
   let thms := ({} : Lean.Meta.Sym.Simp.Theorems).insert thm
   { post := thms.rewrite }
 

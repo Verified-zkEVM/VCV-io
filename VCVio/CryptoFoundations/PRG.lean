@@ -3,9 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.Constructions.SampleableType
+import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.ProbComp
 
 /-!
 # Pseudorandom Generators (PRGs)
@@ -24,7 +24,6 @@ from a truly random output `r`.
 - `prgIdealExp` — the ideal experiment (adversary sees random `r`).
 - `prgAdvantage` — distinguishing advantage.
 -/
-
 
 open OracleComp OracleSpec ENNReal
 
@@ -50,8 +49,7 @@ def prgRealExp [SampleableType S] (prg : PRGScheme S R) (adversary : PRGAdversar
   adversary (prg.gen s)
 
 /-- Ideal PRG experiment: let the adversary see a uniformly random value. -/
-def prgIdealExp [SampleableType R] (adversary : PRGAdversary R) :
-    ProbComp Bool := do
+def prgIdealExp [SampleableType R] (adversary : PRGAdversary R) : ProbComp Bool := do
   let r ← $ᵗ R
   adversary r
 

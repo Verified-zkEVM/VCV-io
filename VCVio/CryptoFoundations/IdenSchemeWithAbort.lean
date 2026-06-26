@@ -3,8 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.EvalDist.TVDist
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Identification Scheme with Aborts
@@ -41,7 +41,6 @@ The structure follows the EasyCrypt formalization in `IDSabort.ec` (formosa-cryp
   (CRYPTO 2023, ePrint 2023/246)
 - EasyCrypt `IDSabort.ec`
 -/
-
 
 open OracleSpec OracleComp
 
@@ -106,19 +105,9 @@ lemma verify_of_complete (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Cha
     (hc : ids.Complete) {s : Stmt} {w : Wit} (hrel : rel s w = true)
     {cm : Commit} {c : Chal} {z : Resp}
     (h_mem : some (cm, c, z) ∈ support (ids.honestExecution s w)) :
-    ids.verify s cm c z = true := by
-  have h := hc s w hrel
-  rw [probOutput_eq_one_iff] at h
-  have hsup := h.2
-  have : ids.verify s cm c z ∈ support (do
-      let t? ← ids.honestExecution s w
-      return match t? with
-        | some (cm, c, z) => ids.verify s cm c z
-        | none => true) := by
-    rw [support_bind]
-    exact Set.mem_iUnion₂.mpr ⟨some (cm, c, z), h_mem, by simp⟩
-  rw [hsup] at this
-  simpa using this
+    ids.verify s cm c z = true :=
+  ((probOutput_eq_one_iff_forall _ _).1 (hc s w hrel)).2 _
+    ((mem_support_bind_iff _ _ _).2 ⟨_, h_mem, by simp⟩)
 
 end Completeness
 
@@ -151,20 +140,7 @@ lemma perfectHVZK_iff_hvzk_zero
     (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
     (sim : Stmt → ProbComp (Option (Commit × Chal × Resp))) :
     ids.PerfectHVZK sim ↔ ids.HVZK sim 0 := by
-  constructor
-  · intro h
-    dsimp [HVZK]
-    intro s w hs
-    have hzero : tvDist (ids.honestExecution s w) (sim s) = 0 := by
-      simpa using (tvDist_eq_zero_iff (ids.honestExecution s w) (sim s)).2 (h s w hs)
-    exact le_of_eq hzero
-  · intro h
-    dsimp [HVZK] at h
-    intro s w hs
-    have hzero : tvDist (ids.honestExecution s w) (sim s) = 0 :=
-      le_antisymm (h s w hs) (by
-        simpa using (tvDist_nonneg (ids.honestExecution s w) (sim s)))
-    simpa using (tvDist_eq_zero_iff (ids.honestExecution s w) (sim s)).mp hzero
+  simp [PerfectHVZK, HVZK, ← tvDist_eq_zero_iff, le_antisymm_iff, tvDist_nonneg]
 
 end HVZK
 

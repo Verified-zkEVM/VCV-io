@@ -39,6 +39,6 @@ theorem GameEquiv.of_approxRelTriple_zero
     (h : Relational.ApproxRelTriple (spec₁ := spec₁) (spec₂ := spec₁) 0 g₁ g₂
       (Relational.EqRel α)) :
     GameEquiv g₁ g₂ :=
-  GameEquiv.of_relTriple' ((Relational.relTriple'_eq_approxRelTriple_zero).mpr h)
+  GameEquiv.of_relTriple' (Relational.relTriple'_eq_approxRelTriple_zero.mpr h)
 
 end OracleComp.ProgramLogic

@@ -27,10 +27,10 @@ variable {ι : Type u} {spec : OracleSpec ι}
 variable [IsUniformSpec spec]
 variable {α β : Type}
 
+open Classical in
 /-- Proposition-level bridge from quantitative WP (`= 1` threshold). -/
-noncomputable def wpProp (oa : OracleComp spec α) (post : α → Prop) : Prop := by
-  classical
-  exact wp oa (fun x => if post x then 1 else 0) = 1
+noncomputable def wpProp (oa : OracleComp spec α) (post : α → Prop) : Prop :=
+  wp oa (fun x => if post x then 1 else 0) = 1
 
 /-- Proposition-style triple alias used by the `Std.Do` bridge. -/
 def tripleProp (pre : Prop) (oa : OracleComp spec α) (post : α → Prop) : Prop :=
@@ -40,21 +40,12 @@ def tripleProp (pre : Prop) (oa : OracleComp spec α) (post : α → Prop) : Pro
 theorem wpProp_iff_probEvent_eq_one (oa : OracleComp spec α) (p : α → Prop) :
     wpProp (spec := spec) oa p ↔ Pr[ p | oa] = 1 := by
   classical
-  let _ : DecidablePred p := Classical.decPred p
-  constructor <;> intro h
-  · simpa [wpProp, OracleComp.ProgramLogic.probEvent_eq_wp_indicator (spec := spec) oa p] using h
-  · simpa [wpProp, OracleComp.ProgramLogic.probEvent_eq_wp_indicator (spec := spec) oa p] using h
+  simp [wpProp, OracleComp.ProgramLogic.probEvent_eq_wp_indicator (spec := spec) oa p]
 
 /-- Support-based characterization of almost-sure postconditions for `OracleComp`. -/
 theorem wpProp_iff_forall_support (oa : OracleComp spec α) (p : α → Prop) :
     wpProp (spec := spec) oa p ↔ ∀ x ∈ support oa, p x := by
-  rw [wpProp_iff_probEvent_eq_one]
-  constructor
-  · intro h
-    exact (probEvent_eq_one_iff (mx := oa) (p := p)).1 h |>.2
-  · intro h
-    exact probEvent_eq_one (mx := oa) (p := p)
-      ⟨probFailure_of_liftM_PMF oa, h⟩
+  simp [wpProp_iff_probEvent_eq_one]
 
 /-- `wpProp` rule for `pure`. -/
 theorem wpProp_pure (x : α) (p : α → Prop) :
@@ -77,21 +68,13 @@ theorem wpProp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β) (
 private theorem wpProp_and (oa : OracleComp spec α) (p q : α → Prop) :
     wpProp (spec := spec) oa (fun a => p a ∧ q a) ↔
       wpProp oa p ∧ wpProp oa q := by
-  rw [wpProp_iff_forall_support, wpProp_iff_forall_support, wpProp_iff_forall_support]
-  constructor
-  · intro h
-    exact ⟨fun x hx => (h x hx).1, fun x hx => (h x hx).2⟩
-  · intro h x hx
-    exact ⟨h.1 x hx, h.2 x hx⟩
+  grind [wpProp_iff_forall_support]
 
 /-- `Std.Do` `WP` instance for `OracleComp`, scoped to almost-sure correctness. -/
 noncomputable instance instWPOracleComp : Std.Do.WP (OracleComp spec) .pure where
   wp oa :=
     { trans := fun Q => ⌜wpProp (spec := spec) oa (fun a => (Q.1 a).down)⌝
-      conjunctiveRaw := by
-        intro Q₁ Q₂
-        apply SPred.pure_congr
-        simp [wpProp_and] }
+      conjunctiveRaw := fun Q₁ Q₂ => SPred.pure_congr (by simp [wpProp_and]) }
 
 /-- `Std.Do` `WPMonad` instance for `OracleComp` under `wpProp`. -/
 noncomputable instance instWPMonadOracleComp : Std.Do.WPMonad (OracleComp spec) .pure where
@@ -99,12 +82,9 @@ noncomputable instance instWPMonadOracleComp : Std.Do.WPMonad (OracleComp spec) 
   toWP := instWPOracleComp (spec := spec)
   wp_pure a := by
     ext Q
-    change wpProp (spec := spec) (pure a) (fun a => (Q.1 a).down) ↔ (Q.1 a).down
     exact wpProp_pure a _
   wp_bind x f := by
     ext Q
-    change wpProp (spec := spec) (x >>= f) (fun b => (Q.1 b).down) ↔
-      wpProp x (fun a => wpProp (f a) (fun b => (Q.1 b).down))
     exact wpProp_bind x f _
 
 /-! ## Support-based bridge for stateful transformers over `OracleComp`
@@ -130,16 +110,11 @@ theorem triple_stateT_iff_forall_support {σ α : Type}
     Std.Do.Triple mx P Q ↔
       ∀ s : σ, (P s).down →
         ∀ a s', (a, s') ∈ support (mx.run s) → (Q.1 a s').down := by
-  classical
   rw [Std.Do.Triple.iff]
   simp only [SPred.entails_1]
-  refine forall_congr' (fun s => ?_)
-  refine imp_congr_right (fun _hP => ?_)
+  refine forall_congr' (fun s => imp_congr_right (fun _hP => ?_))
   change wpProp (spec := spec) (mx.run s) (fun p => (Q.1 p.1 p.2).down) ↔ _
-  rw [wpProp_iff_forall_support]
-  constructor
-  · intro h a s' hmem; exact h (a, s') hmem
-  · intro h p hmem; exact h p.1 p.2 hmem
+  rw [wpProp_iff_forall_support, Prod.forall]
 
 /-- Support characterization of `Std.Do.Triple` on `WriterT ω (OracleComp spec)`.
 
@@ -158,17 +133,12 @@ theorem triple_writerT_iff_forall_support {ω α : Type}
     Std.Do.Triple mx P Q ↔
       ∀ s : ω, (P s).down →
         ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s ++ w)).down := by
-  classical
   rw [Std.Do.Triple.iff]
   simp only [SPred.entails_1]
-  refine forall_congr' (fun s => ?_)
-  refine imp_congr_right (fun _hP => ?_)
+  refine forall_congr' (fun s => imp_congr_right (fun _hP => ?_))
   change wpProp (spec := spec) mx.run
       (fun p => (Q.1 p.1 (s ++ p.2)).down) ↔ _
-  rw [wpProp_iff_forall_support]
-  constructor
-  · intro h a w hmem; exact h (a, w) hmem
-  · intro h p hmem; exact h p.1 p.2 hmem
+  rw [wpProp_iff_forall_support, Prod.forall]
 
 /-- `Monoid`-variant of `triple_writerT_iff_forall_support`.
 
@@ -186,17 +156,12 @@ theorem triple_writerT_iff_forall_support_monoid {ω α : Type} [Monoid ω]
     Std.Do.Triple mx P Q ↔
       ∀ s : ω, (P s).down →
         ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s * w)).down := by
-  classical
   rw [Std.Do.Triple.iff]
   simp only [SPred.entails_1]
-  refine forall_congr' (fun s => ?_)
-  refine imp_congr_right (fun _hP => ?_)
+  refine forall_congr' (fun s => imp_congr_right (fun _hP => ?_))
   change wpProp (spec := spec) mx.run
       (fun p => (Q.1 p.1 (s * p.2)).down) ↔ _
-  rw [wpProp_iff_forall_support]
-  constructor
-  · intro h a w hmem; exact h (a, w) hmem
-  · intro h p hmem; exact h p.1 p.2 hmem
+  rw [wpProp_iff_forall_support, Prod.forall]
 
 end StatefulBridges
 
@@ -209,8 +174,7 @@ unfolds to `liftM (OracleSpec.query t)`. -/
 @[spec] theorem query (t : spec.Domain) {Q : Std.Do.PostCond (spec.Range t) .pure} :
     Std.Do.Triple (HasQuery.query t : OracleComp spec (spec.Range t))
       (⌜wpProp (spec := spec) (HasQuery.query t) (fun a => (Q.1 a).down)⌝)
-      Q := by
-  simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
+      Q := .rfl
 
 /-- Bind-chain specification shape for `mspec`/`mvcgen` in OracleComp do-blocks. -/
 @[spec] theorem query_bind (t : spec.Domain) {f : spec.Range t → OracleComp spec α}
@@ -218,8 +182,7 @@ unfolds to `liftM (OracleSpec.query t)`. -/
     Std.Do.Triple ((HasQuery.query t : OracleComp spec (spec.Range t)) >>= f)
       (⌜wpProp (spec := spec)
         ((HasQuery.query t : OracleComp spec (spec.Range t)) >>= f) (fun a => (Q.1 a).down)⌝)
-      Q := by
-  simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
+      Q := .rfl
 
 /-- Explicit-head spec for the `MonadLift OracleQuery OracleComp`-form of `query`.
 

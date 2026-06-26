@@ -3,9 +3,9 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.OracleComp.SimSemantics.SimulateQ
-import Mathlib.Data.Set.Card
 import Mathlib.Data.Real.ENatENNReal
+import Mathlib.Data.Set.Card
+import VCVio.OracleComp.SimSemantics.SimulateQ
 
 /-!
 # Structures For Tracking a Computation's Oracle Queries
@@ -60,14 +60,7 @@ instance : PartialOrder (QueryCache spec) where
   le c₁ c₂ := ∀ ⦃t⦄ ⦃u : spec.Range t⦄, c₁ t = some u → c₂ t = some u
   le_refl _ _ _ h := h
   le_trans _ _ _ h₁₂ h₂₃ _ _ h := h₂₃ (h₁₂ h)
-  le_antisymm a b hab hba := by
-    funext t
-    cases ha : a t with
-    | none =>
-      cases hb : b t with
-      | none => rfl
-      | some u => exact absurd (hba hb) (by simp [ha])
-    | some u => exact (hab ha).symm
+  le_antisymm a b hab hba := by funext t; aesop
 
 instance : OrderBot (QueryCache spec) where
   bot := ∅
@@ -142,36 +135,13 @@ omit [spec.DecidableEq] in
 lemma agreesWithFn_cacheQuery_iff (t : spec.Domain) (u : spec.Range t) (f : QueryImpl spec Id)
     (hcache : cache t = none) :
     (cache.cacheQuery t u).AgreesWithFn f ↔ cache.AgreesWithFn f ∧ f t = u := by
-  classical
-  refine ⟨fun h => ⟨?_, ?_⟩, fun ⟨h1, h2⟩ => ?_⟩
-  · intro t' r' hr'
-    by_cases htt : t' = t
-    · subst htt
-      rw [hcache] at hr'
-      exact absurd hr' (by simp)
-    · exact h (by rw [cacheQuery_of_ne _ _ htt]; exact hr')
-  · exact h (by simp)
-  · intro t' r' hr'
-    by_cases htt : t' = t
-    · subst htt
-      have hrun : (cache.cacheQuery t' u) t' = some u := by simp
-      rw [hrun] at hr'
-      cases hr'
-      exact h2
-    · exact h1 (by rw [cacheQuery_of_ne _ _ htt] at hr'; exact hr')
+  grind [AgreesWithFn, cacheQuery_self, cacheQuery_of_ne, cacheQuery]
 
 omit [spec.DecidableEq] in
 lemma toSet_cacheQuery_subset_insert (t : spec.Domain) (u : spec.Range t) :
     (cache.cacheQuery t u).toSet ⊆ insert ⟨t, u⟩ cache.toSet := by
   rintro ⟨t', u'⟩ hmem
-  by_cases ht : t' = t
-  · subst ht
-    have hu : u = u' := by
-      simpa [mem_toSet] using hmem
-    subst hu
-    exact Set.mem_insert _ _
-  · exact Or.inr (by
-      simpa [mem_toSet, cacheQuery_of_ne cache u ht] using hmem)
+  rcases eq_or_ne t' t with rfl | ht <;> simp_all [cacheQuery]
 
 omit [spec.DecidableEq] in
 lemma toSet_encard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
@@ -182,31 +152,21 @@ lemma toSet_encard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
 omit [spec.DecidableEq] in
 lemma enncard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
     enncard (cache.cacheQuery t u) ≤ enncard cache + 1 := by
-  have hencard :
-      (cache.cacheQuery t u).toSet.encard ≤ cache.toSet.encard + 1 :=
-    toSet_encard_cacheQuery_le cache t u
-  change ((cache.cacheQuery t u).toSet.encard : ℝ≥0∞) ≤
-    (cache.toSet.encard : ℝ≥0∞) + (1 : ℝ≥0∞)
-  rw [← ENat.toENNReal_one, ← ENat.toENNReal_add]
-  exact ENat.toENNReal_mono hencard
+  simp only [enncard]
+  exact_mod_cast toSet_encard_cacheQuery_le cache t u
 
 omit [spec.DecidableEq] in
 lemma le_cacheQuery {t : spec.Domain} {u : spec.Range t} (h : cache t = none) :
     cache ≤ cache.cacheQuery t u := by
-  intro t' u' ht'
-  by_cases heq : t' = t
-  · subst heq; simp [h] at ht'
-  · rwa [cacheQuery_of_ne cache u heq]
+  grind [cacheQuery_self, cacheQuery_of_ne, le_def]
 
 omit [spec.DecidableEq] in
 lemma cacheQuery_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) (t : spec.Domain)
     (u : spec.Range t) : c₁.cacheQuery t u ≤ c₂.cacheQuery t u := by
   intro t' u' ht'
-  by_cases heq : t' = t
-  · subst heq; simp only [cacheQuery_self] at ht' ⊢; exact ht'
-  · have h₁ := cacheQuery_of_ne c₁ u heq
-    have h₂ := cacheQuery_of_ne c₂ u heq
-    rw [h₁] at ht'; rw [h₂]; exact h ht'
+  rcases eq_or_ne t' t with rfl | heq
+  · simpa only [cacheQuery_self] using ht'
+  · exact cacheQuery_of_ne c₂ u heq ▸ h (cacheQuery_of_ne c₁ u heq ▸ ht')
 
 omit [spec.DecidableEq] in
 @[simp]
@@ -318,15 +278,7 @@ def single [DecidableEq ι] (i : ι) : QueryCount ι := Function.update 0 i 1
 @[simp]
 lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount ι) :
     single i ≤ qc ↔ 0 < qc i := by
-  constructor <;> intro h
-  · have := h i
-    simp [single, Function.update_self] at this
-    omega
-  · intro j
-    simp only [single]
-    by_cases hj : j = i
-    · subst hj; simp [Function.update_self]; omega
-    · simp [Function.update_of_ne hj]
+  simp [single, update_le_iff, Nat.lt_iff_add_one_le]
 
 end QueryCount
 
@@ -365,8 +317,6 @@ instance [spec.DecidableEq] : DecidableEq (QueryLog spec) :=
 
 section getQ
 
--- variable [DecidableEq ι]
-
 /-- Get all the queries with inputs satisfying `p` -/
 def getQ (log : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] :
     List ((t : spec.Domain) × spec.Range t) :=
@@ -392,13 +342,11 @@ lemma getQ_append (log log' : QueryLog spec) (p : spec.Domain → Prop) [Decidab
     (log ++ log').getQ p = log.getQ p ++ log'.getQ p := by
   induction log with
   | nil => rfl
-  | cons hd tl ih => simp [ih]; split_ifs <;> simp
+  | cons hd tl ih => grind [getQ_cons]
 
 end getQ
 
 section countQ
-
--- variable [DecidableEq ι]
 
 /-- Count the number of queries with inputs satisfying `p`. -/
 def countQ (log : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] : ℕ :=
@@ -408,7 +356,7 @@ def countQ (log : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] : 
 lemma countQ_singleton (t : spec.Domain) (u : spec.Range t)
     (p : spec.Domain → Prop) [DecidablePred p] :
     countQ (singleton t u) p = if p t then 1 else 0 := by
-  simp [countQ]; split_ifs <;> rfl
+  simp [countQ, apply_ite List.length]
 
 @[simp]
 lemma countQ_append (log log' : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] :
@@ -426,54 +374,25 @@ lemma getQ_ne_nil_iff_mem_map_fst [spec.DecidableEq]
     (log : QueryLog spec) (t : spec.Domain) :
     log.getQ (· = t) ≠ [] ↔ t ∈ log.map (fun e => e.1) := by
   induction log with
-  | nil =>
-      simp [getQ]
-  | cons hd tl ih =>
-      by_cases h : hd.1 = t
-      · simp [List.map, List.mem_cons, getQ_cons, h]
-      · have hne : t ≠ hd.1 := by
-          simpa [eq_comm] using h
-        constructor
-        · intro hq
-          have hq' : getQ tl (· = t) ≠ [] := by
-            simpa [getQ_cons, h] using hq
-          simpa [List.map, List.mem_cons] using Or.inr (ih.mp hq')
-        · intro hm
-          have hm_cons : t = hd.1 ∨ t ∈ tl.map (fun e => e.1) := by
-            simpa [List.map, List.mem_cons] using hm
-          have hm' : t ∈ tl.map (fun e => e.1) := by
-            rcases hm_cons with hm | hm
-            · exact (hne hm).elim
-            · exact hm
-          have hq' : getQ tl (· = t) ≠ [] := ih.mpr hm'
-          simpa [getQ_cons, h] using hq'
+  | nil => simp
+  | cons hd tl ih => rcases eq_or_ne hd.1 t with h | h <;> simp [List.mem_map, ih, h, Ne.symm]
 
 lemma wasQueried_eq_decide_mem_map_fst [spec.DecidableEq]
     (log : QueryLog spec) (t : spec.Domain) :
-    log.wasQueried t = decide (t ∈ log.map (fun e => e.1)) := by
-  by_cases hq : log.getQ (· = t) ≠ []
-  · have hm : t ∈ log.map (fun e => e.1) :=
-      (getQ_ne_nil_iff_mem_map_fst log t).mp hq
-    simp [wasQueried, hq, hm]
-  · have hm : t ∉ log.map (fun e => e.1) := by
-      intro hm
-      exact hq ((getQ_ne_nil_iff_mem_map_fst log t).mpr hm)
-    simp [wasQueried, hq, hm]
+    log.wasQueried t = decide (t ∈ log.map (fun e => e.1)) :=
+  decide_eq_decide.mpr (getQ_ne_nil_iff_mem_map_fst log t)
 
 @[simp]
 lemma wasQueried_cons_self [spec.DecidableEq] {t : spec.Domain} {u : spec.Range t}
     {log : QueryLog spec} :
     wasQueried (⟨t, u⟩ :: log) t = true := by
-  rw [wasQueried_eq_decide_mem_map_fst]
-  simp [List.mem_cons]
+  simp [wasQueried_eq_decide_mem_map_fst]
 
 @[simp]
 lemma wasQueried_cons_of_ne [spec.DecidableEq] {t t' : spec.Domain}
     {u : spec.Range t'} {log : QueryLog spec} (hne : t' ≠ t) :
     wasQueried (⟨t', u⟩ :: log) t = wasQueried log t := by
-  simp only [wasQueried_eq_decide_mem_map_fst, List.map_cons, List.mem_cons]
-  congr 1; exact propext ⟨fun h => h.elim (fun h' => absurd h'.symm hne) id,
-    fun h => Or.inr h⟩
+  simp [wasQueried_eq_decide_mem_map_fst, List.mem_cons, hne.symm, eq_comm]
 
 section prod
 
@@ -487,11 +406,11 @@ protected def fst (log : QueryLog (spec₁ + spec₂)) : QueryLog spec₁ :=
 protected def snd (log : QueryLog (spec₁ + spec₂)) : QueryLog spec₂ :=
   log.filterMap (fun | ⟨.inr t, u⟩ => some ⟨t, u⟩ | _ => none)
 
-/-- View a log for `spec₁` as one for `spec₁ ++ₒ spec₂` by inclusion. -/
+/-- View a log for `spec₁` as one for `spec₁ + spec₂` by inclusion. -/
 protected def inl (log : QueryLog spec₁) : QueryLog (spec₁ + spec₂) :=
   log.map fun ⟨t, u⟩ => ⟨.inl t, u⟩
 
-/-- View a log for `spec₂` as one for `spec₁ ++ₒ spec₂` by inclusion. -/
+/-- View a log for `spec₂` as one for `spec₁ + spec₂` by inclusion. -/
 protected def inr (log : QueryLog spec₂) : QueryLog (spec₁ + spec₂) :=
   log.map fun ⟨t, u⟩ => ⟨.inr t, u⟩
 
@@ -560,9 +479,7 @@ lemma addValues_nil (seed : QuerySeed spec) (i : ι) :
 lemma addValues_cons (seed : QuerySeed spec) {i : ι} (u : spec.Range i)
     (us : List (spec.Range i)) :
     seed.addValues (u :: us) = (seed.addValues [u]).addValues us := by
-  ext j; by_cases hj : j = i
-  · subst hj; simp [addValues]
-  · simp [addValues, Function.update_of_ne hj]
+  simp [addValues]
 
 /-- Prepend a list of values to the seed at index `i`. -/
 def prependValues (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) : QuerySeed spec :=
@@ -591,43 +508,18 @@ lemma prependValues_nil (seed : QuerySeed spec) (i : ι) :
 lemma prependValues_take_drop (seed : QuerySeed spec) (i : ι) (n : ℕ) :
     QuerySeed.prependValues (Function.update seed i ((seed i).drop n))
       ((seed i).take n : List (spec.Range i)) = seed := by
-  ext j
-  by_cases hj : j = i
-  · subst hj; simp [prependValues, List.take_append_drop]
-  · simp [prependValues, Function.update_of_ne hj]
+  simp [prependValues]
 
 lemma eq_of_prependValues_eq (seed rest : QuerySeed spec)
     {i : ι} (xs : List (spec.Range i)) {n : ℕ} (hlen : xs.length = n)
     (h : rest.prependValues xs = seed) :
     xs = (seed i).take n ∧ rest = Function.update seed i ((seed i).drop n) := by
-  have hi : xs ++ rest i = seed i := by
-    have := congrArg (· i) h; simpa [prependValues] using this
-  constructor
-  · calc xs = (xs ++ rest i).take xs.length := by simp
-      _ = (seed i).take n := by rw [hi, hlen]
-  · funext j
-    by_cases hj : j = i
-    · cases hj
-      simp only [Function.update_self]
-      have : rest i = (xs ++ rest i).drop xs.length := by simp
-      rw [this, hi, hlen]
-    · have hj' : rest j = seed j := by
-        have := congrArg (· j) h; simpa [prependValues, Function.update_of_ne hj] using this
-      simp [Function.update_of_ne hj, hj']
+  subst hlen; subst h; simp [prependValues]
 
 lemma eq_of_prependValues_singleton_eq (seed rest : QuerySeed spec)
     {i : ι} (u : spec.Range i) (h : rest.prependValues [u] = seed) :
     u :: rest i = seed i ∧ rest = Function.update seed i ((seed i).tail) := by
-  have hEq :
-      [u] = (seed i).take 1 ∧ rest = Function.update seed i ((seed i).drop 1) :=
-    eq_of_prependValues_eq (seed := seed) (rest := rest) (i := i)
-      (xs := [u]) (n := 1) (by simp) h
-  refine ⟨?_, ?_⟩
-  · have hi : [u] ++ rest i = seed i := by
-      have := congrArg (fun s => s i) h
-      simpa [prependValues] using this
-    simpa using hi
-  · simpa using hEq.2
+  subst h; simp [prependValues]
 
 abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
     QuerySeed spec :=
@@ -683,12 +575,10 @@ lemma cons_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
     u :: rest i = seed i := by
   unfold pop at h
   cases hsi : seed i with
-  | nil =>
-    simp [hsi] at h
+  | nil => simp [hsi] at h
   | cons u0 us =>
     simp only [hsi, Option.some.injEq, Prod.mk.injEq] at h
-    rcases h with ⟨hu, hrest⟩
-    subst hu hrest
+    obtain ⟨rfl, rfl⟩ := h
     simp
 
 lemma rest_eq_update_tail_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
@@ -697,12 +587,10 @@ lemma rest_eq_update_tail_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
     rest = Function.update seed i ((seed i).tail) := by
   unfold pop at h
   cases hsi : seed i with
-  | nil =>
-    simp [hsi] at h
+  | nil => simp [hsi] at h
   | cons u0 us =>
     simp only [hsi, Option.some.injEq, Prod.mk.injEq] at h
-    rcases h with ⟨hu, hrest⟩
-    subst hu hrest
+    obtain ⟨rfl, rfl⟩ := h
     simp
 
 /-- Construct a query seed from a list at a single index. -/
@@ -723,7 +611,7 @@ lemma eq_addValues_iff (seed seed' : QuerySeed spec)
   · rintro rfl
     exact ⟨by simp, fun j hj => by simp [addValues, Function.update_of_ne hj]⟩
   · rintro ⟨happ, hother⟩
-    apply funext; intro j
+    funext j
     by_cases hj : j = i
     · subst hj; rw [addValues_self]; exact happ.symm
     · rw [addValues_of_ne _ _ hj, hother j hj]
@@ -743,24 +631,22 @@ lemma pop_prependValues_singleton (s' : QuerySeed spec) (i : ι) (u : spec.Range
 lemma prependValues_singleton_injective (i : ι) :
     Function.Injective (fun (p : spec.Range i × QuerySeed spec) => p.2.prependValues [p.1]) := by
   intro ⟨u₁, s₁⟩ ⟨u₂, s₂⟩ h
-  have ht := congr_fun h i
-  simp only [prependValues_singleton] at ht
-  obtain ⟨hu, hst⟩ := List.cons_eq_cons.mp ht
+  obtain ⟨hu, hst⟩ := List.cons_eq_cons.mp <|
+    by simpa only [prependValues_singleton] using congr_fun h i
   refine Prod.ext hu (funext fun j => ?_)
   by_cases hj : j = i
   · exact hj ▸ hst
-  · have := congr_fun h j; simp only [prependValues_of_ne _ _ hj] at this; exact this
+  · simpa only [prependValues_of_ne _ _ hj] using congr_fun h j
 
 lemma eq_prependValues_of_pop_eq_some {seed : QuerySeed spec} {i : ι}
     {u : spec.Range i} {rest : QuerySeed spec} (h : seed.pop i = some (u, rest)) :
     rest.prependValues [u] = seed := by
   have hcons := cons_of_pop_eq_some seed i u rest h
   have hrest := rest_eq_update_tail_of_pop_eq_some seed i u rest h
-  subst hrest; funext j
+  funext j
   by_cases hj : j = i
-  · subst hj; simp only [prependValues_singleton, Function.update_self]
-    simpa [Function.update_self] using hcons
-  · simp only [prependValues_of_ne _ _ hj, Function.update_of_ne hj]
+  · subst hj; simpa [prependValues_singleton] using hcons
+  · simp [prependValues_of_ne _ _ hj, hrest, Function.update_of_ne hj]
 
 lemma pop_takeAtIndex_prependValues_of_ne (s' : QuerySeed spec) (i₀ : ι) (k : ℕ)
     {t : ι} (u₀ : spec.Range t) (hti : t ≠ i₀) :
@@ -769,17 +655,10 @@ lemma pop_takeAtIndex_prependValues_of_ne (s' : QuerySeed spec) (i₀ : ι) (k :
   have h1 : ((s'.prependValues [u₀]).takeAtIndex i₀ k) t = u₀ :: s' t := by
     rw [takeAtIndex_apply_of_ne _ _ _ _ hti, prependValues_singleton]
   rw [pop_eq_some_of_cons _ _ u₀ (s' t) h1]
-  congr 1
-  suffices Function.update ((s'.prependValues [u₀]).takeAtIndex i₀ k) t (s' t) =
-      s'.takeAtIndex i₀ k from Prod.ext rfl this
-  funext j
-  by_cases hj : j = t
-  · subst hj; simp [Function.update_self, takeAtIndex_apply_of_ne _ _ _ _ hti]
-  · rw [Function.update_of_ne hj]
-    by_cases hji : j = i₀
-    · subst hji
-      simp [takeAtIndex_apply_self, prependValues_of_ne _ _ (Ne.symm hti)]
-    · simp [takeAtIndex_apply_of_ne _ _ _ _ hji, prependValues_of_ne _ _ hj]
+  refine congrArg some (Prod.ext rfl (funext fun j => ?_))
+  by_cases hj : j = t <;> by_cases hji : j = i₀ <;> subst_vars <;>
+    simp_all [Function.update_self, Function.update_of_ne, takeAtIndex_apply_self,
+      takeAtIndex_apply_of_ne, prependValues_of_ne]
 
 lemma pop_takeAtIndex_prependValues_self (s' : QuerySeed spec) (i₀ : ι)
     (u₀ : spec.Range i₀) {k : ℕ} (hk : 0 < k) :
@@ -787,19 +666,12 @@ lemma pop_takeAtIndex_prependValues_self (s' : QuerySeed spec) (i₀ : ι)
       some (u₀, s'.takeAtIndex i₀ (k - 1)) := by
   have h1 : ((s'.prependValues [u₀]).takeAtIndex i₀ k) i₀ =
       u₀ :: (s' i₀).take (k - 1) := by
-    simp only [takeAtIndex_apply_self, prependValues_singleton]
-    obtain ⟨k', rfl⟩ := Nat.exists_eq_succ_of_ne_zero (Nat.pos_iff_ne_zero.mp hk)
-    simp [List.take_succ_cons]
+    simp only [takeAtIndex_apply_self, prependValues_singleton, List.take_cons hk]
   rw [pop_eq_some_of_cons _ _ u₀ ((s' i₀).take (k - 1)) h1]
-  congr 1
-  suffices Function.update ((s'.prependValues [u₀]).takeAtIndex i₀ k) i₀
-      ((s' i₀).take (k - 1)) = s'.takeAtIndex i₀ (k - 1) by
-    exact Prod.ext rfl this
-  funext j
-  by_cases hj : j = i₀
-  · subst hj; simp [Function.update_self, takeAtIndex_apply_self]
-  · rw [Function.update_of_ne hj, takeAtIndex_apply_of_ne _ _ _ _ hj,
-      takeAtIndex_apply_of_ne _ _ _ _ hj, prependValues_of_ne _ _ hj]
+  refine congrArg some (Prod.ext rfl (funext fun j => ?_))
+  by_cases hj : j = i₀ <;> subst_vars <;>
+    simp_all [Function.update_self, Function.update_of_ne, takeAtIndex_apply_self,
+      takeAtIndex_apply_of_ne, prependValues_of_ne]
 
 end QuerySeed
 

@@ -120,9 +120,13 @@ for legacy call sites that pre-date local-hypothesis support. -/
 def VCSpecEntry.theoremName! (entry : VCSpecEntry) : Name :=
   entry.declName?.getD Name.anonymous
 
+/-- Broad rule category (`Triple` / `wp` / `RelTriple` / `RelWP`) of the entry,
+read off the `kind` field of its `NormalizedVCSpec` (`VCSpecEntry.spec`). -/
 def VCSpecEntry.kind (entry : VCSpecEntry) : VCSpecKind :=
   entry.spec.kind
 
+/-- Discrimination-tree lookup key of the entry, read off the `lookupKey` field
+of its `NormalizedVCSpec` (`VCSpecEntry.spec`). -/
 def VCSpecEntry.lookupKey (entry : VCSpecEntry) : VCSpecLookupKey :=
   entry.spec.lookupKey
 
@@ -322,8 +326,7 @@ Handles both the folded (`Triple`, `wp`, `RelTriple`, `RelWP`) and unfolded
 (`MAlgOrdered.Triple`, `MAlgOrdered.wp`, `MAlgRelOrdered.Triple`,
 `MAlgRelOrdered.rwp`) heads because `Sym.preprocessType` aggressively unfolds
 the abbreviations in the source theorem before we see the body. -/
-private def selectVCSpecKey (body : Expr) :
-    MetaM (Expr × NormalizedVCSpec × Option Name) := do
+private def selectVCSpecKey (body : Expr) : MetaM (Expr × NormalizedVCSpec × Option Name) := do
   let body := body.consumeMData
   if let some (_pre, oa, _post) := tripleBodyParts? body then
     let head ← headConstNameOrUnary oa
@@ -440,9 +443,11 @@ private def headOfWhnf (e : Expr) : MetaM (Option Name) := do
   let e ← whnfReducible (← instantiateMVars e)
   return headConstName? e
 
+/-- Unary `@[vcspec]` entries whose `comp` pattern matches `comp`, queried from the
+`unary` discrimination tree after reducing `comp` with reducible `whnf`. The
+`whnf`-free counterpart is `getRegisteredUnaryVCSpecEntriesNoWhnf`. -/
 def getRegisteredUnaryVCSpecEntries (comp : Expr) : MetaM (Array VCSpecEntry) := do
-  let comp ← instantiateMVars comp
-  let comp ← whnfReducible comp
+  let comp ← whnfReducible (← instantiateMVars comp)
   let registry := vcSpecRegistry.getState (← getEnv)
   return Lean.Meta.Sym.getMatch registry.unary comp
 
@@ -456,9 +461,11 @@ def getRegisteredUnaryVCSpecEntriesNoWhnf (comp : Expr) : MetaM (Array VCSpecEnt
   let registry := vcSpecRegistry.getState (← getEnv)
   return Lean.Meta.Sym.getMatch registry.unary comp
 
+/-- Relational `@[vcspec]` entries whose `oa` pattern matches the left computation `oa`
+and whose `rightHead?` equals the head constant of the right computation `ob`, queried
+from the `relational` discrimination tree after reducing `oa` with reducible `whnf`. -/
 def getRegisteredRelationalVCSpecEntries (oa ob : Expr) : MetaM (Array VCSpecEntry) := do
-  let oa ← instantiateMVars oa
-  let oa ← whnfReducible oa
+  let oa ← whnfReducible (← instantiateMVars oa)
   let some rightHead ← headOfWhnf ob | return #[]
   let registry := vcSpecRegistry.getState (← getEnv)
   let candidates := Lean.Meta.Sym.getMatch registry.relational oa
@@ -467,16 +474,27 @@ def getRegisteredRelationalVCSpecEntries (oa ob : Expr) : MetaM (Array VCSpecEnt
     | some h => h == rightHead
     | none => false
 
+/-- Declaration names of the unary `@[vcspec]` entries matching `comp`; the
+`declName?` projection of `getRegisteredUnaryVCSpecEntries`, dropping entries
+backed by a local hypothesis or raw proof. -/
 def getRegisteredUnaryVCSpecTheorems (comp : Expr) : MetaM (Array Name) := do
   return (← getRegisteredUnaryVCSpecEntries comp).filterMap (·.declName?)
 
+/-- Declaration names of the relational `@[vcspec]` entries matching `(oa, ob)`; the
+`declName?` projection of `getRegisteredRelationalVCSpecEntries`, dropping entries
+backed by a local hypothesis or raw proof. -/
 def getRegisteredRelationalVCSpecTheorems (oa ob : Expr) : MetaM (Array Name) := do
   return (← getRegisteredRelationalVCSpecEntries oa ob).filterMap (·.declName?)
 
+/-- All registered `@[vcspec]` entries of the given `kind`, taken in registration order
+from the registry's insertion-ordered `all` array. -/
 def getVCSpecEntriesOfKind (kind : VCSpecKind) : CoreM (Array VCSpecEntry) := do
   let registry := vcSpecRegistry.getState (← getEnv)
   return registry.all.filter (·.kind == kind)
 
+/-- Declaration names of all registered `@[vcspec]` entries of the given `kind`; the
+`declName?` projection of `getVCSpecEntriesOfKind`, dropping entries backed by a local
+hypothesis or raw proof. -/
 def getVCSpecTheoremsOfKind (kind : VCSpecKind) : CoreM (Array Name) := do
   return (← getVCSpecEntriesOfKind kind).filterMap (·.declName?)
 

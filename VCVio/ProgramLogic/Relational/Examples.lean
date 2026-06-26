@@ -26,22 +26,16 @@ variable {σ : Type u} {ε : Type u}
 variable {α β γ δ : Type u}
 
 example
-    {pre : σ → l}
-    {x : StateT σ m₁ α} {y : OptionT m₂ β}
-    {cut : α → β → σ → l}
-    {f : α → StateT σ m₁ γ} {g : β → OptionT m₂ δ}
-    {post : γ → δ → σ → l}
+    {pre : σ → l} {x : StateT σ m₁ α} {y : OptionT m₂ β} {cut : α → β → σ → l}
+    {f : α → StateT σ m₁ γ} {g : β → OptionT m₂ δ} {post : γ → δ → σ → l}
     (hxy : MAlgRelOrdered.Triple pre x y cut)
     (hfg : ∀ a b, MAlgRelOrdered.Triple (cut a b) (f a) (g b) post) :
     MAlgRelOrdered.Triple pre (x >>= f) (y >>= g) post :=
   MAlgRelOrdered.triple_bind hxy hfg
 
 example
-    {pre : σ → l}
-    {x : StateT σ m₁ α} {y : ExceptT ε m₂ β}
-    {cut : α → β → σ → l}
-    {f : α → StateT σ m₁ γ} {g : β → ExceptT ε m₂ δ}
-    {post : γ → δ → σ → l}
+    {pre : σ → l} {x : StateT σ m₁ α} {y : ExceptT ε m₂ β} {cut : α → β → σ → l}
+    {f : α → StateT σ m₁ γ} {g : β → ExceptT ε m₂ δ} {post : γ → δ → σ → l}
     (hxy : MAlgRelOrdered.Triple pre x y cut)
     (hfg : ∀ a b, MAlgRelOrdered.Triple (cut a b) (f a) (g b) post) :
     MAlgRelOrdered.Triple pre (x >>= f) (y >>= g) post :=
@@ -59,10 +53,8 @@ variable {α β γ δ : Type}
 /-! ### Term-mode examples (direct lemma application) -/
 
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
-    {R : RelPost α β} {S : RelPost γ δ}
-    (hxy : RelTriple oa ob R)
-    (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
+    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ} {R : RelPost α β} {S : RelPost γ δ}
+    (hxy : RelTriple oa ob R) (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
     RelTriple (oa >>= fa) (ob >>= fb) S :=
   relTriple_bind hxy hfg
 
@@ -75,15 +67,13 @@ example {a : α} {b : β} {R : RelPost α β} (h : R a b) :
       (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) R :=
   relTriple_pure_pure h
 
-example {oa mid : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    {R : RelPost α β}
+example {oa mid : OracleComp spec₁ α} {ob : OracleComp spec₂ β} {R : RelPost α β}
     (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob R) :
     RelTriple oa ob R :=
   relTriple_trans_eqRel_left
     (spec₁ := spec₁) (spec₂ := spec₁) (spec₃ := spec₂) hleft hright
 
-example {oa : OracleComp spec₁ α} {mid ob : OracleComp spec₂ β}
-    {R : RelPost α β}
+example {oa : OracleComp spec₁ α} {mid ob : OracleComp spec₂ β} {R : RelPost α β}
     (hleft : RelTriple oa mid R) (hright : RelTriple mid ob (EqRel β)) :
     RelTriple oa ob R :=
   relTriple_trans_eqRel_right
@@ -98,10 +88,8 @@ example {oa mid : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
 /-! ### Tactic-mode examples (using `rvcstep`) -/
 
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
-    {R : RelPost α β} {S : RelPost γ δ}
-    (hxy : RelTriple oa ob R)
-    (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
+    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ} {R : RelPost α β} {S : RelPost γ δ}
+    (hxy : RelTriple oa ob R) (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
     RelTriple (oa >>= fa) (ob >>= fb) S := by
   rvcstep using R
 
@@ -128,10 +116,7 @@ example (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     RelTriple
       (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₀, ()))
       (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₁, ()))
-      (fun z₁ z₂ => z₁.2 = z₂.2) := by
-  refine relTriple_bind_uniformSample_bij (f := fun key : BitVec sp => key) ?_ ?_
-  · intro key
-    exact relTriple_pure_pure rfl
-  · exact Function.bijective_id
+      (fun z₁ z₂ => z₁.2 = z₂.2) :=
+  relTriple_bind_uniformSample_bij (fun _ => relTriple_pure_pure rfl) Function.bijective_id
 
 end OracleComp.ProgramLogic.Relational

@@ -89,29 +89,16 @@ noncomputable scoped instance (priority := 1100) instRelWP :
       Std.Do'.EPost.nil Std.Do'.EPost.nil where
   rwpTrans oa ob post _epost₁ _epost₂ :=
     OracleComp.ProgramLogic.Relational.CouplingPost oa ob post
-  rwp_trans_pure a b := by
-    intro post _epost₁ _epost₂
-    change post a b →
-      OracleComp.ProgramLogic.Relational.CouplingPost
-        (pure a : OracleComp spec₁ _) (pure b : OracleComp spec₂ _) post
-    intro h
-    have key : MAlgRelOrdered.rwp (m₁ := OracleComp spec₁) (m₂ := OracleComp spec₂) (l := Prop)
-        (pure a) (pure b) post = post a b :=
-      MAlgRelOrdered.rwp_pure a b post
-    exact key.symm.le h
-  rwp_trans_bind_le {α β γ δ} oa ob f g := by
-    intro post _epost₁ _epost₂
-    change OracleComp.ProgramLogic.Relational.CouplingPost oa ob
-            (fun a b => OracleComp.ProgramLogic.Relational.CouplingPost (f a) (g b) post) →
-          OracleComp.ProgramLogic.Relational.CouplingPost (oa >>= f) (ob >>= g) post
-    exact MAlgRelOrdered.rwp_bind_le (m₁ := OracleComp spec₁) (m₂ := OracleComp spec₂) (l := Prop)
+  rwp_trans_pure a b post _epost₁ _epost₂ :=
+    (MAlgRelOrdered.rwp_pure (m₁ := OracleComp spec₁) (m₂ := OracleComp spec₂) (l := Prop)
+      a b post).symm.le
+  rwp_trans_bind_le oa ob f g post _epost₁ _epost₂ :=
+    MAlgRelOrdered.rwp_bind_le (m₁ := OracleComp spec₁) (m₂ := OracleComp spec₂) (l := Prop)
       oa ob f g post
-  rwp_trans_monotone {α β} oa ob post post' _epost₁ _epost₁' _epost₂ _epost₂' := by
-    intro _h₁ _h₂ hpost
-    change OracleComp.ProgramLogic.Relational.CouplingPost oa ob post →
-      OracleComp.ProgramLogic.Relational.CouplingPost oa ob post'
-    exact MAlgRelOrdered.rwp_mono (m₁ := OracleComp spec₁) (m₂ := OracleComp spec₂) (l := Prop)
-      hpost
+  rwp_trans_monotone _oa _ob _post _post' _epost₁ _epost₁' _epost₂ _epost₂'
+      _h₁ _h₂ hpost :=
+    MAlgRelOrdered.rwp_mono (m₁ := OracleComp spec₁) (m₂ := OracleComp spec₂)
+      (l := Prop) hpost
 
 /-! ## Definitional alignment with `CouplingPost`
 
@@ -120,8 +107,7 @@ the nose, so every existing pRHL theorem in
 `VCVio/ProgramLogic/Relational/Basic.lean` transports for free when the
 user rewrites `Std.Do'.rwp _ _ _ _ _ ↦ CouplingPost _ _ _`. -/
 
-theorem rwp_eq_couplingPost
-    (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
+theorem rwp_eq_couplingPost (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (post : α → β → Prop) :
     Std.Do'.rwp oa ob post Lean.Order.bot Lean.Order.bot =
       OracleComp.ProgramLogic.Relational.CouplingPost oa ob post := rfl
@@ -133,14 +119,7 @@ theorem relTriple_iff_relTriple_basic
     (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (R : OracleComp.ProgramLogic.Relational.RelPost α β) :
     Std.Do'.RelTriple True oa ob R Lean.Order.bot Lean.Order.bot ↔
-      OracleComp.ProgramLogic.Relational.RelTriple oa ob R := by
-  unfold Std.Do'.RelTriple Std.Do'.rwp
-  unfold OracleComp.ProgramLogic.Relational.RelTriple
-  unfold MAlgRelOrdered.Triple MAlgRelOrdered.RelWP
-  constructor
-  · intro h _
-    exact h trivial
-  · intro h _
-    exact h True.intro
+      OracleComp.ProgramLogic.Relational.RelTriple oa ob R :=
+  Iff.rfl
 
 end OracleComp.Rel.Qualitative

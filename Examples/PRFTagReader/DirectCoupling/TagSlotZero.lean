@@ -142,7 +142,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
   -- coarse closure (Phase A handler unfolds, Phase B `$ᵗ gS`/`$ᵗ Nonce` commutation,
   -- Phase C empty-`D` `probEvent_bind_le_add_bad_disagree`, Phase D per-`n` cache split),
   -- but with `gFine ← $ᵗ` threaded as an extra binder. We commute `gFine ← $ᵗ` past the
-  -- step at the evalDist level via `evalDist_probComp_bind_comm`, then apply IH on the
+  -- step at the evalDist level via `evalDist_bind_bind_swap`, then apply IH on the
   -- new state at the extended cache (Case B) or the unchanged cache (Case A).
   have hqRk : ∀ u, OracleComp.IsQueryBoundP (k u) (·.isRight) qR := by
     have := hqR
@@ -363,7 +363,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
                       (some (⟨n, OracleComp.tableExtending c gS
                         ((tag, (0 : Fin sessionsPerTag)), n)⟩ :
                         TagTranscript Nonce Digest))))] := fun gS =>
-      evalDist_probComp_bind_comm
+      evalDist_bind_bind_swap
         ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) ($ᵗ Nonce) _
     -- Use hStep1 to rewrite under outer `gS ← $ᵗ`.
     have hPart1 :
@@ -436,7 +436,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
                       (some (⟨n, OracleComp.tableExtending c gS
                         ((tag, (0 : Fin sessionsPerTag)), n)⟩ :
                         TagTranscript Nonce Digest))))] :=
-      evalDist_probComp_bind_comm
+      evalDist_bind_bind_swap
         ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) ($ᵗ Nonce) _
     exact hPart1.trans hStep2
   have hRHS_comm :
@@ -456,7 +456,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
                 (k (some (⟨n, OracleComp.tableExtending c gS
                     ((tag, (0 : Fin sessionsPerTag)), n)⟩ :
                     TagTranscript Nonce Digest)))).run' advM)] :=
-    evalDist_probComp_bind_comm
+    evalDist_bind_bind_swap
       ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) ($ᵗ Nonce) _
   have hBAD_comm :
       𝒟[(do let gS ← $ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)
@@ -522,7 +522,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
                       (some (⟨n, OracleComp.tableExtending c gS
                         ((tag, (0 : Fin sessionsPerTag)), n)⟩ :
                         TagTranscript Nonce Digest))))] := fun gS =>
-      evalDist_probComp_bind_comm
+      evalDist_bind_bind_swap
         ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) ($ᵗ Nonce) _
     have hPart1B :
         𝒟[(do let gS ← $ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)
@@ -593,7 +593,7 @@ lemma dcAux_tag_slotZero [Fintype Nonce] [Fintype Digest]
                       (some (⟨n, OracleComp.tableExtending c gS
                         ((tag, (0 : Fin sessionsPerTag)), n)⟩ :
                         TagTranscript Nonce Digest))))] :=
-      evalDist_probComp_bind_comm
+      evalDist_bind_bind_swap
         ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) ($ᵗ Nonce) _
     exact hPart1B.trans hStep2B
   rw [probOutput_congr rfl hLHS_comm,

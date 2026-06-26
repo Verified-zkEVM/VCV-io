@@ -87,10 +87,7 @@ theorem simulateQ_run_preservesInv
   induction oa using OracleComp.inductionOn with
   | pure a =>
       intro σ0 hσ0 z hz
-      have : z = (a, σ0) := by
-        simpa using (show z ∈ support (pure (a, σ0) : ProbComp (α × σ)) from by
-          simpa using hz)
-      simpa [this] using hσ0
+      simp_all
   | query_bind t oa ih =>
       intro σ0 hσ0 z hz
       have hz' :
@@ -100,17 +97,9 @@ theorem simulateQ_run_preservesInv
               fun us => (simulateQ impl (oa us.1)).run us.2) := by
         simpa [simulateQ_bind, OracleComp.liftM_def] using hz
       rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
-      have hq_run :
-          (simulateQ impl (OracleSpec.query t : OracleComp spec (spec.Range t))).run σ0 =
-            (impl t).run σ0 := by
-        have hq :
-            simulateQ impl (OracleSpec.query t : OracleComp spec (spec.Range t)) =
-              (impl t) := by
-          simp [OracleSpec.query_def, simulateQ_query]
-        simp [hq]
-      have hus' : us ∈ support ((impl t).run σ0) := by simpa [hq_run] using hus
-      have hσ1 : Inv us.2 := himpl t σ0 hσ0 us hus'
-      exact ih us.1 us.2 hσ1 z hzcont
+      have hus' : us ∈ support ((impl t).run σ0) := by
+        simpa [OracleSpec.query_def, simulateQ_query] using hus
+      exact ih us.1 us.2 (himpl t σ0 hσ0 us hus') z hzcont
 
 end OracleComp
 
@@ -166,15 +155,11 @@ def OutputIndependent {σ α : Type} (mx : StateT σ ProbComp α) (Inv : σ → 
 @[simp] lemma statePreserving_pure {σ α : Type} (a : α) :
     StatePreserving (pure a : StateT σ ProbComp α) := by
   intro σ0 z hz
-  have : z = (a, σ0) := by
-    simpa using (show z ∈ support (pure (a, σ0) : ProbComp (α × σ)) from by
-      simpa using hz)
-  simp [this]
+  simp_all
 
 @[simp] lemma outputIndependent_pure {σ α : Type} (Inv : σ → Prop) (a : α) :
     OutputIndependent (pure a : StateT σ ProbComp α) Inv := by
   intro σ0 σ1 _ _
-  dsimp [OutputIndependent]
   simp
 
 lemma statePreserving_bind {σ α β : Type}
@@ -182,13 +167,9 @@ lemma statePreserving_bind {σ α β : Type}
     (h₁ : StatePreserving mx) (h₂ : ∀ a, StatePreserving (my a)) :
     StatePreserving (mx >>= my) := by
   intro σ0 z hz
-  have hz' :
-      z ∈ support ((mx.run σ0) >>= fun us => (my us.1).run us.2) := by
-    simpa [StateT.run_bind] using hz
-  rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hcont⟩
-  have hσ : us.2 = σ0 := h₁ σ0 us hus
-  have hzσ : z.2 = us.2 := h₂ us.1 us.2 z (by simpa using hcont)
-  simp [hzσ, hσ]
+  rw [StateT.run_bind, mem_support_bind_iff] at hz
+  obtain ⟨us, hus, hcont⟩ := hz
+  rw [h₂ us.1 us.2 z (by simpa using hcont), h₁ σ0 us hus]
 
 lemma preservesInv_of_statePreserving {σ α : Type}
     (mx : StateT σ ProbComp α) (Inv : σ → Prop) (h : StatePreserving mx) :
@@ -201,10 +182,8 @@ lemma preservesInv_bind {σ α β : Type}
     (Inv : σ → Prop) (h₁ : PreservesInv mx Inv) (h₂ : ∀ a, PreservesInv (my a) Inv) :
     PreservesInv (mx >>= my) Inv := by
   intro σ0 hσ0 z hz
-  have hz' :
-      z ∈ support ((mx.run σ0) >>= fun us => (my us.1).run us.2) := by
-    simpa [StateT.run_bind] using hz
-  rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hcont⟩
+  rw [StateT.run_bind, mem_support_bind_iff] at hz
+  obtain ⟨us, hus, hcont⟩ := hz
   exact h₂ us.1 us.2 (h₁ σ0 hσ0 us hus) z hcont
 
 /-- If `mx` is output-independent on `Inv`, and `my` preserves `Inv` and never fails under `Inv`,
@@ -228,16 +207,12 @@ lemma outputIndependent_after_preservesInv {σ α β : Type}
     refine tsum_congr fun us => ?_
     rcases eq_or_ne (Pr[= us | my.run σ0]) 0 with hus | hus
     · rw [hus, zero_mul, zero_mul]
-    · have hus' : us ∈ support (my.run σ0) := by
-        rw [mem_support_iff]; exact hus
-      have hInv : Inv us.2 := hmyInv σ0 hσ0 us hus'
+    · have hInv : Inv us.2 := hmyInv σ0 hσ0 us ((mem_support_iff _ _).2 hus)
       simp only [probOutput_def, hmx us.2 σ0 hInv hσ0]
   rw [hbind_eq]
   have hsum : (∑' us : β × σ, Pr[= us | my.run σ0]) = 1 := by
-    have hnofail : Pr[⊥ | my.run σ0] = 0 := hmyNoFail σ0 hσ0
     have htotal := tsum_probOutput_add_probFailure (my.run σ0)
-    rw [hnofail, add_zero] at htotal
-    exact htotal
+    rwa [hmyNoFail σ0 hσ0, add_zero] at htotal
   rw [hsum, one_mul]
 
 end StateT

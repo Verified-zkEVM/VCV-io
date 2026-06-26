@@ -70,8 +70,7 @@ lemma advantage_symm {σ₀ σ₁ : Type}
     (h₁ : QueryImpl.Stateful unifSpec E σ₁) (s₁ : σ₁)
     (A : OracleComp E Bool) :
     h₀.advantage s₀ h₁ s₁ A = h₁.advantage s₁ h₀ s₀ A := by
-  unfold advantage ProbComp.boolDistAdvantage
-  exact abs_sub_comm _ _
+  simp [advantage, ProbComp.boolDistAdvantage, abs_sub_comm]
 
 lemma advantage_eq_of_evalDist_runProb_eq {σ₀ σ₀' σ₁ : Type}
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
@@ -80,8 +79,7 @@ lemma advantage_eq_of_evalDist_runProb_eq {σ₀ σ₀' σ₁ : Type}
     {A : OracleComp E Bool}
     (h_eq : 𝒟[h₀.runProb s₀ A] = 𝒟[h₀'.runProb s₀' A]) :
     h₀.advantage s₀ h₁ s₁ A = h₀'.advantage s₀' h₁ s₁ A := by
-  unfold advantage ProbComp.boolDistAdvantage
-  rw [probOutput_congr rfl h_eq]
+  simp only [advantage, ProbComp.boolDistAdvantage, probOutput_congr rfl h_eq]
 
 lemma advantage_eq_of_evalDist_runProb_eq_right {σ₀ σ₁ σ₁' : Type}
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
@@ -90,8 +88,7 @@ lemma advantage_eq_of_evalDist_runProb_eq_right {σ₀ σ₁ σ₁' : Type}
     {A : OracleComp E Bool}
     (h_eq : 𝒟[h₁.runProb s₁ A] = 𝒟[h₁'.runProb s₁' A]) :
     h₀.advantage s₀ h₁ s₁ A = h₀.advantage s₀ h₁' s₁' A := by
-  unfold advantage ProbComp.boolDistAdvantage
-  rw [probOutput_congr rfl h_eq]
+  simp only [advantage, ProbComp.boolDistAdvantage, probOutput_congr rfl h_eq]
 
 lemma advantage_triangle {σ₀ σ₁ σ₂ : Type}
     (h₀ : QueryImpl.Stateful unifSpec E σ₀) (s₀ : σ₀)
@@ -115,8 +112,7 @@ lemma simulateQ_evalDist_congr {α : Type}
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
       id_map, evalDist_bind]
     rw [hh t]
-    refine bind_congr fun u => ?_
-    exact ih u
+    exact bind_congr ih
 
 lemma simulateQ_StateT_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E (StateT σ ProbComp)}
@@ -130,8 +126,7 @@ lemma simulateQ_StateT_evalDist_congr {α : Type}
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
       id_map, StateT.run_bind, evalDist_bind]
     rw [hh t s]
-    refine bind_congr fun p => ?_
-    exact ih p.1 p.2
+    exact bind_congr fun p => ih p.1 p.2
 
 lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type} {σ₁ σ₂ : Type}
     (h₁ : QueryImpl E (StateT σ₁ ProbComp))
@@ -144,27 +139,18 @@ lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type} {σ₁ σ₂ : Type}
     𝒟[(simulateQ h₁ A).run s] =
     𝒟[Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s)] := by
   induction A using OracleComp.inductionOn generalizing s with
-  | pure x =>
-    simp only [simulateQ_pure, StateT.run_pure, map_pure, Prod.map_apply, id_eq,
-      Equiv.symm_apply_apply]
+  | pure x => simp
   | query_bind t k ih =>
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
-      id_map, StateT.run_bind, map_bind, evalDist_bind, evalDist_map, hh t s]
-    simp only [monad_norm]
-    refine bind_congr fun p => ?_
-    rcases p with ⟨x, s'⟩
-    have hih := ih x (φ.symm s')
-    rw [Equiv.apply_symm_apply] at hih
-    simpa [Prod.map] using hih
+      id_map, StateT.run_bind, map_bind, evalDist_bind, hh t s, monad_norm]
+    refine bind_congr fun ⟨x, s'⟩ => ?_
+    simpa [Prod.map, Equiv.apply_symm_apply] using ih x (φ.symm s')
 
 /-! ## Functoriality of `runProb` -/
 
 lemma runProb_map {α β : Type} (h : QueryImpl.Stateful unifSpec E σ) (s₀ : σ)
     (f : α → β) (A : OracleComp E α) :
     h.runProb s₀ (f <$> A) = f <$> h.runProb s₀ A := by
-  change h.run s₀ (f <$> A) = f <$> h.run s₀ A
-  unfold QueryImpl.Stateful.run
-  rw [simulateQ_map, StateT.run'_eq, StateT.run'_eq, StateT.run_map, Functor.map_map]
-  simp
+  simp [QueryImpl.Stateful.run]
 
 end QueryImpl.Stateful

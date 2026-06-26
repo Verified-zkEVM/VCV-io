@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.StateSeparating.Advantage
 
@@ -53,13 +54,8 @@ theorem advantage_le_expectedQuerySlack_plus_probEvent_bad
     simp [runProb, run, hsim₁_def]
   have h_adv_le_tv :
       h₀.advantage (s_init, false) h₁ (s_init, false) A ≤ tvDist sim₀ sim₁ := by
-    unfold QueryImpl.Stateful.advantage ProbComp.boolDistAdvantage
-    rw [hrun₀, hrun₁]
+    rw [QueryImpl.Stateful.advantage, ProbComp.boolDistAdvantage, hrun₀, hrun₁]
     exact abs_probOutput_toReal_sub_le_tvDist sim₀ sim₁
-  have h_ofreal_adv :
-      ENNReal.ofReal (h₀.advantage (s_init, false) h₁ (s_init, false) A) ≤
-        ENNReal.ofReal (tvDist sim₀ sim₁) :=
-    ENNReal.ofReal_le_ofReal h_adv_le_tv
   have h_bridge :
       ENNReal.ofReal (tvDist sim₀ sim₁)
         ≤ expectedQuerySlack h₀ chargedQuery querySlack A queryBudget (s_init, false)
@@ -69,7 +65,7 @@ theorem advantage_le_expectedQuerySlack_plus_probEvent_bad
     exact ofReal_tvDist_simulateQ_le_expectedQuerySlack_plus_probEvent_output_bad
       h₀ h₁ chargedQuery querySlack h_step_tv_charged h_step_eq_uncharged
         h_mono₀ A h_bound s_init
-  exact le_trans h_ofreal_adv h_bridge
+  exact (ENNReal.ofReal_le_ofReal h_adv_le_tv).trans h_bridge
 
 /-- Constant-ε identical-until-bad with output bad flag. -/
 theorem advantage_le_queryBound_mul_slack_plus_probEvent_bad
@@ -90,10 +86,9 @@ theorem advantage_le_queryBound_mul_slack_plus_probEvent_bad
       ≤ queryBudget * querySlack
         + Pr[fun z : Bool × σ × Bool => z.2.2 = true |
             (simulateQ h₀ A).run (s_init, false)] := by
-  refine le_trans
-    (advantage_le_expectedQuerySlack_plus_probEvent_bad
+  refine (advantage_le_expectedQuerySlack_plus_probEvent_bad
       h₀ h₁ s_init chargedQuery (fun _ => querySlack)
-      h_step_tv_charged h_step_eq_uncharged h_mono₀ A h_bound) ?_
+      h_step_tv_charged h_step_eq_uncharged h_mono₀ A h_bound).trans ?_
   gcongr
   exact expectedQuerySlack_const_le_queryBudget_mul h₀ chargedQuery querySlack A h_bound
     (s_init, false)
@@ -162,9 +157,6 @@ theorem advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv_preserved
         + Pr[fun z : Bool × σ × Bool => z.2.2 = true |
             (simulateQ h₀ A).run (s_init, false)] := by
   classical
-  have h_bridge := advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv
-    h₀ h₁ s_init Inv chargedQuery querySlack h_step_tv_charged h_step_eq_uncharged
-      h_mono₀ A h_bound
   have h_cost_eq :
       expectedQuerySlack h₀ chargedQuery (fun s => if Inv s then querySlack s else 1)
           A queryBudget (s_init, false)
@@ -172,7 +164,9 @@ theorem advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv_preserved
     expectedQuerySlack_eq_of_inv h₀ chargedQuery Inv
       (ε := fun s => if Inv s then querySlack s else 1) (ε' := querySlack)
       (fun s hs => by simp [hs]) h_pres A queryBudget (s_init, false)
-      (by intro _; exact h_init_inv)
-  simpa [h_cost_eq] using h_bridge
+      (fun _ => h_init_inv)
+  simpa [h_cost_eq] using advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv
+    h₀ h₁ s_init Inv chargedQuery querySlack h_step_tv_charged h_step_eq_uncharged
+      h_mono₀ A h_bound
 
 end QueryImpl.Stateful

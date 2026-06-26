@@ -3,13 +3,13 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.OracleComp.Coercions.Add
-import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.HasQuery.Morphism
+import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.StateT.BundledSemantics
-import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 
 /-!
 # Fujisaki-Okamoto T Transform
@@ -69,10 +69,10 @@ def TTransform {m : Type → Type v} [Monad m]
   keygen := do
     let (pk, sk) ← (monadLift pke.keygen : m (PK × SK))
     return (pk, (pk, sk))
-  encrypt := fun pk msg => do
+  encrypt pk msg := do
     let r ← HasQuery.query (spec := (M →ₒ R)) msg
     return pke.encrypt pk msg r
-  decrypt := fun (pk, sk) c => TTransform.decrypt (m := m) pke pk sk c
+  decrypt | (pk, sk), c => TTransform.decrypt pke pk sk c
 
 section naturality
 
@@ -94,19 +94,12 @@ theorem map_construction
   cases pke with
   | mk keygen encrypt decrypt =>
       apply AsymmEncAlg.ext
-      · simp only [AsymmEncAlg.map, TTransform, MonadHom.mmap_bind, MonadHom.mmap_pure,
-          hLift keygen]
+      · simp [AsymmEncAlg.map, TTransform, hLift keygen]
       · funext pk msg
-        simp only [AsymmEncAlg.map, TTransform, MonadHom.mmap_bind, MonadHom.mmap_pure,
-          HasQuery.map_query]
+        simp [AsymmEncAlg.map, TTransform]
       · funext x c
-        cases hdec : decrypt x.2 c with
-        | none =>
-            simp only [AsymmEncAlg.map, TTransform, TTransform.decrypt, MonadHom.mmap_bind,
-              MonadHom.mmap_pure, hdec]
-        | some msg =>
-            simp only [AsymmEncAlg.map, TTransform, TTransform.decrypt, MonadHom.mmap_bind,
-              MonadHom.mmap_pure, HasQuery.map_query, hdec]
+        cases hdec : decrypt x.2 c <;>
+          simp [AsymmEncAlg.map, TTransform, TTransform.decrypt, hdec]
 
 end naturality
 
@@ -124,15 +117,7 @@ theorem encrypt_usesExactQueryCost {ω : Type} [AddMonoid ω]
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (msg : M) (costFn : M → ω) :
     QueryCost[ (TTransform pke).encrypt pk msg in runtime by costFn ] = costFn msg := by
-  change Cost[
-    HasQuery.Program.withAddCost
-      (fun [HasQuery (M →ₒ R) (AddWriterT ω m)] =>
-        (TTransform (m := AddWriterT ω m) pke).encrypt pk msg)
-      runtime costFn
-  ] = costFn msg
-  rw [AddWriterT.hasCost_iff]
-  simp [HasQuery.Program.withAddCost, TTransform, QueryImpl.withAddCost_apply,
-    AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
+  simp [HasQuery.UsesCostExactly, HasQuery.Program.withAddCost, TTransform]
 
 /-- T-transform encryption has expected weighted query cost equal to the weight of querying
 `msg`. -/
@@ -146,9 +131,7 @@ theorem encrypt_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω]
       (TTransform pke).encrypt pk msg in runtime by costFn via val
     ] = val (costFn msg) :=
   HasQuery.expectedQueryCost_eq_of_usesCostExactly
-    (encrypt_usesExactQueryCost
-      (runtime := runtime) (pke := pke) (pk := pk) (msg := msg) (costFn := costFn))
-    hval
+    (encrypt_usesExactQueryCost runtime pke pk msg costFn) hval
 
 /-- T-transform encryption makes exactly one hash-oracle query under unit-cost instrumentation. -/
 theorem encrypt_usesExactlyOneQuery
@@ -157,9 +140,7 @@ theorem encrypt_usesExactlyOneQuery
     (pk : PK) (msg : M) :
     Queries[ (TTransform pke).encrypt pk msg in runtime ] = 1 := by
   simpa [HasQuery.UsesExactlyQueries] using
-    (encrypt_usesExactQueryCost
-      (ω := ℕ) (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)
-      (costFn := fun _ ↦ 1))
+    encrypt_usesExactQueryCost (ω := ℕ) runtime pke pk msg fun _ => 1
 
 /-- If deterministic decryption fails immediately, the T-transform incurs zero weighted
 query cost. -/
@@ -169,15 +150,8 @@ theorem decrypt_usesZeroQueryCost_of_decrypt_eq_none {ω : Type} [AddMonoid ω]
     (pk : PK) (sk : SK) (c : C) (costFn : M → ω)
     (hdec : pke.decrypt sk c = none) :
     QueryCost[ (TTransform pke).decrypt (pk, sk) c in runtime by costFn ] = 0 := by
-  change Cost[
-    HasQuery.Program.withAddCost
-      (fun [HasQuery (M →ₒ R) (AddWriterT ω m)] =>
-        (TTransform (m := AddWriterT ω m) pke).decrypt (pk, sk) c)
-      runtime costFn
-  ] = 0
-  rw [AddWriterT.hasCost_iff]
-  simp [HasQuery.Program.withAddCost, TTransform, TTransform.decrypt, hdec,
-    QueryImpl.withAddCost_apply, AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
+  simp [HasQuery.UsesCostExactly, HasQuery.Program.withAddCost, TTransform,
+    TTransform.decrypt, hdec]
 
 /-- If deterministic decryption fails immediately, the T-transform has expected weighted query
 cost `0`. -/
@@ -193,10 +167,7 @@ theorem decrypt_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
       (TTransform pke).decrypt (pk, sk) c in runtime by costFn via val
     ] = val 0 :=
   HasQuery.expectedQueryCost_eq_of_usesCostExactly
-    (decrypt_usesZeroQueryCost_of_decrypt_eq_none
-      (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-      (costFn := costFn) hdec)
-    hval
+    (decrypt_usesZeroQueryCost_of_decrypt_eq_none runtime pke pk sk c costFn hdec) hval
 
 /-- If deterministic decryption returns a message, the T-transform incurs exactly the weighted
 cost of querying that message to re-derive the coins. -/
@@ -206,15 +177,8 @@ theorem decrypt_usesExactQueryCost_of_decrypt_eq_some {ω : Type} [AddMonoid ω]
     (pk : PK) (sk : SK) (c : C) (costFn : M → ω) {msg : M}
     (hdec : pke.decrypt sk c = some msg) :
     QueryCost[ (TTransform pke).decrypt (pk, sk) c in runtime by costFn ] = costFn msg := by
-  change Cost[
-    HasQuery.Program.withAddCost
-      (fun [HasQuery (M →ₒ R) (AddWriterT ω m)] =>
-        (TTransform (m := AddWriterT ω m) pke).decrypt (pk, sk) c)
-      runtime costFn
-  ] = costFn msg
-  rw [AddWriterT.hasCost_iff]
-  simp [HasQuery.Program.withAddCost, TTransform, TTransform.decrypt, hdec,
-    QueryImpl.withAddCost_apply, AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
+  simp [HasQuery.UsesCostExactly, HasQuery.Program.withAddCost, TTransform,
+    TTransform.decrypt, hdec]
 
 /-- If deterministic decryption returns a message, the T-transform has expected weighted query
 cost equal to the weight of querying that message. -/
@@ -230,10 +194,7 @@ theorem decrypt_expectedQueryCost_eq_of_decrypt_eq_some {ω : Type}
       (TTransform pke).decrypt (pk, sk) c in runtime by costFn via val
     ] = val (costFn msg) :=
   HasQuery.expectedQueryCost_eq_of_usesCostExactly
-    (decrypt_usesExactQueryCost_of_decrypt_eq_some
-      (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-      (costFn := costFn) hdec)
-    hval
+    (decrypt_usesExactQueryCost_of_decrypt_eq_some runtime pke pk sk c costFn hdec) hval
 
 /-- If deterministic decryption fails immediately, the T-transform makes no hash-oracle
 queries. -/
@@ -244,9 +205,7 @@ theorem decrypt_usesNoQueries_of_decrypt_eq_none
     (hdec : pke.decrypt sk c = none) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 0 := by
   simpa [HasQuery.UsesExactlyQueries] using
-    (decrypt_usesZeroQueryCost_of_decrypt_eq_none
-      (ω := ℕ) (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-      (costFn := fun _ ↦ 1) hdec)
+    decrypt_usesZeroQueryCost_of_decrypt_eq_none (ω := ℕ) runtime pke pk sk c (fun _ => 1) hdec
 
 /-- If deterministic decryption returns a message, the T-transform makes exactly one
 hash-oracle query to re-derive the coins. -/
@@ -257,9 +216,7 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
     (hdec : pke.decrypt sk c = some msg) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 1 := by
   simpa [HasQuery.UsesExactlyQueries] using
-    (decrypt_usesExactQueryCost_of_decrypt_eq_some
-      (ω := ℕ) (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-      (costFn := fun _ ↦ 1) hdec)
+    decrypt_usesExactQueryCost_of_decrypt_eq_some (ω := ℕ) runtime pke pk sk c (fun _ => 1) hdec
 
 /-- T-transform decryption makes at most one hash-oracle query under unit-cost instrumentation. -/
 theorem decrypt_usesAtMostOneQuery [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
@@ -270,20 +227,10 @@ theorem decrypt_usesAtMostOneQuery [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
   cases hdec : pke.decrypt sk c with
   | none =>
       exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
-        (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-        (runtime := runtime)
-        (decrypt_usesNoQueries_of_decrypt_eq_none
-          (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
-        (Nat.zero_le 1)
+        (decrypt_usesNoQueries_of_decrypt_eq_none runtime pke pk sk c hdec) (Nat.zero_le 1)
   | some msg =>
       exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
-        (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-        (runtime := runtime)
-        (decrypt_usesExactlyOneQuery_of_decrypt_eq_some
-          (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
-        le_rfl
+        (decrypt_usesExactlyOneQuery_of_decrypt_eq_some runtime pke pk sk c hdec) le_rfl
 
 end costAccounting
 
@@ -293,9 +240,7 @@ namespace TTransform
 noncomputable def runtime
     [DecidableEq M] [SampleableType R] :
     ProbCompRuntime (OracleComp (TTransform.oracleSpec M R)) where
-  toSPMFSemantics := SPMFSemantics.withStateOracle
-    (hashImpl := TTransform.queryImpl (M := M) (R := R))
-    (∅ : QueryCache M R)
+  toSPMFSemantics := SPMFSemantics.withStateOracle TTransform.queryImpl ∅
   toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Structural query bound for T-transform OW-PCVA adversaries: uniform-sampling queries are
@@ -303,8 +248,8 @@ unrestricted, while `qH`, `qP`, and `qV` bound the hash, plaintext-checking, and
 oracles respectively.
 
 Defined as the conjunction of three predicate-targeted query bounds `IsQueryBoundP`, one per
-counted oracle. Because the three index predicates are pairwise disjoint, the conjunction is
-equivalent to the prior single-vector `IsQueryBound` formulation. -/
+counted oracle. Because the three index predicates are pairwise disjoint, this conjunction is
+equivalent to a single-vector `IsQueryBound` over the combined per-oracle budget. -/
 def OW_PCVA_Adversary.MakesAtMostQueries
     {M PK SK R C : Type} [DecidableEq M] [DecidableEq C] [SampleableType R]
     {pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C}

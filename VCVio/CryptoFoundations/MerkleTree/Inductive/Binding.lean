@@ -51,7 +51,6 @@ merely asserting its existence.
   §8.9 (Merkle-Damgård and Merkle trees).
 -/
 
-
 namespace InductiveMerkleTree
 
 open BinaryTree
@@ -105,10 +104,8 @@ theorem findCollision_sound (h : α → α → α) {s : Skeleton} (idx : Skeleto
   | ofLeaf =>
       simp [findCollision] at hfind
   | ofLeft idxLeft ih =>
-      -- Unfold findCollision and zeta-reduce the `let` bindings so that
-      -- the `if` conditions become visible to `simp`.
-      unfold findCollision at hfind
-      dsimp at hfind
+      -- Unfold findCollision so the `if` conditions become visible to `simp`.
+      simp only [findCollision] at hfind
       by_cases hpair : (getPutativeRootWithHash idxLeft x proof₁.tail h, proof₁.head) =
                        (getPutativeRootWithHash idxLeft y proof₂.tail h, proof₂.head)
       · simp only [hpair] at hfind
@@ -116,23 +113,10 @@ theorem findCollision_sound (h : α → α → α) {s : Skeleton} (idx : Skeleto
       · simp only [hpair] at hfind
         by_cases heqhash : h (getPutativeRootWithHash idxLeft x proof₁.tail h) proof₁.head =
                           h (getPutativeRootWithHash idxLeft y proof₂.tail h) proof₂.head
-        · simp only [heqhash] at hfind
-          -- hfind : some (getPutativeRootWithHash ... , proof₁.head, ...) =
-          --         some (l₁, r₁, l₂, r₂)
-          -- Decompose into component equalities and substitute.
-          have hinj : (getPutativeRootWithHash idxLeft x proof₁.tail h, proof₁.head,
-                       getPutativeRootWithHash idxLeft y proof₂.tail h, proof₂.head) =
-                      (l₁, r₁, l₂, r₂) := by
-            simpa using hfind
-          rcases Prod.mk.inj hinj with ⟨h₁, hrest⟩
-          rcases Prod.mk.inj hrest with ⟨h₂, hrest⟩
-          rcases Prod.mk.inj hrest with ⟨h₃, h₄⟩
-          subst h₁; subst h₂; subst h₃; subst h₄
-          exact ⟨hpair, heqhash⟩
+        · simp_all [Collision]
         · simp [heqhash] at hfind
   | ofRight idxRight ih =>
-      unfold findCollision at hfind
-      dsimp at hfind
+      simp only [findCollision] at hfind
       by_cases hpair : (proof₁.head, getPutativeRootWithHash idxRight x proof₁.tail h) =
                        (proof₂.head, getPutativeRootWithHash idxRight y proof₂.tail h)
       · simp only [hpair] at hfind
@@ -140,16 +124,7 @@ theorem findCollision_sound (h : α → α → α) {s : Skeleton} (idx : Skeleto
       · simp only [hpair] at hfind
         by_cases heqhash : h proof₁.head (getPutativeRootWithHash idxRight x proof₁.tail h) =
                           h proof₂.head (getPutativeRootWithHash idxRight y proof₂.tail h)
-        · simp only [heqhash] at hfind
-          have hinj : (proof₁.head, getPutativeRootWithHash idxRight x proof₁.tail h,
-                       proof₂.head, getPutativeRootWithHash idxRight y proof₂.tail h) =
-                      (l₁, r₁, l₂, r₂) := by
-            simpa using hfind
-          rcases Prod.mk.inj hinj with ⟨h₁, hrest⟩
-          rcases Prod.mk.inj hrest with ⟨h₂, hrest⟩
-          rcases Prod.mk.inj hrest with ⟨h₃, h₄⟩
-          subst h₁; subst h₂; subst h₃; subst h₄
-          exact ⟨hpair, heqhash⟩
+        · simp_all [Collision]
         · simp [heqhash] at hfind
 
 /-- Merkle binding: from two distinct leaf values `x ≠ y` that produce the
@@ -179,42 +154,28 @@ theorem getPutativeRootWithHash_binding
       exact absurd heq hne
   | ofLeft idxLeft ih =>
       simp only [getPutativeRootWithHash] at heq
-      have hhash_eq : h (getPutativeRootWithHash idxLeft x proof₁.tail h) proof₁.head =
-                     h (getPutativeRootWithHash idxLeft y proof₂.tail h) proof₂.head := heq
       by_cases hpair : (getPutativeRootWithHash idxLeft x proof₁.tail h, proof₁.head) =
                        (getPutativeRootWithHash idxLeft y proof₂.tail h, proof₂.head)
       · -- Pairs agree: recurse on the smaller index.
         obtain ⟨hsub, _⟩ := Prod.mk.inj hpair
         obtain ⟨l₁, r₁, l₂, r₂, hfind⟩ := ih proof₁.tail proof₂.tail x y hne hsub
-        refine ⟨l₁, r₁, l₂, r₂, ?_⟩
-        unfold findCollision
-        dsimp
-        simp [hpair, hfind]
+        exact ⟨l₁, r₁, l₂, r₂, by simp [findCollision, hpair, hfind]⟩
       · -- Pairs differ but hash to the same value: top-level collision.
-        refine ⟨getPutativeRootWithHash idxLeft x proof₁.tail h, proof₁.head,
-                getPutativeRootWithHash idxLeft y proof₂.tail h, proof₂.head, ?_⟩
-        unfold findCollision
-        dsimp
-        simp [hpair, hhash_eq]
+        exact ⟨getPutativeRootWithHash idxLeft x proof₁.tail h, proof₁.head,
+               getPutativeRootWithHash idxLeft y proof₂.tail h, proof₂.head,
+               by simp [findCollision, hpair, heq]⟩
   | ofRight idxRight ih =>
       simp only [getPutativeRootWithHash] at heq
-      have hhash_eq : h proof₁.head (getPutativeRootWithHash idxRight x proof₁.tail h) =
-                     h proof₂.head (getPutativeRootWithHash idxRight y proof₂.tail h) := heq
       by_cases hpair : (proof₁.head, getPutativeRootWithHash idxRight x proof₁.tail h) =
                        (proof₂.head, getPutativeRootWithHash idxRight y proof₂.tail h)
       · -- Pairs agree: recurse on the smaller index.
         obtain ⟨_, hsub⟩ := Prod.mk.inj hpair
         obtain ⟨l₁, r₁, l₂, r₂, hfind⟩ := ih proof₁.tail proof₂.tail x y hne hsub
-        refine ⟨l₁, r₁, l₂, r₂, ?_⟩
-        unfold findCollision
-        dsimp
-        simp [hpair, hfind]
+        exact ⟨l₁, r₁, l₂, r₂, by simp [findCollision, hpair, hfind]⟩
       · -- Pairs differ but hash to the same value: top-level collision.
-        refine ⟨proof₁.head, getPutativeRootWithHash idxRight x proof₁.tail h,
-                proof₂.head, getPutativeRootWithHash idxRight y proof₂.tail h, ?_⟩
-        unfold findCollision
-        dsimp
-        simp [hpair, hhash_eq]
+        exact ⟨proof₁.head, getPutativeRootWithHash idxRight x proof₁.tail h,
+               proof₂.head, getPutativeRootWithHash idxRight y proof₂.tail h,
+               by simp [findCollision, hpair, heq]⟩
 
 /-- Collision Lemma for Merkle trees: from two distinct leaf values that
     produce the same putative root at the same leaf index under (possibly

@@ -42,16 +42,14 @@ instance instMAlgOrdered : MAlgOrdered (OracleComp spec) Prop where
   μ_pure x := propext (allOutputsSatisfy_pure id x)
   μ_bind_mono {α} f g hfg x := by
     change allOutputsSatisfy id (x >>= f) → allOutputsSatisfy id (x >>= g)
-    rw [allOutputsSatisfy_bind, allOutputsSatisfy_bind]
-    exact allOutputsSatisfy_mono hfg x
+    simpa only [allOutputsSatisfy_bind] using allOutputsSatisfy_mono hfg x
 
 /-- Support-based characterization of the `Prop`-valued WP for `OracleComp`. -/
 theorem wp_iff_forall_support (oa : OracleComp spec α) (post : α → Prop) :
     MAlgOrdered.wp (m := OracleComp spec) (l := Prop) oa post ↔
       ∀ x ∈ support oa, post x := by
   change allOutputsSatisfy id (oa >>= fun a => pure (post a)) ↔ _
-  rw [allOutputsSatisfy_bind]
-  simp only [allOutputsSatisfy_pure]
+  simp only [allOutputsSatisfy_bind, allOutputsSatisfy_pure]
   exact allOutputsSatisfy_iff_forall_support _ oa
 
 end OracleComp.ProgramLogic.PropLogic

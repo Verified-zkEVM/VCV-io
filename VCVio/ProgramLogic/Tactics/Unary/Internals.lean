@@ -133,11 +133,7 @@ theorem wp_StateT_get_layer {m : Type u → Type v} {Pred EPred : Type u}
     {σ : Type u} (post : σ → σ → Pred) (epost : EPred) :
     Std.Do'.wp (MonadStateOf.get : StateT σ m σ) post epost =
       fun s => Std.Do'.wp (pure (s, s) : m (σ × σ))
-        (fun p : σ × σ => post p.1 p.2) epost := by
-  funext s
-  change Std.Do'.wp ((MonadStateOf.get : StateT σ m σ).run s)
-      (fun p : σ × σ => post p.1 p.2) epost =
-    Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost
+        (fun p : σ × σ => post p.1 p.2) epost :=
   rfl
 
 theorem wp_StateT_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
@@ -145,11 +141,7 @@ theorem wp_StateT_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
     {σ : Type u} (post : σ → σ → Pred) (epost : EPred) :
     Std.Do'.wp (StateT.get : StateT σ m σ) post epost =
       fun s => Std.Do'.wp (pure (s, s) : m (σ × σ))
-        (fun p : σ × σ => post p.1 p.2) epost := by
-  funext s
-  change Std.Do'.wp ((StateT.get : StateT σ m σ).run s)
-      (fun p : σ × σ => post p.1 p.2) epost =
-    Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost
+        (fun p : σ × σ => post p.1 p.2) epost :=
   rfl
 
 theorem stdDoTriple_StateT_get_of_rel {m : Type u → Type v} {Pred EPred : Type u}
@@ -171,12 +163,7 @@ theorem wp_StateT_set_layer {m : Type u → Type v} {Pred EPred : Type u}
     {σ : Type u} (s' : σ) (post : PUnit → σ → Pred) (epost : EPred) :
     Std.Do'.wp (MonadStateOf.set s' : StateT σ m PUnit) post epost =
       fun _ => Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
-        (fun p : PUnit × σ => post p.1 p.2) epost := by
-  funext s
-  change Std.Do'.wp ((MonadStateOf.set s' : StateT σ m PUnit).run s)
-      (fun p : PUnit × σ => post p.1 p.2) epost =
-    Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
-      (fun p : PUnit × σ => post p.1 p.2) epost
+        (fun p : PUnit × σ => post p.1 p.2) epost :=
   rfl
 
 theorem wp_StateT_run_get_layer {m : Type u → Type v} {Pred EPred : Type u}
@@ -184,7 +171,7 @@ theorem wp_StateT_run_get_layer {m : Type u → Type v} {Pred EPred : Type u}
     {σ : Type u} (s : σ) (post : σ → σ → Pred) (epost : EPred) :
     Std.Do'.wp ((MonadStateOf.get : StateT σ m σ).run s)
         (fun p : σ × σ => post p.1 p.2) epost =
-      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost := by
+      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost :=
   rfl
 
 theorem wp_StateT_run_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
@@ -192,7 +179,7 @@ theorem wp_StateT_run_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
     {σ : Type u} (s : σ) (post : σ → σ → Pred) (epost : EPred) :
     Std.Do'.wp ((StateT.get : StateT σ m σ).run s)
         (fun p : σ × σ => post p.1 p.2) epost =
-      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost := by
+      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost :=
   rfl
 
 theorem wp_StateT_run_set_layer {m : Type u → Type v} {Pred EPred : Type u}
@@ -201,7 +188,7 @@ theorem wp_StateT_run_set_layer {m : Type u → Type v} {Pred EPred : Type u}
     Std.Do'.wp ((MonadStateOf.set s' : StateT σ m PUnit).run s)
         (fun p : PUnit × σ => post p.1 p.2) epost =
       Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
-        (fun p : PUnit × σ => post p.1 p.2) epost := by
+        (fun p : PUnit × σ => post p.1 p.2) epost :=
   rfl
 
 theorem wp_StateT_run_set_layer' {m : Type u → Type v} {Pred EPred : Type u}
@@ -210,7 +197,7 @@ theorem wp_StateT_run_set_layer' {m : Type u → Type v} {Pred EPred : Type u}
     Std.Do'.wp ((StateT.set s' : StateT σ m PUnit).run s)
         (fun p : PUnit × σ => post p.1 p.2) epost =
       Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
-        (fun p : PUnit × σ => post p.1 p.2) epost := by
+        (fun p : PUnit × σ => post p.1 p.2) epost :=
   rfl
 
 theorem wp_StateT_map_layer {m : Type u → Type v} {Pred EPred : Type u}
@@ -219,29 +206,21 @@ theorem wp_StateT_map_layer {m : Type u → Type v} {Pred EPred : Type u}
     (epost : EPred) :
     Std.Do'.wp (f <$> x) post epost =
       fun s => Std.Do'.wp ((f <$> x).run s)
-        (fun p : β × σ => post p.1 p.2) epost := by
+        (fun p : β × σ => post p.1 p.2) epost :=
   rfl
 
 theorem wp_ReaderT_read_layer {m : Type u → Type v} {Pred EPred : Type u}
     [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
     {ρ : Type u} (post : ρ → ρ → Pred) (epost : EPred) :
     Std.Do'.wp (MonadReaderOf.read : ReaderT ρ m ρ) post epost =
-      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost := by
-  funext r
-  change Std.Do'.wp ((MonadReaderOf.read : ReaderT ρ m ρ).run r)
-      (fun a : ρ => post a r) epost =
-    Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost
+      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost :=
   rfl
 
 theorem wp_ReaderT_read_layer' {m : Type u → Type v} {Pred EPred : Type u}
     [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
     {ρ : Type u} (post : ρ → ρ → Pred) (epost : EPred) :
     Std.Do'.wp (ReaderT.read : ReaderT ρ m ρ) post epost =
-      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost := by
-  funext r
-  change Std.Do'.wp ((ReaderT.read : ReaderT ρ m ρ).run r)
-      (fun a : ρ => post a r) epost =
-    Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost
+      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost :=
   rfl
 
 theorem stdDoTriple_ReaderT_read_of_rel {m : Type u → Type v} {Pred EPred : Type u}
@@ -262,7 +241,7 @@ theorem wp_ReaderT_run_read_layer {m : Type u → Type v} {Pred EPred : Type u}
     {ρ : Type u} (r : ρ) (post : ρ → ρ → Pred) (epost : EPred) :
     Std.Do'.wp ((MonadReaderOf.read : ReaderT ρ m ρ).run r) (fun a : ρ => post a r)
         epost =
-      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost := by
+      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost :=
   rfl
 
 theorem wp_ReaderT_run_read_layer' {m : Type u → Type v} {Pred EPred : Type u}
@@ -270,7 +249,7 @@ theorem wp_ReaderT_run_read_layer' {m : Type u → Type v} {Pred EPred : Type u}
     {ρ : Type u} (r : ρ) (post : ρ → ρ → Pred) (epost : EPred) :
     Std.Do'.wp ((ReaderT.read : ReaderT ρ m ρ).run r) (fun a : ρ => post a r)
         epost =
-      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost := by
+      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost :=
   rfl
 
 theorem mAlgOrdered_wp_OptionT_run_StateT_get {ι : Type u} {spec : OracleSpec ι}
@@ -358,7 +337,7 @@ theorem wp_ReaderT_map_layer {m : Type u → Type v} {Pred EPred : Type u}
     {ρ α β : Type u} (f : α → β) (x : ReaderT ρ m α) (post : β → ρ → Pred)
     (epost : EPred) :
     Std.Do'.wp (f <$> x) post epost =
-      fun r => Std.Do'.wp ((f <$> x).run r) (fun b : β => post b r) epost := by
+      fun r => Std.Do'.wp ((f <$> x).run r) (fun b : β => post b r) epost :=
   rfl
 
 attribute [vcspec]
@@ -597,7 +576,8 @@ private def tryApplyTripleHyp : TacticM Bool := withMainContext do
       return true
     if hypType.isForall then
       let saved ← saveState
-      if ← tryEvalTacticSyntax (← `(tactic| apply $(mkIdent ldecl.userName) <;> assumption)) then
+      if ← tryEvalTacticSyntax
+          (← `(tactic| apply $(mkIdent ldecl.userName) <;> assumption)) then
         return true
       saved.restore
   return false

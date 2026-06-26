@@ -5,11 +5,11 @@ Authors: Quang Dao
 -/
 
 import VCVio.EvalDist.Defs.Instances
-import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
-import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.SimSemantics.Append
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 
 /-!
 # Message Authentication Codes

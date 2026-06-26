@@ -106,12 +106,12 @@ and public-key oracles. -/
 instance {M Commit Chal Resp Stmt : Type}
     [Fintype Chal] [Fintype Commit] [Fintype Resp] [Fintype Stmt] :
     (cmaSpec M Commit Chal Resp Stmt).Fintype where
-  fintype_B q := by cases q <;> dsimp [cmaSpec, OracleSpec.ofFn] <;> infer_instance
+  fintype_B q := by cases q <;> dsimp [cmaSpec] <;> infer_instance
 
 instance {M Commit Chal Resp Stmt : Type}
     [Inhabited Chal] [Inhabited Commit] [Inhabited Resp] [Inhabited Stmt] :
     (cmaSpec M Commit Chal Resp Stmt).Inhabited where
-  inhabited_B q := by cases q <;> dsimp [cmaSpec, OracleSpec.ofFn] <;> infer_instance
+  inhabited_B q := by cases q <;> dsimp [cmaSpec] <;> infer_instance
 
 /-- The non-signing portion of the CMA adversary's oracle view. -/
 @[reducible] def cmaPublicSpec (M Commit Chal Stmt : Type) :
@@ -154,18 +154,10 @@ def cmaRoute (M Commit Chal Resp Stmt : Type) :
       | Sum.inl (CmaPublicQuery.ro mc) => CmaQuery.ro mc
       | Sum.inl CmaPublicQuery.pk => CmaQuery.pk
       | Sum.inr m => CmaQuery.sign m
-    left_inv := by
-      intro t
-      cases t <;> rfl
-    right_inv := by
-      intro t
-      rcases t with (t | m)
-      · cases t <;> rfl
-      · rfl
+    left_inv := fun t => by cases t <;> rfl
+    right_inv := fun t => by rcases t with (_ | _) | _ <;> rfl
   }
-  target_eq := by
-    intro t
-    rcases t with (_ | _) | _ <;> rfl
+  target_eq := fun t => by rcases t with (_ | _) | _ <;> rfl
 
 instance subSpec_unif_nmaSpec (M Commit Chal Stmt : Type) :
     unifSpec ⊂ₒ nmaSpec M Commit Chal Stmt where
@@ -233,8 +225,7 @@ instance subSpec_fsRo_cmaSpec (M Commit Chal Resp Stmt : Type) :
   onResponse
     | .inl _ => id
     | .inr _ => id
-  liftM_eq_lift q := by
-    rcases q with ⟨_ | _, _⟩ <;> rfl
+  liftM_eq_lift q := by rcases q with ⟨_ | _, _⟩ <;> rfl
 
 instance lawfulSubSpec_fsRo_cmaSpec (M Commit Chal Resp Stmt : Type) :
     (unifSpec + roSpec M Commit Chal) ˡ⊂ₒ cmaSpec M Commit Chal Resp Stmt where
@@ -258,8 +249,7 @@ instance subSpec_sourceCma_cmaSpec (M Commit Chal Resp Stmt : Type) :
     | .inl (.inl _) => id
     | .inl (.inr _) => id
     | .inr _ => id
-  liftM_eq_lift q := by
-    rcases q with ⟨(_ | _) | _, _⟩ <;> rfl
+  liftM_eq_lift q := by rcases q with ⟨(_ | _) | _, _⟩ <;> rfl
 
 instance lawfulSubSpec_sourceCma_cmaSpec (M Commit Chal Resp Stmt : Type) :
     (unifSpec + roSpec M Commit Chal + signSpec M Commit Resp) ˡ⊂ₒ
@@ -319,42 +309,24 @@ abbrev CmaState (M Commit Chal Stmt Wit : Type) :=
 instance cmaOuterLens_isVeryWellBehaved (M Commit Chal Stmt Wit : Type) :
     PFunctor.Lens.State.IsVeryWellBehaved
       (cmaOuterLens M Commit Chal Stmt Wit) where
-  get_put := by intro s log; rfl
-  put_get := by intro s; rcases s with ⟨⟨log, cache, kp⟩, bad⟩; rfl
-  put_put := by intro s log₁ log₂; rfl
+  get_put _ _ := rfl
+  put_get _ := rfl
+  put_put _ _ _ := rfl
 
 instance cmaNmaLens_isVeryWellBehaved (M Commit Chal Stmt Wit : Type) :
     PFunctor.Lens.State.IsVeryWellBehaved
       (cmaNmaLens M Commit Chal Stmt Wit) where
-  get_put := by
-    intro s inner
-    rcases inner with ⟨cache, kp, bad⟩
-    rfl
-  put_get := by intro s; rcases s with ⟨⟨log, cache, kp⟩, bad⟩; rfl
-  put_put := by
-    intro s inner₁ inner₂
-    rcases inner₁ with ⟨cache₁, kp₁, bad₁⟩
-    rcases inner₂ with ⟨cache₂, kp₂, bad₂⟩
-    rfl
+  get_put _ _ := rfl
+  put_get _ := rfl
+  put_put _ _ _ := rfl
 
 instance cmaOuterLens_cmaNmaLens_isSeparated (M Commit Chal Stmt Wit : Type) :
     PFunctor.Lens.State.IsSeparated
       (cmaOuterLens M Commit Chal Stmt Wit)
       (cmaNmaLens M Commit Chal Stmt Wit) where
-  left_get_put_right := by
-    intro s inner
-    rcases s with ⟨⟨log, cache, kp⟩, bad⟩
-    rcases inner with ⟨cache', kp', bad'⟩
-    rfl
-  right_get_put_left := by
-    intro s log
-    rcases s with ⟨⟨log₀, cache, kp⟩, bad⟩
-    rfl
-  put_comm := by
-    intro s log inner
-    rcases s with ⟨⟨log₀, cache, kp⟩, bad⟩
-    rcases inner with ⟨cache', kp', bad'⟩
-    rfl
+  left_get_put_right _ _ := rfl
+  right_get_put_left _ _ := rfl
+  put_comm _ _ _ := rfl
 
 /-- The direct CMA frame used by `cmaToNma.linkWith nma`. -/
 @[fs_simp] def cmaFrame (M Commit Chal Stmt Wit : Type) :
@@ -371,15 +343,15 @@ instance cmaOuterLens_cmaNmaLens_isSeparated (M Commit Chal Stmt Wit : Type) :
 
 instance unitLens_isVeryWellBehaved (σ : Type) :
     PFunctor.Lens.State.IsVeryWellBehaved (unitLens σ) where
-  get_put := by intro _ _; rfl
-  put_get := by intro _; rfl
-  put_put := by intro _ _ _; rfl
+  get_put _ _ := rfl
+  put_get _ := rfl
+  put_put _ _ _ := rfl
 
 instance unitLens_id_isSeparated (σ : Type) :
     PFunctor.Lens.State.IsSeparated (unitLens σ) (PFunctor.Lens.State.id σ) where
-  left_get_put_right := by intro _ _; rfl
-  right_get_put_left := by intro _ _; rfl
-  put_comm := by intro _ _ _; rfl
+  left_get_put_right _ _ := rfl
+  right_get_put_left _ _ := rfl
+  put_comm _ _ _ := rfl
 
 /-- Frame used to compose the stateless forwarding part of `cmaToNma` with the
 stateful signing simulator while keeping only the signing log as state. -/

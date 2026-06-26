@@ -101,7 +101,7 @@ noncomputable instance [AddMonoid ω] : AddMonoid (ResourceProfile ω κ) where
   add_zero a := by ext <;> simp
   add_assoc a b c := by ext <;> simp [add_assoc]
   nsmul_zero a := by ext <;> simp
-  nsmul_succ n a := by ext <;> simp [succ_nsmul, add_comm]
+  nsmul_succ n a := by ext <;> simp [succ_nsmul]
 
 @[simp] lemma intrinsic_nsmul [AddMonoid ω] (n : ℕ) (a : ResourceProfile ω κ) :
     (n • a).intrinsic = n • a.intrinsic := rfl
@@ -133,12 +133,8 @@ instance [PartialOrder ω] : PartialOrder (ResourceProfile ω κ) where
   le := (· ≤ ·)
   le_refl a := ⟨le_rfl, le_rfl⟩
   le_trans a b c hab hbc := ⟨le_trans hab.1 hbc.1, le_trans hab.2 hbc.2⟩
-  le_antisymm a b hab hba := by
-    have hprod : a.toProd = b.toProd := le_antisymm hab hba
-    cases a
-    cases b
-    cases hprod
-    rfl
+  le_antisymm a b hab hba :=
+    ResourceProfile.ext (le_antisymm hab.1 hba.1) (le_antisymm hab.2 hba.2)
 
 instance [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] :
     IsOrderedAddMonoid (ResourceProfile ω κ) where
@@ -172,20 +168,17 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
     ResourceProfile ω κ →+ ω where
   toFun := fun c ↦ c.eval weights
   map_zero' := by simp [eval]
-  map_add' a b := by
-    simp [eval, Finsupp.sum_add_index', add_assoc, add_left_comm, add_comm, add_nsmul]
+  map_add' a b := by simp [eval, Finsupp.sum_add_index', add_add_add_comm, add_nsmul]
 
 @[simp] lemma intrinsic_sum [AddCommMonoid ω] {ι : Type*} (s : Finset ι)
     (f : ι → ResourceProfile ω κ) :
-    (∑ a ∈ s, f a).intrinsic = ∑ a ∈ s, (f a).intrinsic := by
-  change (intrinsicAddMonoidHom (ω := ω) (κ := κ)) (∑ a ∈ s, f a) = ∑ a ∈ s, (f a).intrinsic
-  exact map_sum (intrinsicAddMonoidHom (ω := ω) (κ := κ)) (fun a ↦ f a) s
+    (∑ a ∈ s, f a).intrinsic = ∑ a ∈ s, (f a).intrinsic :=
+  map_sum (intrinsicAddMonoidHom (ω := ω) (κ := κ)) f s
 
 @[simp] lemma usage_sum [AddCommMonoid ω] {ι : Type*} (s : Finset ι)
     (f : ι → ResourceProfile ω κ) :
-    (∑ a ∈ s, f a).usage = ∑ a ∈ s, (f a).usage := by
-  change (usageAddMonoidHom (ω := ω) (κ := κ)) (∑ a ∈ s, f a) = ∑ a ∈ s, (f a).usage
-  exact map_sum (usageAddMonoidHom (ω := ω) (κ := κ)) (fun a ↦ f a) s
+    (∑ a ∈ s, f a).usage = ∑ a ∈ s, (f a).usage :=
+  map_sum (usageAddMonoidHom (ω := ω) (κ := κ)) f s
 
 @[simp] lemma intrinsic_instantiate [AddCommMonoid ω]
     (c : ResourceProfile ω κ) (impl : κ → ResourceProfile ω κ') :
@@ -204,15 +197,11 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
 
 @[simp] lemma eval_ofUsage [AddCommMonoid ω] (u : κ →₀ ℕ) (weights : κ → ω) :
     (ofUsage (ω := ω) u).eval weights = u.sum (fun k n ↦ n • weights k) := by
-  rw [eval, ofUsage]
-  simp
+  simp [eval, ofUsage]
 
 @[simp] lemma eval_single [AddCommMonoid ω] (k : κ) (n : ℕ) (weights : κ → ω) :
     (single (ω := ω) k n).eval weights = n • weights k := by
-  rw [single, eval, ofUsage]
-  rw [Finsupp.sum_single_index]
-  · simp
-  · simp
+  simp [single, eval, ofUsage]
 
 @[simp] lemma eval_zero [AddCommMonoid ω] (weights : κ → ω) :
     (0 : ResourceProfile ω κ).eval weights = 0 := by
@@ -228,10 +217,8 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
 
 @[simp] lemma eval_sum [AddCommMonoid ω] {ι : Type*} (s : Finset ι)
     (f : ι → ResourceProfile ω κ) (weights : κ → ω) :
-    (∑ a ∈ s, f a).eval weights = ∑ a ∈ s, (f a).eval weights := by
-  change (evalAddMonoidHom (ω := ω) (κ := κ) weights) (∑ a ∈ s, f a) =
-      ∑ a ∈ s, (f a).eval weights
-  exact map_sum (evalAddMonoidHom (ω := ω) (κ := κ) weights) (fun a ↦ f a) s
+    (∑ a ∈ s, f a).eval weights = ∑ a ∈ s, (f a).eval weights :=
+  map_sum (evalAddMonoidHom (ω := ω) (κ := κ) weights) f s
 
 @[simp] lemma instantiate_ofIntrinsic [AddCommMonoid ω]
     (w : ω) (impl : κ → ResourceProfile ω κ') :
@@ -245,15 +232,12 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
 @[simp] lemma instantiate_ofUsage [AddCommMonoid ω]
     (u : κ →₀ ℕ) (impl : κ → ResourceProfile ω κ') :
     (ofUsage (ω := ω) u).instantiate impl = u.sum (fun k n ↦ n • impl k) := by
-  rw [instantiate, ofUsage, ofIntrinsic_zero]
-  simp
+  simp [instantiate, ofUsage]
 
 @[simp] lemma instantiate_single [AddCommMonoid ω]
     (k : κ) (n : ℕ) (impl : κ → ResourceProfile ω κ') :
     (single (ω := ω) k n).instantiate impl = n • impl k := by
-  rw [single, instantiate_ofUsage]
-  rw [Finsupp.sum_single_index]
-  · simp
+  simp [single, instantiate, ofUsage]
 
 /-- Additive monoid hom instantiating the symbolic capabilities in a resource profile with open
 implementations. -/
@@ -263,8 +247,7 @@ noncomputable def instantiateAddMonoidHom [AddCommMonoid ω]
   toFun := fun c ↦ c.instantiate impl
   map_zero' := by simp [instantiate]
   map_add' a b := by
-    ext <;> simp [instantiate, Finsupp.sum_add_index', add_assoc, add_left_comm, add_comm,
-      add_nsmul]
+    ext <;> simp [instantiate, Finsupp.sum_add_index', add_add_add_comm, add_nsmul]
 
 @[simp] lemma instantiate_add [AddCommMonoid ω]
     (a b : ResourceProfile ω κ) (impl : κ → ResourceProfile ω κ') :
@@ -287,33 +270,19 @@ profile, is the same as substituting the composite implementation
     (impl₂ : κ' → ResourceProfile ω κ'') :
     (c.instantiate impl₁).instantiate impl₂ =
       c.instantiate (fun k ↦ (impl₁ k).instantiate impl₂) := by
-  have hu :
-      ∀ u : κ →₀ ℕ,
-        ((ofUsage (ω := ω) u).instantiate impl₁).instantiate impl₂ =
-          (ofUsage (ω := ω) u).instantiate (fun k ↦ (impl₁ k).instantiate impl₂) := by
-    intro u
+  have hu : ∀ u : κ →₀ ℕ,
+      ((ofUsage (ω := ω) u).instantiate impl₁).instantiate impl₂ =
+        (ofUsage (ω := ω) u).instantiate (fun k ↦ (impl₁ k).instantiate impl₂) := fun u => by
     induction u using Finsupp.induction with
-    | zero =>
-        simp [instantiate]
+    | zero => simp [instantiate]
     | @single_add a n u ha hn ih =>
-        have ihu :
-            (u.sum fun k n ↦ n • impl₁ k).instantiate impl₂ =
-              u.sum fun k n ↦ n • (impl₁ k).instantiate impl₂ := by
-          simpa [instantiate_ofUsage] using ih
-        rw [instantiate_ofUsage, instantiate_ofUsage]
-        rw [Finsupp.sum_add_index' (h_zero := fun _ ↦ by simp)
-          (h_add := fun _ _ _ ↦ by simp [add_nsmul])]
-        rw [Finsupp.sum_add_index' (h_zero := fun _ ↦ by simp)
-          (h_add := fun _ _ _ ↦ by simp [add_nsmul])]
-        rw [instantiate_add, Finsupp.sum_single_index, instantiate_nsmul, Finsupp.sum_single_index]
-        · exact congrArg (fun t ↦ n • (impl₁ a).instantiate impl₂ + t) ihu
-        · simp
-        · simp
+        have hsplit : ofUsage (ω := ω) (Finsupp.single a n + u) = single a n + ofUsage u := by
+          ext <;> simp [ofUsage, single]
+        simp only [hsplit, instantiate_add, instantiate_single, instantiate_nsmul, ih]
   have hc : c = ofIntrinsic (κ := κ) c.intrinsic + ofUsage (ω := ω) c.usage := by
     ext <;> simp [ofUsage]
-  rw [hc, instantiate_add, instantiate_ofIntrinsic, instantiate_add, instantiate_ofIntrinsic,
-    instantiate_add, instantiate_ofIntrinsic]
-  exact congrArg (fun t ↦ ofIntrinsic (κ := κ'') c.intrinsic + t) (hu c.usage)
+  rw [hc]
+  simp only [instantiate_add, instantiate_ofIntrinsic, hu]
 
 /-- Evaluating a purely intrinsic profile after instantiation leaves the intrinsic cost
 unchanged. -/
@@ -329,8 +298,7 @@ capability implementation and summing the resulting scalar costs. -/
     (u : κ →₀ ℕ) (impl : κ → ResourceProfile ω κ') (weights : κ' → ω) :
     ((ofUsage (ω := ω) u).instantiate impl).eval weights =
       (ofUsage (ω := ω) u).eval (fun k => (impl k).eval weights) := by
-  rw [instantiate_ofUsage, Finsupp.sum, eval_sum, eval_ofUsage, Finsupp.sum]
-  simp [eval_nsmul]
+  simp [instantiate_ofUsage, Finsupp.sum]
 
 /-- Evaluating a resource profile after instantiating its symbolic capabilities is the same as
 evaluating the outer profile against the scalar costs induced by the implementations. -/
@@ -340,9 +308,7 @@ evaluating the outer profile against the scalar costs induced by the implementat
     (weights : κ' → ω) :
     (c.instantiate impl).eval weights =
       c.eval (fun k => (impl k).eval weights) := by
-  have hc : c = ofIntrinsic (κ := κ) c.intrinsic + ofUsage (ω := ω) c.usage := by
-    ext <;> simp [ofUsage]
-  rw [hc, instantiate_add, eval_add, eval_instantiate_ofIntrinsic, eval_instantiate_ofUsage,
-    eval_add]
+  rw [show c = ofIntrinsic c.intrinsic + ofUsage c.usage by ext <;> simp [ofUsage],
+    instantiate_add, eval_add, eval_instantiate_ofIntrinsic, eval_instantiate_ofUsage, eval_add]
 
 end ResourceProfile

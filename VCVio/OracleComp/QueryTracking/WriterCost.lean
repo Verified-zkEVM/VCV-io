@@ -37,7 +37,7 @@ def withAddCost {ω : Type} [AddMonoid ω]
     (impl : QueryImpl spec m) (costFn : spec.Domain → ω) :
     QueryImpl spec (AddWriterT ω m) :=
   QueryImpl.withCost (spec := spec) (m := m) impl
-    (fun t => Multiplicative.ofAdd (costFn t))
+    (fun t ↦ Multiplicative.ofAdd (costFn t))
 
 @[simp]
 lemma withAddCost_apply {ω : Type} [AddMonoid ω]
@@ -157,10 +157,9 @@ lemma PathwiseHasCost.unique {ω : Type} [AddMonoid ω] [PartialOrder ω]
     {oa : AddWriterT ω m α} {w₁ w₂ : ω}
     (h₁ : PathwiseHasCost oa w₁) (h₂ : PathwiseHasCost oa w₂) :
     w₁ = w₂ := by
-  rcases h₁.nonempty with ⟨z, hz⟩
-  exact le_antisymm
-    (le_trans (h₁.atLeast z hz) (h₂.atMost z hz))
-    (le_trans (h₂.atLeast z hz) (h₁.atMost z hz))
+  obtain ⟨z, hz⟩ := h₁.nonempty
+  exact le_antisymm ((h₁.atLeast z hz).trans (h₂.atMost z hz))
+    ((h₂.atLeast z hz).trans (h₁.atMost z hz))
 
 lemma pathwiseCostAtMost_of_hasCost {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : AddWriterT ω m α} {w b : ω}
@@ -170,9 +169,8 @@ lemma pathwiseCostAtMost_of_hasCost {ω : Type} [AddMonoid ω] [Preorder ω] [La
   have hzCost : Multiplicative.toAdd z.2 ∈ support oa.costs := by
     rw [AddWriterT.costs_def, support_map]
     exact ⟨z, hz, rfl⟩
-  rw [h] at hzCost
-  rw [support_map] at hzCost
-  rcases hzCost with ⟨a, _, hzCost⟩
+  rw [h, support_map] at hzCost
+  obtain ⟨_, _, hzCost⟩ := hzCost
   simpa [hzCost] using hwb
 
 lemma pathwiseCostAtLeast_of_hasCost {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
@@ -183,9 +181,8 @@ lemma pathwiseCostAtLeast_of_hasCost {ω : Type} [AddMonoid ω] [Preorder ω] [L
   have hzCost : Multiplicative.toAdd z.2 ∈ support oa.costs := by
     rw [AddWriterT.costs_def, support_map]
     exact ⟨z, hz, rfl⟩
-  rw [h] at hzCost
-  rw [support_map] at hzCost
-  rcases hzCost with ⟨a, _, hzCost⟩
+  rw [h, support_map] at hzCost
+  obtain ⟨_, _, hzCost⟩ := hzCost
   simpa [hzCost] using hbw
 
 end pathwiseCost
@@ -222,15 +219,11 @@ lemma expectedCostNat_eq_tsum_tail_probs
     (oa : AddWriterT ℕ m α) :
     expectedCostNat oa = ∑' i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] := by
   unfold expectedCostNat expectedCost
-  calc
-    ∑' n : ℕ, Pr[= n | oa.costs] * (n : ENNReal)
-        = ∑' i : ℕ, ∑' n : ℕ, if i < n then Pr[= n | oa.costs] else 0 :=
-          ENNReal.tsum_mul_nat_eq_tsum_tail (fun n ↦ Pr[= n | oa.costs])
-    _ = ∑' i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] := by
-          refine tsum_congr fun i ↦ ?_
-          rw [probEvent_eq_tsum_indicator]
-          refine tsum_congr fun n ↦ ?_
-          by_cases h : i < n <;> simp [Set.indicator, h]
+  rw [ENNReal.tsum_mul_nat_eq_tsum_tail (fun n ↦ Pr[= n | oa.costs])]
+  refine tsum_congr fun i ↦ ?_
+  rw [probEvent_eq_tsum_indicator]
+  refine tsum_congr fun n ↦ ?_
+  by_cases h : i < n <;> simp [Set.indicator, h]
 
 omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SPMF] [EvalDistCompatible m]
     in
@@ -241,9 +234,8 @@ If the tail probability `Pr[i < cost]` is bounded by `a i` for every `i`, then
 lemma expectedCostNat_le_tsum_of_tail_probs_le
     (oa : AddWriterT ℕ m α) {a : ℕ → ENNReal}
     (h : ∀ i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] ≤ a i) :
-    expectedCostNat oa ≤ ∑' i : ℕ, a i := by
-  rw [expectedCostNat_eq_tsum_tail_probs]
-  exact ENNReal.tsum_le_tsum h
+    expectedCostNat oa ≤ ∑' i : ℕ, a i :=
+  (expectedCostNat_eq_tsum_tail_probs oa).trans_le (ENNReal.tsum_le_tsum h)
 
 omit [LawfulMonadLiftT m SPMF] in
 /-- Finite tail-sum formula for natural-valued writer cost under a pathwise upper bound.
@@ -257,10 +249,9 @@ lemma expectedCostNat_eq_sum_tail_probs_of_pathwiseCostAtMost
     expectedCostNat oa = ∑ i ∈ Finset.range n, Pr[ fun c ↦ i < c | oa.costs ] := by
   rw [expectedCostNat_eq_tsum_tail_probs]
   symm
-  rw [tsum_eq_sum (s := Finset.range n) (fun b hb => ?_)]
+  rw [tsum_eq_sum (s := Finset.range n) (fun b hb ↦ ?_)]
   · have hnb : n ≤ b := Nat.le_of_not_lt (by simpa [Finset.mem_range] using hb)
-    refine probEvent_eq_zero ?_
-    intro c hc
+    refine probEvent_eq_zero fun c hc ↦ ?_
     rw [AddWriterT.costs_def, support_map] at hc
     rcases hc with ⟨z, hz, rfl⟩
     exact not_lt_of_ge (le_trans (h z hz) hnb)
@@ -271,27 +262,16 @@ lemma expectedCost_le_of_support_bound
     (h : ∀ w ∈ support oa.costs, val w ≤ c) :
     expectedCost oa val ≤ c := by
   unfold expectedCost
-  have hmass : ∑' w : ω, Pr[= w | oa.costs] ≤ 1 :=
-    tsum_probOutput_le_one (mx := oa.costs)
   calc
     ∑' w : ω, Pr[= w | oa.costs] * val w
-        ≤ ∑' w : ω, Pr[= w | oa.costs] * c := by
-          refine ENNReal.tsum_le_tsum ?_
-          intro w
-          by_cases hw : w ∈ support oa.costs
-          · exact mul_le_mul_of_nonneg_left (h w hw) (zero_le)
-          · have hp : Pr[= w | oa.costs] = 0 := by
-              rw [AddWriterT.costs_def]
-              exact probOutput_eq_zero_of_not_mem_support
-                (mx := (fun z ↦ Multiplicative.toAdd z.2) <$> WriterT.run oa)
-                (by simpa [AddWriterT.costs_def] using hw)
-            rw [hp]
-            simp
-    _ = (∑' w : ω, Pr[= w | oa.costs]) * c := by
-          rw [ENNReal.tsum_mul_right]
-    _ ≤ 1 * c := by
-          simpa [mul_comm] using (mul_le_mul_right hmass c)
-    _ = c := by simp
+        ≤ ∑' w : ω, Pr[= w | oa.costs] * c :=
+          ENNReal.tsum_le_tsum fun w ↦ by
+            by_cases hw : w ∈ support oa.costs
+            · exact mul_le_mul_of_nonneg_left (h w hw) zero_le'
+            · rw [probOutput_eq_zero_of_not_mem_support hw, zero_mul, zero_mul]
+    _ = (∑' w : ω, Pr[= w | oa.costs]) * c := ENNReal.tsum_mul_right
+    _ ≤ 1 * c := by gcongr; exact tsum_probOutput_le_one
+    _ = c := one_mul c
 
 omit [LawfulMonadLiftT m SPMF] in
 lemma expectedCost_le_of_pathwiseCostAtMost [AddMonoid ω]
@@ -299,42 +279,34 @@ lemma expectedCost_le_of_pathwiseCostAtMost [AddMonoid ω]
     {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
     (h : PathwiseCostAtMost oa w) (hval : Monotone val) :
     expectedCost oa val ≤ val w := by
-  refine expectedCost_le_of_support_bound oa val (val w) ?_
-  intro c hc
+  refine expectedCost_le_of_support_bound oa val (val w) fun c hc ↦ ?_
   rw [AddWriterT.costs_def, support_map] at hc
   rcases hc with ⟨z, hz, rfl⟩
   exact hval (h z hz)
 
 omit [LawfulMonadLiftT m SPMF] in
-lemma expectedCost_ge_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Preorder ω]
+lemma le_expectedCost_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Preorder ω]
     {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
     (h : PathwiseCostAtLeast oa w) (hval : Monotone val)
     (hnf : Pr[⊥ | oa.costs] = 0) :
     val w ≤ expectedCost oa val := by
   unfold expectedCost
   have hmass : ∑' c : ω, Pr[= c | oa.costs] = 1 := by
-    have := tsum_probOutput_eq_sub (mx := oa.costs)
-    rw [this, hnf, tsub_zero]
+    rw [tsum_probOutput_eq_sub (mx := oa.costs), hnf, tsub_zero]
   calc
-    val w = 1 * val w := by simp
-    _ = (∑' c : ω, Pr[= c | oa.costs]) * val w := by
-          rw [← hmass]
-    _ = ∑' c : ω, Pr[= c | oa.costs] * val w := by
-          rw [← ENNReal.tsum_mul_right]
+    val w = (∑' c : ω, Pr[= c | oa.costs]) * val w := by rw [hmass, one_mul]
+    _ = ∑' c : ω, Pr[= c | oa.costs] * val w := ENNReal.tsum_mul_right.symm
     _ ≤ ∑' c : ω, Pr[= c | oa.costs] * val c := by
-          refine ENNReal.tsum_le_tsum ?_
-          intro c
+          refine ENNReal.tsum_le_tsum fun c ↦ ?_
           by_cases hc : c ∈ support oa.costs
           · rw [AddWriterT.costs_def, support_map] at hc
             rcases hc with ⟨z, hz, rfl⟩
-            exact mul_le_mul_of_nonneg_left (hval (h z hz)) (zero_le)
-          · have hp : Pr[= c | oa.costs] = 0 := by
-              rw [AddWriterT.costs_def]
-              exact probOutput_eq_zero_of_not_mem_support
-                (mx := (fun z ↦ Multiplicative.toAdd z.2) <$> WriterT.run oa)
-                (by simpa [AddWriterT.costs_def] using hc)
-            rw [hp]
-            simp
+            gcongr
+            exact hval (h z hz)
+          · rw [probOutput_eq_zero_of_not_mem_support hc, zero_mul, zero_mul]
+
+@[deprecated (since := "2026-06-25")]
+alias expectedCost_ge_of_pathwiseCostAtLeast := le_expectedCost_of_pathwiseCostAtLeast
 
 omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [EvalDistCompatible m] in
@@ -347,28 +319,11 @@ lemma expectedCost_eq_tsum_outputs_of_costsAs
   letI : DecidableEq ω := Classical.decEq ω
   unfold expectedCost
   rw [h]
-  simp_rw [probOutput_map_eq_tsum]
-  calc
-    ∑' w : ω, (∑' a : α, Pr[= a | oa.outputs] * Pr[= w | (pure (f a) : m ω)]) * val w
-      = ∑' w : ω, ∑' a : α, Pr[= a | oa.outputs] *
-          (Pr[= w | (pure (f a) : m ω)] * val w) := by
-            refine tsum_congr fun w => ?_
-            simpa [mul_assoc] using
-              (ENNReal.tsum_mul_right
-                (f := fun a : α =>
-                  Pr[= a | oa.outputs] * Pr[= w | (pure (f a) : m ω)])
-                (a := val w)).symm
-    _ = ∑' a : α, ∑' w : ω, Pr[= a | oa.outputs] *
-          (Pr[= w | (pure (f a) : m ω)] * val w) := by
-            rw [ENNReal.tsum_comm]
-    _ = ∑' a : α, Pr[= a | oa.outputs] *
-          ∑' w : ω, Pr[= w | (pure (f a) : m ω)] * val w := by
-            refine tsum_congr fun a => by
-              rw [← ENNReal.tsum_mul_left]
-    _ = ∑' a : α, Pr[= a | oa.outputs] * val (f a) := by
-            refine tsum_congr fun a => by
-              letI : DecidableEq ω := Classical.decEq ω
-              simp
+  simp_rw [probOutput_map_eq_tsum, ← ENNReal.tsum_mul_right, mul_assoc]
+  rw [ENNReal.tsum_comm]
+  refine tsum_congr fun a ↦ ?_
+  rw [ENNReal.tsum_mul_left]
+  simp
 
 end expectedCost
 
@@ -379,17 +334,11 @@ variable {ω : Type} [AddCommMonoid ω] [PartialOrder ω]
 
 lemma pathwiseCostAtMost_pure [LawfulMonad m] (x : α) :
     PathwiseCostAtMost (pure x : AddWriterT ω m α) 0 := by
-  intro z hz
-  rw [WriterT.run_pure, support_pure] at hz
-  rcases hz with rfl
-  simp
+  simp [PathwiseCostAtMost]
 
 lemma pathwiseCostAtLeast_pure [LawfulMonad m] (x : α) :
     PathwiseCostAtLeast (pure x : AddWriterT ω m α) 0 := by
-  intro z hz
-  rw [WriterT.run_pure, support_pure] at hz
-  rcases hz with rfl
-  simp
+  simp [PathwiseCostAtLeast]
 
 lemma pathwiseCostEqOnSupport_pure [LawfulMonad m] (x : α) :
     PathwiseCostEqOnSupport (pure x : AddWriterT ω m α) 0 :=
@@ -405,17 +354,11 @@ lemma pathwiseHasCost_pure [LawfulMonad m] (x : α) :
 
 lemma pathwiseCostAtMost_monadLift [LawfulMonad m] (x : m α) :
     PathwiseCostAtMost (monadLift x : AddWriterT ω m α) 0 := by
-  intro z hz
-  rw [WriterT.run_monadLift, support_map] at hz
-  rcases hz with ⟨a, _, rfl⟩
-  simp
+  simp [PathwiseCostAtMost, support_map]
 
 lemma pathwiseCostAtLeast_monadLift [LawfulMonad m] (x : m α) :
     PathwiseCostAtLeast (monadLift x : AddWriterT ω m α) 0 := by
-  intro z hz
-  rw [WriterT.run_monadLift, support_map] at hz
-  rcases hz with ⟨a, _, rfl⟩
-  simp
+  simp [PathwiseCostAtLeast, support_map]
 
 lemma pathwiseCostEqOnSupport_monadLift [LawfulMonad m] (x : m α) :
     PathwiseCostEqOnSupport (monadLift x : AddWriterT ω m α) 0 :=
@@ -434,17 +377,11 @@ lemma pathwiseHasCost_monadLift_of_supportNonempty [LawfulMonad m] (x : m α)
 
 lemma pathwiseCostAtMost_liftM [LawfulMonad m] (x : m α) :
     PathwiseCostAtMost (liftM x : AddWriterT ω m α) 0 := by
-  intro z hz
-  rw [WriterT.liftM_def, WriterT.run_mk, support_map] at hz
-  rcases hz with ⟨a, _, rfl⟩
-  simp
+  simp [PathwiseCostAtMost, support_map]
 
 lemma pathwiseCostAtLeast_liftM [LawfulMonad m] (x : m α) :
     PathwiseCostAtLeast (liftM x : AddWriterT ω m α) 0 := by
-  intro z hz
-  rw [WriterT.liftM_def, WriterT.run_mk, support_map] at hz
-  rcases hz with ⟨a, _, rfl⟩
-  simp
+  simp [PathwiseCostAtLeast, support_map]
 
 lemma pathwiseCostEqOnSupport_liftM [LawfulMonad m] (x : m α) :
     PathwiseCostEqOnSupport (liftM x : AddWriterT ω m α) 0 :=
@@ -462,56 +399,43 @@ lemma pathwiseHasCost_liftM_of_supportNonempty [LawfulMonad m] (x : m α)
   exact ⟨a, ha, rfl⟩
 
 lemma pathwiseCostAtMost_probCompLift [LawfulMonad m] [MonadLiftT ProbComp m] (x : ProbComp α) :
-    PathwiseCostAtMost (monadLift x : AddWriterT ω m α) 0 := by
-  change PathwiseCostAtMost (monadLift ((liftM x : m α)) : AddWriterT ω m α) 0
-  exact pathwiseCostAtMost_monadLift (m := m) (x := (liftM x : m α))
+    PathwiseCostAtMost (monadLift x : AddWriterT ω m α) 0 :=
+  pathwiseCostAtMost_monadLift (m := m) (x := (liftM x : m α))
 
 lemma pathwiseCostAtLeast_probCompLift [LawfulMonad m] [MonadLiftT ProbComp m] (x : ProbComp α) :
-    PathwiseCostAtLeast (monadLift x : AddWriterT ω m α) 0 := by
-  change PathwiseCostAtLeast (monadLift ((liftM x : m α)) : AddWriterT ω m α) 0
-  exact pathwiseCostAtLeast_monadLift (m := m) (x := (liftM x : m α))
+    PathwiseCostAtLeast (monadLift x : AddWriterT ω m α) 0 :=
+  pathwiseCostAtLeast_monadLift (m := m) (x := (liftM x : m α))
 
 lemma pathwiseCostEqOnSupport_probCompLift [LawfulMonad m] [MonadLiftT ProbComp m]
     (x : ProbComp α) :
     PathwiseCostEqOnSupport (monadLift x : AddWriterT ω m α) 0 :=
-  ⟨
-    pathwiseCostAtMost_probCompLift (m := m) (ω := ω) x,
-    pathwiseCostAtLeast_probCompLift (m := m) (ω := ω) x
-  ⟩
+  ⟨pathwiseCostAtMost_probCompLift (m := m) (ω := ω) x,
+    pathwiseCostAtLeast_probCompLift (m := m) (ω := ω) x⟩
 
 lemma pathwiseHasCost_probCompLift_of_supportNonempty [LawfulMonad m] [MonadLiftT ProbComp m]
     (x : ProbComp α) (hx : (support (liftM x : m α)).Nonempty) :
-    PathwiseHasCost (monadLift x : AddWriterT ω m α) 0 := by
-  change PathwiseHasCost (monadLift ((liftM x : m α)) : AddWriterT ω m α) 0
-  exact pathwiseHasCost_monadLift_of_supportNonempty (m := m) (ω := ω) (x := (liftM x : m α)) hx
+    PathwiseHasCost (monadLift x : AddWriterT ω m α) 0 :=
+  pathwiseHasCost_monadLift_of_supportNonempty (m := m) (ω := ω) (x := (liftM x : m α)) hx
 
 omit [Monad m] [LawfulMonadLiftT m SetM] in
 lemma pathwiseCostAtMost_mono {oa : AddWriterT ω m α} {w₁ w₂ : ω}
     (h : PathwiseCostAtMost oa w₁) (hw : w₁ ≤ w₂) :
-    PathwiseCostAtMost oa w₂ := by
-  intro z hz
-  exact le_trans (h z hz) hw
+    PathwiseCostAtMost oa w₂ :=
+  fun z hz ↦ (h z hz).trans hw
 
 omit [Monad m] [LawfulMonadLiftT m SetM] in
 lemma pathwiseCostAtLeast_mono {oa : AddWriterT ω m α} {w₁ w₂ : ω}
     (h : PathwiseCostAtLeast oa w₂) (hw : w₁ ≤ w₂) :
-    PathwiseCostAtLeast oa w₁ := by
-  intro z hz
-  exact le_trans hw (h z hz)
+    PathwiseCostAtLeast oa w₁ :=
+  fun z hz ↦ hw.trans (h z hz)
 
 lemma pathwiseCostAtMost_addTell [LawfulMonad m] (w : ω) :
     PathwiseCostAtMost (AddWriterT.addTell (M := m) w) w := by
-  intro z hz
-  rw [AddWriterT.run_addTell, support_pure] at hz
-  rcases hz with rfl
-  simp
+  simp [PathwiseCostAtMost]
 
 lemma pathwiseCostAtLeast_addTell [LawfulMonad m] (w : ω) :
     PathwiseCostAtLeast (AddWriterT.addTell (M := m) w) w := by
-  intro z hz
-  rw [AddWriterT.run_addTell, support_pure] at hz
-  rcases hz with rfl
-  simp
+  simp [PathwiseCostAtLeast]
 
 lemma pathwiseCostEqOnSupport_addTell [LawfulMonad m] (w : ω) :
     PathwiseCostEqOnSupport (AddWriterT.addTell (M := m) w) w :=
@@ -562,11 +486,9 @@ lemma pathwiseCostAtMost_bind [LawfulMonad m] [IsOrderedAddMonoid ω]
   rcases (mem_support_bind_iff
     (mx := oa.run)
     (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
-    (y := z)).1 hz with ⟨aw, haw, hz⟩
-  rcases aw with ⟨a, wa⟩
+    (y := z)).1 hz with ⟨⟨a, wa⟩, haw, hz⟩
   rw [support_map] at hz
-  rcases hz with ⟨bw, hbw, rfl⟩
-  rcases bw with ⟨b, wb⟩
+  rcases hz with ⟨⟨b, wb⟩, hbw, rfl⟩
   simpa using add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
 
 lemma pathwiseCostAtLeast_bind [LawfulMonad m] [IsOrderedAddMonoid ω]
@@ -578,11 +500,9 @@ lemma pathwiseCostAtLeast_bind [LawfulMonad m] [IsOrderedAddMonoid ω]
   rcases (mem_support_bind_iff
     (mx := oa.run)
     (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
-    (y := z)).1 hz with ⟨aw, haw, hz⟩
-  rcases aw with ⟨a, wa⟩
+    (y := z)).1 hz with ⟨⟨a, wa⟩, haw, hz⟩
   rw [support_map] at hz
-  rcases hz with ⟨bw, hbw, rfl⟩
-  rcases bw with ⟨b, wb⟩
+  rcases hz with ⟨⟨b, wb⟩, hbw, rfl⟩
   simpa using add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
 
 lemma pathwiseCostEqOnSupport_bind [LawfulMonad m] [IsOrderedAddMonoid ω]
@@ -598,10 +518,8 @@ lemma pathwiseHasCost_bind [LawfulMonad m] [IsOrderedAddMonoid ω]
     PathwiseHasCost (oa >>= f) (w₁ + w₂) := by
   refine ⟨?_, ⟨pathwiseCostAtMost_bind h₁.atMost (fun a ↦ (h₂ a).atMost),
     pathwiseCostAtLeast_bind h₁.atLeast (fun a ↦ (h₂ a).atLeast)⟩⟩
-  rcases h₁.nonempty with ⟨aw, haw⟩
-  rcases aw with ⟨a, wa⟩
-  rcases (h₂ a).nonempty with ⟨bw, hbw⟩
-  rcases bw with ⟨b, wb⟩
+  rcases h₁.nonempty with ⟨⟨a, wa⟩, haw⟩
+  rcases (h₂ a).nonempty with ⟨⟨b, wb⟩, hbw⟩
   refine ⟨(b, wa * wb), ?_⟩
   rw [WriterT.run_bind, mem_support_bind_iff]
   refine ⟨(a, wa), haw, ?_⟩
@@ -641,14 +559,10 @@ lemma pathwiseCostAtMost_fin_mOfFn [LawfulMonad m] [IsOrderedAddMonoid ω] {n : 
         (pathwiseCostAtMost_pure (m := m) (ω := ω) (x := (Fin.elim0 : Fin 0 → α)))
   | succ n ih =>
       simp only [Fin.mOfFn, succ_nsmul']
-      let consA : α → (Fin n → α) → Fin n.succ → α :=
-        fun a ↦ @Fin.cons n (fun _ : Fin n.succ ↦ α) a
-      simpa [add_comm, consA] using
+      simpa [add_comm] using
         (pathwiseCostAtMost_bind (w₁ := k) (w₂ := n • k)
           (by simpa using h 0)
-          (fun a ↦
-            pathwiseCostAtMost_map (consA a)
-              (ih (fun i ↦ h i.succ))))
+          (fun a ↦ pathwiseCostAtMost_map (Fin.cons a) (ih (fun i ↦ h i.succ))))
 
 lemma pathwiseCostAtLeast_fin_mOfFn [LawfulMonad m] [IsOrderedAddMonoid ω] {n : ℕ} {k : ω}
     {f : Fin n → AddWriterT ω m α} (h : ∀ i, PathwiseCostAtLeast (f i) k) :
@@ -659,14 +573,10 @@ lemma pathwiseCostAtLeast_fin_mOfFn [LawfulMonad m] [IsOrderedAddMonoid ω] {n :
         (pathwiseCostAtLeast_pure (m := m) (ω := ω) (x := (Fin.elim0 : Fin 0 → α)))
   | succ n ih =>
       simp only [Fin.mOfFn, succ_nsmul']
-      let consA : α → (Fin n → α) → Fin n.succ → α :=
-        fun a ↦ @Fin.cons n (fun _ : Fin n.succ ↦ α) a
-      simpa [add_comm, consA] using
+      simpa [add_comm] using
         (pathwiseCostAtLeast_bind (w₁ := k) (w₂ := n • k)
           (by simpa using h 0)
-          (fun a ↦
-            pathwiseCostAtLeast_map (consA a)
-              (ih (fun i ↦ h i.succ))))
+          (fun a ↦ pathwiseCostAtLeast_map (Fin.cons a) (ih (fun i ↦ h i.succ))))
 
 lemma pathwiseHasCost_fin_mOfFn [LawfulMonad m] [IsOrderedAddMonoid ω] {n : ℕ} {k : ω}
     {f : Fin n → AddWriterT ω m α} (h : ∀ i, PathwiseHasCost (f i) k) :
@@ -678,16 +588,9 @@ lemma pathwiseHasCost_fin_mOfFn [LawfulMonad m] [IsOrderedAddMonoid ω] {n : ℕ
   | succ n ih =>
       let consA : α → (Fin n → α) → Fin n.succ → α :=
         fun a ↦ @Fin.cons n (fun _ : Fin n.succ ↦ α) a
-      have htail : ∀ i : Fin n, PathwiseHasCost (f i.succ) k := fun i ↦ h i.succ
-      have ih' : PathwiseHasCost (Fin.mOfFn n (fun i ↦ f i.succ)) (n • k) := ih htail
-      have hbind :
-          PathwiseHasCost
-            (f 0 >>= fun a ↦ (consA a) <$> Fin.mOfFn n (fun i ↦ f i.succ))
-            (k + n • k) :=
-        pathwiseHasCost_bind (m := m) (ω := ω) (w₁ := k) (w₂ := n • k)
-          (h 0)
-          (fun a ↦ pathwiseHasCost_map (f := consA a) ih')
-      simpa [Fin.mOfFn, succ_nsmul', add_comm, consA] using hbind
+      simpa [Fin.mOfFn, succ_nsmul', add_comm, consA] using
+        pathwiseHasCost_bind (m := m) (ω := ω) (w₁ := k) (w₂ := n • k) (h 0)
+          (fun a ↦ pathwiseHasCost_map (f := consA a) (ih (fun i ↦ h i.succ)))
 
 end weightedPathwiseBounds
 
@@ -810,8 +713,8 @@ lemma queryCostExactly_bind [LawfulMonad m]
 lemma queryCostExactly_fin_mOfFn [LawfulMonad m] {n k : ℕ}
     {f : Fin n → AddWriterT ℕ m α} (h : ∀ i, QueryCostExactly (f i) k) :
     QueryCostExactly (Fin.mOfFn n f) (n * k) :=
-  ⟨queryBoundedAboveBy_fin_mOfFn (fun i => (h i).toAbove),
-    queryBoundedBelowBy_fin_mOfFn (fun i => (h i).toBelow)⟩
+  ⟨queryBoundedAboveBy_fin_mOfFn (fun i ↦ (h i).toAbove),
+    queryBoundedBelowBy_fin_mOfFn (fun i ↦ (h i).toBelow)⟩
 
 end unitCostBounds
 
@@ -824,11 +727,9 @@ lemma expectedCostNat_le_of_queryBoundedAboveBy [LawfulMonad m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
     (h : QueryBoundedAboveBy oa n) :
     expectedCostNat oa ≤ n := by
-  simpa [expectedCostNat, QueryBoundedAboveBy] using
+  simpa using
     (expectedCost_le_of_pathwiseCostAtMost
-      (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h
-      (fun a b hle ↦ by
-        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+      (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h Nat.mono_cast)
 
 end expectedUnitCost
 
@@ -837,15 +738,16 @@ section expectedUnitCostPMF
 variable [MonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
-lemma expectedCostNat_ge_of_queryBoundedBelowBy [LawfulMonad m] [EvalDistCompatible m]
+lemma le_expectedCostNat_of_queryBoundedBelowBy [LawfulMonad m] [EvalDistCompatible m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
     (h : QueryBoundedBelowBy oa n) :
     (n : ENNReal) ≤ expectedCostNat oa := by
-  refine expectedCost_ge_of_pathwiseCostAtLeast
-    (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h
-    (fun a b hle ↦ by
-      simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal)))
+  refine le_expectedCost_of_pathwiseCostAtLeast
+    (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h Nat.mono_cast
     (probFailure_of_liftM_PMF _)
+
+@[deprecated (since := "2026-06-25")]
+alias expectedCostNat_ge_of_queryBoundedBelowBy := le_expectedCostNat_of_queryBoundedBelowBy
 
 lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m] [EvalDistCompatible m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
@@ -853,7 +755,7 @@ lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m] [EvalDistCompatible
     expectedCostNat oa = n :=
   le_antisymm
     (expectedCostNat_le_of_queryBoundedAboveBy h.toAbove)
-    (expectedCostNat_ge_of_queryBoundedBelowBy h.toBelow)
+    (le_expectedCostNat_of_queryBoundedBelowBy h.toBelow)
 
 end expectedUnitCostPMF
 

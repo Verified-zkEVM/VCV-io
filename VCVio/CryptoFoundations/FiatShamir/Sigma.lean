@@ -108,7 +108,7 @@ lemma runtimeWithCache_evalDist_map
     (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) :
     (runtimeWithCache M cache).evalDist (f <$> mx) =
       f <$> (runtimeWithCache M cache).evalDist mx :=
-  SPMFSemantics.withStateOracle_evalDist_map _ _ _ _
+  SPMFSemantics.withStateOracle_evalDist_map ..
 
 /-- The cache-parametric Fiat-Shamir runtime commutes with `>>= pure ∘ f`. A direct corollary of
 `runtimeWithCache_evalDist_map`. -/
@@ -117,9 +117,8 @@ lemma runtimeWithCache_evalDist_bind_pure
     {α β : Type} (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (f : α → β) :
     (runtimeWithCache M cache).evalDist (mx >>= fun x => pure (f x)) =
       f <$> (runtimeWithCache M cache).evalDist mx := by
-  have heq : (mx >>= fun x => pure (f x)) = f <$> mx := by
-    rw [map_eq_bind_pure_comp]; rfl
-  rw [heq, runtimeWithCache_evalDist_map]
+  rw [show (mx >>= fun x => pure (f x)) = f <$> mx from (map_eq_bind_pure_comp _ f mx).symm,
+    runtimeWithCache_evalDist_map]
 
 /-- The Fiat-Shamir runtime commutes with binding a lifted `ProbComp` prefix:
 evaluating `liftM oa >>= rest` under the runtime is the same as first sampling
@@ -131,17 +130,12 @@ lemma runtimeWithCache_evalDist_bind_liftComp
     (runtimeWithCache M cache).evalDist (liftM oa >>= rest) =
       𝒟[oa] >>= fun x => (runtimeWithCache M cache).evalDist (rest x) := by
   classical
-  let ro : QueryImpl (M × Commit →ₒ Chal)
-      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
-  let impl : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
-      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := unifFwdImpl (M × Commit →ₒ Chal) + ro
+  let impl := unifFwdImpl (M × Commit →ₒ Chal) + (randomOracle :
+    QueryImpl (M × Commit →ₒ Chal) (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp))
   unfold runtimeWithCache ProbCompRuntime.evalDist SPMFSemantics.evalDist SemanticsVia.denote
   change 𝒟[(simulateQ impl (liftM oa >>= rest)).run' cache] =
       𝒟[oa] >>= fun x => 𝒟[(simulateQ impl (rest x)).run' cache]
-  rw [simulateQ_bind]
-  rw [roSim.run'_liftM_bind (ro := ro) (oa := oa)
-    (rest := fun x => simulateQ impl (rest x)) (s := cache)]
-  rw [evalDist_bind]
+  rw [simulateQ_bind, roSim.run'_liftM_bind, evalDist_bind]
 
 /-- The Fiat-Shamir runtime commutes with `<$>`: `cache := ∅` instance of
 `runtimeWithCache_evalDist_map`. -/
@@ -186,7 +180,7 @@ queries and public-randomness lifting.
 
 This is the basic coherence theorem behind the generic/concrete split:
 
- - define Fiat-Shamir once over `HasQuery`
+- define Fiat-Shamir once over `HasQuery`
 - specialize it in one monad
 - transport it along a query-preserving monad morphism into another analysis monad
 
@@ -201,15 +195,8 @@ theorem map_construction
   · simpa [FiatShamir, liftM, MonadLiftT.monadLift, -QueryImpl.toHasQuery_query]
       using hLift hr.gen
   · funext pk sk msg
-    have hCommit :
-        F.toMonadHom (monadLift (σ.commit pk sk) : m (Commit × PrvState)) =
-          (monadLift (σ.commit pk sk) : n (Commit × PrvState)) :=
-      hLift (σ.commit pk sk)
-    have hRespond :
-        ∀ e r, F.toMonadHom (monadLift (σ.respond pk sk e r) : m Resp) =
-          (monadLift (σ.respond pk sk e r) : n Resp) :=
-      fun e r => hLift (σ.respond pk sk e r)
-    simp [FiatShamir, hCommit, hRespond, HasQuery.map_query, -QueryImpl.toHasQuery_query]
+    simp [FiatShamir, hLift (σ.commit pk sk), fun e r => hLift (σ.respond pk sk e r),
+      HasQuery.map_query, -QueryImpl.toHasQuery_query]
   · funext pk msg sig
     cases sig
     simp [FiatShamir, HasQuery.map_query, -QueryImpl.toHasQuery_query]
@@ -226,7 +213,7 @@ variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
+private lemma sign_outputs_withAddCost_eq_eval {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.outputs
@@ -242,7 +229,7 @@ private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ω m (Commit × PrvState))
         let r ← runtime (msg, a.1.1)
-        (fun z : Resp × Multiplicative ω => (a.1.1, z.1)) <$>
+        (fun z : Resp × Multiplicative ω ↦ (a.1.1, z.1)) <$>
           WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ω m Resp)) =
       (do
         let a ← (monadLift (σ.commit pk sk) : m (Commit × PrvState))
@@ -254,13 +241,13 @@ private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
       let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (Commit × PrvState))) :
         AddWriterT ω m (Commit × PrvState))
       let r ← runtime (msg, a.1.1)
-      (fun z : Resp × Multiplicative ω => (a.1.1, z.1)) <$>
+      (fun z : Resp × Multiplicative ω ↦ (a.1.1, z.1)) <$>
         WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m Resp)) :
           AddWriterT ω m Resp)) = _
   simp [bind_map_left]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
+private lemma sign_costs_withAddCost_eq {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.costs
@@ -277,7 +264,7 @@ private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ω m (Commit × PrvState))
         let r ← runtime (msg, a.1.1)
-        (fun z : Resp × Multiplicative ω =>
+        (fun z : Resp × Multiplicative ω ↦
           a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
           WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ω m Resp)) =
       (do
@@ -291,7 +278,7 @@ private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
       let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (Commit × PrvState))) :
         AddWriterT ω m (Commit × PrvState))
       let r ← runtime (msg, a.1.1)
-      (fun z : Resp × Multiplicative ω =>
+      (fun z : Resp × Multiplicative ω ↦
         a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
         WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m Resp)) :
           AddWriterT ω m Resp)) = _
@@ -308,13 +295,8 @@ theorem sign_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
       (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
         (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
       runtime costFn (fun sig ↦ costFn (msg, sig.1)) := by
-  rw [HasQuery.UsesCostAs, AddWriterT.costsAs_iff]
-  rw [sign_outputs_formula_withAddCost
-    (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
-    (msg := msg) (costFn := costFn)]
-  exact sign_costs_formula_withAddCost
-    (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
-    (msg := msg) (costFn := costFn)
+  rw [HasQuery.UsesCostAs, AddWriterT.costsAs_iff, sign_outputs_withAddCost_eq_eval]
+  exact sign_costs_withAddCost_eq σ hr M runtime pk sk msg costFn
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing has expected weighted query cost equal to the expectation of the queried
@@ -342,21 +324,13 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
               (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
             runtime costFn)] * val (costFn (msg, sig.1)) :=
           HasQuery.expectedQueryCost_eq_tsum_outputs_of_usesCostAs
-            (oa := fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
-              (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
-            (runtime := runtime) (costFn := costFn) (f := fun sig ↦ costFn (msg, sig.1))
-            (val := val)
-            (sign_usesCostAsQueryCost
-              (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
-              (msg := msg) (costFn := costFn))
+            (sign_usesCostAsQueryCost σ hr M runtime pk sk msg costFn)
     _ = ∑' sig : Commit × Resp,
           Pr[= sig | HasQuery.Program.eval
             (fun [HasQuery (M × Commit →ₒ Chal) m] =>
               (FiatShamir (m := m) σ hr M).sign pk sk msg)
             runtime] * val (costFn (msg, sig.1)) := by
-          rw [sign_outputs_formula_withAddCost
-            (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
-            (msg := msg) (costFn := costFn)]
+          rw [sign_outputs_withAddCost_eq_eval]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
@@ -364,8 +338,7 @@ theorem sign_usesExactlyOneQuery
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) :
     Queries[ (FiatShamir σ hr M).sign pk sk msg in runtime ] = 1 := by
   simpa [HasQuery.Program.withUnitCost] using
-    sign_usesCostAsQueryCost (σ := σ) (hr := hr) (M := M) (runtime := runtime)
-      (pk := pk) (sk := sk) (msg := msg) (costFn := fun _ ↦ (1 : ℕ))
+    sign_usesCostAsQueryCost σ hr M runtime pk sk msg fun _ ↦ (1 : ℕ)
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification incurs exactly the weighted cost assigned to the single
@@ -376,15 +349,9 @@ theorem verify_usesExactQueryCost {ω : Type} [AddMonoid ω]
     QueryCost[ (FiatShamir σ hr M).verify pk msg sig in runtime by costFn ] =
       costFn (msg, sig.1) := by
   rcases sig with ⟨c, s⟩
-  change Cost[
-    HasQuery.Program.withAddCost
-      (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
-        (FiatShamir (m := AddWriterT ω m) σ hr M).verify pk msg (c, s))
-      runtime costFn
-  ] = costFn (msg, c)
-  rw [AddWriterT.hasCost_iff]
-  simp [HasQuery.Program.withAddCost, FiatShamir, QueryImpl.withAddCost_apply,
-    AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
+  simp [HasQuery.UsesCostExactly, AddWriterT.hasCost_iff, HasQuery.Program.withAddCost,
+    FiatShamir, QueryImpl.withAddCost_apply, AddWriterT.outputs, AddWriterT.costs,
+    AddWriterT.addTell]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification has expected weighted query cost equal to the weight of its single
@@ -397,10 +364,7 @@ theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [Mo
       (FiatShamir σ hr M).verify pk msg sig in runtime by costFn via val
     ] = val (costFn (msg, sig.1)) :=
   HasQuery.expectedQueryCost_eq_of_usesCostExactly
-    (verify_usesExactQueryCost
-      (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (msg := msg)
-      (sig := sig) (costFn := costFn))
-    hval
+    (verify_usesExactQueryCost σ hr M runtime pk msg sig costFn) hval
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification makes exactly one random-oracle query under unit-cost
@@ -410,9 +374,7 @@ theorem verify_usesExactlyOneQuery
     (sig : Commit × Resp) :
     Queries[ (FiatShamir σ hr M).verify pk msg sig in runtime ] = 1 := by
   simpa [HasQuery.UsesExactlyQueries] using
-    (verify_usesExactQueryCost
-      (ω := ℕ) (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk)
-      (msg := msg) (sig := sig) (costFn := fun _ ↦ 1))
+    verify_usesExactQueryCost σ hr M runtime pk msg sig fun _ ↦ (1 : ℕ)
 
 attribute [simp] sign_usesExactlyOneQuery verify_usesExactlyOneQuery
 
@@ -426,31 +388,8 @@ variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 
 open scoped Classical in
 omit [SampleableType Stmt] [SampleableType Wit] in
-/-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
-underlying Σ-protocol. -/
-theorem perfectlyCorrect [SampleableType Chal]
-    (hc : σ.PerfectlyComplete) :
-    SignatureAlg.PerfectlyComplete
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)
-      (runtime M) := by
-  intro msg
-  let ro : QueryImpl (M × Commit →ₒ Chal)
-      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
-  let impl := unifFwdImpl (M × Commit →ₒ Chal) + ro
-  have hSimQuery : ∀ (q : M × Commit),
-      simulateQ impl (HasQuery.query q) = ro q :=
-    roSim.simulateQ_HasQuery_query ro
-  change
-    Pr[= true | (runtime M).evalDist (do
-      let (pk, sk) ←
-        (FiatShamir
-          (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).keygen
-      let sig ←
-        (FiatShamir
-          (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).sign pk sk msg
-      (FiatShamir
-        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify pk msg sig)] = 1
-  rw [show (runtime M).evalDist (do
+private lemma perfectlyCorrect_evalDist_eq [SampleableType Chal] (msg : M) :
+    (runtime M).evalDist (do
       let (pk, sk) ←
         (FiatShamir
           (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).keygen
@@ -459,77 +398,77 @@ theorem perfectlyCorrect [SampleableType Chal]
           (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).sign pk sk msg
       (FiatShamir
         (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify pk msg sig) =
-        𝒟[do
-          let (pk, sk) ← hr.gen
-          let (c, e) ← σ.commit pk sk
-          let r ← $ᵗ Chal
-          let s ← σ.respond pk sk e r
-          pure (σ.verify pk c r s)] by
-    change 𝒟[StateT.run' (simulateQ impl (do
-        let (pk, sk) ←
-          (FiatShamir
-            (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).keygen
-        let sig ←
-          (FiatShamir
-            (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).sign pk sk msg
+      𝒟[do
+        let (pk, sk) ← hr.gen
+        let (c, e) ← σ.commit pk sk
+        let r ← $ᵗ Chal
+        let s ← σ.respond pk sk e r
+        pure (σ.verify pk c r s)] := by
+  let ro : QueryImpl (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
+  let impl := unifFwdImpl (M × Commit →ₒ Chal) + ro
+  have hSimQuery : ∀ (q : M × Commit),
+      simulateQ impl (HasQuery.query q) = ro q :=
+    roSim.simulateQ_HasQuery_query ro
+  change 𝒟[StateT.run' (simulateQ impl (do
+      let (pk, sk) ←
         (FiatShamir
-          (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify
-            pk msg sig)) ∅] = _
-    dsimp only [FiatShamir]
-    simp only [simulateQ_bind, simulateQ_pure, hSimQuery]
-    have hpeel : ∀ {α β : Type} (oa : ProbComp α)
-        (rest : α → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β)
-        (s : (M × Commit →ₒ Chal).QueryCache),
-        (simulateQ impl (liftM oa) >>= rest).run' s =
-          oa >>= fun x => (rest x).run' s :=
-      fun oa rest s => roSim.run'_liftM_bind ro oa rest s
-    simp_rw [hpeel]
-    have hlift : ∀ {α : Type} (x : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
-        (liftM x : StateT _ ProbComp α).run s = x >>= fun a => pure (a, s) := by
-      intro α x s
-      simp only [liftM, MonadLiftT.monadLift,
-        MonadLift.monadLift, StateT.run_lift]
-    have hmod : ∀ {α : Type}
-        (f : (M × Commit →ₒ Chal).QueryCache → α × (M × Commit →ₒ Chal).QueryCache)
-        (s : (M × Commit →ₒ Chal).QueryCache),
-        (modifyGet f : StateT _ ProbComp α).run s = pure (f s) := by
-      intro α f s
-      simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
-        StateT.modifyGet, StateT.run]
-    have hro_miss : ∀ {β : Type} (q : M × Commit)
-        (rest : Chal → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β),
-        (ro q >>= rest).run' ∅ =
-          $ᵗ Chal >>= fun r =>
-            (rest r).run' ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r) := by
-      intro β q rest
-      change Prod.fst <$> ((ro q >>= rest).run ∅) =
+          (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).keygen
+      let sig ←
+        (FiatShamir
+          (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).sign pk sk msg
+      (FiatShamir
+        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify
+          pk msg sig)) ∅] = _
+  dsimp only [FiatShamir]
+  simp only [simulateQ_bind, simulateQ_pure, hSimQuery]
+  have hpeel : ∀ {α β : Type} (oa : ProbComp α)
+      (rest : α → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β)
+      (s : (M × Commit →ₒ Chal).QueryCache),
+      (simulateQ impl (liftM oa) >>= rest).run' s =
+        oa >>= fun x => (rest x).run' s :=
+    fun oa rest s => roSim.run'_liftM_bind ro oa rest s
+  simp_rw [hpeel]
+  have hro_miss : ∀ {β : Type} (q : M × Commit)
+      (rest : Chal → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β),
+      (ro q >>= rest).run' ∅ =
         $ᵗ Chal >>= fun r =>
-          Prod.fst <$> (rest r).run ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r)
-      simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
-        StateT.run_get, pure_bind, uniformSampleImpl, bind_assoc, map_bind,
-        liftM, MonadLiftT.monadLift,
-        MonadLift.monadLift, StateT.run_lift, hmod]
-    simp only [monad_norm]
-    simp_rw [hpeel, hro_miss, hpeel]
-    have hro_hit : ∀ {β : Type} (q : M × Commit) (r : Chal)
-        (rest : Chal → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β),
-        (ro q >>= rest).run' ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r) =
           (rest r).run' ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r) := by
-      intro β q r rest
-      change Prod.fst <$> ((ro q >>= rest).run
-          ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r)) =
-        Prod.fst <$> (rest r).run
-          ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r)
-      rw [StateT.run_bind]
-      simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
-        StateT.run_get, pure_bind, QueryCache.cacheQuery_self, StateT.run_pure]
-    simp_rw [hro_hit]
-    have hpure_run' : ∀ {α : Type} (a : α) (s : (M × Commit →ₒ Chal).QueryCache),
-        (pure a : StateT _ ProbComp α).run' s = (pure a : ProbComp α) := by
-      intro α a s
-      change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
-      simp [map_pure]
-    simp_rw [hpure_run']]
+    intro β q rest
+    change Prod.fst <$> ((ro q >>= rest).run ∅) =
+      $ᵗ Chal >>= fun r =>
+        Prod.fst <$> (rest r).run ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r)
+    simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
+      StateT.run_get, pure_bind, uniformSampleImpl, bind_assoc, map_bind,
+      liftM, MonadLiftT.monadLift,
+      MonadLift.monadLift, StateT.run_lift, StateT.run_modifyGet]
+  simp only [monad_norm]
+  simp_rw [hpeel, hro_miss, hpeel]
+  have hro_hit : ∀ {β : Type} (q : M × Commit) (r : Chal)
+      (rest : Chal → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β),
+      (ro q >>= rest).run' ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r) =
+        (rest r).run' ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r) := by
+    intro β q r rest
+    change Prod.fst <$> ((ro q >>= rest).run
+        ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r)) =
+      Prod.fst <$> (rest r).run
+        ((∅ : (M × Commit →ₒ Chal).QueryCache).cacheQuery q r)
+    rw [StateT.run_bind]
+    simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
+      StateT.run_get, pure_bind, QueryCache.cacheQuery_self, StateT.run_pure]
+  simp_rw [hro_hit, StateT.run'_pure']
+
+open scoped Classical in
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
+underlying Σ-protocol. -/
+theorem perfectlyCorrect [SampleableType Chal]
+    (hc : σ.PerfectlyComplete) :
+    SignatureAlg.PerfectlyComplete
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)
+      (runtime M) := by
+  intro msg
+  rw [perfectlyCorrect_evalDist_eq σ hr M msg]
   change
     Pr[= true | (do
       let (pk, sk) ← hr.gen
