@@ -18,6 +18,14 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
 open ENNReal
 
+/- The monad/functor laws are confluent (terminating) rewrites. Tagging them for `grind` lets it
+normalize a computation's structure (`mx >>= pure = mx`, `pure a >>= f = f a`, reassociation,
+`f <$> pure a = pure (f a)`) *before* it falls into `probOutput`/`tsum` expansion — turning what
+would otherwise be a `grind` explosion on a structured-computation equality into a quick solve. (The
+analogous `bind_pure_comp`/`map_eq_bind` laws are deliberately omitted: their function argument sits
+under a binder that `grind`'s pattern compiler cannot index.) -/
+attribute [grind =] bind_pure pure_bind bind_assoc map_pure
+
 /-! ## Probabilities of `pure` -/
 
 section pure
