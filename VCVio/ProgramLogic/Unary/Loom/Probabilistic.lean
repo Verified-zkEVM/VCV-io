@@ -117,22 +117,9 @@ noncomputable def probSup (c : Prob → Prop) : Prob :=
   ⟨sSup (valImage c),
     sSup_le (by rintro x ⟨p, _, rfl⟩; exact p.val_le_one)⟩
 
-theorem probSup_is_sup (c : Prob → Prop) : Lean.Order.is_sup c (probSup c) := by
-  intro y
-  refine ⟨?_, ?_⟩
-  · -- (probSup c) ⊑ y → ∀ z, c z → z ⊑ y
-    intro hsup z hcz
-    -- hsup : (probSup c).val ≤ y.val (via the Prob PartialOrder.rel)
-    -- goal : z.val ≤ y.val
-    change z.val ≤ y.val
-    have hle : z.val ≤ (probSup c).val := le_sSup ⟨z, hcz, rfl⟩
-    exact le_trans hle (by change (probSup c).val ≤ y.val at hsup; exact hsup)
-  · -- (∀ z, c z → z ⊑ y) → (probSup c) ⊑ y
-    intro h
-    change (probSup c).val ≤ y.val
-    refine sSup_le ?_
-    rintro x ⟨p, hcp, rfl⟩
-    exact (show p.val ≤ y.val from h p hcp)
+theorem probSup_is_sup (c : Prob → Prop) : Lean.Order.is_sup c (probSup c) :=
+  fun y => ⟨fun hsup z hcz => (le_sSup (s := valImage c) ⟨z, hcz, rfl⟩).trans hsup,
+    fun h => sSup_le (by rintro x ⟨p, hcp, rfl⟩; exact h p hcp)⟩
 
 /-- Bridge `sSup` on `Prob` to `Lean.Order.CompleteLattice`.
 
@@ -214,8 +201,7 @@ The keystone lemma confirms that the underlying `ℝ≥0∞` value of
 `Std.Do'.wp` agrees with the quantitative `MAlgOrdered.wp` on the nose,
 so quantitative theorems still apply after coercing through `.val`. -/
 
-theorem wp_val_eq_mAlgOrdered_wp
-    (oa : OracleComp spec α) (post : α → Prob) :
+theorem wp_val_eq_mAlgOrdered_wp (oa : OracleComp spec α) (post : α → Prob) :
     (Std.Do'.wp oa post Lean.Order.bot).val =
       MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa (fun a => (post a).val) := rfl
 

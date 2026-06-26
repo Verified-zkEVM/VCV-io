@@ -31,7 +31,6 @@ discrete Gaussian. The probability preservation theorem then translates this int
 security loss factor in the Falcon EUF-CMA proof.
 -/
 
-
 noncomputable section
 
 open ENNReal
@@ -63,17 +62,15 @@ universe w in
 theorem renyiDiv_map_le (a : ℝ) (ha : 1 < a) {α' : Type w} {β : Type w}
     (f : α' → β) (p q : SPMF α') :
     SPMF.renyiDiv a (f <$> p) (f <$> q) ≤ SPMF.renyiDiv a p q := by
-  unfold SPMF.renyiDiv
-  rw [SPMF.toPMF_map, SPMF.toPMF_map]
-  exact PMF.renyiDiv_map_le a ha (Option.map f) p.toPMF q.toPMF
+  simpa only [SPMF.renyiDiv, SPMF.toPMF_map] using
+    PMF.renyiDiv_map_le a ha (Option.map f) p.toPMF q.toPMF
 
 universe w in
 theorem renyiDiv_bind_right_le (a : ℝ) (ha : 1 < a) {α' : Type w} {β : Type w}
     (f : α' → SPMF β) (p q : SPMF α') :
     SPMF.renyiDiv a (p >>= f) (q >>= f) ≤ SPMF.renyiDiv a p q := by
-  unfold SPMF.renyiDiv
-  rw [SPMF.toPMF_bind, SPMF.toPMF_bind]
-  exact PMF.renyiDiv_bind_right_le a ha _ p.toPMF q.toPMF
+  simpa only [SPMF.renyiDiv, SPMF.toPMF_bind] using
+    PMF.renyiDiv_bind_right_le a ha _ p.toPMF q.toPMF
 
 end SPMF
 
@@ -96,14 +93,12 @@ theorem renyiDiv_self (a : ℝ) (mx : m α) : renyiDiv a mx mx = 1 :=
 theorem renyiDiv_map_le [LawfulMonad m] {β : Type u} (a : ℝ) (ha : 1 < a)
     (f : α → β) (mx my : m α) :
     renyiDiv a (f <$> mx) (f <$> my) ≤ renyiDiv a mx my := by
-  simp only [renyiDiv, _root_.evalDist_map]
-  exact SPMF.renyiDiv_map_le a ha f _ _
+  simpa only [renyiDiv, _root_.evalDist_map] using SPMF.renyiDiv_map_le a ha f _ _
 
 theorem renyiDiv_bind_right_le [LawfulMonad m] {β : Type u} (a : ℝ) (ha : 1 < a)
     (f : α → m β) (mx my : m α) :
     renyiDiv a (mx >>= f) (my >>= f) ≤ renyiDiv a mx my := by
-  simp only [renyiDiv, _root_.evalDist_bind]
-  exact SPMF.renyiDiv_bind_right_le a ha _ _ _
+  simpa only [renyiDiv, _root_.evalDist_bind] using SPMF.renyiDiv_bind_right_le a ha _ _ _
 
 /-! ### Rényi to Probability Bounds -/
 
@@ -114,12 +109,6 @@ theorem probOutput_le_of_renyiDiv (a : ℝ) (ha : 1 < a) (mx my : m α)
     (R : ℝ≥0∞) (hR : renyiDiv a mx my ≤ R) (x : α) :
     Pr[= x | mx] ^ (a / (a - 1) : ℝ) / R ≤ Pr[= x | my] := by
   simp only [probOutput, renyiDiv, SPMF.renyiDiv] at *
-  rw [SPMF.apply_eq_toPMF_some, SPMF.apply_eq_toPMF_some]
-  calc ((𝒟[mx]).toPMF (some x)) ^ (a / (a - 1) : ℝ) / R
-      ≤ ((𝒟[mx]).toPMF (some x)) ^ (a / (a - 1) : ℝ) /
-          ((𝒟[mx]).toPMF.renyiDiv a (𝒟[my]).toPMF) :=
-        ENNReal.div_le_div_left hR _
-    _ ≤ (𝒟[my]).toPMF (some x) :=
-        PMF.renyiDiv_apply_bound a ha _ _ _
+  exact (ENNReal.div_le_div_left hR _).trans (PMF.renyiDiv_apply_bound a ha _ _ _)
 
 end monadic

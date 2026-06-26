@@ -111,18 +111,15 @@ abbrev Functionality (T : OpenTheory.{u}) (Δ : ProtocolBoundary) : Type u :=
 
 /-- An *adversary* speaks to the protocol over the swapped `adv` side
 and to the environment over a back-channel `back`. -/
-abbrev Adversary (T : OpenTheory.{u}) (Δ : ProtocolBoundary)
-    (back : PortBoundary) : Type u :=
+abbrev Adversary (T : OpenTheory.{u}) (Δ : ProtocolBoundary) (back : PortBoundary) : Type u :=
   T.Obj (PortBoundary.tensor (PortBoundary.swap Δ.adv) back)
 
 /-- An *environment* speaks to the protocol over the swapped `main`
 side and to the adversary over the swapped back-channel. By
 definitional equality of `swap` and `tensor`, this is exactly a
 `T.Plug (PortBoundary.tensor Δ.main back)`. -/
-abbrev Environment (T : OpenTheory.{u}) (Δ : ProtocolBoundary)
-    (back : PortBoundary) : Type u :=
-  T.Obj (PortBoundary.tensor
-    (PortBoundary.swap Δ.main) (PortBoundary.swap back))
+abbrev Environment (T : OpenTheory.{u}) (Δ : ProtocolBoundary) (back : PortBoundary) : Type u :=
+  T.Obj (PortBoundary.tensor (PortBoundary.swap Δ.main) (PortBoundary.swap back))
 
 /-- A *simulator* maps a real-world adversary to an ideal-world
 adversary on the same back-channel.
@@ -131,8 +128,7 @@ This is the lightweight presentation form. A more structural variant
 keeps the simulator as an open system on
 `Δ.adv ⊗ swap Δ.adv` and applies it via `wire`; both variants are
 interconvertible in any compact-closed `OpenTheory`. -/
-abbrev Simulator (T : OpenTheory.{u}) (Δ : ProtocolBoundary)
-    (back : PortBoundary) : Type u :=
+abbrev Simulator (T : OpenTheory.{u}) (Δ : ProtocolBoundary) (back : PortBoundary) : Type u :=
   Adversary T Δ back → Adversary T Δ back
 
 /-- The *dummy adversary*: the canonical bidirectional relay between
@@ -155,8 +151,7 @@ By definitional equality of `swap (X ⊗ Y)` with `swap X ⊗ swap Y`,
 the type of `Z` is exactly the `T.Plug` of the wired result, so no
 explicit boundary transport is needed.
 -/
-def EXEC (π : Protocol T Δ) (A : Adversary T Δ back)
-    (Z : Environment T Δ back) : T.Closed :=
+def EXEC (π : Protocol T Δ) (A : Adversary T Δ back) (Z : Environment T Δ back) : T.Closed :=
   T.close (T.wire π A) Z
 
 /-! ## Textbook UC security -/
@@ -174,9 +169,7 @@ but not on the environment. The back-channel `back` is universally
 quantified to allow the environment-adversary side-channel to be
 arbitrary.
 -/
-def UCSecure (exec : Execution T) (ε : ℝ)
-    {Δ : ProtocolBoundary}
-    (π F : Protocol T Δ) : Prop :=
+def UCSecure (exec : Execution T) (ε : ℝ) {Δ : ProtocolBoundary} (π F : Protocol T Δ) : Prop :=
   ∀ (back : PortBoundary) (A : Adversary T Δ back),
   ∃ S : Adversary T Δ back,
   ∀ Z : Environment T Δ back,
@@ -202,10 +195,8 @@ theorem observedCompEmulates_toUCSecure_id
     (h : ObservedCompEmulates sem ε π F) :
     UCSecure (Execution.ofSemantics sem) ε π F :=
   fun _ A => ⟨A, fun Z => by
-    change sem.distAdvantage (T.plug (T.wire π A) Z)
-                              (T.plug (T.wire F A) Z) ≤ ε
-    rw [OpenTheory.plug_wire_left, OpenTheory.plug_wire_left]
-    exact h _⟩
+    simpa only [Execution.distAdvantage_ofSemantics, EXEC,
+      OpenTheory.plug_wire_left] using h _⟩
 
 /--
 Structural capability for Canetti's dummy-adversary factorization.

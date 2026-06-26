@@ -38,7 +38,8 @@ noncomputable instance instLawfulMonadLiftTRawSetM : LawfulMonadLiftT Raw SetM w
     change ((liftM (pure x : Raw _) : PMF _).support : Set _) = {x}
     have : (liftM (pure x : Raw _) : PMF _) = pure x :=
       LawfulMonadLift.monadLift_pure (m := Raw) (n := PMF) x
-    rw [this]; exact PMF.support_pure x
+    rw [this]
+    exact PMF.support_pure x
   monadLift_bind mx my := by
     change ((liftM (mx >>= my) : PMF _).support : Set _) =
       Bind.bind (m := SetM)
@@ -47,7 +48,8 @@ noncomputable instance instLawfulMonadLiftTRawSetM : LawfulMonadLiftT Raw SetM w
     have hbind : (liftM (mx >>= my) : PMF _) =
         (liftM mx : PMF _) >>= fun x => (liftM (my x) : PMF _) :=
       LawfulMonadLift.monadLift_bind (m := Raw) (n := PMF) mx my
-    rw [hbind]; exact PMF.support_bind _ _
+    rw [hbind]
+    exact PMF.support_bind _ _
 
 /-- Compatibility: `Raw`'s SetM support equals the SPMF support of its `evalDist`. -/
 noncomputable instance : EvalDistCompatible Raw where
@@ -60,8 +62,7 @@ instance : HasEvalFinset Raw where
   finSupport := Raw.support
   coe_finSupport mx := by
     ext x
-    rw [Finset.mem_coe, _root_.mem_support_iff, Raw.mem_support_iff]
-    rw [probOutput_def, evalDist_def]
+    rw [Finset.mem_coe, _root_.mem_support_iff, Raw.mem_support_iff, probOutput_def, evalDist_def]
     change mx.prob x ≠ 0 ↔ (liftM (liftM mx : PMF _) : SPMF _) x ≠ 0
     rw [SPMF.liftM_apply]
     change mx.prob x ≠ 0 ↔ ((@Raw.toPMF _ (Classical.decEq _) mx) x) ≠ 0

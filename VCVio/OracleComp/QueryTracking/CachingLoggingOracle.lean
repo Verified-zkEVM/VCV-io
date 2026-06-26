@@ -70,8 +70,7 @@ lemma withCachingLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
       | some u => pure (u, (s.1, s.2 ++ [⟨t, u⟩]))
       | none => (fun p : spec.Range t × QueryLog spec =>
           (p.1, (s.1.cacheQuery t p.1, p.2))) <$>
-          ((fun u => (u, s.2 ++ [⟨t, u⟩])) <$> so t) := by
-  simp [withCachingLogging, withCachingTraceAppend_apply]
+          ((fun u => (u, s.2 ++ [⟨t, u⟩])) <$> so t) := rfl
 
 /-! ### Forward-direction query bounds for `withCachingTraceAppend`
 
@@ -89,7 +88,7 @@ private lemma _root_.QueryImpl.withCachingTraceAppend_run_proj_eq
     Prod.map id Prod.fst <$> (simulateQ (so.withCachingTraceAppend traceFn) oa).run s =
       (simulateQ so.withCaching oa).run s.1 :=
   QueryImpl.withCachingAux_run_proj_eq so _ _
-    (by intro t cache q; simp [Functor.map_map]) oa s.1 s.2
+    (fun _ _ _ => by simp [Functor.map_map]) oa s.1 s.2
 
 omit [Monad m] [spec.DecidableEq] in
 theorem isTotalQueryBound_run_simulateQ_withCachingTraceAppend
@@ -147,28 +146,15 @@ lemma apply_eq (t : spec.Domain) :
   ext s
   rw [cachingLoggingOracle, QueryImpl.withCachingLogging, QueryImpl.withCachingTraceAppend,
     QueryImpl.withCachingAux_apply]
-  cases hcache : s.1 t with
-  | some u =>
-      simp [hcache]
-  | none =>
-      simp [hcache, StateT.run_bind, StateT.run_monadLift, Functor.map_map]
+  cases hcache : s.1 t <;> simp [hcache]
 
 /-- Projecting away the log component recovers the ordinary caching semantics. -/
 theorem fst_map_run_simulateQ {α : Type u}
     (oa : OracleComp spec α) (s : QueryCache spec × QueryLog spec) :
     Prod.map id Prod.fst <$> (simulateQ cachingLoggingOracle oa).run s =
       (simulateQ cachingOracle oa).run s.1 := by
-  simpa [cachingLoggingOracle, QueryImpl.withCachingLogging, QueryImpl.withCachingTraceAppend,
-    cachingOracle] using
-    (QueryImpl.withCachingAux_run_proj_eq
-      (base := QueryImpl.ofLift spec (OracleComp spec))
-      (hit := fun t u _ trace => trace ++ [⟨t, u⟩])
-      (miss := fun t _ trace => (fun u => (u, trace ++ [⟨t, u⟩])) <$>
-        (QueryImpl.ofLift spec (OracleComp spec) t))
-      (hmiss := by
-        intro t cache trace
-        simp [Functor.map_map])
-      (oa := oa) (cache := s.1) (q := s.2))
+  exact QueryImpl.withCachingTraceAppend_run_proj_eq
+    (QueryImpl.ofLift spec (OracleComp spec)) (fun t u => [⟨t, u⟩]) oa s
 
 /-- Output-only projection corollary of `fst_map_run_simulateQ`. -/
 @[simp]
@@ -176,8 +162,7 @@ theorem run'_simulateQ_eq {α : Type u}
     (oa : OracleComp spec α) (s : QueryCache spec × QueryLog spec) :
     (simulateQ cachingLoggingOracle oa).run' s =
       (simulateQ cachingOracle oa).run' s.1 := by
-  have hrun := fst_map_run_simulateQ oa s
-  have hmap := congrArg (fun p => Prod.fst <$> p) hrun
+  have hmap := congrArg (fun p => Prod.fst <$> p) (fst_map_run_simulateQ oa s)
   simpa [StateT.run'] using hmap
 
 /-! ### Forward-direction query bounds

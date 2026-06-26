@@ -33,6 +33,10 @@ open List OracleSpec OracleComp
 
 variable (α : Type _)
 
+/--
+Building one layer of a Merkle tree never results in failure
+(no matter what queries have already been made to the oracle before it runs).
+-/
 @[grind .]
 theorem buildLayer_neverFails [DecidableEq α]
     [SampleableType α] [(spec α).DecidableEq]
@@ -55,6 +59,16 @@ theorem buildMerkleTree_neverFails [DecidableEq α]
         (buildMerkleTree α n leaves)).run preexisting_cache) := by
   grind only [= neverFail_iff, = probFailure_of_liftM_PMF]
 
+private lemma buildLayer_with_hash_get_aux {n : ℕ} (leaves : List.Vector α (2 ^ (n + 1)))
+    (i : Fin (2 ^ (n + 1))) (hashFn : α × α → α)
+    (a b : Fin (2 ^ (n + 1))) (ha : a.val = 2 * (i.val / 2)) (hb : b.val = 2 * (i.val / 2) + 1) :
+    hashFn (leaves.get a, leaves.get b) =
+      (buildLayer_with_hash (α := α) n leaves hashFn).get ⟨i.val / 2, by grind only⟩ := by
+  rw [show a = ⟨2 * (i.val / 2), by omega⟩ from Fin.ext ha,
+    show b = ⟨2 * (i.val / 2) + 1, by omega⟩ from Fin.ext hb]
+  simp only [buildLayer_with_hash, List.Vector.get_map, List.Vector.get_ofFn]
+  congr
+
 /-- A functional completeness theorem for Merkle proofs built from `buildMerkleTree_with_hash`. -/
 theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i : Fin (2 ^ n))
     (hashFn : α × α → α) :
@@ -63,61 +77,22 @@ theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i :
       getRoot α (buildMerkleTree_with_hash (α := α) n leaves hashFn) := by
   induction n with
   | zero =>
-    have hi : i = 0 := Fin.eq_zero i
-    subst hi
-    simp only [buildMerkleTree_with_hash, Fin.isValue, Nat.pow_zero, getPutativeRoot_with_hash,
-      getRoot]
-    simp
+    simp [Fin.eq_zero i, buildMerkleTree_with_hash, getPutativeRoot_with_hash, getRoot]
   | succ n ih =>
-    -- Abbreviate the upper layer and the upper tree.
     let lastLayer := buildLayer_with_hash (α := α) n leaves hashFn
-    let upperCache := buildMerkleTree_with_hash (α := α) n lastLayer hashFn
-    -- Split on whether `i` is a left or right child at the bottom layer.
     by_cases hsign : i.val % 2 = 0
-    · -- Left child: sibling is `i + 1`.
-      have hdiv : 2 * (i.val / 2) = i.val := by
-        have h := Nat.mod_add_div i.val 2
-        -- `i % 2 = 0` implies `2 * (i / 2) = i`.
-        simpa [hsign] using h
-      have hright : 2 * (i.val / 2) + 1 = i.val + 1 := by grind only
-      have hnew :
-          hashFn (leaves.get i, leaves.get (siblingIndex i)) =
-            lastLayer.get ⟨i.val / 2, by grind only⟩ := by
-        simp [lastLayer, buildLayer_with_hash, siblingIndex, hsign, hdiv]
-        congr
-      -- Unfold and apply the induction hypothesis on the upper tree.
-      -- `generateProof` and `getRoot` reduce via `Cache.upper_cons` and `Cache.leaves_cons`.
-      simp [buildMerkleTree_with_hash, lastLayer, generateProof,
+    · have hnew := buildLayer_with_hash_get_aux α leaves i hashFn i (siblingIndex i)
+        (by omega) (by grind [siblingIndex])
+      simp [buildMerkleTree_with_hash, generateProof,
         getPutativeRoot_with_hash, getRoot, hsign, hnew]
-      simpa [getRoot, Cache.cons, lastLayer, upperCache] using
-        (ih (leaves := lastLayer) (i := ⟨i.val / 2, by grind only⟩))
-    · -- Right child: sibling is `i - 1`.
-      have hmod1 : i.val % 2 = 1 := by
-        rcases Nat.mod_two_eq_zero_or_one i.val with h0 | h1
-        · exact (hsign h0).elim
-        · exact h1
-      have hdiv : 2 * (i.val / 2) = i.val - 1 := by
-        have h := Nat.mod_add_div i.val 2
-        -- `i % 2 = 1` implies `1 + 2 * (i / 2) = i`.
-        have : 1 + 2 * (i.val / 2) = i.val := by simpa [hmod1] using h
-        grind only
-      have hright : 2 * (i.val / 2) + 1 = i.val := by grind only
-      have hnew :
-          hashFn (leaves.get (siblingIndex i), leaves.get i) =
-            lastLayer.get ⟨i.val / 2, by grind only⟩ := by
-        have hiPos : 1 ≤ i.val := by grind only
-        have hi' :
-            (⟨i.val - 1 + 1, by simp [Nat.sub_add_cancel hiPos]⟩ :
-                Fin (2 ^ (n + 1))) =
-              i := by
-          ext
-          simp [Nat.sub_add_cancel hiPos]
-        simpa [lastLayer, buildLayer_with_hash, siblingIndex, hmod1, hdiv] using
-          congrArg (fun j => hashFn (leaves.get ⟨i.val - 1, by grind only⟩, leaves.get j)) hi'.symm
-      simp [buildMerkleTree_with_hash, lastLayer, generateProof,
+      simpa [getRoot, Cache.cons, lastLayer] using
+        ih (leaves := lastLayer) (i := ⟨i.val / 2, by grind only⟩)
+    · have hnew := buildLayer_with_hash_get_aux α leaves i hashFn (siblingIndex i) i
+        (by grind [siblingIndex]) (by omega)
+      simp [buildMerkleTree_with_hash, generateProof,
         getPutativeRoot_with_hash, getRoot, hsign, hnew]
-      simpa [getRoot, Cache.cons, lastLayer, upperCache] using
-        (ih (leaves := lastLayer) (i := ⟨i.val / 2, by grind only⟩))
+      simpa [getRoot, Cache.cons, lastLayer] using
+        ih (leaves := lastLayer) (i := ⟨i.val / 2, by grind only⟩)
 
 /-- Completeness theorem for Merkle trees: for any full binary tree with `2 ^ n` leaves, and for
   any index `i`, the honestly-generated opening proof verifies against the honestly-built root
@@ -136,18 +111,9 @@ theorem completeness [DecidableEq α] [Inhabited α] [SampleableType α] {n : �
   refine (probEvent_eq_one_simulateQ_randomOracle_run_iff (spec := spec α)
     (p := fun b : Bool => b = true) _ _).mpr ?_
   intro f _hf
-  -- Reduce simulation through the do-block to a deterministic computation, then apply
-  -- `functional_completeness`.
-  change (simulateQ f (do
-    let cache ← buildMerkleTree α n leaves
-    let proof := generateProof α i cache
-    let verified ← (verifyProof (m := OracleComp (spec α)) α i leaves[i]
-      (getRoot α cache) proof)
-    return verified) : Id Bool) = (true : Bool)
-  simp only [verifyProof, simulateQ_bind, simulateQ_pure,
+  simp only [evalWithAnswerFn, verifyProof, simulateQ_bind, simulateQ_pure,
     simulateQ_buildMerkleTree_eq, simulateQ_getPutativeRoot_eq]
   change ((_ : α) == _) = true
-  rw [beq_iff_eq]
-  exact functional_completeness α leaves i f
+  exact beq_iff_eq.mpr (functional_completeness α leaves i f)
 
 end MerkleTree

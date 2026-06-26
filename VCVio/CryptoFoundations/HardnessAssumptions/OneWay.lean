@@ -3,9 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.Constructions.SampleableType
+import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.ProbComp
 
 /-!
 # One-Way Functions and Trapdoor Permutations
@@ -33,7 +33,6 @@ invert given only `pk`; the secret key enables efficient inversion via `f⁻¹(s
 - `tdpExp` — the TDP inversion experiment.
 -/
 
-
 open OracleComp OracleSpec ENNReal
 
 namespace OneWay
@@ -47,15 +46,15 @@ def OWFAdversary (X Y : Type) := Y → ProbComp X
 
 /-- One-wayness experiment: sample `x` uniformly, give the adversary `f(x)`,
 and check whether the adversary's output is a valid preimage. -/
-def owfExp [SampleableType X] [DecidableEq Y]
-    (f : X → Y) (adversary : OWFAdversary X Y) : ProbComp Bool := do
+def owfExp [SampleableType X] [DecidableEq Y] (f : X → Y) (adversary : OWFAdversary X Y) :
+    ProbComp Bool := do
   let x ← $ᵗ X
   let x' ← adversary (f x)
   return decide (f x' = f x)
 
 /-- OWF advantage: the probability of successfully inverting `f`. -/
-noncomputable def owfAdvantage [SampleableType X] [DecidableEq Y]
-    (f : X → Y) (adversary : OWFAdversary X Y) : ℝ≥0∞ :=
+noncomputable def owfAdvantage [SampleableType X] [DecidableEq Y] (f : X → Y)
+    (adversary : OWFAdversary X Y) : ℝ≥0∞ :=
   Pr[= true | owfExp f adversary]
 
 /-! ## Trapdoor Permutations -/
@@ -82,9 +81,8 @@ def TDPAdversary (PK X : Type) := PK → X → ProbComp X
 
 /-- TDP inversion experiment: generate keys, sample `x` uniformly,
 and check whether the adversary outputs a valid preimage of `f(pk, x)`. -/
-def tdpExp [SampleableType X] [DecidableEq X]
-    (tdp : TrapdoorPermutation PK SK X) (adversary : TDPAdversary PK X) :
-    ProbComp Bool := do
+def tdpExp [SampleableType X] [DecidableEq X] (tdp : TrapdoorPermutation PK SK X)
+    (adversary : TDPAdversary PK X) : ProbComp Bool := do
   let (pk, _) ← tdp.keygen
   let x ← $ᵗ X
   let x' ← adversary pk (tdp.forward pk x)

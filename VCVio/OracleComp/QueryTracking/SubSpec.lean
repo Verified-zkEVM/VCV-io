@@ -38,8 +38,7 @@ theorem IsQueryBoundP.liftComp_subSpec
     (hoa : oa.IsQueryBoundP p n) :
     (liftComp oa superSpec).IsQueryBoundP q n := by
   induction oa using OracleComp.inductionOn generalizing n with
-  | pure x =>
-      simp
+  | pure x => simp
   | query_bind t mx ih =>
       rw [isQueryBoundP_query_bind_iff] at hoa
       rw [liftComp_bind, liftComp_query]
@@ -59,15 +58,11 @@ theorem IsQueryBoundP.liftComp_subSpec
               ⟨h.onQuery t, h.onResponse t⟩ from h.liftM_eq_lift _]
         rfl]
       rw [bind_assoc, isQueryBoundP_query_bind_iff]
-      constructor
-      · simpa [← hpq t] using hoa.1
-      · intro u
-        rw [pure_bind]
-        have hcont := ih (h.onResponse t u) (hoa.2 (h.onResponse t u))
-        by_cases hp : p t
-        · have hq : q (h.onQuery t) := (hpq t).1 hp
-          simpa [hp, hq] using hcont
-        · have hq : ¬ q (h.onQuery t) := fun hqt => hp ((hpq t).2 hqt)
-          simpa [hp, hq] using hcont
+      refine ⟨by simpa [← hpq t] using hoa.1, fun u => ?_⟩
+      rw [pure_bind]
+      have hcont := ih (h.onResponse t u) (hoa.2 (h.onResponse t u))
+      by_cases hp : p t
+      · simpa [hp, (hpq t).1 hp] using hcont
+      · simpa [hp, mt (hpq t).2 hp] using hcont
 
 end OracleComp

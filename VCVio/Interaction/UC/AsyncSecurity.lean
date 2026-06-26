@@ -3,9 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import PolyFun.Interaction.Concurrent.Fairness
 import VCVio.Interaction.UC.AsyncRuntime
 import VCVio.Interaction.UC.Computational
-import PolyFun.Interaction.Concurrent.Fairness
 
 /-!
 # Fair PPT security for asynchronous env-open processes
@@ -106,9 +106,7 @@ runtime distribution, exactly as
 `ProcessOver.Run`.
 -/
 structure AsyncRun
-    {Γ : Spec.Node.Context}
-    {m : Type → Type} [Pure m]
-    {State Event : Type}
+    {Γ : Spec.Node.Context} {m : Type → Type} [Pure m] {State Event : Type}
     (process : Concurrent.ProcessOver Γ)
     (envAction : EnvAction m Event State) where
   /-- The joint runtime state at each step. -/
@@ -168,8 +166,7 @@ The bundle pins all relevant universes to `0` to match the
 runtime layer in `AsyncRuntime.lean`.
 -/
 structure Ticketed
-    (Party : Type) (m : Type → Type) [Pure m] (Δ : PortBoundary)
-    (Event : Type) (State : Type) where
+    (Party : Type) (m : Type → Type) [Pure m] (Δ : PortBoundary) (Event : Type) (State : Type) where
   /-- The underlying env-open process. -/
   toEnvProcess : EnvOpenProcess.{0, 0, 0, 0, 0} m Party Δ Event State
   /-- The stable obligation type. -/
@@ -281,21 +278,16 @@ theorem fired_implies_enabled
     (ticketed : Ticketed Party m Δ Event State)
     (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) (n : ℕ) :
-    firedAt ticketed run ticket n → enabledAt ticketed run ticket n := by
-  rintro ⟨_, hticket⟩
-  exact ⟨run.procTranscript n, hticket⟩
+    firedAt ticketed run ticket n → enabledAt ticketed run ticket n :=
+  fun ⟨_, hticket⟩ => ⟨run.procTranscript n, hticket⟩
 
 /-- Strong fairness implies weak fairness on the same ticket. -/
 theorem weakFairOn_of_strongFairOn
     (ticketed : Ticketed Party m Δ Event State)
     (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) :
-    StrongFairOn ticketed run ticket → WeakFairOn ticketed run ticket := by
-  intro hSF hEA
-  refine hSF ?_
-  rcases hEA with ⟨N, hN⟩
-  intro N'
-  exact ⟨max N N', le_max_right _ _, hN _ (le_max_left _ _)⟩
+    StrongFairOn ticketed run ticket → WeakFairOn ticketed run ticket :=
+  fun hSF ⟨N, hN⟩ => hSF fun N' => ⟨max N N', le_max_right _ _, hN _ (le_max_left _ _)⟩
 
 /-- Strong fairness implies weak fairness for the whole run. -/
 theorem weakFair_of_strongFair
@@ -318,9 +310,7 @@ This is the natural "joint adversary" type for the async runtime:
 fair-PPT security definitions quantify over scheduler pairs.
 -/
 structure SchedulerPair
-    (Party : Type u)
-    (m : Type → Type)
-    (schedulerSampler : m (ULift Bool))
+    (Party : Type u) (m : Type → Type) (schedulerSampler : m (ULift Bool))
     (State Event : Type) where
   /-- The process-side sampler, indexed by closed processes. -/
   proc : ∀ p : (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Closed,
@@ -356,9 +346,7 @@ safety/liveness vs. complexity split familiar from TLA+ and from
 the PIOA literature.
 -/
 def secureAgainstFair
-    {Party : Type u}
-    {m : Type → Type}
-    {schedulerSampler : m (ULift Bool)}
+    {Party : Type u} {m : Type → Type} {schedulerSampler : m (ULift Bool)}
     {State Event : Type}
     (mkSem : SchedulerPair Party m schedulerSampler State Event →
       Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler))
@@ -425,8 +413,7 @@ quantifies over fewer schedulers, so security against the larger
 class implies security against the smaller class. -/
 theorem mono_isFair
     {isPPT : SchedulerPair Party m schedulerSampler State Event → Prop}
-    {isFair₁ isFair₂ :
-      SchedulerPair Party m schedulerSampler State Event → Prop}
+    {isFair₁ isFair₂ : SchedulerPair Party m schedulerSampler State Event → Prop}
     (hFair : ∀ scheds, isFair₁ scheds → isFair₂ scheds)
     (h : secureAgainstFair mkSem real ideal ε isPPT isFair₂) :
     secureAgainstFair mkSem real ideal ε isPPT isFair₁ :=
@@ -446,18 +433,13 @@ fairness predicates, plus an `extract` function producing the
 scheduler pair and the closing plug at each security parameter.
 -/
 def asympSecureAgainstFair
-    {Party : Type u}
-    {m : Type → Type}
-    {schedulerSampler : m (ULift Bool)}
-    {State Event : Type}
-    {Δ : PortBoundary}
+    {Party : Type u} {m : Type → Type} {schedulerSampler : m (ULift Bool)}
+    {State Event : Type} {Δ : PortBoundary}
     (mkSem : ℕ → SchedulerPair Party m schedulerSampler State Event →
       Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler))
     (real ideal : ℕ →
       (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ)
-    (Adv : Type*)
-    (isPPT : Adv → Prop)
-    (isFair : Adv → Prop)
+    (Adv : Type*) (isPPT : Adv → Prop) (isFair : Adv → Prop)
     (extract : Adv → ∀ _n : ℕ,
       SchedulerPair Party m schedulerSampler State Event ×
       (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Plug Δ) : Prop :=
@@ -495,7 +477,7 @@ theorem of_pointwise_bound
         ((openTheory.{u, 0, 0, 0} Party m schedulerSampler).close
           (ideal n) (extract _A n).2)) ≤ f n) :
     asympSecureAgainstFair mkSem real ideal Adv isPPT isFair extract :=
-  fun A _ _ => negligible_of_le (fun n => hbound A n) hf
+  fun A _ _ => negligible_of_le (hbound A) hf
 
 /-- A family of `secureAgainstFair` bounds with negligible advantage
 sequence implies asymptotic fair-PPT security. -/
@@ -504,15 +486,10 @@ theorem of_secureAgainstFair
     (h : ∀ n, secureAgainstFair (mkSem n) (real n) (ideal n) (ε n)
       (fun s => ∃ A, isPPT A ∧ (extract A n).1 = s)
       (fun s => ∃ A, isFair A ∧ (extract A n).1 = s)) :
-    asympSecureAgainstFair mkSem real ideal Adv isPPT isFair extract := by
-  intro A hppt hfair
-  refine negligible_of_le ?_ hε
-  intro n
-  have hcomp : ObservedCompEmulates (mkSem n (extract A n).1) (ε n) (real n) (ideal n) :=
-    h n (extract A n).1
-      ⟨A, hppt, rfl⟩ ⟨A, hfair, rfl⟩
-  have := hcomp (extract A n).2
-  exact_mod_cast ENNReal.ofReal_le_ofReal this
+    asympSecureAgainstFair mkSem real ideal Adv isPPT isFair extract :=
+  fun A hppt hfair => negligible_of_le
+    (fun n => ENNReal.ofReal_le_ofReal
+      (h n (extract A n).1 ⟨A, hppt, rfl⟩ ⟨A, hfair, rfl⟩ (extract A n).2)) hε
 
 end asympSecureAgainstFair
 

@@ -33,7 +33,6 @@ chain `binding ≤ keyed-CR ≤ birthday`.
 - `bindingAdvantage_toCommitment_le_keyedCRAdvantage` — the binding bound.
 -/
 
-
 open OracleComp OracleSpec ENNReal CommitmentScheme
 
 namespace CollisionResistance

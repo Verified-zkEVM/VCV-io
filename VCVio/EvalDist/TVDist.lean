@@ -12,7 +12,7 @@ import VCVio.EvalDist.Defs.NeverFails
 # Total Variation Distance for SPMFs and Monadic Computations
 
 This file extends the TV distance from `PMF` (defined in
-`ToMathlib.ProbabilityTheory.TotalVariation`) to:
+`ToMathlib.Probability.ProbabilityMassFunction.TotalVariation`) to:
 
 1. `SPMF.tvDist` — on sub-probability mass functions (via `toPMF`)
 2. `tvDist` — on any monad with `MonadLiftT m SPMF` (via `evalDist`)
@@ -48,16 +48,12 @@ lemma tvDist_le_one (p q : SPMF α) : p.tvDist q ≤ 1 := PMF.tvDist_le_one _ _
 universe w in
 lemma tvDist_map_le {α' : Type w} {β : Type w} (f : α' → β)
     (p q : SPMF α') : SPMF.tvDist (f <$> p) (f <$> q) ≤ SPMF.tvDist p q := by
-  unfold SPMF.tvDist
-  rw [SPMF.toPMF_map, SPMF.toPMF_map]
-  exact PMF.tvDist_map_le (Option.map f) p.toPMF q.toPMF
+  simpa only [SPMF.tvDist, SPMF.toPMF_map] using PMF.tvDist_map_le (Option.map f) p.toPMF q.toPMF
 
 universe w in
 lemma tvDist_bind_right_le {α' : Type w} {β : Type w} (f : α' → SPMF β)
     (p q : SPMF α') : SPMF.tvDist (p >>= f) (q >>= f) ≤ SPMF.tvDist p q := by
-  unfold SPMF.tvDist
-  rw [SPMF.toPMF_bind, SPMF.toPMF_bind]
-  exact PMF.tvDist_bind_right_le _ p.toPMF q.toPMF
+  simpa only [SPMF.tvDist, SPMF.toPMF_bind] using PMF.tvDist_bind_right_le _ p.toPMF q.toPMF
 
 end SPMF
 
@@ -78,8 +74,7 @@ omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [Monad m] [LawfulMonadLiftT m SPMF] in
 @[simp] lemma tvDist_eq_zero_iff (mx my : m α) :
     tvDist mx my = 0 ↔ 𝒟[mx] = 𝒟[my] := by
-  unfold tvDist
-  rw [SPMF.tvDist_eq_zero_iff, SPMF.toPMF_inj]
+  simp only [tvDist, SPMF.tvDist_eq_zero_iff, SPMF.toPMF_inj]
 
 omit [Monad m] [LawfulMonadLiftT m SPMF] in
 lemma tvDist_comm (mx my : m α) : tvDist mx my = tvDist my mx :=
@@ -98,17 +93,17 @@ lemma tvDist_le_one (mx my : m α) : tvDist mx my ≤ 1 := SPMF.tvDist_le_one _ 
 
 lemma tvDist_map_le [LawfulMonad m] {β : Type u} (f : α → β) (mx my : m α) :
     tvDist (f <$> mx) (f <$> my) ≤ tvDist mx my := by
-  simp only [tvDist, evalDist_map]
-  exact SPMF.tvDist_map_le f _ _
+  simpa only [tvDist, evalDist_map] using SPMF.tvDist_map_le f (𝒟[mx]) (𝒟[my])
 
 lemma tvDist_bind_right_le [LawfulMonad m] {β : Type u} (f : α → m β) (mx my : m α) :
     tvDist (mx >>= f) (my >>= f) ≤ tvDist mx my := by
-  simp only [tvDist, evalDist_bind]
-  exact SPMF.tvDist_bind_right_le _ _ _
+  simpa only [tvDist, evalDist_bind] using SPMF.tvDist_bind_right_le _ _ _
 
 /-! ### TV distance bounds -/
 
 omit [LawfulMonadLiftT m SPMF] in
+/-- Total variation distance is bounded by the probability of an event `p` whenever the two
+computations have equal output distribution off `p` (and equal probability of `p`). -/
 lemma tvDist_le_probEvent_of_probOutput_eq_of_not
     {mx my : m α} [NeverFail mx] [NeverFail my]
     (p : α → Prop) (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
@@ -118,43 +113,26 @@ lemma tvDist_le_probEvent_of_probOutput_eq_of_not
   rw [tvDist, SPMF.tvDist, PMF.tvDist]
   refine ENNReal.toReal_mono probEvent_ne_top ?_
   rw [PMF.etvDist, tsum_option _ ENNReal.summable]
-  have hfailx : (𝒟[mx]).toPMF none = 0 := by
-    rw [← SPMF.run_eq_toPMF (p := 𝒟[mx]), ← probFailure_def (mx := mx)]
-    exact probFailure_eq_zero (mx := mx)
-  have hfaily : (𝒟[my]).toPMF none = 0 := by
-    rw [← SPMF.run_eq_toPMF (p := 𝒟[my]), ← probFailure_def (mx := my)]
-    exact probFailure_eq_zero (mx := my)
+  have hfailx : (𝒟[mx]).toPMF none = 0 := probFailure_eq_zero (mx := mx)
+  have hfaily : (𝒟[my]).toPMF none = 0 := probFailure_eq_zero (mx := my)
   have hsum :
       (∑' x, ENNReal.absDiff ((𝒟[mx]).toPMF (some x)) ((𝒟[my]).toPMF (some x))) =
         ∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my]) := by
     refine tsum_congr fun x => ?_
     simp [probOutput_def, SPMF.apply_eq_toPMF_some]
-  rw [hfailx, hfaily, ENNReal.absDiff_self, zero_add]
-  rw [hsum]
+  rw [hfailx, hfaily, ENNReal.absDiff_self, zero_add, hsum]
   calc
     (∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my])) / 2
-      ≤ (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0) / 2 :=
-          ENNReal.div_le_div_right
-            (ENNReal.tsum_le_tsum fun x => by
-              by_cases hx : p x
-              · simpa [hx] using ENNReal.absDiff_le_add (Pr[= x | mx]) (Pr[= x | my])
-              · simp [hx, h_eq x hx, ENNReal.absDiff_self]) _
+      ≤ (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0) / 2 := by
+          gcongr with x
+          by_cases hx : p x
+          · simpa [hx] using ENNReal.absDiff_le_add (Pr[= x | mx]) (Pr[= x | my])
+          · simp [hx, h_eq x hx, ENNReal.absDiff_self]
     _ = (Pr[ p | mx] + Pr[ p | my]) / 2 := by
-        rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
-        congr 1
-        calc
-          (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0)
-              = (∑' x, ((if p x then Pr[= x | mx] else 0) +
-                  (if p x then Pr[= x | my] else 0))) := by
-                  refine tsum_congr fun x => ?_
-                  by_cases hx : p x <;> simp [hx]
-          _ = (∑' x, if p x then Pr[= x | mx] else 0) +
-              (∑' x, if p x then Pr[= x | my] else 0) := by
-                rw [ENNReal.tsum_add]
-    _ = (Pr[ p | mx] + Pr[ p | mx]) / 2 := by
-        rw [← h_event_eq]
+        rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite, ← ENNReal.tsum_add]
+        exact congrArg (· / 2) (tsum_congr fun x => by by_cases hx : p x <;> simp [hx])
     _ = Pr[ p | mx] := by
-        rw [← two_mul, mul_div_assoc]
+        rw [← h_event_eq, ← two_mul, mul_div_assoc]
         simp [ENNReal.mul_div_cancel two_ne_zero ofNat_ne_top]
 
 end monadic
@@ -167,36 +145,19 @@ private lemma pmf_etvDist_bind_left_le {α : Type u} {β : Type u}
   have hrhs :
       (∑' a, (f a).etvDist (g a) * p a) =
         (∑' a, (∑' b, ENNReal.absDiff ((f a) b) ((g a) b)) * p a) / 2 := by
-    calc
-      ∑' a, (f a).etvDist (g a) * p a
-          = ∑' a, ((∑' b, ENNReal.absDiff ((f a) b) ((g a) b)) / 2) * p a := by
-              refine tsum_congr fun a => ?_
-              rw [PMF.etvDist]
-      _ = ∑' a, ((∑' b, ENNReal.absDiff ((f a) b) ((g a) b)) * p a) * (2 : ENNReal)⁻¹ := by
-              refine tsum_congr fun a => ?_
-              rw [div_eq_mul_inv]
-              ac_rfl
-      _ = (∑' a, (∑' b, ENNReal.absDiff ((f a) b) ((g a) b)) * p a) * (2 : ENNReal)⁻¹ := by
-              rw [ENNReal.tsum_mul_right]
-      _ = (∑' a, (∑' b, ENNReal.absDiff ((f a) b) ((g a) b)) * p a) / 2 := by
-              rw [div_eq_mul_inv]
+    simp only [PMF.etvDist, div_eq_mul_inv, ← ENNReal.tsum_mul_right, mul_right_comm]
   rw [PMF.etvDist, hrhs]
-  simpa [div_eq_mul_inv] using mul_le_mul_left (a := (2 : ENNReal)⁻¹) (show
-    ∑' y, ENNReal.absDiff (∑' x, p x * (f x) y) (∑' x, p x * (g x) y)
-      ≤ ∑' x, (∑' y, ENNReal.absDiff ((f x) y) ((g x) y)) * p x from by
-        calc
-          ∑' y, ENNReal.absDiff (∑' x, p x * (f x) y) (∑' x, p x * (g x) y)
-              ≤ ∑' y, ∑' x, ENNReal.absDiff (p x * (f x) y) (p x * (g x) y) :=
-                ENNReal.tsum_le_tsum fun y => ENNReal.absDiff_tsum_le _ _
-          _ ≤ ∑' y, ∑' x, ENNReal.absDiff ((f x) y) ((g x) y) * p x :=
-                ENNReal.tsum_le_tsum fun y => ENNReal.tsum_le_tsum fun x => by
-                  simpa [mul_comm, mul_left_comm, mul_assoc] using
-                    (ENNReal.absDiff_mul_right_le ((f x) y) ((g x) y) (p x))
-          _ = ∑' x, ∑' y, ENNReal.absDiff ((f x) y) ((g x) y) * p x := ENNReal.tsum_comm
-          _ = ∑' x, (∑' y, ENNReal.absDiff ((f x) y) ((g x) y)) * p x := by
-                congr 1
-                ext x
-                rw [ENNReal.tsum_mul_right])
+  refine ENNReal.div_le_div_right ?_ 2
+  calc ∑' y, ENNReal.absDiff (∑' x, p x * (f x) y) (∑' x, p x * (g x) y)
+      ≤ ∑' y, ∑' x, ENNReal.absDiff (p x * (f x) y) (p x * (g x) y) :=
+        ENNReal.tsum_le_tsum fun y => ENNReal.absDiff_tsum_le _ _
+    _ ≤ ∑' y, ∑' x, ENNReal.absDiff ((f x) y) ((g x) y) * p x :=
+        ENNReal.tsum_le_tsum fun y => ENNReal.tsum_le_tsum fun x => by
+          simpa [mul_comm, mul_left_comm, mul_assoc] using
+            ENNReal.absDiff_mul_right_le ((f x) y) ((g x) y) (p x)
+    _ = ∑' x, ∑' y, ENNReal.absDiff ((f x) y) ((g x) y) * p x := ENNReal.tsum_comm
+    _ = ∑' x, (∑' y, ENNReal.absDiff ((f x) y) ((g x) y)) * p x := by
+        simp_rw [ENNReal.tsum_mul_right]
 
 private lemma pmf_tvDist_bind_left_le
     {α : Type u} {β : Type u}
@@ -204,20 +165,15 @@ private lemma pmf_tvDist_bind_left_le
     PMF.tvDist (p.bind f) (p.bind g) ≤ ∑' a, (p a).toReal * PMF.tvDist (f a) (g a) := by
   simp only [PMF.tvDist]
   refine le_trans (ENNReal.toReal_mono ?_ (pmf_etvDist_bind_left_le p f g)) ?_
-  · refine ne_top_of_le_ne_top one_ne_top ?_
-    calc
-      ∑' a, (f a).etvDist (g a) * p a ≤ ∑' a, 1 * p a :=
-        ENNReal.tsum_le_tsum fun a => by
-          exact mul_le_mul' (PMF.etvDist_le_one _ _) le_rfl
-      _ = 1 * ∑' a, p a := by rw [ENNReal.tsum_mul_left]
-      _ = 1 := by simp [p.tsum_coe]
+  · exact ne_top_of_le_ne_top one_ne_top (le_trans
+      (ENNReal.tsum_le_tsum fun a => mul_le_mul' (PMF.etvDist_le_one _ _) le_rfl)
+      (by simp [p.tsum_coe]))
   · refine le_of_eq ?_
     calc
       ((∑' a, (f a).etvDist (g a) * p a)).toReal
-          = ∑' a, ((f a).etvDist (g a) * p a).toReal := by
-              rw [ENNReal.tsum_toReal_eq]
-              intro a
-              exact ENNReal.mul_ne_top (PMF.etvDist_ne_top _ _) (PMF.apply_ne_top _ _)
+          = ∑' a, ((f a).etvDist (g a) * p a).toReal :=
+            ENNReal.tsum_toReal_eq fun a =>
+              ENNReal.mul_ne_top (PMF.etvDist_ne_top _ _) (PMF.apply_ne_top _ _)
       _ = ∑' a, (p a).toReal * PMF.tvDist (f a) (g a) := by
               refine tsum_congr fun a => ?_
               rw [ENNReal.toReal_mul, PMF.tvDist]
@@ -246,10 +202,9 @@ lemma tvDist_bind_left_le
         ((liftM (liftM mx : PMF α) : SPMF α) >>= fun a => liftM (liftM (f a) : PMF β))
         ((liftM (liftM mx : PMF α) : SPMF α) >>= fun a => liftM (liftM (g a) : PMF β))
       ≤ ∑' a, ((liftM mx : PMF α) a).toReal *
-          SPMF.tvDist (liftM (liftM (f a) : PMF β)) (liftM (liftM (g a) : PMF β)) := by
-            exact spmf_tvDist_bind_left_le_liftM (liftM mx : PMF α)
-              (fun a => (liftM (f a) : PMF β))
-              (fun a => (liftM (g a) : PMF β))
+          SPMF.tvDist (liftM (liftM (f a) : PMF β)) (liftM (liftM (g a) : PMF β)) :=
+            spmf_tvDist_bind_left_le_liftM (liftM mx : PMF α)
+              (fun a => (liftM (f a) : PMF β)) (fun a => (liftM (g a) : PMF β))
     _ = ∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a) := by
           refine tsum_congr fun a => ?_
           have h1 : ((liftM mx : PMF α) a).toReal = Pr[= a | mx].toReal := by
@@ -258,8 +213,7 @@ lemma tvDist_bind_left_le
             exact (SPMF.liftM_apply (liftM mx : PMF α) a).symm
           have h2 : (liftM (liftM (f a) : PMF β) : SPMF β).tvDist
               (liftM (liftM (g a) : PMF β) : SPMF β) = tvDist (f a) (g a) := by
-            rw [tvDist, evalDist_def,
-              evalDist_def]
+            rw [tvDist, evalDist_def, evalDist_def]
             rfl
           rw [h1, h2]
 
@@ -356,54 +310,27 @@ lemma tsum_probOutput_toReal_mul_tvDist_le_probEvent
     (∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a))
       ≤ Pr[bad | mx].toReal := by
   classical
-  have h_p_sum_le_one : (∑' a : α, Pr[= a | mx]) ≤ 1 := tsum_probOutput_le_one
-  have h_p_sum_ne_top : (∑' a : α, Pr[= a | mx]) ≠ ⊤ :=
-    ne_top_of_le_ne_top one_ne_top h_p_sum_le_one
   have h_p_summable : Summable (fun a : α => Pr[= a | mx].toReal) :=
-    ENNReal.summable_toReal h_p_sum_ne_top
-  have h_lhs_nonneg : ∀ a : α, 0 ≤ Pr[= a | mx].toReal * tvDist (f a) (g a) :=
-    fun a => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
-  have h_lhs_le_p : ∀ a : α,
-      Pr[= a | mx].toReal * tvDist (f a) (g a) ≤ Pr[= a | mx].toReal :=
-    fun a => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)
-  have h_lhs_summable :
-      Summable (fun a : α => Pr[= a | mx].toReal * tvDist (f a) (g a)) :=
-    Summable.of_nonneg_of_le h_lhs_nonneg h_lhs_le_p h_p_summable
-  have h_rhs_nonneg : ∀ a : α, 0 ≤ (if bad a then Pr[= a | mx].toReal else 0) :=
-    fun a => by by_cases ha : bad a <;> simp [ha, ENNReal.toReal_nonneg]
-  have h_rhs_le_p : ∀ a : α,
-      (if bad a then Pr[= a | mx].toReal else 0) ≤ Pr[= a | mx].toReal :=
-    fun a => by by_cases ha : bad a <;> simp [ha, ENNReal.toReal_nonneg]
-  have h_rhs_summable :
-      Summable (fun a : α => if bad a then Pr[= a | mx].toReal else 0) :=
-    Summable.of_nonneg_of_le h_rhs_nonneg h_rhs_le_p h_p_summable
-  have h_point : ∀ a : α,
-      Pr[= a | mx].toReal * tvDist (f a) (g a)
-        ≤ if bad a then Pr[= a | mx].toReal else 0 := by
-    intro a
-    by_cases ha : bad a
-    · simpa [ha] using
-        mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one (f a) (g a))
-    · have htv : tvDist (f a) (g a) = 0 := by
-        rw [tvDist_eq_zero_iff]
-        exact h_eq a ha
-      simp [ha, htv]
-  have h_sum_le :
-      (∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a))
-        ≤ ∑' a, if bad a then Pr[= a | mx].toReal else 0 :=
-    Summable.tsum_le_tsum h_point h_lhs_summable h_rhs_summable
-  have h_event_toReal :
-      (∑' a, if bad a then Pr[= a | mx].toReal else 0)
-        = Pr[bad | mx].toReal := by
-    have h_term_ne_top : ∀ a : α, (if bad a then Pr[= a | mx] else 0) ≠ ⊤ := by
-      intro a
-      by_cases ha : bad a
-      · simp [ha, ne_top_of_le_ne_top one_ne_top (probOutput_le_one (mx := mx) (x := a))]
-      · simp [ha]
-    rw [probEvent_eq_tsum_ite, ENNReal.tsum_toReal_eq h_term_ne_top]
-    refine tsum_congr fun a => ?_
-    by_cases ha : bad a <;> simp [ha]
-  exact le_trans h_sum_le (le_of_eq h_event_toReal)
+    ENNReal.summable_toReal (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)
+  calc (∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a))
+      ≤ ∑' a, if bad a then Pr[= a | mx].toReal else 0 := by
+        refine Summable.tsum_le_tsum (fun a => ?_)
+          (h_p_summable.of_nonneg_of_le
+            (fun a => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _))
+            (fun a => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)))
+          (h_p_summable.of_nonneg_of_le
+            (fun a => by by_cases ha : bad a <;> simp [ha, ENNReal.toReal_nonneg])
+            (fun a => by by_cases ha : bad a <;> simp [ha, ENNReal.toReal_nonneg]))
+        by_cases ha : bad a
+        · simpa [ha] using
+            mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one (f a) (g a))
+        · simp [ha, (tvDist_eq_zero_iff (f a) (g a)).2 (h_eq a ha)]
+    _ = Pr[bad | mx].toReal := by
+        rw [probEvent_eq_tsum_ite, ENNReal.tsum_toReal_eq fun a => by
+          by_cases ha : bad a
+          · simp [ha, ne_top_of_le_ne_top one_ne_top (probOutput_le_one (mx := mx) (x := a))]
+          · simp [ha]]
+        exact tsum_congr fun a => by by_cases ha : bad a <;> simp [ha]
 
 /-- If two continuations are equal off a bad event, binding them over the same base
 computation changes TV distance by at most the probability of that bad event. -/
@@ -412,8 +339,8 @@ lemma tvDist_bind_left_event_le
     {α : Type u} {β : Type u}
     (mx : m α) (f g : α → m β) (bad : α → Prop)
     (h_eq : ∀ a, ¬ bad a → 𝒟[f a] = 𝒟[g a]) :
-    tvDist (mx >>= f) (mx >>= g) ≤ Pr[bad | mx].toReal := by
-  exact le_trans (tvDist_bind_left_le mx f g)
+    tvDist (mx >>= f) (mx >>= g) ≤ Pr[bad | mx].toReal :=
+  le_trans (tvDist_bind_left_le mx f g)
     (tsum_probOutput_toReal_mul_tvDist_le_probEvent mx f g bad h_eq)
 
 /-- `ENNReal` form of `tvDist_bind_left_event_le`, matching the quantitative

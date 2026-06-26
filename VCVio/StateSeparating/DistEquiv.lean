@@ -55,13 +55,11 @@ private lemma simulateQ_StateT_evalDist_congr_import {α : Type}
     (A : OracleComp E α) (s : σ) :
     𝒟[(simulateQ h₀ A).run s] = 𝒟[(simulateQ h₁ A).run s] := by
   induction A using OracleComp.inductionOn generalizing s with
-  | pure x => simp [simulateQ_pure, StateT.run_pure]
+  | pure x => simp
   | query_bind t k ih =>
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
-      id_map, StateT.run_bind, evalDist_bind]
-    rw [hh t s]
-    refine bind_congr fun p => ?_
-    exact ih p.1 p.2
+      id_map, StateT.run_bind, evalDist_bind, hh t s]
+    exact bind_congr fun p => ih p.1 p.2
 
 /-! ## Relation laws -/
 
@@ -109,16 +107,14 @@ theorem runProb_evalDist_eq
     {h₁ : QueryImpl.Stateful unifSpec E σ₁} {s₁ : σ₁}
     (h : (h₀, s₀) ≡ᵈ (h₁, s₁)) {α : Type} (A : OracleComp E α) :
     𝒟[h₀.runProb s₀ A] = 𝒟[h₁.runProb s₁ A] := by
-  rw [runProb_eq_run, runProb_eq_run]
-  exact h A
+  simpa only [runProb_eq_run] using h A
 
 theorem runProb₀_evalDist_eq
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {h₁ : QueryImpl.Stateful unifSpec E σ₁}
     [Inhabited σ₀] [Inhabited σ₁]
     (h : h₀ ≡ᵈ₀ h₁) {α : Type} (A : OracleComp E α) :
     𝒟[h₀.runProb₀ A] = 𝒟[h₁.runProb₀ A] := by
-  rw [runProb₀, runProb₀]
-  exact run₀_evalDist_eq h A
+  simpa only [runProb₀] using run₀_evalDist_eq h A
 
 theorem of_run_eq
     {h₀ : QueryImpl.Stateful I E σ₀} {s₀ : σ₀}
@@ -134,10 +130,8 @@ theorem of_step
     (s₀ : σ) :
     (h₀, s₀) ≡ᵈ (h₁, s₀) := by
   intro α A
-  unfold QueryImpl.Stateful.run
-  rw [StateT.run'_eq, StateT.run'_eq, evalDist_map, evalDist_map]
-  congr 1
-  exact simulateQ_StateT_evalDist_congr_import h_impl A s₀
+  simp only [QueryImpl.Stateful.run, StateT.run'_eq, evalDist_map]
+  exact congrArg _ (simulateQ_StateT_evalDist_congr_import h_impl A s₀)
 
 theorem of_step_bij
     (h₀ : QueryImpl.Stateful unifSpec E σ₀)
@@ -148,11 +142,9 @@ theorem of_step_bij
     (s₀ : σ₀) :
     (h₀, s₀) ≡ᵈ (h₁, φ s₀) := by
   intro α A
-  unfold QueryImpl.Stateful.run
-  rw [StateT.run'_eq, StateT.run'_eq, evalDist_map, evalDist_map]
-  have hbij := simulateQ_StateT_evalDist_congr_of_bij h₀ h₁ φ h_impl A s₀
-  rw [hbij, evalDist_map]
-  simp only [Functor.map_map, Prod.map_fst, id_eq]
+  simp only [QueryImpl.Stateful.run, StateT.run'_eq, evalDist_map,
+    simulateQ_StateT_evalDist_congr_of_bij h₀ h₁ φ h_impl A s₀, Functor.map_map, Prod.map_fst,
+    id_eq]
 
 /-! ## Bridge to advantage -/
 
@@ -186,16 +178,15 @@ section LinkCongr
 variable {ιₘ : Type uₘ} {M : OracleSpec.{uₘ, 0} ιₘ}
 variable {σ_P : Type}
 
+/-- `link` congruence on the inner handler: an inner-handler equivalence lifts to
+an equivalence of the linked handlers with matching outer state and initial state. -/
 theorem link_inner_congr (outer : QueryImpl.Stateful M E σ_P) (sP : σ_P)
     {inner₀ : QueryImpl.Stateful unifSpec M σ₀} {s₀ : σ₀}
     {inner₁ : QueryImpl.Stateful unifSpec M σ₁} {s₁ : σ₁}
     (h : (inner₀, s₀) ≡ᵈ (inner₁, s₁)) :
     (outer.link inner₀, (sP, s₀)) ≡ᵈ (outer.link inner₁, (sP, s₁)) := by
   intro α A
-  change 𝒟[(outer.link inner₀).runProb (sP, s₀) A] =
-    𝒟[(outer.link inner₁).runProb (sP, s₁) A]
-  rw [runProb_eq_run, runProb_eq_run, run_link_eq_run_shiftLeft,
-    run_link_eq_run_shiftLeft]
+  rw [run_link_eq_run_shiftLeft, run_link_eq_run_shiftLeft]
   exact h (outer.shiftLeft sP A)
 
 end LinkCongr
@@ -222,16 +213,10 @@ theorem parSum_congr
   refine of_step ?_ (s₁, s₂)
   intro q s
   rcases q with t | t
-  · change 𝒟[(Prod.map id (·, s.2)) <$> liftComp ((h₁ t).run s.1) (I₁ + I₂)] =
-      𝒟[(Prod.map id (·, s.2)) <$> liftComp ((h₁' t).run s.1) (I₁ + I₂)]
-    refine evalDist_map_eq_of_evalDist_eq ?_ _
-    rw [evalDist_liftComp, evalDist_liftComp]
-    exact hh₁ t s.1
-  · change 𝒟[(Prod.map id (s.1, ·)) <$> liftComp ((h₂ t).run s.2) (I₁ + I₂)] =
-      𝒟[(Prod.map id (s.1, ·)) <$> liftComp ((h₂' t).run s.2) (I₁ + I₂)]
-    refine evalDist_map_eq_of_evalDist_eq ?_ _
-    rw [evalDist_liftComp, evalDist_liftComp]
-    exact hh₂ t s.2
+  · exact evalDist_map_eq_of_evalDist_eq
+      ((evalDist_liftComp _).trans ((hh₁ t s.1).trans (evalDist_liftComp _).symm)) _
+  · exact evalDist_map_eq_of_evalDist_eq
+      ((evalDist_liftComp _).trans ((hh₂ t s.2).trans (evalDist_liftComp _).symm)) _
 
 end ParCongr
 

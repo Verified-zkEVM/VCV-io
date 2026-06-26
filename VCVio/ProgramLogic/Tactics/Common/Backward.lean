@@ -341,6 +341,21 @@ private def mkBackwardRuleFromProofExpr (prf : Expr) :
   let rule ← Lean.Meta.Sym.mkBackwardRuleFromDecl decl
   return (res, decl, rule)
 
+/-- Normalize a `pre ⊑ rhs` / `pre ≤ rhs` proof into a reusable backward-rule
+source by dispatching on the `rhs` weakest-precondition shape: raw `Std.Do'.wp`
+goes through `mkUnarySpecBackwardProof`, raw `Std.Do'.rwp` through
+`mkRelSpecBackwardProof`, and anything else is returned unchanged. -/
+private def normalizeRawRelProof (prf type : Expr) : MetaM Expr := do
+  match ← rawRelParts? type with
+  | some (pre, rhs) =>
+      if (stdDoWpParts? rhs).isSome then
+        mkUnarySpecBackwardProof pre rhs prf
+      else if (stdDoRelWpParts? rhs).isSome then
+        mkRelSpecBackwardProof pre rhs prf
+      else
+        pure prf
+  | none => pure prf
+
 private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
     MetaM VCSpecBackwardRule := do
   let (xsNoBridge, _bisNoBridge, prfNoBridge, typeNoBridge) ←
@@ -357,25 +372,9 @@ private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
       | some (pre, prog, post) =>
           mkUnaryTripleBackwardProof xsNoBridge pre prog post prfNoBridge
       | none =>
-          match ← rawRelParts? type with
-          | some (pre, rhs) =>
-              if (stdDoWpParts? rhs).isSome then
-                mkUnarySpecBackwardProof pre rhs prf
-              else if (stdDoRelWpParts? rhs).isSome then
-                mkRelSpecBackwardProof pre rhs prf
-              else
-                pure prf
-          | none => pure prf
+          normalizeRawRelProof prf type
     else
-      match ← rawRelParts? type with
-      | some (pre, rhs) =>
-          if (stdDoWpParts? rhs).isSome then
-            mkUnarySpecBackwardProof pre rhs prf
-          else if (stdDoRelWpParts? rhs).isSome then
-            mkRelSpecBackwardProof pre rhs prf
-          else
-            pure prf
-      | none => pure prf
+      normalizeRawRelProof prf type
   let (proof, declName, rule) ← mkBackwardRuleFromProofExpr prf
   return { source := entry, rawGoal, proof, declName, rule }
 

@@ -25,8 +25,8 @@ separately when defining security experiments. -/
 @[ext]
 structure AsymmEncAlg (m : Type → Type u) [Monad m] (M PK SK C : Type) where
   keygen : m (PK × SK)
-  encrypt : (pk : PK) → (msg : M) →  m C
-  decrypt : (sk : SK) → (c : C) →  m (Option M)
+  encrypt : (pk : PK) → (msg : M) → m C
+  decrypt : (sk : SK) → (c : C) → m (Option M)
 
 /-- An explicit-coins asymmetric encryption scheme in the monad `m`.
 
@@ -77,12 +77,11 @@ variable [DecidableEq M]
 
 The game returns a `Bool` directly rather than using `guard`, so it does not require
 `AlternativeMonad`. -/
-def CorrectExp (msg : M) : m Bool :=
-  do
-    let (pk, sk) ← encAlg.keygen
-    let c ← encAlg.encrypt pk msg
-    let msg' ← encAlg.decrypt sk c
-    return decide (msg' = some msg)
+def CorrectExp (msg : M) : m Bool := do
+  let (pk, sk) ← encAlg.keygen
+  let c ← encAlg.encrypt pk msg
+  let msg' ← encAlg.decrypt sk c
+  return decide (msg' = some msg)
 
 /-- An asymmetric encryption scheme is perfectly correct under the given runtime when decrypting a
 fresh encryption of any message succeeds with probability `1`. -/
@@ -99,10 +98,10 @@ variable {m : Type → Type v} [Monad m] {M PK SK R C : Type}
 public-randomness capability. -/
 def toAsymmEncAlg [SampleableType R] (runtime : ProbCompRuntime m) : AsymmEncAlg m M PK SK C :=
   { keygen := encAlg.keygen
-    encrypt := fun pk msg => do
+    encrypt pk msg := do
       let r ← runtime.liftProbComp ($ᵗ R)
       return encAlg.encrypt pk msg r
-    decrypt := fun sk c => return (encAlg.decrypt sk c) }
+    decrypt sk c := return encAlg.decrypt sk c }
 
 end ExplicitCoins
 

@@ -4,9 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.Coercions.SubSpec
+import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.Append
 
@@ -123,6 +123,6 @@ point. -/
     simulateQ (prfIdealQueryImpl (D := D) (R := R))
         (liftM (OracleSpec.query (Sum.inr q) : OracleQuery (PRFOracleSpec D R) R))
       = (D →ₒ R).randomOracle q := by
-  simp only [prfIdealQueryImpl, simulateQ_spec_query, QueryImpl.add_apply_inr]
+  simp [prfIdealQueryImpl]
 
 end PRFScheme

@@ -389,8 +389,8 @@ theorem euf_cma_collision_bound [DecidableEq Domain]
     ∃ (red : CollisionAdversary (PK := PK) (Domain := Domain)),
       adv.advantage (runtime M Salt) ≤
         collisionFindingAdvantage (psf := psf) (hr := hr) red +
-        collisionBound Salt qSign := by
-  exact ⟨reduction psf hr M Salt adv,
+        collisionBound Salt qSign :=
+  ⟨reduction psf hr M Salt adv,
     forgery_yields_collision psf hr M Salt hcorrect qSign qHash adv hQ⟩
 
 /-- **Split GPV PFDH bound in the random-oracle model**.
@@ -418,8 +418,8 @@ theorem euf_cma_split_bound [DecidableEq Domain]
         collisionFindingAdvantage (psf := psf) (hr := hr) collisionRed +
           ((qSign + qHash : ℕ) : ENNReal) *
             programmedPreimageAdvantage (psf := psf) (hr := hr) exactMatchRed +
-          collisionBound Salt qSign := by
-  exact ⟨reduction psf hr M Salt adv,
+          collisionBound Salt qSign :=
+  ⟨reduction psf hr M Salt adv,
     programmedPreimageReduction psf hr M Salt adv,
     forgery_yields_collision_or_exact_match psf hr M Salt hcorrect qSign qHash adv hQ⟩
 

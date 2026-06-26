@@ -67,12 +67,9 @@ private lemma eRelWP_le_one_of_post_le_one
   unfold OracleComp.ProgramLogic.Relational.eRelWP
   refine iSup_le fun c => ?_
   calc ∑' z : α × β, Pr[= z | c.1] * post z.1 z.2
-      ≤ ∑' z : α × β, Pr[= z | c.1] * 1 :=
-        ENNReal.tsum_le_tsum fun z => mul_le_mul' le_rfl (hpost z.1 z.2)
-    _ = ∑' z : α × β, Pr[= z | c.1] := by simp
-    _ ≤ 1 := by
-        rw [tsum_probOutput_eq_sub]
-        exact tsub_le_self
+      ≤ ∑' z : α × β, Pr[= z | c.1] :=
+        ENNReal.tsum_le_tsum fun z => by simpa using mul_le_mul' le_rfl (hpost z.1 z.2)
+    _ ≤ 1 := tsum_probOutput_le_one
 
 /-- The underlying `ℝ≥0∞`-valued relational WP, packaged for use inside
 the `Prob` constructor. -/
@@ -81,10 +78,8 @@ private noncomputable def rwpVal
     (post : α → β → Prob) : ℝ≥0∞ :=
   OracleComp.ProgramLogic.Relational.eRelWP oa ob (fun a b => (post a b).val)
 
-private theorem rwpVal_le_one
-    (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (post : α → β → Prob) :
-    rwpVal oa ob post ≤ 1 :=
+private theorem rwpVal_le_one (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
+    (post : α → β → Prob) : rwpVal oa ob post ≤ 1 :=
   eRelWP_le_one_of_post_le_one oa ob _ (fun a b => (post a b).val_le_one)
 
 /-- Probabilistic `Std.Do'.RelWP` interpretation of pairs of
@@ -108,19 +103,16 @@ noncomputable scoped instance (priority := 1100) instRelWP_prob :
   rwp_trans_pure a b := by
     intro post _epost₁ _epost₂
     change (post a b).val ≤ rwpVal (pure a : OracleComp spec₁ _) (pure b : OracleComp spec₂ _) post
-    unfold rwpVal
-    rw [OracleComp.ProgramLogic.Relational.eRelWP_pure]
+    rw [rwpVal, OracleComp.ProgramLogic.Relational.eRelWP_pure]
   rwp_trans_bind_le {α β γ δ} oa ob f g := by
     intro post _epost₁ _epost₂
     change rwpVal oa ob (fun a b => ⟨rwpVal (f a) (g b) post, rwpVal_le_one (f a) (g b) post⟩) ≤
             rwpVal (oa >>= f) (ob >>= g) post
-    unfold rwpVal
     exact OracleComp.ProgramLogic.Relational.eRelWP_bind_le
       (spec₁ := spec₁) (spec₂ := spec₂) oa ob f g _
   rwp_trans_monotone {α β} oa ob post post' _epost₁ _epost₁' _epost₂ _epost₂' := by
     intro _h₁ _h₂ hpost
     change rwpVal oa ob post ≤ rwpVal oa ob post'
-    unfold rwpVal
     exact OracleComp.ProgramLogic.Relational.eRelWP_mono
       (spec₁ := spec₁) (spec₂ := spec₂)
       (fun a b => (show (post a b).val ≤ (post' a b).val from hpost a b))

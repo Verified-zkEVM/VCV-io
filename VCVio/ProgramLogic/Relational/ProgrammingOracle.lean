@@ -62,48 +62,12 @@ private lemma probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad
   classical
   cases hcache : cache t with
   | some v =>
-    have hL : (so.withProgramming policy t).run (cache, false) =
-        (pure (v, (cache, false)) :
-          OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-      simp [QueryImpl.withProgramming_apply, hcache]
-    have hR : (so.withCachingTrackingPolicy policy t).run (cache, false) =
-        (pure (v, (cache, false)) :
-          OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-      simp [QueryImpl.withCachingTrackingPolicy_apply, hcache]
-    rw [hL, hR]
+    simp [QueryImpl.withProgramming_apply, QueryImpl.withCachingTrackingPolicy_apply, hcache]
   | none =>
     cases hpol : policy t with
-    | none =>
-      have hL : (so.withProgramming policy t).run (cache, false) =
-          (so t >>= fun u' => pure (u', (cache.cacheQuery t u', false)) :
-            OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        simp [QueryImpl.withProgramming_apply, hcache, hpol, Functor.map_map]
-      have hR : (so.withCachingTrackingPolicy policy t).run (cache, false) =
-          (so t >>= fun u' => pure (u', (cache.cacheQuery t u', false)) :
-            OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        simp [QueryImpl.withCachingTrackingPolicy_apply, hcache, hpol, Functor.map_map]
-      rw [hL, hR]
-    | some v =>
-      have hne : ∀ (w : spec.Range t) (c : spec.QueryCache),
-          ((u, (cache', false)) : spec.Range t × spec.QueryCache × Bool) ≠ (w, (c, true)) := by
-        intro w c hcontr
-        injection hcontr with _ h2
-        injection h2 with _ h3
-        cases h3
-      have hL_run : (so.withProgramming policy t).run (cache, false) =
-          (pure (v, (cache.cacheQuery t v, true)) :
-            OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        simp [QueryImpl.withProgramming_apply, hcache, hpol]
-      have hR_run : (so.withCachingTrackingPolicy policy t).run (cache, false) =
-          (so t >>= fun u' => pure (u', (cache.cacheQuery t u', true)) :
-            OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        simp [QueryImpl.withCachingTrackingPolicy_apply, hcache, hpol, Functor.map_map]
-      rw [hL_run, hR_run]
-      rw [probOutput_pure, if_neg (hne v _)]
-      rw [probOutput_bind_eq_tsum]
-      symm
-      refine ENNReal.tsum_eq_zero.mpr (fun u' => ?_)
-      rw [probOutput_pure, if_neg (hne u' _), mul_zero]
+    | _ =>
+      simp [QueryImpl.withProgramming_apply, QueryImpl.withCachingTrackingPolicy_apply,
+        hcache, hpol]
 
 /-! ## Bad-input monotonicity wrappers (`σ × Bool` shape) -/
 
@@ -113,7 +77,7 @@ private lemma withProgramming_mono_pair
     (t : spec.Domain) (p : spec.QueryCache × Bool) (hp : p.2 = true)
     (z) (hz : z ∈ support ((so.withProgramming policy t).run p)) : z.2.2 = true := by
   rcases p with ⟨cache, b⟩
-  cases (show b = true from hp)
+  subst hp
   exact QueryImpl.withProgramming_bad_monotone (so := so) (policy := policy) t cache z hz
 
 omit [IsUniformSpec spec] in
@@ -123,7 +87,7 @@ private lemma withCachingTrackingPolicy_mono_pair
     (z) (hz : z ∈ support ((so.withCachingTrackingPolicy policy t).run p)) :
     z.2.2 = true := by
   rcases p with ⟨cache, b⟩
-  cases (show b = true from hp)
+  subst hp
   exact QueryImpl.withCachingTrackingPolicy_bad_monotone (so := so) (policy := policy) t cache z hz
 
 /-! ## TV-distance bound -/
@@ -139,18 +103,13 @@ private theorem tvDist_withProgramming_withCachingTrackingPolicy_le_probEvent_ba
         ((simulateQ (so.withCachingTrackingPolicy policy) oa).run' (cache, false))
       ≤ Pr[fun z : α × spec.QueryCache × Bool => z.2.2 = true |
           (simulateQ (so.withProgramming policy) oa).run (cache, false)].toReal := by
-  refine identical_until_bad_with_flag
+  exact identical_until_bad_with_flag
     (impl₁ := so.withProgramming policy)
     (impl₂ := so.withCachingTrackingPolicy policy)
     (oa := oa) (s₀ := cache)
-    ?_ ?_ ?_
-  · intro t s u s'
-    exact probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad_output
-      so policy t s u s'
-  · intro t p hp z hz
-    exact withProgramming_mono_pair so policy t p hp z hz
-  · intro t p hp z hz
-    exact withCachingTrackingPolicy_mono_pair so policy t p hp z hz
+    (probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad_output so policy)
+    (withProgramming_mono_pair so policy)
+    (withCachingTrackingPolicy_mono_pair so policy)
 
 /-- TV-distance between the output marginal of `so.withCaching` and the output marginal of
 `so.withProgramming policy` is bounded by the probability that the bad flag of
@@ -169,14 +128,8 @@ theorem tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad
         ((simulateQ (so.withProgramming policy) oa).run' (cache, false))
       ≤ Pr[fun z : α × spec.QueryCache × Bool => z.2.2 = true |
           (simulateQ (so.withProgramming policy) oa).run (cache, false)].toReal := by
-  have h_proj :
-      (simulateQ so.withCaching oa).run' cache =
-        (simulateQ (so.withCachingTrackingPolicy policy) oa).run' (cache, false) :=
-    (withCachingTrackingPolicy_run'_eq' so policy oa cache false).symm
-  have h_tv :=
-    tvDist_withProgramming_withCachingTrackingPolicy_le_probEvent_bad so policy oa cache
-  rw [h_proj, tvDist_comm]
-  exact h_tv
+  rw [(withCachingTrackingPolicy_run'_eq' so policy oa cache false).symm, tvDist_comm]
+  exact tvDist_withProgramming_withCachingTrackingPolicy_le_probEvent_bad so policy oa cache
 
 /-! ## Programming collision bound -/
 
@@ -238,10 +191,9 @@ theorem programming_collision_bound_qP_qH_β
         ((simulateQ so.withCaching oa).run' ∅)
         ((simulateQ (so.withProgramming policy) oa).run' (∅, false))
       ≤ ((qP : ℝ≥0∞) * qH * β).toReal := by
-  have hBound_lt_top : (qP : ℝ≥0∞) * qH * β < ∞ := by
-    have hqPqH : (qP : ℝ≥0∞) * qH < ∞ :=
-      ENNReal.mul_lt_top (ENNReal.natCast_lt_top _) (ENNReal.natCast_lt_top _)
-    exact ENNReal.mul_lt_top hqPqH hβ_lt_top
-  exact programming_collision_bound oa so policy hBound_lt_top hBad
+  exact programming_collision_bound oa so policy
+    (ENNReal.mul_lt_top
+      (ENNReal.mul_lt_top (ENNReal.natCast_lt_top _) (ENNReal.natCast_lt_top _)) hβ_lt_top)
+    hBad
 
 end OracleComp.ProgramLogic.Relational

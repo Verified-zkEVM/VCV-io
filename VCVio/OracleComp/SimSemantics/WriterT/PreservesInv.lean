@@ -39,19 +39,17 @@ namespace QueryImpl
 /-- `WriterPreservesInv impl Inv` means every oracle query implementation step preserves
 `Inv` on the accumulated writer: starting from any `s₀` satisfying `Inv`, every reachable
 post-writer `s₀ * w` (for `(a, w)` in the support of `(impl t).run`) also satisfies `Inv`. -/
-def WriterPreservesInv {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec]
-    {ω : Type} [Monoid ω]
+def WriterPreservesInv {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {ω : Type} [Monoid ω]
     (impl : QueryImpl spec (WriterT ω (OracleComp spec))) (Inv : ω → Prop) : Prop :=
   ∀ t s₀, Inv s₀ → ∀ z ∈ support (impl t).run, Inv (s₀ * z.2)
 
-lemma WriterPreservesInv.trivial {ι : Type} {spec : OracleSpec ι}
-    [IsUniformSpec spec] {ω : Type} [Monoid ω]
-    (impl : QueryImpl spec (WriterT ω (OracleComp spec))) :
+lemma WriterPreservesInv.trivial {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {ω : Type}
+    [Monoid ω] (impl : QueryImpl spec (WriterT ω (OracleComp spec))) :
     WriterPreservesInv impl (fun _ => True) :=
   fun _ _ _ _ _ => True.intro
 
-lemma WriterPreservesInv.and {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {ω :
-    Type} [Monoid ω]
+lemma WriterPreservesInv.and
+    {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {ω : Type} [Monoid ω]
     {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {P Q : ω → Prop}
     (hP : WriterPreservesInv impl P) (hQ : WriterPreservesInv impl Q) :
     WriterPreservesInv impl (fun s => P s ∧ Q s) :=
@@ -76,8 +74,7 @@ preserved across the whole simulation. This is the canonical builder for
 writer invariants: pick a submonoid-like predicate, show every per-query
 increment lands in it, and you're done. -/
 lemma WriterPreservesInv.of_mul_closed {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec]
-    {ω : Type} [Monoid ω]
-    {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {Inv : ω → Prop}
+    {ω : Type} [Monoid ω] {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {Inv : ω → Prop}
     (hClosed : ∀ a b, Inv a → Inv b → Inv (a * b))
     (hPerQuery : ∀ t z, z ∈ support (impl t).run → Inv z.2) :
     WriterPreservesInv impl Inv :=
@@ -111,33 +108,14 @@ theorem simulateQ_run_writerPreservesInv
   induction oa using OracleComp.inductionOn with
   | pure a =>
       intro s₀ hs₀ z hz
-      have hz_eq : z = (a, (1 : ω)) := by
-        have : (simulateQ impl (pure a : OracleComp spec α)).run =
-            (pure (a, (1 : ω)) : OracleComp spec (α × ω)) := by
-          simp [simulateQ_pure, WriterT.run_pure]
-        rw [this] at hz
-        simpa using hz
-      subst hz_eq
-      simpa using hs₀
+      obtain rfl : z = (a, (1 : ω)) := by simpa [simulateQ_pure, WriterT.run_pure] using hz
+      simpa only [mul_one] using hs₀
   | query_bind t oa ih =>
       intro s₀ hs₀ z hz
-      have hrun_eq :
-          (simulateQ impl ((query t : OracleComp spec _) >>= oa)).run =
-            ((impl t).run >>= fun us =>
-              (fun vs : α × ω => (vs.1, us.2 * vs.2)) <$>
-                (simulateQ impl (oa us.1)).run) := by
-        simp [simulateQ_bind, simulateQ_query, WriterT.run_bind, OracleSpec.query_def]
-      rw [hrun_eq] at hz
-      rcases (mem_support_bind_iff _ _ _).1 hz with ⟨us, hus, hzcont⟩
-      have hInv_us : Inv (s₀ * us.2) := himpl t s₀ hs₀ us hus
-      rw [support_map] at hzcont
-      rcases hzcont with ⟨vs, hvs, hzvs⟩
-      have hIH : Inv ((s₀ * us.2) * vs.2) := ih us.1 (s₀ * us.2) hInv_us vs hvs
-      have hz2 : s₀ * z.2 = (s₀ * us.2) * vs.2 := by
-        have hz_eq : z = (vs.1, us.2 * vs.2) := hzvs.symm
-        rw [hz_eq]
-        simp [mul_assoc]
-      rw [hz2]
-      exact hIH
+      simp only [OracleSpec.query_def, ofPFunctor_toPFunctor, simulateQ_bind, simulateQ_query,
+        OracleQuery.input_apply, OracleQuery.cont_apply, id_map, WriterT.run_bind, support_bind,
+        support_map, Set.mem_iUnion, Set.mem_image, Prod.exists, exists_prop] at hz
+      obtain ⟨u, w, hus, v, w', hvs, rfl⟩ := hz
+      simpa only [mul_assoc] using ih u (s₀ * w) (himpl t s₀ hs₀ (u, w) hus) (v, w') hvs
 
 end OracleComp

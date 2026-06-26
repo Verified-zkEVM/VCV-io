@@ -56,8 +56,7 @@ monad morphism: `<$>` does not thread state, so `Prod.fst <$> (f <$> mx).run s` 
     {α β : Type} (f : α → β) (mx : OracleComp (unifSpec + hashSpec) α) :
     (SPMFSemantics.withStateOracle hashImpl s).evalDist (f <$> mx) =
       f <$> (SPMFSemantics.withStateOracle hashImpl s).evalDist mx := by
-  set impl :=
-    (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl with himpl
+  set impl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl
   change (liftM (StateT.run' (simulateQ impl (f <$> mx)) s) : SPMF _) =
     f <$> (liftM (StateT.run' (simulateQ impl mx) s) : SPMF _)
   rw [simulateQ_map, StateT.run'_map', liftM_map]
@@ -70,9 +69,7 @@ lemma withStateOracle_evalDist_bind_pure
     (hashImpl : QueryImpl hashSpec (StateT σ ProbComp)) (s : σ)
     {α β : Type} (mx : OracleComp (unifSpec + hashSpec) α) (f : α → β) :
     (SPMFSemantics.withStateOracle hashImpl s).evalDist (mx >>= fun x => pure (f x)) =
-      f <$> (SPMFSemantics.withStateOracle hashImpl s).evalDist mx := by
-  have heq : (mx >>= fun x => pure (f x)) = f <$> mx := by
-    rw [map_eq_bind_pure_comp]; rfl
-  rw [heq, withStateOracle_evalDist_map]
+      f <$> (SPMFSemantics.withStateOracle hashImpl s).evalDist mx :=
+  withStateOracle_evalDist_map hashImpl s f mx
 
 end SPMFSemantics

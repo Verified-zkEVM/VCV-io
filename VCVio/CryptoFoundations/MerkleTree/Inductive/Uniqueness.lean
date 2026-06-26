@@ -63,24 +63,14 @@ theorem getPutativeRootWithHash_unique
     exact ⟨heq, List.Vector.ext (fun i => i.elim0)⟩
   | ofLeft idxLeft ih =>
     simp only [getPutativeRootWithHash] at heq
-    have ⟨hsub, hsib⟩ := hinj heq
+    obtain ⟨hsub, hsib⟩ := hinj heq
     obtain ⟨hval, htail⟩ := ih proof₁.tail proof₂.tail x y hsub
-    exact ⟨hval, by
-      conv_lhs => rw [show proof₁ = proof₁.head ::ᵥ proof₁.tail
-        from (List.Vector.cons_head_tail proof₁).symm]
-      conv_rhs => rw [show proof₂ = proof₂.head ::ᵥ proof₂.tail
-        from (List.Vector.cons_head_tail proof₂).symm]
-      rw [hsib, htail]⟩
+    exact ⟨hval, proof₁.cons_head_tail.symm.trans (hsib ▸ htail ▸ proof₂.cons_head_tail)⟩
   | ofRight idxRight ih =>
     simp only [getPutativeRootWithHash] at heq
-    have ⟨hsib, hsub⟩ := hinj heq
+    obtain ⟨hsib, hsub⟩ := hinj heq
     obtain ⟨hval, htail⟩ := ih proof₁.tail proof₂.tail x y hsub
-    exact ⟨hval, by
-      conv_lhs => rw [show proof₁ = proof₁.head ::ᵥ proof₁.tail
-        from (List.Vector.cons_head_tail proof₁).symm]
-      conv_rhs => rw [show proof₂ = proof₂.head ::ᵥ proof₂.tail
-        from (List.Vector.cons_head_tail proof₂).symm]
-      rw [hsib, htail]⟩
+    exact ⟨hval, proof₁.cons_head_tail.symm.trans (hsib ▸ htail ▸ proof₂.cons_head_tail)⟩
 
 /-- Contrapositive of uniqueness: with an injective hash, distinct leaf values
     at the same index always produce distinct roots, regardless of the

@@ -4,14 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 
-import VCVio.EvalDist.Defs.Instances
-import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
-import VCVio.OracleComp.ProbCompLift
-import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.QueryTracking.LoggingOracle
-import VCVio.OracleComp.QueryTracking.CachingOracle
-import VCVio.OracleComp.SimSemantics.Append
 import PolyFun.Control.Monad.Hom
+import VCVio.EvalDist.Defs.Instances
+import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.ProbCompLift
+import VCVio.OracleComp.QueryTracking.CachingOracle
+import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.SimSemantics.Append
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 
 /-!
 # Signature Algorithms
@@ -19,6 +19,14 @@ import PolyFun.Control.Monad.Hom
 This file defines `SignatureAlg m M PK SK S`, a type representing a digital signature scheme
 with computations in the monad `m`, message space `M`, public/secret key spaces `PK`/`SK`,
 and signature space `S`.
+
+## Main definitions
+
+* `SignatureAlg`: a signature scheme as a `keygen`/`sign`/`verify` triple in a monad `m`.
+* `SignatureAlg.Complete`: completeness up to an error `δ`, with `PerfectlyComplete` the `δ = 0`
+  case.
+* `SignatureAlg.unforgeableExp`, `eufNmaExp`, `managedRoNmaExp`: the EUF-CMA, EUF-NMA, and
+  managed-random-oracle NMA security experiments, with the corresponding adversary advantages.
 -/
 
 universe u v
@@ -40,11 +48,15 @@ section signingOracle
 
 variable {m : Type → Type v} [Monad m] {M PK SK S : Type}
 
-/-- In the new API, `QueryImpl (M →ₒ S)` is just `M → m S` (since `Domain = M`).
-The old version used `⟨fun | query () msg => ...⟩` which matched the old struct-based API. -/
+/-- The signing oracle for `sigAlg` under public key `pk` and secret key `sk`: the
+`QueryImpl` that answers each queried message by running `sigAlg.sign pk sk` on it.
+
+Every produced signature is recorded in a `WriterT (QueryLog (M →ₒ S))` writer layer, so an
+experiment running an adversary against this oracle can later read off which messages were
+signed and check the freshness of a forged message. -/
 def signingOracle (sigAlg : SignatureAlg m M PK SK S) (pk : PK) (sk : SK) :
     QueryImpl (M →ₒ S) (WriterT (QueryLog (M →ₒ S)) m) :=
-  QueryImpl.withLogging (fun msg => sigAlg.sign pk sk msg)
+  QueryImpl.withLogging (sigAlg.sign pk sk)
 
 end signingOracle
 
@@ -68,13 +80,11 @@ lemma map_keygen (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S) :
     (sigAlg.map F).keygen = F sigAlg.keygen := rfl
 
 @[simp]
-lemma map_sign (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S)
-    (pk : PK) (sk : SK) (msg : M) :
+lemma map_sign (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S) (pk : PK) (sk : SK) (msg : M) :
     (sigAlg.map F).sign pk sk msg = F (sigAlg.sign pk sk msg) := rfl
 
 @[simp]
-lemma map_verify (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S)
-    (pk : PK) (msg : M) (σ : S) :
+lemma map_verify (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S) (pk : PK) (msg : M) (σ : S) :
     (sigAlg.map F).verify pk msg σ = F (sigAlg.verify pk msg σ) := rfl
 
 end map
@@ -92,10 +102,10 @@ signing failures (e.g., abort in schemes like Fiat-Shamir with aborts).
 `Complete sigAlg runtime 0` is equivalent to `PerfectlyComplete sigAlg runtime`. -/
 def Complete (sigAlg : SignatureAlg m M PK SK S)
     (runtime : ProbCompRuntime m) (δ : ℝ≥0∞) : Prop :=
-  ∀ msg : M, Pr[= true | runtime.evalDist do
+  ∀ msg : M, (1 : ℝ≥0∞) - δ ≤ Pr[= true | runtime.evalDist do
     let (pk, sk) ← sigAlg.keygen
     let sig ← sigAlg.sign pk sk msg
-    sigAlg.verify pk msg sig] ≥ 1 - δ
+    sigAlg.verify pk msg sig]
 
 /-- Perfect completeness: the canonical keygen-sign-verify execution always accepts.
 This is the special case of `Complete` with zero error. -/
@@ -106,38 +116,32 @@ def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S)
     let sig ← sigAlg.sign pk sk msg
     sigAlg.verify pk msg sig] = 1
 
-lemma perfectlyComplete_iff_complete_zero
-    (sigAlg : SignatureAlg m M PK SK S) (runtime : ProbCompRuntime m) :
+lemma perfectlyComplete_iff_complete_zero (sigAlg : SignatureAlg m M PK SK S)
+    (runtime : ProbCompRuntime m) :
     sigAlg.PerfectlyComplete runtime ↔ sigAlg.Complete runtime 0 := by
   simp [PerfectlyComplete, Complete]
 
-lemma Complete.mono {sigAlg : SignatureAlg m M PK SK S}
-    {runtime : ProbCompRuntime m} {δ₁ δ₂ : ℝ≥0∞}
-    (h : sigAlg.Complete runtime δ₁) (hle : δ₁ ≤ δ₂) :
-    sigAlg.Complete runtime δ₂ :=
-  fun msg => le_trans (tsub_le_tsub_left hle 1) (h msg)
+lemma Complete.mono {sigAlg : SignatureAlg m M PK SK S} {runtime : ProbCompRuntime m} {δ₁ δ₂ : ℝ≥0∞}
+    (h : sigAlg.Complete runtime δ₁) (hle : δ₁ ≤ δ₂) : sigAlg.Complete runtime δ₂ :=
+  fun msg => (tsub_le_tsub_left hle _).trans (h msg)
 
-/-- If every key pair `(pk, sk)` in the support of a generator satisfies
-`Pr[= a | f pk sk] ≥ 1 - δ`, then the overall probability `Pr[= a | gen >>= f] ≥ 1 - δ`.
-This reduces a "for all keys" completeness statement to per-key bounds. -/
-lemma probOutput_bind_ge_of_forall_support
-    {α β : Type} {a : β} {δ : ℝ≥0∞}
-    (gen : ProbComp α)
-    (f : α → ProbComp β)
-    (h : ∀ x, x ∈ support gen → Pr[= a | f x] ≥ 1 - δ) :
-    Pr[= a | gen >>= f] ≥ 1 - δ := by
+/-- If every value `x` in the support of `gen` satisfies `Pr[= a | f x] ≥ 1 - δ`, then the
+overall probability satisfies `Pr[= a | gen >>= f] ≥ 1 - δ`. This reduces a "for all keys"
+completeness statement to per-key bounds. -/
+lemma le_probOutput_bind_of_forall_support {α β : Type} {a : β} {δ : ℝ≥0∞} (gen : ProbComp α)
+    (f : α → ProbComp β) (h : ∀ x, x ∈ support gen → 1 - δ ≤ Pr[= a | f x]) :
+    1 - δ ≤ Pr[= a | gen >>= f] := by
   rw [probOutput_bind_eq_tsum]
-  calc
-    ∑' x, Pr[= x | gen] * Pr[= a | f x]
-      ≥ ∑' x, Pr[= x | gen] * (1 - δ) := by
+  calc 1 - δ = ∑' x, Pr[= x | gen] * (1 - δ) := by
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+    _ ≤ ∑' x, Pr[= x | gen] * Pr[= a | f x] := by
         refine ENNReal.tsum_le_tsum fun x => ?_
         by_cases hx : x ∈ support gen
         · gcongr; exact h x hx
         · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (1 - δ) * ∑' x, Pr[= x | gen] := by
-        simp_rw [mul_comm]; exact ENNReal.tsum_mul_left
-    _ = 1 - δ := by
-        rw [tsum_probOutput_of_liftM_PMF, mul_one]
+
+@[deprecated (since := "2026-06-25")]
+alias probOutput_bind_ge_of_forall_support := le_probOutput_bind_of_forall_support
 
 end correctness
 
@@ -146,6 +150,12 @@ section unforgeable
 variable {ι : Type u} {spec : OracleSpec ι} {M PK SK S : Type}
   [DecidableEq M] [DecidableEq S]
 
+/-- An EUF-CMA (existential unforgeability under chosen-message attack) adversary for
+`sigAlg`. Given the public key, it runs in the oracle family `spec + (M →ₒ S)` — the
+scheme's ambient oracles together with a signing oracle — and outputs a candidate forgery
+`(message, signature)`.
+
+The `_sigAlg` parameter indexes the adversary by a specific scheme's types but is not stored. -/
 structure unforgeableAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
   main (pk : PK) : OracleComp (spec + (M →ₒ S)) (M × S)
 
@@ -154,8 +164,7 @@ the adversary successfully forged a signature. The ambient oracle family is forw
 the signing oracle is logged, and the final check requires both signature validity and that the
 forged message was never submitted to the signing oracle. -/
 noncomputable def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (runtime : ProbCompRuntime (OracleComp spec))
-    (adv : unforgeableAdv sigAlg) : SPMF Bool :=
+    (runtime : ProbCompRuntime (OracleComp spec)) (adv : unforgeableAdv sigAlg) : SPMF Bool :=
   letI : DecidableEq M := Classical.decEq M
   letI : DecidableEq S := Classical.decEq S
   runtime.evalDist do
@@ -172,8 +181,7 @@ noncomputable def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK S
     return !log.wasQueried msg && verified
 
 /-- The success probability of a CMA adversary in the unforgeability experiment. -/
-noncomputable def unforgeableAdv.advantage
-    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+noncomputable def unforgeableAdv.advantage {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := Pr[= true | unforgeableExp runtime adv]
 
@@ -185,10 +193,8 @@ Without the freshness check, an adversary trivially wins by replaying any receiv
 signature; the bound `adv.advantage ≤ Pr[unforgeableExpNoFresh ⇒ true]` (see
 `unforgeableAdv.advantage_le_unforgeableExpNoFresh`) is the first game-hop
 in standard CMA-to-NMA reductions. -/
-noncomputable def unforgeableExpNoFresh
-    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (runtime : ProbCompRuntime (OracleComp spec))
-    (adv : unforgeableAdv sigAlg) : SPMF Bool :=
+noncomputable def unforgeableExpNoFresh {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (runtime : ProbCompRuntime (OracleComp spec)) (adv : unforgeableAdv sigAlg) : SPMF Bool :=
   letI : DecidableEq M := Classical.decEq M
   letI : DecidableEq S := Classical.decEq S
   runtime.evalDist do
@@ -222,8 +228,6 @@ lemma unforgeableAdv.advantage_le_unforgeableExpNoFresh
   letI : DecidableEq M := Classical.decEq M
   letI : DecidableEq S := Classical.decEq S
   unfold unforgeableAdv.advantage unforgeableExp unforgeableExpNoFresh
-  -- Express both as `runtime.evalDist (joint >>= pure ∘ <combiner>)` so that `h_pull`
-  -- pulls the runtime past the final return on both sides.
   set joint : OracleComp spec (M × QueryLog (M →ₒ S) × Bool) := do
     let (pk, sk) ← sigAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ S))
@@ -270,8 +274,7 @@ lemma unforgeableAdv.advantage_le_unforgeableExpNoFresh
     simp only [hjoint_def, monad_norm]
   rw [hExp, hNoFresh, ← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
     probEvent_map, probEvent_map]
-  refine probEvent_mono fun _ _ hv => ?_
-  exact ((Bool.and_eq_true _ _).mp hv).2
+  exact probEvent_mono fun _ _ => Bool.and_elim_right
 
 end unforgeable
 
@@ -291,16 +294,14 @@ structure eufNmaAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
 /-- The EUF-NMA experiment: generate a key pair, give the public key to the adversary
 (with no signing oracle), and check whether the adversary produced a valid forgery. -/
 def eufNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (runtime : ProbCompRuntime (OracleComp spec))
-    (adv : eufNmaAdv sigAlg) : SPMF Bool :=
+    (runtime : ProbCompRuntime (OracleComp spec)) (adv : eufNmaAdv sigAlg) : SPMF Bool :=
   runtime.evalDist do
     let (pk, _) ← sigAlg.keygen
     let (msg, σ) ← adv.main pk
     sigAlg.verify pk msg σ
 
 /-- The success probability of an EUF-NMA adversary. -/
-noncomputable def eufNmaAdv.advantage
-    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+noncomputable def eufNmaAdv.advantage {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adv : eufNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | eufNmaExp runtime adv]
 
@@ -326,28 +327,23 @@ structure managedRoNmaAdv (sigAlg : SignatureAlg (OracleComp spec) M PK SK S) wh
 and a `QueryCache`, then verify the forgery through `withCacheOverlay` so that programmed
 entries take priority over the real oracle. -/
 def managedRoNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (runtime : ProbCompRuntime (OracleComp spec))
-    (adv : managedRoNmaAdv sigAlg) : SPMF Bool :=
+    (runtime : ProbCompRuntime (OracleComp spec)) (adv : managedRoNmaAdv sigAlg) : SPMF Bool :=
   runtime.evalDist do
     let (pk, _) ← sigAlg.keygen
-    let result : (M × S) × spec.QueryCache ← adv.main pk
-    withCacheOverlay result.2 (sigAlg.verify pk result.1.1 result.1.2)
+    let ((msg, σ), cache) ← adv.main pk
+    withCacheOverlay cache (sigAlg.verify pk msg σ)
 
 /-- The success probability of a managed-RO NMA adversary. -/
-noncomputable def managedRoNmaAdv.advantage
-    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+noncomputable def managedRoNmaAdv.advantage {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
-    (adv : managedRoNmaAdv sigAlg) : ℝ≥0∞ :=
-  Pr[= true | managedRoNmaExp runtime adv]
+    (adv : managedRoNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | managedRoNmaExp runtime adv]
 
 /-- Embed a standard NMA adversary as a managed-RO NMA adversary with an empty cache.
 The empty cache means all queries fall through to the real oracle, recovering the
 standard NMA experiment. -/
 def eufNmaAdv.toManagedRoNmaAdv {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (adv : eufNmaAdv sigAlg) : managedRoNmaAdv sigAlg where
-  main pk := do
-    let forgery ← adv.main pk
-    return (forgery, ∅)
+  main pk := (·, ∅) <$> adv.main pk
 
 end managedRoNma
 

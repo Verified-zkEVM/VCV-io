@@ -32,7 +32,6 @@ omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m] in
 @[simp]
 lemma probOutput_xor_map {n : ℕ} (mx : m (BitVec n)) (x y : BitVec n) :
     Pr[= y | (x ^^^ ·) <$> mx] = Pr[= x ^^^ y | mx] := by
-  have hinj : Function.Injective (x ^^^ ·) := fun a b h => by
-    have := congrArg (x ^^^ ·) h; simp only [xor_self_xor] at this; exact this
+  have hinj : Function.Injective (x ^^^ ·) := fun a b h => by simpa using congrArg (x ^^^ ·) h
   conv_lhs => rw [show y = x ^^^ (x ^^^ y) by simp]
   exact probOutput_map_injective mx hinj (x ^^^ y)

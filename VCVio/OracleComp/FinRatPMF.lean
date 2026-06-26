@@ -39,33 +39,10 @@ noncomputable local instance instIsUniformSpec : IsUniformSpec spec :=
 @[simp] lemma toPMF_apply (t : spec.Domain) :
     @Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t) =
       PMF.uniformOfFintype (spec.Range t) := by
-  classical
-  ext x
-  have hprob :
-      @Raw.prob _ (Classical.decEq _) (Raw.uniform (α := spec.Range t)) x =
-        (Fintype.card (spec.Range t) : ℚ≥0)⁻¹ := by
-    calc
-      @Raw.prob _ (Classical.decEq _) (Raw.uniform (α := spec.Range t)) x
-          = @Raw.prob _ (FinEnum.decEq) (Raw.uniform (α := spec.Range t)) x :=
-              Raw.prob_eq_prob (Classical.decEq _) (FinEnum.decEq)
-                (Raw.uniform (α := spec.Range t)) x
-      _ = (Fintype.card (spec.Range t) : ℚ≥0)⁻¹ := Raw.prob_uniform (α := spec.Range t) x
-  rw [PMF.uniformOfFintype_apply]
-  change (((@Raw.prob _ (Classical.decEq _)
-    (Raw.uniform (α := spec.Range t)) x : NNReal) : ENNReal))
-      = ((Fintype.card (spec.Range t) : ENNReal)⁻¹)
-  calc
-    (((@Raw.prob _ (Classical.decEq _) (Raw.uniform (α := spec.Range t)) x : NNReal) : ENNReal))
-        = (((((Fintype.card (spec.Range t) : ℚ≥0)⁻¹ : ℚ≥0) : NNReal) : ENNReal)) :=
-            congrArg
-              (fun q : ℚ≥0 => ((q : NNReal) : ENNReal))
-              hprob
-    _ = ((Fintype.card (spec.Range t) : ENNReal)⁻¹) := by
-          simp [NNRat.cast_inv]
+  convert Raw.toPMF_uniform (α := spec.Range t) using 2
 
 @[simp] lemma evalDist_apply (t : spec.Domain) :
     𝒟[finRatImpl (spec := spec) t] = liftM (PMF.uniformOfFintype (spec.Range t)) := by
-  rw [evalDist_def]
   change (liftM (@Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t)) : SPMF _) = _
   rw [toPMF_apply]
 
@@ -86,13 +63,8 @@ noncomputable local instance instIsUniformSpec : IsUniformSpec spec :=
   simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
 
 @[simp] lemma support_simulateQ {α : Type v} (oa : OracleComp spec α) :
-    support (simulateQ (finRatImpl (spec := spec)) oa) = support oa := by
-  have hLHS : support (simulateQ (finRatImpl (spec := spec)) oa) =
-      SPMF.support 𝒟[simulateQ (finRatImpl (spec := spec)) oa] :=
-    EvalDistCompatible.support_eq_SPMF_support _
-  have hRHS : support oa = SPMF.support 𝒟[oa] :=
-    EvalDistCompatible.support_eq_SPMF_support _
-  rw [hLHS, evalDist_simulateQ, ← hRHS]
+    support (simulateQ (finRatImpl (spec := spec)) oa) = support oa :=
+  Set.ext fun x => mem_support_iff_of_evalDist_eq (evalDist_simulateQ (spec := spec) oa) x
 
 @[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
     (oa : OracleComp spec α) :
@@ -101,8 +73,6 @@ noncomputable local instance instIsUniformSpec : IsUniformSpec spec :=
   rw [coe_finSupport, coe_finSupport, support_simulateQ]
 
 end finRatImpl
-
-/-! ## Demo -/
 
 namespace Demo
 
@@ -125,19 +95,19 @@ instance : (t : coinSpec.Domain) → FinEnum (coinSpec.Range t) := by
   infer_instance
 
 def xorTwoCoins : FinRatPMF.Raw Bool := do
-  let b1 <- FinRatPMF.Raw.coin
-  let b2 <- FinRatPMF.Raw.coin
+  let b1 ← FinRatPMF.Raw.coin
+  let b2 ← FinRatPMF.Raw.coin
   pure (b1 != b2)
 
 def threeCoinCount : FinRatPMF.Raw Nat := do
-  let b1 <- FinRatPMF.Raw.coin
-  let b2 <- FinRatPMF.Raw.coin
-  let b3 <- FinRatPMF.Raw.coin
+  let b1 ← FinRatPMF.Raw.coin
+  let b2 ← FinRatPMF.Raw.coin
+  let b3 ← FinRatPMF.Raw.coin
   pure (cond b1 1 0 + cond b2 1 0 + cond b3 1 0)
 
 def twoCoinQueries : OracleComp coinSpec Nat := do
-  let b1 <- OracleComp.coin
-  let b2 <- OracleComp.coin
+  let b1 ← OracleComp.coin
+  let b2 ← OracleComp.coin
   pure (cond b1 1 0 + cond b2 1 0)
 
 /-

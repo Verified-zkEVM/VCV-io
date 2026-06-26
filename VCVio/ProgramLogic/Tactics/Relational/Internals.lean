@@ -1075,8 +1075,7 @@ def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext
   let target ← instantiateMVars (← getMainTarget)
   if ← tryCloseRelGoalAtCoreGateway then
     return true
-  if let some (pre, oa, ob, _) := stdDoRelTripleGoalParts? target then
-    let _ := pre
+  if let some (_pre, oa, ob, _) := stdDoRelTripleGoalParts? target then
     let oa ← whnfReducible (← instantiateMVars oa)
     let ob ← whnfReducible (← instantiateMVars ob)
     if ← runERelPureRule then

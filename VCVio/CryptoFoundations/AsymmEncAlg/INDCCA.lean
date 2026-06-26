@@ -26,14 +26,10 @@ namespace AsymmEncAlg
 variable {m : Type → Type v} [Monad m] {M PK SK C : Type}
   (encAlg : AsymmEncAlg m M PK SK C)
 
-section decryptionOracle
-
 /-- Oracle that uses a secret key to respond to decryption requests.
 Invalid ciphertexts become oracle failure in `OptionT`. -/
 def decryptionOracle (sk : SK) : QueryImpl (C →ₒ M) (OptionT m) :=
   fun c => OptionT.mk (encAlg.decrypt sk c)
-
-end decryptionOracle
 
 section IND_CCA
 

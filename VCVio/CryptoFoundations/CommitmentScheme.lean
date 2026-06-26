@@ -3,9 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.Constructions.SampleableType
+import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.ProbComp
 
 /-!
 # Commitment Schemes
@@ -17,7 +17,8 @@ properties: correctness, hiding, and binding.
 
 - `CommitmentScheme PP M C D` — a commitment scheme with public parameters `PP`,
   message space `M`, commitment space `C`, and opening (decommitment) space `D`.
-- `CommitmentScheme.PerfectlyCorrect` — honestly generated parameters and commitments always verify.
+- `CommitmentScheme.PerfectlyCorrect` — honestly generated parameters and commitments always
+  verify.
 - `CommitmentScheme.PerfectlyHiding` — under honestly generated parameters, commitment
   distribution is independent of the message.
 - `CommitmentScheme.hidingExp` — computational hiding experiment (IND-style).
@@ -25,7 +26,6 @@ properties: correctness, hiding, and binding.
 - `TrapdoorExtractor PP TD C M` — trapdoor-based message extraction algorithm.
 - `CommitmentScheme.extractExp` — extraction experiment (game-based, allows error).
 -/
-
 
 open OracleComp OracleSpec ENNReal
 
@@ -69,8 +69,7 @@ structure HidingAdv (PP M C : Type) where
 
 /-- Hiding experiment: the adversary chooses two messages, the challenger commits
 to one at random, and the adversary tries to guess which. -/
-def hidingExp (cs : CommitmentScheme PP M C D) (adversary : HidingAdv PP M C) :
-    ProbComp Bool := do
+def hidingExp (cs : CommitmentScheme PP M C D) (adversary : HidingAdv PP M C) : ProbComp Bool := do
   let pp ← cs.setup
   let (m₁, m₂, st) ← adversary.chooseMessages pp
   let b ← $ᵗ Bool
@@ -78,8 +77,10 @@ def hidingExp (cs : CommitmentScheme PP M C D) (adversary : HidingAdv PP M C) :
   let b' ← adversary.distinguish st c
   return (b == b')
 
-noncomputable def hidingAdvantage (cs : CommitmentScheme PP M C D)
-    (adversary : HidingAdv PP M C) : ℝ :=
+/-- The hiding advantage of an adversary: how far its winning probability in `hidingExp`
+deviates from the `1 / 2` of a random guess. -/
+noncomputable def hidingAdvantage (cs : CommitmentScheme PP M C D) (adversary : HidingAdv PP M C) :
+    ℝ :=
   |(Pr[= true | cs.hidingExp adversary]).toReal - 1 / 2|
 
 /-! ### Computational binding -/
@@ -89,12 +90,14 @@ def BindingAdv (PP M C D : Type) := PP → ProbComp (C × M × D × M × D)
 
 /-- Binding experiment: the adversary tries to open a single commitment to two
 distinct messages. Succeeds iff both openings verify and the messages differ. -/
-def bindingExp [DecidableEq M] (cs : CommitmentScheme PP M C D)
-    (adversary : BindingAdv PP M C D) : ProbComp Bool := do
+def bindingExp [DecidableEq M] (cs : CommitmentScheme PP M C D) (adversary : BindingAdv PP M C D) :
+    ProbComp Bool := do
   let pp ← cs.setup
   let (c, m₁, d₁, m₂, d₂) ← adversary pp
   return (decide (m₁ ≠ m₂) && cs.verify pp m₁ c d₁ && cs.verify pp m₂ c d₂)
 
+/-- The binding advantage of an adversary: its probability of winning `bindingExp` by
+opening a single commitment to two distinct messages. -/
 noncomputable def bindingAdvantage [DecidableEq M] (cs : CommitmentScheme PP M C D)
     (adversary : BindingAdv PP M C D) : ℝ≥0∞ :=
   Pr[= true | cs.bindingExp adversary]
@@ -115,8 +118,7 @@ structure TrapdoorExtractor (PP TD C M : Type) where
 /-- The extraction setup produces the same public parameter distribution as
 the scheme's normal setup. Required for reductions that swap in the
 trapdoor setup without the adversary noticing. -/
-def TrapdoorExtractor.SetupConsistent {TD : Type}
-    (extractor : TrapdoorExtractor PP TD C M)
+def TrapdoorExtractor.SetupConsistent {TD : Type} (extractor : TrapdoorExtractor PP TD C M)
     (cs : CommitmentScheme PP M C D) : Prop :=
   𝒟[Prod.fst <$> extractor.setupExtract] = 𝒟[cs.setup]
 
@@ -126,9 +128,8 @@ to message `m`, then check whether the extractor recovers `m` from the commitmen
 Downstream code decides how much error to tolerate:
 - Perfect extraction: `∀ m, Pr[= true | extractExp cs ext m] = 1`
 - Computational: bound `1 - Pr[= true | extractExp cs ext m]` -/
-def extractExp [DecidableEq M] (cs : CommitmentScheme PP M C D)
-    {TD : Type} (extractor : TrapdoorExtractor PP TD C M)
-    (m : M) : ProbComp Bool := do
+def extractExp [DecidableEq M] (cs : CommitmentScheme PP M C D) {TD : Type}
+    (extractor : TrapdoorExtractor PP TD C M) (m : M) : ProbComp Bool := do
   let (pp, td) ← extractor.setupExtract
   let (c, _) ← cs.commit pp m
   let m' ← extractor.extract td c

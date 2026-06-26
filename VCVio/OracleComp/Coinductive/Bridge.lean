@@ -13,9 +13,8 @@ import PolyFun.ITree.Basic
 same polynomial functor. Every finite, terminating `OracleComp` program has
 a canonical embedding into the (potentially-infinite) ITree world.
 
-This module provides that embedding, `OracleComp.toITree`, together with a
-small handful of structural simp lemmas (`toITree_pure`, `toITree_queryBind`,
-`toITree_bind`).
+This module provides that embedding, `OracleComp.toITree`, together with the
+structural simp lemmas (`toITree_pure`, `toITree_queryBind`) that compute it.
 
 The reverse map "ITree-to-OracleComp" exists *only* on terminating ITrees
 and requires productivity / well-foundedness arguments that are not yet
