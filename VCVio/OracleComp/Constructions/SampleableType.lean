@@ -285,11 +285,12 @@ instance {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
   | .inr t => h' t
 
 /-- Select a uniform element from `α × β` by independently selecting from `α` and `β`. -/
-instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
+instance (α β : Type)
     [SampleableType α] [SampleableType β] : SampleableType (α × β) where
   selectElem := (·, ·) <$> ($ᵗ α) <*> ($ᵗ β)
   mem_support_selectElem x := by simp
-  probOutput_selectElem_eq x y := by simp
+  probOutput_selectElem_eq x y := by
+    simp only [probOutput_seq_map_prod_mk_eq_mul]; grind
 
 /-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
 @[reducible] def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) :
