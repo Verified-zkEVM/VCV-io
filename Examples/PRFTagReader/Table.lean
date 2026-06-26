@@ -439,25 +439,6 @@ lemma evalDist_idealCacheMapM_bind_uniformTable {D : Type} [DecidableEq D] [Fini
     refine congrArg (fun h => 𝒟[idealCacheStep c d] >>= h) ?_
     exact funext fun r => ih r.2
 
-/-- Two probabilistic samples may be drawn in either order: the output distribution of drawing
-`mx` then `my` and combining is the same as drawing `my` then `mx`. Proven at the distribution
-level by `tsum` rearrangement; the underlying monads need not be commutative as terms. -/
-lemma evalDist_probComp_bind_comm {α₁ α₂ β : Type}
-    (mx : ProbComp α₁) (my : ProbComp α₂) (F : α₁ → α₂ → ProbComp β) :
-    𝒟[mx >>= fun a => my >>= fun b => F a b] =
-      𝒟[my >>= fun b => mx >>= fun a => F a b] := by
-  refine evalDist_ext fun y => ?_
-  rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-  have hL : ∀ a, Pr[= a | mx] * Pr[= y | my >>= fun b => F a b] =
-      ∑' b, Pr[= a | mx] * (Pr[= b | my] * Pr[= y | F a b]) := fun a => by
-    rw [probOutput_bind_eq_tsum, ENNReal.tsum_mul_left]
-  have hR : ∀ b, Pr[= b | my] * Pr[= y | mx >>= fun a => F a b] =
-      ∑' a, Pr[= b | my] * (Pr[= a | mx] * Pr[= y | F a b]) := fun b => by
-    rw [probOutput_bind_eq_tsum, ENNReal.tsum_mul_left]
-  rw [tsum_congr hL, tsum_congr hR, ENNReal.tsum_comm]
-  refine tsum_congr fun b => tsum_congr fun a => ?_
-  ring
-
 omit [DecidableEq Digest] in
 /-- Computation-valued form of `evalDist_idealCacheStep_bind_uniformTable`: the continuation `Mψ`
 returns a probabilistic computation rather than a pure value. -/
@@ -621,7 +602,7 @@ lemma evalDist_simulateQ_multipleIdealQueryImpl_run'_eq_tableExtending
           rw [bind_assoc]; refine bind_congr fun n => ?_
           rw [pure_bind]
         refine Eq.trans ?_ (congrArg evalDist hrhs_swap).symm
-        rw [evalDist_probComp_bind_comm ($ᵗ (TagId × Nonce → Digest)) ($ᵗ Nonce)]
+        rw [evalDist_bind_bind_swap ($ᵗ (TagId × Nonce → Digest)) ($ᵗ Nonce)]
         refine evalDist_bind_congr_of_support _ _ _ fun n _ => ?_
         exact hlhs_inner n
       · -- tag query, slot exhausted
@@ -874,7 +855,7 @@ lemma evalDist_simulateQ_singleIdealQueryImpl_run'_eq_tableExtending
           rw [bind_assoc]; refine bind_congr fun n => ?_
           rw [pure_bind]
         refine Eq.trans ?_ (congrArg evalDist hrhs_swap).symm
-        rw [evalDist_probComp_bind_comm ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest))
+        rw [evalDist_bind_bind_swap ($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest))
           ($ᵗ Nonce)]
         refine evalDist_bind_congr_of_support _ _ _ fun n _ => ?_
         exact hlhs_inner n

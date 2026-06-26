@@ -263,6 +263,87 @@ lemma tvDist_bind_left_le
             rfl
           rw [h1, h2]
 
+/-! ### TV distance for bind with a constant bound -/
+
+/-- Total-variation distance is convex over a shared `bind`: if `tvDist (f a) (g a) ≤ c` for every
+`a ∈ support mx`, then `tvDist (mx >>= f) (mx >>= g) ≤ c`. The real-valued root of the `const`
+bound, with `ℝ≥0∞` companion `ofReal_tvDist_bind_left_le_const`. -/
+theorem tvDist_bind_left_le_const
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
+    {α β : Type u} (mx : m α) (f g : α → m β) (c : ℝ)
+    (hfg : ∀ a, a ∈ support mx → tvDist (f a) (g a) ≤ c) :
+    tvDist (mx >>= f) (mx >>= g) ≤ c := by
+  classical
+  have hprob_ne_top : ∀ a : α, Pr[= a | mx] ≠ ⊤ := fun a =>
+    ne_top_of_le_ne_top one_ne_top (probOutput_le_one (mx := mx) (x := a))
+  have hp_sum_ne_top : (∑' a : α, Pr[= a | mx]) ≠ ⊤ := by
+    rw [tsum_probOutput_of_liftM_PMF]; exact one_ne_top
+  have hp_summable : Summable (fun a : α => Pr[= a | mx].toReal) :=
+    ENNReal.summable_toReal hp_sum_ne_top
+  have hp_sum_toReal : (∑' a : α, Pr[= a | mx].toReal) = 1 := by
+    rw [← ENNReal.tsum_toReal_eq hprob_ne_top, tsum_probOutput_of_liftM_PMF, ENNReal.toReal_one]
+  have hlhs_nonneg : ∀ a : α, 0 ≤ Pr[= a | mx].toReal * tvDist (f a) (g a) :=
+    fun _ => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
+  have hlhs_le_p : ∀ a : α,
+      Pr[= a | mx].toReal * tvDist (f a) (g a) ≤ Pr[= a | mx].toReal :=
+    fun _ => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)
+  have hlhs_summable :
+      Summable (fun a : α => Pr[= a | mx].toReal * tvDist (f a) (g a)) :=
+    Summable.of_nonneg_of_le hlhs_nonneg hlhs_le_p hp_summable
+  have hrhs_summable : Summable (fun a : α => Pr[= a | mx].toReal * c) :=
+    Summable.mul_right _ hp_summable
+  refine (tvDist_bind_left_le mx f g).trans ?_
+  calc
+    (∑' a : α, Pr[= a | mx].toReal * tvDist (f a) (g a))
+        ≤ ∑' a : α, Pr[= a | mx].toReal * c :=
+          Summable.tsum_le_tsum
+            (fun a => by
+              by_cases ha : a ∈ support mx
+              · exact mul_le_mul_of_nonneg_left (hfg a ha) ENNReal.toReal_nonneg
+              · rw [probOutput_eq_zero_of_not_mem_support ha]; simp)
+            hlhs_summable hrhs_summable
+    _ = (∑' a : α, Pr[= a | mx].toReal) * c := Summable.tsum_mul_right _ hp_summable
+    _ = c := by rw [hp_sum_toReal, one_mul]
+
+/-- Unrestricted companion of `tvDist_bind_left_le_const`: a uniform per-`a` bound
+`tvDist (f a) (g a) ≤ c` lifts through the shared `mx` bind. -/
+theorem tvDist_bind_left_le_const'
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
+    {α β : Type u} (mx : m α) (f g : α → m β) (c : ℝ)
+    (hfg : ∀ a, tvDist (f a) (g a) ≤ c) :
+    tvDist (mx >>= f) (mx >>= g) ≤ c :=
+  tvDist_bind_left_le_const mx f g c fun a _ => hfg a
+
+/-- `ℝ≥0∞` form of `tvDist_bind_left_le_const`, matching the quantitative APIs: a per-`a` bound
+`ENNReal.ofReal (tvDist (f a) (g a)) ≤ ε` on the support of `mx` lifts through the shared bind. -/
+theorem ofReal_tvDist_bind_left_le_const
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
+    {α β : Type u}
+    (mx : m α) (f g : α → m β) (ε : ℝ≥0∞)
+    (hfg : ∀ a, a ∈ support mx → ENNReal.ofReal (tvDist (f a) (g a)) ≤ ε) :
+    ENNReal.ofReal (tvDist (mx >>= f) (mx >>= g)) ≤ ε := by
+  classical
+  by_cases htop : ε = (⊤ : ℝ≥0∞)
+  · simp [htop]
+  · have hreal : tvDist (mx >>= f) (mx >>= g) ≤ ε.toReal :=
+      tvDist_bind_left_le_const mx f g ε.toReal
+        (fun a ha => (ENNReal.ofReal_le_iff_le_toReal htop).mp (hfg a ha))
+    rw [← ENNReal.ofReal_toReal htop]
+    exact ENNReal.ofReal_le_ofReal hreal
+
+/-- Unrestricted companion of `ofReal_tvDist_bind_left_le_const`. -/
+theorem ofReal_tvDist_bind_left_le_const'
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
+    {α β : Type u}
+    (mx : m α) (f g : α → m β) (ε : ℝ≥0∞)
+    (hfg : ∀ a, ENNReal.ofReal (tvDist (f a) (g a)) ≤ ε) :
+    ENNReal.ofReal (tvDist (mx >>= f) (mx >>= g)) ≤ ε :=
+  ofReal_tvDist_bind_left_le_const mx f g ε fun a _ => hfg a
+
 /-! ### TV distance for bind with a bad event -/
 
 /-- Bound the weighted TV sum from `tvDist_bind_left_le` by the probability of a bad event
