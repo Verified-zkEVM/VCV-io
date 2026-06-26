@@ -36,8 +36,7 @@ variable {α : Type}
 /-- `singleHash` makes exactly one oracle query, hence has total query bound `1`. -/
 lemma singleHash_isTotalQueryBound (left right : α) :
     IsTotalQueryBound (singleHash (m := OracleComp (spec α)) left right) 1 := by
-  simp only [singleHash, HasQuery.instOfMonadLift_query]
-  rw [isTotalQueryBound_query_bind_iff]
+  simp only [singleHash, HasQuery.instOfMonadLift_query, isTotalQueryBound_query_bind_iff]
   exact ⟨Nat.zero_lt_one, fun _ => trivial⟩
 
 /-- `getPutativeRoot` makes one oracle query per level of `idx`, so it has total query
@@ -51,18 +50,9 @@ lemma getPutativeRoot_isTotalQueryBound {s : Skeleton}
   | ofLeaf =>
       simp only [getPutativeRoot, SkeletonLeafIndex.depth]
       trivial
-  | ofLeft idxLeft ih =>
+  | ofLeft idxLeft ih | ofRight idxRight ih =>
       simp only [getPutativeRoot, SkeletonLeafIndex.depth]
-      refine isTotalQueryBound_bind (n₁ := idxLeft.depth) (n₂ := 1) ?_ ?_
-      · exact ih proof.tail
-      · intro h
-        exact singleHash_isTotalQueryBound h proof.head
-  | ofRight idxRight ih =>
-      simp only [getPutativeRoot, SkeletonLeafIndex.depth]
-      refine isTotalQueryBound_bind (n₁ := idxRight.depth) (n₂ := 1) ?_ ?_
-      · exact ih proof.tail
-      · intro h
-        exact singleHash_isTotalQueryBound proof.head h
+      exact isTotalQueryBound_bind (ih proof.tail) fun h => singleHash_isTotalQueryBound _ _
 
 /-- `verifyProof` makes the same `idx.depth` queries as `getPutativeRoot`; the
 trailing equality test is pure. -/
@@ -74,9 +64,8 @@ lemma verifyProof_isTotalQueryBound
       (verifyProof (m := OracleComp (spec α)) idx leafValue rootValue proof)
       idx.depth := by
   unfold verifyProof
-  refine isTotalQueryBound_bind (n₁ := idx.depth) (n₂ := 0) ?_ ?_
-  · exact getPutativeRoot_isTotalQueryBound idx leafValue proof
-  · intro _; trivial
+  exact isTotalQueryBound_bind (n₂ := 0)
+    (getPutativeRoot_isTotalQueryBound idx leafValue proof) fun _ => trivial
 
 /-- Coarser form of `verifyProof_isTotalQueryBound` bounded by the full skeleton
 depth `s.depth` rather than the per-leaf `idx.depth`. Useful when the bound must be
@@ -88,7 +77,6 @@ lemma verifyProof_isTotalQueryBound_skeleton_depth
     IsTotalQueryBound
       (verifyProof (m := OracleComp (spec α)) idx leafValue rootValue proof)
       s.depth :=
-  (verifyProof_isTotalQueryBound idx leafValue rootValue proof).mono
-    idx.depth_le_skeleton_depth
+  (verifyProof_isTotalQueryBound idx leafValue rootValue proof).mono idx.depth_le_skeleton_depth
 
 end InductiveMerkleTree
