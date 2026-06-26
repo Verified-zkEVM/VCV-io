@@ -116,6 +116,44 @@ Available for: `Bool`, `Fin n` (for `[NeZero n]`), `ZMod n`, `BitVec n`, `α × 
 7. **Two computations have same distribution?**
    → Show `evalDist oa = evalDist ob`, or use `relTriple_eqRel_of_evalDist_eq`
 
+## `grind` vs `simp` on Probability Goals
+
+`grind` and `simp` have complementary strengths here, and reaching for the wrong one is the most
+common way to get a `grind` that hangs.
+
+**Use `simp` to compute a concrete probability or factor structure.** `simp` evaluates
+`Pr[= x | $ᵗ T]`, `Pr[p | $ᵗ T]`, products of uniform draws, etc.; `grind` is not an `ℝ≥0∞`/`Fintype.card`
+arithmetic engine and will not finish these (it fails fast).
+
+**Use `grind` for symbolic / membership / directed-iff goals.** Equiprobability
+(`Pr[= x | $ᵗ T] = Pr[= y | $ᵗ T]`), `x ∈ support (…)`, `Pr[= x | mx] = 0 ↔ x ∉ support mx`, and
+similar are squarely in `grind`'s wheelhouse.
+
+**Why some characterization lemmas are `@[simp]` but not `@[grind]`.** A characterization whose RHS
+introduces an *unbounded* quantifier or set over the support —
+`Pr[…] = 0/1 ↔ ∃/∀ x ∈ support …`, `support = {x}`, `support = ∅` — is a `grind` **saturation
+hazard**: as `grind` case-splits the iff it instantiates and Skolemizes the support quantifier into
+fresh witnesses that re-trigger each other, with no finite grounding (`support ($ᵗ α) = Set.univ` is
+infinite). Such lemmas are kept `@[simp]` (fixed orientation, no case-split — safe) and **dropped from
+the default `grind` set**. The *directed single-variable* membership bridges
+(`probOutput_eq_zero_iff : … ↔ x ∉ support`, `probOutput_pos_iff`, `mem_finSupport_iff`,
+`mem_finSupport_iff_mem_support`) are confluent and stay `@[grind =]`.
+
+Lemmas that are `@[simp]`-only by this rule (in `EvalDist/Defs/Basic.lean` unless noted):
+`probEvent_eq_zero_iff(')`, `probEvent_ne_zero_iff(')`, `probEvent_pos_iff(')`,
+`probEvent_eq_one_iff(')`, `one_eq_probEvent_iff(')`, `probOutput_eq_one_iff(')`,
+`one_eq_probOutput_iff`, `probFailure_eq_one_iff`; and in `EvalDist/Monad/Basic.lean`,
+`probFailure_bind_eq_zero_iff` (`@[simp]`), `mem_support_bind_iff` / `mem_finSupport_bind_iff`
+(untagged — `support_bind` / `finSupport_bind` are the `simp` forms).
+
+**If a `grind` proof needs one of these, re-supply it locally:** `grind [probEvent_eq_zero_iff]`. This
+keeps the bridge out of the default set (so naive `grind` on a probability goal fails fast instead of
+hanging) while letting the proof that genuinely needs it opt in.
+
+`VCVioTest/ProbabilityTactics.lean` is the living benchmark for this: a curated corpus of
+high-school-probability facts, each closed by the weakest of `simp` / `grind` / `simp; grind`, with
+`target(grind)` markers where `grind` is not yet enough.
+
 ## Common Mistakes
 
 1. **Missing probability spec classes**: on `OracleComp spec`, `evalDist`/`probOutput`/`Pr[...]` require `[IsProbabilitySpec spec]`. Uniform/cardinality lemmas and support-probability lemmas require `[IsUniformSpec spec]`, not just `[spec.Fintype] [spec.Inhabited]`. Use `IsUniformSpec.ofFintypeInhabited spec` when a concrete finite inhabited spec should use uniform sampling.

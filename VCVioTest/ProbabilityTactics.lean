@@ -35,10 +35,10 @@ namespace VCVioTest.ProbabilityTactics
 A fair coin and a fair die: every outcome of a uniform draw over an `n`-element type has
 probability `1 / n`.
 
-target(grind): `grind` does not currently solve these — computing a concrete uniform probability
-forces it through `probOutput → support → card`, which pulls in the `∃/∀ x ∈ support` /
-`support = {x}` characterizations and saturates (it times out even on `Bool`). `simp` closes them
-outright. -/
+target(grind): `grind` does not solve these — computing a concrete probability needs the
+`Fintype.card`/`ℝ≥0∞` arithmetic that `grind` does not do. It now *fails fast* (the
+support-quantifier characterizations were made `simp`-only; previously they made `grind` saturate
+and time out even on `Bool`). `simp` closes them outright. -/
 
 example : Pr[= true | $ᵗ Bool] = 2⁻¹ := by simp
 
@@ -77,8 +77,8 @@ example (x : Bool) : support (pure x : ProbComp Bool) = {x} := by grind
 `Pr[¬p] = 1 - Pr[p]` for a non-failing computation, and the probability of a union of disjoint
 outcomes adds up.
 
-target(grind): as with the single-draw section, `grind` saturates on a concrete event probability;
-`simp` evaluates the count. -/
+target(grind): as with the single-draw section, `grind` fails fast on a concrete event probability
+(it lacks the count/arithmetic); `simp` evaluates it. -/
 
 example : Pr[fun b => b ≠ true | $ᵗ Bool] = 2⁻¹ := by simp
 
@@ -124,9 +124,10 @@ example (mx : ProbComp Bool) (f : Bool → Fin 6) (q : Fin 6 → Prop) :
 
 /-! ## Abstract carriers
 
-The same facts over an arbitrary `SampleableType` carrier. Here the support is infinite, so the
-`∃/∀ x ∈ support` characterizations have nothing to ground on and `grind` cannot brute-force the
-distribution; the idiom is to `simp` the structure away first, then let `grind` finish. -/
+The same facts over an arbitrary `SampleableType` carrier. `grind` cannot factor the applicative
+product `(·, ·) <$> _ <*> _` (the second factor sits under `Seq.seq`'s `Unit → _` thunk, which its
+pattern matcher cannot index), and the bind/`tsum` expansion over an infinite carrier does not
+terminate; the idiom is to `simp` the structure away first, then let `grind` finish. -/
 
 section abstract
 variable (α β : Type) [SampleableType α] [SampleableType β]
