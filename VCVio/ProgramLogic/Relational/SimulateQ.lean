@@ -95,6 +95,33 @@ theorem relTriple_simulateQ_run'
     exact hp.1
   exact relTriple_map h_weak
 
+/-- `probEvent` monotonicity between two relational `simulateQ` runs. Simulating the same adversary
+`oa` under two `StateT` implementations related per query by `rState` (via
+`relTriple_simulateQ_run`), any event implication that holds along the run postcondition
+`z₁.1 = z₂.1 ∧ rState z₁.2 z₂.2` transports to `Pr[p | run impl₁] ≤ Pr[q | run impl₂]`. The
+`simulateQ` form of `probEvent_le_of_relTriple`; the events range over the full `(output, state)`
+pair, so it covers output events, state events, and their conjunctions over the two
+`(output, state)` spaces (the output type is shared; the state spaces `σ₁`/`σ₂` differ). -/
+theorem probEvent_le_of_relTriple_simulateQ_run
+    {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [IsUniformSpec spec₁] [IsUniformSpec spec₂]
+    {σ₁ σ₂ : Type}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
+    (rState : σ₁ → σ₂ → Prop)
+    (oa : OracleComp spec α)
+    (himpl : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂),
+      rState s₁ s₂ →
+      RelTriple ((impl₁ t).run s₁) ((impl₂ t).run s₂)
+        (fun p₁ p₂ => p₁.1 = p₂.1 ∧ rState p₁.2 p₂.2))
+    (s₁ : σ₁) (s₂ : σ₂) (hs : rState s₁ s₂)
+    {p : α × σ₁ → Prop} {q : α × σ₂ → Prop}
+    (himp : ∀ z₁ z₂, z₁.1 = z₂.1 → rState z₁.2 z₂.2 → p z₁ → q z₂) :
+    Pr[p | (simulateQ impl₁ oa).run s₁] ≤ Pr[q | (simulateQ impl₂ oa).run s₂] :=
+  probEvent_le_of_relTriple
+    (relTriple_simulateQ_run impl₁ impl₂ rState oa himpl s₁ s₂ hs)
+    (fun z₁ z₂ h => himp z₁ z₂ h.1 h.2)
+
 /-- Exact-distribution specialization of `relTriple_simulateQ_run'`.
 
 If corresponding oracle calls have identical full `(output, state)` distributions whenever the

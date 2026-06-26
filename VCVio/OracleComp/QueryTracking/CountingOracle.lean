@@ -238,6 +238,18 @@ lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 
       Pr[= x | oa] := by
   rw [fst_map_run_simulateQ]
 
+@[simp]
+lemma evalDist_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
+    [IsUniformSpec spec₀] {α : Type} (oa : OracleComp spec₀ α) :
+    𝒟[Prod.fst <$> (simulateQ (spec₀.countingOracle) oa).run] = 𝒟[oa] := by
+  rw [fst_map_run_simulateQ]
+
+@[simp]
+lemma support_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
+    [IsUniformSpec spec₀] {α : Type} (oa : OracleComp spec₀ α) :
+    support (Prod.fst <$> (simulateQ (spec₀.countingOracle) oa).run) = support oa := by
+  rw [fst_map_run_simulateQ]
+
 section support
 
 /-- Compatibility helper matching old state-style counting semantics:

@@ -401,6 +401,8 @@ lemma evalDist_apply_eq_zero_iff' [MonadLiftT m SPMF] [MonadLiftT m SetM]
   rw [evalDist_apply_eq_zero_iff]
   grind
 
+/-! ## Pushing probabilities through `ite`, `dite`, and `Eq.rec` -/
+
 section ite
 
 variable (p : Prop) [Decidable p]
@@ -416,6 +418,25 @@ variable (p : Prop) [Decidable p]
 
 @[simp] lemma probEvent_ite [MonadLiftT m SPMF] (mx mx' : m α) (q : α → Prop) :
     Pr[ q | if p then mx else mx'] = if p then Pr[ q | mx] else Pr[ q | mx'] := by aesop
+
+@[simp] lemma evalDist_dite [MonadLiftT m SPMF] (mx : p → m α) (mx' : ¬p → m α) :
+    𝒟[if h : p then mx h else mx' h] = if h : p then 𝒟[mx h] else 𝒟[mx' h] := by
+  split <;> rfl
+
+@[simp] lemma probOutput_dite [MonadLiftT m SPMF] (x : α) (mx : p → m α) (mx' : ¬p → m α) :
+    Pr[= x | if h : p then mx h else mx' h] =
+      if h : p then Pr[= x | mx h] else Pr[= x | mx' h] := by
+  split <;> rfl
+
+@[simp] lemma probFailure_dite [MonadLiftT m SPMF] (mx : p → m α) (mx' : ¬p → m α) :
+    Pr[⊥ | if h : p then mx h else mx' h] =
+      if h : p then Pr[⊥ | mx h] else Pr[⊥ | mx' h] := by
+  split <;> rfl
+
+@[simp] lemma probEvent_dite [MonadLiftT m SPMF] (mx : p → m α) (mx' : ¬p → m α) (q : α → Prop) :
+    Pr[ q | if h : p then mx h else mx' h] =
+      if h : p then Pr[ q | mx h] else Pr[ q | mx' h] := by
+  split <;> rfl
 
 end ite
 
@@ -453,6 +474,8 @@ lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m]
   aesop (rule_sets := [UnfoldEvalDist])
 
 end sums
+
+/-! ## Probability bounds and total-probability sums -/
 
 section bounds
 
@@ -718,6 +741,8 @@ lemma probOutput_eq_inv_finSupport_card_of_liftM_PMF [MonadLiftT m SetM] [EvalDi
   simpa using ENNReal.eq_inv_of_mul_eq_one_left h
 
 end pmf_denotation
+
+/-! ## Monotonicity and complementation for `probEvent` -/
 
 section probEvent_mono_compl
 
