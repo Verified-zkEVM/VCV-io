@@ -639,7 +639,7 @@ lemma evalDist_simulateQ_multipleBadQueryImpl_run_eq_tableExtending
           simp only [bind_assoc, pure_bind]
           exact bind_assoc ..
         refine Eq.trans ?_ (congrArg evalDist hrhs_swap).symm
-        rw [evalDist_probComp_bind_comm ($ᵗ (TagId × Nonce → Digest)) ($ᵗ Nonce)]
+        rw [evalDist_bind_bind_swap ($ᵗ (TagId × Nonce → Digest)) ($ᵗ Nonce)]
         refine evalDist_bind_congr_of_support _ _ _ fun n _ => ?_
         exact hlhs_inner n
       · -- tag query, slot exhausted
