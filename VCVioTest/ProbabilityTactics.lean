@@ -60,6 +60,11 @@ example : Pr[⊥ | $ᵗ Bool] = 0 := by simp
 
 example : Pr[⊥ | $ᵗ (Fin 6)] = 0 := by simp
 
+-- A computation with nonempty support does not fail with probability one. `grind` reasons about
+-- `Pr[⊥] = 1` through the `Set.Nonempty` bridge (`probFailure_ne_one_iff_nonempty`), which it keeps
+-- atomic — so this does not trigger the support-quantifier saturation.
+example (mx : ProbComp Bool) (h : (support mx).Nonempty) : Pr[⊥ | mx] ≠ 1 := by grind
+
 /-! ## Support of basic computations
 
 The support of a uniform draw is everything; the support of a `pure` is a singleton. -/

@@ -714,6 +714,14 @@ lemma probFailure_eq_one_iff [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m 
 lemma probFailure_eq_one [MonadLiftT m SetM] [EvalDistCompatible m]
     {mx : m α} (h : support mx = ∅) : Pr[⊥ | mx] = 1 := (probFailure_eq_one_iff mx).mpr h
 
+/-- `grind`-friendly companion to `probFailure_eq_one_iff`: phrasing "does not fail with probability
+one" via `Set.Nonempty` — which `grind` keeps atomic — avoids the support quantifier that makes the
+`support = ∅` form saturate, so this stays in the default `grind` set. -/
+@[grind =]
+lemma probFailure_ne_one_iff_nonempty [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) :
+    Pr[⊥ | mx] ≠ 1 ↔ (support mx).Nonempty := by
+  simp only [ne_eq, probFailure_eq_one_iff, Set.nonempty_iff_ne_empty]
+
 @[simp, aesop norm]
 lemma probEvent_const (mx : m α) (p : Prop) [Decidable p] :
     Pr[ fun _ => p | mx] = if p then (1 - Pr[⊥ | mx]) else 0 := by

@@ -150,6 +150,13 @@ Lemmas that are `@[simp]`-only by this rule (in `EvalDist/Defs/Basic.lean` unles
 keeps the bridge out of the default set (so naive `grind` on a probability goal fails fast instead of
 hanging) while letting the proof that genuinely needs it opt in.
 
+**`Set.Nonempty`-phrased companions stay in the default `grind` set.** `grind` keeps `Set.Nonempty`
+atomic (it does not unfold it to `∃ x ∈ support`), so a characterization phrased via `Nonempty`
+carries the same information without the saturating quantifier. `probFailure_ne_one_iff_nonempty`
+(`Pr[⊥ | mx] ≠ 1 ↔ (support mx).Nonempty`) is the `grind`-friendly companion to the `simp`-only
+`probFailure_eq_one_iff` (`… ↔ support mx = ∅`); reach for the `Nonempty` form when a `grind` proof
+needs to reason about a computation failing (or not) with probability one.
+
 `VCVioTest/ProbabilityTactics.lean` is the living benchmark for this: a curated corpus of
 high-school-probability facts, each closed by the weakest of `simp` / `grind` / `simp; grind`, with
 `target(grind)` markers where `grind` is not yet enough.
