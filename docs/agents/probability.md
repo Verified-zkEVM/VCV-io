@@ -183,6 +183,16 @@ kept (the mirror), so each tactic stays exercised on that shape; where only one 
 `target(simp)` / `target(grind)` note. A regression in either tactic surfaces there in isolation.
 When adding probability automation, add the corresponding battery rows.
 
+`VCVioTest/MonadProbability.lean` is the **generic-`m`** companion: the same gate over an abstract
+monad `m` with the EvalDist instance stack (`[LawfulMonadLiftT m SPMF]`, …) and over the concrete
+transformers (`OptionT`, `ExceptT`, `SPMF`, `Id`), where the lemmas are actually stated. It surfaces
+facts `ProbComp` masks — chiefly the **failure factor**: over a monad that can fail,
+`Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= y | my]` and `Pr[⊥ | mx <* my]` /
+`Pr[⊥ | mf <*> mx]` are inclusion–exclusion (`Pr[⊥|a] + Pr[⊥|b] - Pr[⊥|a]*Pr[⊥|b]`); both collapse
+to the `ProbComp` forms only because `Pr[⊥] = 0` there. New API filled along the way:
+`probOutput_map` (the `probOutput`/`<$>` companion to `probEvent_map`, `@[grind =]`), `support_guard`,
+and the `orElse` (`<|>`) probability lemmas for `OptionT (OracleComp spec)` (`probFailure_orElse` etc.).
+
 ## Common Mistakes
 
 1. **Missing probability spec classes**: on `OracleComp spec`, `evalDist`/`probOutput`/`Pr[...]` require `[IsProbabilitySpec spec]`. Uniform/cardinality lemmas and support-probability lemmas require `[IsUniformSpec spec]`, not just `[spec.Fintype] [spec.Inhabited]`. Use `IsUniformSpec.ofFintypeInhabited spec` when a concrete finite inhabited spec should use uniform sampling.

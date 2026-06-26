@@ -1,3 +1,4 @@
+import VCVioTest.MonadProbability
 import VCVioTest.ProbabilityTactics
 import VCVioTest.SampleableType
 import VCVioTest.Smoke
