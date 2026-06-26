@@ -152,10 +152,18 @@ hanging) while letting the proof that genuinely needs it opt in.
 
 **`Set.Nonempty`-phrased companions stay in the default `grind` set.** `grind` keeps `Set.Nonempty`
 atomic (it does not unfold it to `∃ x ∈ support`), so a characterization phrased via `Nonempty`
-carries the same information without the saturating quantifier. `probFailure_ne_one_iff_nonempty`
-(`Pr[⊥ | mx] ≠ 1 ↔ (support mx).Nonempty`) is the `grind`-friendly companion to the `simp`-only
+carries the same information without the saturating quantifier. `probFailure_eq_one_iff_not_nonempty`
+(`Pr[⊥ | mx] = 1 ↔ ¬ (support mx).Nonempty`) is the `grind`-friendly companion to the `simp`-only
 `probFailure_eq_one_iff` (`… ↔ support mx = ∅`); reach for the `Nonempty` form when a `grind` proof
 needs to reason about a computation failing (or not) with probability one.
+`support_uniformSample_nonempty` (`(support ($ᵗ α)).Nonempty`, `@[grind]`) closes the loop, letting
+`grind` conclude e.g. `Pr[⊥ | $ᵗ α] ≠ 1` end-to-end.
+
+**`grind` cannot factor an independent product.** `Pr[= z | (·, ·) <$> mx <*> my]` or its `bind`
+spelling does not reduce under `grind`: the second factor `my` is a free variable under a binder
+(`Seq.seq`'s `Unit → _` thunk, or `bind`'s continuation), which `grind`'s pattern compiler cannot
+index — tagging the factorization lemma yields an "invalid pattern" error. Factor with `simp`
+(`probOutput_seq_map_prod_mk_eq_mul` is `@[simp high]`), then hand the resulting goal to `grind`.
 
 `VCVioTest/ProbabilityTactics.lean` is the living benchmark for this: a curated corpus of
 high-school-probability facts, each closed by the weakest of `simp` / `grind` / `simp; grind`, with

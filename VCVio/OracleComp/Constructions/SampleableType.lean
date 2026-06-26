@@ -250,6 +250,16 @@ lemma support_uniformSample : support ($ᵗ α) = Set.univ := by
 
 lemma mem_support_uniformSample {x : α} : x ∈ support ($ᵗ α) := by grind
 
+/-- Uniform sampling never fails, so its support is nonempty (which in turn witnesses `Nonempty α`).
+Tagged `@[grind]` rather than `@[simp]` because `simp` rewrites `support ($ᵗ α)` to `Set.univ`
+first, after which it would need a separate `Nonempty α` fact. -/
+@[grind]
+lemma support_uniformSample_nonempty : (support ($ᵗ α)).Nonempty := by
+  rw [Set.nonempty_iff_ne_empty]
+  intro h
+  rw [← probFailure_eq_one_iff, probFailure_uniformSample] at h
+  exact zero_ne_one h
+
 @[simp, grind =]
 lemma finSupport_uniformSample [Fintype α] [DecidableEq α] :
     finSupport ($ᵗ α) = Finset.univ := by aesop
