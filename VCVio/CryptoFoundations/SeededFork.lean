@@ -345,9 +345,7 @@ theorem probEvent_seededFork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
   refine probEvent_ext fun r hr ↦ ?_
   rcases r with _ | ⟨x₁, x₂⟩
   · simp
-  · obtain ⟨t, h₁, h₂⟩ := cf_eq_of_mem_support_seededFork (main := main) (qb := qb)
-      (js := js) (i := i) (cf := cf) x₁ x₂ (by simpa using hr)
-    simp [h₁, h₂]
+  · grind [cf_eq_of_mem_support_seededFork]
 
 omit [spec.DecidableEq] [DecidableEq ι] in
 private lemma probEvent_uniform_eq_seedSlot_le_inv (s : Fin (qb i + 1))

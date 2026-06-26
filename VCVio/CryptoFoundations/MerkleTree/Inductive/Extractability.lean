@@ -306,13 +306,8 @@ private lemma getPutativeRoot_step_withQueryLog_decompose
       (prog >>= fun a => let (l, r') := mkPair a; singleHash l r').withQueryLog) :
     ∃ a log_a, (a, log_a) ∈ support prog.withQueryLog
       ∧ log_v = log_a ++ [⟨mkPair a, r⟩] := by
-  rw [OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
-  obtain ⟨⟨a, log_a⟩, h_rec, hmem⟩ := hmem
-  rw [singleHash_withQueryLog, support_map, Set.mem_image] at hmem
-  obtain ⟨⟨_, _⟩, h_q, rfl, rfl⟩ := hmem
-  rw [mem_support_bind_iff] at h_q
-  obtain ⟨_, _, rfl, rfl⟩ := h_q
-  exact ⟨a, log_a, h_rec, rfl⟩
+  simp only [OracleComp.withQueryLog_bind, singleHash_withQueryLog] at hmem
+  grind
 
 /--
 Predicate stating that `log` contains a hash chain from `leaf` (combined with the
@@ -384,8 +379,7 @@ private lemma chainInLog_of_mem_support_verifyProof
     (hmem : (true, log_v) ∈ support
         (verifyProof (m := OracleComp (spec α)) idx leaf root proof).withQueryLog) :
     ChainInLog log_v leaf root idx proof := by
-  grind [verifyProof, OracleComp.withQueryLog_bind, OracleComp.withQueryLog_pure,
-    chainInLog_of_mem_support_getPutativeRoot]
+  grind [ChainInLog, OracleComp.withQueryLog_bind, chainInLog_of_mem_support_getPutativeRoot]
 
 /-- **Log-level binding (Collision Lemma at the log level).** Log-formalized
 analog of `getPutativeRootWithHash_binding_collision`: two distinct openings

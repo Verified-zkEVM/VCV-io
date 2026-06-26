@@ -41,6 +41,7 @@ protected lemma ext {c₁ c₂ : QueryCache spec} (h : ∀ t, c₁ t = c₂ t) :
 /-! ### Agreement with answer functions -/
 
 /-- A total answer function agrees with a cache if it returns every cached response. -/
+@[grind]
 def AgreesWithFn (f : QueryImpl spec Id) (cache : QueryCache spec) : Prop :=
   ∀ ⦃t : spec.Domain⦄ ⦃r : spec.Range t⦄, cache t = some r → f t = r
 
@@ -69,6 +70,7 @@ instance : OrderBot (QueryCache spec) where
 @[simp]
 lemma bot_eq_empty : (⊥ : QueryCache spec) = ∅ := rfl
 
+@[grind =]
 lemma le_def {c₁ c₂ : QueryCache spec} :
     c₁ ≤ c₂ ↔ ∀ ⦃t⦄ ⦃u : spec.Range t⦄, c₁ t = some u → c₂ t = some u :=
   ⟨fun h => h, fun h => h⟩
@@ -110,57 +112,48 @@ lemma enncard_empty : enncard (∅ : QueryCache spec) = 0 := by
 
 /-! ### Cache update -/
 
-variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
+variable [DecidableEq ι] (cache : QueryCache spec)
 
 /-- Add an index + input pair to the cache by updating the function
 (wrapper around `Function.update`). -/
 def cacheQuery (t : spec.Domain) (u : spec.Range t) : QueryCache spec :=
   Function.update cache t u
 
-omit [spec.DecidableEq] in
-@[simp]
+@[simp, grind =]
 lemma cacheQuery_self (t : spec.Domain) (u : spec.Range t) :
     (cache.cacheQuery t u) t = some u := by
   simp [cacheQuery]
 
-omit [spec.DecidableEq] in
-@[simp]
+@[simp, grind =]
 lemma cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
     (cache.cacheQuery t u) t' = cache t' := by
   simp [cacheQuery, h]
 
-omit [spec.DecidableEq] in
 /-- An answer function agrees with `cache.cacheQuery t u` iff it agrees with `cache` and returns
 `u` on `t`, provided `t` was not already cached. -/
 lemma agreesWithFn_cacheQuery_iff (t : spec.Domain) (u : spec.Range t) (f : QueryImpl spec Id)
     (hcache : cache t = none) :
     (cache.cacheQuery t u).AgreesWithFn f ↔ cache.AgreesWithFn f ∧ f t = u := by
-  grind [AgreesWithFn, cacheQuery_self, cacheQuery_of_ne, cacheQuery]
+  grind [cacheQuery]
 
-omit [spec.DecidableEq] in
 lemma toSet_cacheQuery_subset_insert (t : spec.Domain) (u : spec.Range t) :
     (cache.cacheQuery t u).toSet ⊆ insert ⟨t, u⟩ cache.toSet := by
   rintro ⟨t', u'⟩ hmem
   rcases eq_or_ne t' t with rfl | ht <;> simp_all [cacheQuery]
 
-omit [spec.DecidableEq] in
 lemma toSet_encard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
     (cache.cacheQuery t u).toSet.encard ≤ cache.toSet.encard + 1 :=
   le_trans (Set.encard_le_encard (toSet_cacheQuery_subset_insert cache t u))
     (Set.encard_insert_le cache.toSet ⟨t, u⟩)
 
-omit [spec.DecidableEq] in
 lemma enncard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
     enncard (cache.cacheQuery t u) ≤ enncard cache + 1 := by
   simp only [enncard]
   exact_mod_cast toSet_encard_cacheQuery_le cache t u
 
-omit [spec.DecidableEq] in
 lemma le_cacheQuery {t : spec.Domain} {u : spec.Range t} (h : cache t = none) :
-    cache ≤ cache.cacheQuery t u := by
-  grind [cacheQuery_self, cacheQuery_of_ne, le_def]
+    cache ≤ cache.cacheQuery t u := by grind
 
-omit [spec.DecidableEq] in
 lemma cacheQuery_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) (t : spec.Domain)
     (u : spec.Range t) : c₁.cacheQuery t u ≤ c₂.cacheQuery t u := by
   intro t' u' ht'
@@ -168,13 +161,11 @@ lemma cacheQuery_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) (t : spe
   · simpa only [cacheQuery_self] using ht'
   · exact cacheQuery_of_ne c₂ u heq ▸ h (cacheQuery_of_ne c₁ u heq ▸ ht')
 
-omit [spec.DecidableEq] in
 @[simp]
 lemma isCached_cacheQuery_self (t : spec.Domain) (u : spec.Range t) :
     (cache.cacheQuery t u).isCached t = true := by
   simp [isCached]
 
-omit [spec.DecidableEq] in
 @[simp]
 lemma isCached_cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
     (cache.cacheQuery t u).isCached t' = cache.isCached t' := by

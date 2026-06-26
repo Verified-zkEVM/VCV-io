@@ -348,8 +348,7 @@ lemma advantage_eq_zero_iff (exp : SecExp m) :
 @[simp]
 lemma advantage_eq_one_iff (exp : SecExp m) :
     exp.advantage = 1 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 0 := by
-  rw [advantage]
-  grind
+  grind [advantage, probEvent_eq_one_iff]
 
 end advantage
 
