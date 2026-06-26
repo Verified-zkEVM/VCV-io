@@ -154,7 +154,8 @@ private lemma simulateQ_prfReal_reduction (k : K) (n : ℕ)
   rw [simulateQ_bind, simulateQ_prfReal_oracleOutputs, pure_bind,
       simulateQ_prfRealQueryImpl_liftComp]
 
-omit [DecidableEq S] [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O] in
+omit [Inhabited K] [Fintype K] [Inhabited S] [Fintype S] [DecidableEq S] [Inhabited O] [Fintype O]
+  [DecidableEq O] [SampleableType O] in
 /-- In the real world, the stream PRG experiment has the same output distribution as
 the real PRF experiment for the reduction adversary, provided the PRF key
 distribution is uniform. -/
@@ -205,7 +206,7 @@ lemma prgIdealExp_eq_bind (adv : PRGAdversary (List.Vector O n)) :
     PRGScheme.prgIdealExp adv = (($ᵗ (List.Vector O n)) >>= adv) :=
   rfl
 
-omit [DecidableEq O] in
+omit [Inhabited S] [Fintype S] [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- The ideal PRF experiment, applied to the stream reduction, factors as sampling the
 adversary's input via the lazy-random-oracle chain (`idealOutputs`) and then running the
 adversary. -/
@@ -234,12 +235,14 @@ noncomputable def seedCollisionExp (n : ℕ) (seed : S) : ProbComp Bool := do
       (oracleVisitedStates n seed)).run' ∅
   return decide (¬ states.toList.Nodup)
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- `idealOutputs` averages the per-seed chain outputs over a uniform initial state. -/
 lemma idealOutputs_eq_bind :
     idealOutputs (S := S) (O := O) n = (($ᵗ S) >>= seedOutputs (S := S) (O := O) n) := rfl
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- `idealCollisionExp` averages the per-seed collision test over a uniform initial state. -/
 lemma idealCollisionExp_eq_bind :
     idealCollisionExp (S := S) (O := O) n = (($ᵗ S) >>= seedCollisionExp (S := S) (O := O) n) :=
@@ -256,7 +259,8 @@ noncomputable def genCollisionExp (N : ℕ) (s : S) (c : (S →ₒ S × O).Query
     (simulateQ (prfIdealQueryImpl (D := S) (R := S × O)) (oracleVisitedStates N s)).run' c
   return decide (¬ states.toList.Nodup ∨ ∃ x ∈ states.toList, c.isCached x = true)
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- One lazy-random-oracle step of the output chain: sample/recall the answer at `s`, then
 recurse on the returned next-state with the updated cache, prepending the output block. -/
 private lemma simulateQ_oracleOutputs_succ_run' (N : ℕ) (s : S)
@@ -275,7 +279,8 @@ private lemma simulateQ_oracleOutputs_succ_run' (N : ℕ) (s : S)
   simp only [simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure, map_bind, map_pure,
     bind_map_left]
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- One lazy-random-oracle step of the visited-state chain: sample/recall the answer at `s`, then
 recurse on the returned next-state with the updated cache, prepending the just-visited state `s`. -/
 private lemma simulateQ_oracleVisitedStates_succ_run' (N : ℕ) (s : S)
@@ -295,7 +300,8 @@ private lemma simulateQ_oracleVisitedStates_succ_run' (N : ℕ) (s : S)
   simp only [simulateQ_bind, simulateQ_pure, StateT.run_bind, StateT.run_pure, map_bind, map_pure,
     bind_map_left]
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- Cache-miss form of the lazy random oracle on input `s`: a fresh uniform draw `u : S × O`,
 returned together with the cache extended by `s ↦ u`. -/
 private lemma randomOracle_run_of_none (s : S) (c : (S →ₒ S × O).QueryCache) (hc : c s = none) :
@@ -303,7 +309,8 @@ private lemma randomOracle_run_of_none (s : S) (c : (S →ₒ S × O).QueryCache
       = (fun u => (u, c.cacheQuery s u)) <$> ($ᵗ (S × O)) := by
   rw [OracleSpec.randomOracle, QueryImpl.withCaching_run_none _ hc]; rfl
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq S] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [DecidableEq S]
+  [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- Sampling a pair uniformly is the same as sampling each coordinate independently. -/
 private lemma uniformSample_prod_eq_bind :
     ($ᵗ (S × O)) = (do let a ← $ᵗ S; let b ← $ᵗ O; pure (a, b)) := by
@@ -312,7 +319,7 @@ private lemma uniformSample_prod_eq_bind :
   simp [seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
 
 omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [DecidableEq S]
-  [SampleableType S] [Fintype O] [DecidableEq O] in
+  [SampleableType S] [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- A uniform output vector of length `N + 1` decomposes as a uniform head block prepended to a
 uniform vector of length `N`. -/
 private lemma evalDist_uniformSample_vector_succ (N : ℕ) :
@@ -346,7 +353,8 @@ private lemma evalDist_uniformSample_vector_succ (N : ℕ) :
     simp [card_vector, pow_succ, Nat.mul_comm]
   rw [hL, hR]
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq S] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [DecidableEq S]
+  [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- The reference uniform output vector of length `N + 1`, written as a bind over a uniformly
 sampled pair `p : S × O` whose first coordinate is discarded and whose second coordinate is the
 prepended head block. This is the shared-base form used for the identical-until-bad coupling. -/
@@ -358,7 +366,8 @@ private lemma evalDist_uniformSample_vector_succ_pair (N : ℕ) :
   refine (evalDist_ext fun v => ?_).symm
   rw [probOutput_bind_const, probFailure_uniformSample, tsub_zero, one_mul]
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- Cache-miss recursion for the generalized collision experiment. When `s` is uncached, the bad
 event on the length-`N + 1` visited chain splits into the fresh draw at `s` (extending the cache by
 `s`) followed by the bad event on the length-`N` sub-chain run against the extended cache. The
@@ -406,7 +415,8 @@ private lemma genCollisionExp_succ_of_none (N : ℕ) (s : S) (c : (S →ₒ S ×
   rw [hrest, List.nodup_cons, hhead]
   tauto
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- Cache-hit determinism for the generalized collision experiment. When `s` is already cached, the
 visited chain of length `N + 1` starts at `s`, which lies in the chain and is cached, so the bad
 event always fires and the experiment returns `true` with probability one. -/
@@ -423,7 +433,7 @@ private lemma probOutput_genCollisionExp_succ_of_isCached (N : ℕ) (s : S)
     subst hpeq
     rw [List.Vector.toList_cons, decide_eq_true (Or.inr ⟨s, List.mem_cons_self, hc⟩)]
 
-omit [DecidableEq O] in
+omit [Inhabited S] [Fintype S] [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- **Generalized per-seed core coupling.** For an arbitrary starting cache `c`, the total
 variation distance between the lazy-random-oracle output chain (run from cache `c`) and a
 uniformly random output vector is bounded by the generalized collision probability. Proved by
@@ -435,6 +445,7 @@ lemma tvDist_seedOutputs_le_collision_gen (N : ℕ) (s : S)
     tvDist ((simulateQ (prfIdealQueryImpl (D := S) (R := S × O))
           (oracleOutputs N s)).run' c) ($ᵗ (List.Vector O N)) ≤
       (Pr[= true | genCollisionExp N s c]).toReal := by
+  haveI : Fintype O := Fintype.ofFinite O
   induction N generalizing s c with
   | zero =>
     refine le_trans (le_of_eq ?_) ENNReal.toReal_nonneg
@@ -495,7 +506,7 @@ lemma tvDist_seedOutputs_le_collision_gen (N : ℕ) (s : S)
       rw [probOutput_genCollisionExp_succ_of_isCached N s c hc, ENNReal.toReal_one]
       exact tvDist_le_one _ _
 
-omit [DecidableEq O] in
+omit [Inhabited S] [Fintype S] [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- **Per-seed core coupling.** For a fixed initial state, the total variation distance between
 the lazy-random-oracle output chain and a uniformly random output vector is bounded by the
 probability that the state chain revisits a state. This is the fundamental "identical until
@@ -513,7 +524,7 @@ lemma tvDist_seedOutputs_le_collision (seed : S) :
   rw [heq] at h
   exact h
 
-omit [DecidableEq O] in
+omit [Inhabited S] [Fintype S] [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- **Core coupling.** The total variation distance between the lazy-random-oracle output
 chain and a uniformly random output vector is bounded by the state-collision probability.
 This is the fundamental "identical until bad" step: until the state chain repeats, the lazy
@@ -547,7 +558,7 @@ lemma tvDist_idealOutputs_le_collisionProb :
       (ENNReal.summable_toReal tsum_probOutput_ne_top)
   · exact ENNReal.summable_toReal (by rw [← probOutput_bind_eq_tsum]; exact probOutput_ne_top)
 
-omit [DecidableEq O] in
+omit [Inhabited S] [Fintype S] [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- The gap between the ideal PRF and ideal PRG experiments is bounded by the
 collision probability. This follows from the fundamental lemma of game playing:
 when a lazy random function never receives the same input twice, its outputs are
@@ -579,7 +590,8 @@ theorem prfIdealGap_le_collisionProb (adv : PRGAdversary (List.Vector O n)) :
     _ ≤ tvDist (idealOutputs n) ($ᵗ (List.Vector O n)) := tvDist_bind_right_le _ _ _
     _ ≤ collisionProb (S := S) (O := O) n := tvDist_idealOutputs_le_collisionProb
 
-omit [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [Inhabited S] [Fintype S] [Inhabited O] [Fintype O]
+  [DecidableEq O] in
 /-- Security of the stream PRG obtained from a PRF: PRG distinguishing advantage is
 bounded by the PRF advantage of the reduction plus the collision probability in the
 ideal random-function world. -/
@@ -662,7 +674,8 @@ private lemma enncard_eq_sum_isCached (c : (S →ₒ S × O).QueryCache) :
   rw [Set.toFinset_setOf]
   norm_cast
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [Inhabited O]
+  [Fintype O] [DecidableEq O] in
 /-- **Domain-invariance of the collision probability.** The generalized collision experiment reads
 the starting cache only through its domain (`isCached`): on the good path cached values are never
 inspected, and on a hit the bad event has already fired. Hence two caches with the same domain give
@@ -693,7 +706,8 @@ private lemma probOutput_genCollisionExp_eq_of_isCached_agree (N : ℕ) (s : S)
           QueryCache.isCached_cacheQuery_of_ne c' p hx]
         exact h x
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq S] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S] [DecidableEq S]
+  [Inhabited O] [Fintype O] [DecidableEq O] in
 /-- Sampling a pair uniformly and discarding the second coordinate is the same as sampling the
 first coordinate uniformly. -/
 private lemma probOutput_bind_uniformSample_prod_fst (f : S → ProbComp Bool) (b : Bool) :
@@ -706,7 +720,7 @@ private lemma probOutput_bind_uniformSample_prod_fst (f : S → ProbComp Bool) (
   congr 1
   rw [probOutput_bind_const, probFailure_uniformSample, tsub_zero, one_mul]
 
-omit [Inhabited K] [Fintype K] [SampleableType K] [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [SampleableType K] [Fintype O] [DecidableEq O] in
 /-- **Generalized averaged birthday bound.** Averaging over the uniform initial state, the
 generalized collision probability of the length-`N` chain starting from cache `c` is bounded by
 `∑_{j < N} (|c| + j) / |S|`. Proved by induction on `N` (generalizing `c`): a cache miss draws a
@@ -782,7 +796,7 @@ private lemma probOutput_genCollisionExp_bind_le (N : ℕ) (c : (S →ₒ S × O
           push_cast
           ring_nf
 
-omit [DecidableEq O] in
+omit [Fintype O] [DecidableEq O] in
 /-- **Birthday bound for the state-collision probability.** Over `n` rounds of the lazy random
 oracle chain, each freshly sampled state is uniform over `S`, so the probability that the chain
 revisits a state is at most `n·(n-1) / (2·|S|)` by a union bound over the at most `C(n,2)` pairs. -/
@@ -816,7 +830,7 @@ theorem collisionProb_le_birthday (n : ℕ) :
     ENNReal.toReal_natCast]
   norm_num
 
-omit [DecidableEq O] in
+omit [Inhabited K] [Fintype K] [Fintype O] [DecidableEq O] in
 /-- **Concrete security of the stream PRG.** The PRG distinguishing advantage is bounded by the
 PRF advantage of the reduction plus the birthday term `n·(n-1) / (2·|S|)`, obtained by combining
 `security` with `collisionProb_le_birthday`. -/

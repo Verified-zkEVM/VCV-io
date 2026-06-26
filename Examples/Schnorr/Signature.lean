@@ -128,7 +128,7 @@ def signature (g : G) (M : Type) [DecidableEq M] :
       (M := M) (PK := G) (SK := F) (S := G × F) :=
   FiatShamir (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
 
-omit [Fintype F] in
+omit [Fintype F] [DecidableEq F] in
 /-- Completeness of the Schnorr signature follows from completeness of the
 underlying Schnorr Σ-protocol via the generic Fiat-Shamir completeness theorem. -/
 theorem signature_complete (g : G) (M : Type) [DecidableEq M] :
