@@ -423,6 +423,10 @@ variable [IsProbabilitySpec spec]
     rw [OptionT.probFailure_eq, OptionT.run_failure]
     simp
 
+@[simp] lemma support_guard {p : Prop} [Decidable p] :
+    support (guard p : OptionT (OracleComp spec) Unit) = if p then {()} else ∅ := by
+  rw [OracleComp.guard_eq]; split_ifs <;> simp
+
 lemma probOutput_eq_sub_probFailure_of_unit {oa : OracleComp spec PUnit} :
     Pr[= () | oa] = 1 - Pr[⊥ | oa] := by
   have h := tsum_probOutput_add_probFailure oa
@@ -450,6 +454,46 @@ lemma probOutput_guard_eq_sub_probOutput_guard_not {α : Type} {oa : OracleComp 
   exact ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top probEvent_le_one) h
 
 end guard
+
+/-! ## Probabilities of `orElse` (`<|>`)
+
+`oa <|> oa'` runs `oa`, falling back to `oa'` only when `oa` returns `none`. The base `OracleComp`
+never fails, so the two failure events are independent: `oa <|> oa'` fails exactly when both do, and
+an output comes either from `oa` or — on `oa`'s failure mass — from `oa'`. (`support_orElse` is left
+as a future addition; it follows from `probOutput_orElse` via the support↔probability bridge.) -/
+
+section orElse
+
+variable [IsProbabilitySpec spec] {α : Type}
+
+@[simp]
+lemma probFailure_orElse (oa oa' : OptionT (OracleComp spec) α) :
+    Pr[⊥ | oa <|> oa'] = Pr[⊥ | oa] * Pr[⊥ | oa'] := by
+  classical
+  rw [OracleComp.orElse_def, OptionT.probFailure_eq, OptionT.probFailure_eq, OptionT.probFailure_eq,
+    OptionT.run_mk, probFailure_of_liftM_PMF, probFailure_of_liftM_PMF, probFailure_of_liftM_PMF,
+    zero_add, zero_add, zero_add, probOutput_bind_eq_tsum, tsum_option _ ENNReal.summable]
+  simp [probOutput_pure]
+
+@[simp]
+lemma probOutput_orElse (oa oa' : OptionT (OracleComp spec) α) (x : α) :
+    Pr[= x | oa <|> oa'] = Pr[= x | oa] + Pr[⊥ | oa] * Pr[= x | oa'] := by
+  classical
+  rw [OracleComp.orElse_def, OptionT.probOutput_eq, OptionT.probOutput_eq, OptionT.probFailure_eq,
+    OptionT.probOutput_eq, OptionT.run_mk, probFailure_of_liftM_PMF, zero_add,
+    probOutput_bind_eq_tsum, tsum_option _ ENNReal.summable,
+    tsum_eq_single x (fun b hb => by simp [probOutput_pure, Ne.symm hb])]
+  simp [probOutput_pure, add_comm]
+
+@[simp]
+lemma probEvent_orElse (oa oa' : OptionT (OracleComp spec) α) (p : α → Prop) :
+    Pr[ p | oa <|> oa'] = Pr[ p | oa] + Pr[⊥ | oa] * Pr[ p | oa'] := by
+  classical
+  simp only [probEvent_eq_tsum_ite, probOutput_orElse]
+  conv_rhs => rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_add]
+  refine tsum_congr fun b => ?_; split_ifs <;> ring
+
+end orElse
 
 section simulateQ_evalDist
 
