@@ -135,7 +135,7 @@ example (mx : ProbComp Bool) (p : Bool → Prop) : Pr[p | mx] ≠ ⊤ := by grin
 -- target(grind): `grind` routes `Pr[fun _ => False]` through the support machinery and fails.
 example (mx : ProbComp Bool) : Pr[fun _ => False | mx] = 0 := by simp
 example : Pr[fun b => b = true | $ᵗ Bool] = 2⁻¹ := by simp
-example : Pr[fun n => n < 3 | $ᵗ (Fin 6)] = 3 / 6 := by simp; congr 1
+example : Pr[fun n => n < 3 | $ᵗ (Fin 6)] = 3 / 6 := by simp; rfl
 
 /-! ## Monotonicity and complement
 An event implies a wider event; the complement subtracts from one. -/
@@ -146,10 +146,10 @@ example (mx : ProbComp Bool) (p q : Bool → Prop) (h : ∀ x, p x → q x) :
 example : Pr[fun b => b ≠ true | $ᵗ Bool] = 2⁻¹ := by simp
 
 /-! ## Counting (favourable / total)
-target(grind): the finite count needs `congr 1` after the `probEvent_uniformSample` rewrite; ideally
+target(grind): the finite count needs `rfl` after the `probEvent_uniformSample` rewrite; ideally
 `grind` evaluates the count itself. -/
 
-example : Pr[fun n => n = 0 ∨ n = 1 | $ᵗ (Fin 6)] = 2 / 6 := by simp; congr 1
+example : Pr[fun n => n = 0 ∨ n = 1 | $ᵗ (Fin 6)] = 2 / 6 := by simp; rfl
 example : Pr[fun p => p.1 = true ∨ p.2 = true | $ᵗ (Bool × Bool)] = 3 / 4 := by simp; congr 1
 
 /-! ## Map pushforward
@@ -311,6 +311,12 @@ example : Pr[⊥ | nestedDraw] = 0 := by simp [nestedDraw]
 example : Pr[⊥ | branchToFin] = 0 := by simp [branchToFin]
 example : Pr[⊥ | fiveCoins] = 0 := by simp [fiveCoins]
 
+example : Pr[⊥ | coinThenNeg] = 0 := by grind [coinThenNeg]
+example : Pr[⊥ | twoThenAnd] = 0 := by grind [twoThenAnd]
+example : Pr[⊥ | nestedDraw] = 0 := by grind [nestedDraw]
+example : Pr[⊥ | branchToFin] = 0 := by grind [branchToFin]
+example : Pr[⊥ | fiveCoins] = 0 := by grind [fiveCoins]
+
 example : Pr[= false | coinThenNeg] = Pr[= true | $ᵗ Bool] := by simp [coinThenNeg]
 
 /-- Abort unless the coin comes up `true`: fails with probability one half. -/
@@ -327,7 +333,7 @@ probability, and outcome probabilities summing to one. -/
 
 example (guess : Fin 6) : Pr[= guess | $ᵗ (Fin 6)] = 6⁻¹ := by simp
 
-example : Pr[fun p => p.1 = p.2 | $ᵗ (Fin 6 × Fin 6)] = 6 / 36 := by simp; congr 1
+example : Pr[fun p => p.1 = p.2 | $ᵗ (Fin 6 × Fin 6)] = 6 / 36 := by simp; rfl
 
 example : ∑ k : Fin 6, Pr[= k | $ᵗ (Fin 6)] = 1 := sum_probOutput_eq_one (by simp)
 

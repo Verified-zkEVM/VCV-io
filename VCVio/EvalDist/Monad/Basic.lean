@@ -123,7 +123,7 @@ lemma support_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my
     support (mx >>= my) = ⋃ x ∈ support mx, support (my x) :=
   monadLift_bind mx my
 
--- untagged: the `∃ x ∈ support` RHS saturates `grind`; `support_bind` is the `simp` form.
+@[grind =]
 lemma mem_support_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α)
     (my : α → m β) (y : β) :
     y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
@@ -133,7 +133,7 @@ lemma finSupport_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFins
     [DecidableEq α] [DecidableEq β] (mx : m α) (my : α → m β) : finSupport (mx >>= my) =
       Finset.biUnion (finSupport mx) fun x => finSupport (my x) := by aesop
 
--- untagged: the `∃ x ∈ finSupport` RHS saturates `grind`; `finSupport_bind` is the `simp` form.
+@[grind =]
 lemma mem_finSupport_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
     [DecidableEq α] [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
@@ -244,7 +244,7 @@ variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 @[simp]
 lemma support_bind_const (mx : m α) (my : m β) :
     support (mx >>= fun _ => my) = {y ∈ support my | (support mx).Nonempty} := by
-  grind [= Set.Nonempty, mem_support_bind_iff]
+  grind [= Set.Nonempty]
 
 @[simp]
 lemma finSupport_bind_const [HasEvalFinset m]

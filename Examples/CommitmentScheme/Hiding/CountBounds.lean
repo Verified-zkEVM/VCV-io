@@ -259,12 +259,12 @@ lemma self_mem_cache_of_mem_support_step_hidingImplCountAll (ms : M × S)
       simp [hcache]
   | none =>
       simp only [hcache, StateT.run_bind] at hx
+
       rw [mem_support_bind_iff] at hx
       obtain ⟨u, _, hx⟩ := hx
       simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,
         Set.mem_singleton_iff] at hx
-      subst hx
-      simp
+      simp only [hx, QueryCache.cacheQuery_self]
 
 /-- The counted hiding invariant: every cached salt has a positive counter. -/
 def HidingCountInv (st : QueryCache (CMOracle M S C) × (S → ℕ)) : Prop :=
@@ -1369,4 +1369,3 @@ abbrev hidingAvgRightImpl :
       OracleComp.liftComp
         ((hidingImplCountAll (M := M) (S := S) (C := C) t).run st)
         (HidingAvgSpec M S C)
-
