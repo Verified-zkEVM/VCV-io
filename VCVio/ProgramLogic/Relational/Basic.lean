@@ -408,6 +408,23 @@ lemma evalDist_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleCo
     𝒟[oa] = 𝒟[ob] :=
   evalDist_ext (fun x => probOutput_eq_of_relTriple_eqRel (spec₁ := spec₁) (spec₂ := spec₂) h x)
 
+/-- `probEvent` monotonicity from a relational triple: if `RelTriple oa ob R` and `R a b` forces
+`p a → q b`, then `Pr[p | oa] ≤ Pr[q | ob]`. Routing both events through the coupling's marginals
+(`c.2.map_fst`/`map_snd`) reduces the bound to `probEvent_mono` on the joint distribution. The
+inequality-from-implication, event-level companion of `probOutput_eq_of_relTriple_eqRel`, for events
+tracked over different output spaces. -/
+lemma probEvent_le_of_relTriple {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β} (h : RelTriple oa ob R)
+    {p : α → Prop} {q : β → Prop} (himp : ∀ a b, R a b → p a → q b) :
+    Pr[p | oa] ≤ Pr[q | ob] := by
+  obtain ⟨c, hc⟩ := (relTriple_iff_relWP).1 h
+  have hfst : Pr[p | oa] = Pr[(p ∘ Prod.fst) | c.1] := by
+    rw [show Pr[p | oa] = Pr[p | (𝒟[oa] : SPMF α)] from rfl, ← probEvent_map, c.2.map_fst]
+  have hsnd : Pr[q | ob] = Pr[(q ∘ Prod.snd) | c.1] := by
+    rw [show Pr[q | ob] = Pr[q | (𝒟[ob] : SPMF β)] from rfl, ← probEvent_map, c.2.map_snd]
+  rw [hfst, hsnd]
+  exact probEvent_mono fun z hz hpz => himp z.1 z.2 (hc z hz) hpz
+
 /-- Transitivity through an intermediate computation related to the left side by `EqRel`. -/
 lemma relTriple_trans_eqRel_left
     {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
