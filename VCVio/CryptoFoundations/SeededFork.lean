@@ -334,7 +334,20 @@ theorem cf_eq_of_mem_support_seededFork (x₁ x₂ : α)
     (h : some (x₁, x₂) ∈ support (seededFork main qb js i cf)) :
       ∃ s, cf x₁ = some s ∧ cf x₂ = some s := by
   simp only [seededFork] at h
-  grind
+  rw [mem_support_bind_iff] at h; obtain ⟨seed, -, h⟩ := h
+  rw [mem_support_bind_iff] at h; obtain ⟨y₁, -, h⟩ := h
+  rcases hcf : cf y₁ with _ | s
+  · simp_all
+  · simp only [hcf] at h
+    rw [mem_support_bind_iff] at h; obtain ⟨u, -, h⟩ := h
+    split_ifs at h with heq
+    · simp_all
+    · rw [mem_support_bind_iff] at h; obtain ⟨y₂, -, h⟩ := h
+      split_ifs at h with hcf₂
+      · rw [mem_support_pure_iff] at h
+        obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj h)
+        exact ⟨s, hcf, hcf₂⟩
+      · simp_all
 
 omit [unifSpec ˡ⊂ₒ spec] in
 /-- On `seededFork` support, first-projection success equals old pair-style success event. -/

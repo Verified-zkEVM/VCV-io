@@ -55,7 +55,15 @@ theorem wpProp_pure (x : α) (p : α → Prop) :
 /-- `wpProp` rule for bind. -/
 theorem wpProp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β) (p : β → Prop) :
     wpProp (spec := spec) (oa >>= ob) p ↔ wpProp oa (fun a => wpProp (ob a) p) := by
-  grind [wpProp_iff_forall_support]
+  rw [wpProp_iff_forall_support, wpProp_iff_forall_support]
+  constructor
+  · intro h a ha
+    rw [wpProp_iff_forall_support (spec := spec) (oa := ob a) (p := p)]
+    intro b hb
+    exact h b ((mem_support_bind_iff oa ob b).2 ⟨a, ha, hb⟩)
+  · intro h b hb
+    rcases (mem_support_bind_iff oa ob b).1 hb with ⟨a, ha, hb'⟩
+    exact ((wpProp_iff_forall_support (spec := spec) (oa := ob a) (p := p)).1 (h a ha)) b hb'
 
 private theorem wpProp_and (oa : OracleComp spec α) (p q : α → Prop) :
     wpProp (spec := spec) oa (fun a => p a ∧ q a) ↔

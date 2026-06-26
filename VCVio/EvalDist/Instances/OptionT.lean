@@ -66,11 +66,11 @@ lemma mem_support_iff (mx : OptionT m α) (x : α) :
 
 @[simp]
 lemma support_liftM (mx : m α) :
-    support (liftM mx : OptionT m α) = support mx := by grind
+    support (liftM mx : OptionT m α) = support mx := by grind [mem_support_bind_iff]
 
 @[simp]
 lemma support_lift (mx : m α) :
-    support (OptionT.lift mx) = support mx := by grind
+    support (OptionT.lift mx) = support mx := by grind [mem_support_bind_iff]
 
 end EvalSet
 

@@ -235,34 +235,41 @@ section zero
 
 variable [MonadLiftT m SetM] [EvalDistCompatible m] {mx : m α} {p : α → Prop}
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probEvent_eq_zero_iff :
     Pr[ p | mx] = 0 ↔ ∀ x ∈ support mx, ¬ p x := by
   rw [probEvent_eq_tsum_indicator]; aesop
 alias ⟨_, probEvent_eq_zero⟩ := probEvent_eq_zero_iff
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probEvent_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
-    Pr[ p | mx] = 0 ↔ ∀ x ∈ finSupport mx, ¬ p x := by grind
+    Pr[ p | mx] = 0 ↔ ∀ x ∈ finSupport mx, ¬ p x := by grind [probEvent_eq_zero_iff]
 alias ⟨_, probEvent_eq_zero'⟩ := probEvent_eq_zero_iff'
 
-@[simp, grind =]
-lemma probEvent_ne_zero_iff : Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ support mx, p x := by  grind
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
+lemma probEvent_ne_zero_iff : Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ support mx, p x := by
+  grind [probEvent_eq_zero_iff]
 alias ⟨_, probEvent_ne_zero⟩ := probEvent_ne_zero_iff
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probEvent_ne_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ finSupport mx, p x := by aesop
 alias ⟨_, probEvent_ne_zero'⟩ := probEvent_ne_zero_iff'
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probEvent_pos_iff : 0 < Pr[ p | mx] ↔ ∃ x ∈ support mx, p x := by
   simp [pos_iff_ne_zero]
 alias ⟨_, probEvent_pos⟩ := probEvent_pos_iff
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probEvent_pos_iff' [HasEvalFinset m] [DecidableEq α] :
-    0 < Pr[ p | mx] ↔ ∃ x ∈ finSupport mx, p x := by grind
+    0 < Pr[ p | mx] ↔ ∃ x ∈ finSupport mx, p x := by grind [probEvent_pos_iff]
 alias ⟨_, probEvent_pos'⟩ := probEvent_pos_iff'
 
 end zero
@@ -528,7 +535,8 @@ lemma one_le_probEvent_iff [MonadLiftT m SPMF] : 1 ≤ Pr[ p | mx] ↔ Pr[ p | m
 lemma one_le_probFailure_iff [MonadLiftT m SPMF] : 1 ≤ Pr[⊥ | mx] ↔ Pr[⊥ | mx] = 1 := by
   simp only [le_iff_eq_or_lt, not_one_lt_probFailure, or_false, eq_comm]
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probOutput_eq_one_iff [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m] :
     Pr[= x | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ support mx = {x} := by
   rw [← probEvent_eq_eq_probOutput]
@@ -536,13 +544,15 @@ lemma probOutput_eq_one_iff [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCom
     Set.ext_iff, Option.forall, mem_support_iff_evalDist_apply_ne_zero]
 alias ⟨_, probOutput_eq_one⟩ := probOutput_eq_one_iff
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma one_eq_probOutput_iff [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m] :
     1 = Pr[= x | mx] ↔ Pr[⊥ | mx] = 0 ∧ support mx = {x} := by
   rw [eq_comm, probOutput_eq_one_iff]
 alias ⟨_, one_eq_probOutput⟩ := one_eq_probOutput_iff
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probOutput_eq_one_iff' [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
     [HasEvalFinset m] [DecidableEq α] :
     Pr[= x | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ finSupport mx = {x} := by
@@ -677,14 +687,23 @@ lemma probFailure_eq_one_iff_probEvent_true (mx : m α) :
   rw [ENNReal.toReal_sub_of_le (by grind) (by simp)]
   simp [tsub_eq_zero_iff_le, ENNReal.toReal_eq_one_iff]
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probFailure_eq_one_iff [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) :
     Pr[⊥ | mx] = 1 ↔ support mx = ∅ := by
   simp [probFailure_eq_one_iff_probEvent_true, probEvent_eq_tsum_subtype_mem_support, Set.ext_iff]
 
 @[aesop unsafe forward]
 lemma probFailure_eq_one [MonadLiftT m SetM] [EvalDistCompatible m]
-    {mx : m α} (h : support mx = ∅) : Pr[⊥ | mx] = 1 := by grind
+    {mx : m α} (h : support mx = ∅) : Pr[⊥ | mx] = 1 := (probFailure_eq_one_iff mx).mpr h
+
+/-- `grind`-friendly companion to `probFailure_eq_one_iff`: phrasing "fails with probability one"
+via `Set.Nonempty` — which `grind` keeps atomic — avoids the support quantifier that makes the
+`support = ∅` form saturate, so this stays in the default `grind` set. -/
+@[grind =]
+lemma probFailure_eq_one_iff_not_nonempty [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) :
+    Pr[⊥ | mx] = 1 ↔ ¬ (support mx).Nonempty := by
+  simp only [probFailure_eq_one_iff, Set.not_nonempty_iff_eq_empty]
 
 @[simp, aesop norm]
 lemma probEvent_const (mx : m α) (p : Prop) [Decidable p] :
@@ -786,7 +805,8 @@ specialisation of `probEvent_mono` that drops the support hypothesis. -/
 lemma probEvent_mono'' (h : ∀ x, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
   probEvent_mono (fun x _ => h x)
 
-@[simp low, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp low]
 lemma probEvent_eq_one_iff :
     Pr[ p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
   rw [show (∀ x ∈ support mx, p x) ↔ Pr[ fun x => ¬p x | mx] = 0 by
@@ -808,21 +828,24 @@ lemma probOutput_eq_one_iff_forall (mx : m α) (x : α) :
     Pr[= x | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ y ∈ support mx, y = x := by
   rw [← probEvent_eq_eq_probOutput, probEvent_eq_one_iff]
 
-@[simp low, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp low]
 lemma one_eq_probEvent_iff :
     1 = Pr[ p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
   rw [eq_comm, probEvent_eq_one_iff]
 
 alias ⟨_, one_eq_probEvent⟩ := one_eq_probEvent_iff
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probEvent_eq_one_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
   simp_rw [probEvent_eq_one_iff, mem_finSupport_iff_mem_support]
 
 alias ⟨_, probEvent_eq_one'⟩ := probEvent_eq_one_iff'
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma one_eq_probEvent_iff' [HasEvalFinset m] [DecidableEq α] :
     1 = Pr[ p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
   rw [eq_comm, probEvent_eq_one_iff']

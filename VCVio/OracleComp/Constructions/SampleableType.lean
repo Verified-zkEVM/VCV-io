@@ -203,6 +203,16 @@ lemma support_uniformSample : support ($ᵗ α) = Set.univ :=
 
 lemma mem_support_uniformSample {x : α} : x ∈ support ($ᵗ α) := by grind
 
+/-- Uniform sampling never fails, so its support is nonempty (which in turn witnesses `Nonempty α`).
+Tagged `@[grind]` rather than `@[simp]` because `simp` rewrites `support ($ᵗ α)` to `Set.univ`
+first, after which it would need a separate `Nonempty α` fact. -/
+@[grind]
+lemma support_uniformSample_nonempty : (support ($ᵗ α)).Nonempty := by
+  rw [Set.nonempty_iff_ne_empty]
+  intro h
+  rw [← probFailure_eq_one_iff, probFailure_uniformSample] at h
+  exact zero_ne_one h
+
 @[simp, grind =]
 lemma finSupport_uniformSample [Fintype α] [DecidableEq α] :
     finSupport ($ᵗ α) = Finset.univ := by aesop
@@ -237,11 +247,12 @@ instance {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
   | .inr t => h' t
 
 /-- Select a uniform element from `α × β` by independently selecting from `α` and `β`. -/
-instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
+instance (α β : Type)
     [SampleableType α] [SampleableType β] : SampleableType (α × β) where
   selectElem := (·, ·) <$> ($ᵗ α) <*> ($ᵗ β)
   mem_support_selectElem x := by simp
-  probOutput_selectElem_eq x y := by simp
+  probOutput_selectElem_eq x y := by
+    simp only [probOutput_seq_map_prod_mk_eq_mul]; grind
 
 /-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
 @[reducible] def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) :

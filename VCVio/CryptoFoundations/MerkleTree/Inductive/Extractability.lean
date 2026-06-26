@@ -384,8 +384,18 @@ private lemma chainInLog_of_mem_support_verifyProof
     (hmem : (true, log_v) ∈ support
         (verifyProof (m := OracleComp (spec α)) idx leaf root proof).withQueryLog) :
     ChainInLog log_v leaf root idx proof := by
-  grind [verifyProof, OracleComp.withQueryLog_bind, OracleComp.withQueryLog_pure,
-    chainInLog_of_mem_support_getPutativeRoot]
+  rw [show verifyProof (m := OracleComp (spec α)) idx leaf root proof =
+      (do let r ← getPutativeRoot (m := OracleComp (spec α)) idx leaf proof
+          pure (r == root)) from rfl,
+    OracleComp.withQueryLog_bind, mem_support_bind_iff] at hmem
+  obtain ⟨⟨r, log_g⟩, h_g, hmem⟩ := hmem
+  rw [support_map, Set.mem_image] at hmem
+  obtain ⟨⟨b, log_x⟩, h_x, h_eq⟩ := hmem
+  obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_eq
+  obtain ⟨h_b_eq, rfl⟩ := Prod.mk.inj h_x
+  obtain rfl : r = root := by grind
+  have := chainInLog_of_mem_support_getPutativeRoot idx leaf proof r log_g h_g
+  grind
 
 /-- **Log-level binding (Collision Lemma at the log level).** Log-formalized
 analog of `getPutativeRootWithHash_binding_collision`: two distinct openings

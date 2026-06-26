@@ -18,6 +18,14 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
 open ENNReal
 
+/- The monad/functor laws are confluent (terminating) rewrites. Tagging them for `grind` lets it
+normalize a computation's structure (`mx >>= pure = mx`, `pure a >>= f = f a`, reassociation,
+`f <$> pure a = pure (f a)`) *before* it falls into `probOutput`/`tsum` expansion — turning what
+would otherwise be a `grind` explosion on a structured-computation equality into a quick solve. (The
+analogous `bind_pure_comp`/`map_eq_bind` laws are deliberately omitted: their function argument sits
+under a binder that `grind`'s pattern compiler cannot index.) -/
+attribute [grind =] bind_pure pure_bind bind_assoc map_pure
+
 /-! ## Probabilities of `pure` -/
 
 section pure
@@ -115,7 +123,7 @@ lemma support_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my
     support (mx >>= my) = ⋃ x ∈ support mx, support (my x) :=
   monadLift_bind mx my
 
-@[grind =]
+-- untagged: the `∃ x ∈ support` RHS saturates `grind`; `support_bind` is the `simp` form.
 lemma mem_support_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α)
     (my : α → m β) (y : β) :
     y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
@@ -125,7 +133,7 @@ lemma finSupport_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFins
     [DecidableEq α] [DecidableEq β] (mx : m α) (my : α → m β) : finSupport (mx >>= my) =
       Finset.biUnion (finSupport mx) fun x => finSupport (my x) := by aesop
 
-@[grind =]
+-- untagged: the `∃ x ∈ finSupport` RHS saturates `grind`; `finSupport_bind` is the `simp` form.
 lemma mem_finSupport_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
     [DecidableEq α] [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
@@ -172,7 +180,8 @@ lemma probFailure_bind_eq_add_tsum_support [MonadLiftT m SPMF] [LawfulMonadLiftT
   refine tsum_congr fun x => ?_
   aesop (add simp Set.indicator)
 
-@[simp, grind =]
+-- `simp`-only: `grind` saturates on this support-quantifier characterization.
+@[simp]
 lemma probFailure_bind_eq_zero_iff [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = 0 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, Pr[⊥ | my x] = 0 := by
@@ -235,7 +244,7 @@ variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 @[simp]
 lemma support_bind_const (mx : m α) (my : m β) :
     support (mx >>= fun _ => my) = {y ∈ support my | (support mx).Nonempty} := by
-  grind [= Set.Nonempty]
+  grind [= Set.Nonempty, mem_support_bind_iff]
 
 @[simp]
 lemma finSupport_bind_const [HasEvalFinset m]
