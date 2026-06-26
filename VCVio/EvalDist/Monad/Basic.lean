@@ -30,6 +30,12 @@ lemma mem_support_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : 
 lemma mem_support_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (x y : α) :
     x ∈ support (pure y : m α) ↔ y = x := by aesop
 
+/-- `obtain`-friendly forward direction of `mem_support_pure_iff`: membership in the support
+of a `pure` forces equality with the pure value. -/
+lemma eq_of_mem_support_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    {x y : α} (h : y ∈ support (pure x : m α)) : y = x := by
+  simpa [mem_support_pure_iff] using h
+
 @[simp, grind =]
 lemma finSupport_pure [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
     [DecidableEq α] (x : α) : finSupport (pure x : m α) = {x} := by aesop
@@ -121,6 +127,13 @@ lemma support_bind [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my
 lemma mem_support_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m α) (my : α
     → m β) (y : β) :
     y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
+
+/-- `obtain`-friendly forward direction of `mem_support_bind_iff`: peel an element of the
+support of a bind into a witness for the first computation and membership for the second. -/
+lemma support_bind_exists [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+    (x : m α) (f : α → m β) {y : β}
+    (hy : y ∈ support (x >>= f)) : ∃ a, a ∈ support x ∧ y ∈ support (f a) := by
+  simpa [mem_support_bind_iff] using hy
 
 -- dt: do we need global assumptions about `decidable_eq` for the `finSupport` definition?
 @[simp, grind =]

@@ -533,4 +533,74 @@ noncomputable def evalDistWhen (d : QueryImpl spec SPMF) (mx : OracleComp spec �
 
 end evalDistWhen
 
+section supportPeel
+
+/-- `obtain`-friendly bind support peeler at the bare `OracleComp` level. Unlike `rw
+[mem_support_bind_iff]`, applying this lemma to a hypothesis uses *definitional* unification to
+match `mx >>= f`, so it engages through the `Monad`/`MonadLift` instance-tree mismatches that block
+the syntactic `rw` (the elaborated `OracleComp.instMonad`/`Bind.bind` spelling produced by
+unfolding nested protocol definitions differs syntactically from the canonical `>>=`). -/
+lemma mem_support_bind_peel (mx : OracleComp spec α) (f : α → OracleComp spec β) {y : β}
+    (hy : y ∈ support (mx >>= f)) :
+    ∃ a, a ∈ support mx ∧ y ∈ support (f a) := by
+  rw [mem_support_bind_iff] at hy; exact hy
+
+/-- `obtain`-friendly `pure` support resolver at the bare `OracleComp` level: `y ∈ support (pure
+a)` forces `y = a`, matched by definitional unification (so it engages on the
+`PFunctor.FreeM.pure` spelling that the syntactic `support_pure` `rw` rejects). -/
+lemma eq_of_mem_support_pure (a : α) {y : α}
+    (hy : y ∈ support (pure a : OracleComp spec α)) : y = a := by
+  rwa [support_pure, Set.mem_singleton_iff] at hy
+
+/-- `obtain`-friendly `<$>` (map) support peeler at the bare `OracleComp` level: `y ∈ support (g
+<$> mx)` yields a preimage `a ∈ support mx` with `y = g a`, matched by definitional unification
+(so it engages on the elaborated `Functor.map`/`OracleComp.instMonad` spelling that the syntactic
+`support_map` `rw` rejects). -/
+lemma mem_support_map_peel (g : α → β) (mx : OracleComp spec α) {y : β}
+    (hy : y ∈ support (g <$> mx)) :
+    ∃ a, a ∈ support mx ∧ y = g a := by
+  rw [support_map, Set.mem_image] at hy
+  obtain ⟨a, ha, hy⟩ := hy
+  exact ⟨a, ha, hy.symm⟩
+
+end supportPeel
+
 end OracleComp
+
+namespace OptionT
+
+variable {ι : Type} {spec : OracleSpec ι} {α β : Type}
+
+/-- Support-level peeler for an `OptionT`-monadic bind, stated at the underlying
+`OracleComp`-level `.run`: every element `y` of the support of the *run* of `mx >>= f` factors
+through an intermediate `some a` in `mx`'s run support and a `y` in the run support of `f a`,
+unless `mx`'s run can produce `none` (in which case `y` may be that `none`). Companion to
+`OptionT.mem_support_bind_mk` for the case where the `OptionT.run` has already been stripped to
+the bare underlying computation.
+
+Applies to a hypothesis `y ∈ support oa` whenever `oa` is *definitionally* `(mx >>= f).run`
+(the `OptionT.run` is identity), so callers need not respell the full bind term. -/
+lemma mem_support_run_bind
+    (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) {y : Option β}
+    (hy : y ∈ support ((mx >>= f : OptionT (OracleComp spec) β).run)) :
+    (none ∈ support mx.run ∧ y = none) ∨
+      ∃ a, some a ∈ support mx.run ∧ y ∈ support ((f a).run) := by
+  rw [OptionT.run_bind, Option.elimM, mem_support_bind_iff] at hy
+  obtain ⟨o, ho, hy⟩ := hy
+  cases o with
+  | none => exact Or.inl ⟨ho, by simpa using hy⟩
+  | some a => exact Or.inr ⟨a, ho, hy⟩
+
+/-- `OptionT.lift`-headed specialization of `mem_support_run_bind`: a `lift`ed (hence
+never-failing) first computation `oa` peels cleanly, with the intermediate value living in
+`support oa` directly (no `none` branch). -/
+lemma mem_support_run_lift_bind
+    (oa : OracleComp spec α) (f : α → OptionT (OracleComp spec) β) {y : Option β}
+    (hy : y ∈ support ((OptionT.lift oa >>= f : OptionT (OracleComp spec) β).run)) :
+    ∃ a, a ∈ support oa ∧ y ∈ support ((f a).run) := by
+  rw [OptionT.run_bind, OptionT.run_lift, Option.elimM, bind_pure_comp, bind_map_left,
+    mem_support_bind_iff] at hy
+  obtain ⟨a, ha, hy⟩ := hy
+  exact ⟨a, ha, hy⟩
+
+end OptionT

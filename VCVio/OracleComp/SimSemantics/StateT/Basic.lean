@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.ProbComp
+import ToMathlib.Control.StateT
 
 /-!
 # Query Implementations with State Monads
@@ -364,3 +366,95 @@ theorem support_simulateQ_run'_subset
 end support_simulateQ_StateT
 
 end OracleComp
+
+section probEventSimulateQ
+
+open OracleComp
+
+/-- `run'`-level corollary of `simulateQ_bind_map_eq_of_body`: if the two bodies of a bind agree
+under `simulateQ` up to a pure post-map `f`, then so do the `run'`s of the simulated binds from
+any initial state. -/
+lemma StateT.run'_simulateQ_bind_map_eq_of_body
+    {ι : Type} {σ α β γ : Type} {spec : OracleSpec ι}
+    {n : Type → Type} [Monad n] [LawfulMonad n]
+    (impl : QueryImpl spec (StateT σ n))
+    (oa : OracleComp spec α) (body₁ : α → OracleComp spec β)
+    (body₂ : α → OracleComp spec γ) (f : γ → β) (s : σ)
+    (hBody : ∀ a, simulateQ impl (body₁ a) = f <$> simulateQ impl (body₂ a)) :
+    (simulateQ impl (oa >>= body₁)).run' s =
+      f <$> (simulateQ impl (oa >>= body₂)).run' s := by
+  rw [← StateT.run'_map']
+  exact congrArg (fun mx : StateT σ n β => mx.run' s)
+    (simulateQ_bind_map_eq_of_body impl oa body₁ body₂ f hBody)
+
+/-- If all outputs of the original `OracleComp` are successful (`some`) and satisfy `P`, then
+the simulated `OptionT`-wrapped computation satisfies `P` with probability one. The success
+hypothesis is at the level of the *original* computation's support, which bounds the simulated
+support by `support_simulateQ_run'_subset`. -/
+lemma OptionT.probEvent_eq_one_of_simulateQ_support
+    {ι σ α : Type} {spec : OracleSpec ι}
+    (impl : QueryImpl spec (StateT σ ProbComp))
+    (oa : OracleComp spec (Option α)) (s₀ : σ) (P : α → Prop)
+    (h : ∀ x ∈ support oa, ∃ a, x = some a ∧ P a) :
+    Pr[P | OptionT.mk ((simulateQ impl oa).run' s₀)] = 1 := by
+  letI := Classical.decPred P
+  rw [probEvent_eq_one_iff]
+  constructor
+  · rw [OptionT.probFailure_eq, OptionT.run_mk]
+    have hfail : Pr[⊥ | (simulateQ impl oa).run' s₀] = 0 :=
+      probFailure_eq_zero
+    rw [hfail, _root_.zero_add]
+    exact probOutput_eq_zero_of_not_mem_support fun hnone =>
+      let hnone' := support_simulateQ_run'_subset impl oa s₀ hnone
+      let ⟨_, hsome, _⟩ := h none hnone'
+      by cases hsome
+  · intro x hx
+    rw [OptionT.mem_support_iff] at hx
+    obtain ⟨a, ha, hP⟩ := h (some x) (support_simulateQ_run'_subset impl oa s₀ hx)
+    cases ha
+    exact hP
+
+/-- Bind-prefixed variant of `OptionT.probEvent_eq_one_of_simulateQ_support`: the simulated
+`OptionT` computation may sample its initial state `s₀` from an arbitrary `ProbComp σ`. Since
+`support_simulateQ_run'_subset` bounds the support uniformly in `s₀`, the support hypothesis
+`h` (independent of `s₀`) still discharges both the never-fail and all-outputs-`P`
+obligations. -/
+lemma OptionT.probEvent_eq_one_of_simulateQ_support_bind
+    {ι σ α : Type} {spec : OracleSpec ι}
+    (init : ProbComp σ)
+    (impl : QueryImpl spec (StateT σ ProbComp))
+    (oa : OracleComp spec (Option α)) (P : α → Prop)
+    (h : ∀ x ∈ support oa, ∃ a, x = some a ∧ P a) :
+    Pr[P | OptionT.mk (do let s ← init; (simulateQ impl oa).run' s)] = 1 := by
+  letI := Classical.decPred P
+  rw [probEvent_eq_one_iff]
+  refine ⟨?_, ?_⟩
+  · -- The simulated computation never fails: for every sampled state `s`, the run' has no `none`
+    -- in its support (it is bounded by `support oa`, which contains no `none` by `h`).
+    rw [OptionT.probFailure_eq, OptionT.run_mk, add_eq_zero]
+    refine ⟨probFailure_eq_zero, ?_⟩
+    refine probOutput_eq_zero_of_not_mem_support fun hnone => ?_
+    rw [mem_support_bind_iff] at hnone
+    obtain ⟨s, _, hnone⟩ := hnone
+    obtain ⟨_, hsome, _⟩ := h none (support_simulateQ_run'_subset impl oa s hnone)
+    cases hsome
+  · -- Every successful output satisfies `P`: peel the `init` bind, then bound the support.
+    intro x hx
+    rw [OptionT.mem_support_iff, OptionT.run_mk, mem_support_bind_iff] at hx
+    obtain ⟨s, _, hx⟩ := hx
+    obtain ⟨a, ha, hP⟩ := h (some x) (support_simulateQ_run'_subset impl oa s hx)
+    cases ha
+    exact hP
+
+/-- Properties of `Option`-valued outputs of an underlying `OracleComp` propagate to elements
+in the support of the simulated, run, and `OptionT`-wrapped version. -/
+lemma OptionT.aux_mem_support_simulateQ_run'
+    {ι σ α : Type} {spec : OracleSpec ι}
+    (impl : QueryImpl spec (StateT σ ProbComp))
+    (oa : OracleComp spec (Option α)) (s₀ : σ) (P : α → Prop)
+    (h : ∀ x ∈ support oa, ∀ a, x = some a → P a)
+    {x : α} (hx : x ∈ support (OptionT.mk ((simulateQ impl oa).run' s₀))) : P x := by
+  rw [OptionT.mem_support_iff] at hx
+  exact h (some x) (support_simulateQ_run'_subset impl oa s₀ hx) x rfl
+
+end probEventSimulateQ

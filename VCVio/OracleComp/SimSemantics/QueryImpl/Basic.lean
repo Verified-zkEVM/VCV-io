@@ -60,6 +60,13 @@ def mapQuery {α} [Functor m] (impl : QueryImpl spec m)
     (t : spec.Domain) : impl.mapQuery (query t) = impl t := by
   simp [mapQuery]
 
+/-- Reduce `mapQuery` on an explicit constructor-form query. Companion to `mapQuery_query`
+for queries that arise from `SubSpec`-lift normalization (which produces
+`OracleQuery.mk`/anonymous-constructor forms rather than `OracleSpec.query`). -/
+@[simp] lemma mapQuery_mk {α} [Functor m] (impl : QueryImpl spec m)
+    (t : spec.Domain) (f : spec.Range t → α) :
+    impl.mapQuery (OracleQuery.mk t f) = f <$> impl t := rfl
+
 section liftTarget
 
 /-- Gadget for auto-adding a lift to the end of a query implementation. -/
