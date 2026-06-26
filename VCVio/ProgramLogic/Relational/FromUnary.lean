@@ -93,13 +93,16 @@ theorem relTriple_prod_of_triple {oa : OracleComp spec₁ α} {ob : OracleComp s
 
 /-- Relational triples are monotone in the postcondition, so a product coupling can be
 weakened to any relation implied by the conjunction of independent postconditions. -/
-theorem relTriple_of_triple_of_imp {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+theorem relTriple_of_triple_of_implies {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     {P : α → Prop} {Q : β → Prop} {R : RelPost α β}
     (hP : Std.Do.Triple (m := OracleComp spec₁) (ps := .pure) oa (⌜True⌝) (⇓a => ⌜P a⌝))
     (hQ : Std.Do.Triple (m := OracleComp spec₂) (ps := .pure) ob (⌜True⌝) (⇓b => ⌜Q b⌝))
     (hImp : ∀ a b, P a → Q b → R a b) :
     RelTriple oa ob R :=
   relTriple_post_mono (relTriple_prod_of_triple hP hQ) (fun _ _ ⟨hp, hq⟩ => hImp _ _ hp hq)
+
+@[deprecated (since := "2026-06-25")]
+alias relTriple_of_triple_of_imp := relTriple_of_triple_of_implies
 
 /-! ## Smoke tests -/
 
@@ -114,11 +117,11 @@ private example (x : α) (y : β) :
     ((OracleComp.ProgramLogic.StdDo.wpProp_pure (spec := spec₁) x _).2 rfl)
     ((OracleComp.ProgramLogic.StdDo.wpProp_pure (spec := spec₂) y _).2 rfl)
 
-/-- Smoke test: using `relTriple_of_triple_of_imp` to project a product coupling onto
+/-- Smoke test: using `relTriple_of_triple_of_implies` to project a product coupling onto
 any logically weaker relation. -/
 private example (x : α) :
     RelTriple (pure x : OracleComp spec₁ α) (pure x : OracleComp spec₁ α) (EqRel α) :=
-  relTriple_of_triple_of_imp (P := fun a => a = x) (Q := fun a => a = x)
+  relTriple_of_triple_of_implies (P := fun a => a = x) (Q := fun a => a = x)
     (by intro _; exact (OracleComp.ProgramLogic.StdDo.wpProp_pure (spec := spec₁) x _).2 rfl)
     (by intro _; exact (OracleComp.ProgramLogic.StdDo.wpProp_pure (spec := spec₁) x _).2 rfl)
     (fun _ _ hP hQ => by dsimp [EqRel]; rw [hP, hQ])

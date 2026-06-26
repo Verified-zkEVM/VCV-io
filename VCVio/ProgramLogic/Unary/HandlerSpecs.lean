@@ -532,7 +532,7 @@ example (t₁ t₂ : spec.Domain) (qc₀ : QueryCount ι) :
 count under `simulateQ countingOracle oa` only ever grows. Derived from the
 generic `simulateQ_writerT_triple_preserves_invariant` with invariant
 `I qc := qc₀ ≤ qc`. -/
-theorem simulateQ_countingOracle_preserves_ge {α : Type}
+theorem simulateQ_countingOracle_preserves_le {α : Type}
     (qc₀ : QueryCount ι) (oa : OracleComp spec α) :
     Std.Do.Triple
       (simulateQ countingOracle oa :
@@ -546,6 +546,9 @@ theorem simulateQ_countingOracle_preserves_ge {α : Type}
   intro qc hqc _ w hmem
   rw [(triple_writerT_iff_forall_support_monoid ..).mp (countingOracle_triple t qc) qc rfl _ w hmem]
   exact fun i => (hqc i).trans (Nat.le_add_right _ _)
+
+@[deprecated (since := "2026-06-25")]
+alias simulateQ_countingOracle_preserves_ge := simulateQ_countingOracle_preserves_le
 
 end countingOracle
 

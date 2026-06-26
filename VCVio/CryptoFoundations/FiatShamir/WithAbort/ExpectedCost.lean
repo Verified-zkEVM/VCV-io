@@ -90,7 +90,7 @@ private lemma signLoop_queryCountDist_succ
               (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ℕ m)] =>
                 fsAbortSignLoop (m := AddWriterT ℕ m) ids M pk sk msg n)
               runtime) = _
-  rw [AddWriterT.costs_def, WriterT.run_bind, signAttempt_run_formula_withUnitCost]
+  rw [AddWriterT.costs_def, WriterT.run_bind, signAttempt_run_withUnitCost_eq]
   simp only [bind_map_left, map_bind, Functor.map_map, toAdd_mul, toAdd_ofAdd]
   refine bind_congr ?_
   intro attempt

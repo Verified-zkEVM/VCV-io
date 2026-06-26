@@ -213,7 +213,7 @@ variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
+private lemma sign_outputs_withAddCost_eq_eval {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.outputs
@@ -247,7 +247,7 @@ private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
   simp [bind_map_left]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
+private lemma sign_costs_withAddCost_eq {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.costs
@@ -295,8 +295,8 @@ theorem sign_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
       (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
         (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
       runtime costFn (fun sig ↦ costFn (msg, sig.1)) := by
-  rw [HasQuery.UsesCostAs, AddWriterT.costsAs_iff, sign_outputs_formula_withAddCost]
-  exact sign_costs_formula_withAddCost σ hr M runtime pk sk msg costFn
+  rw [HasQuery.UsesCostAs, AddWriterT.costsAs_iff, sign_outputs_withAddCost_eq_eval]
+  exact sign_costs_withAddCost_eq σ hr M runtime pk sk msg costFn
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing has expected weighted query cost equal to the expectation of the queried
@@ -330,7 +330,7 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
             (fun [HasQuery (M × Commit →ₒ Chal) m] =>
               (FiatShamir (m := m) σ hr M).sign pk sk msg)
             runtime] * val (costFn (msg, sig.1)) := by
-          rw [sign_outputs_formula_withAddCost]
+          rw [sign_outputs_withAddCost_eq_eval]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/

@@ -1277,13 +1277,16 @@ discharge most apRHL-style goals without descending to the underlying coupling s
 
 This is the basic primitive used by every closed-form / lower-bound rule below, and is the
 right tool whenever a proof can exhibit a specific coupling. -/
-theorem eRelWP_ge_of_isCoupling
+theorem le_eRelWP_of_isCoupling
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (post : α → β → ℝ≥0∞)
     (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (𝒟[oa]) (𝒟[ob])) :
     (∑' z, Pr[= z | c] * post z.1 z.2) ≤ eRelWP oa ob post :=
   le_iSup (f := fun c' : SPMF.Coupling (𝒟[oa]) (𝒟[ob]) =>
     ∑' z, Pr[= z | c'.1] * post z.1 z.2) ⟨c, hc⟩
+
+@[deprecated (since := "2026-06-25")]
+alias eRelWP_ge_of_isCoupling := le_eRelWP_of_isCoupling
 
 /-- A witness coupling whose score dominates the precondition discharges a
 quantitative relational WP lower-bound obligation. -/
@@ -1294,7 +1297,7 @@ theorem eRelWP_of_isCoupling
     (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (𝒟[oa]) (𝒟[ob]))
     (hpre : pre ≤ ∑' z, Pr[= z | c] * post z.1 z.2) :
     pre ≤ eRelWP oa ob post :=
-  hpre.trans (eRelWP_ge_of_isCoupling post c hc)
+  hpre.trans (le_eRelWP_of_isCoupling post c hc)
 
 /-- Reindex the score of the bijection coupling `base >>= fun a => pure (a, f a)` as a
 sum over `a`, collapsing the second component. Shared by the uniform-sampling and
@@ -1353,7 +1356,7 @@ theorem eRelWP_uniformSample_bij_ge
       = ∑' z : α × α, Pr[= z | c] * post z.1 z.2 :=
         (tsum_probOutput_bind_pure_pair (𝒟[($ᵗ α : ProbComp α)]) f post).symm
     _ ≤ eRelWP ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post :=
-        eRelWP_ge_of_isCoupling post c hc
+        le_eRelWP_of_isCoupling post c hc
 
 /-- Any precondition below the bijection average discharges the quantitative
 relational WP lower-bound for two uniform samples. -/
@@ -1395,7 +1398,7 @@ theorem eRelWP_query_bij_ge (t : spec₁.Domain)
       = ∑' z : spec₁.Range t × spec₁.Range t, Pr[= z | c] * post z.1 z.2 :=
         (tsum_probOutput_bind_pure_pair (𝒟[oq]) f post).symm
     _ ≤ eRelWP (spec₁ := spec₁) (spec₂ := spec₁) oq oq post :=
-        eRelWP_ge_of_isCoupling post c hc
+        le_eRelWP_of_isCoupling post c hc
 
 /-- Triple form of `eRelWP_query_bij_ge`. -/
 theorem eRelWP_query_bij (t : spec₁.Domain)

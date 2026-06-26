@@ -42,7 +42,7 @@ omit [LawfulMonad n] in
   exact bind_congr fun x => simulateQ_option_elim impl x my my'
 
 /-- `simulateQ` distributes through `OptionT.bind`, stated via `OptionT.run`. -/
-lemma simulateQ_optionT_bind'
+lemma simulateQ_optionT_bind_run
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
     simulateQ impl (mx >>= f).run =
     (simulateQ impl mx.run >>= fun a => simulateQ impl (f a).run : OptionT n β) := by
@@ -50,12 +50,18 @@ lemma simulateQ_optionT_bind'
   refine bind_congr fun x => ?_
   induction x <;> simp
 
+@[deprecated (since := "2026-06-25")]
+alias simulateQ_optionT_bind' := simulateQ_optionT_bind_run
+
 /-- `simulateQ` distributes through `OptionT.bind`, stated via `Option.elimM`. -/
-lemma simulateQ_optionT_bind''
+lemma simulateQ_optionT_bind_elimM
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
     simulateQ impl (mx >>= f).run =
     Option.elimM (simulateQ impl mx.run) (pure none) (fun a => simulateQ impl (f a).run) := by
   simp
+
+@[deprecated (since := "2026-06-25")]
+alias simulateQ_optionT_bind'' := simulateQ_optionT_bind_elimM
 
 /-- `simulateQ` distributes through `OptionT.bind`: the simulated OptionT-bind is the
     OptionT-bind of the simulated pieces. -/
@@ -63,7 +69,7 @@ lemma simulateQ_optionT_bind
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
     simulateQ impl (mx >>= f : OptionT (OracleComp spec) β) =
     (simulateQ impl mx >>= fun a => simulateQ impl (f a) : OptionT n β) :=
-  simulateQ_optionT_bind' impl mx f
+  simulateQ_optionT_bind_run impl mx f
 
 /-- `simulateQ` commutes with `OptionT.lift`. -/
 @[simp] lemma simulateQ_optionT_lift
@@ -76,7 +82,7 @@ lemma simulateQ_optionT_bind
 
 When every step of a `mapM` resolves to `pure (some _)` under `simulateQ`,
 the whole `mapM` resolves to `pure (some _)` of the pointwise mapped collection.
-These are the `List` and `Vector` companions to `simulateQ_optionT_bind'` /
+These are the `List` and `Vector` companions to `simulateQ_optionT_bind_run` /
 `simulateQ_optionT_lift`. -/
 
 /-- `simulateQ` over `List.mapM` in `OptionT`: when each step is `pure (some (g x))`
@@ -92,11 +98,11 @@ lemma simulateQ_optionT_list_mapM_pure
   | nil => exact simulateQ_pure impl (some [])
   | cons a rest ih =>
     change simulateQ impl ((a :: rest).mapM f : OptionT (OracleComp spec) (List β)).run = _
-    rw [List.mapM_cons, simulateQ_optionT_bind'']
+    rw [List.mapM_cons, simulateQ_optionT_bind_elimM]
     have h₁ : (f a : OracleComp spec (Option β)) = (f a).run := rfl
     rw [← h₁, hfg a]
     simp only [Option.elimM, pure_bind, Option.elim_some]
-    rw [simulateQ_optionT_bind'']
+    rw [simulateQ_optionT_bind_elimM]
     have h₂ : (rest.mapM f : OracleComp spec (Option (List β))) =
         (rest.mapM f : OptionT (OracleComp spec) (List β)).run := rfl
     rw [← h₂, ih]
@@ -105,7 +111,7 @@ lemma simulateQ_optionT_list_mapM_pure
 
 /-- `simulateQ` over `Vector.mapM` in `OptionT`: when each step is `pure (some (g x))`
 under `simulateQ`, the whole `mapM` is `pure (some (xs.map g))`. -/
-lemma simulateQ_optionT_mapM_pure {k : ℕ}
+lemma simulateQ_optionT_vector_mapM_pure {k : ℕ}
     (f : α → OptionT (OracleComp spec) β) (g : α → β) (xs : Vector α k)
     (hfg : ∀ x, simulateQ impl (f x : OracleComp spec (Option β)) =
       (pure (some (g x)) : n (Option β))) :
@@ -136,3 +142,6 @@ lemma simulateQ_optionT_mapM_pure {k : ℕ}
   rw [h_simp_rhs] at h_sim
   exact (map_inj_right
     (fun h => Option.map_injective (fun _ _ => Vector.toArray_inj.mp) h)).mp h_sim
+
+@[deprecated (since := "2026-06-25")]
+alias simulateQ_optionT_mapM_pure := simulateQ_optionT_vector_mapM_pure

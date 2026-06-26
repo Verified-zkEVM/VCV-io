@@ -39,7 +39,7 @@ values. The definitions `eraseObs` and `runObs` are parameterized by a base orac
 
 * `fst_map_runObs`: erasure theorem — projecting away the trace recovers `eraseObs`.
 * `probFailure_runObs`: observations do not change failure probability (`[MonadLiftT m SPMF]`).
-* `NeverFail_runObs_iff`: `NeverFail` is preserved by observation (`[MonadLiftT m SPMF]`).
+* `neverFail_runObs_iff`: `NeverFail` is preserved by observation (`[MonadLiftT m SPMF]`).
 -/
 
 open OracleSpec OracleComp
@@ -155,10 +155,13 @@ theorem probFailure_runObs [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT
   rw [← fst_map_runObs base encode oa, probFailure_map]
 
 /-- `NeverFail` is preserved by observation. -/
-theorem NeverFail_runObs_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+theorem neverFail_runObs_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
     NeverFail (runObs base encode oa) ↔ NeverFail (eraseObs base oa) := by
   simp only [neverFail_iff, probFailure_runObs]
+
+@[deprecated (since := "2026-06-25")]
+alias NeverFail_runObs_iff := neverFail_runObs_iff
 
 /-! ### EvalDist Bridge for `runObs`
 

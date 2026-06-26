@@ -89,7 +89,7 @@ lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [MonadLiftT m SPMF]
     [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withCost costFn) mx).run ↔ NeverFail (simulateQ so mx) :=
-  NeverFail_run_simulateQ_withTraceBefore_iff so costFn mx
+  neverFail_run_simulateQ_withTraceBefore_iff so costFn mx
 
 /-- When every query costs the monoid identity `1`, the trace is always `1`,
 so `withCost` is a no-op up to pairing with `1`. -/
@@ -246,18 +246,21 @@ def simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
     OracleComp spec (α × QueryCount ι) :=
   Prod.map id (qc + ·) <$> (simulateQ countingOracle oa).run
 
-lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : QueryCount ι) :
+lemma simulate_eq_map_simulate_zero (oa : OracleComp spec α) (qc : QueryCount ι) :
     simulate oa qc = Prod.map id (qc + ·) <$> simulate oa 0 := by
   simp only [simulate, Functor.map_map]
   congr 1
   funext ⟨x, q⟩
   simp
 
+@[deprecated (since := "2026-06-25")]
+alias run_simulateT_eq_run_simulateT_zero := simulate_eq_map_simulate_zero
+
 /-- We can always reduce simulation with counting to start with `0`,
 and add the initial count back at the end. -/
 lemma support_simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
     support (simulate oa qc) = Prod.map id (qc + ·) '' support (simulate oa 0) := by
-  rw [run_simulateT_eq_run_simulateT_zero]
+  rw [simulate_eq_map_simulate_zero]
   simp [support_map]
 
 /-- Reduce membership in support of simulation with counting to simulation starting from `0`. -/

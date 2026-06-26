@@ -104,7 +104,7 @@ lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [MonadLiftT m SPMF
     [LawfulMonadLiftT m SPMF]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withLogging) mx).run ↔ NeverFail (simulateQ so mx) :=
-  so.NeverFail_run_simulateQ_withTraceAppend_iff
+  so.neverFail_run_simulateQ_withTraceAppend_iff
     (fun (t : spec.Domain) u => ([⟨t, u⟩] : QueryLog spec)) mx
 
 variable {κ : Type} {loggedSpec : OracleSpec κ}

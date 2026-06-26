@@ -628,7 +628,7 @@ lemma probOutput_bind_bind_swap [LawfulMonadLiftT m SPMF] [LawfulMonad m]
 
 omit [Monad m] in
 /-- If `1 - ε ≤ Pr[ p | mx]` and `mx` never fails, then `Pr[ ¬p | mx] ≤ ε`. -/
-lemma probEvent_compl_le_of_ge
+lemma probEvent_compl_le_of_one_sub_le
     {mx : m α} {p : α → Prop} {ε : ℝ≥0∞}
     (hfail : Pr[⊥ | mx] = 0)
     (h : 1 - ε ≤ Pr[ p | mx]) :
@@ -637,9 +637,12 @@ lemma probEvent_compl_le_of_ge
     simpa [hfail, add_comm] using probEvent_compl mx p
   rwa [ENNReal.eq_sub_of_add_eq probEvent_ne_top hsum, tsub_le_iff_tsub_le]
 
+@[deprecated (since := "2026-06-25")]
+alias probEvent_compl_le_of_ge := probEvent_compl_le_of_one_sub_le
+
 omit [Monad m] in
 /-- If `Pr[ ¬p | mx] ≤ ε` and `mx` never fails, then `1 - ε ≤ Pr[ p | mx]`. -/
-lemma probEvent_ge_of_compl_le
+lemma probEvent_one_sub_le_of_compl_le
     {mx : m α} {p : α → Prop} {ε : ℝ≥0∞}
     (hfail : Pr[⊥ | mx] = 0)
     (h : Pr[ fun x => ¬p x | mx] ≤ ε) :
@@ -648,6 +651,9 @@ lemma probEvent_ge_of_compl_le
     simpa [hfail] using probEvent_compl mx p
   rw [ENNReal.eq_sub_of_add_eq probEvent_ne_top hsum]
   exact tsub_le_tsub_left h _
+
+@[deprecated (since := "2026-06-25")]
+alias probEvent_ge_of_compl_le := probEvent_one_sub_le_of_compl_le
 
 end swap_compl
 

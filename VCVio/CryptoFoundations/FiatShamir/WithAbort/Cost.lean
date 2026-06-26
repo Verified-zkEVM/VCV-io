@@ -33,7 +33,7 @@ variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel) (M :
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
-private lemma signAttempt_run_formula_withAddCost {ω : Type} [AddMonoid ω]
+private lemma signAttempt_run_withAddCost_eq {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     WriterT.run
@@ -69,7 +69,7 @@ private lemma signAttempt_run_formula_withAddCost {ω : Type} [AddMonoid ω]
       pure ((a.1.1, z.1), a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2))) = _
   simp
 
-private lemma signAttempt_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
+private lemma signAttempt_outputs_withAddCost_eq_eval {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.outputs
@@ -81,9 +81,9 @@ private lemma signAttempt_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
         (fun [HasQuery (M × Commit →ₒ Chal) m] =>
           fsAbortSignAttempt (m := m) ids M pk sk msg)
         runtime := by
-  simp [AddWriterT.outputs, signAttempt_run_formula_withAddCost, Functor.map_map]
+  simp [AddWriterT.outputs, signAttempt_run_withAddCost_eq, Functor.map_map]
 
-private lemma signAttempt_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
+private lemma signAttempt_costs_withAddCost_eq {ω : Type} [AddMonoid ω]
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.costs
@@ -96,11 +96,11 @@ private lemma signAttempt_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
           (fun [HasQuery (M × Commit →ₒ Chal) m] =>
             fsAbortSignAttempt (m := m) ids M pk sk msg)
           runtime := by
-  simp [signAttempt_run_formula_withAddCost]
+  simp [signAttempt_run_withAddCost_eq]
 
 /-- Unit-cost specialization of the run formula: each signing attempt run tags its output with a
-single unit of cost (cf. `signAttempt_run_formula_withAddCost`). -/
-lemma signAttempt_run_formula_withUnitCost
+single unit of cost (cf. `signAttempt_run_withAddCost_eq`). -/
+lemma signAttempt_run_withUnitCost_eq
     (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) :
     WriterT.run
         (HasQuery.Program.withUnitCost
@@ -113,9 +113,12 @@ lemma signAttempt_run_formula_withUnitCost
             fsAbortSignAttempt (m := m) ids M pk sk msg)
           runtime := by
   simpa [HasQuery.Program.withUnitCost] using
-    signAttempt_run_formula_withAddCost
+    signAttempt_run_withAddCost_eq
       (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
       (costFn := fun _ ↦ (1 : ℕ))
+
+@[deprecated (since := "2026-06-25")]
+alias signAttempt_run_formula_withUnitCost := signAttempt_run_withUnitCost_eq
 
 /-- A single signing attempt has query cost determined by its output: the returned commitment
 `w'` is exactly the random-oracle query point. -/
@@ -126,8 +129,8 @@ theorem signAttempt_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
       (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
         fsAbortSignAttempt (m := AddWriterT ω m) ids M pk sk msg)
       runtime costFn (fun attempt ↦ costFn (msg, attempt.1)) := by
-  rw [HasQuery.UsesCostAs, AddWriterT.costsAs_iff, signAttempt_outputs_formula_withAddCost]
-  exact signAttempt_costs_formula_withAddCost ids M runtime pk sk msg costFn
+  rw [HasQuery.UsesCostAs, AddWriterT.costsAs_iff, signAttempt_outputs_withAddCost_eq_eval]
+  exact signAttempt_costs_withAddCost_eq ids M runtime pk sk msg costFn
 
 /-- The expected weighted query cost of one signing attempt is the expectation of the queried
 commitment cost over the attempt output distribution. -/
@@ -161,7 +164,7 @@ theorem signAttempt_expectedQueryCost_eq_outputExpectation
             (fun [HasQuery (M × Commit →ₒ Chal) m] =>
               fsAbortSignAttempt (m := m) ids M pk sk msg)
             runtime] * val (costFn (msg, attempt.1)) := by
-          rw [signAttempt_outputs_formula_withAddCost]
+          rw [signAttempt_outputs_withAddCost_eq_eval]
 
 section queryBounds
 

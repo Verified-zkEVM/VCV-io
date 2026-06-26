@@ -133,7 +133,7 @@ private lemma IND_CPA_hybridLR_counted_run'_evalDist_eq_above (pk : PK) (k : ℕ
       (impl₁ := encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k)
       (impl₂ := encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1))
       (Inv := fun s => k + 1 ≤ s.2) (oa := oa)
-      (himpl_eq := IND_CPA_hybridLR_counted_run_eq_of_ge (encAlg' := encAlg') pk k)
+      (himpl_eq := IND_CPA_hybridLR_counted_run_eq_of_le (encAlg' := encAlg') pk k)
       (hpres₂ := fun t s hs z hz => by
         have := IND_CPA_hybridLR_counted_counter_le (encAlg' := encAlg') pk (k + 1) t s z hz
         omega)

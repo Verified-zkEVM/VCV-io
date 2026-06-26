@@ -266,7 +266,7 @@ lemma probEvent_simulateQ_run'_eq {σ τ : Type u}
 /-- If two stateful oracle implementations agree on the post-`run` distribution of every
 query (`𝒟[(impl₁ t).run s] = 𝒟[(impl₂ t).run s]`), then simulating any computation through
 either yields the same distribution on the run. -/
-lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
+lemma evalDist_simulateQ_run_congr
     {ι' : Type} {spec' : OracleSpec ι'} {σ α : Type}
     (impl₁ impl₂ : QueryImpl spec' (StateT σ (OracleComp spec)))
     (h : ∀ (t : spec'.Domain) (s : σ),
@@ -275,6 +275,9 @@ lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
     𝒟[(simulateQ impl₁ comp).run s] =
       𝒟[(simulateQ impl₂ comp).run s] := by
   induction comp using OracleComp.inductionOn generalizing s <;> simp_all
+
+@[deprecated (since := "2026-06-25")]
+alias evalDist_simulateQ_run_eq_of_impl_evalDist_eq := evalDist_simulateQ_run_congr
 
 end simulateQ_evalDist
 

@@ -497,7 +497,7 @@ theorem IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
       (b := (1 / 2 : ℝ≥0∞)))
 
 /-- When the counter is above both thresholds, two hybrid LR counted oracles agree pointwise. -/
-lemma IND_CPA_hybridLR_counted_run_eq_of_ge
+lemma IND_CPA_hybridLR_counted_run_eq_of_le
     (pk : PK) (k : ℕ)
     (t : encAlg'.IND_CPA_oracleSpec.Domain)
     (st : encAlg'.IND_CPA_CountedState)
@@ -511,6 +511,9 @@ lemma IND_CPA_hybridLR_counted_run_eq_of_ge
       (fun n mm => if n < k then mm.1 else mm.2)
       (fun n mm => if n < k + 1 then mm.1 else mm.2) mm st
       (by simp [show ¬(st.2 < k) from by omega, show ¬(st.2 < k + 1) from by omega])
+
+@[deprecated (since := "2026-06-25")]
+alias IND_CPA_hybridLR_counted_run_eq_of_ge := IND_CPA_hybridLR_counted_run_eq_of_le
 
 /-- Counter monotonicity for the hybrid LR counted oracle: the counter never decreases. -/
 lemma IND_CPA_hybridLR_counted_counter_le

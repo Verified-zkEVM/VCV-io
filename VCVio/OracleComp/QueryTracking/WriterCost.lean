@@ -285,7 +285,7 @@ lemma expectedCost_le_of_pathwiseCostAtMost [AddMonoid ω]
   exact hval (h z hz)
 
 omit [LawfulMonadLiftT m SPMF] in
-lemma expectedCost_ge_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Preorder ω]
+lemma le_expectedCost_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Preorder ω]
     {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
     (h : PathwiseCostAtLeast oa w) (hval : Monotone val)
     (hnf : Pr[⊥ | oa.costs] = 0) :
@@ -304,6 +304,9 @@ lemma expectedCost_ge_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Pre
             gcongr
             exact hval (h z hz)
           · rw [probOutput_eq_zero_of_not_mem_support hc, zero_mul, zero_mul]
+
+@[deprecated (since := "2026-06-25")]
+alias expectedCost_ge_of_pathwiseCostAtLeast := le_expectedCost_of_pathwiseCostAtLeast
 
 omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [EvalDistCompatible m] in
@@ -735,13 +738,16 @@ section expectedUnitCostPMF
 variable [MonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
-lemma expectedCostNat_ge_of_queryBoundedBelowBy [LawfulMonad m] [EvalDistCompatible m]
+lemma le_expectedCostNat_of_queryBoundedBelowBy [LawfulMonad m] [EvalDistCompatible m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
     (h : QueryBoundedBelowBy oa n) :
     (n : ENNReal) ≤ expectedCostNat oa := by
-  refine expectedCost_ge_of_pathwiseCostAtLeast
+  refine le_expectedCost_of_pathwiseCostAtLeast
     (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h Nat.mono_cast
     (probFailure_of_liftM_PMF _)
+
+@[deprecated (since := "2026-06-25")]
+alias expectedCostNat_ge_of_queryBoundedBelowBy := le_expectedCostNat_of_queryBoundedBelowBy
 
 lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m] [EvalDistCompatible m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
@@ -749,7 +755,7 @@ lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m] [EvalDistCompatible
     expectedCostNat oa = n :=
   le_antisymm
     (expectedCostNat_le_of_queryBoundedAboveBy h.toAbove)
-    (expectedCostNat_ge_of_queryBoundedBelowBy h.toBelow)
+    (le_expectedCostNat_of_queryBoundedBelowBy h.toBelow)
 
 end expectedUnitCostPMF
 

@@ -313,7 +313,7 @@ private lemma nma_lift_unif_run
     (oa := oa) ▸ himpl₁
 
 omit [Finite Chal] [Inhabited Chal] in
-private lemma simulatedNmaUnifSim_fsUniform_run_for_cma
+private lemma simulatedNmaUnifSim_fsUniform_run
     {α : Type} (oa : ProbComp α)
     (cache : (fsRoSpec M Commit Chal).QueryCache) :
     simulateQ (fsUniformImpl (M := M) (Commit := Commit) (Chal := Chal))
@@ -457,7 +457,7 @@ private def cmaSimLoggedLeftOrnament
               ((simulateQ (simulatedNmaUnifSim (M := M) (Commit := Commit)
                 (Chal := Chal)) (simT pk)).run advCache) =
             (fun a ↦ (a, advCache)) <$> simT pk :=
-        simulatedNmaUnifSim_fsUniform_run_for_cma (M := M)
+        simulatedNmaUnifSim_fsUniform_run (M := M)
           (Commit := Commit) (Chal := Chal) (oa := simT pk) (cache := advCache)
       rw [nma_lift_unif_run (M := M) (Commit := Commit)
         (Chal := Chal) (Stmt := Stmt) (Wit := Wit) hr (simT pk)
@@ -1284,7 +1284,7 @@ private def forkLoggedProbOrnament
                 (Chal := Chal)) (simT pk)).run advCache) =
             (fun a => (a, advCache)) <$> simT pk := by
         simpa [fsUniformImpl] using
-          (simulatedNmaUnifSim_fsUniform_run_for_cma (M := M) (Commit := Commit)
+          (simulatedNmaUnifSim_fsUniform_run (M := M) (Commit := Commit)
             (Chal := Chal) (oa := simT pk) (cache := advCache))
       simp [hleft, hright, Functor.map_map]
 

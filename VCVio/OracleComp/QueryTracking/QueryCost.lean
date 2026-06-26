@@ -330,15 +330,18 @@ section expectedCostPMF
 variable [Monad m] [MonadLiftT m PMF]
   [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
 
-lemma expectedQueryCost_ge_of_usesCostAtLeast
+lemma le_expectedQueryCost_of_usesCostAtLeast
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
     {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
     (h : HasQuery.UsesCostAtLeast oa runtime costFn w) (hval : Monotone val) :
     val w ≤ HasQuery.expectedQueryCost oa runtime costFn val := by
   simpa [HasQuery.expectedQueryCost] using
-    (AddWriterT.expectedCost_ge_of_pathwiseCostAtLeast
+    (AddWriterT.le_expectedCost_of_pathwiseCostAtLeast
       (oa := HasQuery.Program.withAddCost oa runtime costFn) (w := w) (val := val) h hval)
+
+@[deprecated (since := "2026-06-25")]
+alias expectedQueryCost_ge_of_usesCostAtLeast := le_expectedQueryCost_of_usesCostAtLeast
 
 lemma expectedQueryCost_eq_of_usesCostExactly
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
@@ -349,17 +352,20 @@ lemma expectedQueryCost_eq_of_usesCostExactly
   le_antisymm
     (expectedQueryCost_le_of_usesCostAtMost
       (usesCostAtMost_of_usesCostExactly h le_rfl) hval)
-    (expectedQueryCost_ge_of_usesCostAtLeast
+    (le_expectedQueryCost_of_usesCostAtLeast
       (usesCostAtLeast_of_usesCostExactly h le_rfl) hval)
 
-lemma expectedQueries_ge_of_usesAtLeastQueries [LawfulMonad m]
+lemma le_expectedQueries_of_usesAtLeastQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}
     (h : HasQuery.UsesAtLeastQueries oa runtime n) :
     (n : ENNReal) ≤ HasQuery.expectedQueries oa runtime := by
   simpa [HasQuery.expectedQueryCost] using
-    (AddWriterT.expectedCost_ge_of_pathwiseCostAtLeast
+    (AddWriterT.le_expectedCost_of_pathwiseCostAtLeast
       (oa := HasQuery.Program.withUnitCost oa runtime) (w := n) (val := fun k ↦ (k : ENNReal)) h
       Nat.mono_cast)
+
+@[deprecated (since := "2026-06-25")]
+alias expectedQueries_ge_of_usesAtLeastQueries := le_expectedQueries_of_usesAtLeastQueries
 
 lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     [LawfulMonad m]
@@ -369,7 +375,7 @@ lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     HasQuery.expectedQueries oa runtime = n :=
   le_antisymm
     (expectedQueries_le_of_usesAtMostQueries hUpper)
-    (expectedQueries_ge_of_usesAtLeastQueries hLower)
+    (le_expectedQueries_of_usesAtLeastQueries hLower)
 
 lemma expectedQueries_eq_of_usesExactlyQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryImpl spec m} {n : ℕ}

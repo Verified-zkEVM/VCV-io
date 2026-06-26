@@ -318,7 +318,7 @@ theorem correct
         let (pk, sk) ← hr.gen
         signVerify pk sk] by
     rw [hRewrite]
-    apply SignatureAlg.probOutput_bind_ge_of_forall_support
+    apply SignatureAlg.le_probOutput_bind_of_forall_support
     intro ⟨pk, sk⟩ hmem
     have hrel : rel pk sk = true := hr.gen_sound pk sk hmem
     have habort : Pr[= none | 𝒟[signOnly pk sk]] ≤ δ := h_abort pk sk hrel msg

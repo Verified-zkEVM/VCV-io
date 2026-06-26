@@ -128,7 +128,7 @@ lemma Complete.mono {sigAlg : SignatureAlg m M PK SK S} {runtime : ProbCompRunti
 /-- If every value `x` in the support of `gen` satisfies `Pr[= a | f x] ≥ 1 - δ`, then the
 overall probability satisfies `Pr[= a | gen >>= f] ≥ 1 - δ`. This reduces a "for all keys"
 completeness statement to per-key bounds. -/
-lemma probOutput_bind_ge_of_forall_support {α β : Type} {a : β} {δ : ℝ≥0∞} (gen : ProbComp α)
+lemma le_probOutput_bind_of_forall_support {α β : Type} {a : β} {δ : ℝ≥0∞} (gen : ProbComp α)
     (f : α → ProbComp β) (h : ∀ x, x ∈ support gen → 1 - δ ≤ Pr[= a | f x]) :
     1 - δ ≤ Pr[= a | gen >>= f] := by
   rw [probOutput_bind_eq_tsum]
@@ -139,6 +139,9 @@ lemma probOutput_bind_ge_of_forall_support {α β : Type} {a : β} {δ : ℝ≥0
         by_cases hx : x ∈ support gen
         · gcongr; exact h x hx
         · simp [probOutput_eq_zero_of_not_mem_support hx]
+
+@[deprecated (since := "2026-06-25")]
+alias probOutput_bind_ge_of_forall_support := le_probOutput_bind_of_forall_support
 
 end correctness
 

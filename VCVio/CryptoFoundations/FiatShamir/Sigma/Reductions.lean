@@ -196,14 +196,14 @@ private theorem forkSupportInvariant_of_mem_replayFirstRun
     Fork.forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
       (Chal := Chal) hs
   have hverified : x.verified = true :=
-    Fork.forkPoint_some_imp_verified (M := M) (Commit := Commit) (Resp := Resp)
+    Fork.verified_of_forkPoint_eq_some (M := M) (Commit := Commit) (Resp := Resp)
       (Chal := Chal) hs
   obtain ⟨hslt, htgt_eq⟩ := List.getElem?_eq_some_iff.1 htarget
   obtain ⟨ω, hcache_idx, hlog⟩ :=
     Fork.runTrace_cache_outer_lockstep σ hr M nmaAdv pk h (↑s : ℕ) hslt
   rw [htgt_eq] at hcache_idx
   obtain ⟨ω', hcache', hverify⟩ :=
-    Fork.runTrace_verified_imp_verify σ hr M nmaAdv pk h hverified
+    Fork.exists_cached_verify_of_runTrace_verified σ hr M nmaAdv pk h hverified
   refine ⟨ω, hlog, hcache_idx, ?_⟩
   rwa [Option.some.inj (hcache'.symm.trans hcache_idx)] at hverify
 
