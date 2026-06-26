@@ -259,7 +259,6 @@ lemma self_mem_cache_of_mem_support_step_hidingImplCountAll (ms : M × S)
       simp [hcache]
   | none =>
       simp only [hcache, StateT.run_bind] at hx
-
       rw [mem_support_bind_iff] at hx
       obtain ⟨u, _, hx⟩ := hx
       simp only [StateT.run_set, StateT.run_pure, monad_norm, support_pure,

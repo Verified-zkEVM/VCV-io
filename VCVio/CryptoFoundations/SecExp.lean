@@ -348,12 +348,7 @@ lemma advantage_eq_zero_iff (exp : SecExp m) :
 @[simp]
 lemma advantage_eq_one_iff (exp : SecExp m) :
     exp.advantage = 1 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 0 := by
-  constructor
-  · intro h; by_contra hne
-    have : exp.advantage < 1 := by
-      unfold advantage; exact ENNReal.sub_lt_self one_ne_top one_ne_zero hne
-    exact absurd h (ne_of_lt this)
-  · intro h; simp [advantage, h]
+  grind [advantage, probEvent_eq_one_iff]
 
 end advantage
 

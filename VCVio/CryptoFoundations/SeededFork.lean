@@ -334,20 +334,7 @@ theorem cf_eq_of_mem_support_seededFork (x₁ x₂ : α)
     (h : some (x₁, x₂) ∈ support (seededFork main qb js i cf)) :
       ∃ s, cf x₁ = some s ∧ cf x₂ = some s := by
   simp only [seededFork] at h
-  rw [mem_support_bind_iff] at h; obtain ⟨seed, -, h⟩ := h
-  rw [mem_support_bind_iff] at h; obtain ⟨y₁, -, h⟩ := h
-  rcases hcf : cf y₁ with _ | s
-  · simp_all
-  · simp only [hcf] at h
-    rw [mem_support_bind_iff] at h; obtain ⟨u, -, h⟩ := h
-    split_ifs at h with heq
-    · simp_all
-    · rw [mem_support_bind_iff] at h; obtain ⟨y₂, -, h⟩ := h
-      split_ifs at h with hcf₂
-      · rw [mem_support_pure_iff] at h
-        obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj h)
-        exact ⟨s, hcf, hcf₂⟩
-      · simp_all
+  grind
 
 omit [unifSpec ˡ⊂ₒ spec] in
 /-- On `seededFork` support, first-projection success equals old pair-style success event. -/
@@ -358,9 +345,7 @@ theorem probEvent_seededFork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
   refine probEvent_ext fun r hr ↦ ?_
   rcases r with _ | ⟨x₁, x₂⟩
   · simp
-  · obtain ⟨t, h₁, h₂⟩ := cf_eq_of_mem_support_seededFork (main := main) (qb := qb)
-      (js := js) (i := i) (cf := cf) x₁ x₂ (by simpa using hr)
-    simp [h₁, h₂]
+  · grind [cf_eq_of_mem_support_seededFork]
 
 omit [spec.DecidableEq] [DecidableEq ι] in
 private lemma probEvent_uniform_eq_seedSlot_le_inv (s : Fin (qb i + 1))
