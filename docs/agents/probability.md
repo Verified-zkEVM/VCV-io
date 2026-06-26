@@ -133,18 +133,33 @@ similar are squarely in `grind`'s wheelhouse.
 introduces an *unbounded* quantifier or set over the support —
 `Pr[…] = 0/1 ↔ ∃/∀ x ∈ support …`, `support = {x}`, `support = ∅` — is a `grind` **saturation
 hazard**: as `grind` case-splits the iff it instantiates and Skolemizes the support quantifier into
-fresh witnesses that re-trigger each other, with no finite grounding (`support ($ᵗ α) = Set.univ` is
-infinite). Such lemmas are kept `@[simp]` (fixed orientation, no case-split — safe) and **dropped from
-the default `grind` set**. The *directed single-variable* membership bridges
-(`probOutput_eq_zero_iff : … ↔ x ∉ support`, `probOutput_pos_iff`, `mem_finSupport_iff`,
-`mem_finSupport_iff_mem_support`) are confluent and stay `@[grind =]`.
+fresh witnesses, which the always-tagged `bind`-expansion lemmas (`support_bind`,
+`probFailure_bind_eq_add_tsum`, `mem_support_bind_iff`, …) re-expand into yet more `support`/`Pr[…]`
+terms, with no finite grounding (`support ($ᵗ α) = Set.univ` is infinite). The hazard is
+**combinatorial, not per-lemma**: no single one of these lemmas saturates `grind` on its own (restore
+any one and a `grind` that should fail fast stays fast), but tagged *together* they form a re-trigger
+cycle — restoring all of them makes that same `grind` run ~25× longer. The **hub of the cycle is the
+`probEvent_eq_one_iff` family**: its RHS `Pr[⊥|mx]=0 ∧ ∀ x∈support, p x` couples the `probEvent`,
+`probFailure`, and `support` layers at once (drop it and the blow-up roughly quarters). So that
+family, together with the `∃`-Skolemizing `probEvent_ne_zero_iff` and the `probEvent_eq_zero_iff`
+families, is kept `@[simp]`-only (fixed orientation, no case-split — safe). The *directed
+single-variable* membership bridges (`probOutput_eq_zero_iff : … ↔ x ∉ support`, `probOutput_pos_iff`,
+`mem_finSupport_iff`, `mem_finSupport_iff_mem_support`) are confluent and stay `@[grind =]`.
 
-Lemmas that are `@[simp]`-only by this rule (in `EvalDist/Defs/Basic.lean` unless noted):
-`probEvent_eq_zero_iff(')`, `probEvent_ne_zero_iff(')`, `probEvent_pos_iff(')`,
-`probEvent_eq_one_iff(')`, `one_eq_probEvent_iff(')`, `probOutput_eq_one_iff(')`,
-`one_eq_probOutput_iff`, `probFailure_eq_one_iff`; and in `EvalDist/Monad/Basic.lean`,
-`probFailure_bind_eq_zero_iff` (`@[simp]`), `mem_support_bind_iff` / `mem_finSupport_bind_iff`
-(untagged — `support_bind` / `finSupport_bind` are the `simp` forms).
+Lemmas kept `@[simp]`-only by this rule (in `EvalDist/Defs/Basic.lean` unless noted):
+`probEvent_eq_zero_iff(')`, `probEvent_ne_zero_iff(')`, `probEvent_eq_one_iff(')`,
+`one_eq_probEvent_iff(')`, `probOutput_eq_one_iff`, `one_eq_probOutput_iff`, `probFailure_eq_one_iff`;
+and `mem_support_bind_iff` / `mem_finSupport_bind_iff` (untagged — `support_bind` / `finSupport_bind`
+are the `simp` forms).
+
+**Support-quantifier lemmas verified safe in isolation, kept `@[grind =]`.** A few carry the support
+quantifier yet sit *outside* the `probEvent_eq_one_iff` hub cycle and add no measurable `grind` cost
+on their own, so they keep their `grind` tag: `probEvent_pos_iff(')`, `probOutput_eq_one_iff'` (the
+mirror of the never-dropped `one_eq_probOutput_iff'` — both are the `finSupport`-singleton form), and
+`probFailure_bind_eq_zero_iff` (in `EvalDist/Monad/Basic.lean`). These are safe **only while the hub
+family stays `@[simp]`-only**: re-tagging the `probEvent_eq_one_iff` family alongside them re-forms the
+saturation cycle. `VCVioTest/LongChainPrograms.lean` is the 10+-step stress benchmark for exactly
+this.
 
 **If a `grind` proof needs one of these, re-supply it locally:** `grind [probEvent_eq_zero_iff]`. This
 keeps the bridge out of the default set (so naive `grind` on a probability goal fails fast instead of
@@ -158,6 +173,16 @@ carries the same information without the saturating quantifier. `probFailure_eq_
 needs to reason about a computation failing (or not) with probability one.
 `support_uniformSample_nonempty` (`(support ($ᵗ α)).Nonempty`, `@[grind]`) closes the loop, letting
 `grind` conclude e.g. `Pr[⊥ | $ᵗ α] ≠ 1` end-to-end.
+
+The event-probability versions follow the same recipe with the *filtered* support `{x ∈ support mx | p x}`
+(the reachable outputs satisfying `p`): `probEvent_ne_zero_iff_nonempty`
+(`Pr[ p | mx] ≠ 0 ↔ {x ∈ support mx | p x}.Nonempty`) and `probEvent_eq_zero_iff_not_nonempty`
+(`Pr[ p | mx] = 0 ↔ ¬ …`) are the `@[grind =]` companions to the `simp`-only `probEvent_ne_zero_iff` /
+`probEvent_eq_zero_iff`. The `Pr[…] = 1` companions are deliberately *omitted*: a `Nonempty`-phrased
+`probEvent_eq_one` keeps its `Pr[⊥ | mx] = 0` conjunct, which re-couples it to the hub family and
+re-creates the combination slowdown even though it is cheap in isolation. The two event companions add
+a small fixed `grind` cost that does not compound, so they stay in the default set; the `= 1` cases use
+`grind [probEvent_eq_one_iff]` opt-in instead.
 
 **Monad/functor laws normalise structure for `grind`.** `bind_pure`, `pure_bind`, `bind_assoc`, and
 `map_pure` are tagged `@[grind =]` (in `EvalDist/Monad/Basic.lean`). They are confluent rewrites, so

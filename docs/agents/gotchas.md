@@ -57,15 +57,18 @@ The bare `query` identifier is the `export`ed `HasQuery.query`, so writing `quer
 bind, so use `rw [probOutput_bind_eq_tsum]` or `grind`.
 
 Conversely, the support-*characterization* lemmas (`Pr[…] = 0/1 ↔ ∃/∀ x ∈ support …`,
-`support = {x}`, `support = ∅`: `probEvent_eq_zero_iff`, `probEvent_pos_iff`, `probOutput_eq_one_iff`,
+`support = {x}`, `support = ∅`: `probEvent_eq_zero_iff`, `probEvent_eq_one_iff`, `probOutput_eq_one_iff`,
 `probFailure_eq_one_iff`, `mem_support_bind_iff`, …) are `@[simp]` but deliberately **NOT** `@[grind]`.
 Their RHS introduces an unbounded support quantifier that `grind` Skolemizes into fresh witnesses with
-no finite grounding, so a naive `grind` on a probability value/event goal would *saturate and time
-out*. Dropped from the default `grind` set, `grind` instead fails fast. If a `grind` proof genuinely
+no finite grounding; tagged *together* they form a re-trigger cycle so a naive `grind` on a probability
+value/event goal would *saturate and time out*. The saturation is **combinatorial** — no single lemma
+saturates alone (a few that sit outside the cycle, e.g. `probEvent_pos_iff` and
+`probFailure_bind_eq_zero_iff`, keep `@[grind =]`); the `probEvent_eq_one_iff` family is the cycle's
+hub. Dropped from the default `grind` set, `grind` instead fails fast. If a `grind` proof genuinely
 needs one, re-supply it: `grind [probEvent_eq_zero_iff]`. The directed single-variable membership
 bridges (`probOutput_eq_zero_iff`, `probOutput_pos_iff`, `mem_finSupport_iff`) stay `@[grind =]`. See
-*`grind` vs `simp` on Probability Goals* in [`probability.md`](probability.md) and the benchmark
-`VCVioTest/ProbabilityTactics.lean`.
+*`grind` vs `simp` on Probability Goals* in [`probability.md`](probability.md) and the benchmarks
+`VCVioTest/ProbabilityTactics.lean` / `VCVioTest/LongChainPrograms.lean`.
 
 ### 10. Plain `vcstep` may solve a probability equality when you only wanted a rewrite
 

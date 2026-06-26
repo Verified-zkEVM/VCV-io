@@ -180,8 +180,9 @@ lemma probFailure_bind_eq_add_tsum_support [MonadLiftT m SPMF] [LawfulMonadLiftT
   refine tsum_congr fun x => ?_
   aesop (add simp Set.indicator)
 
--- `simp`-only: `grind` saturates on this support-quantifier characterization.
-@[simp]
+-- `grind`-safe in isolation: this support-quantifier characterization saturates `grind` only in
+-- combination with the `probEvent_eq_one_iff` family (kept `simp`-only). See `probability.md`.
+@[simp, grind =]
 lemma probFailure_bind_eq_zero_iff [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = 0 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, Pr[⊥ | my x] = 0 := by

@@ -260,17 +260,36 @@ lemma probEvent_ne_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ finSupport mx, p x := by aesop
 alias ⟨_, probEvent_ne_zero'⟩ := probEvent_ne_zero_iff'
 
--- `simp`-only: `grind` saturates on this support-quantifier characterization.
-@[simp]
+-- `grind`-safe in isolation: this support-quantifier characterization saturates `grind` only in
+-- combination with the `probEvent_eq_one_iff` family (kept `simp`-only). See `probability.md`.
+@[simp, grind =]
 lemma probEvent_pos_iff : 0 < Pr[ p | mx] ↔ ∃ x ∈ support mx, p x := by
   simp [pos_iff_ne_zero]
 alias ⟨_, probEvent_pos⟩ := probEvent_pos_iff
 
--- `simp`-only: `grind` saturates on this support-quantifier characterization.
-@[simp]
+-- `grind`-safe in isolation; see `probEvent_pos_iff`.
+@[simp, grind =]
 lemma probEvent_pos_iff' [HasEvalFinset m] [DecidableEq α] :
     0 < Pr[ p | mx] ↔ ∃ x ∈ finSupport mx, p x := by grind [probEvent_pos_iff]
 alias ⟨_, probEvent_pos'⟩ := probEvent_pos_iff'
+
+/-- `grind`-friendly companion to the `simp`-only `probEvent_ne_zero_iff`: the event has positive
+probability iff some reachable output satisfies `p`. The `Set.Nonempty` witness stays atomic under
+`grind` (unlike the saturating `∃ x ∈ support mx, p x` form). Mirrors
+`probFailure_eq_one_iff_not_nonempty`. -/
+@[grind =]
+lemma probEvent_ne_zero_iff_nonempty :
+    Pr[ p | mx] ≠ 0 ↔ {x ∈ support mx | p x}.Nonempty := by
+  rw [probEvent_ne_zero_iff]; simp [Set.nonempty_def]
+
+/-- `grind`-friendly companion to the `simp`-only `probEvent_eq_zero_iff`: the event has probability
+zero iff no reachable output satisfies `p`, phrased via `Set.Nonempty` rather than the saturating
+`∀ x ∈ support mx, ¬ p x`. The negation of `probEvent_ne_zero_iff_nonempty`. -/
+@[grind =]
+lemma probEvent_eq_zero_iff_not_nonempty :
+    Pr[ p | mx] = 0 ↔ ¬ {x ∈ support mx | p x}.Nonempty := by
+  rw [probEvent_eq_zero_iff]
+  simp [Set.not_nonempty_iff_eq_empty, Set.eq_empty_iff_forall_notMem]
 
 end zero
 
@@ -551,8 +570,9 @@ lemma one_eq_probOutput_iff [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCom
   rw [eq_comm, probOutput_eq_one_iff]
 alias ⟨_, one_eq_probOutput⟩ := one_eq_probOutput_iff
 
--- `simp`-only: `grind` saturates on this support-quantifier characterization.
-@[simp]
+-- `grind`-safe in isolation, and the natural mirror of `one_eq_probOutput_iff'` (which kept its
+-- `grind` tag): both are the `finSupport`-singleton characterization. See `probability.md`.
+@[simp, grind =]
 lemma probOutput_eq_one_iff' [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
     [HasEvalFinset m] [DecidableEq α] :
     Pr[= x | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ finSupport mx = {x} := by

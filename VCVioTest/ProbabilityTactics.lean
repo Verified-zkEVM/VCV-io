@@ -246,6 +246,17 @@ example (mx : ProbComp Bool) (x : Bool) : Pr[= x | mx] = 0 ↔ x ∉ support mx 
 example (mx : ProbComp Bool) (x : Bool) : 0 < Pr[= x | mx] ↔ x ∈ support mx := by simp
 example (mx : ProbComp Bool) (x : Bool) : 0 < Pr[= x | mx] ↔ x ∈ support mx := by grind
 
+/-! ## Event support via `Set.Nonempty`
+An *event* has (non)zero probability exactly when some / no reachable output satisfies it. The
+`grind`-friendly companions phrase this with `Set.Nonempty` of the filtered support
+`{x ∈ support mx | p x}`, keeping the witness atomic where the `simp`-only `∃`/`∀ x ∈ support` forms
+would saturate. -/
+
+example (mx : ProbComp Bool) (p : Bool → Prop) :
+    Pr[ p | mx] ≠ 0 ↔ {x ∈ support mx | p x}.Nonempty := by grind
+example (mx : ProbComp Bool) (p : Bool → Prop) :
+    Pr[ p | mx] = 0 ↔ ¬ {x ∈ support mx | p x}.Nonempty := by grind
+
 /-! ## Structured supports
 target(grind): a non-trivial `<$>`/`do` support equality needs `simp`'s computation normalisation
 (and a set extensionality); `grind` would expand it instead. -/
