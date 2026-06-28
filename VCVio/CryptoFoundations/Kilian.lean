@@ -4,8 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Bolton Bailey
 -/
 
-import VCVio.CryptoFoundations.MerkleTree.Inductive.Defs
+import VCVio.CryptoFoundations.VectorCommitment.Basic
 import VCVio.CryptoFoundations.ChallengeVerifyProtocol
+import VCVio.OracleComp.ProbComp
 
 /-!
 
@@ -24,7 +25,7 @@ zero-knowledge proof more efficient while keeping zero knowledge by implementing
 "notarized envelope" primitive. But I think this file should just focus on the succinctness part.
 -/
 
-open OracleComp OracleSpec BinaryTree InductiveMerkleTree
+open OracleComp OracleSpec
 
 namespace PCP
 
@@ -115,86 +116,76 @@ end PCP
 
 section KilianTransformation
 
-/-- Build the leaf data of a Merkle tree of skeleton `s` from a function assigning a value to each
-leaf position. -/
-def leafDataOfFn {α : Type _} : (s : Skeleton) → (SkeletonLeafIndex s → α) → LeafData α s
-  | Skeleton.leaf, f => LeafData.leaf (f SkeletonLeafIndex.ofLeaf)
-  | Skeleton.internal _ _, f =>
-      LeafData.internal
-        (leafDataOfFn _ fun i => f (SkeletonLeafIndex.ofLeft i))
-        (leafDataOfFn _ fun i => f (SkeletonLeafIndex.ofRight i))
-
 variable {Stmt Wit : Type} {rel : Stmt → Wit → Prop}
 
 /-- **The Kilian transformation.**
 
 Turn a `PCP` into a (public-coin) succinct `ChallengeVerifyProtocol`, the interactive argument at
-the heart of Kilian's protocol:
+the heart of Kilian's protocol, parameterized by an arbitrary batch-opening vector commitment `bovc`
+over the PCP's symbol alphabet (e.g. the inductive Merkle tree of
+`VCVio.CryptoFoundations.VectorCommitment.MerkleTree`):
 
-1. the prover Merkle-commits to its PCP proof string (`commit`);
+1. the prover commits to its PCP proof string with `bovc.commit` (`commit`);
 2. the verifier sends random coins (`sampleChal := pcp.sampleCoins`);
-3. the prover simulates `pcp.Verifier stmt coins` against its proof to learn exactly which positions
-   the verifier reads, and opens *only those* leaves with their Merkle authentication paths
-   (`respond`);
-4. the verifier replays `pcp.Verifier stmt coins`, answering each position query from the prover's
-   opening while checking that opening's authentication path against the committed root, and accepts
-   iff every queried position was opened authentically and the PCP verifier accepts (`verify`).
+3. the prover simulates `pcp.Verifier stmt coins` against its committed proof to learn exactly which
+   positions the verifier reads, and opens *exactly* that set in one shot with `bovc.openBatch`,
+   returning the claimed `(position, value)` pairs alongside the batch opening (`respond`);
+4. the verifier checks the batch opening against the commitment with `bovc.verifyBatch`, then
+   replays `pcp.Verifier stmt coins`, answering each position query from the claimed values, accepts
+   iff
+   the batch opening verifies, every queried position was claimed, and the PCP verifier accepts
+   (`verify`).
+
+A batch-opening commitment is the natural primitive here: Kilian opens a whole set of positions at
+once, so a construction that amortizes work across that set (a shared-path Merkle proof, say) is
+exactly what makes the argument succinct.
 
 Modeling choices for this definition (correctness/soundness are deferred):
 
-- The committed proof string is laid out on a caller-supplied Merkle skeleton `s` via the
-  position-to-leaf equivalence `e : Fin pcp.length ≃ SkeletonLeafIndex s`.
-- `hashFn` is the (collision-resistant) two-to-one hash compressing the tree; the construction is in
-  the standard-model / CRH formulation, so hashing is the pure function `hashFn` and `verify` is
-  deterministic.
-- `Resp` is the *partial* opening map: `resp i = some (symbol, path)` exactly for the positions the
-  prover opens, and `none` elsewhere. Succinctness is what makes Kilian interesting: only the
-  positions the verifier actually queries are opened, and `verify` rejects (via the `none` branch)
-  if it ever reads an unopened position.
+- Positions of the proof string are the commitment indices `Fin pcp.length`; the value at a position
+  is a PCP symbol.
+- The whole transformation runs in the commitment's monad `m`; the prover's PCP randomness is pulled
+  in via `MonadLiftT ProbComp m`. Taking `m := ProbComp` with a standard-model Merkle commitment
+  recovers the usual deterministic-verification formulation.
+- `Resp` is the claimed `(position, value)` pairs together with a single batch opening. Succinctness
+  is what makes Kilian interesting: only the positions the verifier actually queries are opened, and
+  `verify` rejects (via the `none` branch of the lookup) if it ever reads an unclaimed position.
 - `boolRel` is the `Bool`-valued relation of the resulting protocol; relating it to `pcp.rel` is
-  part of the deferred security analysis.
-
-The monad is `ProbComp` (the prover's only randomness is the PCP prover's).
-
-TODOs:
-
-- Instead of a Merkle Tree, create an abstract vector commitment interface
-- Make `KilianTransformation` monadic over the vector commitment's monad.
-
--/
+  part of the deferred security analysis. -/
 noncomputable def KilianTransformation
     (pcp : PCP Stmt Wit rel) [DecidableEq pcp.Symbol]
-    (s : Skeleton) (e : Fin pcp.length ≃ SkeletonLeafIndex s)
-    (hashFn : pcp.Symbol → pcp.Symbol → pcp.Symbol)
+    {m : Type → Type} [Monad m] [MonadLiftT ProbComp m]
+    {Commit State BatchOpening : Type}
+    (bovc : BatchOpeningVectorCommitment m (Fin pcp.length) pcp.Symbol Commit State BatchOpening)
     (boolRel : Stmt → Wit → Bool) :
     ChallengeVerifyProtocol Stmt Wit
-      pcp.Symbol                                          -- Commit: the Merkle root
-      (FullData pcp.Symbol s)                             -- PrvState: the committed tree
-      pcp.Coins                                           -- Chal: the verifier's coins
-      ((i : Fin pcp.length) → Option (pcp.Symbol × List.Vector pcp.Symbol (e i).depth))  -- Resp
-      boolRel ProbComp where
+      Commit                                                  -- Commit: the vector commitment
+      State                                                   -- PrvState: the opener's state
+      pcp.Coins                                               -- Chal: the verifier's coins
+      (List (Fin pcp.length × pcp.Symbol) × BatchOpening)     -- Resp: claims + batch opening
+      boolRel m where
   commit stmt wit := do
     let proof ← pcp.Prover stmt wit
-    let tree := buildMerkleTreeWithHash (leafDataOfFn s fun i => proof.get (e.symm i)) hashFn
-    return (tree.getRootValue, tree)
-  sampleChal := pcp.sampleCoins
-  respond stmt _wit tree coins := do
+    bovc.commit proof.get
+  sampleChal := liftM pcp.sampleCoins
+  respond stmt _wit st coins := do
     -- Simulate the verifier against the committed proof, logging the positions it reads.
     let logImpl : QueryImpl (PCP.spec pcp.Symbol pcp.length) (StateT (List (Fin pcp.length)) Id) :=
-      fun i => do modify (i :: ·); pure (tree.toLeafData.get (e i))
+      fun i => do modify (i :: ·); pure (bovc.decode st i)
     let queried : List (Fin pcp.length) :=
-      (Id.run ((simulateQ logImpl (pcp.Verifier stmt coins)).run [])).2
-    -- Open exactly the queried positions, each with its authentication path.
-    return fun j =>
-      if j ∈ queried then some (tree.toLeafData.get (e j), generateProof tree (e j)) else none
-  verify stmt root coins resp :=
-    -- Replay the verifier, answering each position from its opening while checking the
-    -- authentication path; an unopened or mis-authenticated position fails the whole run.
+      ((Id.run ((simulateQ logImpl (pcp.Verifier stmt coins)).run [])).2).dedup
+    -- Open exactly the queried positions as a single batch, alongside the claimed values.
+    let op ← bovc.openBatch st queried
+    return (queried.map (fun i => (i, bovc.decode st i)), op)
+  verify stmt c coins resp :=
+    -- Check the batch opening, then replay the verifier answering each position from its claimed
+    -- value; an unclaimed position fails the run, as does a batch opening that does not verify.
+    let (claims, op) := resp
     let answerImpl : QueryImpl (PCP.spec pcp.Symbol pcp.length) (OptionT Id) :=
-      fun i => match resp i with
+      fun i => match claims.find? (fun e => decide (e.1 = i)) with
         | none => failure
-        | some (sym, path) =>
-            if getPutativeRootWithHash (e i) sym path hashFn = root then pure sym else failure
-    decide (Id.run (simulateQ answerImpl (pcp.Verifier stmt coins)).run = some true)
+        | some (_, sym) => pure sym
+    bovc.verifyBatch c claims op &&
+      decide (Id.run (simulateQ answerImpl (pcp.Verifier stmt coins)).run = some true)
 
 end KilianTransformation
