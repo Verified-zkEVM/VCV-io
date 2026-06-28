@@ -147,4 +147,28 @@ def toVectorCommitment (bovc : BatchOpeningVectorCommitment m ι α Commit State
   openAt st i := bovc.openBatch st [i]
   verifyOpen c i v op := bovc.verifyBatch c [(i, v)] op
 
+section Security
+
+variable [Monad m] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
+
+/-- A batch-opening vector commitment is **perfectly correct** if, for every vector and every list
+of positions, any honestly produced commitment/state opens that list to a batch opening that
+verifies the corresponding decoded claims. The claim list `is.map (fun i => (i, decode st i))` is
+exactly the shape consumers (such as the Kilian transformation) hand to `verifyBatch`. -/
+def PerfectlyCorrect
+    (bovc : BatchOpeningVectorCommitment m ι α Commit State BatchOpening) : Prop :=
+  ∀ (data : ι → α) (is : List ι) (c : Commit) (st : State),
+    (c, st) ∈ support (bovc.commit data) →
+      ∀ op ∈ support (bovc.openBatch st is),
+        bovc.verifyBatch c (is.map fun i => (i, bovc.decode st i)) op = true
+
+/-- A batch-opening vector commitment is **position binding** if no commitment can be opened at a
+single position to two different values: any two (singleton) batch openings that both verify at the
+same position and commitment must certify the same value. -/
+def PositionBinding (bovc : BatchOpeningVectorCommitment m ι α Commit State BatchOpening) : Prop :=
+  ∀ (c : Commit) (i : ι) (v₁ v₂ : α) (op₁ op₂ : BatchOpening),
+    bovc.verifyBatch c [(i, v₁)] op₁ = true → bovc.verifyBatch c [(i, v₂)] op₂ = true → v₁ = v₂
+
+end Security
+
 end BatchOpeningVectorCommitment

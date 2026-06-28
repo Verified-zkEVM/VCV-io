@@ -5,7 +5,7 @@ Authors: Bolton Bailey
 -/
 
 import VCVio.CryptoFoundations.VectorCommitment.Basic
-import VCVio.CryptoFoundations.ChallengeVerifyProtocol
+import VCVio.CryptoFoundations.ChallengeVerifyProtocol.Basic
 import VCVio.OracleComp.ProbComp
 
 /-!
