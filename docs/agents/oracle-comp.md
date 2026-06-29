@@ -258,6 +258,66 @@ def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
 
 Preservation of `evalDist` through `uniformSampleImpl` is a **lemma**, not definitional: `uniformSampleImpl.evalDist_simulateQ : evalDist (simulateQ uniformSampleImpl oa) = evalDist oa` (`VCVio/OracleComp/Constructions/SampleableType.lean:517-523`). Companion lemmas `probOutput_simulateQ`, `probEvent_simulateQ`, `support_simulateQ`, `finSupport_simulateQ` live in the same namespace and are what you reach for when you want to stay inside `ProbComp` rather than drop to `PMF`.
 
+## Oracle strategies (the coalgebra dual)
+
+`VCVio/OracleComp/Coinductive/DynSystem.lean` develops the dual view of `OracleComp`. `OracleComp spec`
+is the *inductive* free monad on `spec.toPFunctor` — a program that **asks** queries. A stateful,
+adaptive querier is the *coalgebraic* dual: a PolyFun dynamical system over the same polynomial functor
+(Niu–Spivak, *Polynomial Functors*, Ch. 4).
+
+- `OracleStrategy spec := PFunctor.DynSystem spec.toPFunctor` — `expose : State → ι` chooses the next
+  query, `update : State → spec.Range _ → State` digests the answer. The whole `PFunctor.DynSystem` /
+  `PFunctor.Lens` combinator library applies directly (it is an `abbrev`).
+- `OracleHandler spec := PFunctor.Section spec.toPFunctor` — a deterministic oracle as a PolyFun
+  **section** (a lens `spec.toPFunctor ⟹ X`). Build one with `OracleHandler.ofFn`, apply it as a
+  function via its `DFunLike` coercion (`h t : spec.Range t`), and recover the underlying
+  `QueryImpl spec Id` via `OracleHandler.toQueryImpl` / the `Coe` (so a handler drops straight into the
+  deterministic-handler API, e.g. `evalWithAnswerFn h oa`). Being the section lens, it is exactly what
+  closes a strategy: `OracleStrategy.runAgainst h A := PFunctor.DynSystem.wrap h A`.
+- `OracleStrategy.{stateAfter, queryStream, answerStream, transcript}` read off the closed-loop run; the
+  cofree behaviour tree is `PFunctor.DynSystem.trajectory` with spine `next_iterate_trajectory`.
+- Combinators: `reduce` (a reduction is `wrap` along `SubSpec.toLens`; `reduce_trans` is free from
+  `wrap_comp`), `pair` (shared-state product oracle `*` via `pairing`), `juxtapose` (parallel `⊗`).
+- Randomized handler `ProbHandler spec := QueryImpl spec SPMF` turns the closed loop into a Markov chain
+  on states (`kleisliStep`/`kleisliIterate`/`transcriptDist`); the deterministic run embeds as the Dirac
+  special case (`ProbHandler.ofHandler`, `transcriptDist_ofHandler`).
+
+The **headline correspondence** reads a program back as its own state machine and shows the dynamical
+iterate *computes* `simulateQ`:
+
+```lean
+theorem iterate_advance_eq_simulate (h : OracleHandler spec) (oa : OracleComp spec α) :
+    (advance h)^[stepsToHalt h oa] oa = pure (evalWithAnswerFn (QueryImpl.ofFn h) oa)
+```
+
+with `OracleComp.evalSystem` packaging the same thing as a `PFunctor.Closed`, and the probabilistic
+`simulateQ_eq_advanceK_bind` exhibiting `simulateQ` as one coalgebraic Kleisli step. The new transcript
+is not a new notion: `run_simulateQ_ofFn_withLogging` proves it equals the existing
+`QueryImpl.withLogging` output, and the operational query bounds become denotational bounds on the
+transcript: `transcript_length_le_of_isTotalQueryBound` (total), `transcript_countQ_le_of_isQueryBoundP`
+(per predicate), and `transcript_countQ_le_of_isPerIndexQueryBound` (per oracle index, via
+`QueryLog.countQ`).
+
+The flat transcript is the *answer-erasure of a typed one*: since `OracleComp spec` is
+`PFunctor.FreeM spec.toPFunctor`, a `PFunctor.FreeM.Path` is a typed root-to-leaf branch choice
+(a sequence of typed answers). `handlerPath` builds the handler-induced path; its leaf is the run
+value (`output_handlerPath`) and its erasure is the flat log (`logOfPath_handlerPath`). The
+lens-relative form `outputAlong_runAlong` runs a program *along a reduction lens* (`PFunctor.FreeM.PathAlong`
+of `SubSpec.toLens`) answered by a super-spec handler, recovering the pulled-back handler's value —
+the denotational content of "a reduction is a lens". Worked examples: `Examples/DynamicalSystems/Basic.lean`.
+
+### Logs and counts are PFunctor traces
+
+`VCVio/OracleComp/QueryTracking/Trace.lean` formalizes that the query-tracking carriers *are* the
+generic `PolyFun.PFunctor.Trace` types (the identification is latent in the defs — these are `rfl`).
+`QueryLog spec = PFunctor.TraceList spec.toPFunctor` (the free monoid on query events
+`PFunctor.Idx spec.toPFunctor`): the empty log is `1`, a single entry is `FreeMonoid.of`, and
+`withLogging`'s instrumentation is `FreeMonoid.of` (`withLogging_traceFn_eq_of`). `QueryCount ι =
+Control.Trace ℕ ι` — but with the bespoke *additive* monoid, **not** `Control.Trace`'s default
+multiplicative `Pi.monoid` (do not infer the monoid through the equality). Every monoid-valued readout
+of a run factors through the log by the free-monoid universal property `FreeMonoid.lift φ`, and the
+coalgebraic `OracleComp.transcript` is such a word (`lift_transcript_pure`/`lift_transcript_queryBind`).
+
 ## Enforcement Oracle
 
 Defined in `VCVio/OracleComp/QueryTracking/Enforcement.lean`. Wraps an oracle with a

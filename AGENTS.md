@@ -108,6 +108,8 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Oracle computation core: `VCVio/OracleComp/OracleComp.lean`
 - Probability lemmas: `VCVio/EvalDist/Monad/Basic.lean`
 - SubSpec / coercions: `VCVio/OracleComp/Coercions/SubSpec.lean`
+- Oracle strategies (the coalgebra dual: `OracleStrategy`, `OracleHandler := PFunctor.Section` with `ofFn`/`DFunLike`/`Coe`, run/transcript, headline `iterate_advance_eq_simulate`): `VCVio/OracleComp/Coinductive/DynSystem.lean`, with worked examples in `Examples/DynamicalSystems/Basic.lean`
+- Query logs/counts unified with PolyFun traces (`QueryLog = PFunctor.TraceList`, `QueryCount = Control.Trace ℕ`, free-monoid `FreeMonoid.lift` readouts): `VCVio/OracleComp/QueryTracking/Trace.lean`
 - `QueryImpl` instrumentation primitives (`preInsert` / `postInsert` and their bridge lemmas): `VCVio/OracleComp/SimSemantics/QueryImpl/Constructions.lean`. Prefer these (or their downstream wrappers `withTraceBefore` / `withTrace` / `withCost` / `withLogging`) when wrapping a `QueryImpl` with a per-query side effect, so the generic theory in that file applies.
 - DLog / CDH / DDH via HHS: `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`
 - Cost model / polynomial time: `VCVio/OracleComp/QueryTracking/CostModel.lean`
