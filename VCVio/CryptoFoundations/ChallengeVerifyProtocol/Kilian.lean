@@ -7,7 +7,8 @@ Authors: Bolton Bailey
 import VCVio.CryptoFoundations.VectorCommitment.Basic
 import VCVio.CryptoFoundations.ChallengeVerifyProtocol.Basic
 import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.QueryTracking.Tracing
+import VCVio.OracleComp.QueryTracking.LoggingOracle
+import ToMathlib.Data.List.Lookup
 
 /-!
 
@@ -28,7 +29,7 @@ zero-knowledge proof more efficient while keeping zero knowledge by implementing
 
 open OracleComp OracleSpec
 
-/-- A **Probabilistically Checkable Proof (PCP)** system for a relation `rel : Stmt → Wit → Prop`.
+/-- A **Probabilistically Checkable Proof (PCP)** system for a relation `rel : Stmt → Wit → Bool`.
 
   The honest prover turns a statement and witness into a proof string of `length` symbols over the
   alphabet `Symbol`.
@@ -41,7 +42,7 @@ open OracleComp OracleSpec
   `OracleComp (unifSpec + (Fin length →ₒ Symbol))` — matches the public-coin structure used by the
   Kilian transformation: the verifier *sends* its coins, and the prover then simulates `Verifier
   stmt coins` to learn exactly which positions to open. -/
-structure PCP (Stmt Wit : Type) (rel : Stmt → Wit → Prop) where
+structure PCP (Stmt Wit : Type) where
   Symbol : Type
   [finSymbol : Fintype Symbol]
   length : ℕ
@@ -54,19 +55,20 @@ namespace PCP
 
 open scoped NNReal
 
-variable {Stmt Wit : Type} {rel : Stmt → Wit → Prop}
+variable {Stmt Wit : Type}
 
 /-- Run the PCP verifier on statement `stmt` with fixed coins `coins` against a concrete proof
   string `proof`, answering each oracle query for position `i` with `proof.get i`. Since the coins
   are fixed and the proof is concrete, the result is a deterministic accept/reject bit. -/
-def runVerifier (pcp : PCP Stmt Wit rel) (stmt : Stmt) (coins : pcp.Coins)
+def runVerifier (pcp : PCP Stmt Wit) (stmt : Stmt) (coins : pcp.Coins)
     (proof : List.Vector pcp.Symbol pcp.length) : Bool :=
   Id.run <| simulateQ (QueryImpl.ofListVector proof) (pcp.Verifier stmt coins)
 
 /-- A PCP system satisfies **correctness** with error `correctnessError` if for every
   statement/witness pair `(stmt, wit)` in the relation, the honest verifier accepts a proof
   produced by the honest prover with probability at least `1 - correctnessError`. -/
-noncomputable def correctness (pcp : PCP Stmt Wit rel) (correctnessError : ℝ≥0) : Prop :=
+noncomputable def correctness (pcp : PCP Stmt Wit) (rel : Stmt → Wit → Bool)
+    (correctnessError : ℝ≥0) : Prop :=
   ∀ stmt : Stmt,
   ∀ wit : Wit,
     rel stmt wit →
@@ -76,8 +78,8 @@ noncomputable def correctness (pcp : PCP Stmt Wit rel) (correctnessError : ℝ�
           return pcp.runVerifier stmt coins proof] ≥ 1 - correctnessError
 
 /-- A PCP system satisfies **perfect correctness** if it satisfies correctness with no error. -/
-noncomputable def perfectCorrectness (pcp : PCP Stmt Wit rel) : Prop :=
-  pcp.correctness 0
+noncomputable def perfectCorrectness (pcp : PCP Stmt Wit) (rel : Stmt → Wit → Bool) : Prop :=
+  pcp.correctness rel 0
 
 /-- A PCP system satisfies **soundness** with error `soundnessError` if for every statement `stmt`
   outside the language (i.e. with no valid witness), and every adversarially chosen proof string,
@@ -86,7 +88,8 @@ noncomputable def perfectCorrectness (pcp : PCP Stmt Wit rel) : Prop :=
   Since the verifier's only source of randomness is its own coin tosses, it suffices to quantify
   over fixed proof strings: a randomized malicious prover is a convex combination of these, so it
   can do no better than the best fixed proof. -/
-noncomputable def soundness (pcp : PCP Stmt Wit rel) (soundnessError : ℝ≥0) : Prop :=
+noncomputable def soundness (pcp : PCP Stmt Wit) (rel : Stmt → Wit → Bool)
+    (soundnessError : ℝ≥0) : Prop :=
   ∀ stmt : Stmt,
     (¬ ∃ wit : Wit, rel stmt wit) →
   ∀ proof : List.Vector pcp.Symbol pcp.length,
@@ -96,8 +99,8 @@ noncomputable def soundness (pcp : PCP Stmt Wit rel) (soundnessError : ℝ≥0) 
 
 /-- A PCP system satisfies **perfect soundness** if it satisfies soundness with no error, i.e. the
   verifier never accepts a proof for a statement outside the language. -/
-noncomputable def perfectSoundness (pcp : PCP Stmt Wit rel) : Prop :=
-  pcp.soundness 0
+noncomputable def perfectSoundness (pcp : PCP Stmt Wit) (rel : Stmt → Wit → Bool) : Prop :=
+  pcp.soundness rel 0
 
 -- TODO: Definition 19.1.3. straightline knowledge soundness error with extraction time
 
@@ -108,26 +111,27 @@ section ReadLog
 /-! ## Read-log of a deterministic oracle computation
 
 `pathLog so comp` is the list of inputs that `comp` queries, in the order it reads them, when its
-oracles are answered by the handler `so`. It is the input-only specialization of the generic writer
-trace `QueryImpl.withTraceAppendBefore`: each queried input is `tell`-ed before being answered. The
-Kilian prover uses it to discover exactly which proof positions the verifier reads. -/
+oracles are answered by the handler `so`. It is the input-only projection of the generic query log
+produced by `QueryImpl.withLogging`: each query/response pair `⟨t, u⟩` is recorded, and `pathLog`
+keeps only the inputs `t`. The Kilian prover uses it to discover exactly which proof positions the
+verifier reads. -/
 
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
 
 /-- The inputs a deterministic computation queries when its oracles are answered by `so`, in the
-order they are read: each queried input is `tell`-ed to the writer before being answered. -/
+order they are read: the `QueryImpl.withLogging` query log with each entry's response discarded. -/
 def pathLog (so : QueryImpl spec Id) {α : Type u} (comp : OracleComp spec α) : List ι :=
-  (simulateQ (so.withTraceAppendBefore (fun t => [t])) comp).run.2
+  ((simulateQ so.withLogging comp).run.2).map Sigma.fst
 
-/-- A query records its input at the head of the read-log and then continues: the writer trace
-`tell`s `[t]` before answering, so the input is prepended. -/
+/-- A query records its input at the head of the read-log and then continues: `withLogging` appends
+`⟨t, so t⟩` for the query, so projecting to inputs prepends `t`. -/
 theorem pathLog_query (so : QueryImpl spec Id) {α : Type u} (t : spec.Domain)
     (oa : spec.Range t → OracleComp spec α) :
     pathLog so (liftM (spec.query t) >>= oa) = t :: pathLog so (oa (so t)) := by
   unfold pathLog
-  simp only [simulateQ_bind, simulateQ_spec_query, QueryImpl.withTraceAppendBefore_apply,
+  simp only [simulateQ_bind, simulateQ_spec_query, QueryImpl.withLogging_apply,
     WriterT.run_bind', WriterT.run_tell]
   rfl
 
@@ -143,20 +147,21 @@ prover needs the positions read — with `pathLog` (the read-log built on
 `QueryImpl.withTraceAppendBefore`). `claimAnswer` below is the verifier's own per-query handler: a
 failing lookup against the prover's claimed `(position, value)` pairs. -/
 
-variable {Sym : Type} {len : ℕ}
+variable {ι Sym : Type*}
 
-/-- Look up a position among the claimed `(position, value)` pairs, failing if absent. This is the
-verifier's per-query handler in `KilianTransformation.verify`. -/
-def claimAnswer (claims : List (Fin len × Sym)) : QueryImpl (Fin len →ₒ Sym) (OptionT Id) :=
-  fun i => match claims.find? (fun e => decide (e.1 = i)) with
-    | none => failure
-    | some (_, sym) => pure sym
+/-- Implement oracle by
+looking up an input among the claimed `(input, value)` pairs, failing if absent. This is the
+verifier's per-query handler in `KilianTransformation.verify`. It is `QueryImpl.ofFn?` over the
+association-list lookup `claims.lookup`, using that `QueryImpl spec Option` is `QueryImpl spec
+(OptionT Id)`. -/
+def claimAnswer [BEq ι] (claims : List (ι × Sym)) : QueryImpl (ι →ₒ Sym) (OptionT Id) :=
+  QueryImpl.ofFn? (claims.lookup ·)
 
 end AnswerFunctions
 
 section KilianTransformation
 
-variable {Stmt Wit : Type} {rel : Stmt → Wit → Prop}
+variable {Stmt Wit : Type}
 
 /-- **The Kilian transformation.**
 
@@ -193,17 +198,17 @@ Modeling choices for this definition (correctness/soundness are deferred):
 - `boolRel` is the `Bool`-valued relation of the resulting protocol; relating it to `pcp.rel` is
   part of the deferred security analysis. -/
 noncomputable def KilianTransformation
-    (pcp : PCP Stmt Wit rel) [DecidableEq pcp.Symbol]
+    (pcp : PCP Stmt Wit) [BEq pcp.Symbol]
     {m : Type → Type} [Monad m] [MonadLiftT ProbComp m]
     {Commit State BatchOpening : Type}
     (bovc : BatchOpeningVectorCommitment m (Fin pcp.length) pcp.Symbol Commit State BatchOpening)
-    (boolRel : Stmt → Wit → Bool) :
+    (rel : Stmt → Wit → Bool) :
     ChallengeVerifyProtocol Stmt Wit
       Commit                                                  -- Commit: the vector commitment
       State                                                   -- PrvState: the opener's state
       pcp.Coins                                               -- Chal: the verifier's coins
       (List (Fin pcp.length × pcp.Symbol) × BatchOpening)     -- Resp: claims + batch opening
-      boolRel m where
+      rel m where
   commit stmt wit := do
     let proof ← pcp.Prover stmt wit
     bovc.commit proof.get
@@ -220,7 +225,7 @@ noncomputable def KilianTransformation
     -- value; an unclaimed position fails the run, as does a batch opening that does not verify.
     let (claims, op) := resp
     bovc.verifyBatch c claims op &&
-      decide (Id.run (simulateQ (claimAnswer claims) (pcp.Verifier stmt coins)).run = some true)
+      (Id.run (simulateQ (claimAnswer claims) (pcp.Verifier stmt coins)).run == some true)
 
 end KilianTransformation
 
@@ -229,33 +234,26 @@ section ReplayInfrastructure
 /-! ## Deterministic replay infrastructure
 
 The completeness of the Kilian transformation rests on a deterministic fact about the verifier:
-the prover's logging simulation (which records the positions the verifier reads), the verifier's
-own replay against the prover's openings, and the bare PCP run on the committed proof are all the
-*same* deterministic computation answered consistently. These lemmas package that fact for a fixed
-answer function `f : Fin len → Sym` on the PCP oracle. -/
+the prover's logging simulation (which records the inputs the verifier reads), the verifier's own
+replay against the prover's openings, and the bare run on the answer function are all the *same*
+deterministic computation answered consistently. These lemmas package that fact for a fixed answer
+function `f : ι → Sym` on a single-oracle spec `ι →ₒ Sym`. -/
 
-variable {Sym : Type} {len : ℕ}
+universe u
 
-/-- Looking up a present position among `(i, f i)` claims returns its value. -/
-theorem find?_claims (f : Fin len → Sym) (t : Fin len) :
-    ∀ L : List (Fin len), t ∈ L →
-      (L.map (fun i => (i, f i))).find? (fun e => decide (e.1 = t)) = some (t, f t)
-  | a :: L, h => by
-    simp only [List.map_cons, List.find?_cons]
-    rcases eq_or_ne a t with rfl | hat
-    · simp
-    · rw [show decide (a = t) = false from by simpa using hat]
-      exact find?_claims f t L ((List.mem_cons.1 h).resolve_left (fun h' => hat h'.symm))
+variable {ι Sym : Type u} [BEq ι] [LawfulBEq ι]
 
-/-- The verifier's per-query handler answers a claimed position with its value. -/
-theorem claimAnswer_map (f : Fin len → Sym) (L : List (Fin len)) (t : Fin len) (ht : t ∈ L) :
+/-- The verifier's per-query handler answers a claimed input with its value. -/
+theorem claimAnswer_map (f : ι → Sym) (L : List ι) (t : ι) (ht : t ∈ L) :
     claimAnswer (L.map (fun i => (i, f i))) t = (pure (f t) : OptionT Id Sym) := by
-  simp only [claimAnswer, find?_claims f t L ht]
+  simp only [claimAnswer, QueryImpl.ofFn?, List.map_lookup f t L ht]
+  rfl
 
-/-- **Replay lemma.** If the claims answer every position the verifier reads (under `f`) with `f`'s
+omit [LawfulBEq ι] in
+/-- **Replay lemma.** If the claims answer every input the verifier reads (under `f`) with `f`'s
 value, the verifier's `OptionT` replay never fails and reproduces the pure run. -/
-theorem claimAnswer_run (f : Fin len → Sym) (claims : List (Fin len × Sym)) {β}
-    (comp : OracleComp (Fin len →ₒ Sym) β) :
+theorem claimAnswer_run (f : ι → Sym) (claims : List (ι × Sym)) {β : Type u}
+    (comp : OracleComp (ι →ₒ Sym) β) :
     (∀ t ∈ pathLog f comp, claimAnswer claims t = (pure (f t) : OptionT Id Sym)) →
       (simulateQ (claimAnswer claims) comp).run
         = some (evalWithAnswerFn (QueryImpl.ofFn f) comp) := by
@@ -265,8 +263,8 @@ theorem claimAnswer_run (f : Fin len → Sym) (claims : List (Fin len × Sym)) {
     intro h
     have ht : claimAnswer claims t = (pure (f t) : OptionT Id Sym) :=
       h t (by rw [pathLog_query]; exact List.mem_cons_self ..)
-    have hq : evalWithAnswerFn (QueryImpl.ofFn f) (liftM ((Fin len →ₒ Sym).query t)) = f t := by
-      change simulateQ (QueryImpl.ofFn f) (liftM ((Fin len →ₒ Sym).query t)) = f t
+    have hq : evalWithAnswerFn (QueryImpl.ofFn f) (liftM ((ι →ₒ Sym).query t)) = f t := by
+      change simulateQ (QueryImpl.ofFn f) (liftM ((ι →ₒ Sym).query t)) = f t
       rw [simulateQ_spec_query]; rfl
     simp only [simulateQ_bind, simulateQ_spec_query, ht, evalWithAnswerFn_bind, hq]
     exact ih (f t) (fun t' ht' => h t' (by rw [pathLog_query]; exact List.mem_cons_of_mem _ ht'))
@@ -275,7 +273,7 @@ end ReplayInfrastructure
 
 section Completeness
 
-variable {Stmt Wit : Type} {rel : Stmt → Wit → Prop}
+variable {Stmt Wit : Type} {rel : Stmt → Wit → Bool}
 
 /-- **Deterministic completeness core.** For a fixed honestly committed state `st` and coins, the
 Kilian verifier accepts the honest prover's response, provided:
@@ -288,7 +286,7 @@ Kilian verifier accepts the honest prover's response, provided:
 The novel content is the `claimAnswer_run` replay: the verifier's failing `OptionT` replay against
 the openings reproduces the bare PCP run, so it accepts exactly when the PCP run does. -/
 theorem KilianTransformation_verify_eq_true
-    (pcp : PCP Stmt Wit rel) [DecidableEq pcp.Symbol]
+    (pcp : PCP Stmt Wit) [BEq pcp.Symbol]
     {m : Type → Type} [Monad m] [MonadLiftT ProbComp m] {Commit State BatchOpening : Type}
     (bovc : BatchOpeningVectorCommitment m (Fin pcp.length) pcp.Symbol Commit State BatchOpening)
     (boolRel : Stmt → Wit → Bool)
@@ -303,8 +301,149 @@ theorem KilianTransformation_verify_eq_true
     (queried.map fun i => (i, bovc.decode st i)) (pcp.Verifier x coins)
     (fun t ht => claimAnswer_map (bovc.decode st) queried t (hcov ht))
   change (bovc.verifyBatch c (queried.map fun i => (i, bovc.decode st i)) op
-      && decide (Id.run ((simulateQ (claimAnswer (queried.map fun i => (i, bovc.decode st i)))
-        (pcp.Verifier x coins)).run) = some true)) = true
+      && (Id.run ((simulateQ (claimAnswer (queried.map fun i => (i, bovc.decode st i)))
+        (pcp.Verifier x coins)).run) == some true)) = true
   rw [hbatch, hreplay, haccept]; rfl
+
+/-- Running the PCP verifier on a concrete proof string is the same as evaluating it with the
+answer function that reads each position out of that string. This bridges the `runVerifier`
+vocabulary of PCP correctness with the `evalWithAnswerFn` form consumed by the deterministic
+core. -/
+theorem runVerifier_eq_evalWithAnswerFn
+    (pcp : PCP Stmt Wit) (stmt : Stmt) (coins : pcp.Coins)
+    (proof : List.Vector pcp.Symbol pcp.length) :
+    pcp.runVerifier stmt coins proof
+      = evalWithAnswerFn (QueryImpl.ofFn proof.get) (pcp.Verifier stmt coins) :=
+  rfl
+
+/-- Ordinary PCP completeness (`pcp.perfectCorrectness`) delivers the acceptance condition consumed
+by `KilianTransformation_perfectlyComplete`, namely that every proof the honest prover can produce
+in `m` passes the PCP verifier on every challenge it can sample in `m`.
+
+Two side conditions bridge the gap between PCP completeness (stated over `ProbComp`) and the ambient
+monad `m`:
+
+* `hrel` — the protocol's boolean relation refines the PCP relation, so a valid protocol instance
+  is a valid PCP instance;
+* `hlift` — lifting a `ProbComp` into `m` does not enlarge its support. This is the coherence of
+  the public-randomness lift; it cannot be derived from the bare `MonadLiftT ProbComp m` (the lift
+  could *a priori* interpret sampling differently from `ProbComp`), so it is required explicitly.
+  It holds by `rfl` for `m := ProbComp` and for any faithful lift. -/
+theorem perfectCorrectness_accepts_liftedProver
+    (pcp : PCP Stmt Wit)
+    {m : Type → Type} [Monad m] [MonadLiftT ProbComp m]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    (rel : Stmt → Wit → Bool)
+    (hlift : ∀ {β : Type} (mx : ProbComp β), support (liftM mx : m β) ⊆ support mx)
+    (hpcp : pcp.perfectCorrectness rel) :
+    ∀ x w, rel x w →
+      ∀ proof ∈ support (liftM (pcp.Prover x w) : m (List.Vector pcp.Symbol pcp.length)),
+      ∀ coins ∈ support (liftM pcp.sampleCoins : m pcp.Coins),
+        pcp.runVerifier x coins proof = true := by
+  intro x w hxw proof hproof coins hcoins
+  unfold PCP.perfectCorrectness PCP.correctness at hpcp
+  have hpr := hpcp x w hxw
+  simp only [ENNReal.coe_zero, tsub_zero, ge_iff_le] at hpr
+  have h1 := le_antisymm probEvent_le_one hpr
+  rw [probEvent_eq_one_iff] at h1
+  refine h1.2 _ ?_
+  rw [mem_support_bind_iff]
+  refine ⟨pcp.runVerifier x coins proof, ?_, by rw [support_pure]; rfl⟩
+  rw [mem_support_bind_iff]
+  refine ⟨proof, hlift _ hproof, ?_⟩
+  rw [mem_support_bind_iff]
+  exact ⟨coins, hlift _ hcoins, by rw [support_pure]; rfl⟩
+
+/-- Perfect PCP completeness already forces the honest prover and coin sampler never to fail: any
+positive failure probability inside `do proof ← Prover; coins ← sampleCoins; …` would pull the
+acceptance probability below one. So the never-failing of these honest `ProbComp` computations is
+*derived* from `pcp.perfectCorrectness`, never assumed — there is no need to take it as a separate
+hypothesis. -/
+theorem neverFail_of_perfectCorrectness
+    (pcp : PCP Stmt Wit) (rel : Stmt → Wit → Bool)
+    (hpcp : pcp.perfectCorrectness rel) {x : Stmt} {w : Wit} (hxw : rel x w) :
+    NeverFail (pcp.Prover x w) ∧ NeverFail pcp.sampleCoins := by
+  unfold PCP.perfectCorrectness PCP.correctness at hpcp
+  have hpr := hpcp x w hxw
+  simp only [ENNReal.coe_zero, tsub_zero, ge_iff_le] at hpr
+  have h1 := le_antisymm probEvent_le_one hpr
+  rw [probEvent_eq_one_iff] at h1
+  obtain ⟨hinner, -⟩ := (probFailure_bind_eq_zero_iff _ _).mp h1.1
+  obtain ⟨hProverF, hRest⟩ := (probFailure_bind_eq_zero_iff _ _).mp hinner
+  refine ⟨⟨hProverF⟩, ?_⟩
+  have hne : (support (pcp.Prover x w)).Nonempty := by
+    rw [Set.nonempty_iff_ne_empty, ne_eq, ← probFailure_eq_one_iff, hProverF]
+    exact zero_ne_one
+  obtain ⟨proof, hproof⟩ := hne
+  exact ⟨((probFailure_bind_eq_zero_iff _ _).mp (hRest proof hproof)).1⟩
+
+/-- **Perfect completeness of the Kilian transformation.** If the underlying batch-opening vector
+commitment is complete (perfectly correct) and faithfully decodes its committed vector, and the PCP
+is complete (its honest prover's proof is accepted on every sampled coin set), then the resulting
+interactive argument is perfectly complete: the honest prover always convinces the verifier.
+
+The hypotheses isolate the moving parts:
+
+* `hbovc` — the batch-opening vector commitment is complete: an honest commitment opens its
+  decoded claims to a batch opening that verifies;
+* `hdecode` — the committer's state decodes to exactly the vector it committed to;
+* `hpcp` — the PCP is complete (`pcp.perfectCorrectness`); together with `hfaithful` (lifting
+  `ProbComp` into `m` preserves the distribution) this gives, via
+  `perfectCorrectness_accepts_liftedProver`, that the honest proof is accepted on every sampled coin
+  set, and (via `neverFail_of_perfectCorrectness`) that the honest prover and sampler never fail;
+* `hCommit` / `hOpen` — the commitment's own operations never fail. These are genuinely independent:
+  perfect correctness of `bovc` is vacuous if `openBatch` always fails, so it cannot supply them.
+
+The deterministic content lives in `KilianTransformation_verify_eq_true`; here we lift it across the
+probabilistic structure, showing the transcript distribution is supported entirely on `true`. -/
+theorem KilianTransformation_perfectlyComplete
+    (pcp : PCP Stmt Wit) (rel : Stmt → Wit → Bool) [BEq pcp.Symbol]
+    {m : Type → Type} [Monad m] [LawfulMonad m] [MonadLiftT ProbComp m]
+    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    {Commit State BatchOpening : Type}
+    (bovc : BatchOpeningVectorCommitment m (Fin pcp.length) pcp.Symbol Commit State BatchOpening)
+    (hbovc : bovc.PerfectlyCorrect)
+    (hdecode : ∀ (data : Fin pcp.length → pcp.Symbol) (c : Commit) (st : State),
+      (c, st) ∈ support (bovc.commit data) → bovc.decode st = data)
+    (hpcp : pcp.perfectCorrectness rel)
+    (hfaithful : ∀ {β : Type} (mx : ProbComp β), 𝒟[(liftM mx : m β)] = 𝒟[mx])
+    (hCommit : ∀ data, NeverFail (bovc.commit data))
+    (hOpen : ∀ st is, NeverFail (bovc.openBatch st is)) :
+    (KilianTransformation pcp bovc rel).PerfectlyComplete := by
+  have hlift : ∀ {β : Type} (mx : ProbComp β), support (liftM mx : m β) ⊆ support mx := by
+    intro β mx z hz
+    rw [mem_support_iff_evalDist_apply_ne_zero] at hz ⊢
+    rwa [hfaithful mx] at hz
+  have transport : ∀ {β : Type} (mx : ProbComp β), NeverFail mx → NeverFail (liftM mx : m β) := by
+    intro β mx h
+    rw [neverFail_iff]
+    unfold probFailure
+    rw [hfaithful mx]
+    exact (neverFail_iff _).mp h
+  have hAccept := perfectCorrectness_accepts_liftedProver pcp rel hlift hpcp
+  intro x w hxw
+  rw [probOutput_eq_one_iff_forall]
+  refine ⟨?_, ?_⟩
+  · -- The honest transcript never fails: prover/sampler by completeness, the rest by hCommit/hOpen.
+    obtain ⟨hProver0, hSample0⟩ := neverFail_of_perfectCorrectness pcp rel hpcp hxw
+    have hProver := transport _ hProver0
+    have hSample := transport _ hSample0
+    rw [← neverFail_iff]
+    simp only [KilianTransformation, neverFail_bind_iff, hProver, hSample, hCommit, hOpen,
+      NeverFail.instPure, implies_true, and_self]
+  · -- Every honest transcript makes the verifier accept.
+    intro y hy
+    simp only [KilianTransformation, mem_support_bind_iff, support_pure,
+      Set.mem_singleton_iff] at hy
+    obtain ⟨⟨pc, sc⟩, ⟨proof, hproof, hcommit⟩, coins, hcoins, _, ⟨op, hop, rfl⟩, rfl⟩ :=
+      hy
+    have hdec : bovc.decode sc = proof.get := hdecode proof.get pc sc hcommit
+    refine KilianTransformation_verify_eq_true pcp bovc rel x pc sc coins op _
+      (List.subset_dedup _) ?_ ?_
+    · exact hbovc proof.get _ pc sc hcommit op hop
+    · rw [hdec, ← runVerifier_eq_evalWithAnswerFn]
+      exact hAccept x w hxw proof hproof coins hcoins
 
 end Completeness
