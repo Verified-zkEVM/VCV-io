@@ -64,16 +64,13 @@ structure Trace where
   verified : Bool
 
 /-- The hash point corresponding to the final forgery recorded in a fork trace. -/
-def Trace.target
-    (trace : Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
+def Trace.target (trace : Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
     M × Commit :=
   (trace.forgery.1, trace.forgery.2.1)
 
 /-- Rewinding point extracted from a managed-RO fork trace. The fork is usable exactly when
 the final forgery verifies and its hash point appears in the live query log. -/
-def forkPoint
-    [DecidableEq M] [DecidableEq Commit]
-    (qH : ℕ)
+def forkPoint [DecidableEq M] [DecidableEq Commit] (qH : ℕ)
     (trace : Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
     Option (Fin (qH + 1)) := by
   if hverified : trace.verified then
@@ -89,38 +86,35 @@ def forkPoint
   else
     exact none
 
-lemma forkPoint_some_imp_verified
-    [DecidableEq M] [DecidableEq Commit]
-    {qH : ℕ}
+/-- If `forkPoint` selects a rewinding index, the recorded forgery verifies. -/
+lemma verified_of_forkPoint_eq_some
+    [DecidableEq M] [DecidableEq Commit] {qH : ℕ}
     {trace : Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
     {s : Fin (qH + 1)}
     (hs : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH trace = some s) :
     trace.verified = true := by
-  unfold forkPoint at hs
-  by_cases hverified : trace.verified
-  · exact hverified
-  · simp [hverified] at hs
+  simp_all [forkPoint]
 
-lemma forkPoint_some_imp_mem
-    [DecidableEq M] [DecidableEq Commit]
-    {qH : ℕ}
+@[deprecated (since := "2026-06-25")]
+alias forkPoint_some_imp_verified := verified_of_forkPoint_eq_some
+
+/-- If `forkPoint` selects a rewinding index, the recorded forgery's hash point appears in
+the live query log. -/
+lemma target_mem_queryLog_of_forkPoint_eq_some
+    [DecidableEq M] [DecidableEq Commit] {qH : ℕ}
     {trace : Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
     {s : Fin (qH + 1)}
     (hs : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH trace = some s) :
     trace.target ∈ trace.queryLog := by
-  unfold forkPoint at hs
-  by_cases hverified : trace.verified
-  · have hs' :
-        trace.target ∈ trace.queryLog ∧
-          ∃ h : trace.queryLog.findIdx (· == trace.target) ≤ qH,
-            (⟨trace.queryLog.findIdx (· == trace.target), Nat.lt_succ_of_le h⟩ :
-              Fin (qH + 1)) = s := by
-        simpa [hverified, Trace.target] using hs
-    exact hs'.1
-  · simp [hverified] at hs
+  simp_all [forkPoint]
 
+@[deprecated (since := "2026-06-25")]
+alias forkPoint_some_imp_mem := target_mem_queryLog_of_forkPoint_eq_some
+
+/-- The index selected by `forkPoint` looks up the forgery's hash point in the live query
+log: `trace.queryLog[s]?` equals `some trace.target`. -/
 lemma forkPoint_getElem?_eq_some_target
     [DecidableEq M] [DecidableEq Commit]
     {qH : ℕ}
@@ -129,27 +123,7 @@ lemma forkPoint_getElem?_eq_some_target
     (hs : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH trace = some s) :
     trace.queryLog[↑s]? = some trace.target := by
-  unfold forkPoint at hs
-  by_cases hverified : trace.verified
-  · have hs' :
-        trace.target ∈ trace.queryLog ∧
-          ∃ h : trace.queryLog.findIdx (· == trace.target) ≤ qH,
-            (⟨trace.queryLog.findIdx (· == trace.target), Nat.lt_succ_of_le h⟩ :
-              Fin (qH + 1)) = s := by
-        simpa [hverified, Trace.target] using hs
-    rcases hs' with ⟨hmem, ⟨hidx, hs'⟩⟩
-    have hlt : trace.queryLog.findIdx (· == trace.target) < trace.queryLog.length := by
-      exact List.findIdx_lt_length_of_exists ⟨trace.target, hmem, by simp⟩
-    subst s
-    exact (List.getElem_eq_iff
-      (l := trace.queryLog)
-      (i := trace.queryLog.findIdx (· == trace.target))
-      (x := trace.target)
-      hlt).mp <| by
-        simpa [Trace.target] using
-          (List.findIdx_getElem (xs := trace.queryLog) (p := fun x => x == trace.target)
-            (w := hlt))
-  · simp [hverified] at hs
+  grind [forkPoint, List.findIdx_getElem]
 
 /-- Wrapped oracle spec used by `runTrace`: uniform sampling plus a single counted challenge
 oracle exposing the random-oracle entropy. -/
@@ -204,8 +178,7 @@ theorem queryLog_length_le_of_nmaHashQueryBound
       simp
   | query_bind t mx ih =>
       rw [nmaHashQueryBound_query_bind_iff (M := M) (Commit := Commit) (Chal := Chal)] at hQ
-      rw [simulateQ_query_bind, StateT.run_bind] at hz
-      rw [support_bind] at hz
+      rw [simulateQ_query_bind, StateT.run_bind, support_bind] at hz
       simp only [Set.mem_iUnion] at hz
       obtain ⟨us, hus, hz'⟩ := hz
       cases t with
@@ -223,7 +196,6 @@ theorem queryLog_length_le_of_nmaHashQueryBound
           simpa using ih u (hQ.2 u) (cache, log) hz'
       | inr mc =>
           rcases st with ⟨cache, log⟩
-          have hQpos : 0 < Q := hQ.1
           cases hcache : cache mc with
           | some v =>
               have hus' : us = (v, (cache, log)) := by
@@ -251,12 +223,9 @@ theorem queryLog_length_le_of_nmaHashQueryBound
                 simpa using
                   ih u (hQ.2 u)
                     ((cache.cacheQuery mc u : (M × Commit →ₒ Chal).QueryCache), log ++ [mc]) hz'
-              have hlen : (log ++ [mc]).length = log.length + 1 := by
-                simp [List.length_append]
-              rw [hlen] at hrec
-              have hbudget : log.length + 1 + (Q - 1) = log.length + Q := by
-                omega
-              simpa [hbudget] using hrec
+              have hQpos : 0 < Q := hQ.1
+              simp only [List.length_append, List.length_singleton] at hrec ⊢
+              lia
 
 /-- Replay a managed-RO NMA adversary against a single counted challenge oracle, keeping both
 the adversary-returned cache and the live query log that the forking lemma can rewind.
@@ -424,8 +393,7 @@ factored out once. -/
 
 /-- Generic 1-state preservation for the "stateful inner simulation, then outer logging"
 pattern. Given a per-step preservation `hstep`, lift it to the whole layered simulation. -/
-private theorem preservesInv_layered
-    {γ : Type}
+private theorem preservesInv_layered {γ : Type}
     (Inv : simSt M Commit Chal → QueryLog (wrappedSpec Chal) → Prop)
     (hstep : ∀ t (s : simSt M Commit Chal) (w : QueryLog (wrappedSpec Chal)),
       Inv s w →
@@ -456,22 +424,10 @@ private theorem preservesInv_layered
           monad_norm, OracleQuery.cont_query, OracleQuery.input_query]
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at hz
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at hz
-      obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
-      have hpres : Inv us_w.1.2 (w₀ ++ us_w.2) := hstep t s₀ w₀ hinit us_w hus_w
-      have hpw_split : (pw.1, pw.2) ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w.1.1)).run us_w.1.2)).run) := hpw
-      have hih := ih (us_w.1.1) (s₀ := us_w.1.2) (w₀ := w₀ ++ us_w.2)
-        hpres (z := pw) hpw_split
-      have hz_eq' : z = (pw.1, us_w.2 ++ pw.2) := by
-        have h_eq : (pw.1, us_w.2 ++ pw.2) =
-            Prod.map id (us_w.2 ++ ·) pw := rfl
-        rw [h_eq]; exact hz_eq.symm
-      rw [hz_eq']
-      change Inv pw.1.2 (w₀ ++ (us_w.2 ++ pw.2))
-      rw [← List.append_assoc]
-      exact hih
+      obtain ⟨us_w, hus_w, pw, hpw, rfl⟩ := hz
+      simp only [Prod.map_fst, Prod.map_snd, id_eq, ← List.append_assoc]
+      exact ih us_w.1.1 (s₀ := us_w.1.2) (w₀ := w₀ ++ us_w.2)
+        (hstep t s₀ w₀ hinit us_w hus_w) hpw
 
 /-- Coupling invariant for `runTrace`'s inner simulation: the trace's internal `queryLog`
 grows by exactly the number of `Sum.inr ()` queries issued to the outer wrapped spec.
@@ -488,9 +444,6 @@ private theorem queryLog_length_eq_outer_inr_count
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run)) :
     z.2.2.length = l₀.length + outerLog.countQ (· = Sum.inr ()) := by
-  -- The invariant is `s.2.length = l₀.length + w.countQ Sum.inr ()`. Each step preserves
-  -- it: `Sum.inl` does not touch either side; `Sum.inr` cache hits leave both unchanged;
-  -- `Sum.inr` cache misses grow both sides by one.
   have h := preservesInv_layered (M := M) (Commit := Commit) (Chal := Chal)
     (Inv := fun s w => s.2.length = l₀.length + w.countQ (· = Sum.inr ()))
     (hstep := ?_) Y (c₀, l₀) [] (by simp [QueryLog.countQ]) hz
@@ -506,12 +459,11 @@ private theorem queryLog_length_eq_outer_inr_count
         rw [support_step_inr] at hz
         rcases hz with ⟨v, _, rfl⟩ | ⟨_, v, rfl⟩
         · simpa using hI
-        · simp only [List.length_append, List.length_singleton, QueryLog.countQ_append]
-          have h1 : QueryLog.countQ (spec := wrappedSpec Chal)
+        · have h1 : QueryLog.countQ (spec := wrappedSpec Chal)
               [⟨Sum.inr (), v⟩] (· = Sum.inr ()) = 1 := by
             simp [QueryLog.countQ, QueryLog.getQ]
-          rw [h1, hI]
-          ring
+          simp only [List.length_append, List.length_singleton, QueryLog.countQ_append, h1, hI]
+          omega
 
 /-- Lockstep value invariant for `runTrace`'s inner simulation. Three coupled invariants
 travel together along the simulation:
@@ -550,11 +502,10 @@ private theorem queryLog_cache_outer_lockstep
       obtain ⟨hz_eq, hlog_eq⟩ := hz
       subst hz_eq
       subst hlog_eq
-      refine ⟨⟨[], by simp⟩, ?_, ?_⟩
-      · intro mc ω h; exact h
-      · intro i h_lo h_hi
-        change i < l₀.length at h_hi
-        omega
+      refine ⟨⟨[], by simp⟩, fun _ _ h => h, ?_⟩
+      intro i h_lo h_hi
+      change i < l₀.length at h_hi
+      omega
   | query_bind t oa ih =>
       have hY :
           (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
@@ -566,43 +517,32 @@ private theorem queryLog_cache_outer_lockstep
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at hz
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at hz
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
-      have hpw_split : (pw.1, pw.2) ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w.1.1)).run us_w.1.2)).run) := by
-        change pw ∈ support _
-        exact hpw
       have hih := ih (u := us_w.1.1) (c₀ := us_w.1.2.1) (l₀ := us_w.1.2.2)
-        (z := pw.1) (outerLog := pw.2) hpw_split
+        (z := pw.1) (outerLog := pw.2) hpw
       have hz_eq' : (pw.1, us_w.2 ++ pw.2) = (z, outerLog) := by
         rw [show ((pw.1, us_w.2 ++ pw.2) : _ × QueryLog (wrappedSpec Chal)) =
               Prod.map id (fun x => us_w.2 ++ x) pw from rfl]
         exact hz_eq
       obtain ⟨hz_eq1, hz_eq2⟩ := Prod.mk.inj hz_eq'
-      have hzeq : z = pw.1 := hz_eq1.symm
-      have houter_eq : outerLog = us_w.2 ++ pw.2 := hz_eq2.symm
-      subst hzeq
-      subst houter_eq
-      have houter : us_w ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w
+      subst hz_eq1
+      subst hz_eq2
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run (c₀, l₀) =
               (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
-          rw [hrun] at houter
+          rw [hrun] at hus_w
           change us_w ∈ support (simulateQ loggingOracle
               ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter
+                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at hus_w
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
-            (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at houter
-          rw [support_bind] at houter
+            (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at hus_w
+          rw [support_bind] at hus_w
           simp only [support_map, support_query, Set.mem_univ,
             simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-            Set.iUnion_const] at houter
-          obtain ⟨_, ⟨u, hu_eq⟩, hus_w_in_u⟩ := houter
+            Set.iUnion_const] at hus_w
+          obtain ⟨_, ⟨u, hu_eq⟩, hus_w_in_u⟩ := hus_w
           subst hu_eq
           rw [Set.mem_singleton_iff] at hus_w_in_u
           subst hus_w_in_u
@@ -625,19 +565,19 @@ private theorem queryLog_cache_outer_lockstep
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
-            rw [hrun] at houter
+            rw [hrun] at hus_w
             change us_w ∈ support (simulateQ loggingOracle
                 ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
-                    OracleComp _ _))).run at houter
+                    OracleComp _ _))).run at hus_w
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind
               (spec := wrappedSpec Chal) (Sum.inr ())
-              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at houter
-            rw [support_bind] at houter
+              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at hus_w
+            rw [support_bind] at hus_w
             simp only [support_map, support_query, Set.mem_univ,
               simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-              Set.iUnion_const] at houter
-            obtain ⟨_, ⟨v, hv_eq⟩, hus_w_in_u⟩ := houter
+              Set.iUnion_const] at hus_w
+            obtain ⟨_, ⟨v, hv_eq⟩, hus_w_in_u⟩ := hus_w
             subst hv_eq
             rw [Set.mem_singleton_iff] at hus_w_in_u
             subst hus_w_in_u
@@ -650,19 +590,20 @@ private theorem queryLog_cache_outer_lockstep
             · intro mc' ω hmc'
               apply hmono'
               by_cases heq : mc' = mc
-              · subst heq; rw [hcache] at hmc'; exact (Option.some_ne_none ω hmc'.symm).elim
-              · rw [QueryCache.cacheQuery_of_ne _ _ heq]; exact hmc'
+              · subst heq
+                rw [hcache] at hmc'
+                exact (Option.some_ne_none ω hmc'.symm).elim
+              · rwa [QueryCache.cacheQuery_of_ne _ _ heq]
             · intro i h_lo h_hi
               by_cases hi_eq : i = l₀.length
               · subst hi_eq
                 have hidx : pw.1.2.2[l₀.length]'h_hi = mc := by
                   have h_hi'' : l₀.length < (l₀ ++ ([mc] ++ l_new')).length := by
-                    rw [← List.append_assoc, ← hpref']; exact h_hi
+                    rwa [← List.append_assoc, ← hpref']
                   have hcongr : pw.1.2.2[l₀.length]'h_hi =
                       (l₀ ++ ([mc] ++ l_new'))[l₀.length]'h_hi'' :=
                     List.getElem_of_eq hpref_z _
-                  rw [hcongr]
-                  rw [List.getElem_append_right (Nat.le_refl _)]
+                  rw [hcongr, List.getElem_append_right (Nat.le_refl _)]
                   simp
                 refine ⟨v, ?_, ?_⟩
                 · rw [hidx]
@@ -673,28 +614,28 @@ private theorem queryLog_cache_outer_lockstep
                   rw [Nat.sub_self]
                   exact QueryLog.getQueryValue?_cons_self_zero (Sum.inr ()) v pw.2
               · have h_lo' : (l₀ ++ [mc]).length ≤ i := by
-                  simp [List.length_append]; omega
+                  simp only [List.length_append, List.length_singleton]
+                  omega
                 obtain ⟨ω, hcacheω, hlogω⟩ := hlock' i h_lo' h_hi
                 refine ⟨ω, hcacheω, ?_⟩
                 obtain ⟨k, hk⟩ : ∃ k, i - l₀.length = k + 1 := ⟨i - l₀.length - 1, by omega⟩
                 have hk_eq : k = i - (l₀ ++ [mc]).length := by
-                  simp [List.length_append] at hk ⊢; omega
+                  simp only [List.length_append, List.length_singleton] at hk ⊢
+                  omega
                 change QueryLog.getQueryValue?
                   ((⟨Sum.inr (), v⟩ : (j : ℕ ⊕ Unit) × (wrappedSpec Chal).Range j) ::
                     pw.2) (Sum.inr ()) (i - l₀.length) = some ω
-                rw [hk]
-                rw [QueryLog.getQueryValue?_cons_self_succ]
-                rw [hk_eq]
+                rw [hk, QueryLog.getQueryValue?_cons_self_succ, hk_eq]
                 exact hlogω
           · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
             have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) = pure (v, (c₀, l₀)) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get, ← hv]
-            rw [hrun] at houter
+            rw [hrun] at hus_w
             change us_w ∈ support (simulateQ loggingOracle
-                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at houter
-            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at houter
-            subst houter
+                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at hus_w
+            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at hus_w
+            subst hus_w
             obtain ⟨⟨l_new, hpref⟩, hmono, hlock⟩ := hih
             refine ⟨⟨l_new, hpref⟩, hmono, ?_⟩
             intro i h_lo h_hi
@@ -739,22 +680,8 @@ private theorem queryLog_extends_l₀
       rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at h
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at h
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := h
-      have hpw_split : (pw.1, pw.2) ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w.1.1)).run us_w.1.2)).run) := by
-        change pw ∈ support _
-        exact hpw
-      have hz_eq' : (pw.1, us_w.2 ++ pw.2) = (z, outerLog) := by
-        rw [show ((pw.1, us_w.2 ++ pw.2) : _ × QueryLog (wrappedSpec Chal)) =
-              Prod.map id (fun x => us_w.2 ++ x) pw from rfl]
-        exact hz_eq
-      obtain ⟨hz_eq1, _⟩ := Prod.mk.inj hz_eq'
-      have hzeq : z = pw.1 := hz_eq1.symm
+      obtain ⟨hzeq, _⟩ := Prod.mk.inj hz_eq
       subst hzeq
-      have houter : us_w ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run
@@ -762,21 +689,21 @@ private theorem queryLog_extends_l₀
               (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
-          rw [hrun] at houter
+          rw [hrun] at hus_w
           change us_w ∈ support (simulateQ loggingOracle
               ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter
+                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at hus_w
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
-            (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at houter
-          rw [support_bind] at houter
+            (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at hus_w
+          rw [support_bind] at hus_w
           simp only [support_map, support_query, Set.mem_univ,
             simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-            Set.iUnion_const] at houter
-          obtain ⟨_, ⟨u, hu_eq⟩, hus_w_in⟩ := houter
+            Set.iUnion_const] at hus_w
+          obtain ⟨_, ⟨u, hu_eq⟩, hus_w_in⟩ := hus_w
           subst hu_eq
           rw [Set.mem_singleton_iff] at hus_w_in
           subst hus_w_in
-          exact ih u c₀ l₀ hpw_split
+          exact ih u c₀ l₀ hpw
       | inr mc =>
           by_cases hcache : c₀ mc = none
           · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
@@ -785,40 +712,38 @@ private theorem queryLog_extends_l₀
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
-            rw [hrun] at houter
+            rw [hrun] at hus_w
             change us_w ∈ support (simulateQ loggingOracle
                 ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
-                    OracleComp _ _))).run at houter
+                    OracleComp _ _))).run at hus_w
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind
               (spec := wrappedSpec Chal) (Sum.inr ())
-              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at houter
-            rw [support_bind] at houter
+              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at hus_w
+            rw [support_bind] at hus_w
             simp only [support_map, support_query, Set.mem_univ,
               simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-              Set.iUnion_const] at houter
-            obtain ⟨_, ⟨v, hv_eq⟩, hus_w_in⟩ := houter
+              Set.iUnion_const] at hus_w
+            obtain ⟨_, ⟨v, hv_eq⟩, hus_w_in⟩ := hus_w
             subst hv_eq
             rw [Set.mem_singleton_iff] at hus_w_in
             subst hus_w_in
-            have hih := ih v (c₀.cacheQuery mc v) (l₀ ++ [mc]) hpw_split
-            have hlen_le : l₀.length ≤ (l₀ ++ [mc]).length := by
-              simp [List.length_append]
             calc pw.1.2.2.take l₀.length
                 = (pw.1.2.2.take (l₀ ++ [mc]).length).take l₀.length := by
-                    rw [List.take_take, min_eq_left hlen_le]
-              _ = (l₀ ++ [mc]).take l₀.length := by rw [hih]
+                    rw [List.take_take, min_eq_left (by simp [List.length_append])]
+              _ = (l₀ ++ [mc]).take l₀.length := by
+                    rw [ih v (c₀.cacheQuery mc v) (l₀ ++ [mc]) hpw]
               _ = l₀ := List.take_left
           · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
             have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) = pure (v, (c₀, l₀)) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get, ← hv]
-            rw [hrun] at houter
+            rw [hrun] at hus_w
             change us_w ∈ support (simulateQ loggingOracle
-                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at houter
-            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at houter
-            subst houter
-            exact ih v c₀ l₀ hpw_split
+                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at hus_w
+            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at hus_w
+            subst hus_w
+            exact ih v c₀ l₀ hpw
 
 /-- Outer-log **prefix**-determinism for `runTrace`'s inner simulation. If the two outer
 logs share a common prefix `p` (with `#{Sum.inr ()} = j` in `p`), then the first
@@ -872,40 +797,12 @@ private theorem inner_prefix_det
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at h₁ h₂
       obtain ⟨us_w₁, hus_w₁, pw₁, hpw₁, hz_eq₁⟩ := h₁
       obtain ⟨us_w₂, hus_w₂, pw₂, hpw₂, hz_eq₂⟩ := h₂
-      have hpw₁_split : (pw₁.1, pw₁.2) ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w₁.1.1)).run us_w₁.1.2)).run) := by
-        change pw₁ ∈ support _
-        exact hpw₁
-      have hpw₂_split : (pw₂.1, pw₂.2) ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w₂.1.1)).run us_w₂.1.2)).run) := by
-        change pw₂ ∈ support _
-        exact hpw₂
-      have hz_eq'₁ : (pw₁.1, us_w₁.2 ++ pw₁.2) = (z₁, outerLog₁) := by
-        rw [show ((pw₁.1, us_w₁.2 ++ pw₁.2) : _ × QueryLog (wrappedSpec Chal)) =
-              Prod.map id (fun x => us_w₁.2 ++ x) pw₁ from rfl]
-        exact hz_eq₁
-      have hz_eq'₂ : (pw₂.1, us_w₂.2 ++ pw₂.2) = (z₂, outerLog₂) := by
-        rw [show ((pw₂.1, us_w₂.2 ++ pw₂.2) : _ × QueryLog (wrappedSpec Chal)) =
-              Prod.map id (fun x => us_w₂.2 ++ x) pw₂ from rfl]
-        exact hz_eq₂
-      obtain ⟨hz_eq1₁, hz_eq2₁⟩ := Prod.mk.inj hz_eq'₁
-      obtain ⟨hz_eq1₂, hz_eq2₂⟩ := Prod.mk.inj hz_eq'₂
-      have hzeq₁ : z₁ = pw₁.1 := hz_eq1₁.symm
-      have hzeq₂ : z₂ = pw₂.1 := hz_eq1₂.symm
-      subst hzeq₁
-      subst hzeq₂
+      have hz_eq'₁ : (pw₁.1, us_w₁.2 ++ pw₁.2) = (z₁, outerLog₁) := hz_eq₁
+      have hz_eq'₂ : (pw₂.1, us_w₂.2 ++ pw₂.2) = (z₂, outerLog₂) := hz_eq₂
+      obtain ⟨rfl, hz_eq2₁⟩ := Prod.mk.inj hz_eq'₁
+      obtain ⟨rfl, hz_eq2₂⟩ := Prod.mk.inj hz_eq'₂
       have houter₁_eq : us_w₁.2 ++ pw₁.2 = p ++ suffix₁ := hz_eq2₁.trans hlog₁
       have houter₂_eq : us_w₂.2 ++ pw₂.2 = p ++ suffix₂ := hz_eq2₂.trans hlog₂
-      have houter₁ : us_w₁ ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₁
-      have houter₂ : us_w₂ ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₂
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run
@@ -913,21 +810,21 @@ private theorem inner_prefix_det
               (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
-          rw [hrun] at houter₁ houter₂
+          rw [hrun] at hus_w₁ hus_w₂
           change us_w₁ ∈ support (simulateQ loggingOracle
               ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₁
+                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at hus_w₁
           change us_w₂ ∈ support (simulateQ loggingOracle
               ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₂
+                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at hus_w₂
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
-            (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at houter₁ houter₂
-          rw [support_bind] at houter₁ houter₂
+            (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at hus_w₁ hus_w₂
+          rw [support_bind] at hus_w₁ hus_w₂
           simp only [support_map, support_query, Set.mem_univ,
             simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-            Set.iUnion_const] at houter₁ houter₂
-          obtain ⟨_, ⟨u₁, hu₁_eq⟩, hus_w₁_in⟩ := houter₁
-          obtain ⟨_, ⟨u₂, hu₂_eq⟩, hus_w₂_in⟩ := houter₂
+            Set.iUnion_const] at hus_w₁ hus_w₂
+          obtain ⟨_, ⟨u₁, hu₁_eq⟩, hus_w₁_in⟩ := hus_w₁
+          obtain ⟨_, ⟨u₂, hu₂_eq⟩, hus_w₂_in⟩ := hus_w₂
           subst hu₁_eq
           subst hu₂_eq
           rw [Set.mem_singleton_iff] at hus_w₁_in hus_w₂_in
@@ -938,10 +835,10 @@ private theorem inner_prefix_det
               simp only [QueryLog.countQ, QueryLog.getQ_nil, List.length_nil, add_zero]
               have h₁' : pw₁.1.2.2.take l₀.length = l₀ :=
                 queryLog_extends_l₀ (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa u₁) c₀ l₀ hpw₁_split
+                  (oa u₁) c₀ l₀ hpw₁
               have h₂' : pw₂.1.2.2.take l₀.length = l₀ :=
                 queryLog_extends_l₀ (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa u₂) c₀ l₀ hpw₂_split
+                  (oa u₂) c₀ l₀ hpw₂
               rw [h₁', h₂']
           | cons p_head p_tail =>
               simp only [List.cons_append, List.cons.injEq]
@@ -961,7 +858,7 @@ private theorem inner_prefix_det
                     QueryLog.countQ (spec := wrappedSpec Chal) p_tail (· = Sum.inr ()) := by
                 simp [QueryLog.countQ, QueryLog.getQ_cons, hpH_fst]
               rw [hp_count]
-              exact ih u₁ c₀ l₀ hpw₁_split hpw₂_split p_tail suffix₁ suffix₂ htail₁ htail₂
+              exact ih u₁ c₀ l₀ hpw₁ hpw₂ p_tail suffix₁ suffix₂ htail₁ htail₂
       | inr mc =>
           by_cases hcache : c₀ mc = none
           · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
@@ -970,24 +867,24 @@ private theorem inner_prefix_det
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
-            rw [hrun] at houter₁ houter₂
+            rw [hrun] at hus_w₁ hus_w₂
             change us_w₁ ∈ support (simulateQ loggingOracle
                 ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
-                    OracleComp _ _))).run at houter₁
+                    OracleComp _ _))).run at hus_w₁
             change us_w₂ ∈ support (simulateQ loggingOracle
                 ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
-                    OracleComp _ _))).run at houter₂
+                    OracleComp _ _))).run at hus_w₂
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind
               (spec := wrappedSpec Chal) (Sum.inr ())
-              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at houter₁ houter₂
-            rw [support_bind] at houter₁ houter₂
+              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at hus_w₁ hus_w₂
+            rw [support_bind] at hus_w₁ hus_w₂
             simp only [support_map, support_query, Set.mem_univ,
               simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-              Set.iUnion_const] at houter₁ houter₂
-            obtain ⟨_, ⟨v₁, hv₁_eq⟩, hus_w₁_in⟩ := houter₁
-            obtain ⟨_, ⟨v₂, hv₂_eq⟩, hus_w₂_in⟩ := houter₂
+              Set.iUnion_const] at hus_w₁ hus_w₂
+            obtain ⟨_, ⟨v₁, hv₁_eq⟩, hus_w₁_in⟩ := hus_w₁
+            obtain ⟨_, ⟨v₂, hv₂_eq⟩, hus_w₂_in⟩ := hus_w₂
             subst hv₁_eq
             subst hv₂_eq
             rw [Set.mem_singleton_iff] at hus_w₁_in hus_w₂_in
@@ -996,27 +893,20 @@ private theorem inner_prefix_det
             cases p with
             | nil =>
                 simp only [QueryLog.countQ, QueryLog.getQ_nil, List.length_nil, add_zero]
-                have h₁' : pw₁.1.2.2.take l₀.length = l₀ := by
-                  have h1 := queryLog_extends_l₀ (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa v₁) (c₀.cacheQuery mc v₁) (l₀ ++ [mc]) hpw₁_split
-                  have hlen_le : l₀.length ≤ (l₀ ++ [mc]).length := by
-                    simp [List.length_append]
-                  calc pw₁.1.2.2.take l₀.length
-                      = (pw₁.1.2.2.take (l₀ ++ [mc]).length).take l₀.length := by
-                          rw [List.take_take, min_eq_left hlen_le]
-                    _ = (l₀ ++ [mc]).take l₀.length := by rw [h1]
+                have take_eq : ∀ (v : (wrappedSpec Chal).Range (Sum.inr ()))
+                    (pw : (γ × simSt M Commit Chal) × QueryLog (wrappedSpec Chal)),
+                    pw ∈ support ((simulateQ (wrappedSpec Chal).loggingOracle
+                      ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
+                        (oa v)).run (c₀.cacheQuery mc v, l₀ ++ [mc]))).run) →
+                    pw.1.2.2.take l₀.length = l₀ := fun v pw h => by
+                  have hext := queryLog_extends_l₀ (M := M) (Commit := Commit) (Chal := Chal)
+                    (oa v) (c₀.cacheQuery mc v) (l₀ ++ [mc]) h
+                  calc pw.1.2.2.take l₀.length
+                      = (pw.1.2.2.take (l₀ ++ [mc]).length).take l₀.length := by
+                          rw [List.take_take, min_eq_left (by simp [List.length_append])]
+                    _ = (l₀ ++ [mc]).take l₀.length := by rw [hext]
                     _ = l₀ := List.take_left
-                have h₂' : pw₂.1.2.2.take l₀.length = l₀ := by
-                  have h2 := queryLog_extends_l₀ (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa v₂) (c₀.cacheQuery mc v₂) (l₀ ++ [mc]) hpw₂_split
-                  have hlen_le : l₀.length ≤ (l₀ ++ [mc]).length := by
-                    simp [List.length_append]
-                  calc pw₂.1.2.2.take l₀.length
-                      = (pw₂.1.2.2.take (l₀ ++ [mc]).length).take l₀.length := by
-                          rw [List.take_take, min_eq_left hlen_le]
-                    _ = (l₀ ++ [mc]).take l₀.length := by rw [h2]
-                    _ = l₀ := List.take_left
-                rw [h₁', h₂']
+                rw [take_eq v₁ pw₁ hpw₁, take_eq v₂ pw₂ hpw₂]
             | cons p_head p_tail =>
                 simp only [List.cons_append, List.cons.injEq]
                   at houter₁_eq houter₂_eq
@@ -1043,20 +933,20 @@ private theorem inner_prefix_det
                   omega
                 rw [hlen_eq]
                 exact ih v₁ (c₀.cacheQuery mc v₁) (l₀ ++ [mc])
-                  hpw₁_split hpw₂_split p_tail suffix₁ suffix₂ htail₁ htail₂
+                  hpw₁ hpw₂ p_tail suffix₁ suffix₂ htail₁ htail₂
           · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
             have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) = pure (v, (c₀, l₀)) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get, ← hv]
-            rw [hrun] at houter₁ houter₂
+            rw [hrun] at hus_w₁ hus_w₂
             change us_w₁ ∈ support (simulateQ loggingOracle
-                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at houter₁
+                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at hus_w₁
             change us_w₂ ∈ support (simulateQ loggingOracle
-                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at houter₂
-            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at houter₁ houter₂
-            subst houter₁
-            subst houter₂
-            exact ih v c₀ l₀ hpw₁_split hpw₂_split p suffix₁ suffix₂ houter₁_eq houter₂_eq
+                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at hus_w₂
+            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at hus_w₁ hus_w₂
+            subst hus_w₁
+            subst hus_w₂
+            exact ih v c₀ l₀ hpw₁ hpw₂ p suffix₁ suffix₂ houter₁_eq houter₂_eq
 
 /-- One-more-step extension of `inner_prefix_det`: if the outer logs of two runs share the
 prefix `p ++ [⟨Sum.inr (), v_i⟩]` (allowing the values `v₁, v₂` at position `|p|` to differ),
@@ -1104,42 +994,14 @@ private theorem inner_prefix_det_one_more_inr
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at h₁ h₂
       obtain ⟨us_w₁, hus_w₁, pw₁, hpw₁, hz_eq₁⟩ := h₁
       obtain ⟨us_w₂, hus_w₂, pw₂, hpw₂, hz_eq₂⟩ := h₂
-      have hpw₁_split : (pw₁.1, pw₁.2) ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w₁.1.1)).run us_w₁.1.2)).run) := by
-        change pw₁ ∈ support _
-        exact hpw₁
-      have hpw₂_split : (pw₂.1, pw₂.2) ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w₂.1.1)).run us_w₂.1.2)).run) := by
-        change pw₂ ∈ support _
-        exact hpw₂
-      have hz_eq'₁ : (pw₁.1, us_w₁.2 ++ pw₁.2) = (z₁, outerLog₁) := by
-        rw [show ((pw₁.1, us_w₁.2 ++ pw₁.2) : _ × QueryLog (wrappedSpec Chal)) =
-              Prod.map id (fun x => us_w₁.2 ++ x) pw₁ from rfl]
-        exact hz_eq₁
-      have hz_eq'₂ : (pw₂.1, us_w₂.2 ++ pw₂.2) = (z₂, outerLog₂) := by
-        rw [show ((pw₂.1, us_w₂.2 ++ pw₂.2) : _ × QueryLog (wrappedSpec Chal)) =
-              Prod.map id (fun x => us_w₂.2 ++ x) pw₂ from rfl]
-        exact hz_eq₂
-      obtain ⟨hz_eq1₁, hz_eq2₁⟩ := Prod.mk.inj hz_eq'₁
-      obtain ⟨hz_eq1₂, hz_eq2₂⟩ := Prod.mk.inj hz_eq'₂
-      have hzeq₁ : z₁ = pw₁.1 := hz_eq1₁.symm
-      have hzeq₂ : z₂ = pw₂.1 := hz_eq1₂.symm
-      subst hzeq₁
-      subst hzeq₂
+      have hz_eq'₁ : (pw₁.1, us_w₁.2 ++ pw₁.2) = (z₁, outerLog₁) := hz_eq₁
+      have hz_eq'₂ : (pw₂.1, us_w₂.2 ++ pw₂.2) = (z₂, outerLog₂) := hz_eq₂
+      obtain ⟨rfl, hz_eq2₁⟩ := Prod.mk.inj hz_eq'₁
+      obtain ⟨rfl, hz_eq2₂⟩ := Prod.mk.inj hz_eq'₂
       have houter₁_eq : us_w₁.2 ++ pw₁.2 = p ++ (⟨Sum.inr (), v₁⟩ :: rest₁) :=
         hz_eq2₁.trans hlog₁
       have houter₂_eq : us_w₂.2 ++ pw₂.2 = p ++ (⟨Sum.inr (), v₂⟩ :: rest₂) :=
         hz_eq2₂.trans hlog₂
-      have houter₁ : us_w₁ ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₁
-      have houter₂ : us_w₂ ∈ support
-          ((simulateQ (wrappedSpec Chal).loggingOracle
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₂
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run
@@ -1147,22 +1009,22 @@ private theorem inner_prefix_det_one_more_inr
               (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
-          rw [hrun] at houter₁ houter₂
+          rw [hrun] at hus_w₁ hus_w₂
           change us_w₁ ∈ support (simulateQ loggingOracle
               ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₁
+                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at hus_w₁
           change us_w₂ ∈ support (simulateQ loggingOracle
               ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₂
+                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at hus_w₂
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
             (spec := wrappedSpec Chal) (Sum.inl n)
-            (fun u => pure (u, (c₀, l₀)))] at houter₁ houter₂
-          rw [support_bind] at houter₁ houter₂
+            (fun u => pure (u, (c₀, l₀)))] at hus_w₁ hus_w₂
+          rw [support_bind] at hus_w₁ hus_w₂
           simp only [support_map, support_query, Set.mem_univ,
             simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-            Set.iUnion_const] at houter₁ houter₂
-          obtain ⟨_, ⟨u₁, hu₁_eq⟩, hus_w₁_in⟩ := houter₁
-          obtain ⟨_, ⟨u₂, hu₂_eq⟩, hus_w₂_in⟩ := houter₂
+            Set.iUnion_const] at hus_w₁ hus_w₂
+          obtain ⟨_, ⟨u₁, hu₁_eq⟩, hus_w₁_in⟩ := hus_w₁
+          obtain ⟨_, ⟨u₂, hu₂_eq⟩, hus_w₂_in⟩ := hus_w₂
           subst hu₁_eq
           subst hu₂_eq
           rw [Set.mem_singleton_iff] at hus_w₁_in hus_w₂_in
@@ -1188,7 +1050,7 @@ private theorem inner_prefix_det_one_more_inr
                     QueryLog.countQ (spec := wrappedSpec Chal) p_tail (· = Sum.inr ()) := by
                 simp [QueryLog.countQ, QueryLog.getQ_cons, hpH_fst]
               rw [hp_count]
-              exact ih u₁ c₀ l₀ hpw₁_split hpw₂_split p_tail htail₁ htail₂
+              exact ih u₁ c₀ l₀ hpw₁ hpw₂ p_tail htail₁ htail₂
       | inr mc =>
           by_cases hcache : c₀ mc = none
           · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
@@ -1197,24 +1059,24 @@ private theorem inner_prefix_det_one_more_inr
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
-            rw [hrun] at houter₁ houter₂
+            rw [hrun] at hus_w₁ hus_w₂
             change us_w₁ ∈ support (simulateQ loggingOracle
                 ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
-                    OracleComp _ _))).run at houter₁
+                    OracleComp _ _))).run at hus_w₁
             change us_w₂ ∈ support (simulateQ loggingOracle
                 ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
-                    OracleComp _ _))).run at houter₂
+                    OracleComp _ _))).run at hus_w₂
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind
               (spec := wrappedSpec Chal) (Sum.inr ())
-              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at houter₁ houter₂
-            rw [support_bind] at houter₁ houter₂
+              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at hus_w₁ hus_w₂
+            rw [support_bind] at hus_w₁ hus_w₂
             simp only [support_map, support_query, Set.mem_univ,
               simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-              Set.iUnion_const] at houter₁ houter₂
-            obtain ⟨_, ⟨w₁, hw₁_eq⟩, hus_w₁_in⟩ := houter₁
-            obtain ⟨_, ⟨w₂, hw₂_eq⟩, hus_w₂_in⟩ := houter₂
+              Set.iUnion_const] at hus_w₁ hus_w₂
+            obtain ⟨_, ⟨w₁, hw₁_eq⟩, hus_w₁_in⟩ := hus_w₁
+            obtain ⟨_, ⟨w₂, hw₂_eq⟩, hus_w₂_in⟩ := hus_w₂
             subst hw₁_eq
             subst hw₂_eq
             rw [Set.mem_singleton_iff] at hus_w₁_in hus_w₂_in
@@ -1225,10 +1087,10 @@ private theorem inner_prefix_det_one_more_inr
                 simp only [QueryLog.countQ, QueryLog.getQ_nil, List.length_nil, add_zero]
                 have h₁' : pw₁.1.2.2.take (l₀ ++ [mc]).length = l₀ ++ [mc] :=
                   queryLog_extends_l₀ (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa w₁) (c₀.cacheQuery mc w₁) (l₀ ++ [mc]) hpw₁_split
+                    (oa w₁) (c₀.cacheQuery mc w₁) (l₀ ++ [mc]) hpw₁
                 have h₂' : pw₂.1.2.2.take (l₀ ++ [mc]).length = l₀ ++ [mc] :=
                   queryLog_extends_l₀ (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa w₂) (c₀.cacheQuery mc w₂) (l₀ ++ [mc]) hpw₂_split
+                    (oa w₂) (c₀.cacheQuery mc w₂) (l₀ ++ [mc]) hpw₂
                 have hlen : (l₀ ++ [mc]).length = l₀.length + 1 := by
                   simp [List.length_append]
                 rw [← hlen, h₁', h₂']
@@ -1260,20 +1122,20 @@ private theorem inner_prefix_det_one_more_inr
                   omega
                 rw [hlen_eq]
                 exact ih w₁ (c₀.cacheQuery mc w₁) (l₀ ++ [mc])
-                  hpw₁_split hpw₂_split p_tail htail₁ htail₂
+                  hpw₁ hpw₂ p_tail htail₁ htail₂
           · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
             have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) = pure (v, (c₀, l₀)) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get, ← hv]
-            rw [hrun] at houter₁ houter₂
+            rw [hrun] at hus_w₁ hus_w₂
             change us_w₁ ∈ support (simulateQ loggingOracle
-                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at houter₁
+                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at hus_w₁
             change us_w₂ ∈ support (simulateQ loggingOracle
-                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at houter₂
-            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at houter₁ houter₂
-            subst houter₁
-            subst houter₂
-            exact ih v c₀ l₀ hpw₁_split hpw₂_split p houter₁_eq houter₂_eq
+                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at hus_w₂
+            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at hus_w₁ hus_w₂
+            subst hus_w₁
+            subst hus_w₂
+            exact ih v c₀ l₀ hpw₁ hpw₂ p houter₁_eq houter₂_eq
 
 /-- Specialization of `queryLog_length_eq_outer_inr_count` to `runTrace`'s initial state
 `(∅, [])`: the trace's `queryLog` has the same length as the count of `Sum.inr ()` outer
@@ -1292,17 +1154,14 @@ lemma runTrace_queryLog_length_eq
   simp only [bind_pure_comp, simulateQ_map, WriterT.run_map', support_map] at hx
   obtain ⟨a, ha_mem, ha_eq⟩ := hx
   have hxqueryLog : x.queryLog = a.1.2.2 := by
-    have := congrArg Prod.fst ha_eq
-    have h2 := congrArg Trace.queryLog this
-    simpa [Prod.map_apply, Trace.queryLog] using h2.symm
-  have hlog_eq : a.2 = outerLog := by
-    have := congrArg Prod.snd ha_eq
-    simpa [Prod.map_apply] using this
+    simpa [Prod.map_apply, Trace.queryLog] using
+      (congrArg Trace.queryLog (congrArg Prod.fst ha_eq)).symm
+  have hlog_eq : a.2 = outerLog :=
+    by simpa [Prod.map_apply] using congrArg Prod.snd ha_eq
   rw [hxqueryLog, ← hlog_eq]
-  have h := queryLog_length_eq_outer_inr_count (M := M) (Commit := Commit) (Chal := Chal)
+  simpa using queryLog_length_eq_outer_inr_count (M := M) (Commit := Commit) (Chal := Chal)
     (γ := (M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache)
     (nmaAdv.main pk) ∅ [] (z := a.1) (outerLog := a.2) ha_mem
-  simpa using h
 
 /-- Specialization of `queryLog_cache_outer_lockstep` to `runTrace`'s initial state
 `(∅, [])`: the trace's `queryLog[i]` is cached in `x.roCache`, and the cached value matches
@@ -1323,28 +1182,22 @@ lemma runTrace_cache_outer_lockstep
   simp only [bind_pure_comp, simulateQ_map, WriterT.run_map', support_map] at hx
   obtain ⟨a, ha_mem, ha_eq⟩ := hx
   have hxqueryLog : x.queryLog = a.1.2.2 := by
-    have := congrArg Prod.fst ha_eq
-    have h2 := congrArg Trace.queryLog this
-    simpa [Prod.map_apply, Trace.queryLog] using h2.symm
+    simpa [Prod.map_apply, Trace.queryLog] using
+      (congrArg Trace.queryLog (congrArg Prod.fst ha_eq)).symm
   have hxroCache : x.roCache = a.1.2.1 := by
-    have := congrArg Prod.fst ha_eq
-    have h2 := congrArg Trace.roCache this
-    simpa [Prod.map_apply, Trace.roCache] using h2.symm
-  have hlog_eq : a.2 = outerLog := by
-    have := congrArg Prod.snd ha_eq
-    simpa [Prod.map_apply] using this
+    simpa [Prod.map_apply, Trace.roCache] using
+      (congrArg Trace.roCache (congrArg Prod.fst ha_eq)).symm
+  have hlog_eq : a.2 = outerLog :=
+    by simpa [Prod.map_apply] using congrArg Prod.snd ha_eq
   intro i h_hi
-  have h_hi' : i < a.1.2.2.length := by rw [← hxqueryLog]; exact h_hi
+  have h_hi' : i < a.1.2.2.length := hxqueryLog ▸ h_hi
   obtain ⟨_, _, hlock⟩ :=
     queryLog_cache_outer_lockstep (M := M) (Commit := Commit) (Chal := Chal)
       (γ := (M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache)
       (nmaAdv.main pk) ∅ [] (z := a.1) (outerLog := a.2) ha_mem
   obtain ⟨ω, hcache, hlog⟩ := hlock i (Nat.zero_le _) h_hi'
   refine ⟨ω, ?_, ?_⟩
-  · rw [hxroCache]
-    have hcongr : x.queryLog[i]'h_hi = a.1.2.2[i]'h_hi' :=
-      List.getElem_of_eq hxqueryLog _
-    rw [hcongr]
+  · rw [hxroCache, List.getElem_of_eq hxqueryLog]
     exact hcache
   · rw [← hlog_eq]
     simpa using hlog
@@ -1352,7 +1205,7 @@ lemma runTrace_cache_outer_lockstep
 /-- Decoding the `verified` flag of a trace produced by `runTrace`. If the trace's
 `verified` field is `true`, then there is a cached challenge `ω` for `x.target` and the
 corresponding `σ.verify` succeeds. Used by `forkSupportInvariant_of_mem_replayFirstRun`. -/
-lemma runTrace_verified_imp_verify
+lemma exists_cached_verify_of_runTrace_verified
     [SampleableType Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
@@ -1379,16 +1232,15 @@ lemma runTrace_verified_imp_verify
            | some ω => σ.verify pk c ω s
            | none => false } :
         Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) := by
-    have := congrArg Prod.fst ha_eq
-    simpa using this.symm
-  rw [hxeq]
-  rw [hxeq] at hv
+    simpa using (congrArg Prod.fst ha_eq).symm
+  rw [hxeq] at hv ⊢
   simp only [Trace.target] at *
-  match hcase : roCache (msg, c), hv with
-  | none, hv => simp at hv
-  | some ω, hv =>
-      refine ⟨ω, rfl, ?_⟩
-      simpa using hv
+  split at hv
+  · exact ⟨_, ‹_ = some _›, hv⟩
+  · simp at hv
+
+@[deprecated (since := "2026-06-25")]
+alias runTrace_verified_imp_verify := exists_cached_verify_of_runTrace_verified
 
 /-- The `forkPoint`-based reachability invariant for `runTrace`: whenever
 `forkPoint qH x = some s`, the outer `QueryLog` of `replayFirstRun (runTrace ...)` has a
@@ -1410,16 +1262,8 @@ theorem runTrace_forkPoint_CfReachable
   have htarget : x.queryLog[(↑s : ℕ)]? = some x.target :=
     forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
       (Chal := Chal) hs
-  have hslt : (↑s : ℕ) < x.queryLog.length := by
-    by_contra hge
-    push Not at hge
-    have hnone : x.queryLog[(↑s : ℕ)]? = none := List.getElem?_eq_none hge
-    rw [hnone] at htarget
-    exact (Option.some_ne_none x.target htarget.symm).elim
-  have hslt' : (↑s : ℕ) < (log.getQ (· = Sum.inr ())).length := by
-    change (↑s : ℕ) < log.countQ (· = Sum.inr ())
-    rw [← hlen]
-    exact hslt
+  have hslt : (↑s : ℕ) < x.queryLog.length := (List.getElem?_eq_some_iff.mp htarget).1
+  have hslt' : (↑s : ℕ) < log.countQ (· = Sum.inr ()) := hlen ▸ hslt
   exact QueryLog.getQueryValue?_isSome_of_lt log (Sum.inr ()) ↑s hslt'
 
 /-- **Determinism of `runTrace`'s inner `queryLog` from the outer-log prefix.** If the outer
@@ -1448,19 +1292,15 @@ lemma runTrace_queryLog_take_eq
   obtain ⟨a₁, ha_mem₁, ha_eq₁⟩ := h₁
   obtain ⟨a₂, ha_mem₂, ha_eq₂⟩ := h₂
   have hxqL₁ : x₁.queryLog = a₁.1.2.2 := by
-    have := congrArg Prod.fst ha_eq₁
-    have h3 := congrArg Trace.queryLog this
-    simpa [Prod.map_apply, Trace.queryLog] using h3.symm
+    simpa [Prod.map_apply, Trace.queryLog] using
+      (congrArg Trace.queryLog (congrArg Prod.fst ha_eq₁)).symm
   have hxqL₂ : x₂.queryLog = a₂.1.2.2 := by
-    have := congrArg Prod.fst ha_eq₂
-    have h3 := congrArg Trace.queryLog this
-    simpa [Prod.map_apply, Trace.queryLog] using h3.symm
+    simpa [Prod.map_apply, Trace.queryLog] using
+      (congrArg Trace.queryLog (congrArg Prod.fst ha_eq₂)).symm
   have hlog_eq₁ : a₁.2 = outerLog₁ := by
-    have := congrArg Prod.snd ha_eq₁
-    simpa [Prod.map_apply] using this
+    simpa [Prod.map_apply] using congrArg Prod.snd ha_eq₁
   have hlog_eq₂ : a₂.2 = outerLog₂ := by
-    have := congrArg Prod.snd ha_eq₂
-    simpa [Prod.map_apply] using this
+    simpa [Prod.map_apply] using congrArg Prod.snd ha_eq₂
   rw [hxqL₁, hxqL₂]
   have hdet := inner_prefix_det_one_more_inr (M := M) (Commit := Commit) (Chal := Chal)
     (γ := (M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache)
@@ -1474,13 +1314,8 @@ lemma runTrace_queryLog_take_eq
 
 end Coupling
 
-/- If two successful replay-fork runs of `runTrace` select the same fork index,
-their forgery targets agree.
-
-The replay transcript gives a common outer-log prefix up to the consumed fork query.
-`runTrace_queryLog_take_eq` transfers that prefix equality to the internal logical
-`queryLog`, and `forkPoint_getElem?_eq_some_target` identifies each target with
-the selected logical query. -/
+/-- If two successful replay-fork runs of `runTrace` select the same fork index, then their
+forgery targets agree. -/
 lemma runTrace_target_eq_of_mem_forkReplay
     [DecidableEq M] [DecidableEq Commit] [DecidableEq Chal] [SampleableType Chal] [Inhabited Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
@@ -1500,17 +1335,13 @@ lemma runTrace_target_eq_of_mem_forkReplay
   letI : IsUniformSpec ((Unit →ₒ Chal) : OracleSpec _) :=
     IsUniformSpec.ofFintypeInhabited _
   classical
-  let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
   obtain ⟨log₁, log₂, s', hx₁, hx₂, hcf₁, _hcf₂, _hneq, replacement, st, hz, hlog₂,
     _hmismatch, hfork, _hprefix⟩ := forkReplay_success_log_props
       (main := runTrace σ hr M nmaAdv pk)
-      (qb := qb) (i := Sum.inr ())
+      (qb := fun j => match j with | .inl _ => 0 | .inr () => qH) (i := Sum.inr ())
       (cf := forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH)
       hsup
-  have hs_eq : s' = s := by
-    rw [hcf₁] at h₁
-    exact Option.some.inj h₁
-  cases hs_eq
+  cases Option.some.inj (hcf₁.symm.trans h₁)
   set main : OracleComp (wrappedSpec Chal)
       (Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
     runTrace σ hr M nmaAdv pk
@@ -1571,64 +1402,31 @@ lemma runTrace_target_eq_of_mem_forkReplay
       have hlen₁ : (log₁.take (st.cursor - 1)).length ≤ n := by rw [htake_len₁]; exact hn
       have hlen₂ : (log₂.take (st.cursor - 1)).length ≤ n := by rw [htake_len₂]; exact hn
       rw [List.getElem?_eq_none hlen₁, List.getElem?_eq_none hlen₂]
-  have hget₁ : log₁[st.cursor - 1]? = some (log₁[st.cursor - 1]'hc1_lt_t) :=
-    List.getElem?_eq_getElem hc1_lt_t
-  have hget₂ : log₂[st.cursor - 1]? = some (log₂[st.cursor - 1]'hc1_lt_o) :=
-    List.getElem?_eq_getElem hc1_lt_o
-  have hfst₁ : (log₁[st.cursor - 1]'hc1_lt_t).1 = Sum.inr () := by
-    have := htrace_in
-    unfold QueryLog.inputAt? at this
-    rw [hget₁] at this
-    simpa using this
-  have hfst₂ : (log₂[st.cursor - 1]'hc1_lt_o).1 = Sum.inr () := by
-    have := hobs_in
-    unfold QueryLog.inputAt? at this
-    rw [hget₂] at this
-    simpa using this
-  obtain ⟨v₁, hv₁⟩ : ∃ v : Chal, log₁[st.cursor - 1]'hc1_lt_t =
-      (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) := by
-    rcases hsig : log₁[st.cursor - 1]'hc1_lt_t with ⟨i, v⟩
-    rw [hsig] at hfst₁
+  have entry_inr : ∀ (L : (wrappedSpec Chal).QueryLog) (hlt : st.cursor - 1 < L.length),
+      QueryLog.inputAt? L (st.cursor - 1) = some (Sum.inr ()) →
+      ∃ v : Chal, L[st.cursor - 1]'hlt =
+        (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) := by
+    intro L hlt hin
+    rw [QueryLog.inputAt?, List.getElem?_eq_getElem hlt] at hin
+    rcases hsig : L[st.cursor - 1]'hlt with ⟨i, v⟩
+    rw [hsig] at hin
     cases i with
-    | inl n => cases hfst₁
+    | inl n => simp at hin
     | inr u => cases u; exact ⟨v, rfl⟩
-  obtain ⟨v₂, hv₂⟩ : ∃ v : Chal, log₂[st.cursor - 1]'hc1_lt_o =
-      (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) := by
-    rcases hsig : log₂[st.cursor - 1]'hc1_lt_o with ⟨i, v⟩
-    rw [hsig] at hfst₂
-    cases i with
-    | inl n => cases hfst₂
-    | inr u => cases u; exact ⟨v, rfl⟩
+  obtain ⟨v₁, hv₁⟩ := entry_inr log₁ hc1_lt_t htrace_in
+  obtain ⟨v₂, hv₂⟩ := entry_inr log₂ hc1_lt_o hobs_in
   have hcsub : st.cursor - 1 + 1 = st.cursor := by omega
-  have hdec₁ : log₁ = log₁.take (st.cursor - 1) ++
-      ((⟨Sum.inr (), v₁⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
-        log₁.drop st.cursor) := by
-    have hdrop :
-        log₁.drop (st.cursor - 1) =
-          (log₁[st.cursor - 1]'hc1_lt_t) :: log₁.drop (st.cursor - 1 + 1) :=
-      List.drop_eq_getElem_cons hc1_lt_t
-    rw [hcsub] at hdrop
-    rw [hv₁] at hdrop
-    calc log₁ = log₁.take (st.cursor - 1) ++ log₁.drop (st.cursor - 1) :=
-        (List.take_append_drop _ _).symm
-      _ = log₁.take (st.cursor - 1) ++
-          ((⟨Sum.inr (), v₁⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
-            log₁.drop st.cursor) := by rw [hdrop]
+  have decomp : ∀ (L : (wrappedSpec Chal).QueryLog) (hlt : st.cursor - 1 < L.length) (v : Chal),
+      L[st.cursor - 1]'hlt =
+        (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) →
+      L = L.take (st.cursor - 1) ++ (⟨Sum.inr (), v⟩ :: L.drop st.cursor) := by
+    intro L hlt v hv
+    conv_lhs => rw [← List.take_append_drop (st.cursor - 1) L,
+      List.drop_eq_getElem_cons hlt, hcsub, hv]
+  have hdec₁ := decomp log₁ hc1_lt_t v₁ hv₁
   have hdec₂ : log₂ = log₁.take (st.cursor - 1) ++
-      ((⟨Sum.inr (), v₂⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
-        log₂.drop st.cursor) := by
-    have hdrop :
-        log₂.drop (st.cursor - 1) =
-          (log₂[st.cursor - 1]'hc1_lt_o) :: log₂.drop (st.cursor - 1 + 1) :=
-      List.drop_eq_getElem_cons hc1_lt_o
-    rw [hcsub] at hdrop
-    rw [hv₂] at hdrop
-    calc log₂ = log₂.take (st.cursor - 1) ++ log₂.drop (st.cursor - 1) :=
-        (List.take_append_drop _ _).symm
-      _ = log₁.take (st.cursor - 1) ++ log₂.drop (st.cursor - 1) := by rw [hprefix_val]
-      _ = log₁.take (st.cursor - 1) ++
-          ((⟨Sum.inr (), v₂⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
-            log₂.drop st.cursor) := by rw [hdrop]
+      (⟨Sum.inr (), v₂⟩ :: log₂.drop st.cursor) := by
+    rw [hprefix_val]; exact decomp log₂ hc1_lt_o v₂ hv₂
   have hpref_count :
       QueryLog.countQ (log₁.take (st.cursor - 1)) (· = Sum.inr ()) = (↑s : ℕ) := by
     unfold QueryLog.countQ
@@ -1649,13 +1447,9 @@ lemma runTrace_target_eq_of_mem_forkReplay
   have htgt₂ : x₂.queryLog[(↑s : ℕ)]? = some x₂.target :=
     forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
       (Chal := Chal) h₂
-  have hgetElem_take :
-      ∀ l : List (M × Commit),
-        (l.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = l[(↑s : ℕ)]? := fun l => by
-    rw [List.getElem?_take]
-    split_ifs with h
-    · rfl
-    · exact absurd (Nat.lt_succ_self _) h
+  have hgetElem_take (l : List (M × Commit)) :
+      (l.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = l[(↑s : ℕ)]? :=
+    List.getElem?_take_of_lt (Nat.lt_succ_self _)
   have : some x₁.target = some x₂.target := by
     rw [← htgt₁, ← htgt₂, ← hgetElem_take x₁.queryLog, ← hgetElem_take x₂.queryLog, htakeEq]
   exact Option.some.inj this
@@ -1740,24 +1534,18 @@ theorem replayForkingBound
   letI : IsUniformSpec ((Unit →ₒ Chal) : OracleSpec _) :=
     IsUniformSpec.ofFintypeInhabited _
   intro wrappedMain cf qb acc
-  -- Step 1: Rewrite `acc` as `∑ s, Pr[= some s | cf <$> wrappedMain]`, matching the LHS of
-  -- `le_probEvent_isSome_forkReplay`.
   classical
   have hAcc_sum :
       acc = ∑ s, Pr[= some s | cf <$> wrappedMain] := by
     simp only [acc]
     rw [show (fun x => (cf x).isSome = true) =
         (fun x : _ => (Option.isSome x = true)) ∘ cf from rfl,
-      ← probEvent_map (q := fun r => Option.isSome r = true)]
-    rw [probEvent_eq_tsum_ite]
-    rw [tsum_option _ ENNReal.summable]
+      ← probEvent_map (q := fun r => Option.isSome r = true),
+      probEvent_eq_tsum_ite, tsum_option _ ENNReal.summable]
     simp only [Option.isSome_none, Bool.false_eq_true, ↓reduceIte, Option.isSome_some,
       ↓reduceIte, zero_add]
     rw [tsum_fintype]
   rw [hAcc_sum]
-  -- Step 2: Apply the forking lemma lower bound `le_probEvent_isSome_forkReplay`,
-  -- then upgrade the RHS event from `isSome` to the structural postcondition using
-  -- `forkReplay_propertyTransfer` through `probEvent_mono`.
   have hH_inv : (Fintype.card ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr ())) : ENNReal)⁻¹ =
       challengeSpaceInv Chal := rfl
   have hqb_eq : qb (Sum.inr ()) = qH := rfl
@@ -1765,7 +1553,9 @@ theorem replayForkingBound
         ((∑ s, Pr[= some s | cf <$> wrappedMain]) / (↑qH + 1) - challengeSpaceInv Chal)
       = (∑ s, Pr[= some s | cf <$> wrappedMain]) *
         ((∑ s, Pr[= some s | cf <$> wrappedMain]) / ↑(qb (Sum.inr ()) + 1)
-          - challengeSpaceInv Chal) := by rw [hqb_eq]; push_cast; ring_nf
+          - challengeSpaceInv Chal) := by
+        rw [hqb_eq]
+        norm_cast
     _ ≤ Pr[ fun r : Option
             (Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
               Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
@@ -1773,8 +1563,7 @@ theorem replayForkingBound
         have hbound := le_probEvent_isSome_forkReplay
           (main := wrappedMain) (qb := qb) (i := Sum.inr ()) (cf := cf) hreach
         simp only at hbound
-        rw [hH_inv] at hbound
-        exact hbound
+        rwa [hH_inv] at hbound
     _ ≤ _ := by
         apply probEvent_mono
         intro r hr hisSome

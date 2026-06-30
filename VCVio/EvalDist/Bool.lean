@@ -3,8 +3,8 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Defs.NeverFails
+import VCVio.EvalDist.Monad.Map
 
 /-!
 # Evaluation Distributions on Boolean-Valued Computations
@@ -18,8 +18,7 @@ omit [Monad m] in
 @[simp, grind =]
 lemma probOutput_true_add_false (mx : m Bool) :
     Pr[= true | mx] + Pr[= false | mx] = 1 - Pr[⊥ | mx] := by
-  have h := tsum_probOutput_eq_sub mx
-  rwa [tsum_fintype (L := .unconditional _), Fintype.sum_bool] at h
+  simpa using tsum_probOutput_eq_sub mx
 
 omit [Monad m] in
 @[simp, grind =]

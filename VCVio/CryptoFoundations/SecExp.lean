@@ -3,12 +3,12 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
+import VCVio.EvalDist.Defs.Instances
+import VCVio.EvalDist.Defs.Semantics
+import VCVio.EvalDist.TVDist
+import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.QueryBound
-import VCVio.EvalDist.TVDist
-import VCVio.EvalDist.Defs.Semantics
-import VCVio.EvalDist.Defs.Instances
-import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Security Experiments
@@ -60,13 +60,10 @@ lemma SPMF.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : SPMF Bool)
   have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by
     rw [← htotal, ENNReal.add_sub_cancel_left probOutput_ne_top]
   unfold SPMF.boolBiasAdvantage
-  rw [hfalse]
-  set t := (Pr[= true | p]).toReal
-  have h1 : (1 : ℝ≥0∞).toReal = 1 := ENNReal.toReal_one
-  have hle : Pr[= true | p] ≤ 1 := by rw [← htotal]; exact le_add_right (le_refl _)
-  rw [ENNReal.toReal_sub_of_le hle ENNReal.one_ne_top, h1]
-  rw [show t - (1 - t) = 2 * (t - 1 / 2) by ring]
-  rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2)]
+  rw [hfalse, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top, ENNReal.toReal_one,
+    show (Pr[= true | p]).toReal - (1 - (Pr[= true | p]).toReal) =
+      2 * ((Pr[= true | p]).toReal - 1 / 2) by ring,
+    abs_mul, abs_two]
 
 /-- Hidden-bit decomposition at the SPMF level: the bias of a coin-flip guessing game equals the
 distinguishing advantage between the two branches, assuming the coin is fair and both branches
@@ -85,7 +82,6 @@ lemma SPMF.boolBiasAdvantage_eq_boolDistAdvantage_coin_branch
     (coin >>= fun b =>
       (if b then p else q) >>= fun z => pure (b == z)).boolBiasAdvantage =
     p.boolDistAdvantage q := by
-  -- Branch probabilities: true branch preserves, false branch flips
   have hbt : ∀ x : Bool,
       Pr[= x | (if (true : Bool) then p else q) >>= fun z =>
         (pure (true == z) : SPMF Bool)] = Pr[= x | p] := by
@@ -94,52 +90,42 @@ lemma SPMF.boolBiasAdvantage_eq_boolDistAdvantage_coin_branch
       Pr[= x | (if (false : Bool) then p else q) >>= fun z =>
         (pure (false == z) : SPMF Bool)] = Pr[= (!x) | q] := by
     intro x; cases x <;> simp
-  -- Compute Pr[= x | game] for each x
   have hgame : ∀ x : Bool, Pr[= x | coin >>= fun b =>
       (if b then p else q) >>= fun z => pure (b == z)] =
-    (Pr[= x | p] + Pr[= (!x) | q]) / 2 := by
-    intro x
+    (Pr[= x | p] + Pr[= (!x) | q]) / 2 := fun x => by
     rw [probOutput_bind_eq_tsum, tsum_fintype (L := .unconditional _), Fintype.sum_bool,
-      hcoin_true, hcoin_false, hbt x, hbf x]
-    rw [← left_distrib, one_div, mul_comm, div_eq_mul_inv]
-  -- Total mass = 1
+      hcoin_true, hcoin_false, hbt x, hbf x, ← left_distrib, one_div, mul_comm, div_eq_mul_inv]
   have htotal : Pr[= true | coin >>= fun b =>
       (if b then p else q) >>= fun z => pure (b == z)] +
     Pr[= false | coin >>= fun b =>
       (if b then p else q) >>= fun z => pure (b == z)] = 1 := by
     rw [hgame true, hgame false]
     simp only [Bool.not_true, Bool.not_false, ENNReal.div_add_div_same]
-    have : Pr[= true | p] + Pr[= false | q] + (Pr[= false | p] + Pr[= true | q]) =
-        (Pr[= true | p] + Pr[= false | p]) + (Pr[= true | q] + Pr[= false | q]) := by ring
-    rw [this, hp, hq, show (1 : ℝ≥0∞) + 1 = 2 from by norm_num]
+    rw [show Pr[= true | p] + Pr[= false | q] + (Pr[= false | p] + Pr[= true | q]) =
+        (Pr[= true | p] + Pr[= false | p]) + (Pr[= true | q] + Pr[= false | q]) from by ring,
+      hp, hq, show (1 : ℝ≥0∞) + 1 = 2 from by norm_num]
     exact ENNReal.div_self (by positivity) ENNReal.ofNat_ne_top
-  -- Bias = 2 * |Pr[true] - 1/2|, then compute Pr[true] - 1/2
-  rw [SPMF.boolBiasAdvantage_eq_two_mul_abs_sub_half _ htotal, hgame true]
-  simp only [Bool.not_true]
-  have hfalseq : Pr[= false | q] = 1 - Pr[= true | q] := by
-    rw [← hq, ENNReal.add_sub_cancel_left probOutput_ne_top]
-  rw [hfalseq]
-  have hle : Pr[= true | q] ≤ 1 := by rw [← hq]; exact le_add_right (le_refl _)
-  rw [ENNReal.toReal_div, ENNReal.toReal_add probOutput_ne_top
-    (ENNReal.sub_ne_top ENNReal.one_ne_top),
-    ENNReal.toReal_sub_of_le hle ENNReal.one_ne_top, ENNReal.toReal_one, ENNReal.toReal_ofNat]
+  rw [SPMF.boolBiasAdvantage_eq_two_mul_abs_sub_half _ htotal, hgame true, Bool.not_true]
+  rw [show Pr[= false | q] = 1 - Pr[= true | q] from by
+      rw [← hq, ENNReal.add_sub_cancel_left probOutput_ne_top],
+    ENNReal.toReal_div, ENNReal.toReal_add probOutput_ne_top
+      (ENNReal.sub_ne_top ENNReal.one_ne_top),
+    ENNReal.toReal_sub_of_le (by rw [← hq]; exact le_add_right (le_refl _)) ENNReal.one_ne_top,
+    ENNReal.toReal_one, ENNReal.toReal_ofNat]
   unfold SPMF.boolDistAdvantage
-  set pt := (Pr[= true | p]).toReal; set qt := (Pr[= true | q]).toReal
-  rw [show (pt + (1 - qt)) / 2 - 1 / 2 = (pt - qt) / 2 from by ring,
-    show (2 : ℝ) * |(pt - qt) / 2| = |(2 : ℝ)| * |(pt - qt) / 2| from by norm_num,
-    ← abs_mul, show (2 : ℝ) * ((pt - qt) / 2) = pt - qt from by ring]
+  rw [show ((Pr[= true | p]).toReal + (1 - (Pr[= true | q]).toReal)) / 2 - 1 / 2 =
+      ((Pr[= true | p]).toReal - (Pr[= true | q]).toReal) / 2 from by ring, abs_div, abs_two,
+    mul_div_cancel₀ _ two_ne_zero]
 
 /-- Triangle inequality for SPMF Boolean distinguishing advantage. -/
 lemma SPMF.boolDistAdvantage_triangle (p q r : SPMF Bool) :
-    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
-  unfold SPMF.boolDistAdvantage
-  exact abs_sub_le _ _ _
+    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r :=
+  abs_sub_le _ _ _
 
 /-- Triangle inequality for Boolean distinguishing advantage. -/
 lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
-    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
-  unfold ProbComp.boolDistAdvantage
-  exact abs_sub_le _ _ _
+    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r :=
+  abs_sub_le _ _ _
 
 /-- The `true`-branch probability of one Boolean-valued game is bounded above by the
 `true`-branch probability of another game plus their distinguishing advantage.
@@ -151,29 +137,22 @@ probability inequality `Pr[true|p] ≤ Pr[true|q] + ENNReal.ofReal ε` that plug
 lemma ProbComp.probOutput_true_le_add_ofReal_boolDistAdvantage (p q : ProbComp Bool) :
     Pr[= true | p] ≤ Pr[= true | q] + ENNReal.ofReal (p.boolDistAdvantage q) := by
   unfold ProbComp.boolDistAdvantage
-  set a : ℝ := (Pr[= true | p]).toReal with ha_def
-  set b : ℝ := (Pr[= true | q]).toReal with hb_def
-  have h_abs : a ≤ b + |a - b| := by
-    have : a - b ≤ |a - b| := le_abs_self _
-    linarith
-  have h_p : Pr[= true | p] = ENNReal.ofReal a :=
-    (ENNReal.ofReal_toReal probOutput_ne_top).symm
-  have h_q : Pr[= true | q] = ENNReal.ofReal b :=
-    (ENNReal.ofReal_toReal probOutput_ne_top).symm
-  rw [h_p, h_q, ← ENNReal.ofReal_add ENNReal.toReal_nonneg (abs_nonneg _)]
-  exact ENNReal.ofReal_le_ofReal h_abs
+  set a : ℝ := (Pr[= true | p]).toReal
+  set b : ℝ := (Pr[= true | q]).toReal
+  rw [show Pr[= true | p] = ENNReal.ofReal a from (ENNReal.ofReal_toReal probOutput_ne_top).symm,
+    show Pr[= true | q] = ENNReal.ofReal b from (ENNReal.ofReal_toReal probOutput_ne_top).symm,
+    ← ENNReal.ofReal_add ENNReal.toReal_nonneg (abs_nonneg _)]
+  exact ENNReal.ofReal_le_ofReal (by linarith [le_abs_self (a - b)])
+
 /-- Re-express Boolean bias as twice the absolute deviation of `Pr[true]` from `1/2`. -/
 lemma ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : ProbComp Bool) :
     p.boolBiasAdvantage = 2 * |(Pr[= true | p]).toReal - 1 / 2| := by
-  have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by
-    have hsum : Pr[= true | p] + Pr[= false | p] = 1 := by simp
-    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by simp [probOutput_false_eq_sub]
   unfold ProbComp.boolBiasAdvantage
-  rw [hfalse, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
-  rw [ENNReal.toReal_one]
-  rw [show (Pr[= true | p]).toReal - (1 - (Pr[= true | p]).toReal) =
-      2 * ((Pr[= true | p]).toReal - 1 / 2) by ring]
-  rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2)]
+  rw [hfalse, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top, ENNReal.toReal_one,
+    show (Pr[= true | p]).toReal - (1 - (Pr[= true | p]).toReal) =
+      2 * ((Pr[= true | p]).toReal - 1 / 2) by ring,
+    abs_mul, abs_two]
 
 /-- A hidden-bit guessing game over two Boolean branches has bias exactly equal to the
 distinguishing advantage between those two branches. -/
@@ -184,18 +163,9 @@ lemma ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch
       let z ← if b then real else rand
       pure (b == z)).boolBiasAdvantage =
     real.boolDistAdvantage rand := by
-  rw [ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half]
-  rw [probOutput_uniformBool_branch_toReal_sub_half]
-  unfold ProbComp.boolDistAdvantage
-  calc
-    2 * |((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2|
-        = |(2 : ℝ)| * |((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2| := by
-            norm_num
-    _ = |(2 : ℝ) * (((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2)| := by
-          rw [← abs_mul]
-    _ = |(Pr[= true | real]).toReal - (Pr[= true | rand]).toReal| := by
-          congr 1
-          ring
+  rw [ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half,
+    probOutput_uniformBool_branch_toReal_sub_half, ProbComp.boolDistAdvantage, abs_div, abs_two,
+    mul_div_cancel₀ _ two_ne_zero]
 
 /-- Version of `boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch` with a shared sampled
 prefix before the real/random branch is chosen. -/
@@ -247,10 +217,9 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
             refine probOutput_bind_congr' ($ᵗ Bool) x ?_
             intro b
             cases b <;> simp [left, right]
-  have hprob := evalDist_ext_iff.mp hbranch
   rw [show game.boolBiasAdvantage = branchGame.boolBiasAdvantage by
     unfold ProbComp.boolBiasAdvantage
-    rw [hprob true, hprob false]]
+    rw [evalDist_ext_iff.mp hbranch true, evalDist_ext_iff.mp hbranch false]]
   simpa [branchGame, left, right] using
     ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch left right
 
@@ -258,41 +227,41 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
   statement, is the absolute difference between the probability of success and 1/2. -/
 noncomputable def ProbComp.guessAdvantage (p : ProbComp Unit) : ℝ := |1 / 2 - (Pr[= () | p]).toReal|
 
+/-- The guess advantage of `p` equals the absolute difference between `1/2` and `p`'s
+  probability of failure. -/
 lemma ProbComp.guessAdvantage_eq_half_sub_probFailure (p : ProbComp Unit) :
     p.guessAdvantage = |1 / 2 - (Pr[⊥ | p]).toReal| := by
   have h : Pr[= () | p] = 1 - Pr[⊥ | p] := probOutput_eq_sub_probFailure_of_unit
   simp only [guessAdvantage, h,
     ENNReal.toReal_sub_of_le probFailure_le_one one_ne_top, ENNReal.toReal_one]
-  rw [show (1 : ℝ) / 2 - (1 - (Pr[⊥ | p]).toReal) = (Pr[⊥ | p]).toReal - 1 / 2 from by ring]
-  exact abs_sub_comm _ _
+  rw [show (1 : ℝ) / 2 - (1 - (Pr[⊥ | p]).toReal) = -(1 / 2 - (Pr[⊥ | p]).toReal) from by ring,
+    abs_neg]
 
+/-- The guess advantage of `p` equals half the absolute difference between `p`'s
+  probabilities of failure and success. -/
 lemma ProbComp.guessAdvantage_eq_half_of_sub (p : ProbComp Unit) :
     p.guessAdvantage = 2⁻¹ * |(Pr[⊥ | p]).toReal - (Pr[= () | p]).toReal| := by
   have h : Pr[= () | p] = 1 - Pr[⊥ | p] := probOutput_eq_sub_probFailure_of_unit
   simp only [guessAdvantage, h,
     ENNReal.toReal_sub_of_le probFailure_le_one one_ne_top, ENNReal.toReal_one]
-  set f := (Pr[⊥ | p]).toReal with hf_def
-  have h1 : f - (1 - f) = 2 * f - 1 := by ring
-  have h2 : (1 : ℝ) / 2 - (1 - f) = f - 1 / 2 := by ring
-  rw [h1, h2]
-  have h3 : 2 * f - 1 = 2 * (f - 1 / 2) := by ring
-  rw [h3, abs_mul, abs_of_pos (by positivity : (2 : ℝ) > 0)]
-  ring
+  grind
 
 /-- The **advantage** between two games `p` and `q`, modeled as probabilistic computations returning
   `Unit`, is the absolute difference between their probabilities of success. -/
 noncomputable def ProbComp.distAdvantage (p q : ProbComp Unit) : ℝ :=
   |(Pr[= () | p]).toReal - (Pr[= () | q]).toReal|
 
+/-- A game has zero distinguishing advantage against itself. -/
 @[simp]
 lemma ProbComp.distAdvantage_self (p : ProbComp Unit) : p.distAdvantage p = 0 := by
   simp [ProbComp.distAdvantage]
 
+/-- Distinguishing advantage is symmetric in its two games. -/
 lemma ProbComp.distAdvantage_comm (p q : ProbComp Unit) :
-    p.distAdvantage q = q.distAdvantage p := by
-  unfold ProbComp.distAdvantage
-  exact abs_sub_comm _ _
+    p.distAdvantage q = q.distAdvantage p :=
+  abs_sub_comm _ _
 
+/-- Distinguishing advantage equals the gap between the two games' failure probabilities. -/
 lemma ProbComp.distAdvantage_eq_abs_sub_probFailure (p q : ProbComp Unit) :
     p.distAdvantage q = |(Pr[⊥ | p]).toReal - (Pr[⊥ | q]).toReal| := by
   have hp : Pr[= () | p] = 1 - Pr[⊥ | p] := probOutput_eq_sub_probFailure_of_unit
@@ -300,30 +269,29 @@ lemma ProbComp.distAdvantage_eq_abs_sub_probFailure (p q : ProbComp Unit) :
   simp only [distAdvantage, hp, hq,
     ENNReal.toReal_sub_of_le probFailure_le_one one_ne_top, ENNReal.toReal_one]
   rw [show (1 - (Pr[⊥ | p]).toReal) - (1 - (Pr[⊥ | q]).toReal) =
-    -((Pr[⊥ | p]).toReal - (Pr[⊥ | q]).toReal) from by ring]
-  exact abs_neg _
+    -((Pr[⊥ | p]).toReal - (Pr[⊥ | q]).toReal) by ring, abs_neg]
 
+/-- Distinguishing advantage is nonnegative. -/
 lemma ProbComp.distAdvantage_nonneg (p q : ProbComp Unit) : 0 ≤ p.distAdvantage q :=
   abs_nonneg _
 
+/-- Triangle inequality for distinguishing advantage. -/
 lemma ProbComp.distAdvantage_triangle (p q r : ProbComp Unit) :
-    p.distAdvantage r ≤ p.distAdvantage q + q.distAdvantage r := by
-  unfold distAdvantage; exact abs_sub_le _ _ _
+    p.distAdvantage r ≤ p.distAdvantage q + q.distAdvantage r :=
+  abs_sub_le _ _ _
 
+/-- The distinguishing advantage between the endpoints of a chain of games is bounded by the
+sum of the consecutive advantages along the chain. -/
 lemma ProbComp.distAdvantage_le_sum_range {n : ℕ} (games : ℕ → ProbComp Unit) :
     (games 0).distAdvantage (games n) ≤
       ∑ i ∈ Finset.range n, (games i).distAdvantage (games (i + 1)) := by
   induction n with
   | zero => simp
   | succ n ih =>
-    calc (games 0).distAdvantage (games (n + 1))
-      _ ≤ (games 0).distAdvantage (games n) + (games n).distAdvantage (games (n + 1)) :=
-          distAdvantage_triangle _ _ _
-      _ ≤ (∑ i ∈ Finset.range n, (games i).distAdvantage (games (i + 1))) +
-          (games n).distAdvantage (games (n + 1)) := by gcongr
-      _ = ∑ i ∈ Finset.range (n + 1), (games i).distAdvantage (games (i + 1)) := by
-          rw [Finset.sum_range_succ]
+    rw [Finset.sum_range_succ]
+    exact (distAdvantage_triangle _ _ _).trans (by gcongr)
 
+/-- Distinguishing advantage coincides with the total-variation distance of the two games. -/
 lemma ProbComp.distAdvantage_eq_tvDist (p q : ProbComp Unit) :
     p.distAdvantage q = tvDist p q := by
   simp only [distAdvantage, tvDist, SPMF.tvDist, PMF.tvDist_option_punit]
@@ -374,19 +342,14 @@ noncomputable def advantage (exp : SecExp m) : ℝ≥0∞ :=
 lemma advantage_eq_zero_iff (exp : SecExp m) :
     exp.advantage = 0 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 1 := by
   rw [advantage, tsub_eq_zero_iff_le]
-  exact ⟨fun h => le_antisymm (exp.toSPMFSemantics.probFailure_le_one _) h,
-    fun h => h ▸ le_refl _⟩
+  exact (exp.toSPMFSemantics.probFailure_le_one _).ge_iff_eq
 
 /-- A failure-based experiment has advantage `1` exactly when it never fails. -/
 @[simp]
 lemma advantage_eq_one_iff (exp : SecExp m) :
     exp.advantage = 1 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 0 := by
-  constructor
-  · intro h; by_contra hne
-    have : exp.advantage < 1 := by
-      unfold advantage; exact ENNReal.sub_lt_self one_ne_top one_ne_zero hne
-    exact absurd h (ne_of_lt this)
-  · intro h; simp [advantage, h]
+  rw [advantage]
+  grind
 
 end advantage
 

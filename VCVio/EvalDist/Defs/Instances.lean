@@ -34,7 +34,8 @@ protected lemma support_eq_support (p : SPMF α) : support p = SPMF.support p :=
 lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
 
 lemma evalDist_eq_iff {m} [Monad m] [MonadLiftT m SPMF] (mx : m α) (p : SPMF α) :
-    𝒟[mx] = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
+    𝒟[mx] = p ↔ ∀ x, Pr[= x | mx] = p x := by
+  simp only [probOutput_def, DFunLike.ext_iff]
 
 end SPMF
 
@@ -69,7 +70,7 @@ noncomputable instance : LawfulMonadLift Id PMF where
   monadLift_pure _ := rfl
   monadLift_bind _ _ := by
     change (PMF.pure _ : PMF _) = (pure _ : PMF _).bind fun x => pure _
-    simp [PMF.monad_pure_eq_pure]
+    simp
 
 instance : HasEvalFinset Id where
   finSupport x := {x}
@@ -80,9 +81,7 @@ instance : HasEvalFinset Id where
     rfl
 
 @[simp, grind =]
-lemma support_eq_singleton (x : Id α) : support x = {x.run} := by
-  change SetM.run (pure x.run : SetM α) = _
-  rfl
+lemma support_eq_singleton (x : Id α) : support x = {x.run} := rfl
 
 @[simp, grind =]
 lemma finSupport_eq_singleton [DecidableEq α] (x : Id α) : finSupport x = {x.run} := rfl
@@ -91,16 +90,14 @@ lemma finSupport_eq_singleton [DecidableEq α] (x : Id α) : finSupport x = {x.r
 lemma probOutput_eq_ite [DecidableEq α] (x : Id α) (y : α) :
     Pr[= y | x] = if y = x.run then 1 else 0 := by
   rw [← Id.pure_run x, probOutput_pure]
-  aesop
+  rfl
 
 @[simp, grind =]
 lemma probEvent_eq_ite (x : Id α) (p : α → Prop) [DecidablePred p] :
     Pr[ p | x] = if p x.run then 1 else 0 := by
-  classical
-  rw [show x = pure x.run from rfl, probEvent_pure]
+  rw [← Id.pure_run x, probEvent_pure]
   rfl
 
-lemma probFailure_eq_zero (x : Id α) : Pr[⊥ | x] = 0 := by
-  rw [show x = pure x.run from rfl, probFailure_pure]
+lemma probFailure_eq_zero (x : Id α) : Pr[⊥ | x] = 0 := probFailure_pure _
 
 end Id

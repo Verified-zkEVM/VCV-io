@@ -5,10 +5,10 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
-import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.Append
+import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
 import VCVio.OracleComp.SimSemantics.StateT.Basic
 
 /-!
@@ -21,7 +21,6 @@ This file defines the shared objects used by the Fujisaki-Okamoto transform:
 - spread notions and OW-CPA games for the `ProbComp` specialization
 - OW-PCVA games for the general monadic interface
 -/
-
 
 open OracleComp OracleSpec ENNReal
 
@@ -121,8 +120,7 @@ abbrev OW_PCVA_Adversary (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) :=
   PK → C → OracleComp (OW_PCVA_oracleSpec encAlg) M
 
 /-- Oracle implementation for OW-PCVA. -/
-def OW_PCVA_queryImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
-    [DecidableEq M] (sk : SK) :
+def OW_PCVA_queryImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) [DecidableEq M] (sk : SK) :
     QueryImpl (OW_PCVA_oracleSpec encAlg) (OracleComp spec) :=
   let checkImpl : QueryImpl ((C × M) →ₒ Bool) (OracleComp spec) := fun (c, msg) => do
     let msg' ← encAlg.decrypt sk c

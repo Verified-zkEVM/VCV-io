@@ -90,13 +90,11 @@ variable {Event : Type}
 
 @[simp]
 theorem processTick_ne_envTick (e : Event) :
-    (processTick : RuntimeEvent Event) ≠ envTick e := by
-  intro h; cases h
+    (processTick : RuntimeEvent Event) ≠ envTick e := nofun
 
 @[simp]
 theorem envTick_ne_processTick (e : Event) :
-    envTick e ≠ (processTick : RuntimeEvent Event) := by
-  intro h; cases h
+    envTick e ≠ (processTick : RuntimeEvent Event) := nofun
 
 end RuntimeEvent
 
@@ -135,8 +133,7 @@ variable {Proc State : Type}
 
 @[simp]
 theorem mk_eta (st : AsyncRuntimeState Proc State) :
-    (⟨st.proc, st.envState⟩ : AsyncRuntimeState Proc State) = st := by
-  cases st; rfl
+    (⟨st.proc, st.envState⟩ : AsyncRuntimeState Proc State) = st := rfl
 
 end AsyncRuntimeState
 
@@ -267,12 +264,10 @@ theorem runStepsAsync_empty_trivial_eq
           ((⟨s', ()⟩ : Interaction.UC.AsyncRuntimeState process.Proc Unit),
             List.replicate fuel Interaction.UC.RuntimeEvent.processTick)) := by
   induction fuel generalizing s with
-  | zero =>
-      simp [runStepsAsync, ProcessOver.runSteps]
+  | zero => simp [runStepsAsync, ProcessOver.runSteps]
   | succ n ih =>
       rw [runStepsAsync, ProcessOver.runSteps]
-      simp only [Interaction.UC.trivialEnvScheduler_apply, monad_norm, ih]
-      rfl
+      simp only [Interaction.UC.trivialEnvScheduler_apply, monad_norm, ih, List.replicate_succ]
 
 end Concurrent
 
@@ -388,17 +383,7 @@ theorem processSemantics_eq_processSemanticsAsync_trivial
   unfold processSemantics processSemanticsAsync
   congr 1
   funext process
-  change (do
-      let finalState ← ProcessOver.runSteps process.toProcess process.stepSampler
-        fuel (init process)
-      observe process finalState) =
-    (do
-      let (final, _trace) ← Concurrent.runStepsAsync (m := m) process.toProcess
-        (EnvAction.empty Unit)
-        (fun st => process.stepSampler st.proc)
-        (trivialEnvScheduler (m := m) Unit Empty)
-        fuel ⟨init process, ()⟩
-      observe process final.proc)
+  simp only [monad_norm]
   rw [Concurrent.runStepsAsync_empty_trivial_eq]
   simp only [monad_norm]
 
@@ -429,9 +414,8 @@ theorem processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial
         (fun p => trivialEnvScheduler (m := ProbComp)
           (Proc := p.Proc) Unit Empty)
         fuel
-        (fun p s _ _ => observe p s) := by
-  unfold processSemanticsProbComp processSemanticsAsyncProbComp
-  exact processSemantics_eq_processSemanticsAsync_trivial _ _ _ _ _ _
+        (fun p s _ _ => observe p s) :=
+  processSemantics_eq_processSemanticsAsync_trivial _ _ _ _ _ _
 
 end UC
 end Interaction

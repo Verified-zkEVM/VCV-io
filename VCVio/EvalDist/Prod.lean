@@ -21,17 +21,14 @@ variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [MonadLiftT m SPMF]
 omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 lemma probOutput_prod_mk_eq_probEvent (mx : m (α × β)) (x : α) (y : β) :
-    Pr[= (x, y) | mx] = Pr[ fun z => z.1 = x ∧ z.2 = y | mx] := by
-  simp [← probEvent_eq_eq_probOutput, Prod.eq_iff_fst_eq_snd_eq]
+    Pr[= (x, y) | mx] = Pr[ fun z => z.1 = x ∧ z.2 = y | mx] := by grind
 
 @[grind =]
 lemma probOutput_fst_map_eq_tsum (mx : m (α × β)) (x : α) :
     Pr[= x | Prod.fst <$> mx] = ∑' y, Pr[= (x, y) | mx] := by
-  have : DecidableEq α := Classical.decEq _
-  simp only [probOutput_map_eq_tsum_ite]
-  rw [ENNReal.tsum_prod']; dsimp only [Prod.fst]
-  refine (tsum_eq_single x ?_).trans (by simp)
-  intro a ha; simp [Ne.symm ha]
+  classical
+  simp only [probOutput_map_eq_tsum_ite, ENNReal.tsum_prod']
+  refine (tsum_eq_single x fun a ha => by simp [Ne.symm ha]).trans (by simp)
 
 @[grind =]
 lemma probOutput_fst_map_eq_sum [Fintype β] (mx : m (α × β)) (x : α) :
@@ -41,11 +38,9 @@ lemma probOutput_fst_map_eq_sum [Fintype β] (mx : m (α × β)) (x : α) :
 @[grind =]
 lemma probOutput_snd_map_eq_tsum (mx : m (α × β)) (y : β) :
     Pr[= y | Prod.snd <$> mx] = ∑' x, Pr[= (x, y) | mx] := by
-  have : DecidableEq β := Classical.decEq _
-  simp only [probOutput_map_eq_tsum_ite]
-  rw [ENNReal.tsum_prod']; dsimp only [Prod.snd]
-  refine tsum_congr fun _ => (tsum_eq_single y ?_).trans (by simp)
-  intro b hb; simp [Ne.symm hb]
+  classical
+  simp only [probOutput_map_eq_tsum_ite, ENNReal.tsum_prod']
+  refine tsum_congr fun _ => (tsum_eq_single y fun b hb => by simp [Ne.symm hb]).trans (by simp)
 
 @[grind =]
 lemma probOutput_snd_map_eq_sum [Fintype α] (mx : m (α × β)) (y : β) :
@@ -77,9 +72,7 @@ lemma probEvent_fst_eq_snd (mx : m (α × α)) :
     Pr[ fun z => z.1 = z.2 | mx] = ∑' x : α, Pr[= (x, x) | mx] := by
   classical
   rw [probEvent_eq_tsum_ite, ENNReal.tsum_prod']
-  refine tsum_congr fun x => ?_
-  refine (tsum_eq_single x fun b hb => ?_).trans (by simp)
-  exact if_neg (Ne.symm hb)
+  simp
 
 section prod_mk
 
@@ -113,20 +106,19 @@ lemma probOutput_seq_map_prod_mk_map_eq_mul (z : γ × δ) :
 lemma probOutput_seq_map_prod_mk_map_eq_mul' (z : γ × δ) :
     Pr[= z | (fun y x => (f x, g y)) <$> my <*> mx] =
       Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
-  rw [← probOutput_seq_map_swap]; simp
+  rw [← probOutput_seq_map_swap]
+  simp
 
 @[simp]
 lemma probOutput_bind_map_prod_mk_eq_mul (z : γ × δ) :
     Pr[= z | do let x ← mx; (f x, g ·) <$> my] = Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
-  simpa [monad_norm] using
-    probOutput_seq_map_prod_mk_map_eq_mul mx my f g z
+  simpa [monad_norm] using probOutput_seq_map_prod_mk_map_eq_mul mx my f g z
 
 @[simp]
 lemma probOutput_bind_map_prod_mk_eq_mul'
     (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (z : γ × δ) :
     Pr[= z | do let y ← my; (f ·, g y) <$> mx] = Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
-  simpa [monad_norm] using
-    probOutput_seq_map_prod_mk_map_eq_mul' mx my f g z
+  simpa [monad_norm] using probOutput_seq_map_prod_mk_map_eq_mul' mx my f g z
 
 omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
 @[simp high]

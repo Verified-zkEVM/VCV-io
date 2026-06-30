@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 
-import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.QueryTracking.QueryBound
 
 /-!
 # Query-count bounds for Fiat-Shamir adversaries
@@ -93,8 +93,8 @@ lemma nmaHashQueryBound_query_iff
   simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_iff]
   cases t <;> simp
 
-lemma nmaHashQueryBound_mono {α : Type}
-    {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α} {Q₁ Q₂ : ℕ}
+lemma nmaHashQueryBound_mono {α : Type} {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α}
+    {Q₁ Q₂ : ℕ}
     (h : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
     (hQ : Q₁ ≤ Q₂) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₂ :=
@@ -102,11 +102,9 @@ lemma nmaHashQueryBound_mono {α : Type}
 
 lemma nmaHashQueryBound_bind {α β : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α}
-    {ob : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β}
-    {Q₁ Q₂ : ℕ}
+    {ob : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β} {Q₁ Q₂ : ℕ}
     (h1 : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
-    (h2 : ∀ x,
-      nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := ob x) Q₂) :
+    (h2 : ∀ x, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := ob x) Q₂) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := oa >>= ob) (Q₁ + Q₂) :=
   OracleComp.isQueryBoundP_bind h1 (fun x _ => h2 x)
@@ -115,8 +113,6 @@ lemma nmaHashQueryBound_liftComp_zero [Inhabited Chal] [Finite Chal] {α : Type}
     (oa : ProbComp α) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) 0 := by
-  -- The lifted handler routes every uniform query into the `.inl` arm, which never matches
-  -- `(· matches .inr _)`, so the predicate-targeted bound is uniformly 0 per step.
   haveI : Fintype Chal := Fintype.ofFinite Chal
   letI : IsUniformSpec ((M × Commit →ₒ Chal) : OracleSpec _) :=
     IsUniformSpec.ofFintypeInhabited _
@@ -128,11 +124,10 @@ lemma nmaHashQueryBound_liftComp_zero [Inhabited Chal] [Finite Chal] {α : Type}
     (OracleComp.isQueryBoundP_false oa 0)
     (fun _ h => h.elim) ?_
   intro t _
-  -- `liftM (query t)` lifts to `query (Sum.inl t)` which never matches `.inr _`.
   change (liftM ((unifSpec + (M × Commit →ₒ Chal)).query (Sum.inl t)) :
       OracleComp (unifSpec + (M × Commit →ₒ Chal)) _).IsQueryBoundP _ 0
   rw [OracleComp.isQueryBoundP_query_iff]
-  intro hcontra; cases hcontra
+  simp
 
 /-- Reciprocal of the finite challenge-space size. -/
 noncomputable def challengeSpaceInv (challenge : Type) [Fintype challenge] : ENNReal :=

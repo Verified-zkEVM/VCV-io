@@ -22,7 +22,7 @@ Defined as a typeclass to allow it to be synthesized automatically in certain ca
 However we don't include any instances for `bind` as this blows up the search space.
 Instances involving `bind` should be added manually as needed.
 
-The existence of a `MonadLiftT m PMF` instance implies that `NeverFail mx` holds for any computaiton
+The existence of a `MonadLiftT m PMF` instance implies that `NeverFail mx` holds for any computation
 in the monad, since the `PMF` doesn't allow any probability of failing.
 -/
 
@@ -73,7 +73,6 @@ lemma neverFail_iff (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
 lemma neverFail_bind_iff [MonadLiftT m SetM] [EvalDistCompatible m]
     (mx : m α) (my : α → m β) :
     NeverFail (mx >>= my) ↔ NeverFail mx ∧ ∀ x ∈ support mx, NeverFail (my x) := by
-  simp [neverFail_iff, probFailure_bind_eq_add_tsum, add_eq_zero]
   grind
 
 @[simp, grind =]
@@ -87,13 +86,10 @@ lemma neverFail_seq_iff [LawfulMonad m]
     (mf : m (α → β)) (mx : m α) :
     NeverFail (mf <*> mx) ↔ NeverFail mf ∧ NeverFail mx := by
   simp only [seq_eq_bind_map, neverFail_bind_iff, neverFail_map_iff]
-  constructor
-  · rintro ⟨hf, h⟩
-    refine ⟨hf, ?_⟩
-    have hne : (support mf).Nonempty := by
-      rw [Set.nonempty_iff_ne_empty, ne_eq, ← probFailure_eq_one_iff]; simp
-    exact h _ hne.choose_spec
-  · exact fun ⟨hf, hx⟩ => ⟨hf, fun _ _ => hx⟩
+  refine ⟨fun ⟨hf, h⟩ => ⟨hf, ?_⟩, fun ⟨hf, hx⟩ => ⟨hf, fun _ _ => hx⟩⟩
+  have hne : (support mf).Nonempty := by
+    simp [Set.nonempty_iff_ne_empty, ← probFailure_eq_one_iff]
+  exact h _ hne.choose_spec
 
 @[simp]
 lemma not_neverFail_failure {m : Type u → Type v} [AlternativeMonad m]
@@ -136,10 +132,7 @@ lemma bind_of_mem_support [MonadLiftT m SetM] [EvalDistCompatible m]
     {mx : m α} {my : α → m β}
     [hx : NeverFail mx] (hy : ∀ x ∈ support mx, NeverFail (my x)) :
     NeverFail (mx >>= my) where
-  probFailure_eq_zero := by
-    simp [probFailure_bind_eq_add_tsum]
-    simp [neverFail_iff] at hy
-    tauto
+  probFailure_eq_zero := by grind
 
 /--
 Weak bind lemma: if the right-hand side never fails for every possible input (`∀ x`),
@@ -162,19 +155,13 @@ instance instMap [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
     NeverFail (f <$> mx) := by
   simp only [monad_norm, bind_of_forall, Function.comp_def]
 
-
-
 /-- If both the function computation and the argument computation never fail,
 then their applicative sequencing also never fails. -/
 @[simp, grind .]
 instance instSeq [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
     {mf : m (α → β)} {mx : m α}
     [hf : NeverFail mf] [hx : NeverFail mx] :
-    NeverFail (mf <*> mx) := by
-  -- `mf <*> mx = mf >>= fun f => f <$> mx`, and mapping preserves `NeverFail` given `hx`.
-  simpa [seq_eq_bind_map] using
-    (bind_of_forall (mx := mf) (my := fun f => f <$> mx)
-      (hx := hf) (hy := fun f => by simpa))
+    NeverFail (mf <*> mx) := by aesop
 
 /-- If `mx` and `my` never fail, then `mx <* my` never fails. -/
 @[simp, grind .]

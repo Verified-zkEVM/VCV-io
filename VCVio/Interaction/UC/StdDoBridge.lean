@@ -5,8 +5,8 @@ Authors: Quang Dao
 -/
 
 import Std.Tactic.Do
-import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.Interaction.UC.Runtime
+import VCVio.ProgramLogic.Unary.StdDoBridge
 
 /-!
 # `Std.Do` / `mvcgen` bridge for the Interaction / UC runtime
@@ -46,9 +46,11 @@ since both carry `Std.Do.WPMonad` instances via
   a per-step invariant triple to a whole-`runSteps` triple, by
   induction on fuel.
 
-All equations are proved by `rfl` and are tagged `@[simp]` so that
-`mvcgen` can walk an exposed `sampleTranscript` / `sample` / `runSteps`
-body in one simp pass before the usual `do`-block traversal.
+These equations are tagged `@[simp]` so that `mvcgen` can walk an
+exposed `sampleTranscript` / `sample` / `runSteps` body in one simp pass
+before the usual `do`-block traversal. The bind-shaped definitions hold
+by `rfl`; `Concurrent.StepOver.sample_eq` rephrases the map-shaped
+`StepOver.sample` and needs `[LawfulMonad m]`.
 -/
 
 open Std.Do OracleComp
@@ -85,11 +87,11 @@ variable {m : Type → Type} [Monad m]
 variable {Γ : Interaction.Spec.Node.Context.{0, 0}} {P : Type}
 
 @[simp]
-theorem StepOver.sample_eq (step : StepOver Γ P)
-    (sampler : Spec.Sampler m step.spec) :
-    step.sample sampler =
+theorem StepOver.sample_eq [LawfulMonad m] (step : StepOver Γ P)
+    (sampler : Spec.Sampler m step.spec) : step.sample sampler =
       (do let tr ← Spec.sampleTranscript step.spec sampler
-          return step.next tr) := rfl
+          return step.next tr) := by
+  rw [StepOver.sample, map_eq_pure_bind]
 
 end StepOver
 
@@ -99,17 +101,14 @@ variable {m : Type → Type} [Monad m]
 variable {Γ : Interaction.Spec.Node.Context.{0, 0}}
 
 @[simp]
-theorem ProcessOver.runSteps_zero
-    (process : ProcessOver Γ)
-    (sampler : ∀ p : process.Proc, Spec.Sampler m (process.step p).spec)
-    (s : process.Proc) :
+theorem ProcessOver.runSteps_zero (process : ProcessOver Γ)
+    (sampler : ∀ p : process.Proc, Spec.Sampler m (process.step p).spec) (s : process.Proc) :
     process.runSteps sampler 0 s = pure s := rfl
 
 @[simp]
-theorem ProcessOver.runSteps_succ
-    (process : ProcessOver Γ)
-    (sampler : ∀ p : process.Proc, Spec.Sampler m (process.step p).spec)
-    (n : ℕ) (s : process.Proc) :
+theorem ProcessOver.runSteps_succ (process : ProcessOver Γ)
+    (sampler : ∀ p : process.Proc, Spec.Sampler m (process.step p).spec) (n : ℕ)
+    (s : process.Proc) :
     process.runSteps sampler (n + 1) s =
       (do let s' ← (process.step s).sample (sampler s)
           process.runSteps sampler n s') := rfl
@@ -134,11 +133,9 @@ This is the process-runtime analogue of
 `OracleComp.ProgramLogic.StdDo.simulateQ_triple_preserves_invariant`:
 a generic invariant lemma that factors out the fuel induction so
 downstream proofs stay inside the `Std.Do` world. -/
-theorem runSteps_triple_preserves_invariant
-    (process : ProcessOver Γ)
+theorem runSteps_triple_preserves_invariant (process : ProcessOver Γ)
     (sampler : ∀ p : process.Proc, Spec.Sampler m (process.step p).spec)
-    (I : process.Proc → Prop)
-    (hstep : ∀ p : process.Proc,
+    (I : process.Proc → Prop) (hstep : ∀ p : process.Proc,
       Std.Do.Triple ((process.step p).sample (sampler p))
         (spred(⌜I p⌝))
         (⇓ p' => ⌜I p'⌝))
@@ -153,7 +150,7 @@ theorem runSteps_triple_preserves_invariant
     exact Triple.pure s₀ .rfl
   | succ n ih =>
     simp only [runSteps_succ]
-    exact Triple.bind _ _ (hstep s₀) (fun s' => ih s')
+    exact Triple.bind _ _ (hstep s₀) ih
 
 end ProcessOver
 end Concurrent
@@ -195,12 +192,9 @@ private theorem incrementProcess_step_triple (p₀ p : ℕ) :
       ((incrementProcess.step p).sample (trivSampler p) : ProbComp _)
       (spred(⌜p₀ ≤ p⌝))
       (⇓ p' => ⌜p₀ ≤ p'⌝) := by
-  have hrw : (incrementProcess.step p).sample (trivSampler p)
-      = (pure (p + 1) : ProbComp _) := rfl
-  rw [hrw]
   refine Std.Do.Triple.pure (p + 1) ?_
   simp only [SPred.entails_nil, SPred.down_pure]
-  intro hp; omega
+  omega
 
 /-- Smoke-test corollary: `runSteps` over `incrementProcess` never
 decreases the counter, starting from any `s₀ ≥ p₀`. The precondition is

@@ -33,7 +33,6 @@ variable {ι : Type*} {spec : OracleSpec ι}
 variable [IsUniformSpec spec]
 variable {α : Type}
 
-
 /-- If every oracle query in `impl` has the same evaluation distribution as the original query,
 then `wp` of the simulated computation equals `wp` of the original. -/
 @[game_rule] theorem wp_simulateQ_eq
@@ -51,7 +50,6 @@ then `wp` of the simulated computation equals `wp` of the original. -/
     rw [wp_bind, wp_bind]
     simp_rw [ih]
     exact wp_congr_evalDist (hImpl t) _
-
 
 /-- Lifting a computation to a larger oracle spec via `liftComp` preserves `wp`. -/
 @[game_rule] theorem wp_liftComp {ι' : Type*} {superSpec : OracleSpec ι'}

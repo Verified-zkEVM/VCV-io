@@ -142,14 +142,14 @@ end
 theorem getRoot_trivial {m : Type _ → Type _} [Monad m] [LawfulMonad m]
     [HasQuery (spec α) m] (a : α) :
     getRoot α <$> (buildMerkleTree (m := m) α 0 ⟨[a], rfl⟩) = pure a := by
-  simp [getRoot, buildMerkleTree, List.Vector.head]
+  simp [buildMerkleTree, List.Vector.head]
 
 @[simp, grind =]
 theorem getRoot_single (a b : α) :
     getRoot α <$> buildMerkleTree (m := OracleComp (spec α)) α 1 ⟨[a, b], rfl⟩ =
       ((spec α).query (a, b)) := by
-  simp [buildMerkleTree, buildLayer, singleHash, List.Vector.ofFn, List.Vector.get]
-  rfl
+  simp [buildMerkleTree, buildLayer, singleHash, List.Vector.ofFn, List.Vector.get,
+    Cache.cons, Fin.snoc]
 
 section
 
@@ -158,29 +158,9 @@ variable [DecidableEq α] [Inhabited α] [Fintype α]
 /-- Sibling index in a perfect binary tree layer indexed by `Fin (2 ^ (n + 1))`. -/
 def siblingIndex {n : ℕ} (i : Fin (2 ^ (n + 1))) : Fin (2 ^ (n + 1)) :=
   if h : i.val % 2 = 0 then
-    ⟨i.val + 1, by
-      have hi : i.val < 2 ^ (n + 1) := i.isLt
-      have hEven : Even (2 ^ (n + 1)) := by
-        exact (Nat.even_pow).2 ⟨even_two, Nat.succ_ne_zero n⟩
-      have hmod : (2 ^ (n + 1)) % 2 = 0 := (Nat.even_iff).1 hEven
-      have hle : i.val + 1 ≤ 2 ^ (n + 1) := Nat.succ_le_of_lt hi
-      have hne : i.val + 1 ≠ 2 ^ (n + 1) := by
-        intro hEq
-        have hiVal : i.val = 2 ^ (n + 1) - 1 := by omega
-        have hpos : 0 < 2 ^ (n + 1) := by
-          exact pow_pos (by decide : 0 < (2 : ℕ)) _
-        have hle1 : 1 ≤ 2 ^ (n + 1) := Nat.succ_le_of_lt hpos
-        have hmodPred : (2 ^ (n + 1) - 1) % 2 = 1 := by
-          have : (2 ^ (n + 1) - 1 + 1) % 2 = 0 := by
-            simp [Nat.sub_add_cancel hle1, hmod]
-          exact (Nat.succ_mod_two_eq_zero_iff (m := 2 ^ (n + 1) - 1)).1 this
-        have : i.val % 2 = 1 := by simp [hiVal, hmodPred]
-        grind only
-      exact lt_of_le_of_ne hle hne⟩
+    ⟨i.val + 1, by omega⟩
   else
-    ⟨i.val - 1, by
-      have hi : i.val < 2 ^ (n + 1) := i.isLt
-      grind only [= Lean.Grind.toInt_fin]⟩
+    ⟨i.val - 1, by omega⟩
 
 /-- Generate a Merkle proof that a given leaf at index `i` is in the Merkle tree. The proof consists
   of the Merkle tree nodes that are needed to recompute the root from the given leaf. -/
@@ -267,9 +247,7 @@ omit [DecidableEq α] [Inhabited α] [Fintype α] in
 @[simp, grind =]
 lemma simulateQ_singleHash (f : QueryImpl (spec α) Id) (left right : α) :
     simulateQ f (singleHash (m := OracleComp (spec α)) α left right) = f ⟨left, right⟩ := by
-  simp only [singleHash, bind_pure, HasQuery.instOfMonadLift_query]
-  rw [simulateQ_query (impl := f) (q := OracleSpec.query (left, right))]
-  rfl
+  simp [singleHash, simulateQ_query]
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
 @[simp, grind =]
@@ -279,14 +257,10 @@ lemma simulateQ_listVector_mmap_singleHash (f : QueryImpl (spec α) Id) {m : ℕ
         (fun x => (singleHash α x.1 x.2 : OracleComp (spec α) α)) xs) =
       xs.map f := by
   induction xs using List.Vector.inductionOn with
-  | nil =>
-    unfold simulateQ List.Vector.mmap
-    simp_all only [vector_eq_nil]
+  | nil => simp
   | @cons m x xs ih =>
-    obtain ⟨fst, snd⟩ := x
-    simp only [Vector.mmap_cons, Vector.map_cons]
-    rw [simulateQ_bind, simulateQ_singleHash]
-    simp only [simulateQ_bind, simulateQ_pure, ih]; rfl
+    simp only [Vector.mmap_cons, Vector.map_cons, simulateQ_bind, simulateQ_singleHash, ih]
+    rfl
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
 @[simp, grind =]
@@ -294,9 +268,7 @@ lemma simulateQ_buildLayer_eq (f : QueryImpl (spec α) Id) (n : ℕ)
     (leaves : List.Vector α (2 ^ (n + 1))) :
     simulateQ f (buildLayer α n leaves) =
       buildLayer_with_hash (α := α) n leaves f := by
-  unfold buildLayer
-  simp_all only [bind_pure, simulateQ_listVector_mmap_singleHash, domain_def]
-  rfl
+  simp [buildLayer, buildLayer_with_hash, simulateQ_listVector_mmap_singleHash]
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
 @[simp, grind =]
@@ -305,23 +277,11 @@ lemma simulateQ_buildMerkleTree_eq (f : QueryImpl (spec α) Id) (n : ℕ)
     simulateQ f (buildMerkleTree α n leaves) =
       buildMerkleTree_with_hash (α := α) n leaves f := by
   induction n with
-  | zero =>
-    simp_all only [Cache, Nat.reduceAdd, buildMerkleTree, Nat.pow_zero, eq_mpr_eq_cast]
-    rfl
+  | zero => rfl
   | succ n ih =>
-    have sqb : ∀ {β γ : Type _} (ma : OracleComp (spec α) β) (k : β → OracleComp (spec α) γ),
-        simulateQ f (ma >>= k) = simulateQ f (k (simulateQ f ma)) := by
-      intros β γ ma k
-      rw [simulateQ_bind]
-      rfl
-    have sqp : ∀ {β : Type _} (a : β),
-        simulateQ f (pure a : OracleComp (spec α) β) = a := by
-      intros β a
-      rw [simulateQ_pure]
-      show (pure a : Id β) = a
-      rfl
-    simp only [buildMerkleTree, buildMerkleTree_with_hash]
-    simp only [sqb, simulateQ_buildLayer_eq, ih, sqp]
+    simp only [buildMerkleTree, buildMerkleTree_with_hash, simulateQ_bind,
+      simulateQ_buildLayer_eq, ih]
+    rfl
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
 @[simp, grind =]
@@ -330,16 +290,11 @@ lemma simulateQ_getPutativeRoot_eq (f : QueryImpl (spec α) Id) {n : ℕ} (i : F
     simulateQ f (getPutativeRoot α i leaf proof) =
       getPutativeRoot_with_hash (α := α) i leaf proof f := by
   induction n generalizing leaf with
-  | zero =>
-    simp_all only [getPutativeRoot, vector_eq_nil]
-    rfl
+  | zero => rfl
   | succ n ih =>
-    by_cases hsign : i.val % 2 = 0
-    · simp [getPutativeRoot, getPutativeRoot_with_hash, hsign, ih]
-      rfl
-    · simp [getPutativeRoot, getPutativeRoot_with_hash, hsign, ih]
-      simp_all only [Nat.mod_two_not_eq_zero]
-      rfl
+    by_cases hsign : i.val % 2 = 0 <;>
+      · simp [getPutativeRoot, getPutativeRoot_with_hash, hsign, ih]
+        rfl
 
 end
 

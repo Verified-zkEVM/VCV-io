@@ -82,15 +82,11 @@ instance lawfulSubSpec_add_right : spec₂ ˡ⊂ₒ (spec₁ + spec₂) where
 
 instance disjointSubSpec_add_left_right :
     OracleSpec.DisjointSubSpec spec₁ spec₂ (spec₁ + spec₂) where
-  disjoint_onQuery t₁ t₂ := by
-    intro h
-    cases h
+  disjoint_onQuery _ _ := by rintro ⟨⟩
 
 instance disjointSubSpec_add_right_left :
     OracleSpec.DisjointSubSpec spec₂ spec₁ (spec₁ + spec₂) where
-  disjoint_onQuery t₂ t₁ := by
-    intro h
-    cases h
+  disjoint_onQuery _ _ := by rintro ⟨⟩
 
 end add_right
 
@@ -123,12 +119,9 @@ instance (priority := low) subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂
       | .mk (.inl q) f => liftM ((liftM (OracleQuery.mk q f) : OracleQuery spec₃ _))
       | .mk (.inr q) f => .mk (.inr q) f := by
   rcases q with ⟨t | t, f⟩
-  · let qOuter : OracleQuery (spec₁ + spec₂) α := ⟨Sum.inl t, f⟩
-    let qInner : OracleQuery spec₁ α := ⟨t, f⟩
-    change (liftM qOuter : OracleQuery (spec₃ + spec₂) α) =
-        liftM (liftM qInner : OracleQuery spec₃ α)
-    rw [show (liftM qInner : OracleQuery spec₃ α) =
-        ⟨h.onQuery t, f ∘ h.onResponse t⟩ from h.liftM_eq_lift qInner]
+  · change _ = liftM (liftM (OracleQuery.mk t f) : OracleQuery spec₃ _)
+    rw [show (liftM (OracleQuery.mk t f) : OracleQuery spec₃ _) =
+      ⟨h.onQuery t, f ∘ h.onResponse t⟩ from h.liftM_eq_lift _]
     rfl
   · rfl
 
@@ -136,8 +129,10 @@ instance (priority := low) subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂
     [h : spec₁ ⊂ₒ spec₃] (t : (spec₁ + spec₂).Domain) :
     (liftM (query t) : OracleQuery (spec₃ + spec₂) ((spec₁ + spec₂).Range t)) =
       match t with
-        | .inl t => liftM (liftM (query t)  : OracleQuery spec₃ _)
-        | .inr t => query (Sum.inr t) := by aesop
+        | .inl t => liftM (liftM (query t) : OracleQuery spec₃ _)
+        | .inr t => query (Sum.inr t) := by
+  rw [liftM_left_add_left_add_def]
+  rcases t with t | t <;> rfl
 
 instance lawfulSubSpec_left_add_left_add [spec₁ ⊂ₒ spec₃]
     [spec₁ ˡ⊂ₒ spec₃] :
@@ -178,12 +173,9 @@ instance (priority := low) subSpec_right_add_right_add_of_subSpec [h : spec₂ �
       | .mk (.inr q) f => (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) := by
   rcases q with ⟨t | t, f⟩
   · rfl
-  · let qOuter : OracleQuery (spec₁ + spec₂) α := ⟨Sum.inr t, f⟩
-    let qInner : OracleQuery spec₂ α := ⟨t, f⟩
-    change (liftM qOuter : OracleQuery (spec₁ + spec₃) α) =
-        liftM (liftM qInner : OracleQuery spec₃ α)
-    rw [show (liftM qInner : OracleQuery spec₃ α) =
-        ⟨h.onQuery t, f ∘ h.onResponse t⟩ from h.liftM_eq_lift qInner]
+  · change _ = liftM (liftM (OracleQuery.mk t f) : OracleQuery spec₃ _)
+    rw [show (liftM (OracleQuery.mk t f) : OracleQuery spec₃ _) =
+      ⟨h.onQuery t, f ∘ h.onResponse t⟩ from h.liftM_eq_lift _]
     rfl
 
 @[simp high] lemma liftM_right_add_right_add_query
@@ -191,7 +183,9 @@ instance (priority := low) subSpec_right_add_right_add_of_subSpec [h : spec₂ �
     (liftM (query t) : OracleQuery (spec₁ + spec₃) ((spec₁ + spec₂).Range t)) =
       match t with
         | .inl t => query (Sum.inl t)
-        | .inr t => liftM (liftM (query t) : OracleQuery spec₃ _) := by aesop
+        | .inr t => liftM (liftM (query t) : OracleQuery spec₃ _) := by
+  rw [liftM_right_add_right_add_def]
+  rcases t with t | t <;> rfl
 
 instance lawfulSubSpec_right_add_right_add [spec₂ ⊂ₒ spec₃]
     [spec₂ ˡ⊂ₒ spec₃] :
@@ -235,7 +229,7 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
         | .inl t => query (Sum.inl (Sum.inl t))
         | .inr (.inl t) => query (Sum.inl (Sum.inr t))
         | .inr (.inr t) => query (Sum.inr t) := by
-  rcases t with t | t | t <;> simp [OracleSpec.query_def]
+  rcases t with t | t | t <;> rfl
 
 instance lawfulSubSpec_add_assoc :
     spec₁ + (spec₂ + spec₃) ˡ⊂ₒ spec₁ + spec₂ + spec₃ where

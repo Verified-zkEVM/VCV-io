@@ -144,8 +144,7 @@ private def selectWpStepLhsComp (body : Expr) : MetaM (Expr × Unit) := do
     throwError m!"@[wpStep] expects an `wp _ _` LHS; got:{indentExpr lhs}"
   unless n ≥ 2 do
     throwError m!"@[wpStep] LHS has too few arguments:{indentExpr lhs}"
-  let oa := lhs.getArg! (n - 2)
-  return (oa, ())
+  return (lhs.getArg! (n - 2), ())
 
 /-- Construct a registry entry from a theorem declaration. Runs the
 `Sym.Pattern` pipeline once, keyed on the `comp` argument. -/

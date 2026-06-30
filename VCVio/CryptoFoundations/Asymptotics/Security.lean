@@ -224,7 +224,7 @@ theorem secureAgainst_of_hybrid
   induction k with
   | zero => exact hsecure
   | succ k ih =>
-    exact ih (fun j hj => hconsec j (by omega))
+    exact ih (fun j _ => hconsec j (by omega))
       (secureAgainst_of_close hε (hconsec k (by omega)) hsecure)
 
 end SecurityGame

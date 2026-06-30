@@ -8,11 +8,10 @@ import VCVio.EvalDist.Defs.Basic
 /-!
 # Denotational Semantics Over `AlternativeMonad`.
 
-This file defines a type-class refining `MonadLiftT m SetM` when given an `AlternativeMonad`
-    instance
-on the base monad, enforcing that `failure` maps to the empty sub-distribution.
-
-Compatibility conditions then force the correct semantics for `evalDist`, see _.
+This file defines `HasEvalSet.LawfulFailure`, a type-class refining `MonadLiftT m SetM` when
+given an `AlternativeMonad` instance on the base monad, enforcing that `failure` maps to the
+empty sub-distribution. Compatibility conditions then force the correct semantics for `evalDist`,
+recorded in the `*_failure` simp lemmas below.
 -/
 
 open ENNReal HasEvalSet
@@ -41,14 +40,11 @@ lemma finSupport_failure [MonadLiftT m SetM] [LawfulFailure m] [HasEvalFinset m]
 
 @[simp, grind =]
 lemma probOutput_failure [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
-    [LawfulFailure m]
-    (x : α) : Pr[= x | (failure : m α)] = 0 := by simp only [probOutput_eq_zero_iff,
-      support_failure, Set.mem_empty_iff_false, not_false_eq_true]
+    [LawfulFailure m] (x : α) : Pr[= x | (failure : m α)] = 0 := by simp
 
 @[simp, grind =]
 lemma probEvent_failure [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
-    [LawfulFailure m]
-    (p : α → Prop) : Pr[ p | (failure : m α)] = 0 := by aesop
+    [LawfulFailure m] (p : α → Prop) : Pr[ p | (failure : m α)] = 0 := by simp
 
 @[simp, grind =]
 lemma probFailure_failure [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
@@ -57,5 +53,4 @@ lemma probFailure_failure [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompa
 
 @[simp, grind =]
 lemma evalDist_failure [MonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
-    [LawfulFailure m] :
-    𝒟[(failure : m α)] = SPMF.mk (PMF.pure none) := by simp
+    [LawfulFailure m] : 𝒟[(failure : m α)] = SPMF.mk (PMF.pure none) := by simp

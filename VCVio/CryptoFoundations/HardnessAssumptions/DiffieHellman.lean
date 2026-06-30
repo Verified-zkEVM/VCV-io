@@ -183,8 +183,7 @@ private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G)
   unfold ddhExp
   rw [probOutput_bind_congr fun a _ => probOutput_bind_bind_swap _ _ _ _,
       probOutput_bind_bind_swap]
-  refine probOutput_bind_congr' ($ᵗ Bool) true ?_
-  intro bit
+  refine probOutput_bind_congr' ($ᵗ Bool) true fun bit => ?_
   cases bit <;> simp [ddhExpReal, ddhExpRand]
 
 /-- The single-game DDH decomposes: `Pr[win] - 1/2 = (Pr[real=1] - Pr[rand=1]) / 2`. -/
@@ -192,27 +191,16 @@ lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
     (Pr[= true | ddhExp g adversary]).toReal - 1 / 2 =
     ((Pr[= true | ddhExpReal g adversary]).toReal -
       (Pr[= true | ddhExpRand g adversary]).toReal) / 2 := by
-  rw [show (Pr[= true | ddhExp g adversary]).toReal =
-      (Pr[= true | do
-        let bit ← ($ᵗ Bool)
-        let z ← if bit then ddhExpReal g adversary
-                 else ddhExpRand g adversary
-        pure (bit == z)]).toReal from by
-    congr 1; exact ddhExp_probOutput_eq_branch (F := F) g adversary]
-  exact probOutput_uniformBool_branch_toReal_sub_half
-    (ddhExpReal g adversary)
-    (ddhExpRand g adversary)
+  rw [ddhExp_probOutput_eq_branch]
+  exact probOutput_uniformBool_branch_toReal_sub_half _ _
 
 /-- The two DDH advantage formulations are related by a factor of 2:
 `ddhDistAdvantage = 2 * ddhGuessAdvantage`. -/
 theorem ddhDistAdvantage_eq_two_mul_ddhGuessAdvantage (g : G) (adversary : DDHAdversary F G) :
     ddhDistAdvantage g adversary = 2 * ddhGuessAdvantage g adversary := by
   unfold ddhDistAdvantage ddhGuessAdvantage
-  have h := ddhExp_probOutput_sub_half (F := F) g adversary
-  have h2 : (Pr[= true | ddhExpReal g adversary]).toReal -
-      (Pr[= true | ddhExpRand g adversary]).toReal =
-      2 * ((Pr[= true | ddhExp g adversary]).toReal - 1 / 2) := by linarith
-  rw [h2, abs_mul, abs_of_nonneg (by positivity)]
+  rw [ddhExp_probOutput_sub_half (F := F) g adversary, abs_div, abs_two]
+  ring
 
 end DDHBranch
 
@@ -222,23 +210,20 @@ variable [SampleableType F] [DecidableEq G]
 
 /-- In the real DDH game, the CDH-to-DDH reduction succeeds exactly when the underlying CDH
 adversary computed the correct shared DH value. -/
-theorem probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp
-    (g : G) (adversary : CDHAdversary F G) :
+theorem probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp (g : G) (adversary : CDHAdversary F G) :
     Pr[= true | ddhExpReal g (cdhToDDHReduction (F := F) adversary)] =
-      Pr[= true | cdhExp g adversary] := by
-  simp only [ddhExpReal, cdhToDDHReduction, cdhExp]
+      Pr[= true | cdhExp g adversary] := rfl
 
 private lemma probOutput_decide_smul_eq_inv_card
     [Fintype F] (g : G) (hg : Function.Bijective (· • g : F → G)) (h : G) :
     Pr[= true | ($ᵗ F) >>= fun c => pure (decide (h = c • g))] =
       (Fintype.card F : ℝ≥0∞)⁻¹ := by
-  obtain ⟨c₀, hc₀⟩ := hg.surjective h
-  rw [probOutput_bind_eq_tsum]
-  simp only [probOutput_uniformSample, probOutput_pure]
+  obtain ⟨c₀, rfl⟩ := hg.surjective h
+  simp only [probOutput_bind_eq_tsum, probOutput_uniformSample, probOutput_pure]
   rw [tsum_fintype, Finset.sum_eq_single c₀]
-  · simp [← hc₀]
+  · simp
   · intro c _ hne
-    simp [show h ≠ c • g from fun heq => hne (hg.injective (hc₀.trans heq)).symm]
+    simp [show c₀ • g ≠ c • g from fun heq => hne (hg.injective heq).symm]
   · exact absurd (Finset.mem_univ c₀)
 
 /-- In the random DDH game, the CDH-to-DDH reduction only matches the target with the uniform
@@ -256,8 +241,7 @@ theorem probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar
           pure (decide (h = c • g))] =
         (Fintype.card F : ℝ≥0∞)⁻¹ := by
     intro a b
-    rw [probOutput_bind_bind_swap]
-    rw [probOutput_bind_of_const _ fun h _ =>
+    rw [probOutput_bind_bind_swap, probOutput_bind_of_const _ fun h _ =>
       probOutput_decide_smul_eq_inv_card g hg h]
     simp [probFailure_of_liftM_PMF]
   rw [probOutput_bind_of_const _ fun a _ =>
@@ -275,15 +259,37 @@ theorem cdhSuccess_toReal_le_uniform_add_ddhDistAdvantage
   unfold ddhDistAdvantage uniformDHTargetSuccessProb
   rw [← probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp g adversary,
       probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar g hg adversary]
-  linarith [le_abs_self
-    ((Pr[= true | ddhExpReal g (cdhToDDHReduction (F := F) adversary)]).toReal -
-     ((Fintype.card F : ℝ≥0∞)⁻¹).toReal)]
+  exact le_add_of_sub_left_le (le_abs_self _)
 
 end CDHToDDH
 
 section DLogToCDH
 
 variable [DecidableEq F] [SampleableType F] [DecidableEq G]
+
+omit [DecidableEq G] in
+private lemma dlogExp_probOutput_eq_tsum (g : G) (adversary : DLogAdversary F G) :
+    Pr[= true | dlogExp g adversary] =
+      ∑' x : F, Pr[= x | $ᵗ F] * Pr[= x | adversary g (x • g)] := by
+  unfold dlogExp
+  rw [probOutput_bind_eq_tsum]
+  refine tsum_congr fun x => ?_
+  congr 1
+  rw [probOutput_bind_eq_tsum]
+  refine (tsum_eq_single x fun x' hx' => ?_).trans (by simp)
+  simp [show (decide (x' = x) : Bool) = false by simp [hx']]
+
+omit [DecidableEq F] in
+private lemma cdhExp_dlogToCDHReduction_probOutput_eq_tsum (g : G) (adversary : DLogAdversary F G) :
+    Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)] =
+      ∑' (a : F) (b : F) (a' : F) (b' : F),
+        Pr[= a | $ᵗ F] * (Pr[= b | $ᵗ F] * (Pr[= a' | adversary g (a • g)] *
+          (Pr[= b' | adversary g (b • g)] *
+            (if (a' * b') • g = (a * b) • g then 1 else 0)))) := by
+  unfold cdhExp dlogToCDHReduction
+  simp only [monad_norm, probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left]
+  refine tsum_congr fun a => tsum_congr fun b => tsum_congr fun a' => tsum_congr fun b' => ?_
+  simp [probOutput_pure]
 
 /-- Concrete form of the hardness implication `CDH ⇒ DLog`: if a DLog adversary succeeds with
 probability `p`, the induced CDH adversary succeeds with probability at least `p^2`. -/
@@ -293,69 +299,23 @@ theorem dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction
       (Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)]).toReal := by
   rw [← ENNReal.toReal_pow]
   refine ENNReal.toReal_mono probOutput_ne_top ?_
-  set w : F → ℝ≥0∞ := fun x => Pr[= x | $ᵗ F] with hw
-  set f : F → ℝ≥0∞ := fun x => Pr[= x | adversary g (x • g)] with hff
-  -- Step 1: Pr[dlog] decomposes as ∑'_x w(x) * f(x).
-  have hdlog : Pr[= true | dlogExp g adversary] = ∑' x : F, w x * f x := by
-    unfold dlogExp
-    rw [probOutput_bind_eq_tsum]
-    refine tsum_congr fun x => ?_
-    congr 1
-    rw [probOutput_bind_eq_tsum]
-    refine (tsum_eq_single x ?_).trans ?_
-    · intro x' hx'
-      have : (decide (x' = x) : Bool) = false := by simp [hx']
-      simp [this]
-    · simp [f]
-  -- Step 2: Pr[dlog]^2 expands to a double tsum over independent copies.
-  have h_sq : Pr[= true | dlogExp g adversary] ^ 2 =
-      ∑' (a : F) (b : F), w a * f a * (w b * f b) := by
-    rw [sq, hdlog, ← ENNReal.tsum_mul_right]
-    refine tsum_congr fun _ => ?_
-    rw [← ENNReal.tsum_mul_left]
-  rw [h_sq]
-  -- Step 3: Pr[cdh] expands to a 4-fold tsum, with each weight pushed under the inner tsum.
-  have hcdh : Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)] =
-    ∑' (a : F) (b : F) (a' : F) (b' : F),
-      w a * (w b * (Pr[= a' | adversary g (a • g)] *
-        (Pr[= b' | adversary g (b • g)] *
-          (if (a' * b') • g = (a * b) • g then 1 else 0)))) := by
-    unfold cdhExp dlogToCDHReduction
-    simp only [monad_norm, probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left]
-    refine tsum_congr fun a => ?_
-    refine tsum_congr fun b => ?_
-    refine tsum_congr fun a' => ?_
-    refine tsum_congr fun b' => ?_
-    by_cases hP : (a' * b') • g = (a * b) • g
-    · simp only [hP, if_true, mul_one, decide_true, probOutput_pure_self]
-      rfl
-    · have hPdec : (decide ((a' * b') • g = (a * b) • g) : Bool) = false := by simp [hP]
-      simp only [if_neg hP, mul_zero, hPdec]
-      rw [show Pr[= true | (pure false : ProbComp Bool)] = 0 from by simp]
-      ring
-  rw [hcdh]
-  -- Step 4: pointwise lower bound — keep only the (a' = a, b' = b) terms.
+  set w : F → ℝ≥0∞ := fun x => Pr[= x | $ᵗ F]
+  set f : F → ℝ≥0∞ := fun x => Pr[= x | adversary g (x • g)]
+  rw [sq, dlogExp_probOutput_eq_tsum, ← ENNReal.tsum_mul_right,
+    cdhExp_dlogToCDHReduction_probOutput_eq_tsum]
   refine ENNReal.tsum_le_tsum fun a => ?_
+  rw [← ENNReal.tsum_mul_left]
   refine ENNReal.tsum_le_tsum fun b => ?_
-  have heq_diag : w a * f a * (w b * f b) =
-      w a * (w b * (Pr[= a | adversary g (a • g)] *
-        (Pr[= b | adversary g (b • g)] *
-          (if (a * b) • g = (a * b) • g then 1 else 0)))) := by
-    change w a * f a * (w b * f b) =
-      w a * (w b * (f a * (f b * (if (a * b) • g = (a * b) • g then 1 else 0))))
-    simp only [if_true, mul_one]; ring
   calc w a * f a * (w b * f b)
-      = w a * (w b * (Pr[= a | adversary g (a • g)] *
-          (Pr[= b | adversary g (b • g)] *
-            (if (a * b) • g = (a * b) • g then 1 else 0)))) := heq_diag
-    _ ≤ ∑' (b' : F), w a * (w b * (Pr[= a | adversary g (a • g)] *
+      = w a * (w b * (f a * (f b * (if (a * b) • g = (a * b) • g then 1 else 0)))) := by
+        simp only [if_true, mul_one]
+        ring
+    _ ≤ ∑' (b' : F), w a * (w b * (f a *
           (Pr[= b' | adversary g (b • g)] *
-            (if (a * b') • g = (a * b) • g then 1 else 0)))) :=
-        ENNReal.le_tsum b
+            (if (a * b') • g = (a * b) • g then 1 else 0)))) := ENNReal.le_tsum b
     _ ≤ ∑' (a' : F) (b' : F), w a * (w b * (Pr[= a' | adversary g (a • g)] *
           (Pr[= b' | adversary g (b • g)] *
-            (if (a' * b') • g = (a * b) • g then 1 else 0)))) :=
-        ENNReal.le_tsum a
+            (if (a' * b') • g = (a * b) • g then 1 else 0)))) := ENNReal.le_tsum a
 
 /-- Concrete form of the hardness implication `DDH ⇒ DLog`, obtained by composing the previous two
 adversary-map reductions. -/
@@ -364,14 +324,9 @@ theorem dlogSuccess_sq_le_uniform_add_ddhDistAdvantage
     (adversary : DLogAdversary F G) :
     (Pr[= true | dlogExp g adversary]).toReal ^ 2 ≤
       uniformDHTargetSuccessProb F +
-        ddhDistAdvantage g (dlogToDDHReduction (F := F) adversary) := by
-  calc (Pr[= true | dlogExp g adversary]).toReal ^ 2
-      ≤ (Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)]).toReal :=
-        dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction g adversary
-    _ ≤ uniformDHTargetSuccessProb F +
-          ddhDistAdvantage g (dlogToDDHReduction (F := F) adversary) :=
-        cdhSuccess_toReal_le_uniform_add_ddhDistAdvantage g hg
-          (dlogToCDHReduction (F := F) adversary)
+        ddhDistAdvantage g (dlogToDDHReduction (F := F) adversary) :=
+  (dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction g adversary).trans
+    (cdhSuccess_toReal_le_uniform_add_ddhDistAdvantage g hg (dlogToCDHReduction (F := F) adversary))
 
 end DLogToCDH
 
@@ -403,13 +358,13 @@ ruling out the trivial case. Uses additive notation consistent with `Module F G`
 def NondegenerateGenerator (g : G) : Prop :=
   Function.Surjective fun a : Fin (Fintype.card G) => a.val • g
 
+/-- A nondegenerate generator of a nontrivial group is nonzero. -/
 lemma NondegenerateGenerator.ne_zero [Nontrivial G] {g : G}
     (hg : NondegenerateGenerator (G := G) g) : g ≠ 0 := by
-  intro hg0
-  rcases exists_ne (0 : G) with ⟨x, hx⟩
-  rcases hg x with ⟨a, ha⟩
-  have h0x : (0 : G) = x := by simpa [hg0] using ha
-  exact hx h0x.symm
+  rintro rfl
+  obtain ⟨x, hx⟩ := exists_ne (0 : G)
+  obtain ⟨a, ha⟩ := hg x
+  exact hx (by simpa using ha.symm)
 
 end CyclicInstantiation
 

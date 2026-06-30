@@ -37,16 +37,13 @@ namespace IndistAt
 variable {σ σ₀ σ₁ σ₂ : Type}
 
 protected theorem refl (h : QueryImpl.Stateful unifSpec E σ) (s : σ) :
-    (h, s) ≈ᵈ[0] (h, s) := by
-  intro A
-  rw [advantage_self]
+    (h, s) ≈ᵈ[0] (h, s) := fun A => (advantage_self h s A).le
 
 protected theorem symm
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
     {h₁ : QueryImpl.Stateful unifSpec E σ₁} {s₁ : σ₁} {ε : ℝ}
-    (h : (h₀, s₀) ≈ᵈ[ε] (h₁, s₁)) : (h₁, s₁) ≈ᵈ[ε] (h₀, s₀) := fun A => by
-  rw [advantage_symm]
-  exact h A
+    (h : (h₀, s₀) ≈ᵈ[ε] (h₁, s₁)) : (h₁, s₁) ≈ᵈ[ε] (h₀, s₀) :=
+  fun A => advantage_symm h₁ s₁ h₀ s₀ A ▸ h A
 
 protected theorem trans
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
@@ -54,8 +51,7 @@ protected theorem trans
     {h₂ : QueryImpl.Stateful unifSpec E σ₂} {s₂ : σ₂} {ε₀ ε₁ : ℝ}
     (h₀₁ : (h₀, s₀) ≈ᵈ[ε₀] (h₁, s₁)) (h₁₂ : (h₁, s₁) ≈ᵈ[ε₁] (h₂, s₂)) :
     (h₀, s₀) ≈ᵈ[ε₀ + ε₁] (h₂, s₂) :=
-  fun A => (advantage_triangle h₀ s₀ h₁ s₁ h₂ s₂ A).trans
-    (add_le_add (h₀₁ A) (h₁₂ A))
+  fun A => (advantage_triangle h₀ s₀ h₁ s₁ h₂ s₂ A).trans (add_le_add (h₀₁ A) (h₁₂ A))
 
 /-! ## ε-monotonicity -/
 
@@ -66,16 +62,15 @@ theorem mono
     (h₀, s₀) ≈ᵈ[ε'] (h₁, s₁) := fun A => (h A).trans h_le
 
 theorem refl_le {ε : ℝ} (h : QueryImpl.Stateful unifSpec E σ) (s : σ) (hε : 0 ≤ ε) :
-    (h, s) ≈ᵈ[ε] (h, s) :=
-  IndistAt.mono hε (IndistAt.refl h s)
+    (h, s) ≈ᵈ[ε] (h, s) := mono hε (IndistAt.refl h s)
 
 /-! ## Bridge from `DistEquiv` -/
 
 theorem of_distEquiv
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
     {h₁ : QueryImpl.Stateful unifSpec E σ₁} {s₁ : σ₁}
-    (h : (h₀, s₀) ≡ᵈ (h₁, s₁)) : (h₀, s₀) ≈ᵈ[0] (h₁, s₁) := fun A => by
-  rw [DistEquiv.advantage_zero h]
+    (h : (h₀, s₀) ≡ᵈ (h₁, s₁)) : (h₀, s₀) ≈ᵈ[0] (h₁, s₁) :=
+  fun A => (DistEquiv.advantage_zero h A).le
 
 theorem distEquiv_left
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
@@ -83,9 +78,8 @@ theorem distEquiv_left
     {h₁ : QueryImpl.Stateful unifSpec E σ₁} {s₁ : σ₁} {ε : ℝ}
     (h : (h₀, s₀) ≡ᵈ (h₀', s₀'))
     (hi : (h₀', s₀') ≈ᵈ[ε] (h₁, s₁)) :
-    (h₀, s₀) ≈ᵈ[ε] (h₁, s₁) := fun A => by
-  rw [DistEquiv.advantage_left h h₁ s₁]
-  exact hi A
+    (h₀, s₀) ≈ᵈ[ε] (h₁, s₁) :=
+  fun A => DistEquiv.advantage_left h h₁ s₁ A ▸ hi A
 
 theorem distEquiv_right
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
@@ -93,9 +87,8 @@ theorem distEquiv_right
     {h₁' : QueryImpl.Stateful unifSpec E σ} {s₁' : σ} {ε : ℝ}
     (h : (h₁, s₁) ≡ᵈ (h₁', s₁'))
     (hi : (h₀, s₀) ≈ᵈ[ε] (h₁, s₁)) :
-    (h₀, s₀) ≈ᵈ[ε] (h₁', s₁') := fun A => by
-  rw [← DistEquiv.advantage_right h₀ s₀ h]
-  exact hi A
+    (h₀, s₀) ≈ᵈ[ε] (h₁', s₁') :=
+  fun A => DistEquiv.advantage_right h₀ s₀ h A ▸ hi A
 
 /-! ## Bridge to advantage -/
 
@@ -114,8 +107,7 @@ theorem of_advantage_le
 /-! ## Hybrid and compositional bounds -/
 
 theorem hybrid {n : ℕ} {σ : ℕ → Type} {ε : ℕ → ℝ}
-    (h : (i : ℕ) → QueryImpl.Stateful unifSpec E (σ i))
-    (s : (i : ℕ) → σ i)
+    (h : (i : ℕ) → QueryImpl.Stateful unifSpec E (σ i)) (s : (i : ℕ) → σ i)
     (hh : ∀ i ∈ Finset.range n, (h i, s i) ≈ᵈ[ε i] (h (i + 1), s (i + 1))) :
     (h 0, s 0) ≈ᵈ[∑ i ∈ Finset.range n, ε i] (h n, s n) := fun A =>
   (advantage_hybrid h s A n).trans (Finset.sum_le_sum (fun i hi => hh i hi A))

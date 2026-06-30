@@ -59,25 +59,22 @@ private lemma simulateQ_add_liftM_query_left (t : spec₁'.Domain) :
     simulateQ (impl₁' + impl₂')
       (liftM (spec₁'.query t) : OracleComp (spec₁' + spec₂') _) =
     impl₁' t := by
-  change simulateQ (impl₁' + impl₂')
-    (liftM (liftM (spec₁'.query t) : OracleQuery (spec₁' + spec₂') _)) = _
-  simp [simulateQ_query]
+  change simulateQ (impl₁' + impl₂') (liftM ((spec₁' + spec₂').query (Sum.inl t))) = _
+  simp
 
 private lemma simulateQ_add_liftM_query_right (t : spec₂'.Domain) :
     simulateQ (impl₁' + impl₂')
       (liftM (spec₂'.query t) : OracleComp (spec₁' + spec₂') _) =
     impl₂' t := by
-  change simulateQ (impl₁' + impl₂')
-    (liftM (liftM (spec₂'.query t) : OracleQuery (spec₁' + spec₂') _)) = _
-  simp [simulateQ_query]
+  change simulateQ (impl₁' + impl₂') (liftM ((spec₁' + spec₂').query (Sum.inr t))) = _
+  simp
 
 @[simp]
 lemma simulateQ_add_liftComp_left (oa : OracleComp spec₁' α) :
     simulateQ (impl₁' + impl₂') (OracleComp.liftComp oa (spec₁' + spec₂')) =
       simulateQ impl₁' oa := by
   rw [OracleComp.liftComp_def, ← simulateQ_compose]
-  congr 1
-  funext t
+  congr 1 with t
   exact simulateQ_add_liftM_query_left impl₁' impl₂' t
 
 @[simp]
@@ -85,8 +82,7 @@ lemma simulateQ_add_liftComp_right (ob : OracleComp spec₂' α) :
     simulateQ (impl₁' + impl₂') (OracleComp.liftComp ob (spec₁' + spec₂')) =
       simulateQ impl₂' ob := by
   rw [OracleComp.liftComp_def, ← simulateQ_compose]
-  congr 1
-  funext t
+  congr 1 with t
   exact simulateQ_add_liftM_query_right impl₁' impl₂' t
 
 /-- `liftM`-normal-form companion of `simulateQ_add_liftComp_left`. Because `liftComp_eq_liftM`
@@ -126,12 +122,10 @@ lemma simulateQ_liftComp_left_eq_of_apply
               (liftM (spec₁'.query t) : OracleComp spec₁' (spec₁'.Range t))
               (spec₁' + spec₂')) = impl₁ t := by
         rw [OracleComp.liftComp_query]
-        change simulateQ impl
-          (liftM ((spec₁' + spec₂').query (Sum.inl t))) = impl₁ t
-        rw [simulateQ_spec_query]
-        exact h t
+        change simulateQ impl (liftM ((spec₁' + spec₂').query (Sum.inl t))) = impl₁ t
+        simp [h]
       rw [hq, simulateQ_spec_query]
-      exact bind_congr fun u => ih u
+      exact bind_congr ih
 
 lemma simulateQ_liftComp_right_eq_of_apply
     (impl : QueryImpl (spec₁' + spec₂') m') (impl₂ : QueryImpl spec₂' m')
@@ -148,12 +142,10 @@ lemma simulateQ_liftComp_right_eq_of_apply
               (liftM (spec₂'.query t) : OracleComp spec₂' (spec₂'.Range t))
               (spec₁' + spec₂')) = impl₂ t := by
         rw [OracleComp.liftComp_query]
-        change simulateQ impl
-          (liftM ((spec₁' + spec₂').query (Sum.inr t))) = impl₂ t
-        rw [simulateQ_spec_query]
-        exact h t
+        change simulateQ impl (liftM ((spec₁' + spec₂').query (Sum.inr t))) = impl₂ t
+        simp [h]
       rw [hq, simulateQ_spec_query]
-      exact bind_congr fun u => ih u
+      exact bind_congr ih
 
 end simulateQ_add_liftComp
 
@@ -189,11 +181,10 @@ lemma simulateQ_liftM_eq_of_query
     simulateQ impl (liftM oa : OracleComp spec₂' α) =
       simulateQ impl₁ oa := by
   induction oa using OracleComp.inductionOn with
-  | pure x =>
-      simp
+  | pure x => simp
   | query_bind t k ih =>
       rw [liftM_bind, simulateQ_bind, simulateQ_bind, h t, simulateQ_spec_query]
-      exact bind_congr fun u => ih u
+      exact bind_congr ih
 
 end simulateQ_liftM
 

@@ -466,29 +466,11 @@ private def byteDecode12VecPoly {k : Nat} (bytes : ByteArray) (poly : Fin k) : T
 
 private theorem decode12Pair_fst {a b : Nat} (ha : a < 4096) :
     a % 256 + 256 * ((a / 256 + 16 * (b % 16)) % 16) = a := by
-  have haDiv : a / 256 < 16 := Nat.div_lt_of_lt_mul (by omega)
-  calc
-    a % 256 + 256 * ((a / 256 + 16 * (b % 16)) % 16)
-        = a % 256 + 256 * ((a / 256) % 16) := by
-            rw [Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt haDiv]
-    _ = a % 256 + 256 * (a / 256) := by
-      rw [Nat.mod_eq_of_lt haDiv]
-    _ = a := by
-      rw [Nat.mod_add_div]
+  grind
 
 private theorem decode12Pair_snd {a b : Nat} (ha : a < 4096) :
     (a / 256 + 16 * (b % 16)) / 16 + 16 * (b / 16) = b := by
-  have haDiv : a / 256 < 16 := Nat.div_lt_of_lt_mul (by omega)
-  calc
-    (a / 256 + 16 * (b % 16)) / 16 + 16 * (b / 16)
-        = (a / 256 + (b % 16) * 16) / 16 + 16 * (b / 16) := by
-            rw [Nat.mul_comm 16 (b % 16)]
-    _ = (a / 256) / 16 + (b % 16) + 16 * (b / 16) := by
-      rw [Nat.add_mul_div_right (a / 256) (b % 16) (by decide : 0 < 16)]
-    _ = b % 16 + 16 * (b / 16) := by
-      rw [Nat.div_eq_of_lt haDiv, zero_add]
-    _ = b := by
-      rw [Nat.mod_add_div]
+  grind
 
 private theorem getByteD_eq_getElem {bytes : ByteArray} {i : Nat} (hi : i < bytes.size) :
     getByteD bytes i = bytes[i] := by

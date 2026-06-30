@@ -64,12 +64,7 @@ lemma probOutput_pair_xor_uniform (sp : ℕ) (mx : ProbComp (BitVec sp))
           by_cases h : msg = msg' <;> simp [h, inv, mul_comm]
     _ = (∑' msg', Pr[= msg' | mx] * (if msg = msg' then 1 else 0)) * inv := by
           rw [ENNReal.tsum_mul_right]
-    _ = Pr[= msg | mx] * inv := by
-          have hsum :
-              ∑' msg', Pr[= msg' | mx] * (if msg = msg' then 1 else 0) =
-                Pr[= msg | mx] := by
-            simp
-          rw [hsum]
+    _ = Pr[= msg | mx] * inv := by simp
 
 lemma probOutput_cipher_from_pair_uniform (sp : ℕ) (mx : ProbComp (BitVec sp))
     (σ : BitVec sp) :

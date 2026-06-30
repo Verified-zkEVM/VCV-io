@@ -24,7 +24,6 @@ With `Tweak := Unit` this is definitionally a keyed hash family
 existing `KeyedHashFamily` surface.
 -/
 
-
 open OracleComp
 
 /-- A tweakable hash family: a sampled public seed plus a deterministic evaluation taking a

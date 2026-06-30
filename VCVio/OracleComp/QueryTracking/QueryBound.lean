@@ -4,10 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import Mathlib.Algebra.Polynomial.Eval.Defs
-import ToMathlib.General
 import PolyFun.PFunctor.Bound
-import VCVio.OracleComp.QueryTracking.CountingOracle
+import ToMathlib.General
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT.Basic
 
@@ -210,11 +210,8 @@ theorem IsQueryBound.simulateQ_run_of_step
             (stepBudget t budget) canQuery' cost' := by
         simpa [OracleComp.liftM_run_StateT, MonadLift.monadLift] using
           hstep t budget s h.1
-      have hrest : ∀ p : spec.Range t × σ,
-          IsQueryBound ((simulateQ impl (mx p.1)).run p.2)
-            (mapBudget (cost t budget)) canQuery' cost' :=
-        fun p => ih p.1 (h.2 p.1) p.2
-      simpa [hcombine t budget h.1] using hbind hstep' hrest
+      simpa [hcombine t budget h.1] using
+        hbind hstep' (fun p => ih p.1 (h.2 p.1) p.2)
 
 end IsQueryBound
 
@@ -297,11 +294,8 @@ lemma IsQueryBoundP.proj
     (h : IsQueryBound oa b canQuery cost) :
     IsQueryBoundP oa p (proj b) := by
   rw [isQueryBoundP_iff_isQueryBound_if]
-  refine OracleComp.IsQueryBound.proj proj ?_ h_cost h
-  intro t b' hcan
-  by_cases hpt : p t
-  · simp [hpt, h_can t b' hcan hpt]
-  · simp [hpt]
+  refine OracleComp.IsQueryBound.proj proj (fun t b' hcan => ?_) h_cost h
+  by_cases hpt : p t <;> simp [hpt, h_can t b' hcan]
 
 theorem IsQueryBoundP.mono {oa : OracleComp spec α} {n m : ℕ}
     (h : IsQueryBoundP oa p n) (hnm : n ≤ m) : IsQueryBoundP oa p m := by
@@ -311,12 +305,7 @@ theorem IsQueryBoundP.mono {oa : OracleComp spec α} {n m : ℕ}
       rw [isQueryBoundP_query_bind_iff] at h
       rw [isQueryBoundP_query_bind_iff]
       refine ⟨h.1.imp id (fun hn => Nat.lt_of_lt_of_le hn hnm), fun u => ?_⟩
-      have hu := h.2 u
-      by_cases hpt : p t
-      · simp only [if_pos hpt] at hu ⊢
-        exact ih u hu (Nat.sub_le_sub_right hnm 1)
-      · simp only [if_neg hpt] at hu ⊢
-        exact ih u hu hnm
+      exact ih u (h.2 u) (by split <;> omega)
 
 /-- `oa >>= ob` is `p`-bounded by `n + m` when `oa` is `p`-bounded by `n` and every reachable
 continuation `ob x` is `p`-bounded by `m`. -/
@@ -337,12 +326,7 @@ lemma isQueryBoundP_bind
         h' x ((mem_support_bind_iff _ _ _).mpr ⟨u, mem_support_query t u, hx⟩)
       have ih' := ih u hmx hob
       refine ih'.mono ?_
-      by_cases hpt : p t
-      · simp only [if_pos hpt]
-        rcases h.1 with hnp | hn
-        · exact absurd hpt hnp
-        · omega
-      · simp only [if_neg hpt]; omega
+      grind
 
 /-- Transfer a predicate-targeted query bound through a `StateT` simulation
 whose handler step consumes at most one target-side predicate query exactly when
@@ -374,13 +358,7 @@ theorem IsQueryBoundP.simulateQ_run_StateT_of_step
         exact ih x.1 (h.2 x.1) x.2
       have hbind := isQueryBoundP_bind (hstep t s) hrest
       refine hbind.mono ?_
-      by_cases ht : p t
-      · simp only [if_pos ht]
-        rcases h.1 with hnot | hpos
-        · exact absurd ht hnot
-        · omega
-      · simp only [if_neg ht]
-        omega
+      grind
 
 /-- Predicate-extensionality: replacing `p` with an equivalent predicate does not change the
 bound. -/
@@ -388,11 +366,7 @@ lemma isQueryBoundP_congr_pred {oa : OracleComp spec α} {p p' : ι → Prop}
     [DecidablePred p] [DecidablePred p'] {n : ℕ}
     (hpp : ∀ t, p t ↔ p' t) :
     IsQueryBoundP oa p n ↔ IsQueryBoundP oa p' n := by
-  refine isQueryBound_congr (fun t b => ?_) (fun t b => ?_)
-  · rw [hpp t]
-  · by_cases ht' : p' t
-    · rw [if_pos ((hpp t).mpr ht'), if_pos ht']
-    · rw [if_neg (fun h => ht' ((hpp t).mp h)), if_neg ht']
+  refine isQueryBound_congr (fun t b => ?_) (fun t b => ?_) <;> simp [hpp]
 
 /-- Antitone in the predicate: if every `p`-index is also a `p'`-index, then a `p'`-targeted
 bound is a `p`-targeted bound at the same budget. The `p`-indices form a sub-collection of the
@@ -411,9 +385,7 @@ lemma IsQueryBoundP.of_imp {oa : OracleComp spec α} {p p' : ι → Prop}
         · exact Or.inr (h.1.resolve_left (not_not.mpr (himp t hpt)))
         · exact Or.inl hpt
       · refine (ih u (h.2 u)).mono ?_
-        by_cases hpt : p t
-        · simp only [if_pos hpt, if_pos (himp t hpt), le_refl]
-        · simp only [if_neg hpt]; split <;> omega
+        grind
 
 @[simp]
 lemma isQueryBoundP_map_iff (oa : OracleComp spec α) (f : α → β) (n : ℕ) :
@@ -500,13 +472,10 @@ lemma isPerIndexQueryBound_query_iff (t : ι) (qb : ι → ℕ) :
   simp [IsPerIndexQueryBound]
 
 private lemma update_le_update {qb qb' : ι → ℕ} {t : ι} (hle : qb ≤ qb') :
-    Function.update qb t (qb t - 1) ≤ Function.update qb' t (qb' t - 1) := by
-  intro j
-  by_cases hj : j = t
-  · rw [hj, Function.update_self, Function.update_self]
-    exact Nat.sub_le_sub_right (hle t) 1
-  · rw [Function.update_of_ne hj, Function.update_of_ne hj]
-    exact hle j
+    Function.update qb t (qb t - 1) ≤ Function.update qb' t (qb' t - 1) := fun j => by
+  rcases eq_or_ne j t with rfl | hj
+  · simpa using Nat.sub_le_sub_right (hle j) 1
+  · simpa [Function.update_of_ne hj] using hle j
 
 private lemma isPerIndexQueryBound_mono_aux (oa : OracleComp spec α) :
     ∀ {qb qb' : ι → ℕ}, qb ≤ qb' →
@@ -525,10 +494,17 @@ lemma IsPerIndexQueryBound.mono {oa : OracleComp spec α} {qb qb' : ι → ℕ}
 private lemma update_add_eq_update_add {qb₁ qb₂ : ι → ℕ} {t : ι} (ht : 0 < qb₁ t) :
     Function.update qb₁ t (qb₁ t - 1) + qb₂ =
       Function.update (qb₁ + qb₂) t ((qb₁ + qb₂) t - 1) := by
-  ext j
-  by_cases hj : j = t
-  · rw [hj, Pi.add_apply, Function.update_self, Pi.add_apply, Function.update_self]; omega
-  · simp only [Pi.add_apply, Function.update_of_ne hj]
+  funext j
+  by_cases hj : j = t <;> simp [Function.update_apply, hj, Pi.add_apply]
+  omega
+
+/-- Split a per-index budget at index `t` into one unit at `t` plus the decremented
+remainder, used to feed `isPerIndexQueryBound_bind` in the `simulateQ` transfer proofs. -/
+private lemma update_zero_one_add_update {qb : ι → ℕ} {t : ι} (ht : 0 < qb t) :
+    qb = Function.update (0 : ι → ℕ) t 1 + Function.update qb t (qb t - 1) := by
+  funext j
+  by_cases hj : j = t <;> simp [hj, Pi.add_apply]
+  omega
 
 private lemma isPerIndexQueryBound_bind_aux (oa : OracleComp spec α)
     (ob : α → OracleComp spec β) (qb₂ : ι → ℕ)
@@ -614,9 +590,7 @@ theorem IsPerIndexQueryBound.counting_bounded {oa : OracleComp spec α} {qb : ι
       calc z.2 t = (z.2 t - 1) + 1 := (Nat.succ_pred_eq_of_pos hz_pos).symm
         _ ≤ (qb t - 1) + 1 := Nat.succ_le_succ hle
         _ = qb t := Nat.succ_pred_eq_of_pos hq_pos
-    · have hle := h_snd i
-      rw [Function.update_of_ne hi, Function.update_of_ne hi] at hle
-      exact hle
+    · simpa only [Function.update_of_ne hi] using h_snd i
 
 /-! ### Uniform per-step transfer for `simulateQ`
 
@@ -648,15 +622,7 @@ theorem IsPerIndexQueryBound.simulateQ_run_of_uniform_step
           IsPerIndexQueryBound ((simulateQ impl (mx p.1)).run p.2)
             (Function.update qb t (qb t - 1)) :=
         fun p => ih p.1 (h.2 p.1) p.2
-      have hadd : qb =
-          (Function.update (0 : ι → ℕ) t 1) + Function.update qb t (qb t - 1) := by
-        ext j
-        by_cases hj : j = t
-        · subst hj
-          simp only [Pi.add_apply, Function.update_self]
-          omega
-        · simp [Function.update_of_ne hj]
-      rw [hadd]
+      rw [update_zero_one_add_update hqb_pos]
       simpa [StateT.run_bind] using isPerIndexQueryBound_bind hstep' hrest
 
 /-- Stateless analogue of `IsPerIndexQueryBound.simulateQ_run_of_uniform_step`: when the
@@ -678,15 +644,7 @@ theorem IsPerIndexQueryBound.simulateQ_of_uniform_step
       have hrest : ∀ u, IsPerIndexQueryBound (simulateQ impl (mx u))
           (Function.update qb t (qb t - 1)) :=
         fun u => ih u (h.2 u)
-      have hadd : qb =
-          (Function.update (0 : ι → ℕ) t 1) + Function.update qb t (qb t - 1) := by
-        ext j
-        by_cases hj : j = t
-        · subst hj
-          simp only [Pi.add_apply, Function.update_self]
-          omega
-        · simp [Function.update_of_ne hj]
-      rw [hadd]
+      rw [update_zero_one_add_update hqb_pos]
       exact isPerIndexQueryBound_bind (hstep t) hrest
 
 end IsPerIndexQueryBound
@@ -717,8 +675,7 @@ lemma IsTotalQueryBound.mono {oa : OracleComp spec α} {n₁ n₂ : ℕ}
     (h : IsTotalQueryBound oa n₁) (hle : n₁ ≤ n₂) :
     IsTotalQueryBound oa n₂ := by
   induction oa using OracleComp.inductionOn generalizing n₁ n₂ with
-  | pure _ =>
-      exact trivial
+  | pure _ => trivial
   | query_bind t mx ih =>
       rw [isTotalQueryBound_query_bind_iff] at h ⊢
       exact ⟨Nat.lt_of_lt_of_le h.1 hle,
@@ -730,9 +687,7 @@ lemma isTotalQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp s
     {n₁ n₂ : ℕ}
     (h1 : IsTotalQueryBound oa n₁) (h2 : ∀ x, IsTotalQueryBound (ob x) n₂) :
     IsTotalQueryBound (oa >>= ob) (n₁ + n₂) := by
-  refine isQueryBound_bind (combine := fun a b => a + b) ?_ ?_ h1 h2
-  · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
-  · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
+  refine isQueryBound_bind (combine := fun a b => a + b) ?_ ?_ h1 h2 <;> grind
 
 /-- If `oa >>= ob` has a total query bound `n`, then `oa` alone has total query bound `n`
 (the continuation can only add queries, not remove them). -/
@@ -786,25 +741,13 @@ lemma IsTotalQueryBound.of_bind_query_prefix [spec.Inhabited]
         (n + 1)) :
     IsTotalQueryBound oa n := by
   induction oa using OracleComp.inductionOn generalizing n with
-  | pure _ =>
-      exact trivial
+  | pure _ => trivial
   | query_bind t mx ih =>
       rw [bind_assoc, isTotalQueryBound_query_bind_iff] at h
       rw [isTotalQueryBound_query_bind_iff]
-      have hn0 : n ≠ 0 := by
-        intro hz
-        subst hz
-        exact not_isTotalQueryBound_bind_query_prefix_zero
-          (oa := mx default) (next := next) (ob := ob) (h.2 default)
-      have hn : 0 < n := Nat.pos_of_ne_zero hn0
-      refine ⟨hn, fun u => ?_⟩
-      have hn_succ : n = (n - 1) + 1 := by omega
-      have hu : IsTotalQueryBound
-          (mx u >>= fun x => liftM (spec.query (next x)) >>= ob x)
-          ((n - 1) + 1) := by
-        rw [← hn_succ]
-        exact h.2 u
-      exact ih u (n := n - 1) hu
+      have hn : 0 < n := Nat.pos_of_ne_zero fun hz =>
+        absurd (hz ▸ h.2 default) not_isTotalQueryBound_bind_query_prefix_zero
+      exact ⟨hn, fun u => ih u (n := n - 1) (Nat.sub_add_cancel hn ▸ h.2 u)⟩
 
 theorem IsTotalQueryBound.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSpec ι'}
     [IsUniformSpec spec'] {σ : Type u}
@@ -873,10 +816,7 @@ theorem IsTotalQueryBound.simulateQ_of_step_le {ι' : Type u} {spec' : OracleSpe
       have hrest : ∀ u, IsTotalQueryBound (simulateQ impl (mx u)) ((n - 1) * step) :=
         fun u => ih u (h.2 u)
       have hn : step + (n - 1) * step = n * step := by
-        have hpos : 0 < n := h.1
-        rcases n with _ | k
-        · omega
-        · simp [Nat.succ_mul]; ring
+        rw [Nat.sub_one_mul, Nat.add_sub_cancel' (Nat.le_mul_of_pos_left step h.1)]
       simpa [hn] using isTotalQueryBound_bind (hstep t) hrest
 
 /-! ### Forward query-bound transfer for `preInsert` / `postInsert`
@@ -903,9 +843,7 @@ theorem isTotalQueryBound_simulateQ_preInsert
     (h_so : ∀ t, IsTotalQueryBound (impl t) b_so)
     (h_nx : ∀ t, IsTotalQueryBound (nx t) b_nx) :
     IsTotalQueryBound (simulateQ (impl.preInsert nx) oa) (n * (b_nx + b_so)) := by
-  refine IsTotalQueryBound.simulateQ_of_step_le hoa ?_
-  intro t
-  show IsTotalQueryBound ((impl.preInsert nx) t) (b_nx + b_so)
+  refine IsTotalQueryBound.simulateQ_of_step_le hoa fun t => ?_
   simp only [QueryImpl.preInsert_apply, monadLift_self]
   exact isTotalQueryBound_bind (h_nx t) (fun _ => h_so t)
 
@@ -918,9 +856,7 @@ theorem isTotalQueryBound_simulateQ_postInsert
     (h_so : ∀ t, IsTotalQueryBound (impl t) b_so)
     (h_nx : ∀ t u, IsTotalQueryBound (nx t u) b_nx) :
     IsTotalQueryBound (simulateQ (impl.postInsert nx) oa) (n * (b_so + b_nx)) := by
-  refine IsTotalQueryBound.simulateQ_of_step_le hoa ?_
-  intro t
-  show IsTotalQueryBound ((impl.postInsert nx) t) (b_so + b_nx)
+  refine IsTotalQueryBound.simulateQ_of_step_le hoa fun t => ?_
   simp only [QueryImpl.postInsert_apply, monadLift_self]
   refine isTotalQueryBound_bind (h_so t) (fun u => ?_)
   exact isTotalQueryBound_bind (h_nx t u)
@@ -944,10 +880,9 @@ theorem IsQueryBoundP.simulateQ_of_step_le_total
       have hrest : ∀ u, IsQueryBoundP (simulateQ impl (mx u)) q ((n - 1) * step) :=
         fun u => ih u (h.2 u)
       have hbind := isQueryBoundP_bind (hstep t) (fun u _ => hrest u)
-      refine hbind.mono ?_
-      rcases n with _ | k
-      · exact absurd h.1 (lt_irrefl 0)
-      · simp [Nat.succ_mul]; ring_nf; rfl
+      exact hbind.mono
+        (Nat.le_of_eq (by rw [Nat.sub_one_mul,
+          Nat.add_sub_cancel' (Nat.le_mul_of_pos_left step h.1)]))
 
 theorem isQueryBoundP_simulateQ_preInsert
     {ι' : Type u} {spec' : OracleSpec ι'} [IsUniformSpec spec'] {β : Type u}
@@ -959,9 +894,7 @@ theorem isQueryBoundP_simulateQ_preInsert
     (h_so : ∀ t, IsQueryBoundP (impl t) q b_so)
     (h_nx : ∀ t, IsQueryBoundP (nx t) q b_nx) :
     IsQueryBoundP (simulateQ (impl.preInsert nx) oa) q (n * (b_nx + b_so)) := by
-  refine IsQueryBoundP.simulateQ_of_step_le_total hoa ?_
-  intro t
-  show IsQueryBoundP ((impl.preInsert nx) t) q (b_nx + b_so)
+  refine IsQueryBoundP.simulateQ_of_step_le_total hoa fun t => ?_
   simp only [QueryImpl.preInsert_apply, monadLift_self]
   exact isQueryBoundP_bind (h_nx t) (fun _ _ => h_so t)
 
@@ -975,9 +908,7 @@ theorem isQueryBoundP_simulateQ_postInsert
     (h_so : ∀ t, IsQueryBoundP (impl t) q b_so)
     (h_nx : ∀ t u, IsQueryBoundP (nx t u) q b_nx) :
     IsQueryBoundP (simulateQ (impl.postInsert nx) oa) q (n * (b_so + b_nx)) := by
-  refine IsQueryBoundP.simulateQ_of_step_le_total hoa ?_
-  intro t
-  show IsQueryBoundP ((impl.postInsert nx) t) q (b_so + b_nx)
+  refine IsQueryBoundP.simulateQ_of_step_le_total hoa fun t => ?_
   simp only [QueryImpl.postInsert_apply, monadLift_self]
   refine isQueryBoundP_bind (h_so t) (fun u _ => ?_)
   exact isQueryBoundP_bind (h_nx t u)
@@ -995,6 +926,13 @@ example {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α β : Type 
       (n * (b_mon + b_so)) :=
   isTotalQueryBound_simulateQ_preInsert hoa h_so (fun _ => h_mon)
 
+/-- The total query count of a single-query `QueryCount` is one. Shared by the counting-oracle
+support lemmas that peel off one `QueryCount.single t` per query step. -/
+private lemma sum_single_eq_one [DecidableEq ι] [Fintype ι] (t : ι) :
+    ∑ i, QueryCount.single t i = 1 := by
+  rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_univ t)]
+  simp
+
 namespace countingOracle
 
 lemma add_single_mem_support_simulate_queryBind [DecidableEq ι]
@@ -1009,10 +947,7 @@ lemma add_single_mem_support_simulate_queryBind [DecidableEq ι]
   refine ⟨by simp [QueryCount.single], ⟨u, ?_⟩⟩
   convert hz using 2
   funext j
-  by_cases hj : j = t
-  · subst hj
-    simp [QueryCount.single]
-  · simp [Function.update, hj, QueryCount.single]
+  by_cases hj : j = t <;> simp [Function.update, hj, QueryCount.single]
 
 section CostSupport
 
@@ -1045,26 +980,12 @@ lemma exists_mem_support_simulate_of_mem_support_run_simulateQ_le_cost
       rcases ih qu.1 (st₀ := qu.2) (z := z) hz' with ⟨qc, hqc, hcost⟩
       refine ⟨QueryCount.single t + qc, ?_, ?_⟩
       · exact countingOracle.add_single_mem_support_simulate_queryBind hqc
-      · have hstep' : cost qu.2 ≤ cost st₀ + 1 :=
-            hstep t st₀ qu hqu
-        have hsum_single : ∑ i, QueryCount.single t i = 1 := by
-          rw [QueryCount.single]
-          conv_lhs =>
-            rw [← Finset.add_sum_erase Finset.univ (Function.update 0 t 1) (Finset.mem_univ t)]
-          simp only [Function.update_self]
-          have herase :
-              ∑ x ∈ Finset.univ.erase t, Function.update (0 : QueryCount ι) t 1 x = 0 := by
-            apply Finset.sum_eq_zero
-            intro j hj
-            have hjt : j ≠ t := Finset.ne_of_mem_erase hj
-            change Function.update (0 : QueryCount ι) t 1 j = 0
-            simp [Function.update, hjt]
-          rw [herase]
+      · have hstep' : cost qu.2 ≤ cost st₀ + 1 := hstep t st₀ qu hqu
         calc
           cost z.2 ≤ cost qu.2 + ∑ i, qc i := hcost
           _ ≤ (cost st₀ + 1) + ∑ i, qc i := by omega
           _ = cost st₀ + ∑ i, (QueryCount.single t + qc) i := by
-              simp [Finset.sum_add_distrib, hsum_single, add_left_comm, add_comm]
+              simp [Finset.sum_add_distrib, sum_single_eq_one t, add_left_comm, add_comm]
 
 end CostSupport
 
@@ -1091,19 +1012,12 @@ theorem IsTotalQueryBound.residual_of_mem_support_counting
       rw [bind_assoc, isTotalQueryBound_query_bind_iff] at h
       rw [countingOracle.mem_support_simulate_queryBind_iff] at hz
       obtain ⟨hz0, u, hz'⟩ := hz
-      have hu :
-          IsTotalQueryBound (ob z.1)
-            ((n - 1) - ∑ i, (Function.update z.2 t (z.2 t - 1)) i) :=
-        ih u (h.2 u) hz'
-      have hsum : ∑ i, Function.update z.2 t (z.2 t - 1) i = (∑ i, z.2 i) - 1 := by
-        exact sum_update_pred (Nat.pos_of_ne_zero hz0)
-      rw [hsum] at hu
-      have hsum_pos : 0 < ∑ i, z.2 i := by
-        exact Nat.lt_of_lt_of_le (Nat.pos_of_ne_zero hz0)
-          (Finset.single_le_sum (fun _ _ => Nat.zero_le _) (Finset.mem_univ t))
-      have hbudget : (n - 1) - ((∑ i, z.2 i) - 1) = n - ∑ i, z.2 i := by
-        omega
-      simpa [hbudget] using hu
+      have hu : IsTotalQueryBound (ob z.1)
+          ((n - 1) - ∑ i, (Function.update z.2 t (z.2 t - 1)) i) := ih u (h.2 u) hz'
+      rw [sum_update_pred (Nat.pos_of_ne_zero hz0)] at hu
+      have hsum_pos : 0 < ∑ i, z.2 i := Nat.lt_of_lt_of_le (Nat.pos_of_ne_zero hz0)
+        (Finset.single_le_sum (fun _ _ => Nat.zero_le _) (Finset.mem_univ t))
+      simpa [show (n - 1) - ((∑ i, z.2 i) - 1) = n - ∑ i, z.2 i by omega] using hu
 
 /-- Any support point of the counting simulation of a totally query-bounded
 computation has total query count at most the structural bound. -/
@@ -1122,15 +1036,12 @@ theorem IsTotalQueryBound.counting_total_le
       rw [isTotalQueryBound_query_bind_iff] at h
       rw [countingOracle.mem_support_simulate_queryBind_iff] at hz
       obtain ⟨hz0, u, hz'⟩ := hz
-      have hu :
-          ∑ i, Function.update z.2 t (z.2 t - 1) i ≤ n - 1 :=
-        ih u (h.2 u) hz'
-      have hsum : ∑ i, Function.update z.2 t (z.2 t - 1) i = (∑ i, z.2 i) - 1 := by
-        exact sum_update_pred (Nat.pos_of_ne_zero hz0)
+      have hu : ∑ i, Function.update z.2 t (z.2 t - 1) i ≤ n - 1 := ih u (h.2 u) hz'
+      have hsum : ∑ i, Function.update z.2 t (z.2 t - 1) i = (∑ i, z.2 i) - 1 :=
+        sum_update_pred (Nat.pos_of_ne_zero hz0)
       rw [hsum] at hu
-      have hsum_pos : 0 < ∑ i, z.2 i := by
-        exact Nat.lt_of_lt_of_le (Nat.pos_of_ne_zero hz0)
-          (Finset.single_le_sum (fun _ _ => Nat.zero_le _) (Finset.mem_univ t))
+      have hsum_pos : 0 < ∑ i, z.2 i := Nat.lt_of_lt_of_le (Nat.pos_of_ne_zero hz0)
+        (Finset.single_le_sum (fun _ _ => Nat.zero_le _) (Finset.mem_univ t))
       omega
 
 omit [Fintype ι] in
@@ -1159,16 +1070,8 @@ theorem isTotalQueryBound_iff_counting_total_le [IsUniformSpec spec]
   | pure _ => trivial
   | query_bind t mx ih =>
       rw [isTotalQueryBound_query_bind_iff]
-      have hsum_single : (∑ i, QueryCount.single t i) = 1 := by
-        rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_univ t)]
-        simp
-      have hsplit : ∀ (q : QueryCount ι),
-          (∑ i, (QueryCount.single t + q) i) = 1 + ∑ i, q i := by
-        intro q
-        have : (∑ i, (QueryCount.single t + q) i) =
-            (∑ i, QueryCount.single t i) + ∑ i, q i := by
-          simp [Pi.add_apply, Finset.sum_add_distrib]
-        rw [this, hsum_single]
+      have hsplit : ∀ q : QueryCount ι, (∑ i, (QueryCount.single t + q) i) = 1 + ∑ i, q i :=
+        fun q => by simp [Pi.add_apply, Finset.sum_add_distrib, sum_single_eq_one]
       obtain ⟨z₀, hz₀⟩ := countingOracle.support_simulate_nonempty (mx default)
       have hbig : (z₀.1, QueryCount.single t + z₀.2) ∈
           support (countingOracle.simulate ((query t : OracleComp spec _) >>= mx) 0) :=
@@ -1206,12 +1109,9 @@ theorem IsTotalQueryBound.residual_of_mem_support_run_simulateQ_le_cost
   rcases countingOracle.exists_mem_support_simulate_of_mem_support_run_simulateQ_le_cost
       (spec := spec) (ι := ι) (impl := impl) cost hstep hz with
     ⟨qc, hqc, hcost⟩
-  have hres :
-      IsTotalQueryBound (ob z.1) (n - ∑ i, qc i) :=
+  have hres : IsTotalQueryBound (ob z.1) (n - ∑ i, qc i) :=
     IsTotalQueryBound.residual_of_mem_support_counting
       (spec := spec) (ι := ι) (oa := oa) (ob := ob) (n := n) (z := (z.1, qc)) h hqc
-  have hdiff : cost z.2 - cost st₀ ≤ ∑ i, qc i := by
-    omega
   exact hres.mono (by omega)
 
 end CountingResidual
@@ -1223,14 +1123,12 @@ theorem IsTotalQueryBound.of_perIndex [DecidableEq ι] [Fintype ι]
     (h : IsPerIndexQueryBound oa qb) :
     IsTotalQueryBound oa (∑ i, qb i) := by
   induction oa using OracleComp.inductionOn generalizing qb with
-  | pure _ =>
-      exact trivial
+  | pure _ => trivial
   | query_bind t mx ih =>
       rw [isPerIndexQueryBound_query_bind_iff] at h
       rw [isTotalQueryBound_query_bind_iff]
-      have hpos : 0 < ∑ i, qb i :=
-        Nat.lt_of_lt_of_le h.1 (Finset.single_le_sum (fun i _ => Nat.zero_le _) (Finset.mem_univ t))
-      refine ⟨hpos, fun u => ?_⟩
+      refine ⟨Nat.lt_of_lt_of_le h.1
+        (Finset.single_le_sum (fun i _ => Nat.zero_le _) (Finset.mem_univ t)), fun u => ?_⟩
       rw [← sum_update_pred h.1]
       exact ih u (h.2 u)
 
@@ -1239,6 +1137,20 @@ theorem IsTotalQueryBound.of_perIndex [DecidableEq ι] [Fintype ι]
 section IsQueryBoundPRelations
 
 variable {p : ι → Prop} [DecidablePred p]
+
+/-- The `p`-filtered total of a single-query `QueryCount` is one when `t` satisfies `p`. Shared
+by the counting-oracle characterizations that peel off one `QueryCount.single t` per step. -/
+private lemma sum_single_filter_eq_one [DecidableEq ι] [Fintype ι] {t : ι} (hpt : p t) :
+    ∑ i ∈ Finset.univ.filter p, QueryCount.single t i = 1 := by
+  rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)]
+  simp
+
+/-- The `p`-filtered total of a single-query `QueryCount` is zero when `t` fails `p`. -/
+private lemma sum_single_filter_eq_zero [DecidableEq ι] [Fintype ι] {t : ι} (hpt : ¬ p t) :
+    ∑ i ∈ Finset.univ.filter p, QueryCount.single t i = 0 :=
+  Finset.sum_eq_zero fun j hj =>
+    have hjt : j ≠ t := fun he => hpt (he ▸ (Finset.mem_filter.mp hj).2)
+    by simp [QueryCount.single, Function.update_of_ne hjt]
 
 /-- A total query bound implies a predicate-targeted bound for every predicate `p`. -/
 theorem IsTotalQueryBound.isQueryBoundP {oa : OracleComp spec α} {n : ℕ}
@@ -1249,11 +1161,9 @@ theorem IsTotalQueryBound.isQueryBoundP {oa : OracleComp spec α} {n : ℕ}
       rw [isTotalQueryBound_query_bind_iff] at h
       rw [isQueryBoundP_query_bind_iff]
       refine ⟨Or.inr h.1, fun u => ?_⟩
-      by_cases hpt : p t
-      · simp only [if_pos hpt]
-        exact ih u (h.2 u)
-      · simp only [if_neg hpt]
-        exact (ih u (h.2 u)).mono (Nat.sub_le _ _)
+      split
+      · exact ih u (h.2 u)
+      · exact (ih u (h.2 u)).mono (Nat.sub_le _ _)
 
 /-- With the always-true predicate, `IsQueryBoundP` reduces to `IsTotalQueryBound`. -/
 lemma isQueryBoundP_true_iff (oa : OracleComp spec α) (n : ℕ) :
@@ -1268,9 +1178,7 @@ lemma isQueryBoundP_false (oa : OracleComp spec α) (n : ℕ) :
   | pure _ => trivial
   | query_bind t mx ih =>
       rw [isQueryBoundP_query_bind_iff]
-      refine ⟨Or.inl (fun h => h), fun u => ?_⟩
-      simp only [if_neg (fun h : False => h)]
-      exact ih u
+      exact ⟨Or.inl id, fun u => by simpa using ih u⟩
 
 /-- A per-index bound implies a predicate-targeted bound at the sum of the per-index budgets
 over the indices satisfying `p`. -/
@@ -1285,15 +1193,16 @@ theorem IsPerIndexQueryBound.isQueryBoundP [DecidableEq ι] [Fintype ι]
       rw [isQueryBoundP_query_bind_iff]
       refine ⟨?_, fun u => ?_⟩
       · by_cases hpt : p t
-        · refine Or.inr (Nat.lt_of_lt_of_le h.1 ?_)
-          exact Finset.single_le_sum (f := qb) (fun _ _ => Nat.zero_le _)
-            (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)
+        · exact Or.inr (Nat.lt_of_lt_of_le h.1 (Finset.single_le_sum (f := qb)
+            (fun _ _ => Nat.zero_le _) (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)))
         · exact Or.inl hpt
-      · by_cases hpt : p t
-        · rw [if_pos hpt, ← sum_filter_update_of_pred_pos hpt h.1]
-          exact ih u (h.2 u)
-        · rw [if_neg hpt, ← sum_filter_update_of_not_pred hpt]
-          exact ih u (h.2 u)
+      · split
+        · next hpt =>
+            rw [← sum_filter_update_of_pred_pos hpt h.1]
+            exact ih u (h.2 u)
+        · next hpt =>
+            rw [← sum_filter_update_of_not_pred hpt]
+            exact ih u (h.2 u)
 
 /-- Soundness: any path of the counting-oracle simulation of a `p`-bounded computation has
 sum of per-index counts over `p`-indices at most `n`. -/
@@ -1329,8 +1238,7 @@ theorem IsQueryBoundP.counting_bounded [DecidableEq ι] [Fintype ι]
           Nat.add_le_add_right hrec 1
         rwa [Nat.sub_add_cancel hp_pos, Nat.sub_add_cancel hn_pos] at hshift
       · simp only [if_neg hpt] at hrec
-        rw [sum_filter_update_of_not_pred hpt] at hrec
-        exact hrec
+        rwa [sum_filter_update_of_not_pred hpt] at hrec
 
 /-- Residual bound via the counting oracle: after any partial counting-simulation of `oa`, the
 continuation `ob` is `p`-bounded by `n` minus the filtered count so far. -/
@@ -1365,8 +1273,7 @@ theorem IsQueryBoundP.residual_of_mem_support_counting [DecidableEq ι] [Fintype
         refine hrec.mono ?_
         rw [Nat.sub_sub, Nat.add_sub_of_le hp_pos]
       · simp only [if_neg hpt] at hrec
-        rw [sum_filter_update_of_not_pred hpt] at hrec
-        exact hrec
+        rwa [sum_filter_update_of_not_pred hpt] at hrec
 
 /-- Predicate-targeted analogue of `isTotalQueryBound_iff_counting_total_le`: a
 counting-oracle filtered-sum bound characterizes the structural `IsQueryBoundP` bound. -/
@@ -1394,12 +1301,8 @@ theorem isQueryBoundP_iff_counting_filter_le
           have hbig : (z₀.1, QueryCount.single t + z₀.2) ∈
               support (countingOracle.simulate ((query t : OracleComp spec _) >>= mx) 0) :=
             countingOracle.add_single_mem_support_simulate_queryBind hz₀
-          have hsum_single : (∑ i ∈ Finset.univ.filter p, QueryCount.single t i) = 1 := by
-            rw [QueryCount.single,
-              Finset.sum_update_of_mem (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)]
-            simp
           have hbound := h _ hbig
-          rw [hsplit, hsum_single] at hbound
+          rw [hsplit, sum_single_filter_eq_one hpt] at hbound
           omega
         · exact Or.inl hpt
       · apply ih u
@@ -1411,21 +1314,10 @@ theorem isQueryBoundP_iff_counting_filter_le
         rw [hsplit] at hbound
         by_cases hpt : p t
         · simp only [if_pos hpt]
-          have hsum_single : (∑ i ∈ Finset.univ.filter p, QueryCount.single t i) = 1 := by
-            rw [QueryCount.single,
-              Finset.sum_update_of_mem (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)]
-            simp
-          rw [hsum_single] at hbound
+          rw [sum_single_filter_eq_one hpt] at hbound
           omega
         · simp only [if_neg hpt]
-          have hsum_single : (∑ i ∈ Finset.univ.filter p, QueryCount.single t i) = 0 := by
-            apply Finset.sum_eq_zero
-            intro j hj
-            have hjp : p j := (Finset.mem_filter.mp hj).2
-            have hjt : j ≠ t := fun he => hpt (he ▸ hjp)
-            simp [QueryCount.single, Function.update_of_ne hjt]
-          rw [hsum_single, zero_add] at hbound
-          exact hbound
+          rwa [sum_single_filter_eq_zero hpt, zero_add] at hbound
 
 end IsQueryBoundPRelations
 
@@ -1456,22 +1348,9 @@ theorem IsQueryBoundP.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSpec �
             hstep_p t hpt s
         · simpa [OracleComp.liftM_run_StateT, MonadLift.monadLift, if_neg hpt] using
             hstep_np t hpt s
-      have hrest : ∀ pu : spec.Range t × σ,
-          pu ∈ support ((liftM (impl t) :
-              StateT σ (OracleComp spec') (spec.Range t)).run s) →
-            IsQueryBoundP ((simulateQ impl (mx pu.1)).run pu.2) q
-              (if p t then n - 1 else n) := by
-        intro pu _
-        exact ih pu.1 (h.2 pu.1) pu.2
-      have hbound : (if p t then 1 else 0) + (if p t then n - 1 else n) = n := by
-        by_cases hpt : p t
-        · simp only [if_pos hpt]
-          rcases h.1 with hnp | hn
-          · exact absurd hpt hnp
-          · omega
-        · simp only [if_neg hpt]; omega
-      have := isQueryBoundP_bind hlift hrest
-      simpa [hbound] using this
+      have hbound : (if p t then 1 else 0) + (if p t then n - 1 else n) = n := by grind
+      simpa [hbound] using isQueryBoundP_bind hlift
+        fun pu _ => ih pu.1 (h.2 pu.1) pu.2
 
 /-- Stateless analogue of `IsQueryBoundP.simulateQ_run_of_step`: when the simulation target
 monad is `OracleComp spec'` directly (no `StateT` layer), the per-step bounds apply without
@@ -1495,16 +1374,8 @@ theorem IsQueryBoundP.simulateQ_of_step {ι' : Type u} {spec' : OracleSpec ι'}
         by_cases hpt : p t
         · simpa [if_pos hpt] using hstep_p t hpt
         · simpa [if_neg hpt] using hstep_np t hpt
-      have hrest : ∀ u, IsQueryBoundP (simulateQ impl (mx u)) q (if p t then n - 1 else n) :=
-        fun u => ih u (h.2 u)
-      have hbound : (if p t then 1 else 0) + (if p t then n - 1 else n) = n := by
-        by_cases hpt : p t
-        · simp only [if_pos hpt]
-          rcases h.1 with hnp | hn
-          · exact absurd hpt hnp
-          · omega
-        · simp only [if_neg hpt]; omega
-      simpa [hbound] using isQueryBoundP_bind hlift (fun u _ => hrest u)
+      have hbound : (if p t then 1 else 0) + (if p t then n - 1 else n) = n := by grind
+      simpa [hbound] using isQueryBoundP_bind hlift fun u _ => ih u (h.2 u)
 
 /-- Transfer a predicate-targeted bound through `simulateQ` with a sum-of-implementations
 `impl₁ + impl₂` on a sum source spec `spec₁ + spec₂`. The source predicate `p` is split into
@@ -1805,8 +1676,7 @@ theorem isTotalQueryBound_run_simulateQ_withTraceAppendBefore_iff
     {α : Type u} (mx : OracleComp spec α) (n : ℕ) :
     IsTotalQueryBound ((simulateQ (so.withTraceAppendBefore traceFn) mx).run) n ↔
     IsTotalQueryBound (simulateQ so mx) n :=
-  isQueryBound_iff_of_map_eq
-    (QueryImpl.fst_map_run_withTraceAppendBefore so traceFn mx) _ _
+  isQueryBound_iff_of_map_eq (QueryImpl.fst_map_run_withTraceAppendBefore so traceFn mx) _ _
 
 theorem isQueryBoundP_run_simulateQ_withTraceAppendBefore_iff
     {ι : Type u} {spec : OracleSpec ι}
@@ -1817,8 +1687,7 @@ theorem isQueryBoundP_run_simulateQ_withTraceAppendBefore_iff
     (q : ι' → Prop) [DecidablePred q] (n : ℕ) :
     IsQueryBoundP ((simulateQ (so.withTraceAppendBefore traceFn) mx).run) q n ↔
     IsQueryBoundP (simulateQ so mx) q n :=
-  isQueryBoundP_iff_of_map_eq (p := q)
-    (QueryImpl.fst_map_run_withTraceAppendBefore so traceFn mx)
+  isQueryBoundP_iff_of_map_eq (p := q) (QueryImpl.fst_map_run_withTraceAppendBefore so traceFn mx)
 
 theorem isTotalQueryBound_run_simulateQ_withCost_iff
     {ι : Type u} {spec : OracleSpec ι}
@@ -1899,8 +1768,7 @@ theorem isPerIndexQueryBound_run_simulateQ_withTraceAppendBefore_iff
     {α : Type u} (mx : OracleComp spec α) (qb : ι' → ℕ) :
     IsPerIndexQueryBound ((simulateQ (so.withTraceAppendBefore traceFn) mx).run) qb ↔
     IsPerIndexQueryBound (simulateQ so mx) qb :=
-  isPerIndexQueryBound_iff_of_map_eq
-    (QueryImpl.fst_map_run_withTraceAppendBefore so traceFn mx)
+  isPerIndexQueryBound_iff_of_map_eq (QueryImpl.fst_map_run_withTraceAppendBefore so traceFn mx)
 
 theorem isPerIndexQueryBound_run_simulateQ_withTraceAppend_iff
     {ι : Type u} {spec : OracleSpec ι}

@@ -20,7 +20,7 @@ namespace OracleComp
 protected def runIO {α : Type} (oa : ProbComp α) : IO α :=
   simulateQ (spec := unifSpec) (fun n => Fin.ofNat (n + 1) <$> (IO.rand 0 n).toIO) oa
 
-/-- Automatic lifting of probabalistic computations into `IO`. -/
+/-- Automatic lifting of probabilistic computations into `IO`. -/
 instance : MonadLift ProbComp IO where monadLift := OracleComp.runIO
 
 def test1 : ProbComp (ℕ × ℕ × ℕ) := do

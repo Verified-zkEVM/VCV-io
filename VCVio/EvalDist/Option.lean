@@ -3,13 +3,14 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Defs.NeverFails
+import VCVio.EvalDist.Monad.Map
 
 /-!
 # Probability Distributions on `Option` return types
 
-File for lemmas about `evalDist` on involving `Option`.
+Lemmas about `evalDist` and the associated probabilities for computations
+returning an `Option`.
 -/
 
 universe u v w
@@ -37,23 +38,21 @@ omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 lemma probOutput_none_add_tsum_some :
     Pr[= none | mx] + ∑' x, Pr[= some x | mx] = 1 - Pr[⊥ | mx] := by
-  rw [← tsum_probOutput_eq_sub mx]
-  rw [← tsum_option _ ENNReal.summable]
+  rw [← tsum_probOutput_eq_sub mx, ← tsum_option _ ENNReal.summable]
 
 omit [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
 lemma probEvent_isSome_eq_one_sub_probOutput_none [NeverFail mx] :
     Pr[ fun r => r.isSome | mx] = 1 - Pr[= none | mx] := by
-  rw [probEvent_eq_tsum_ite]
-  rw [tsum_option (fun r : Option α => if r.isSome then Pr[= r | mx] else 0) ENNReal.summable]
+  rw [probEvent_eq_tsum_ite,
+    tsum_option (fun r : Option α => if r.isSome then Pr[= r | mx] else 0) ENNReal.summable]
   simp only [Option.isSome, reduceCtorEq, ↓reduceIte, zero_add]
-  have htotal : Pr[= none | mx] + ∑' x, Pr[= some x | mx] = 1 := by
-    simpa [probFailure_eq_zero (mx := mx), tsub_zero] using probOutput_none_add_tsum_some (mx := mx)
   have hnone_ne_top : Pr[= none | mx] ≠ ⊤ :=
     ne_top_of_le_ne_top ENNReal.one_ne_top probOutput_le_one
-  have htotal' : (∑' x, Pr[= some x | mx]) + Pr[= none | mx] = 1 := by
-    simpa [add_comm] using htotal
-  exact ENNReal.eq_sub_of_add_eq hnone_ne_top htotal'
+  have htotal : (∑' x, Pr[= some x | mx]) + Pr[= none | mx] = 1 := by
+    simpa [probFailure_eq_zero (mx := mx), tsub_zero, add_comm]
+      using probOutput_none_add_tsum_some (mx := mx)
+  exact ENNReal.eq_sub_of_add_eq hnone_ne_top htotal
 
 omit [Monad m] [LawfulMonadLiftT m SPMF] in
 omit [LawfulMonad m] in
@@ -63,9 +62,8 @@ lemma sum_probOutput_some_le_one [Fintype α] :
   calc
     ∑ x : α, Pr[= (some x : Option α) | mx]
       ≤ ∑' y : Option α, Pr[= y | mx] := by
-          rw [← tsum_fintype (L := .unconditional _)]
-          have h := tsum_option (fun y : Option α => Pr[= y | mx]) ENNReal.summable
-          rw [h]
+          rw [← tsum_fintype (L := .unconditional _),
+            tsum_option (fun y : Option α => Pr[= y | mx]) ENNReal.summable]
           exact le_add_self
     _ ≤ 1 := tsum_probOutput_le_one
 

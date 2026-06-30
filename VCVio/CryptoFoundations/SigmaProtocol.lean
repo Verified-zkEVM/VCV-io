@@ -141,21 +141,9 @@ lemma perfectHVZK_iff_hvzk_zero
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) :
     σ.PerfectHVZK simTranscript ↔ σ.HVZK simTranscript 0 := by
-  constructor
-  · intro h
-    dsimp [HVZK]
-    intro x w hx
-    have hzero : tvDist (σ.realTranscript x w) (simTranscript x) = 0 := by
-      simpa using
-        (tvDist_eq_zero_iff (σ.realTranscript x w) (simTranscript x)).2 (h x w hx)
-    exact le_of_eq hzero
-  · intro h
-    dsimp [HVZK] at h
-    intro x w hx
-    have hzero : tvDist (σ.realTranscript x w) (simTranscript x) = 0 :=
-      le_antisymm (h x w hx) (by
-        simpa using (tvDist_nonneg (σ.realTranscript x w) (simTranscript x)))
-    simpa using (tvDist_eq_zero_iff (σ.realTranscript x w) (simTranscript x)).mp hzero
+  refine ⟨fun h x w hx => ?_, fun h x w hx => ?_⟩
+  · exact le_of_eq ((tvDist_eq_zero_iff _ _).2 (h x w hx))
+  · exact (tvDist_eq_zero_iff _ _).1 (le_antisymm (h x w hx) (tvDist_nonneg _ _))
 
 open scoped ENNReal in
 /-- The simulator's commitment marginal has predictability at most `β`: no single

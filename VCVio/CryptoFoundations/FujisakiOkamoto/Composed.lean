@@ -12,7 +12,6 @@ This file exposes the composed two-RO Fujisaki-Okamoto transform together with a
 specialization for the `H(m)` branch.
 -/
 
-
 open OracleComp OracleSpec ENNReal
 
 variable {M PK SK R C KD K KPRF : Type}

@@ -75,11 +75,10 @@ theorem eRelWP_indicator_le_one
   refine iSup_le fun c => ?_
   calc ∑' z : α × β, Pr[= z | c.1] * RelPost.indicator R z.1 z.2
       ≤ ∑' z : α × β, Pr[= z | c.1] * 1 := by
-        refine ENNReal.tsum_le_tsum fun z => mul_le_mul' le_rfl ?_
-        unfold RelPost.indicator
-        split_ifs <;> simp
+        gcongr with z
+        simp only [RelPost.indicator]; split_ifs <;> simp
     _ = ∑' z : α × β, Pr[= z | c.1] := by simp
-    _ ≤ 1 := by rw [tsum_probOutput_eq_sub]; exact tsub_le_self
+    _ ≤ 1 := tsum_probOutput_le_one
 
 /-! ## Probabilistic ↔ Quantitative
 
@@ -109,16 +108,11 @@ the unary file, and it reduces to the existing
 `eRelWP_indicator_le_one`. -/
 theorem couplingPost_iff_eRelWP_indicator_eq_one
     (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) (R : RelPost α β) :
-    CouplingPost oa ob R ↔
-      eRelWP oa ob (RelPost.indicator R) = 1 := by
+    CouplingPost oa ob R ↔ eRelWP oa ob (RelPost.indicator R) = 1 := by
   constructor
   · intro h
-    have h' : RelTriple' oa ob R := relTriple'_iff_couplingPost.mpr h
-    have hge : 1 ≤ eRelWP oa ob (RelPost.indicator R) := h'
-    exact le_antisymm (eRelWP_indicator_le_one oa ob R) hge
-  · intro h
-    apply relTriple'_iff_couplingPost.mp
-    exact h.ge
+    exact le_antisymm (eRelWP_indicator_le_one oa ob R) (relTriple'_iff_couplingPost.mpr h)
+  · exact fun h => relTriple'_iff_couplingPost.mp h.ge
 
 /-- Convenience: rewrites the `couplingPost_iff_eRelWP_indicator_eq_one`
 bridge as a `RelTriple'` equivalence. The `RelTriple'` form is the

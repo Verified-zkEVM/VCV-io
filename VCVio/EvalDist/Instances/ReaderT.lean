@@ -42,9 +42,9 @@ namespace ReaderT
 /-- Evaluate a `ReaderT` computation at a fixed environment `ρ0`.
 This is a monad homomorphism because `ReaderT` is read-only. -/
 def evalAt (ρ0 : ρ) : ReaderT ρ m →ᵐ m where
-  toFun     := fun {α} (mx : ReaderT ρ m α) => mx ρ0
-  toFun_pure' := by intros; rfl
-  toFun_bind' := by intros; rfl
+  toFun {α} (mx : ReaderT ρ m α) := mx ρ0
+  toFun_pure' _ := rfl
+  toFun_bind' _ _ := rfl
 
 @[simp] lemma evalAt_apply (ρ0 : ρ) (mx : ReaderT ρ m α) :
     evalAt ρ0 mx = mx ρ0 := rfl
@@ -55,22 +55,18 @@ def evalAt (ρ0 : ρ) : ReaderT ρ m →ᵐ m where
 @[simp] lemma evalAt_bind (ρ0 : ρ) (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :
     evalAt ρ0 (mx >>= f) = evalAt ρ0 mx >>= fun x => evalAt ρ0 (f x) := rfl
 
-end ReaderT
-
-namespace ReaderT
-
 /-- Lift `m → SPMF` to a homomorphism `ReaderT ρ m →ᵐ SPMF` by fixing `ρ0`.
 
 This allows evaluating reader computations to sub-probability distributions
 when the base monad `m` has such an evaluation. -/
 noncomputable def toSPMF (ρ0 : ρ) [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] :
     ReaderT ρ m →ᵐ SPMF :=
-  MonadHom.ofLift m SPMF ∘ₘ ReaderT.evalAt (m := m) ρ0
+  MonadHom.ofLift m SPMF ∘ₘ evalAt ρ0
 
 /-- Lift `m → PMF` to a homomorphism `ReaderT ρ m →ᵐ PMF` by fixing `ρ0`. -/
 noncomputable def toPMF (ρ0 : ρ) [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] :
     ReaderT ρ m →ᵐ PMF :=
-  MonadHom.ofLift m PMF ∘ₘ ReaderT.evalAt (m := m) ρ0
+  MonadHom.ofLift m PMF ∘ₘ evalAt ρ0
 
 section evalDist_lemmas
 
@@ -78,16 +74,12 @@ variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (ρ0 : ρ)
 
 /-- Evaluating `pure x` at any environment gives the same result as `pure x` in the base monad. -/
 @[simp] lemma toSPMF_pure (x : α) :
-    ReaderT.toSPMF ρ0 (pure x : ReaderT ρ m α) = (liftM (pure x : m α) : SPMF α) := by
-  change liftM ((ReaderT.evalAt ρ0).toFun α (pure x : ReaderT ρ m α)) = (liftM (pure x : m α) :
-      SPMF α)
-  rfl
+    toSPMF ρ0 (pure x : ReaderT ρ m α) = (liftM (pure x : m α) : SPMF α) := rfl
 
 /-- Evaluating a bind distributes through the monad homomorphism. -/
 @[simp] lemma toSPMF_bind (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :
-    ReaderT.toSPMF ρ0 (mx >>= f) =
-      ReaderT.toSPMF ρ0 mx >>= fun x => ReaderT.toSPMF ρ0 (f x) :=
-  (ReaderT.toSPMF ρ0).toFun_bind' mx f
+    toSPMF ρ0 (mx >>= f) = toSPMF ρ0 mx >>= fun x => toSPMF ρ0 (f x) :=
+  (toSPMF ρ0).toFun_bind' mx f
 
 end evalDist_lemmas
 
@@ -96,15 +88,11 @@ section evalPMF_lemmas
 variable [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] (ρ0 : ρ)
 
 @[simp] lemma toPMF_pure (x : α) :
-    ReaderT.toPMF ρ0 (pure x : ReaderT ρ m α) = (liftM (pure x : m α) : PMF α) := by
-  change liftM ((ReaderT.evalAt ρ0).toFun α (pure x : ReaderT ρ m α)) = (liftM (pure x : m α) :
-      PMF α)
-  rfl
+    toPMF ρ0 (pure x : ReaderT ρ m α) = (liftM (pure x : m α) : PMF α) := rfl
 
 @[simp] lemma toPMF_bind (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :
-    ReaderT.toPMF ρ0 (mx >>= f) =
-      ReaderT.toPMF ρ0 mx >>= fun x => ReaderT.toPMF ρ0 (f x) :=
-  (ReaderT.toPMF ρ0).toFun_bind' mx f
+    toPMF ρ0 (mx >>= f) = toPMF ρ0 mx >>= fun x => toPMF ρ0 (f x) :=
+  (toPMF ρ0).toFun_bind' mx f
 
 end evalPMF_lemmas
 

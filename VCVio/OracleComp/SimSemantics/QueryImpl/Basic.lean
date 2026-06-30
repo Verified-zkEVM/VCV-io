@@ -3,9 +3,9 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.OracleComp
-import Mathlib.Algebra.Polynomial.Eval.Defs
 import Mathlib.Algebra.MvPolynomial.Eval
+import Mathlib.Algebra.Polynomial.Eval.Defs
+import VCVio.OracleComp.OracleComp
 
 /-!
 # Implementing Oracle Queries in Other Monads
@@ -26,7 +26,7 @@ open scoped OracleSpec.PrimitiveQuery
 This is defined in terms of a mapping of input elements to oracle outputs,
 which extends to a mapping on `OracleQuery spec` by copying over the continuation,
 and then further to `OracleComp spec` by preserving the pure and bind operations.
-See `QueryImpl.map_query` and `HasSimulateQ` for these two operations. -/
+See `QueryImpl.mapQuery` and `simulateQ` for these two operations. -/
 @[reducible] def QueryImpl {ι} (spec : OracleSpec ι) (m : Type u → Type v) :=
   (x : spec.Domain) → m (spec.Range x)
 

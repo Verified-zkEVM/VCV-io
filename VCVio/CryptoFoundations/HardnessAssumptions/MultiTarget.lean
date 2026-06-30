@@ -27,7 +27,6 @@ functions so that a (seed-fixed) `TweakableHash` can be plugged in.
 - Hülsing, Rijneveld, Song, Schwabe, "Mitigating Multi-Target Attacks in Hash-Based Signatures"
 -/
 
-
 open OracleComp ENNReal
 
 namespace MultiTarget
@@ -94,7 +93,8 @@ def tcrExperiment {prob : TcrProblem Tweak M Y} [DecidableEq M] [DecidableEq Y]
     (adv : TcrAdversary prob) : ProbComp Bool := do
   let (targets, st) ← adv.choose
   let (j, m') ← adv.forge st fun i => prob.f (targets i).1 (targets i).2
-  return decide (m' ≠ (targets j).2 ∧ prob.f (targets j).1 m' = prob.f (targets j).1 (targets j).2)
+  let (tweak, m) := targets j
+  return decide (m' ≠ m ∧ prob.f tweak m' = prob.f tweak m)
 
 /-- The SM-TCR advantage of an adversary. -/
 noncomputable def tcrAdvantage {prob : TcrProblem Tweak M Y} [DecidableEq M] [DecidableEq Y]

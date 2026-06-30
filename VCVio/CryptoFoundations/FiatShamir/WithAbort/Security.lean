@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
+import VCVio.CryptoFoundations.FiatShamir.WithAbort
 
 /-!
 # EUF-CMA security of Fiat-Shamir with aborts
@@ -22,7 +22,6 @@ scheme (e.g. `MLDSA.nma_security`).
 universe u v
 
 open OracleComp OracleSpec
-open scoped BigOperators
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 
@@ -140,14 +139,12 @@ theorem euf_cma_bound_perfectHVZK
     ∃ reduction : Stmt → ProbComp Wit,
       adv.advantage (runtime M) ≤
         Pr[= true | hardRelationExp hr reduction] +
-          ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
-  simpa using
-    (euf_cma_bound (ids := ids) (M := M) (maxAttempts := maxAttempts)
-      (hc := hc) (sim := sim) (ζ_zk := 0) (hζ := le_rfl)
-      (hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp hhvzk)
-      (recover := recover) (hcr := hcr) (adv := adv)
-      (qS := qS) (qH := qH) (ε := ε) (p_abort := p_abort) (δ := δ) (hp := hp)
-      (hQ := hQ))
+          ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) :=
+  euf_cma_bound (ids := ids) (M := M) (maxAttempts := maxAttempts)
+    (hc := hc) (sim := sim) (ζ_zk := 0) (hζ := le_rfl)
+    (hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp hhvzk)
+    (recover := recover) (hcr := hcr) (adv := adv)
+    (qS := qS) (qH := qH) (ε := ε) (p_abort := p_abort) (δ := δ) (hp := hp) (hQ := hQ)
 
 end EUF_CMA
 

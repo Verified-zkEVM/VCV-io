@@ -66,8 +66,7 @@ other kinds of denotational semantics such as sets of outcomes, traces, or quant
 The important asymmetry is that `interpret` is required to be a monad morphism, while `observe`
 is not. This lets us model semantics where running the internal computation requires fixing hidden
 state or discarding auxiliary structure before exposing the final denotation. -/
-structure SemanticsVia
-    (m : Type u → Type v) [Monad m] (Obs : Type u → Type x) where
+structure SemanticsVia (m : Type u → Type v) [Monad m] (Obs : Type u → Type x) where
   /-- Internal monad used to give denotational meaning to computations in `m`. -/
   Sem : Type u → Type w
   /-- Monad structure on the internal semantic monad. -/
@@ -93,8 +92,7 @@ end SemanticsVia
 This is the specialization of `SemanticsVia` where the external observation target is `SPMF`.
 Computations in `m` are therefore interpreted as subprobability distributions on outputs, possibly
 with failure mass. -/
-structure SPMFSemantics (m : Type u → Type v) [Monad m]
-    extends SemanticsVia m SPMF
+structure SPMFSemantics (m : Type u → Type v) [Monad m] extends SemanticsVia m SPMF
 
 /-- The internal semantic monad of an `SPMFSemantics` carries the inherited monad structure. -/
 instance {m : Type u → Type v} [Monad m] (sem : SPMFSemantics m) : Monad sem.Sem :=
@@ -124,8 +122,7 @@ def probFailure (sem : SPMFSemantics m) (mx : m α) : ENNReal :=
 
 /-- Failure probability under an `SPMFSemantics` is always at most `1`. -/
 @[simp]
-lemma probFailure_le_one (sem : SPMFSemantics m) (mx : m α) :
-    sem.probFailure mx ≤ 1 :=
+lemma probFailure_le_one (sem : SPMFSemantics m) (mx : m α) : sem.probFailure mx ≤ 1 :=
   PMF.coe_le_one (sem.evalDist mx) none
 
 /-- Package an ordinary `MonadLiftT m SPMF` instance as a bundled `SPMFSemantics`.
@@ -154,8 +151,7 @@ end SPMFSemantics
 
 This is the specialization of `SemanticsVia` where the external observation target is `PMF`.
 There is therefore no failure mass in the resulting denotation. -/
-structure PMFSemantics (m : Type u → Type v) [Monad m]
-    extends SemanticsVia m PMF
+structure PMFSemantics (m : Type u → Type v) [Monad m] extends SemanticsVia m PMF
 
 /-- The internal semantic monad of a `PMFSemantics` carries the inherited monad structure. -/
 instance {m : Type u → Type v} [Monad m] (sem : PMFSemantics m) : Monad sem.Sem :=
@@ -175,9 +171,9 @@ def evalDist (sem : PMFSemantics m) (mx : m α) : PMF α :=
 
 /-- Forget that a total semantics is total, yielding the underlying subprobabilistic semantics.
 
-This simply postcomposes observation with the canonical embedding `PMF α → SPMF α`. The resulting
-`SPMFSemantics` has zero failure probability, but it can now be consumed by APIs that are stated in
-terms of subprobabilistic semantics. -/
+This simply postcomposes observation with the canonical embedding `PMF α → SPMF α`. The
+resulting `SPMFSemantics` has zero failure probability, but it can now be consumed by APIs
+that are stated in terms of subprobabilistic semantics. -/
 noncomputable def toSPMFSemantics (sem : PMFSemantics m) : SPMFSemantics m where
   Sem := sem.Sem
   instMonadSem := sem.instMonadSem
