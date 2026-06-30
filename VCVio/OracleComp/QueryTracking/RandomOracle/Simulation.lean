@@ -209,9 +209,9 @@ theorem probEvent_eq_one_simulateQ_randomOracle_run_iff
 
 end OracleComp
 
-/-- Simulating the random oracle leaves a mapped uniform `Fin` sample unchanged: a `unifSpec`
-computation contains no hash queries for the oracle to answer, so running the simulation from
-the empty cache is the identity. -/
+/-- Simulating the random oracle leaves a mapped uniform `Fin` sample unchanged: the query is
+intercepted, but from the empty cache it misses and resamples uniformly, and the updated cache is
+then discarded by `run'`, so the distribution over results is identical to the original sample. -/
 lemma simulateQ_randomOracle_map_uniformFin {α : Type} (n : ℕ) (f : Fin (n + 1) → α) :
     ((simulateQ (unifSpec.randomOracle :
       QueryImpl unifSpec (StateT unifSpec.QueryCache ProbComp))

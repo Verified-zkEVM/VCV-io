@@ -26,7 +26,7 @@ lemma mapM_map_postcomp {m : Type → Type} {α β γ : Type} {n : ℕ}
     [Monad m] [LawfulMonad m]
     (v : Vector α n) (f : α → m β) (g : β → γ) :
     (v.mapM (fun a => g <$> f a)) = (Vector.map g) <$> (v.mapM f) := by
-  have hlist : ∀ l : List α, l.mapM (fun a => g <$> f a) = List.map g <$> l.mapM f := by
+  have hlist : ∀ l : List α, l.mapM (fun a ↦ g <$> f a) = List.map g <$> l.mapM f := by
     intro l
     induction l with
     | nil => simp
@@ -34,9 +34,8 @@ lemma mapM_map_postcomp {m : Type → Type} {α β γ : Type} {n : ℕ}
   apply Vector.map_toArray_inj.mp
   rw [Vector.toArray_mapM]
   simp only [Functor.map_map, Vector.toArray_map]
-  rw [← Functor.map_map]
-  rw [Vector.toArray_mapM]
-  rw [Array.mapM_eq_mapM_toList, Array.mapM_eq_mapM_toList]
+  rw [← Functor.map_map, Vector.toArray_mapM, Array.mapM_eq_mapM_toList,
+    Array.mapM_eq_mapM_toList]
   simp only [Functor.map_map]
   rw [hlist]
   simp [Functor.map_map]
@@ -60,15 +59,10 @@ lemma mapM_bind_map_eq {m : Type → Type} {α β γ δ : Type} {n : ℕ}
     (post₁ : Vector γ n → m δ) (post₂ : Vector β n → m δ)
     (hpost : ∀ opts, post₁ (opts.map g) = post₂ opts) :
     (v.mapM f₁ >>= post₁) = (v.mapM f₂ >>= post₂) := by
-  have hf' : f₁ = fun a => g <$> f₂ a := by
-    funext a
-    exact hf a
-  rw [hf']
-  rw [Vector.mapM_map_postcomp]
+  have hf' : f₁ = fun a ↦ g <$> f₂ a := funext hf
+  rw [hf', Vector.mapM_map_postcomp]
   simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp, pure_bind]
-  apply bind_congr
-  intro opts
-  exact hpost opts
+  exact bind_congr hpost
 
 /-- For a `Vector` of `Option` values, if `mapM id` yields `some w`, then each entry is
 `some` of the corresponding entry in `w`. -/
@@ -84,8 +78,8 @@ lemma mapM_id_some_index
       subst hw
       have hdecomp : v0.mapM id = some w0 ∧ a = some b := by
         have hpush : (v0.push a).mapM id =
-            (v0.mapM id >>= (fun x => a.map (fun last => x.push last))) := by
-          have hsingle : (#v[a]).mapM id = a.map (fun last => #v[last]) := by
+            (v0.mapM id >>= (fun x ↦ a.map (fun last ↦ x.push last))) := by
+          have hsingle : (#v[a]).mapM id = a.map (fun last ↦ #v[last]) := by
             apply Vector.map_toArray_inj.mp
             cases a <;> simp
           rw [← Vector.append_singleton, Vector.mapM_append, hsingle]

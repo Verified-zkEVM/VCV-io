@@ -496,7 +496,7 @@ unfolding nested protocol definitions differs syntactically from the canonical `
 lemma mem_support_bind_peel (mx : OracleComp spec α) (f : α → OracleComp spec β) {y : β}
     (hy : y ∈ support (mx >>= f)) :
     ∃ a, a ∈ support mx ∧ y ∈ support (f a) := by
-  rw [mem_support_bind_iff] at hy; exact hy
+  rwa [mem_support_bind_iff] at hy
 
 /-- `obtain`-friendly `pure` support resolver at the bare `OracleComp` level: `y ∈ support (pure
 a)` forces `y = a`, matched by definitional unification (so it engages on the
@@ -551,9 +551,7 @@ lemma mem_support_run_lift_bind
     (oa : OracleComp spec α) (f : α → OptionT (OracleComp spec) β) {y : Option β}
     (hy : y ∈ support ((OptionT.lift oa >>= f : OptionT (OracleComp spec) β).run)) :
     ∃ a, a ∈ support oa ∧ y ∈ support ((f a).run) := by
-  rw [OptionT.run_bind, OptionT.run_lift, Option.elimM, bind_pure_comp, bind_map_left,
+  rwa [OptionT.run_bind, OptionT.run_lift, Option.elimM, bind_pure_comp, bind_map_left,
     mem_support_bind_iff] at hy
-  obtain ⟨a, ha, hy⟩ := hy
-  exact ⟨a, ha, hy⟩
 
 end OptionT

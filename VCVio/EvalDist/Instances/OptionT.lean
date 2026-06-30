@@ -76,15 +76,13 @@ lemma support_lift (mx : m α) :
 support of `OptionT.mk (sample >>= body)` factors through a sample `a` in the support of
 `sample`, with the element in the support of `OptionT.mk (body a)`. -/
 lemma mem_support_bind_mk (sample : m α) (body : α → m (Option β)) {x : β}
-    (hx : x ∈ support (OptionT.mk (do
-      let a ← sample
-      body a))) :
+    (hx : x ∈ support (OptionT.mk (sample >>= body))) :
     ∃ a, a ∈ support sample ∧ x ∈ support (OptionT.mk (body a)) := by
   rw [OptionT.mem_support_iff] at hx
   simp only [OptionT.run_mk] at hx
   rw [mem_support_bind_iff] at hx
-  obtain ⟨a, _, hx⟩ := hx
-  exact ⟨a, ‹a ∈ support sample›, by simpa [OptionT.mem_support_iff] using hx⟩
+  obtain ⟨a, ha, hx⟩ := hx
+  exact ⟨a, ha, by simpa [OptionT.mem_support_iff] using hx⟩
 
 end EvalSet
 

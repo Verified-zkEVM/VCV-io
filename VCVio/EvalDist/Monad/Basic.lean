@@ -129,7 +129,7 @@ lemma mem_support_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] (mx : m
 /-- `obtain`-friendly forward direction of `mem_support_bind_iff`: peel an element of the
 support of a bind into a witness for the first computation and membership for the second. -/
 lemma support_bind_exists [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
-    (x : m α) (f : α → m β) {y : β}
+    {x : m α} {f : α → m β} {y : β}
     (hy : y ∈ support (x >>= f)) : ∃ a, a ∈ support x ∧ y ∈ support (f a) := by
   simpa [mem_support_bind_iff] using hy
 

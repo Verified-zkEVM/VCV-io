@@ -359,15 +359,14 @@ lemma Vector.support_mapM_index
       subst hxs
       subst hv0
       have hpush : (xs0.push x).mapM f =
-          (xs0.mapM f >>= (fun ys => f x >>= fun last => pure (ys.push last))) := by
-        have hsingle : (#v[x]).mapM f = (fun last => #v[last]) <$> f x := by
+          (xs0.mapM f >>= (fun ys ↦ f x >>= fun last ↦ pure (ys.push last))) := by
+        have hsingle : (#v[x]).mapM f = (fun last ↦ #v[last]) <$> f x := by
           apply Vector.map_toArray_inj.mp
           simp
         rw [← Vector.append_singleton, Vector.mapM_append, hsingle]
         simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp, pure_bind]
         rfl
-      rw [hpush] at hv
-      rw [mem_support_bind_iff] at hv
+      rw [hpush, mem_support_bind_iff] at hv
       obtain ⟨ys, hys, hv⟩ := hv
       rw [mem_support_bind_iff] at hv
       obtain ⟨last, hlast, hpush_eq⟩ := hv
@@ -375,8 +374,7 @@ lemma Vector.support_mapM_index
       have hparts := Vector.push_eq_push.mp hpush_eq.symm
       by_cases hi : (i : ℕ) < L
       · change (v0.push y)[(i : ℕ)] ∈ support (f ((xs0.push x)[(i : ℕ)]))
-        rw [Vector.getElem_push_lt hi, Vector.getElem_push_lt hi]
-        rw [← hparts.2]
+        rw [Vector.getElem_push_lt hi, Vector.getElem_push_lt hi, ← hparts.2]
         exact ih xs0 hys ⟨i, hi⟩
       · have hilast : (i : ℕ) = L := by omega
         have hi_eq : i = ⟨L, Nat.lt_succ_self L⟩ := Fin.ext hilast

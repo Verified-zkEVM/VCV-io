@@ -330,7 +330,7 @@ lemma StateT.run'_simulateQ_bind_map_eq_of_body
     (simulateQ impl (oa >>= body₁)).run' s =
       f <$> (simulateQ impl (oa >>= body₂)).run' s := by
   rw [← StateT.run'_map']
-  exact congrArg (fun mx : StateT σ n β => mx.run' s)
+  exact congrArg (fun mx : StateT σ n β ↦ mx.run' s)
     (simulateQ_bind_map_eq_of_body impl oa body₁ body₂ f hBody)
 
 /-- If all outputs of the original `OracleComp` are successful (`some`) and satisfy `P`, then
@@ -346,13 +346,9 @@ lemma OptionT.probEvent_eq_one_of_simulateQ_support
   letI := Classical.decPred P
   rw [probEvent_eq_one_iff]
   constructor
-  · rw [OptionT.probFailure_eq, OptionT.run_mk]
-    have hfail : Pr[⊥ | (simulateQ impl oa).run' s₀] = 0 :=
-      probFailure_eq_zero
-    rw [hfail, _root_.zero_add]
-    exact probOutput_eq_zero_of_not_mem_support fun hnone =>
-      let hnone' := support_simulateQ_run'_subset impl oa s₀ hnone
-      let ⟨_, hsome, _⟩ := h none hnone'
+  · rw [OptionT.probFailure_eq, OptionT.run_mk, probFailure_eq_zero, _root_.zero_add]
+    exact probOutput_eq_zero_of_not_mem_support fun hnone ↦
+      let ⟨_, hsome, _⟩ := h none (support_simulateQ_run'_subset impl oa s₀ hnone)
       by cases hsome
   · intro x hx
     rw [OptionT.mem_support_iff] at hx
@@ -375,17 +371,14 @@ lemma OptionT.probEvent_eq_one_of_simulateQ_support_bind
   letI := Classical.decPred P
   rw [probEvent_eq_one_iff]
   refine ⟨?_, ?_⟩
-  · -- The simulated computation never fails: for every sampled state `s`, the run' has no `none`
-    -- in its support (it is bounded by `support oa`, which contains no `none` by `h`).
-    rw [OptionT.probFailure_eq, OptionT.run_mk, add_eq_zero]
+  · rw [OptionT.probFailure_eq, OptionT.run_mk, add_eq_zero]
     refine ⟨probFailure_eq_zero, ?_⟩
-    refine probOutput_eq_zero_of_not_mem_support fun hnone => ?_
+    refine probOutput_eq_zero_of_not_mem_support fun hnone ↦ ?_
     rw [mem_support_bind_iff] at hnone
     obtain ⟨s, _, hnone⟩ := hnone
     obtain ⟨_, hsome, _⟩ := h none (support_simulateQ_run'_subset impl oa s hnone)
     cases hsome
-  · -- Every successful output satisfies `P`: peel the `init` bind, then bound the support.
-    intro x hx
+  · intro x hx
     rw [OptionT.mem_support_iff, OptionT.run_mk, mem_support_bind_iff] at hx
     obtain ⟨s, _, hx⟩ := hx
     obtain ⟨a, ha, hP⟩ := h (some x) (support_simulateQ_run'_subset impl oa s hx)

@@ -164,7 +164,7 @@ lemma simulateQ_optionT_list_forIn (xs : List α) (init : β)
       exact simulateQ_pure impl (some init)
   | cons x rest ih =>
       rw [List.forIn_cons, List.forIn_cons, simulateQ_optionT_bind]
-      refine bind_congr fun step => ?_
+      refine bind_congr fun step ↦ ?_
       cases step with
       | done b =>
           change simulateQ impl ((pure b : OptionT (OracleComp spec) β) :
@@ -187,7 +187,9 @@ lemma simulateQ_optionT_forIn_yield_pure_some (xs : List α) (init : β)
       = (pure (some init) : n (Option β)) := by
   rw [simulateQ_optionT_list_forIn]
   induction xs with
-  | nil => rw [List.forIn_nil]; rfl
+  | nil =>
+      rw [List.forIn_nil]
+      rfl
   | cons x rest ih =>
       rw [List.forIn_cons]
       change ((simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
@@ -195,8 +197,7 @@ lemma simulateQ_optionT_forIn_yield_pure_some (xs : List α) (init : β)
           OptionT n β) = _
       rw [show (simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
           OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β))
-          = (pure (ForInStep.yield init) : OptionT n (ForInStep β)) from hbody x]
-      rw [pure_bind]
+          = (pure (ForInStep.yield init) : OptionT n (ForInStep β)) from hbody x, pure_bind]
       exact ih
 
 omit [LawfulMonad n] in
@@ -238,18 +239,18 @@ lemma simulateQ_optionT_forIn_yield_pure_none (xs : List α) (init : β)
             OptionT n β) = _
         rw [show (simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
             OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β))
-            = (pure (ForInStep.yield init) : OptionT n (ForInStep β)) from by
-          rw [hbody x, if_pos hx]; rfl]
-        rw [pure_bind]
+            = (pure (ForInStep.yield init) : OptionT n (ForInStep β)) by
+          rw [hbody x, if_pos hx]
+          rfl, pure_bind]
         exact ih (fun hall ↦ hfail (List.forall_mem_cons.mpr ⟨hx, hall⟩))
       · change ((simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
             OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β)) >>= _ :
             OptionT n β) = _
         rw [show (simulateQ impl ((body x init : OptionT (OracleComp spec) (ForInStep β)) :
             OracleComp spec (Option (ForInStep β))) : OptionT n (ForInStep β))
-            = (failure : OptionT n (ForInStep β)) from by
-          rw [hbody x, if_neg hx]; rfl]
-        rw [failure_bind]
+            = (failure : OptionT n (ForInStep β)) by
+          rw [hbody x, if_neg hx]
+          rfl, failure_bind]
         rfl
 
 @[deprecated (since := "2026-06-25")]

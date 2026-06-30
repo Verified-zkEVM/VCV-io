@@ -170,10 +170,10 @@ lemma support_ofFn_mapM_index
     {ι α : Type} {spec : OracleSpec ι} {L : ℕ}
     (f : Fin L → OracleComp spec α)
     {v : Vector α L}
-    (hv : v ∈ support ((Vector.ofFn (fun i : Fin L => i)).mapM f))
+    (hv : v ∈ support ((Vector.ofFn (id : Fin L → Fin L)).mapM f))
     (i : Fin L) : v[i] ∈ support (f i) := by
   simpa using
-    Vector.support_mapM_index (Vector.ofFn (fun i : Fin L => i)) f hv i
+    Vector.support_mapM_index (Vector.ofFn (id : Fin L → Fin L)) f hv i
 
 end VectorMapM
 
