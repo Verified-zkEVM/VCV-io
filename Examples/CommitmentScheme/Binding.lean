@@ -341,7 +341,7 @@ theorem binding_bound [Finite M] [Finite S] [Fintype C]
         (Fintype.card C : ℝ≥0∞)⁻¹ := by
         gcongr
         exact probEvent_cacheCollision_le_birthday_total_tight A.run t A.queryBound
-          Fintype.card_pos (fun _ => le_refl _)
+          (fun _ => le_refl _)
     _ = ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
         simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
           add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
@@ -378,4 +378,4 @@ theorem binding_bound_via_cr_chain [Fintype C] [Inhabited M] [Inhabited S] [Inha
     _ ≤ (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) :=
         probEvent_cacheCollision_le_birthday_total_tight
           (spec := CMOracle M S C) (bindingInner A) (t + 2)
-          (bindingInner_totalBound A) Fintype.card_pos (fun _ => le_refl _)
+          (bindingInner_totalBound A) (fun _ => le_refl _)

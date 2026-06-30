@@ -298,13 +298,12 @@ theorem probEvent_collision_win_le {α : Type} {t : ℕ}
     (oa : OracleComp spec α)
     (win : α × QueryCache spec → Prop)
     (hbound : IsPerIndexQueryBound oa (fun _ => t))
-    (hC : 0 < Fintype.card (spec.Range default))
     (hrange : ∀ t, Fintype.card (spec.Range default) ≤ Fintype.card (spec.Range t))
     (hwin : ∀ z ∈ support ((simulateQ cachingOracle oa).run ∅),
       win z → CacheHasCollision z.2) :
     Pr[win | (simulateQ cachingOracle oa).run ∅] ≤
       (t ^ 2 : ℝ≥0∞) / (2 * Fintype.card (spec.Range default)) :=
-  (probEvent_mono hwin).trans (probEvent_cacheCollision_le_birthday' oa hbound hC hrange)
+  (probEvent_mono hwin).trans (probEvent_cacheCollision_le_birthday' oa hbound hrange)
 
 /-! ## `HasUnpredictableSample` -/
 
