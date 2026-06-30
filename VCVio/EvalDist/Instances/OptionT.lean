@@ -72,6 +72,18 @@ lemma support_liftM (mx : m α) :
 lemma support_lift (mx : m α) :
     support (OptionT.lift mx) = support mx := by grind
 
+/-- Peel the leading sample off the support of an `OptionT.mk`'d bind: any element of the
+support of `OptionT.mk (sample >>= body)` factors through a sample `a` in the support of
+`sample`, with the element in the support of `OptionT.mk (body a)`. -/
+lemma mem_support_bind_mk (sample : m α) (body : α → m (Option β)) {x : β}
+    (hx : x ∈ support (OptionT.mk (sample >>= body))) :
+    ∃ a, a ∈ support sample ∧ x ∈ support (OptionT.mk (body a)) := by
+  rw [OptionT.mem_support_iff] at hx
+  simp only [OptionT.run_mk] at hx
+  rw [mem_support_bind_iff] at hx
+  obtain ⟨a, ha, hx⟩ := hx
+  exact ⟨a, ha, by simpa [OptionT.mem_support_iff] using hx⟩
+
 end EvalSet
 
 section HasEvalFinset
@@ -209,6 +221,17 @@ lemma probFailure_liftM [LawfulMonad m] (mx : m α) :
 lemma probFailure_lift [LawfulMonad m] (mx : m α) :
     Pr[⊥ | OptionT.lift mx] = Pr[⊥ | mx] :=
   probFailure_liftM mx
+
+/-- Bridge lemma: when two `OptionT` computations have underlying `run`s related by an
+`Option.map` of a function `f`, their probabilities for the events `P` and `P ∘ f` agree. -/
+lemma probEvent_eq_of_run_map_eq [LawfulMonad m]
+    (mx : OptionT m α) (my : OptionT m β) (f : β → α) (P : α → Prop)
+    (h : mx.run = (Option.map f) <$> my.run) :
+    Pr[P | mx] = Pr[P ∘ f | my] := by
+  have hmx : mx = f <$> my := by
+    change mx.run = (f <$> my).run
+    rw [OptionT.run_map]; exact h
+  rw [hmx, probEvent_map]
 
 end EvalSPMF
 

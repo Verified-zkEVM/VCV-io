@@ -28,6 +28,7 @@ import ToMathlib.Data.Heap
 import ToMathlib.Data.IndexedBinaryTree.Basic
 import ToMathlib.Data.IndexedBinaryTree.Equiv
 import ToMathlib.Data.IndexedBinaryTree.Lemmas
+import ToMathlib.Data.Vector
 import ToMathlib.General
 import ToMathlib.OrderEnrichedCategory
 import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence
