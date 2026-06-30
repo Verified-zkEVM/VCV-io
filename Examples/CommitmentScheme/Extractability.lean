@@ -534,7 +534,7 @@ private lemma extractability_win_le_textbook_bound [Inhabited M] [Inhabited S]
         (by
           simpa using
             (probEvent_cacheCollision_le_birthday_total_tight commitPart A.t₁
-              hcommit_bound Fintype.card_pos (fun _ => le_refl _)))
+              hcommit_bound (fun _ => le_refl _)))
         (by
           rintro ⟨⟨⟨cm, aux⟩, tr⟩, cache₁⟩ hx hno
           simpa [restPart, extractabilityRestOa] using

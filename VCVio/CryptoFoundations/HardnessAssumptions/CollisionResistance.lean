@@ -268,15 +268,16 @@ private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y] [Finite
     cachingOracle_query_caches x' cache₂ y' cache₃ hmem₃, heq_of_eq hyy⟩
 
 /-- **ROM Collision Resistance birthday bound**: for any `t`-query ROM-CR
-adversary `A` over a hash range of cardinality `|Y| > 0`, the advantage is
-bounded by `(t+2) * (t+1) / (2 * |Y|)`. The two extra queries account for the
-experiment's verification queries, which share the adversary's cache. -/
+adversary `A` over a hash range `Y`, the advantage is bounded by
+`(t+2) * (t+1) / (2 * |Y|)` (a vacuous bound when `|Y| = 0`). The two extra
+queries account for the experiment's verification queries, which share the
+adversary's cache. -/
 theorem romCRAdvantage_le_birthday [DecidableEq X] [DecidableEq Y] [Fintype Y] [Inhabited X]
-    [Inhabited Y] {t : ℕ} (hY : 0 < Fintype.card Y) (A : BoundedROMCRAdversary X Y t) :
+    [Inhabited Y] {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     romCRAdvantage A ≤ (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card Y) := by
   simp only [romCRAdvantage, romCRExp_eq]
   exact (probEvent_mono (romCRWin_implies_collision A)).trans <|
     probEvent_cacheCollision_le_birthday_total_tight (spec := ROMHashSpec.cached X Y)
-      (romCRInner A) (t + 2) (romCRInner_totalBound A) hY fun _ => le_rfl
+      (romCRInner A) (t + 2) (romCRInner_totalBound A) fun _ => le_rfl
 
 end CollisionResistance
