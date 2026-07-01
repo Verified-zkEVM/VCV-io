@@ -99,6 +99,7 @@ import VCVio.Interaction.UC.StdDoBridge
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Coinductive.Bridge
+import VCVio.OracleComp.Coinductive.DynSystem
 import VCVio.OracleComp.Constructions.BitVec
 import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Constructions.Replicate
@@ -136,6 +137,7 @@ import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.QueryTracking.SubSpec
+import VCVio.OracleComp.QueryTracking.Trace
 import VCVio.OracleComp.QueryTracking.Tracing
 import VCVio.OracleComp.QueryTracking.Unpredictability
 import VCVio.OracleComp.QueryTracking.WriterCost
