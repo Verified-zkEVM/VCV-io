@@ -1006,6 +1006,15 @@ def concreteEncoding (params : Params) : Encoding params where
   byteEncode1 := byteEncode1Msg
   byteDecode1 := byteDecode1Msg
 
+/-- Coefficients produced by the concrete ML-KEM message decoder `byteDecode1` are bit coefficients,
+    represented by values below `2`. -/
+theorem byteDecode1_get_val_lt_two
+    (params : Params) (m : Message) (i : Fin ringDegree) :
+    (((concreteEncoding params).byteDecode1 m).get i : Coeff).val < 2 := by
+  change ((byteDecode1Msg m).get i : Coeff).val < 2
+  rw [byteDecode1Msg_val]
+  exact bytesToBits_getD_lt_two (ByteArray.mk m.toArray) i.val
+
 /-- Proof bundle showing that the concrete ML-KEM encoding satisfies the abstract encoding laws
 under the standard bit-width side conditions. -/
 theorem concreteEncodingLaws (params : Params)
