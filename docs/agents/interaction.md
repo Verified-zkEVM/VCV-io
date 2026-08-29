@@ -22,6 +22,7 @@ VCVio retains the computational and runtime interpretation of PolyFun's generic 
 | File | Purpose |
 |------|---------|
 | `VCVio/Interaction/UC/Computational.lean` | Computational observation layer for UC-style emulation using subprobability measures and total variation distance. |
+| `VCVio/Interaction/UC/ProportionalScheduler.lean` | Mass-aware `ProbComp` scheduler whose output distribution is invariant under swap and reassociation. |
 | `VCVio/Interaction/UC/Runtime.lean` | Synchronous runtime semantics for closed open processes, including `processSemantics`, `processSemanticsProbComp`, and `processSemanticsOracle`. |
 | `VCVio/Interaction/UC/AsyncRuntime.lean` | Asynchronous runtime semantics with process ticks and environment events. |
 | `VCVio/Interaction/UC/AsyncSecurity.lean` | Fair-PPT security wrappers for asynchronous env-open executions. |
@@ -44,6 +45,13 @@ PolyFun separates the shape of an interaction from the effects that choose its m
 those samplers and then observing the resulting state in a probabilistic semantics. Use PolyFun's
 `OpenStep.boundaryTrace` when you need to read the emitted output packets from a completed open-step
 path; routing and probabilistic interpretation remain VCVio runtime concerns.
+
+For composition whose scheduler must be insensitive to binary-tree
+parenthesization, use `ProportionalScheduler.theory Party`. Each atomic
+component starts with one positive scheduler slot, composition adds slot
+masses, and a binary scheduler node chooses a subtree in proportion to its
+mass. `ProportionalScheduler.isCoherent` proves that the resulting output
+distribution is unchanged by swapping or reassociating component frontiers.
 
 Use the synchronous entry points in `VCVio/Interaction/UC/Runtime.lean`:
 
@@ -113,6 +121,7 @@ import PolyFun.Interaction.UC.OpenProcessModel
 
 -- VCV-specific runtime and security interpretation
 import VCVio.Interaction.UC.Runtime
+import VCVio.Interaction.UC.ProportionalScheduler
 import VCVio.Interaction.UC.AsyncRuntime
 import VCVio.Interaction.UC.Computational
 import VCVio.Interaction.UC.Standard
