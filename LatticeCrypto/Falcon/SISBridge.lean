@@ -30,8 +30,11 @@ from the coefficientwise bound `(a − b)² ≤ 2·a² + 2·b²` on centered rep
   advantage transfer. `ntruSISProblemKeyed` differs from `ntruSISProblem` only in the
   challenge distribution (honest NTRU keys versus a uniform ring element); closing that gap
   is exactly a decisional-NTRU assumption and is not formalized here.
-- `euf_cma_security_ntruSIS`: the EUF-CMA bound of `euf_cma_security` restated with the
-  collision term replaced by the keyed NTRU-SIS advantage.
+- `euf_cma_collision_security_ntruSIS`: the attempt-level, collision-only EUF-CMA bound of
+  `euf_cma_collision_security` restated with the collision term replaced by the keyed NTRU-SIS
+  advantage.
+- `euf_cma_security_oneShot_ntruSIS`: the one-shot bound of `euf_cma_security_oneShot`
+  restated the same way.
 -/
 
 @[expose] public section
@@ -234,11 +237,11 @@ theorem advantage_le_ntruSISProblemKeyed
 /-! ## The EUF-CMA bound in NTRU-SIS terms -/
 
 /-- **EUF-CMA security of Falcon down to keyed NTRU-SIS.** The bound of
-`euf_cma_security`, with the collision term translated through
+`euf_cma_security_oneShot`, with the collision term translated through
 `advantage_le_ntruSISProblemKeyed` into the advantage against the kernel-vector NTRU-SIS
 problem at the honest key distribution. Hypotheses are exactly those of
-`euf_cma_security`. -/
-theorem euf_cma_security_ntruSIS
+`euf_cma_security_oneShot`. -/
+theorem euf_cma_security_oneShot_ntruSIS
     (Salt : Type) [DecidableEq Salt] [SampleableType Salt] [Fintype Salt] [Nonempty Salt]
     [Inhabited (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
@@ -283,8 +286,8 @@ theorem euf_cma_security_ntruSIS
             idealPSF hr exactMatchReduction +
         GPVHashAndSign.collisionBound Salt qSign qHash +
         samplerLoss := by
-  obtain ⟨cRed, eRed, hbound⟩ := euf_cma_security p prims Salt hr qSign qHash samplerLoss adv
-    idealPSF hEval hShort hCorrect hReg hNeverFail hTransport
+  obtain ⟨cRed, eRed, hbound⟩ := euf_cma_security_oneShot p prims Salt hr qSign qHash samplerLoss
+    adv idealPSF hEval hShort hCorrect hReg hNeverFail hTransport
   refine ⟨collisionToKernelAdv p prims hr cRed, eRed, le_trans hbound ?_⟩
   gcongr
   exact advantage_le_ntruSISProblemKeyed p prims hr cRed
@@ -299,7 +302,7 @@ per-attempt rejection probability `pRej` (`Falcon.attemptRejectBound`), the atte
   `                 + collisionBound Salt qSign (qHash + 1)`
   `                 + qSign · (ε_step / (1 - pRej) + pRej ^ maxAttempts)`
 
-This is `Falcon.euf_cma_collision_security_of_attemptTransport` with its one remaining
+This is `Falcon.euf_cma_collision_security` with its one remaining
 cryptographic residual — the Falcon-PSF collision problem — translated through
 `advantage_le_ntruSISProblemKeyed` into a kernel-vector lattice problem.  The four terms are
 the lattice assumption, the min-entropy branch at the multi-target factor, the salt birthday
@@ -309,7 +312,7 @@ attempt-budget exhaustion mass.
 The challenge of `ntruSISProblemKeyed` is drawn from Falcon's honest key distribution `hr.gen`
 rather than uniformly over `Rq p.n`; closing that gap to the uniform-challenge
 `ntruSISProblem` is exactly a decisional-NTRU assumption and is not formalized here. -/
-theorem euf_cma_collision_security_ntruSIS_of_attemptTransport
+theorem euf_cma_collision_security_ntruSIS
     (Salt : Type) [DecidableEq Salt] [SampleableType Salt] [Fintype Salt] [Nonempty Salt]
     [Inhabited (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
@@ -352,7 +355,7 @@ theorem euf_cma_collision_security_ntruSIS_of_attemptTransport
         GPVHashAndSign.collisionBound Salt qSign (qHash + 1) +
         ENNReal.ofReal (qSign * (ε_step / (1 - pRej) + pRej ^ maxAttempts)) := by
   obtain ⟨cRed, hbound⟩ :=
-    euf_cma_collision_security_of_attemptTransport p prims Salt hr qSign qHash maxAttempts
+    euf_cma_collision_security p prims Salt hr qSign qHash maxAttempts
       ε_step pRej hε hRej0 hRej1 εpp adv idealAttempt idealPSF hEval hShort hCorrect hReg
       hNeverFail hAttempt hRej hRes hQ hGuess
   refine ⟨collisionToKernelAdv p prims hr cRed, le_trans hbound ?_⟩

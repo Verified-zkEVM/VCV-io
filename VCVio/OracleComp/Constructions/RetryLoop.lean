@@ -6,6 +6,7 @@ Authors: Oleksandr Vovkotrub
 
 module
 public import VCVio.OracleComp.ProbComp
+public import VCVio.OracleComp.Constructions.SampleableType
 public import VCVio.EvalDist.TVDist
 
 /-! # First-Success Retry Loops and their Total-Variation Theory
@@ -230,5 +231,81 @@ theorem tvDist_retryToDefault_le_pow [Inhabited α]
           rw [add_zero]
           exact mul_le_mul hq ih (tvDist_nonneg _ _) hq0
       _ = q ^ (n + 1) := by ring
+
+/-! ## Uniform rejection sampling -/
+
+/-- **Uniform rejection sampling resamples to the accept-conditional.** Drawing `δ` uniformly
+from a finite type and accepting `F δ` exactly when `P δ` resamples to the uniform draw over the
+accepting `δ`, mapped through `F`: replacing a rejection by a fresh draw from that conditional
+reproduces the conditional. -/
+theorem ResamplesTo.uniform_filter {D : Type} [Fintype D] [SampleableType D]
+    (P : D → Prop) [DecidablePred P] [Nonempty {δ : D // P δ}] (F : D → α) :
+    ResamplesTo ((fun δ => if P δ then some (F δ) else none) <$> ($ᵗ D))
+      ((fun δ : {δ // P δ} => F δ.1) <$>
+        (@uniformSample {δ // P δ} (SampleableType.ofFintype _))) := by
+  have _ : DecidableEq α := Classical.decEq α
+  let _ : SampleableType {δ : D // P δ} := SampleableType.ofFintype _
+  set cond : ProbComp α := (fun δ : {δ : D // P δ} => F δ.1) <$> ($ᵗ {δ : D // P δ}) with hcond
+  unfold ResamplesTo
+  -- Replacing a rejection by a draw from `cond` is: draw `δ`, return `F δ` if accepted, else
+  -- draw from `cond`.
+  have hbind : ((fun δ => if P δ then some (F δ) else none) <$> ($ᵗ D) >>= fun o =>
+      match o with
+      | some v => (pure v : ProbComp α)
+      | none => cond) =
+      ($ᵗ D >>= fun δ => if P δ then pure (F δ) else cond) := by
+    simp only [map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def]
+    refine bind_congr fun δ => ?_
+    split_ifs <;> rfl
+  rw [hbind]
+  refine evalSPMF_ext fun x => ?_
+  -- The counts: `N` box points, `K` accepted, `M` accepted with image `x`.
+  set N : ℕ := Fintype.card D with hN
+  set K : ℕ := Fintype.card {δ : D // P δ} with hK
+  set M : ℕ := Fintype.card {δ : D // P δ ∧ F δ = x} with hM
+  have hK0 : 0 < K := Fintype.card_pos
+  have hKN : K ≤ N := Fintype.card_subtype_le _
+  -- The conditional puts mass `M / K` on `x`.
+  have hp : Pr[= x | cond] = (M : ℝ≥0∞) / K := by
+    rw [hcond, probOutput_map, probEvent_uniformSample, ← Fintype.card_subtype, hM, hK]
+    congr 2
+    exact Fintype.card_congr (Equiv.subtypeSubtypeEquivSubtypeInter P fun δ => F δ = x)
+  -- The resampled attempt puts mass `(M + (N − K) · M / K) / N` on `x`.
+  rw [probOutput_bind_eq_sum_fintype]
+  simp only [probOutput_uniformSample]
+  have hterm : ∀ δ : D, Pr[= x | (if P δ then pure (F δ) else cond : ProbComp α)] =
+      (if P δ ∧ F δ = x then 1 else 0) + (if P δ then 0 else (M : ℝ≥0∞) / K) := by
+    intro δ
+    by_cases hδ : P δ
+    · simp [hδ, probOutput_pure, eq_comm]
+    · simp [hδ, hp]
+  simp only [hterm, mul_add, Finset.sum_add_distrib, ← Finset.mul_sum]
+  rw [Finset.sum_boole, Finset.sum_ite, Finset.sum_const_zero, zero_add, Finset.sum_const,
+    nsmul_eq_mul]
+  have hMcard : ((Finset.univ.filter fun δ : D => P δ ∧ F δ = x).card : ℝ≥0∞) = M := by
+    rw [hM, Fintype.card_subtype]
+  have hNKcard : ((Finset.univ.filter fun δ : D => ¬P δ).card : ℝ≥0∞) = (N : ℝ≥0∞) - K := by
+    rw [← Fintype.card_subtype, Fintype.card_subtype_compl, ← hK, ← hN]
+    exact ENNReal.natCast_sub N K
+  rw [hMcard, hNKcard, ← hN, hp]
+  -- The identity `N⁻¹ · (M + (N − K) · M / K) = M / K`, in the reals.
+  have hN0 : (N : ℝ≥0∞) ≠ 0 := by exact_mod_cast (lt_of_lt_of_le hK0 hKN).ne'
+  have hK0' : (K : ℝ≥0∞) ≠ 0 := by exact_mod_cast hK0.ne'
+  have hMK : ((M : ℝ≥0∞) / K) ≠ ⊤ := ENNReal.div_ne_top (by simp) hK0'
+  have hprod : ((N : ℝ≥0∞) - K) * ((M : ℝ≥0∞) / K) ≠ ⊤ :=
+    ENNReal.mul_ne_top (ENNReal.sub_ne_top (by simp)) hMK
+  have h1 : (N : ℝ≥0∞)⁻¹ * M ≠ ⊤ :=
+    ENNReal.mul_ne_top (ENNReal.inv_ne_top.mpr hN0) (ENNReal.natCast_ne_top M)
+  have h2 : (N : ℝ≥0∞)⁻¹ * (((N : ℝ≥0∞) - K) * ((M : ℝ≥0∞) / K)) ≠ ⊤ :=
+    ENNReal.mul_ne_top (ENNReal.inv_ne_top.mpr hN0) hprod
+  refine (ENNReal.toReal_eq_toReal_iff' (ENNReal.add_ne_top.mpr ⟨h1, h2⟩) hMK).mp ?_
+  rw [ENNReal.toReal_add h1 h2, ENNReal.toReal_mul, ENNReal.toReal_mul, ENNReal.toReal_mul,
+    ENNReal.toReal_inv, ENNReal.toReal_div,
+    ENNReal.toReal_sub_of_le (by exact_mod_cast hKN) (ENNReal.natCast_ne_top N)]
+  simp only [ENNReal.toReal_natCast]
+  have hK' : (0 : ℝ) < K := by exact_mod_cast hK0
+  have hN' : (0 : ℝ) < N := lt_of_lt_of_le hK' (by exact_mod_cast hKN)
+  field_simp
+  ring
 
 end ProbComp
