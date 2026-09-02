@@ -406,6 +406,9 @@ lean_exe slhdsa_hypertree_tests where
 lean_exe slhdsa_external_tests where
   root := `HashSigTest.SLHDSA.External
 
+lean_exe slhdsa_target_ledger_tests where
+  root := `HashSigTest.SLHDSA.ReachableTargets
+
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
 TCB-isolation gate: that gate bounds imports, this one accounts for the axioms every

@@ -337,6 +337,8 @@ jobs:
         run: lake exe slhdsa_hypertree_tests
       - name: Run SLH-DSA external-interface tests
         run: lake exe slhdsa_external_tests
+      - name: Run SLH-DSA reachable-target ledger tests
+        run: lake exe slhdsa_target_ledger_tests
       # - name: Run ML-KEM tests
       #   run: |
       #     .lake/build/bin/mlkem_test

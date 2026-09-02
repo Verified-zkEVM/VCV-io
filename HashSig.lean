@@ -41,6 +41,8 @@ public import HashSig.SLHDSA.Primitives
 public import HashSig.SLHDSA.RandomOracle
 public import HashSig.SLHDSA.Scheme
 public import HashSig.SLHDSA.Security
+public import HashSig.SLHDSA.Security.ReachableTargets
+public import HashSig.SLHDSA.Security.TargetCounts
 public import HashSig.SLHDSA.Wots
 public import HashSig.SLHDSA.WotsChecksum
 public import HashSig.SLHDSA.WotsEncoding
