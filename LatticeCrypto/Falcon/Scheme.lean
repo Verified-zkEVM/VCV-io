@@ -14,9 +14,11 @@ public import VCVio.OracleComp.Coercions.Add
 /-!
 # Falcon Signature Scheme
 
-This file defines the core Falcon signature scheme algorithms: key generation, signing,
-and verification. It also establishes the bridge to the generic GPV hash-and-sign framework
-via a `PreimageSampleableFunction` instantiation.
+This file defines the core Falcon signature scheme: key types and validity, the one-shot
+signing core (`signAttempt`), and verification (`verify`), together with the bridge to the
+generic GPV hash-and-sign framework via a `PreimageSampleableFunction` instantiation. Key
+generation and the full fresh-salt retry-loop signer are realized in
+`LatticeCrypto.Falcon.Concrete`.
 
 ## Architecture
 
@@ -111,19 +113,6 @@ theorem validKeyPair_eq_true_iff (pk : PublicKey p) (sk : SecretKey p) :
       negacyclicMul (IntPoly.toRq sk.f) pk.h = IntPoly.toRq sk.g := by
   simp [validKeyPair]
 
-/-! ### Core Algorithms -/
-
-/-- Falcon key generation (Algorithms 4–9).
-
-1. Generate short polynomials `(f, g)` via NTRUGen (Algorithm 5).
-2. Compute `(F, G)` satisfying the NTRU equation `fG - gF = q` (Algorithm 6).
-3. Compute `h = g · f⁻¹ mod q`.
-4. Build the Falcon tree via `ffLDL*` and normalize (Algorithms 8–9).
-
-This is modeled as a deterministic function from a seed. The actual NTRUGen uses
-rejection sampling, but that detail is abstracted away. -/
-noncomputable def keyGenFromSeed (_seed : List Byte) : PublicKey p × SecretKey p := sorry
-
 /-! ### GPV Bridge -/
 
 /-- Convert a target `c ∈ R_q` and the secret NTRU basis to an FFT-domain target vector
@@ -203,9 +192,9 @@ the trapdoor sampler (`falconPSF.trapdoorSample`) to produce a candidate short
 preimage `(s₁, s₂)` with `s₁ + s₂ · h = c mod q`. Returns the preimage if the norm
 check `‖(s₁, s₂)‖₂² ≤ ⌊β²⌋` passes, or `none` to signal retry.
 
-This separates the trapdoor-sampling obligation from retry logic: proofs about
-sampling quality target `falconPSF.trapdoorSample`, while the retry loop is handled
-by `sign`. -/
+This isolates the one-shot trapdoor-sampling core (with its norm-check abort) so that
+proofs about sampling quality can target `falconPSF.trapdoorSample` directly, separately
+from the surrounding fresh-salt retry loop. -/
 noncomputable def signAttempt (pk : PublicKey p) (sk : SecretKey p) (c : Rq p.n) :
     ProbComp (Option (Rq p.n × Rq p.n)) := do
   let x ← (falconPSF p prims).trapdoorSample pk sk c
@@ -213,20 +202,6 @@ noncomputable def signAttempt (pk : PublicKey p) (sk : SecretKey p) (c : Rq p.n)
     return some x
   else
     return none
-
-/-- Falcon signing (Falcon+, Algorithm 10).
-
-On each attempt:
-1. Sample a fresh 40-byte salt `r`.
-2. Hash `c = HashToPoint(r, pk, message)` to get the target in `R_q`.
-3. Use the secret key to sample a short preimage `(s₁, s₂)` via `signAttempt`.
-4. If the norm check passes and compression succeeds, return `(r, compress(s₂))`.
-5. Otherwise retry with a new salt.
-
-The fresh-salt-per-retry structure matches the Falcon+ convention and the concrete
-executable signer in `LatticeCrypto.Falcon.Concrete.Sign.concreteSign`. -/
-noncomputable def sign (pk : PublicKey p) (sk : SecretKey p) (msg : List Byte) :
-    ProbComp Signature := sorry
 
 /-- Falcon verification (Algorithm 16).
 

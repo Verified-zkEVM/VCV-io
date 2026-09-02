@@ -197,6 +197,7 @@ public import VCVio.OracleComp.Constructions.BitVec
 public import VCVio.OracleComp.Constructions.Fork
 public import VCVio.OracleComp.Constructions.GenerateSeed
 public import VCVio.OracleComp.Constructions.Replicate
+public import VCVio.OracleComp.Constructions.RetryLoop
 public import VCVio.OracleComp.Constructions.SampleableType
 public import VCVio.OracleComp.Constructions.WithoutReplacement
 public import VCVio.OracleComp.EvalDist
