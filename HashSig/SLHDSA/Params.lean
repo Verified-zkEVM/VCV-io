@@ -118,6 +118,11 @@ def len2 (p : Params) : ℕ := Nat.log p.w (p.len1 * (p.w - 1)) + 1
 /-- Total number of WOTS+ chains `len = len1 + len2`. -/
 def len (p : Params) : ℕ := p.len1 + p.len2
 
+/-- The checksum always contributes at least one WOTS+ chain. -/
+theorem len_pos (p : Params) : 0 < p.len := by
+  unfold Params.len Params.len2
+  omega
+
 /-- Number of leaves in one FORS tree, `t = 2^a`. -/
 def t (p : Params) : ℕ := 2 ^ p.a
 

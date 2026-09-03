@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao, Alexander Hicks
+Authors: Quang Dao
 -/
 
 module
@@ -13,12 +13,13 @@ public import HashSig.SLHDSA.Security.TargetCounts
 # Reachable SLH-DSA target coordinates
 
 This module enumerates the layer-indexed XMSS trees and WOTS+ instances in a validated SLH-DSA
-hypertree and, from them, every structural address at which the construction can evaluate a public
-hash in each `TargetRole`.  The coordinates reuse `LayerPosition`, the owner of the FIPS 205
-tree/leaf bounds, rather than introducing a second reachability model.
+hypertree and, from them, the structural addresses of each `TargetRole`.  The coordinates reuse
+`LayerPosition`, the owner of the FIPS 205 tree/leaf bounds, rather than introducing a second
+reachability model.
 
-For every role the ledger is an executable `List Adrs` whose length is proved equal to the
-formula-derived `targetCount` and which is proved structurally `Nodup`:
+For every role the ledger is an executable `List Adrs`.  Each is proved structurally `Nodup`, each
+is proved complete for its role by a membership lemma, and each length is proved equal to the
+formula-derived `targetCount` except where the table below records a bound:
 
 | Role | Ledger | Length |
 | --- | --- | --- |
@@ -30,6 +31,13 @@ formula-derived `targetCount` and which is proved structurally `Nodup`:
 | `wotsFTcr` | `wotsStepAddresses` | `wotsInstanceCount * len * (w - 1)`, at most `… * w` |
 | `wotsTl` | `wotsPkAddresses` | `wotsInstanceCount` |
 | `xmssH` | `xmssNodeAddresses` | `xmssTreeCount * (2^hp - 1)` |
+
+Length and distinctness alone would also hold of a ledger built on a wrong index convention, so
+each role additionally carries a completeness lemma in the opposite direction: `wotsStepAdrs_mem`,
+`wotsPkAdrs_mem`, `forsLeafAdrs_mem`, `forsNodeAdrs_mem`, `forsPkAdrs_mem`, and `xmssNodeAdrs_mem`
+say that the address of every reachable coordinate in that role is listed, over the node
+coordinates characterized by `mem_perfectInternalCoords`.  Whether the construction's free programs
+query only such addresses is a separate, trace-level statement and is not proved here.
 
 The address lists remain structural `Adrs` values.  A concrete primitive maps them to its
 `AdrsKey` only after proving injectivity on the listed reachable family; no global injectivity of
@@ -276,6 +284,24 @@ theorem perfectInternalCoords_nodup (h : ℕ) :
         simp only at hheight
         omega
 
+/-- Every coordinate of the right shape is listed: a height in `1 … h`, with an index below the
+number of nodes at that height. -/
+theorem mem_perfectInternalCoords {h z idx : ℕ} (hz : 0 < z) (hzh : z ≤ h)
+    (hidx : idx < 2 ^ (h - z)) : (z, idx) ∈ perfectInternalCoords h := by
+  induction h generalizing z with
+  | zero => omega
+  | succ h ih =>
+      rw [perfectInternalCoords, List.mem_append]
+      match z with
+      | 1 =>
+          left
+          simp only [List.mem_map, List.mem_range]
+          exact ⟨idx, by simpa using hidx, rfl⟩
+      | (z + 2) =>
+          right
+          simp only [List.mem_map]
+          exact ⟨(z + 1, idx), ih (by omega) (by omega) (by simpa using hidx), rfl⟩
+
 /-! ## Bottom-layer FORS coordinates -/
 
 /-- A reachable layer-zero position, where an SLH-DSA signature places its FORS instance. -/
@@ -308,6 +334,12 @@ def forsAdrs {vp : ValidatedParams} (pos : BottomPosition vp) : Adrs :=
 theorem forsAdrs_ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.params) :
     (ofDigestParts vp parts).forsAdrs = parts.forsAdrs := by
   rfl
+
+/-- The typed bottom position parsed from a digest is the layer-zero position the hypertree
+scheduler starts from. -/
+@[simp]
+theorem toLayerPosition_ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.params) :
+    (ofDigestParts vp parts).toLayerPosition = LayerPosition.initial vp parts := rfl
 
 @[simp]
 theorem forsAdrs_tree {vp : ValidatedParams} (pos : BottomPosition vp) :
@@ -816,6 +848,16 @@ theorem selectedWotsAddresses_nodup (vp : ValidatedParams)
     exact hadrs
   exact congrArg Prod.fst hpair
 
+/-- Any partial one-step-per-chain selection remains structurally duplicate-free. -/
+theorem optionalWotsAddresses_nodup (vp : ValidatedParams)
+    (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) :
+    (optionalWotsAddresses vp select).Nodup := by
+  apply (allWotsChains_nodup vp).filterMap
+  intro c d a hc hd
+  obtain ⟨sc, hsc, rfl⟩ := Option.map_eq_some_iff.mp hc
+  obtain ⟨sd, hsd, hda⟩ := Option.map_eq_some_iff.mp hd
+  exact congrArg Prod.fst (wotsStepAdrs_injective vp (a₁ := (c, sc)) (a₂ := (d, sd)) hda.symm)
+
 /-- WOTS public-key-compression addresses are structurally duplicate-free. -/
 theorem wotsPkAddresses_nodup (vp : ValidatedParams) :
     (wotsPkAddresses vp).Nodup := by
@@ -845,6 +887,98 @@ theorem wotsPkAddresses_nodup (vp : ValidatedParams) :
       subst dLeaf
       rfl
 
+/-! ## Completeness of the ledgers
+
+A length and a distinctness proof do not by themselves say that a ledger holds the right
+addresses.  These lemmas close that gap in the other direction: every address the construction can
+hash in a role occurs in that role's ledger. -/
+
+@[simp] theorem mem_allXmssTrees (vp : ValidatedParams) (coord : LayerTreeCoord vp) :
+    coord ∈ allXmssTrees vp := by
+  rcases coord with ⟨layer, tree⟩
+  simp [allXmssTrees]
+
+@[simp] theorem mem_allWotsInstances (vp : ValidatedParams) (pos : LayerPosition vp) :
+    pos ∈ allWotsInstances vp := by
+  rcases pos with ⟨layer, tree, leaf⟩
+  simp [allWotsInstances, allXmssTrees]
+
+@[simp] theorem mem_allBottomPositions (vp : ValidatedParams) (pos : BottomPosition vp) :
+    pos ∈ allBottomPositions vp := by
+  rcases pos with ⟨tree, leaf⟩
+  simp [allBottomPositions]
+
+@[simp] theorem mem_allWotsChains (vp : ValidatedParams) (coord : WotsChainCoord vp) :
+    coord ∈ allWotsChains vp := by
+  rcases coord with ⟨pos, chain⟩
+  simp [allWotsChains]
+
+/-- Every reachable WOTS instance has its base address listed. -/
+theorem wotsInstanceAdrs_mem (vp : ValidatedParams) (pos : LayerPosition vp) :
+    wotsInstanceAdrs pos ∈ wotsInstanceAddresses vp := by
+  simp [wotsInstanceAddresses]
+
+/-- Every executed chain step of every reachable WOTS instance is a listed `F` target. -/
+theorem wotsStepAdrs_mem (vp : ValidatedParams) (coord : WotsChainCoord vp)
+    (step : Fin (vp.params.w - 1)) : wotsStepAdrs coord step ∈ wotsStepAddresses vp := by
+  simp only [wotsStepAddresses, List.mem_map]
+  exact ⟨(coord, step), by simp, rfl⟩
+
+/-- Every reachable WOTS public-key compression is a listed `T_len` target. -/
+theorem wotsPkAdrs_mem (vp : ValidatedParams) (pos : LayerPosition vp) :
+    wotsPkAdrs (wotsInstanceAdrs pos) ∈ wotsPkAddresses vp := by
+  simp [wotsPkAddresses]
+
+/-- Every FORS leaf of every reachable bottom position is a listed `F` target.  The index is the
+global one used by `forsSignWith`: tree `tree`, leaf `leaf`. -/
+theorem forsLeafAdrs_mem (vp : ValidatedParams) (pos : BottomPosition vp)
+    (tree : Fin vp.params.k) (leaf : Fin vp.params.t) :
+    forsNodeAdrs pos.forsAdrs 0 (tree.val * vp.params.t + leaf.val) ∈ forsLeafAddresses vp := by
+  simp only [forsLeafAddresses, List.mem_map]
+  exact ⟨((pos, tree), leaf), by simp, rfl⟩
+
+/-- Every FORS internal node of every reachable bottom position is a listed `H` target.  Heights
+run from one to `a`, so the tree root is included and the leaves are not. -/
+theorem forsNodeAdrs_mem (vp : ValidatedParams) (pos : BottomPosition vp)
+    (tree : Fin vp.params.k) {z idx : ℕ} (hz : 0 < z) (hzh : z ≤ vp.params.a)
+    (hidx : idx < 2 ^ (vp.params.a - z)) :
+    forsNodeAdrs pos.forsAdrs z (tree.val * 2 ^ (vp.params.a - z) + idx) ∈
+      forsTreeAddresses vp := by
+  simp only [forsTreeAddresses, List.mem_map]
+  exact ⟨((pos, tree), (z, idx)), by simp [mem_perfectInternalCoords hz hzh hidx], rfl⟩
+
+/-- Every reachable FORS root compression is a listed `T_k` target. -/
+theorem forsPkAdrs_mem (vp : ValidatedParams) (pos : BottomPosition vp) :
+    forsPkAdrs pos.forsAdrs ∈ forsRootAddresses vp := by
+  simp [forsRootAddresses]
+
+/-- Every internal node of every reachable XMSS tree is a listed `H` target.  Heights run from one
+to `hp`, so the tree root is included and the WOTS public-key leaves are not. -/
+theorem xmssNodeAdrs_mem (vp : ValidatedParams) (coord : LayerTreeCoord vp) {z idx : ℕ}
+    (hz : 0 < z) (hzh : z ≤ vp.params.hp) (hidx : idx < 2 ^ (vp.params.hp - z)) :
+    xmssNodeAdrs coord.toAdrs z idx ∈ xmssNodeAddresses vp := by
+  simp only [xmssNodeAddresses, List.mem_map]
+  exact ⟨(coord, (z, idx)), by simp [mem_perfectInternalCoords hz hzh hidx], rfl⟩
+
+/-- A total one-step-per-chain selection lists only executed chain steps. -/
+theorem selectedWotsAddresses_subset (vp : ValidatedParams)
+    (select : WotsChainCoord vp → Fin (vp.params.w - 1)) :
+    ∀ a ∈ selectedWotsAddresses vp select, a ∈ wotsStepAddresses vp := by
+  intro a ha
+  simp only [selectedWotsAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  exact wotsStepAdrs_mem vp coord (select coord)
+
+/-- A partial one-step-per-chain selection lists only executed chain steps. -/
+theorem optionalWotsAddresses_subset (vp : ValidatedParams)
+    (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) :
+    ∀ a ∈ optionalWotsAddresses vp select, a ∈ wotsStepAddresses vp := by
+  intro a ha
+  simp only [optionalWotsAddresses, List.mem_filterMap] at ha
+  obtain ⟨coord, -, hmap⟩ := ha
+  obtain ⟨step, -, rfl⟩ := Option.map_eq_some_iff.mp hmap
+  exact wotsStepAdrs_mem vp coord step
+
 /-! ## Concrete address encodings -/
 
 variable {p : Params}
@@ -870,6 +1004,18 @@ theorem encodeTargets_nodup_of_injOn (prims : Primitives p) (addresses : List Ad
       prims.adrsToKey a = prims.adrsToKey b → a = b) :
     (encodeTargets prims addresses).Nodup :=
   (encodeTargets_nodup_iff_injOn prims addresses haddresses).2 hinj
+
+/-- Encoded distinctness is inherited by any duplicate-free sublist of a ledger.  The two WOTS
+selection roles are covered by the complete chain-step ledger through
+`selectedWotsAddresses_subset` and `optionalWotsAddresses_subset`. -/
+theorem encodeTargets_nodup_of_subset {p : Params} (prims : Primitives p)
+    {sub super : List Adrs} (hsub : sub.Nodup) (hmem : ∀ a ∈ sub, a ∈ super)
+    (hsuper : (encodeTargets prims super).Nodup) :
+    (encodeTargets prims sub).Nodup := by
+  refine encodeTargets_nodup_of_injOn prims sub hsub fun a ha b hb hkey => ?_
+  have hinj := (encodeTargets_nodup_iff_injOn prims super
+    (by simpa [encodeTargets] using List.Nodup.of_map _ hsuper)).1 hsuper
+  exact hinj a (hmem a ha) b (hmem b hb) hkey
 
 /-- Explicit encoded-address obligations for the eight target roles in the security architecture.
 

@@ -5,7 +5,6 @@ Authors: Alexander Hicks
 -/
 
 module
-
 public import HashSig.SLHDSA.Security.ReachableTargets
 
 /-!
@@ -20,7 +19,7 @@ wrong height, hash step `w - 1`, out-of-range tree) are not.  Cross-role ledgers
 be pairwise disjoint on these profiles.
 -/
 
-@[expose] public section
+public section
 
 namespace SLHDSA.ReachableTargetsTest
 
@@ -47,6 +46,8 @@ def oneLayer : ValidatedParams := ⟨oneLayerParams, by decide⟩
 example : twoLayerParams.len = 4 := by decide
 example : twoLayerParams.w = 16 := by decide
 example : oneLayerParams.len = 2 := by decide
+example : oneLayerParams.m = 2 := by decide
+example : twoLayerParams.m = 3 := by decide
 example : oneLayerParams.w = 256 := by decide
 
 /-! ## Hand-computed ledger sizes -/
@@ -83,8 +84,15 @@ def checkOneLayerSizes : IO Unit := do
   ensure "one-layer: 4 FORS internal nodes" ((forsTreeAddresses oneLayer).length == 4)
   ensure "one-layer: 4 FORS roots" ((forsRootAddresses oneLayer).length == 4)
   ensure "one-layer: 3 XMSS internal nodes" ((xmssNodeAddresses oneLayer).length == 3)
+  ensure "one-layer: 8 WOTS+ chains" ((allWotsChains oneLayer).length == 8)
+  ensure "one-layer: 4 WOTS+ base addresses" ((wotsInstanceAddresses oneLayer).length == 4)
   ensure "one-layer: 2040 executed WOTS+ steps" ((wotsStepAddresses oneLayer).length == 2040)
   ensure "one-layer: 4 WOTS+ public keys" ((wotsPkAddresses oneLayer).length == 4)
+  ensure "one-layer: 8 selected UD steps"
+    ((selectedWotsAddresses oneLayer fun _ => firstWotsStep oneLayer).length == 8)
+  ensure "one-layer: optional PRE selection drops zero-digit chains"
+    ((optionalWotsAddresses oneLayer fun coord =>
+      if coord.2.val = 0 then none else some (firstWotsStep oneLayer)).length == 4)
 
 /-- The formula layer agrees with the same hand-computed constants. -/
 def checkTargetCounts : IO Unit := do
@@ -120,6 +128,7 @@ def roleLedgers (vp : ValidatedParams) : List (String × List Adrs) :=
 
 def checkLedgerFamily (profile : String) (vp : ValidatedParams) : IO Unit := do
   let ledgers := roleLedgers vp
+  let steps := wotsStepAddresses vp
   for (label, addresses) in ledgers do
     checkNodup s!"{profile} {label}" addresses
     ensure s!"{profile} {label}: every address is canonical"
@@ -132,7 +141,7 @@ def checkLedgerFamily (profile : String) (vp : ValidatedParams) : IO Unit := do
   -- A WOTS+ base address is an instance identifier, not a separate hash target: it coincides
   -- with the first executed step of chain zero, so it lies inside the step ledger.
   ensure s!"{profile} WOTS+ base addresses are the chain-zero step-zero targets"
-    ((wotsInstanceAddresses vp).all fun a => (wotsStepAddresses vp).contains a)
+    ((wotsInstanceAddresses vp).all fun a => steps.contains a)
 
 /-! ## Pinned address content -/
 
@@ -216,6 +225,43 @@ example : xmssTreeCount oneLayerParams = 1 := by decide
 example : (perfectInternalCoords 3).length = 7 := by decide
 example : (perfectInternalCoords 2) = [(1, 0), (1, 1), (2, 0)] := by decide
 
+/-! ## One-layer pinned content -/
+
+/-- A fixed one-layer digest.  At `d = 1` the digest carries no tree-index byte at all, so its two
+bytes are `md = 0x5a` and `idx_leaf = 0x03`. -/
+def oneLayerDigest : Bytes oneLayerParams.m :=
+  Vector.ofFn fun i => ([0x5a, 0x03] : List Byte).getD i.val 0
+
+def oneLayerParts : DigestParts oneLayerParams := splitDigest oneLayerParams oneLayerDigest
+
+/-- At `d = 1` the only tree is tree zero, and the ledgers still list exactly its addresses. -/
+def checkOneLayerContent : IO Unit := do
+  ensure "one-layer digest: idx_tree = 0" (oneLayerParts.idxTree.val == 0)
+  ensure "one-layer digest: idx_leaf = 3" (oneLayerParts.idxLeaf.val == 3)
+  let pos := LayerPosition.initial oneLayer oneLayerParts
+  ensure "initial position is the only tree at layer 0"
+    (pos.layer.val == 0 && pos.tree.val == 0 && pos.leaf.val == 3)
+  let wotsBase := wotsInstanceAdrs pos
+  ensure "WOTS+ base address is listed"
+    ((wotsInstanceAddresses oneLayer).contains wotsBase)
+  ensure "WOTS+ chain 1 step 254 is an executed-step target"
+    ((wotsStepAddresses oneLayer).contains ((wotsChainAdrs wotsBase 1).setHashAddress 254))
+  ensure "WOTS+ chain 1 step 255 = w - 1 is never executed"
+    (!(wotsStepAddresses oneLayer).contains ((wotsChainAdrs wotsBase 1).setHashAddress 255))
+  ensure "WOTS+ chain 2 exceeds len and is not a step target"
+    (!(wotsStepAddresses oneLayer).contains ((wotsChainAdrs wotsBase 2).setHashAddress 0))
+  ensure "the XMSS root is a target"
+    ((xmssNodeAddresses oneLayer).contains (xmssNodeAdrs pos.toAdrs 2 0))
+  ensure "a second tree at layer 0 is unreachable"
+    (!(xmssNodeAddresses oneLayer).contains
+      (xmssNodeAdrs ((Adrs.zero.setLayerAddress 0).setTreeAddress 1) 1 0))
+  let bottom := BottomPosition.ofDigestParts oneLayer oneLayerParts
+  ensure "the single FORS tree has two leaves and one internal node"
+    ((forsLeafAddresses oneLayer).contains (forsNodeAdrs bottom.forsAdrs 0 1) &&
+      (forsTreeAddresses oneLayer).contains (forsNodeAdrs bottom.forsAdrs 1 0))
+  ensure "FORS height 2 exceeds a and is not a tree target"
+    (!(forsTreeAddresses oneLayer).contains (forsNodeAdrs bottom.forsAdrs 2 0))
+
 def main : IO Unit := do
   checkTargetCounts
   checkTwoLayerSizes
@@ -223,8 +269,9 @@ def main : IO Unit := do
   checkLedgerFamily "two-layer" twoLayer
   checkLedgerFamily "one-layer" oneLayer
   checkTwoLayerContent
+  checkOneLayerContent
   IO.println "SLH-DSA reachable-target ledger tests: PASS \
-    (two small profiles; sizes, distinctness, cross-role disjointness, pinned content)"
+    (two small profiles; sizes, distinctness, cross-role disjointness, pinned content at both)"
 
 end SLHDSA.ReachableTargetsTest
 

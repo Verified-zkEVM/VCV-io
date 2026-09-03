@@ -7,7 +7,7 @@ Authors: Quang Dao, Alexander Hicks
 module
 public import HashSig.SLHDSA.Params
 public import Mathlib.Algebra.BigOperators.Fin
-public import Mathlib.Algebra.Ring.GeomSum
+import Mathlib.Algebra.Ring.GeomSum
 
 /-!
 # SLH-DSA security target roles and formula-derived target counts
@@ -21,10 +21,20 @@ targets each role can reach in a hypertree with `d` layers of height `hp`:
 - `targetCount p role` for each of the eight `TargetRole`s.
 
 The counts are pure parameter arithmetic.  `HashSig.SLHDSA.Security.ReachableTargets` realizes
-each of them as the exact length of an executable, duplicate-free address ledger.
+each of them by an executable, duplicate-free address ledger.  Six of the eight are realized
+exactly.  The two that are not are upper bounds in the safe direction:
 
-The EasyCrypt FORS-instance variable called `d` in the source proof instantiates to `2 ^ h`, the
-number of bottom-layer leaves, not to the layer count `Params.d`.
+- `wotsFTcr` counts `w` steps per WOTS+ chain, while a chain executes only the `w - 1` steps its
+  ledger lists; the source proof's looser cap is kept so the term matches the literature; and
+- `wotsFPre` counts one step per chain, while a preimage reduction may omit the chains whose
+  honest digit is zero.
+
+Every count is the one the machine-checked source proof issues, whose artifact fixes them as
+`t_smdtopenpre = t_smdttcr = d * k * t`, `d * k * (t - 1)`, and `d` for the three FORS roles,
+`t_smdtud = t_smdtpre = c * len` and `t_smdttcr = c * len * w` for the three WOTS+ `F` roles, and
+the two hypertree sums for `wotsTl` and `xmssH`.  Its FORS-instance variable `d` instantiates to
+`2 ^ h`, the number of bottom-layer leaves, not to the layer count `Params.d`, and its `c` is
+`wotsInstanceCount`.
 
 ## References
 
@@ -40,7 +50,9 @@ namespace SLHDSA.Security
 /-! ## Closed target-role vocabulary -/
 
 /-- The eight distinct-target hash roles of the classical SLH-DSA security argument.  The WOTS+
-`F` role appears three times because its UD, TCR, and PRE games issue different target sets. -/
+`F` role appears three times because its undetectability, target-collision, and preimage games
+select their targets differently: the first two share the one-step-per-chain cap, while the
+target-collision game ranges over every step of every chain. -/
 inductive TargetRole
   /-- FORS leaf hash `F` (arity one). -/
   | forsF
@@ -50,7 +62,7 @@ inductive TargetRole
   | forsTl
   /-- WOTS+ chain hash `F`, undetectability targets (one selected step per chain). -/
   | wotsFUd
-  /-- WOTS+ chain hash `F`, target-collision-resistance targets (every chain step). -/
+  /-- WOTS+ chain hash `F`, target-collision-resistance targets (every step of every chain). -/
   | wotsFTcr
   /-- WOTS+ chain hash `F`, preimage targets (at most one selected step per chain). -/
   | wotsFPre
@@ -64,7 +76,7 @@ instance : Fintype TargetRole where
   elems := {.forsF, .forsH, .forsTl, .wotsFUd, .wotsFTcr, .wotsFPre, .wotsTl, .xmssH}
   complete role := by cases role <;> simp
 
-theorem TargetRole.card : Fintype.card TargetRole = 8 := by decide
+@[simp] theorem TargetRole.card : Fintype.card TargetRole = 8 := by decide
 
 /-! ## Tree and instance counts -/
 
@@ -81,7 +93,8 @@ def xmssTreeCount (p : Params) : ℕ :=
 def wotsInstanceCount (p : Params) : ℕ :=
   ∑ i : Fin p.d, treesAtLayer p i * 2 ^ p.hp
 
-/-- Formula-derived number of targets issued in each named game. -/
+/-- Formula-derived cap on the number of targets issued in each named game.  Six roles meet their
+cap exactly; `wotsFTcr` and `wotsFPre` are upper bounds, as the module docstring records. -/
 def targetCount (p : Params) : TargetRole → ℕ
   | .forsF => 2 ^ p.h * p.k * 2 ^ p.a
   | .forsH => 2 ^ p.h * p.k * (2 ^ p.a - 1)
@@ -128,11 +141,11 @@ theorem targetCount_xmssH_eq (p : Params) (hvalid : p.Valid) :
     targetCount p .xmssH = 2 ^ p.h - 1 :=
   xmssTreeCount_mul_pred p hvalid
 
-/-! ## Positivity -/
+/-- The undetectability and preimage roles share the one-target-per-WOTS+-chain cap. -/
+theorem targetCount_wotsFUd_eq_wotsFPre (p : Params) :
+    targetCount p .wotsFUd = targetCount p .wotsFPre := rfl
 
-theorem _root_.SLHDSA.Params.len_pos (p : Params) : 0 < p.len := by
-  unfold Params.len Params.len2
-  omega
+/-! ## Positivity -/
 
 theorem xmssTreeCount_pos (p : Params) (hvalid : p.Valid) : 0 < xmssTreeCount p := by
   unfold xmssTreeCount
