@@ -95,8 +95,8 @@ theorem CanonicalAddressBounds.d_le_97 {vp : ValidatedParams}
   omega
 
 /-- A one-byte layer field therefore comes for free, which is why `ApprovedAddressBounds` adds only
-one independent condition. -/
-theorem CanonicalAddressBounds.d_le_byte {vp : ValidatedParams}
+one independent condition.  The name differs from that record's field so the two do not shadow. -/
+theorem CanonicalAddressBounds.d_le_256 {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) : vp.params.d ≤ 256 :=
   le_trans hb.d_le_97 (by norm_num)
 
@@ -453,7 +453,7 @@ theorem sha2EncodedTargetLedgerConditions (vp : ValidatedParams)
 /-- Every reachable target ledger keeps distinct tweaks under the SHAKE instantiation.  Only the
 canonical widths are needed, so this covers parameter sets whose hypertree is too tall for SHA-2's
 compressed eight-byte tree field.  Being too deep for its one-byte layer field is not possible:
-`CanonicalAddressBounds.d_le_byte` rules that out. -/
+`CanonicalAddressBounds.d_le_256` rules that out. -/
 theorem shakeEncodedTargetLedgerConditions (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     EncodedTargetLedgerConditions vp (shakePrimitives vp.params) where
