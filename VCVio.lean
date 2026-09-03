@@ -54,6 +54,7 @@ public import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.Collection
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.FinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.OpenPREFromTCRDSPR
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPR
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPRFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTOpenPREFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTPRE
