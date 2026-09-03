@@ -29,13 +29,14 @@ exactly.  The two that are not are upper bounds in the safe direction:
 - `wotsFPre` counts one step per chain, while a preimage reduction may omit the chains whose
   honest digit is zero.
 
-Every count is the one the machine-checked source proof issues.  Its artifact fixes the FORS roles
-at `d * k * t` (as `t_smdtopenpre`, and as the target count the OpenPRE-from-TCR/DSPR theory
-forwards to the collision and second-preimage games), `d * k * (t - 1)`, and `d`; the three WOTS+
-`F` roles at `t_smdtud = t_smdtpre = c * len` and `t_smdttcr = c * len * w`; and `wotsTl` and
-`xmssH` at the two hypertree sums.  Its FORS-instance variable `d` instantiates to `2 ^ h`, the
-number of bottom-layer leaves, not to the layer count `Params.d`, and its `c` is
-`wotsInstanceCount`.
+Every count is the one the machine-checked source proof issues.  In its artifact the FORS roles are
+`t_smdtopenpre = d * k * t`, which the OpenPRE-from-collision-and-second-preimage theory forwards to
+those two games as its own `t`, then `t_smdttcr = d * k * (t - 1)` for the node hash and
+`t_smdttcr = d` for the root compression; the three WOTS+ `F` roles are `t_smdtud = t_smdtpre =
+c * len` and `t_smdttcr = c * len * w`; and `wotsTl` and `xmssH` are the two hypertree sums.  The
+name `t_smdttcr` is reused across those theories, so each is read in its own.  The FORS-instance
+variable `d` instantiates to `2 ^ h`, the number of bottom-layer leaves, not to the layer count
+`Params.d`, and `c` is `wotsInstanceCount`.
 
 ## References
 
@@ -52,8 +53,8 @@ namespace SLHDSA.Security
 
 /-- The eight distinct-target hash roles of the classical SLH-DSA security argument.  The WOTS+
 `F` role appears three times because its three games select their targets differently: the
-undetectability and preimage games each take one step per chain, while the target-collision game
-ranges over every step of every chain. -/
+undetectability game takes one step per chain and the preimage game at most one, while the
+target-collision game ranges over every step of every chain. -/
 inductive TargetRole
   /-- FORS leaf hash `F` (arity one). -/
   | forsF
@@ -142,9 +143,11 @@ theorem targetCount_xmssH_eq (p : Params) (hvalid : p.Valid) :
     targetCount p .xmssH = 2 ^ p.h - 1 :=
   xmssTreeCount_mul_pred p hvalid
 
-/-- The undetectability and preimage roles share the one-target-per-WOTS+-chain cap. -/
-@[simp] theorem targetCount_wotsFUd_eq_wotsFPre (p : Params) :
-    targetCount p .wotsFUd = targetCount p .wotsFPre := rfl
+/-- The undetectability and preimage roles share the one-target-per-WOTS+-chain cap.  The
+orientation keeps `selectedWotsAddresses_length` in simp-normal form, since that lemma names the
+undetectability role. -/
+@[simp] theorem targetCount_wotsFPre_eq_wotsFUd (p : Params) :
+    targetCount p .wotsFPre = targetCount p .wotsFUd := rfl
 
 /-! ## Positivity -/
 

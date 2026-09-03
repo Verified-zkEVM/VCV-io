@@ -32,12 +32,14 @@ formula-derived `targetCount` except where the table below records a bound:
 | `wotsTl` | `wotsPkAddresses` | `wotsInstanceCount` |
 | `xmssH` | `xmssNodeAddresses` | `xmssTreeCount * (2^hp - 1)` |
 
-Length and distinctness alone would also hold of a ledger built on a wrong index convention, so
-every role additionally carries a completeness lemma in the opposite direction, named `mem_` after
-its ledger: the address of each reachable coordinate in that role is listed.  The node coordinates
-those lemmas quantify over are exactly the ones `mem_perfectInternalCoords_iff` characterizes.
-Whether the construction's free programs query only such addresses is a separate, trace-level
-statement and is not proved here.
+Every role additionally carries a completeness lemma in the opposite direction, named `mem_` after
+its ledger: the address of each reachable coordinate in that role is listed, and for the optional
+preimage selection, of each coordinate that selection retains.  For the three roles whose ledger
+applies an index formula, `forsF`, `forsH`, and `xmssH`, these lemmas are what rules out a ledger
+built on a wrong convention, which length and distinctness alone would not; for the rest they say
+the coordinate enumeration is exhaustive.  `mem_perfectInternalCoords` characterizes the node
+coordinates the `forsH` and `xmssH` lemmas quantify over.  Whether the construction's free programs
+query only listed addresses is a separate, trace-level statement and is not proved here.
 
 The address lists remain structural `Adrs` values.  A concrete primitive maps them to its
 `AdrsKey` only after proving injectivity on the listed reachable family; no global injectivity of
@@ -286,7 +288,7 @@ theorem perfectInternalCoords_nodup (h : ℕ) :
 
 /-- Every coordinate of the right shape is listed: a height in `1 … h`, with an index below the
 number of nodes at that height. -/
-theorem mem_perfectInternalCoords {h z idx : ℕ} (hz : 0 < z) (hzh : z ≤ h)
+theorem mem_perfectInternalCoords_of_bounds {h z idx : ℕ} (hz : 0 < z) (hzh : z ≤ h)
     (hidx : idx < 2 ^ (h - z)) : (z, idx) ∈ perfectInternalCoords h := by
   induction h generalizing z with
   | zero => omega
@@ -304,11 +306,11 @@ theorem mem_perfectInternalCoords {h z idx : ℕ} (hz : 0 < z) (hzh : z ≤ h)
 
 /-- The listed internal coordinates are exactly the heights in `1 … h` paired with an index below
 the number of nodes at that height. -/
-theorem mem_perfectInternalCoords_iff {h z idx : ℕ} :
+@[simp] theorem mem_perfectInternalCoords {h z idx : ℕ} :
     (z, idx) ∈ perfectInternalCoords h ↔ 0 < z ∧ z ≤ h ∧ idx < 2 ^ (h - z) :=
   ⟨fun hmem => ⟨perfectInternalCoords_height_pos hmem, perfectInternalCoords_height_le hmem,
       perfectInternalCoords_index_lt hmem⟩,
-    fun ⟨hz, hzh, hidx⟩ => mem_perfectInternalCoords hz hzh hidx⟩
+    fun ⟨hz, hzh, hidx⟩ => mem_perfectInternalCoords_of_bounds hz hzh hidx⟩
 
 /-! ## Bottom-layer FORS coordinates -/
 
@@ -897,9 +899,10 @@ theorem wotsPkAddresses_nodup (vp : ValidatedParams) :
 
 /-! ## Completeness of the ledgers
 
-A length and a distinctness proof do not by themselves say that a ledger holds the right
-addresses.  These lemmas close that gap in the other direction: for every coordinate of a role's
-reachable coordinate space, the address that role builds from it occurs in that role's ledger. -/
+A length and a distinctness proof do not by themselves say that a ledger holds the right addresses.
+These lemmas close that gap in the other direction.  The first four say each coordinate enumeration
+is exhaustive; the rest say that for every coordinate of a role's reachable space, the address that
+role builds from it occurs in that role's ledger. -/
 
 @[simp] theorem mem_allXmssTrees (vp : ValidatedParams) (coord : LayerTreeCoord vp) :
     coord ∈ allXmssTrees vp := by
@@ -953,7 +956,8 @@ theorem mem_forsTreeAddresses (vp : ValidatedParams) (pos : BottomPosition vp)
     forsNodeAdrs pos.forsAdrs z (tree.val * 2 ^ (vp.params.a - z) + idx) ∈
       forsTreeAddresses vp := by
   simp only [forsTreeAddresses, List.mem_map]
-  exact ⟨((pos, tree), (z, idx)), by simp [mem_perfectInternalCoords hz hzh hidx], rfl⟩
+  exact ⟨((pos, tree), (z, idx)),
+    by simp [mem_perfectInternalCoords_of_bounds hz hzh hidx], rfl⟩
 
 /-- Every reachable FORS root compression is a listed `T_k` target. -/
 theorem mem_forsRootAddresses (vp : ValidatedParams) (pos : BottomPosition vp) :
@@ -966,7 +970,7 @@ theorem mem_xmssNodeAddresses (vp : ValidatedParams) (coord : LayerTreeCoord vp)
     (hz : 0 < z) (hzh : z ≤ vp.params.hp) (hidx : idx < 2 ^ (vp.params.hp - z)) :
     xmssNodeAdrs coord.toAdrs z idx ∈ xmssNodeAddresses vp := by
   simp only [xmssNodeAddresses, List.mem_map]
-  exact ⟨(coord, (z, idx)), by simp [mem_perfectInternalCoords hz hzh hidx], rfl⟩
+  exact ⟨(coord, (z, idx)), by simp [mem_perfectInternalCoords_of_bounds hz hzh hidx], rfl⟩
 
 /-- Every chain's selected step is listed by a total one-step-per-chain selection. -/
 theorem mem_selectedWotsAddresses (vp : ValidatedParams)
@@ -1040,6 +1044,11 @@ theorem encodeTargets_nodup_of_subset (prims : Primitives p)
   exact hinj a (hmem a ha) b (hmem b hb) hkey
 
 /-- Explicit encoded-address obligations for the eight target roles in the security architecture.
+
+The `wotsFUd` and `wotsFPre` fields are stated for convenience, not because they are independent:
+both follow from `wotsFTcr` through `encodeTargets_nodup_of_subset` and the two subset lemmas, since
+every selected step is a step of the complete chain-step ledger.  A context that has already
+discharged `wotsFTcr` can fill them in that way.
 
 `ValidatedParams` deliberately does not imply these facts: concrete address encodings have narrower
 field domains, most visibly SHA-2's one-byte layer and eight-byte tree.  A concrete security context
