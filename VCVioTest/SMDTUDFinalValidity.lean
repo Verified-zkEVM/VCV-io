@@ -335,6 +335,68 @@ theorem subspace_emb_applied_canary :
     SM_DT_UD_SourceFinalValidity.RealSuccess, SM_DT_UD_SourceFinalValidity.IdealSuccess,
     experiment_subspaceProbe_real, experiment_subspaceProbe_ideal]
 
+section RunLevelInvariant
+
+open TweakableHash TweakableHash.SM_DT_UD_SourceFinalValidity
+
+/-- Transfer of the run-level monitor invariant along a transcript pinned to one outcome, in the
+direction that concludes the final predicate holds. -/
+private lemma valid_of_run {world : World} {adv : Adversary problem} {ps : adv.State}
+    {gs : State Bool}
+    (hrun : (simulateQ (oracles world problem .only) adv.pick).run .initial = pure (ps, gs))
+    (hvalid : gs.valid = true) :
+    ∀ z ∈ support ((simulateQ (oracles world problem .only) adv.pick).run .initial),
+      SourceFinalValidity.Valid problem.numTargets id z.2 := by
+  intro z hz
+  have hdecide := valid_eq_decide_valid_of_reachable world adv .only hz
+  rw [hrun, support_pure, Set.mem_singleton_iff] at hz
+  subst hz
+  simpa [hvalid] using hdecide.symm
+
+/-- Transfer of the run-level monitor invariant along a transcript pinned to one outcome, in the
+direction that concludes the final predicate fails. -/
+private lemma not_valid_of_run {world : World} {adv : Adversary problem} {ps : adv.State}
+    {gs : State Bool}
+    (hrun : (simulateQ (oracles world problem .only) adv.pick).run .initial = pure (ps, gs))
+    (hvalid : gs.valid = false) :
+    ∀ z ∈ support ((simulateQ (oracles world problem .only) adv.pick).run .initial),
+      ¬ SourceFinalValidity.Valid problem.numTargets id z.2 := by
+  intro z hz
+  have hdecide := valid_eq_decide_valid_of_reachable world adv .only hz
+  rw [hrun, support_pure, Set.mem_singleton_iff] at hz
+  subst hz
+  simpa [hvalid] using hdecide.symm
+
+/-- The sticky bit decides the final predicate on every reachable state, in both worlds. Reading the
+outcome off `SourceFinalValidity.Valid` at the reachable state rather than off the recorded bit is
+what makes this more than a restatement of the transcript: a vacuously lifted invariant would not
+close these. The real and ideal runs of the same adversary reach the same state, because the
+challenge response is drawn before the state is written. -/
+theorem reachable_valid_decides_canary :
+    (∀ z ∈ support ((simulateQ (oracles .real problem .only) separate.pick).run .initial),
+        SourceFinalValidity.Valid problem.numTargets id z.2) ∧
+      (∀ z ∈ support ((simulateQ (oracles .ideal problem .only) separate.pick).run .initial),
+        SourceFinalValidity.Valid problem.numTargets id z.2) ∧
+      (∀ z ∈ support
+          ((simulateQ (oracles .real problem .only) repeatCollection.pick).run .initial),
+        SourceFinalValidity.Valid problem.numTargets id z.2) ∧
+      (∀ z ∈ support
+          ((simulateQ (oracles .ideal problem .only) repeatCollection.pick).run .initial),
+        SourceFinalValidity.Valid problem.numTargets id z.2) ∧
+      (∀ z ∈ support ((simulateQ (oracles .real problem .only) exceedCap.pick).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets id z.2) ∧
+      (∀ z ∈ support ((simulateQ (oracles .real problem .only) duplicateTarget.pick).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets id z.2) ∧
+      (∀ z ∈ support ((simulateQ (oracles .real problem .only) crossClash.pick).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets id z.2) :=
+  ⟨valid_of_run run_separate_real rfl, valid_of_run run_separate_ideal rfl,
+    valid_of_run run_repeatCollection_real rfl, valid_of_run run_repeatCollection_ideal rfl,
+    not_valid_of_run run_exceedCap_real rfl,
+    not_valid_of_run run_duplicateTarget_real rfl,
+    not_valid_of_run run_crossClash_real rfl⟩
+
+end RunLevelInvariant
+
 /-- The phase types expose the challenge/collection bundle only before seed reveal. -/
 example : OracleComp Specs separate.State := separate.pick
 
