@@ -60,6 +60,7 @@ public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTPRE
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTPREFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTTCR
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTTCRFinalValidity
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTUD
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTUDFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.ToFinalValidity
 public import VCVio.CryptoFoundations.HashCommitment
