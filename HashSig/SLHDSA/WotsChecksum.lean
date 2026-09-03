@@ -6,6 +6,9 @@ Authors: Vitalik Buterin, Nicolas Consigny
 
 module
 public import Mathlib.Algebra.BigOperators.Group.List.Basic
+public import Mathlib.Algebra.Order.BigOperators.Group.List
+public import Mathlib.Algebra.Order.Group.Nat
+public import Mathlib.Data.List.Forall2
 public import Mathlib.Tactic.Ring
 
 /-!
@@ -33,80 +36,27 @@ namespace SLHDSA.WotsChecksum
 
 variable {α β : Type}
 
-/-- Pointwise relation: `Forall₂ R xs ys` means `xs` and `ys` have equal length
-and corresponding elements are related by `R`. -/
-inductive Forall₂ (R : α → β → Prop) : List α → List β → Prop
-  | nil  : Forall₂ R [] []
-  | cons {a : α} {b : β} {as : List α} {bs : List β} :
-      R a b → Forall₂ R as bs → Forall₂ R (a :: as) (b :: bs)
+open List (Forall₂)
 
-theorem Forall₂.length_eq {R : α → β → Prop} {xs : List α} {ys : List β}
-    (h : Forall₂ R xs ys) : xs.length = ys.length := by
-  induction h with
-  | nil => rfl
-  | cons _ _ ih => simp [ih]
-
-theorem Forall₂.sum_le {xs ys : List ℕ} (h : Forall₂ (· ≤ ·) xs ys) :
-    xs.sum ≤ ys.sum := by
-  induction h with
-  | nil => exact Nat.le_refl 0
-  | cons hd htl ih =>
-    simp only [List.sum_cons]
-    exact Nat.add_le_add hd ih
-
+/-- Pointwise-`≤` lists with equal sums are equal. -/
 theorem Forall₂.eq_of_sum_eq {xs ys : List ℕ}
     (hLE : Forall₂ (· ≤ ·) xs ys) (hSum : xs.sum = ys.sum) : xs = ys := by
   match xs, ys, hLE with
   | [], [], .nil => rfl
   | a :: as, b :: bs, .cons hd htl =>
     simp only [List.sum_cons] at hSum
-    have hSumLE : as.sum ≤ bs.sum := htl.sum_le
-    by_cases hlt : a < b
-    · have h1 : a + as.sum < b + as.sum := Nat.add_lt_add_right hlt as.sum
-      have h2 : b + as.sum ≤ b + bs.sum := Nat.add_le_add_left hSumLE b
-      have : a + as.sum < b + bs.sum := Nat.lt_of_lt_of_le h1 h2
-      rw [hSum] at this
-      exact absurd this (Nat.lt_irrefl _)
-    · have hge : b ≤ a := Nat.ge_of_not_lt hlt
-      have heq : a = b := Nat.le_antisymm hd hge
-      subst heq
-      have hSumAsEq : as.sum = bs.sum := Nat.add_left_cancel hSum
-      have hAsEqBs : as = bs := Forall₂.eq_of_sum_eq htl hSumAsEq
-      rw [hAsEqBs]
+    have hSumLE : as.sum ≤ bs.sum := htl.sum_le_sum
+    obtain rfl : a = b := by omega
+    rw [Forall₂.eq_of_sum_eq htl (by omega)]
 
 /-! ## Splitting `Forall₂` at equal-length prefixes -/
 
-theorem Forall₂.take {xs ys : List α} {R : α → α → Prop}
-    (h : Forall₂ R xs ys) (n : ℕ) : Forall₂ R (xs.take n) (ys.take n) := by
-  induction h generalizing n with
-  | nil => simpa using Forall₂.nil
-  | cons hd htl ih =>
-    cases n with
-    | zero => simpa using Forall₂.nil
-    | succ n => simpa using Forall₂.cons hd (ih n)
-
-theorem Forall₂.drop {xs ys : List α} {R : α → α → Prop}
-    (h : Forall₂ R xs ys) (n : ℕ) : Forall₂ R (xs.drop n) (ys.drop n) := by
-  induction h generalizing n with
-  | nil => simpa using Forall₂.nil
-  | cons hd htl ih =>
-    cases n with
-    | zero => simpa using Forall₂.cons hd htl
-    | succ n => simpa using ih n
-
+/-- A `Forall₂` relation between two appends splits at an equal-length prefix. -/
 theorem Forall₂.append_inv {R : α → α → Prop} {xs₁ xs₂ ys₁ ys₂ : List α}
-    (h : Forall₂ R (xs₁ ++ ys₁) (xs₂ ++ ys₂))
-    (hlen : xs₁.length = xs₂.length) :
-    Forall₂ R xs₁ xs₂ ∧ Forall₂ R ys₁ ys₂ := by
-  have take1 : (xs₁ ++ ys₁).take xs₁.length = xs₁ := by simp
-  have drop1 : (xs₁ ++ ys₁).drop xs₁.length = ys₁ := by simp
-  have take2 : (xs₂ ++ ys₂).take xs₂.length = xs₂ := by simp
-  have drop2 : (xs₂ ++ ys₂).drop xs₂.length = ys₂ := by simp
-  have htake := h.take xs₁.length
-  rw [take1, hlen, take2] at htake
-  have hdrop := h.drop xs₁.length
-  rw [drop1, hlen, drop2] at hdrop
-  exact ⟨htake, hdrop⟩
+    (h : Forall₂ R (xs₁ ++ ys₁) (xs₂ ++ ys₂)) (hlen : xs₁.length = xs₂.length) :
+    Forall₂ R xs₁ xs₂ ∧ Forall₂ R ys₁ ys₂ :=
+  ⟨by simpa [hlen] using List.forall₂_take_append _ _ _ h,
+   by simpa [hlen] using List.forall₂_drop_append _ _ _ h⟩
 
 /-! ## Base-w digit arithmetic -/
 
@@ -184,81 +134,27 @@ theorem digitsOfBaseW_lt (n w len : ℕ) (hw : 0 < w) :
     · subst h; exact Nat.mod_lt _ hw
     · exact ih d h
 
-/-- The key modular identity: `n % w^(len+1) = ((n / w^len) % w) * w^len + n % w^len`. -/
-theorem mod_pow_succ_extract (n w len : ℕ) (hw : 0 < w) :
-    n % (w ^ (len + 1)) = ((n / w ^ len) % w) * w ^ len + n % w ^ len := by
-  let M := w ^ len
-  let MW := M * w
-  let R := ((n / M) % w) * M + n % M
-  let q := (n / M) / w
-  have hMW_eq : MW = w ^ (len + 1) := by
-    dsimp [MW, M]; rw [Nat.pow_succ]
-  rw [← hMW_eq]
-  have h_bound : R < MW := by
-    dsimp [R, MW, M]
-    have h1 : (n / (w ^ len)) % w < w := Nat.mod_lt (n / (w ^ len)) hw
-    have h2 : n % (w ^ len) < w ^ len := Nat.mod_lt n (Nat.pow_pos (a := w) (n := len) hw)
-    have hMpos : 0 < w ^ len := Nat.pow_pos (a := w) (n := len) hw
-    have h_dle : (n / (w ^ len)) % w ≤ w - 1 := Nat.le_sub_one_of_lt h1
-    have h_ble : n % (w ^ len) ≤ (w ^ len) - 1 := Nat.le_sub_one_of_lt h2
-    have h_mul : ((n / (w ^ len)) % w) * (w ^ len) ≤ (w - 1) * (w ^ len) :=
-      Nat.mul_le_mul h_dle (Nat.le_refl _)
-    have h_sum_le : ((n / (w ^ len)) % w) * (w ^ len) + n % (w ^ len) ≤
-        (w - 1) * (w ^ len) + ((w ^ len) - 1) :=
-      Nat.add_le_add h_mul h_ble
-    have h_final : (w - 1) * (w ^ len) + ((w ^ len) - 1) < (w ^ len) * w := by
-      have h_sub_lt : (w ^ len) - 1 < w ^ len := Nat.sub_lt hMpos (by omega)
-      have h_lt : (w - 1) * (w ^ len) + ((w ^ len) - 1) < (w - 1) * (w ^ len) + (w ^ len) :=
-        Nat.add_lt_add_left h_sub_lt ((w - 1) * (w ^ len))
-      have h_eq : (w - 1) * (w ^ len) + (w ^ len) = (w ^ len) * w := by
-        calc
-          (w - 1) * (w ^ len) + (w ^ len) = ((w - 1) + 1) * (w ^ len) := by rw [← Nat.succ_mul]
-          _ = w * (w ^ len) := by rw [Nat.sub_add_cancel (Nat.one_le_of_lt hw)]
-          _ = (w ^ len) * w := Nat.mul_comm _ _
-      simpa [h_eq] using h_lt
-    exact Nat.lt_of_le_of_lt h_sum_le h_final
-  have h1 := Nat.div_add_mod n M
-  have h2 := Nat.div_add_mod (n / M) w
-  have h_n_eq : n = q * MW + R := by
-    dsimp [R, MW, M, q]
-    calc
-      n = (w ^ len) * (n / (w ^ len)) + n % (w ^ len) := by rw [h1]
-      _ = (w ^ len) * (w * ((n / (w ^ len)) / w) + (n / (w ^ len)) % w) + n % (w ^ len) := by
-            rw [h2]
-      _ = (w ^ len) * (w * ((n / (w ^ len)) / w)) + (w ^ len) * ((n / (w ^ len)) % w)
-            + n % (w ^ len) := by rw [Nat.mul_add]
-      _ = ((w ^ len) * w) * ((n / (w ^ len)) / w) + ((n / (w ^ len)) % w) * (w ^ len)
-            + n % (w ^ len) := by
-            rw [Nat.mul_assoc, Nat.mul_comm ((n / (w ^ len)) % w) (w ^ len)]
-      _ = ((n / (w ^ len)) / w) * ((w ^ len) * w)
-            + (((n / (w ^ len)) % w) * (w ^ len) + n % (w ^ len)) := by
-            simp [Nat.mul_comm, Nat.add_comm, Nat.add_assoc]
-  calc
-    n % MW = (q * MW + R) % MW := by rw [h_n_eq]
-    _ = R % MW := by simp
-    _ = R := Nat.mod_eq_of_lt h_bound
-
-theorem fromBaseW_digitsOfBaseW_eq_mod (n w len : ℕ) (hw : 0 < w) :
+theorem fromBaseW_digitsOfBaseW_eq_mod (n w len : ℕ) :
     fromBaseW w (digitsOfBaseW n w len) = n % (w ^ len) := by
   induction len generalizing n with
   | zero => simp [digitsOfBaseW, fromBaseW, Nat.mod_one]
   | succ len ih =>
     simp only [digitsOfBaseW, fromBaseW_cons, digitsOfBaseW_length n w len, ih n]
-    rw [mod_pow_succ_extract n w len hw]
+    rw [Nat.mod_pow_succ, Nat.mul_comm, Nat.add_comm]
 
-theorem fromBaseW_digitsOfBaseW_of_lt (n w len : ℕ) (hw : 0 < w)
+theorem fromBaseW_digitsOfBaseW_of_lt (n w len : ℕ)
     (h : n < w ^ len) : fromBaseW w (digitsOfBaseW n w len) = n := by
-  rw [fromBaseW_digitsOfBaseW_eq_mod n w len hw]
+  rw [fromBaseW_digitsOfBaseW_eq_mod n w len]
   exact Nat.mod_eq_of_lt h
 
-theorem digitsOfBaseW_pointwiseLE_imp_le {a b w len : ℕ} (hw : 0 < w)
+theorem digitsOfBaseW_pointwiseLE_imp_le {a b w len : ℕ}
     (ha : a < w ^ len) (hb : b < w ^ len)
     (hLE : Forall₂ (· ≤ ·) (digitsOfBaseW a w len) (digitsOfBaseW b w len)) :
     a ≤ b := by
   have ha' : fromBaseW w (digitsOfBaseW a w len) = a :=
-    fromBaseW_digitsOfBaseW_of_lt a w len hw ha
+    fromBaseW_digitsOfBaseW_of_lt a w len ha
   have hb' : fromBaseW w (digitsOfBaseW b w len) = b :=
-    fromBaseW_digitsOfBaseW_of_lt b w len hw hb
+    fromBaseW_digitsOfBaseW_of_lt b w len hb
   have hValLE : fromBaseW w (digitsOfBaseW a w len) ≤ fromBaseW w (digitsOfBaseW b w len) :=
     fromBaseW_pointwiseLE hLE
   simpa [ha', hb'] using hValLE
@@ -277,21 +173,8 @@ private theorem checksum_each_le (w : ℕ) (digits : List ℕ)
   omega
 
 private theorem sum_le_length_mul (xs : List ℕ) (M : ℕ)
-    (h : ∀ x ∈ xs, x ≤ M) : xs.sum ≤ xs.length * M := by
-  induction xs with
-  | nil => simp
-  | cons x xs ih =>
-    simp only [List.sum_cons]
-    have hx : x ≤ M := h x (by simp)
-    have hxs : ∀ y ∈ xs, y ≤ M := fun y hy => h y (by simp [hy])
-    have ih' : xs.sum ≤ xs.length * M := ih hxs
-    have h1 : x + xs.sum ≤ M + xs.sum := Nat.add_le_add_right hx xs.sum
-    have h2 : M + xs.sum ≤ M + xs.length * M := Nat.add_le_add_left ih' M
-    have h_eq : M + xs.length * M = (xs.length + 1) * M := by
-      rw [Nat.succ_mul, Nat.add_comm]
-    simp only [List.length_cons]
-    rw [h_eq] at h2
-    exact Nat.le_trans h1 h2
+    (h : ∀ x ∈ xs, x ≤ M) : xs.sum ≤ xs.length * M :=
+  List.sum_le_card_nsmul xs M h
 
 theorem wotsChecksumValue_le {digits : List ℕ} {w l1 : ℕ}
     (hLen : digits.length = l1) (hBound : ∀ d ∈ digits, d < w) :
@@ -358,7 +241,7 @@ theorem wotsChecksumValue_antitone {dig1 dig2 : List ℕ} {w : ℕ}
     (hBound1 : ∀ d ∈ dig1, d < w) (hBound2 : ∀ d ∈ dig2, d < w) :
     wotsChecksumValue w dig2 ≤ wotsChecksumValue w dig1 := by
   rw [wotsChecksumValue, wotsChecksumValue]
-  exact (Forall₂_map_checksum_rev hLE hBound1 hBound2).sum_le
+  exact (Forall₂_map_checksum_rev hLE hBound1 hBound2).sum_le_sum
 
 theorem wotsChecksum_eq_imp_sum_eq {dig1 dig2 : List ℕ} {w : ℕ}
     (hLE : Forall₂ (· ≤ ·) dig1 dig2)
@@ -379,7 +262,6 @@ theorem wotsChecksum_eq_imp_sum_eq {dig1 dig2 : List ℕ} {w : ℕ}
 message-digit vectors are equal. -/
 theorem wots_fullDigits_pointwiseLE_imp_dig_eq
     {dig1 dig2 : List ℕ} {w l1 l2 : ℕ}
-    (hw : 0 < w)
     (hLen1 : dig1.length = l1) (hLen2 : dig2.length = l1)
     (hBound1 : ∀ d ∈ dig1, d < w) (hBound2 : ∀ d ∈ dig2, d < w)
     (hL2suff : l1 * (w - 1) < w ^ l2)
@@ -388,7 +270,7 @@ theorem wots_fullDigits_pointwiseLE_imp_dig_eq
     dig1 = dig2 := by
   simp only [wotsFullDigits] at hLE
   have hlen_prefix : dig1.length = dig2.length := by rw [hLen1, hLen2]
-  obtain ⟨hMsgLE, hcsLE⟩ := hLE.append_inv hlen_prefix
+  obtain ⟨hMsgLE, hcsLE⟩ := Forall₂.append_inv hLE hlen_prefix
   have hCsumGE : wotsChecksumValue w dig2 ≤ wotsChecksumValue w dig1 :=
     wotsChecksumValue_antitone hMsgLE hBound1 hBound2
   have hCsumLE : wotsChecksumValue w dig1 ≤ wotsChecksumValue w dig2 := by
@@ -396,19 +278,18 @@ theorem wots_fullDigits_pointwiseLE_imp_dig_eq
       Nat.lt_of_le_of_lt (wotsChecksumValue_le hLen1 hBound1) hL2suff
     have hC2 : wotsChecksumValue w dig2 < w ^ l2 :=
       Nat.lt_of_le_of_lt (wotsChecksumValue_le hLen2 hBound2) hL2suff
-    exact digitsOfBaseW_pointwiseLE_imp_le hw hC1 hC2 hcsLE
+    exact digitsOfBaseW_pointwiseLE_imp_le hC1 hC2 hcsLE
   have hCsumEq : wotsChecksumValue w dig1 = wotsChecksumValue w dig2 :=
     Nat.le_antisymm hCsumLE hCsumGE
   have hSumEq : dig1.sum = dig2.sum :=
     wotsChecksum_eq_imp_sum_eq hMsgLE hBound1 hBound2 hCsumEq
-  exact hMsgLE.eq_of_sum_eq hSumEq
+  exact Forall₂.eq_of_sum_eq hMsgLE hSumEq
 
 /-- For distinct message-digit vectors, neither full WOTS+ digit vector is pointwise `≤` the
 other: the WOTS+ encoding is incomparable, which is the combinatorial obstruction to
 chain-advancing forgeries. -/
 theorem wots_fullDigits_incomparable
     {dig1 dig2 : List ℕ} {w l1 l2 : ℕ}
-    (hw : 0 < w)
     (hLen1 : dig1.length = l1) (hLen2 : dig2.length = l1)
     (hBound1 : ∀ d ∈ dig1, d < w) (hBound2 : ∀ d ∈ dig2, d < w)
     (hL2suff : l1 * (w - 1) < w ^ l2)
@@ -416,7 +297,7 @@ theorem wots_fullDigits_incomparable
     ¬ Forall₂ (· ≤ ·) (wotsFullDigits dig1 w l1 l2) (wotsFullDigits dig2 w l1 l2) ∧
     ¬ Forall₂ (· ≤ ·) (wotsFullDigits dig2 w l1 l2) (wotsFullDigits dig1 w l1 l2) := by
   refine ⟨fun h => hNeq ?_, fun h => hNeq ?_⟩
-  · exact wots_fullDigits_pointwiseLE_imp_dig_eq hw hLen1 hLen2 hBound1 hBound2 hL2suff h
-  · exact (wots_fullDigits_pointwiseLE_imp_dig_eq hw hLen2 hLen1 hBound2 hBound1 hL2suff h).symm
+  · exact wots_fullDigits_pointwiseLE_imp_dig_eq hLen1 hLen2 hBound1 hBound2 hL2suff h
+  · exact (wots_fullDigits_pointwiseLE_imp_dig_eq hLen2 hLen1 hBound2 hBound1 hL2suff h).symm
 
 end SLHDSA.WotsChecksum
