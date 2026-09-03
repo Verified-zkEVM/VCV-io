@@ -134,4 +134,51 @@ theorem final_validity_branch_canary :
       TweakableHash.SM_DT_PRE_SourceFinalValidity.Experiment collectionClash = pure false :=
   ⟨experiment_valid, experiment_duplicateTarget, experiment_collectionClash⟩
 
+section RunLevelInvariant
+
+open TweakableHash TweakableHash.SM_DT_PRE_SourceFinalValidity
+
+/-- Transfer of the run-level monitor invariant along a transcript pinned to one outcome, in the
+direction that concludes the final predicate holds. -/
+private lemma valid_of_run {adv : Adversary problem} {ps : adv.State} {gs : State Bool Input}
+    (hrun : (simulateQ (oracles problem .only) adv.choose).run .initial = pure (ps, gs))
+    (hvalid : gs.valid = true) :
+    ∀ z ∈ support ((simulateQ (oracles problem .only) adv.choose).run .initial),
+      SourceFinalValidity.Valid problem.numTargets Prod.fst z.2 := by
+  intro z hz
+  have hdecide := valid_eq_decide_valid_of_reachable adv .only hz
+  rw [hrun, support_pure, Set.mem_singleton_iff] at hz
+  subst hz
+  simpa [hvalid] using hdecide.symm
+
+/-- Transfer of the run-level monitor invariant along a transcript pinned to one outcome, in the
+direction that concludes the final predicate fails. -/
+private lemma not_valid_of_run {adv : Adversary problem} {ps : adv.State} {gs : State Bool Input}
+    (hrun : (simulateQ (oracles problem .only) adv.choose).run .initial = pure (ps, gs))
+    (hvalid : gs.valid = false) :
+    ∀ z ∈ support ((simulateQ (oracles problem .only) adv.choose).run .initial),
+      ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2 := by
+  intro z hz
+  have hdecide := valid_eq_decide_valid_of_reachable adv .only hz
+  rw [hrun, support_pure, Set.mem_singleton_iff] at hz
+  subst hz
+  simpa [hvalid] using hdecide.symm
+
+/-- The lifted monitor invariant decides the final predicate correctly on every canary transcript,
+including across the oracle-side message draw: the sampled preimage enters the recorded history but
+the predicate depends only on the tweaks. -/
+theorem reachable_valid_decides_canary :
+    (∀ z ∈ support ((simulateQ (oracles problem .only) valid.choose).run .initial),
+        SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) ∧
+      (∀ z ∈ support
+          ((simulateQ (oracles problem .only) duplicateTarget.choose).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) ∧
+      (∀ z ∈ support
+          ((simulateQ (oracles problem .only) collectionClash.choose).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) :=
+  ⟨valid_of_run run_valid rfl, not_valid_of_run run_duplicateTarget rfl,
+    not_valid_of_run run_collectionClash rfl⟩
+
+end RunLevelInvariant
+
 end SMDTPREFinalValidityTest

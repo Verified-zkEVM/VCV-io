@@ -191,4 +191,66 @@ theorem final_validity_branch_canary :
   ⟨experiment_challengeOnly, experiment_challengeThenCollection,
     experiment_collectionThenChallenge, experiment_repeatedCollection, experiment_repeatedTarget⟩
 
+section RunLevelInvariant
+
+open TweakableHash TweakableHash.SM_DT_TCR_SourceFinalValidity
+
+/-- Transfer of the run-level monitor invariant along a transcript pinned to one outcome, in the
+direction that concludes the final predicate holds. -/
+private lemma valid_of_run {adv : Adversary problem} {ps : adv.State} {gs : State Bool Bool}
+    (hrun : (simulateQ (oracles problem .only) adv.choose).run .initial = pure (ps, gs))
+    (hvalid : gs.valid = true) :
+    ∀ z ∈ support ((simulateQ (oracles problem .only) adv.choose).run .initial),
+      SourceFinalValidity.Valid problem.numTargets Prod.fst z.2 := by
+  intro z hz
+  have hdecide := valid_eq_decide_valid_of_reachable adv .only hz
+  rw [hrun, support_pure, Set.mem_singleton_iff] at hz
+  subst hz
+  simpa [hvalid] using hdecide.symm
+
+/-- Transfer of the run-level monitor invariant along a transcript pinned to one outcome, in the
+direction that concludes the final predicate fails. -/
+private lemma not_valid_of_run {adv : Adversary problem} {ps : adv.State} {gs : State Bool Bool}
+    (hrun : (simulateQ (oracles problem .only) adv.choose).run .initial = pure (ps, gs))
+    (hvalid : gs.valid = false) :
+    ∀ z ∈ support ((simulateQ (oracles problem .only) adv.choose).run .initial),
+      ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2 := by
+  intro z hz
+  have hdecide := valid_eq_decide_valid_of_reachable adv .only hz
+  rw [hrun, support_pure, Set.mem_singleton_iff] at hz
+  subst hz
+  simpa [hvalid] using hdecide.symm
+
+/-- The lifted monitor invariant decides the final predicate correctly on every canary transcript:
+`SourceFinalValidity.Valid` holds on the two legal runs and fails on both clash orders and on the
+repeated target, including after the monitor keeps answering.
+
+Quantifying over the whole support is what makes the run-level lifting load-bearing: the outcome is
+read off `SourceFinalValidity.Valid` at the reachable state, not off the recorded bit. The
+`repeatedTarget` and `poisonThenCollection` cases pin the distinct-target-tweak conjunct and the
+clash orders pin target/collection disjointness. -/
+theorem reachable_valid_decides_canary :
+    (∀ z ∈ support ((simulateQ (oracles problem .only) challengeOnly.choose).run .initial),
+        SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) ∧
+      (∀ z ∈ support ((simulateQ (oracles problem .only) repeatedCollection.choose).run .initial),
+        SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) ∧
+      (∀ z ∈ support
+          ((simulateQ (oracles problem .only) challengeThenCollection.choose).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) ∧
+      (∀ z ∈ support
+          ((simulateQ (oracles problem .only) collectionThenChallenge.choose).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) ∧
+      (∀ z ∈ support ((simulateQ (oracles problem .only) repeatedTarget.choose).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) ∧
+      (∀ z ∈ support
+          ((simulateQ (oracles problem .only) poisonThenCollection.choose).run .initial),
+        ¬ SourceFinalValidity.Valid problem.numTargets Prod.fst z.2) :=
+  ⟨valid_of_run run_challengeOnly rfl, valid_of_run run_repeatedCollection rfl,
+    not_valid_of_run run_challengeThenCollection rfl,
+    not_valid_of_run run_collectionThenChallenge rfl,
+    not_valid_of_run run_repeatedTarget rfl,
+    not_valid_of_run poison_then_collection_history_canary rfl⟩
+
+end RunLevelInvariant
+
 end SMDTTCRFinalValidityTest
