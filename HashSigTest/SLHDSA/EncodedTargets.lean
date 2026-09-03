@@ -140,8 +140,9 @@ theorem deep_sha2_conditions_false :
   rw [htree₁, htree₂] at hcontra
   omega
 
-/-- Every ledger of a profile, including the two roles whose ledger depends on a reduction's own
-selection. -/
+/-- The eight target-role ledgers of a profile, including the two whose ledger depends on a
+reduction's own selection.  The WOTS+ instance base addresses are not a role ledger and are left
+out. -/
 def ledgers (vp : ValidatedParams) : List (String × List Adrs) :=
   [("FORS leaves", forsLeafAddresses vp),
    ("FORS internal nodes", forsTreeAddresses vp),
@@ -238,7 +239,9 @@ def checkFallbackAliasing : IO Unit := do
     (Sha2Address.ofAdrs wideTree).toOption.isNone
   ensure "SHA-2 maps it to the all-zero key"
     (sha2AdrsKey wideTree == zeroBytes 22)
-  ensure "which is the genuine key of the all-zero WOTS-hash address"
+  ensure "the all-zero WOTS-hash address is inside the checked domain"
+    (Sha2Address.ofAdrs Adrs.zero).toOption.isSome
+  ensure "so the all-zero key is genuinely its own compression, not a fallback"
     (sha2AdrsKey Adrs.zero == zeroBytes 22)
   ensure "so SHA-2 does not separate the two"
     (wideTree != Adrs.zero && sha2AdrsKey wideTree == sha2AdrsKey Adrs.zero)

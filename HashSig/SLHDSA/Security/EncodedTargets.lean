@@ -54,10 +54,11 @@ open Concrete
 /-- Arithmetic conditions on a parameter set under which every reachable structural target address
 is FIPS-canonical, and so lies in the domain on which SHAKE's full serialization is injective.
 
-There is one field per ADRS width rather than one per independent condition, so that each proof can
-name the width it is about.  Two of the seven are consequences of their siblings over a validated
-parameter set: `d_le` of `treeBits_canonical`, and `a_le` of `forsIndex_le`.  `d_le_97` and
-`a_le_of_forsIndex_le` record that. -/
+There is one field per bounded quantity rather than one per independent condition, so that each
+proof can name the bound it is about; several fields therefore concern the same four-byte word.
+Two of the seven are consequences of their siblings over a validated parameter set: `d_le` of
+`treeBits_canonical`, and `a_le` of `forsIndex_le`.  `d_le_97` and `a_le_of_forsIndex_le` record
+that. -/
 structure CanonicalAddressBounds (p : Params) : Prop where
   /-- The four-byte layer word holds every hypertree layer. -/
   d_le : p.d ≤ 2 ^ 32
@@ -75,9 +76,10 @@ structure CanonicalAddressBounds (p : Params) : Prop where
   w_le : p.w ≤ 2 ^ 32
 
 /-- The canonical conditions together with the narrower widths SHA-2's compressed `ADRSc` layout
-imposes on the layer and the tree.  Only `treeBits_le` adds anything: `d_le_byte` already follows
-from the canonical record.  The tree condition is tight, and the two fast category-five parameter
-sets saturate it at exactly sixty-four bits. -/
+imposes on the layer and the tree.  Only `treeBits_le` adds anything: over a validated parameter
+set `d_le_byte` already follows from the canonical record, as `CanonicalAddressBounds.d_le_256`
+shows.  The tree condition is tight, and the two fast category-five parameter sets saturate it at
+exactly sixty-four bits. -/
 structure ApprovedAddressBounds (p : Params) : Prop extends CanonicalAddressBounds p where
   /-- The one-byte compressed layer field holds every hypertree layer. -/
   d_le_byte : p.d ≤ 256
@@ -94,8 +96,10 @@ theorem CanonicalAddressBounds.d_le_97 {vp : ValidatedParams}
     Nat.mul_le_mul_left _ hhp
   omega
 
-/-- A one-byte layer field therefore comes for free, which is why `ApprovedAddressBounds` adds only
-one independent condition.  The name differs from that record's field so the two do not shadow. -/
+/-- Over a validated parameter set a one-byte layer field therefore comes for free, which is why
+`ApprovedAddressBounds` adds only one independent condition.  Validity is needed: without a
+positive layer height the twelve-byte tree condition is vacuous and the layer count is unbounded.
+The name differs from that record's field so the two do not shadow. -/
 theorem CanonicalAddressBounds.d_le_256 {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) : vp.params.d ≤ 256 :=
   le_trans hb.d_le_97 (by norm_num)
