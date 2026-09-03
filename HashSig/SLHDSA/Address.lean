@@ -94,6 +94,10 @@ namespace Adrs
 /-- Executable check that a natural number fits in an unsigned big-endian field. -/
 def Fits (widthBytes value : ℕ) : Bool := decide (value < 256 ^ widthBytes)
 
+/-- A field of the given byte width holds exactly the values below `256 ^ width`. -/
+theorem fits_iff {width value : ℕ} : Fits width value = true ↔ value < 256 ^ width := by
+  simp [Fits]
+
 /-- Shared rejecting range check for ADRS setters. -/
 def requireFits (widthBytes value : ℕ) : Except CodecError ℕ :=
   if Fits widthBytes value then .ok value else .error (.outOfRange widthBytes value)
@@ -334,9 +338,36 @@ theorem fits_of_isCanonical (a : Adrs) (h : a.isCanonical = true) :
   simp only [isCanonical, Bool.and_eq_true] at h
   aesop
 
-/-- A field of the given byte width holds exactly the values below `256 ^ width`. -/
-theorem fits_iff {width value : ℕ} : Fits width value = true ↔ value < 256 ^ width := by
-  simp [Fits]
+/-- Field-level sufficient condition for canonicality at an address type with no unused words. -/
+theorem isCanonical_of_fields_free {a : Adrs} {ty : AddrType}
+    (hfree : ty = .wotsHash ∨ ty = .forsTree)
+    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
+    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
+    a.isCanonical = true := by
+  rcases hfree with rfl | rfl <;>
+    simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
+      Fits, decide_eq_true_eq, Option.isSome_some] <;>
+    and_intros <;> first | omega | decide
+
+/-- Field-level sufficient condition at a compression type, whose last two words are unused. -/
+theorem isCanonical_of_fields_compress {a : Adrs} {ty : AddrType}
+    (hcompress : ty = .wotsPk ∨ ty = .forsRoots)
+    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
+    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 = 0) (hword3 : a.word3 = 0) :
+    a.isCanonical = true := by
+  rcases hcompress with rfl | rfl <;>
+    simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
+      Fits, decide_eq_true_eq, Option.isSome_some, hword2, hword3] <;>
+    and_intros <;> first | omega | decide
+
+/-- Field-level sufficient condition at the tree type, whose first word is unused. -/
+theorem isCanonical_of_fields_tree {a : Adrs}
+    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = AddrType.tree.toCode)
+    (hword1 : a.word1 = 0) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
+    a.isCanonical = true := by
+  simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
+    Fits, decide_eq_true_eq, Option.isSome_some, hword1]
+  and_intros <;> first | omega | decide
 
 /-- Only the seven FIPS type codes decode, so a canonical address has a type below seven. -/
 theorem type_le_six_of_isCanonical {a : Adrs} (h : a.isCanonical = true) : a.type ≤ 6 := by

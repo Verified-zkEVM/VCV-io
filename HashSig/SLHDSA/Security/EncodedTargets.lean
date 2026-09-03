@@ -24,7 +24,9 @@ The two encoders need different amounts of the parameter set:
 - SHAKE serializes the full thirty-two byte `ADRS`, so it needs only that every listed address is
   FIPS-canonical, which `CanonicalAddressBounds` secures; and
 - SHA-2 compresses to twenty-two bytes with a one-byte layer and an eight-byte tree, so it needs
-  `ApprovedAddressBounds`, which extends the canonical record with those two narrower widths.
+  `ApprovedAddressBounds`.  Only its eight-byte tree condition is an independent addition: over a
+  validated parameter set the canonical record already forces at most ninety-seven layers, hence a
+  one-byte layer, as `CanonicalAddressBounds.d_le_97` shows.
 
 `AddressFacts` is what the per-ledger lemmas actually establish, and it is stated once for both
 routes: an address is canonical and its layer and tree lie in the hypertree's own ranges.  The
@@ -52,8 +54,10 @@ open Concrete
 /-- Arithmetic conditions on a parameter set under which every reachable structural target address
 is FIPS-canonical, and so lies in the domain on which SHAKE's full serialization is injective.
 
-Each field bounds one or more ADRS words against the four-byte width the canonical layout gives
-them, or the layer and tree against their four- and twelve-byte widths. -/
+There is one field per ADRS width rather than one per independent condition, so that each proof can
+name the width it is about.  Two of the seven are consequences of their siblings over a validated
+parameter set: `d_le` of `treeBits_canonical`, and `a_le` of `forsIndex_le`.  `d_le_97` and
+`a_le_of_forsIndex_le` record that. -/
 structure CanonicalAddressBounds (p : Params) : Prop where
   /-- The four-byte layer word holds every hypertree layer. -/
   d_le : p.d ≤ 2 ^ 32
@@ -70,13 +74,36 @@ structure CanonicalAddressBounds (p : Params) : Prop where
   /-- The four-byte hash-address word holds every WOTS+ chain step. -/
   w_le : p.w ≤ 2 ^ 32
 
-/-- The canonical conditions together with the two narrower widths SHA-2's compressed `ADRSc`
-layout imposes on the layer and the tree. -/
+/-- The canonical conditions together with the narrower widths SHA-2's compressed `ADRSc` layout
+imposes on the layer and the tree.  Only `treeBits_le` adds anything: `d_le_byte` already follows
+from the canonical record.  The tree condition is tight, and the two fast category-five parameter
+sets saturate it at exactly sixty-four bits. -/
 structure ApprovedAddressBounds (p : Params) : Prop extends CanonicalAddressBounds p where
   /-- The one-byte compressed layer field holds every hypertree layer. -/
   d_le_byte : p.d ≤ 256
   /-- The eight-byte compressed tree field holds every layer-zero tree index. -/
   treeBits_le : (p.d - 1) * p.hp ≤ 64
+
+/-- The twelve-byte tree condition already caps the layer count, because every layer below the top
+contributes at least one tree-index bit. -/
+theorem CanonicalAddressBounds.d_le_97 {vp : ValidatedParams}
+    (hb : CanonicalAddressBounds vp.params) : vp.params.d ≤ 97 := by
+  have hhp := vp.valid.hp_pos
+  have h := hb.treeBits_canonical
+  have hmul : (vp.params.d - 1) * 1 ≤ (vp.params.d - 1) * vp.params.hp :=
+    Nat.mul_le_mul_left _ hhp
+  omega
+
+/-- A one-byte layer field therefore comes for free, which is why `ApprovedAddressBounds` adds only
+one independent condition. -/
+theorem CanonicalAddressBounds.d_le_byte {vp : ValidatedParams}
+    (hb : CanonicalAddressBounds vp.params) : vp.params.d ≤ 256 :=
+  le_trans hb.d_le_97 (by norm_num)
+
+/-- The FORS index condition already caps the tree height, because there is at least one tree. -/
+theorem CanonicalAddressBounds.a_le_of_forsIndex_le {vp : ValidatedParams}
+    (hb : CanonicalAddressBounds vp.params) : 2 ^ vp.params.a ≤ 2 ^ 32 :=
+  le_trans (Nat.le_mul_of_pos_left _ vp.valid.k_pos) hb.forsIndex_le
 
 /-- Every FIPS 205 parameter set fits the compressed SHA-2 address layout, hence also the wider
 canonical one. -/
@@ -110,6 +137,19 @@ structure AddressFacts (vp : ValidatedParams) (a : Adrs) : Prop where
 def Sha2Domain (a : Adrs) : Prop :=
   a.isCanonical = true ∧ Adrs.Fits 1 a.layer = true ∧ Adrs.Fits 8 a.tree = true
 
+/-- The domain is exactly what the checked compression boundary accepts, so a canary that runs
+`Sha2Address.ofAdrs` over a ledger is testing this predicate and not a weaker one. -/
+theorem sha2Domain_iff_ofAdrs_isSome {a : Adrs} :
+    Sha2Domain a ↔ (Sha2Address.ofAdrs a).toOption.isSome = true := by
+  unfold Sha2Domain Sha2Address.ofAdrs
+  by_cases hcanonical : a.isCanonical = true
+  · by_cases hlayer : Adrs.Fits 1 a.layer = true
+    · by_cases htree : Adrs.Fits 8 a.tree = true
+      · simp [hcanonical, hlayer, htree, Except.toOption]
+      · simp [hcanonical, hlayer, htree, Except.toOption]
+    · simp [hcanonical, hlayer, Except.toOption]
+  · simp [hcanonical, Except.toOption]
+
 /-- Under the compressed widths, every reachable target address is in the SHA-2 domain. -/
 theorem sha2Domain_of_addressFacts {vp : ValidatedParams} (hb : ApprovedAddressBounds vp.params)
     {a : Adrs} (h : AddressFacts vp a) : Sha2Domain a := by
@@ -121,39 +161,6 @@ theorem sha2Domain_of_addressFacts {vp : ValidatedParams} (hb : ApprovedAddressB
     calc (2 : ℕ) ^ ((vp.params.d - 1) * vp.params.hp) ≤ 2 ^ 64 :=
           Nat.pow_le_pow_right (by norm_num) hb.treeBits_le
       _ = 256 ^ 8 := by norm_num
-
-/-! ## Field-level canonicality -/
-
-/-- Field-level sufficient condition for an address type with no unused words. -/
-theorem isCanonical_of_fields_free {a : Adrs} {ty : AddrType}
-    (hfree : ty = .wotsHash ∨ ty = .forsTree)
-    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
-    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
-    a.isCanonical = true := by
-  rcases hfree with rfl | rfl <;>
-    simp only [Adrs.isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
-      Adrs.Fits, decide_eq_true_eq, Option.isSome_some] <;>
-    and_intros <;> first | omega | decide
-
-/-- Field-level sufficient condition for a compression type, whose last two words are unused. -/
-theorem isCanonical_of_fields_compress {a : Adrs} {ty : AddrType}
-    (hcompress : ty = .wotsPk ∨ ty = .forsRoots)
-    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
-    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 = 0) (hword3 : a.word3 = 0) :
-    a.isCanonical = true := by
-  rcases hcompress with rfl | rfl <;>
-    simp only [Adrs.isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
-      Adrs.Fits, decide_eq_true_eq, Option.isSome_some, hword2, hword3] <;>
-    and_intros <;> first | omega | decide
-
-/-- Field-level sufficient condition for the XMSS tree type, whose first word is unused. -/
-theorem isCanonical_of_fields_tree {a : Adrs}
-    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = AddrType.tree.toCode)
-    (hword1 : a.word1 = 0) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
-    a.isCanonical = true := by
-  simp only [Adrs.isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
-    Adrs.Fits, decide_eq_true_eq, Option.isSome_some, hword1]
-  and_intros <;> first | omega | decide
 
 /-! ## Coordinate bounds -/
 
@@ -187,7 +194,7 @@ theorem addressFacts_wotsInstanceAdrs {vp : ValidatedParams}
   have hword1 : (wotsInstanceAdrs pos).word1 = pos.leaf.val := rfl
   have hword2 : (wotsInstanceAdrs pos).word2 = 0 := rfl
   have hword3 : (wotsInstanceAdrs pos).word3 = 0 := rfl
-  exact ⟨isCanonical_of_fields_free (Or.inl rfl)
+  exact ⟨Adrs.isCanonical_of_fields_free (Or.inl rfl)
       (by rw [hlayerEq]; exact layer_lt_canonical hb pos.layer)
       (by rw [htreeEq]; exact tree_lt_canonical hb _ pos.tree) rfl
       (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf)
@@ -206,7 +213,7 @@ theorem addressFacts_wotsStepAdrs {vp : ValidatedParams}
   have hword3 : (wotsStepAdrs coord step).word3 = step.val := rfl
   have hstep : step.val < 2 ^ 32 := by have := step.isLt; have := hb.w_le; omega
   have hchain : coord.2.val < 2 ^ 32 := by have := coord.2.isLt; have := hb.len_le; omega
-  exact ⟨isCanonical_of_fields_free (Or.inl rfl)
+  exact ⟨Adrs.isCanonical_of_fields_free (Or.inl rfl)
       (by rw [hlayerEq]; exact layer_lt_canonical hb coord.1.layer)
       (by rw [htreeEq]; exact tree_lt_canonical hb _ coord.1.tree) rfl
       (by rw [hword1]; exact leaf_lt_canonical hb coord.1.leaf)
@@ -220,7 +227,7 @@ theorem addressFacts_wotsPkAdrs {vp : ValidatedParams}
   have hlayerEq : (wotsPkAdrs (wotsInstanceAdrs pos)).layer = pos.layer.val := rfl
   have htreeEq : (wotsPkAdrs (wotsInstanceAdrs pos)).tree = pos.tree.val := rfl
   have hword1 : (wotsPkAdrs (wotsInstanceAdrs pos)).word1 = pos.leaf.val := rfl
-  exact ⟨isCanonical_of_fields_compress (Or.inl rfl)
+  exact ⟨Adrs.isCanonical_of_fields_compress (Or.inl rfl)
       (by rw [hlayerEq]; exact layer_lt_canonical hb pos.layer)
       (by rw [htreeEq]; exact tree_lt_canonical hb _ pos.tree) rfl
       (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf) rfl rfl,
@@ -236,7 +243,7 @@ theorem addressFacts_forsNodeAdrs {vp : ValidatedParams}
   have hword1 : (forsNodeAdrs pos.forsAdrs z t).word1 = pos.leaf.val := rfl
   have hword2 : (forsNodeAdrs pos.forsAdrs z t).word2 = z := rfl
   have hword3 : (forsNodeAdrs pos.forsAdrs z t).word3 = t := rfl
-  exact ⟨isCanonical_of_fields_free (Or.inr rfl) (by rw [hlayerEq]; norm_num)
+  exact ⟨Adrs.isCanonical_of_fields_free (Or.inr rfl) (by rw [hlayerEq]; norm_num)
       (by rw [htreeEq]; exact tree_lt_canonical hb 0 pos.tree) rfl
       (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf)
       (by rw [hword2]; exact hz) (by rw [hword3]; exact ht),
@@ -249,7 +256,7 @@ theorem addressFacts_forsPkAdrs {vp : ValidatedParams}
   have hlayerEq : (forsPkAdrs pos.forsAdrs).layer = 0 := rfl
   have htreeEq : (forsPkAdrs pos.forsAdrs).tree = pos.tree.val := rfl
   have hword1 : (forsPkAdrs pos.forsAdrs).word1 = pos.leaf.val := rfl
-  exact ⟨isCanonical_of_fields_compress (Or.inr rfl) (by rw [hlayerEq]; norm_num)
+  exact ⟨Adrs.isCanonical_of_fields_compress (Or.inr rfl) (by rw [hlayerEq]; norm_num)
       (by rw [htreeEq]; exact tree_lt_canonical hb 0 pos.tree) rfl
       (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf) rfl rfl,
     by rw [hlayerEq]; exact vp.valid.d_pos,
@@ -264,7 +271,7 @@ theorem addressFacts_xmssNodeAdrs {vp : ValidatedParams}
   have hword1 : (xmssNodeAdrs coord.toAdrs z t).word1 = 0 := rfl
   have hword2 : (xmssNodeAdrs coord.toAdrs z t).word2 = z := rfl
   have hword3 : (xmssNodeAdrs coord.toAdrs z t).word3 = t := rfl
-  exact ⟨isCanonical_of_fields_tree
+  exact ⟨Adrs.isCanonical_of_fields_tree
       (by rw [hlayerEq]; exact layer_lt_canonical hb coord.layer)
       (by rw [htreeEq]; exact tree_lt_canonical hb _ coord.tree) rfl hword1
       (by rw [hword2]; exact hz) (by rw [hword3]; exact ht),
@@ -272,6 +279,17 @@ theorem addressFacts_xmssNodeAdrs {vp : ValidatedParams}
     by rw [htreeEq]; exact tree_lt_hypertree _ coord.tree⟩
 
 /-! ## Per-ledger facts -/
+
+/-- The WOTS+ instance base addresses are not a target role of their own, being the identifier a
+reduction indexes an instance by rather than a hashed target, but a reduction that carries them
+needs the same facts. -/
+theorem addressFacts_wotsInstanceAddresses (vp : ValidatedParams)
+    (hb : CanonicalAddressBounds vp.params) :
+    ∀ a ∈ wotsInstanceAddresses vp, AddressFacts vp a := by
+  intro a ha
+  simp only [wotsInstanceAddresses, List.mem_map] at ha
+  obtain ⟨pos, -, rfl⟩ := ha
+  exact addressFacts_wotsInstanceAdrs hb pos
 
 theorem addressFacts_forsLeafAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
@@ -379,16 +397,15 @@ theorem addressFacts_wotsPkAddresses (vp : ValidatedParams)
 /-! ## Approved instantiations -/
 
 /-- On a duplicate-free ledger inside the SHA-2 address domain, the compressed `ADRSc` tweaks of
-`sha2Primitives` stay duplicate-free; in particular no listed address reaches the zero fallback. -/
+`sha2Primitives` stay duplicate-free.  The hypothesis is what rules out the zero fallback: every
+listed address compresses successfully, so its key is its own `ADRSc`. -/
 theorem encodeTargets_sha2_nodup {p : Params} {addresses : List Adrs}
     (hnodup : addresses.Nodup) (hdomain : ∀ a ∈ addresses, Sha2Domain a) :
     (encodeTargets (sha2Primitives p) addresses).Nodup := by
   refine encodeTargets_nodup_of_injOn _ _ hnodup fun a ha b hb hkey => ?_
   obtain ⟨haCanonical, haLayer, haTree⟩ := hdomain a ha
   obtain ⟨hbCanonical, hbLayer, hbTree⟩ := hdomain b hb
-  exact sha2AdrsKey_injective_of_domain haCanonical haLayer haTree
-    (Adrs.fits_one_type_of_isCanonical haCanonical) hbCanonical hbLayer hbTree
-    (Adrs.fits_one_type_of_isCanonical hbCanonical) hkey
+  exact sha2AdrsKey_injective_of_domain haCanonical haLayer haTree hbCanonical hbLayer hbTree hkey
 
 /-- On a duplicate-free ledger of canonical addresses, the full thirty-two byte tweaks of
 `shakePrimitives` stay duplicate-free.  Canonicality is needed: the serialization truncates each
@@ -409,27 +426,34 @@ theorem sha2EncodedTargetLedgerConditions (vp : ValidatedParams)
     (hb : ApprovedAddressBounds vp.params) :
     EncodedTargetLedgerConditions vp (sha2Primitives vp.params) where
   forsF := encodeTargets_sha2_nodup (forsLeafAddresses_nodup vp)
-    fun a ha => sha2Domain_of_addressFacts hb (addressFacts_forsLeafAddresses vp hb.1 a ha)
+    fun a ha => sha2Domain_of_addressFacts hb
+      (addressFacts_forsLeafAddresses vp hb.toCanonicalAddressBounds a ha)
   forsH := encodeTargets_sha2_nodup (forsTreeAddresses_nodup vp)
-    fun a ha => sha2Domain_of_addressFacts hb (addressFacts_forsTreeAddresses vp hb.1 a ha)
+    fun a ha => sha2Domain_of_addressFacts hb
+      (addressFacts_forsTreeAddresses vp hb.toCanonicalAddressBounds a ha)
   forsTl := encodeTargets_sha2_nodup (forsRootAddresses_nodup vp)
-    fun a ha => sha2Domain_of_addressFacts hb (addressFacts_forsRootAddresses vp hb.1 a ha)
+    fun a ha => sha2Domain_of_addressFacts hb
+      (addressFacts_forsRootAddresses vp hb.toCanonicalAddressBounds a ha)
   wotsFUd select := encodeTargets_sha2_nodup (selectedWotsAddresses_nodup vp select)
     fun a ha => sha2Domain_of_addressFacts hb
-      (addressFacts_selectedWotsAddresses vp hb.1 select a ha)
+      (addressFacts_selectedWotsAddresses vp hb.toCanonicalAddressBounds select a ha)
   wotsFTcr := encodeTargets_sha2_nodup (wotsStepAddresses_nodup vp)
-    fun a ha => sha2Domain_of_addressFacts hb (addressFacts_wotsStepAddresses vp hb.1 a ha)
+    fun a ha => sha2Domain_of_addressFacts hb
+      (addressFacts_wotsStepAddresses vp hb.toCanonicalAddressBounds a ha)
   wotsFPre select := encodeTargets_sha2_nodup (optionalWotsAddresses_nodup vp select)
     fun a ha => sha2Domain_of_addressFacts hb
-      (addressFacts_optionalWotsAddresses vp hb.1 select a ha)
+      (addressFacts_optionalWotsAddresses vp hb.toCanonicalAddressBounds select a ha)
   wotsTl := encodeTargets_sha2_nodup (wotsPkAddresses_nodup vp)
-    fun a ha => sha2Domain_of_addressFacts hb (addressFacts_wotsPkAddresses vp hb.1 a ha)
+    fun a ha => sha2Domain_of_addressFacts hb
+      (addressFacts_wotsPkAddresses vp hb.toCanonicalAddressBounds a ha)
   xmssH := encodeTargets_sha2_nodup (xmssNodeAddresses_nodup vp)
-    fun a ha => sha2Domain_of_addressFacts hb (addressFacts_xmssNodeAddresses vp hb.1 a ha)
+    fun a ha => sha2Domain_of_addressFacts hb
+      (addressFacts_xmssNodeAddresses vp hb.toCanonicalAddressBounds a ha)
 
 /-- Every reachable target ledger keeps distinct tweaks under the SHAKE instantiation.  Only the
-canonical widths are needed, so this covers parameter sets whose hypertree is too deep or too tall
-for SHA-2's compressed layout. -/
+canonical widths are needed, so this covers parameter sets whose hypertree is too tall for SHA-2's
+compressed eight-byte tree field.  Being too deep for its one-byte layer field is not possible:
+`CanonicalAddressBounds.d_le_byte` rules that out. -/
 theorem shakeEncodedTargetLedgerConditions (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     EncodedTargetLedgerConditions vp (shakePrimitives vp.params) where
@@ -450,6 +474,12 @@ theorem shakeEncodedTargetLedgerConditions (vp : ValidatedParams)
   xmssH := encodeTargets_shake_nodup (xmssNodeAddresses_nodup vp)
     fun a ha => (addressFacts_xmssNodeAddresses vp hb a ha).canonical
 
+/-- The limited-use SHA2-128-24 profile satisfies them too.  It is a SHA-2 profile, so it takes the
+compressed route. -/
+theorem limitedEncodedTargetLedgerConditions (ps : LimitedParameterSet) :
+    EncodedTargetLedgerConditions ps.validatedParams (sha2Primitives ps.params) :=
+  sha2EncodedTargetLedgerConditions ps.validatedParams (limitedApprovedAddressBounds ps)
+
 /-- Every approved FIPS 205 instantiation satisfies the encoded-ledger conditions. -/
 theorem approvedEncodedTargetLedgerConditions (ps : FipsParameterSet) :
     EncodedTargetLedgerConditions ps.validatedParams (approvedPrimitives ps) := by
@@ -457,6 +487,6 @@ theorem approvedEncodedTargetLedgerConditions (ps : FipsParameterSet) :
   rw [approvedPrimitives]
   cases ps.hashFamily with
   | sha2 => exact sha2EncodedTargetLedgerConditions ps.validatedParams hb
-  | shake => exact shakeEncodedTargetLedgerConditions ps.validatedParams hb.1
+  | shake => exact shakeEncodedTargetLedgerConditions ps.validatedParams hb.toCanonicalAddressBounds
 
 end SLHDSA.Security
