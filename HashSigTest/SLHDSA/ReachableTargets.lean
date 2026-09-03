@@ -70,7 +70,7 @@ def checkTwoLayerSizes : IO Unit := do
   ensure "two-layer: 20 WOTS+ public keys" ((wotsPkAddresses twoLayer).length == 20)
   ensure "two-layer: 80 selected UD steps"
     ((selectedWotsAddresses twoLayer fun _ => firstWotsStep twoLayer).length == 80)
-  ensure "two-layer: optional PRE selection drops zero-digit chains"
+  ensure "two-layer: an optional PRE selection drops the chains it skips"
     ((optionalWotsAddresses twoLayer fun coord =>
       if coord.2.val = 0 then none else some (firstWotsStep twoLayer)).length == 60)
 
@@ -90,7 +90,7 @@ def checkOneLayerSizes : IO Unit := do
   ensure "one-layer: 4 WOTS+ public keys" ((wotsPkAddresses oneLayer).length == 4)
   ensure "one-layer: 8 selected UD steps"
     ((selectedWotsAddresses oneLayer fun _ => firstWotsStep oneLayer).length == 8)
-  ensure "one-layer: optional PRE selection drops zero-digit chains"
+  ensure "one-layer: an optional PRE selection drops the chains it skips"
     ((optionalWotsAddresses oneLayer fun coord =>
       if coord.2.val = 0 then none else some (firstWotsStep oneLayer)).length == 4)
 

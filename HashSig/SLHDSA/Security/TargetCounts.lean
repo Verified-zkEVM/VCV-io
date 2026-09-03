@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Quang Dao. All rights reserved.
+Copyright (c) 2026 Nicolas Consigny. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao, Alexander Hicks
+Authors: Nicolas Consigny, Alexander Hicks
 -/
 
 module
@@ -29,11 +29,12 @@ exactly.  The two that are not are upper bounds in the safe direction:
 - `wotsFPre` counts one step per chain, while a preimage reduction may omit the chains whose
   honest digit is zero.
 
-Every count is the one the machine-checked source proof issues, whose artifact fixes them as
-`t_smdtopenpre = t_smdttcr = d * k * t`, `d * k * (t - 1)`, and `d` for the three FORS roles,
-`t_smdtud = t_smdtpre = c * len` and `t_smdttcr = c * len * w` for the three WOTS+ `F` roles, and
-the two hypertree sums for `wotsTl` and `xmssH`.  Its FORS-instance variable `d` instantiates to
-`2 ^ h`, the number of bottom-layer leaves, not to the layer count `Params.d`, and its `c` is
+Every count is the one the machine-checked source proof issues.  Its artifact fixes the FORS roles
+at `d * k * t` (as `t_smdtopenpre`, and as the target count the OpenPRE-from-TCR/DSPR theory
+forwards to the collision and second-preimage games), `d * k * (t - 1)`, and `d`; the three WOTS+
+`F` roles at `t_smdtud = t_smdtpre = c * len` and `t_smdttcr = c * len * w`; and `wotsTl` and
+`xmssH` at the two hypertree sums.  Its FORS-instance variable `d` instantiates to `2 ^ h`, the
+number of bottom-layer leaves, not to the layer count `Params.d`, and its `c` is
 `wotsInstanceCount`.
 
 ## References
@@ -50,9 +51,9 @@ namespace SLHDSA.Security
 /-! ## Closed target-role vocabulary -/
 
 /-- The eight distinct-target hash roles of the classical SLH-DSA security argument.  The WOTS+
-`F` role appears three times because its undetectability, target-collision, and preimage games
-select their targets differently: the first two share the one-step-per-chain cap, while the
-target-collision game ranges over every step of every chain. -/
+`F` role appears three times because its three games select their targets differently: the
+undetectability and preimage games each take one step per chain, while the target-collision game
+ranges over every step of every chain. -/
 inductive TargetRole
   /-- FORS leaf hash `F` (arity one). -/
   | forsF
@@ -142,7 +143,7 @@ theorem targetCount_xmssH_eq (p : Params) (hvalid : p.Valid) :
   xmssTreeCount_mul_pred p hvalid
 
 /-- The undetectability and preimage roles share the one-target-per-WOTS+-chain cap. -/
-theorem targetCount_wotsFUd_eq_wotsFPre (p : Params) :
+@[simp] theorem targetCount_wotsFUd_eq_wotsFPre (p : Params) :
     targetCount p .wotsFUd = targetCount p .wotsFPre := rfl
 
 /-! ## Positivity -/
