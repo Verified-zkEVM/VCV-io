@@ -802,6 +802,7 @@ audit before deletion (see Method).
 | `Examples/Regev.lean`, `Examples/FrankingProtocol.lean` | delete (fully commented out) |
 | `Examples/OneTimePad/Basic.lean:12` `public import Mathlib.Data.Vector.Zip` | no `Vector` use in the file; delete |
 | 23 `open (scoped) BigOperators` | the namespace still exists (`Mathlib/Algebra/BigOperators/Group/Finset/Defs.lean`) but the notation is root-level; no-ops |
+| Twenty-one declarations of the former `ToMathlib/General.lean` with no in-repo consumer by name (after the split in #657): `list_prod_natCast_ne_top`, `Prod.fst/snd_comp_map`, `fst_map_prod_map_eq_map`, `PMF.apply_eq_one_sub_tsum_ite`, the four `abs`-against-a-sign lemmas, `Fintype.sum_inv_card`, `List.Vector.toList_eq_ofFn_get`, `Function.injective2_swap_iff`, `List.card_filter_getElem_eq`, `Vector.cases₂`/`induction₂`, `PMF.bind_eq_zero`, `PMF.heq_iff`, `Option.cast_eq_some_iff`, `PMF.uniformOfFintype_cast`, `tsum_cast`, `list_mapM_loop_eq`, `List.forIn_mprod_yield_eq_foldlM`, `bind_eq_of_map_eq` | delete one build at a time; the `@[simp]`-tagged ones (`fst/snd_map_prod_map`, `Vector.getElem_eq_get`, `Fintype.card_bitVec`, `BitVec.xor_self_xor`, `heq_of_toArray_eq_of_size_eq`, `PMF.some_map_apply_some`) may fire implicitly and are not in this list |
 
 ## Where the queue stands (2026-09-03)
 
