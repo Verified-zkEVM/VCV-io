@@ -290,7 +290,19 @@ jobs:
       # not elaborate anything. Kept out of the timed build commands on purpose: the
       # timing report compares exactly the seven non-test libraries.
       - name: Build the canary library
-        run: lake build VCVioTest
+        shell: bash  # explicit bash gives pipefail; the default `bash -e {0}` does not
+        run: lake build VCVioTest 2>&1 | tee "$BUILD_TIMING_LOG_DIR/test_build.log"
+      # The canary library is the tactic gate: a warning there (an unused tactic, a
+      # redundant `grind` parameter, a deprecated name) is a gate entry going stale, so
+      # it fails the job like a proof-library warning does. Dependency logs are replayed
+      # into this output too, hence the `VCVioTest` path prefixes: the five `sorry`
+      # warnings under `VCVio/CryptoFoundations/**` are the proof-library gate's business.
+      - name: Check canary warning budget
+        run: |
+          python3 ./scripts/check-warning-log.py "$BUILD_TIMING_LOG_DIR/test_build.log" \
+            --path-prefix VCVioTest/ \
+            --path-prefix VCVioTest.lean \
+            --label 'VCVioTest warnings'
       # `LatticeCryptoTest.lean` deliberately omits the native `Main` executables,
       # which remain covered by the nightly FFI workflow. Building this library
       # elaborates every Lean-only lattice helper, vector, and regression canary.

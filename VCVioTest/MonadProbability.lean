@@ -22,8 +22,9 @@ factor**: over a failing monad, `Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= 
 only when `Pr[⊥] = 0` (as in `ProbComp`).
 
 As in the concrete battery: where a fact closes by both `simp` and `grind`, both are kept (the
-mirror); otherwise a single terminal tactic + a `target(...)` note. Operations with no probability
-API yet are recorded as `target` gaps at the end.
+mirror); otherwise a gap pair (`fail_if_success (tac; done)` guard, dated reason, then the working
+closer; see `CONTRIBUTING.md`, *Tactic Gate Files*). Operations with no probability API yet are
+recorded as prose gaps at the end.
 -/
 
 @[expose] public section
@@ -72,9 +73,12 @@ example (mx : m α) (my : α → m β) :
 example (mx : m α) (my : α → m β) : 𝒮[mx >>= my] = 𝒮[mx] >>= fun x => 𝒮[my x] := by simp
 example (mx : m α) (my : α → m β) : 𝒮[mx >>= my] = 𝒮[mx] >>= fun x => 𝒮[my x] := by grind
 
--- target(simp): the `tsum` bind expansions are `@[grind =]` only.
+-- by design: the `tsum` bind expansions are `@[grind =]` only (`gotchas.md` §10); the guard is
+-- the machine-checked form of that decision.
 example (mx : m α) (my : α → m β) (y : β) :
-    Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by grind
+    Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
+  fail_if_success simp  -- gap(simp, 2026-09-03): deliberate, bind expansion is not default simp
+  grind
 example (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by grind
 
@@ -110,9 +114,11 @@ example (f : α → β) (mx : m α) : support (f <$> mx) = f '' support mx := by
 example (f : α → β) (mx : m α) : 𝒮[f <$> mx] = f <$> 𝒮[mx] := by simp
 example (f : α → β) (mx : m α) : 𝒮[f <$> mx] = f <$> 𝒮[mx] := by grind
 
--- target(simp): `probOutput_map` is `@[grind =]` only (`simp` keeps its injective/equiv map forms).
+-- by design: `probOutput_map` is `@[grind =]` only (`simp` keeps its injective/equiv map forms).
 example (f : α → β) (mx : m α) (y : β) :
-    Pr[= y | f <$> mx] = Pr[ fun x => f x = y | mx] := by grind
+    Pr[= y | f <$> mx] = Pr[ fun x => f x = y | mx] := by
+  fail_if_success simp  -- gap(simp, 2026-09-03): deliberate, `probOutput_map` is not simp
+  grind
 
 /-! ## `seqLeft` (`<*`) / `seqRight` (`*>`) — the headline failure factors
 
@@ -128,20 +134,30 @@ example (mx my : m α) (y : α) : Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[=
 example (mx my : m α) (p : α → Prop) :
     Pr[ p | mx <* my] = (1 - Pr[⊥ | my]) * Pr[ p | mx] := by simp
 example (mx my : m α) (p : α → Prop) :
+    Pr[ p | mx <* my] = (1 - Pr[⊥ | my]) * Pr[ p | mx] := by grind
+example (mx my : m α) (p : α → Prop) :
     Pr[ p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[ p | my] := by simp
+example (mx my : m α) (p : α → Prop) :
+    Pr[ p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[ p | my] := by grind
 
 example (mx my : m α) :
     Pr[⊥ | mx <* my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by simp
 example (mx my : m α) :
+    Pr[⊥ | mx <* my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by grind
+example (mx my : m α) :
     Pr[⊥ | mx *> my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by simp
+example (mx my : m α) :
+    Pr[⊥ | mx *> my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by grind
 
 example (mx my : m α) : 𝒮[mx *> my] = 𝒮[mx] *> 𝒮[my] := by simp
+example (mx my : m α) : 𝒮[mx *> my] = 𝒮[mx] *> 𝒮[my] := by grind
 example (mx my : m α) : 𝒮[mx <* my] = 𝒮[mx] <* 𝒮[my] := by simp
+example (mx my : m α) : 𝒮[mx <* my] = 𝒮[mx] <* 𝒮[my] := by grind
 
 /-! ## `seq` (`<*>`)
 
-Failure is inclusion–exclusion; the `Prod.mk` product factors (`simp`-only — `grind` cannot
-factor an applicative product). -/
+Failure is inclusion–exclusion; the `Prod.mk` product factors under both tactics (`simp` by the
+`@[simp high]` rule, `grind` by the same lemma as a `@[grind norm]` rule). -/
 
 example (mf : m (α → β)) (mx : m α) :
     Pr[⊥ | mf <*> mx] = Pr[⊥ | mf] + Pr[⊥ | mx] - Pr[⊥ | mf] * Pr[⊥ | mx] := by simp
@@ -149,6 +165,7 @@ example (mf : m (α → β)) (mx : m α) :
     Pr[⊥ | mf <*> mx] = Pr[⊥ | mf] + Pr[⊥ | mx] - Pr[⊥ | mf] * Pr[⊥ | mx] := by grind
 
 example (mf : m (α → β)) (mx : m α) : 𝒮[mf <*> mx] = 𝒮[mf] <*> 𝒮[mx] := by simp
+example (mf : m (α → β)) (mx : m α) : 𝒮[mf <*> mx] = 𝒮[mf] <*> 𝒮[mx] := by grind
 
 -- the applicative product factors under both: `simp` by the `@[simp high]` rule, `grind` by the
 -- same lemma as a `@[grind norm]` rule (the `Seq.seq` thunk is unindexable for E-matching, but
@@ -169,7 +186,9 @@ failing ones it does not — that contrast is the point. -/
 /-! ## `Id` -/
 example (x : Bool) : Pr[= x | (pure x : Id Bool)] = 1 := by simp
 example (x : Bool) : Pr[= x | (pure x : Id Bool)] = 1 := by grind
-example (mx my : Id Bool) (y : Bool) : Pr[= y | mx *> my] = Pr[= y | my] := by simp
+example (mx my : Id Bool) (y : Bool) : Pr[= y | mx *> my] = Pr[= y | my] := by
+  fail_if_success grind  -- gap(grind, 2026-09-03): the factor `1 - 0` is `ℝ≥0∞` arithmetic
+  simp
 
 /-! ## `OptionT ProbComp` (the failing case used in cryptography) -/
 example (x : Bool) : Pr[= x | (pure x : OptionT ProbComp Bool)] = 1 := by simp
@@ -180,6 +199,8 @@ example : Pr[⊥ | (failure : OptionT ProbComp Bool)] = 1 := by grind
 -- the failure factor is visible here (the discarded draw can fail):
 example (mx my : OptionT ProbComp Bool) (y : Bool) :
     Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by simp
+example (mx my : OptionT ProbComp Bool) (y : Bool) :
+    Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by grind
 
 /-! ## `ExceptT` over `ProbComp` (a failing carrier — failure factor visible) -/
 example (x : Bool) : Pr[= x | (pure x : ExceptT String ProbComp Bool)] = 1 := by simp
@@ -191,23 +212,30 @@ example (x : Bool) : Pr[= x | (pure x : SPMF Bool)] = 1 := by grind
 
 /-! ## `orElse` (`<|>`) and `guard` over `OptionT ProbComp`
 
-The freshly-added API (`probFailure_orElse` / `probOutput_orElse` / `support_guard`). -/
+The `orElse`/`guard` API (`probFailure_orElse` / `probOutput_orElse` / `support_guard`).
+gap(grind): none of these lemmas is a `grind` rule yet; the first entry of each family carries the
+guard. -/
 
 example (oa oa' : OptionT ProbComp Bool) :
-    Pr[⊥ | oa <|> oa'] = Pr[⊥ | oa] * Pr[⊥ | oa'] := by simp
+    Pr[⊥ | oa <|> oa'] = Pr[⊥ | oa] * Pr[⊥ | oa'] := by
+  fail_if_success grind  -- gap(grind, 2026-09-03): `orElse` family
+  simp
 
 example (oa oa' : OptionT ProbComp Bool) (x : Bool) :
     Pr[= x | oa <|> oa'] = Pr[= x | oa] + Pr[⊥ | oa] * Pr[= x | oa'] := by simp
 
 example (p : Prop) [Decidable p] :
-    support (guard p : OptionT ProbComp Unit) = if p then {()} else ∅ := by simp
+    support (guard p : OptionT ProbComp Unit) = if p then {()} else ∅ := by
+  fail_if_success grind  -- gap(grind, 2026-09-03): `guard` family
+  simp
 
 example (p : Prop) [Decidable p] :
     Pr[⊥ | (guard p : OptionT ProbComp Unit)] = if p then 0 else 1 := by simp
 
-/-! # Remaining API gaps (`target`)
+/-! # Remaining API gaps
 
-These common monad operations have no probability lemmas yet; each is a future API addition:
+These common monad operations have no probability lemmas yet (re-verified 2026-09-03); each is a
+future API addition:
 
 * `support_orElse` — `support (oa <|> oa') = support oa ∪ {x | Pr[⊥ | oa] ≠ 0 ∧ x ∈ support oa'}`;
   follows from `probOutput_orElse` via the support↔probability bridge.

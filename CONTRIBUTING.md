@@ -125,6 +125,30 @@ ASCII banners are visually loud, do not appear in the generated documentation, a
 - Respect the module layering documented in [`AGENTS.md`](AGENTS.md).
 - Use `/-! ## Title -/` doc-headers, not ASCII banners, for inline section breaks (see *Documentation Expectations* above).
 
+## Tactic Gate Files
+
+`VCVioTest/ProbabilityTactics.lean`, `VCVioTest/MonadProbability.lean`, `VCVioTest/GrindFailFast.lean`
+and their siblings are the *tactic gates*: they state what the basic tactics must do on the whole
+(see *Normal forms and the tactic contract* in [`docs/agents/probability.md`](docs/agents/probability.md)).
+Four rules keep them honest:
+
+1. **One terminal call.** A positive entry is `by <one tactic>` (or a term): `simp`, `grind`,
+   `gcongr`, `finiteness`, `simp [S]`, `simp only [S]`.
+2. **Known gaps are machine-checked and self-expiring.** Where the expected tactic does not close
+   a goal, the entry is a *gap pair*: `fail_if_success (tac; done)` on its own line, then the
+   working closer, with a dated `gap(tac, YYYY-MM-DD): reason` comment. The guard errors the moment
+   the set improves, so the PR that closes a gap must also retire its guard. One guard covers a
+   family of same-shaped entries when the family is named in the section note.
+3. **No multi-call scripts.** A `;`/multi-line script is allowed only as the closer of a gap pair.
+   A one-call entry that stops closing is fixed in the simp/grind set or filed as a dated gap pair;
+   it is never fixed by adding a second call.
+4. **Normalizers pin their normal form.** Where a set is a normalizer rather than a closer
+   (`simp only [monad_norm]`, `handler_step`), the entry is `simp only [S]` followed by
+   `guard_target =ₛ <expected form>` and then a closer.
+
+Warnings in `VCVioTest` fail CI (the *Check canary warning budget* step), so a stale entry cannot
+linger as a warning.
+
 ## Licensing
 
 This project is licensed under Apache 2.0. By contributing, you agree that your contributions are licensed under the same terms.
