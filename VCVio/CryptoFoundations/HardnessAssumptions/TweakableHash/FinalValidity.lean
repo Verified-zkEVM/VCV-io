@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 module
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.Collection
+public import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 
 /-!
 # Source-final-validity monitoring for multi-target tweakable-hash games
@@ -211,6 +212,27 @@ recovered rather than merely approximated, so it is pinned rather than asserted.
 theorem isEmpty_domain_collectionSpec_empty :
     IsEmpty (collectionSpec (TweakableHashCollection.empty PkSeed Tweak Y)).Domain :=
   ⟨fun q => q.1.elim⟩
+
+/-! ## Invariant preservation -/
+
+/-- The private-randomness summand of a game's oracle implementation answers by lifting its query
+into the state monad, so it never writes the monitor state and preserves every invariant. The state
+belongs to the target and collection summands, which record through `State.recordTarget` and
+`State.recordCollection`. -/
+theorem preservesInv_privateRandomness {σ : Type} (Inv : σ → Prop) :
+    QueryImpl.PreservesInv
+      ((QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp)) Inv := fun t => by
+  rw [QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply]
+  exact StateT.preservesInv_monadLift _ Inv
+
+/-- The collection summand records its query's tweak and writes nothing else, so it maintains the
+monitor invariant at the collection-recording step. -/
+theorem preservesInv_collectionOracle [DecidableEq Tweak] (numTargets : ℕ) (tweakOf : Q → Tweak)
+    (thColl : TweakableHashCollection ι PkSeed Tweak Y) (pk : PkSeed) :
+    QueryImpl.PreservesInv (collectionOracle tweakOf thColl pk) (Invariant numTargets tweakOf) :=
+  fun q st hst z hz => by
+    rw [collectionOracle_run, support_pure, Set.mem_singleton_iff] at hz
+    exact hz ▸ hst.recordCollection numTargets tweakOf st q.2.1
 
 /-! ## Semantic pins -/
 

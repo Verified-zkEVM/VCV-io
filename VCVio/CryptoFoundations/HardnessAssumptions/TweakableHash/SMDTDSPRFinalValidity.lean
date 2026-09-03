@@ -7,6 +7,7 @@ Authors: Quang Dao
 module
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.FinalValidity
 public import VCVio.OracleComp.SimSemantics.Append
+public import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 
 /-!
 # Source-final-validity SM-DT-DSPR
@@ -177,6 +178,43 @@ theorem challengeOracle_run :
     (challengeOracle prob pk (t, m)).run st =
       pure (prob.th.eval pk t m, st.recordTarget prob.numTargets Prod.fst (t, m)) := by
   simp [challengeOracle]
+
+/-! ## Run-level final-validity correspondence -/
+
+section Reachable
+
+/-- The target summand answers every query and records it, so it maintains the monitor invariant at
+the target-recording step. -/
+theorem challengeOracle_preservesInv (prob : Problem ι PkSeed Tweak M Y) (pk : PkSeed) :
+    QueryImpl.PreservesInv (challengeOracle prob pk)
+      (SourceFinalValidity.Invariant prob.numTargets Prod.fst) :=
+  fun (t, m) st hst z hz => by
+    rw [challengeOracle_run, support_pure, Set.mem_singleton_iff] at hz
+    exact hz ▸ hst.recordTarget prob.numTargets Prod.fst st (t, m)
+
+/-- Every summand of the target-selection oracle implementation maintains the monitor invariant:
+private randomness leaves the state untouched, and the challenge and collection oracles record
+through `SourceFinalValidity.State.recordTarget` and
+`SourceFinalValidity.State.recordCollection`. -/
+theorem oracles_preservesInv (prob : Problem ι PkSeed Tweak M Y) (pk : PkSeed) :
+    QueryImpl.PreservesInv (oracles prob pk)
+      (SourceFinalValidity.Invariant prob.numTargets Prod.fst) :=
+  (SourceFinalValidity.preservesInv_privateRandomness _).add
+    ((challengeOracle_preservesInv prob pk).add
+      (SourceFinalValidity.preservesInv_collectionOracle _ _ _ _))
+
+/-- The sticky bit decides the final predicate on every reachable state: the run-level form of the
+monitor invariant, obtained from the initial state and the two recording steps. Both `Experiment`
+and `SPExperiment` read `gameState.valid`, so this is what makes their shared guard mean
+`SourceFinalValidity.Valid`. -/
+theorem valid_eq_decide_valid_of_reachable {prob : Problem ι PkSeed Tweak M Y}
+    (adv : Adversary prob) (pk : PkSeed) {z : adv.State × State Tweak M}
+    (hz : z ∈ support ((simulateQ (oracles prob pk) adv.choose).run .initial)) :
+    z.2.valid = decide (SourceFinalValidity.Valid prob.numTargets Prod.fst z.2) :=
+  (OracleComp.simulateQ_run_preservesInv (oracles prob pk) _ (oracles_preservesInv prob pk)
+    adv.choose .initial (SourceFinalValidity.invariant_initial _ _) z hz).eq_decide _ _ _
+
+end Reachable
 
 end SM_DT_DSPR_SourceFinalValidity
 
