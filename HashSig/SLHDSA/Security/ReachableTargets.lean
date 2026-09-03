@@ -17,9 +17,8 @@ hypertree and, from them, the structural addresses of each `TargetRole`.  The co
 `LayerPosition`, the owner of the FIPS 205 tree/leaf bounds, rather than introducing a second
 reachability model.
 
-For every role the ledger is an executable `List Adrs`.  Each is proved structurally `Nodup`, each
-is proved complete for its role by a membership lemma, and each length is proved equal to the
-formula-derived `targetCount` except where the table below records a bound:
+For every role the ledger is an executable `List Adrs`, proved structurally `Nodup`, whose length
+is proved equal to the formula-derived `targetCount` except where the table below records a bound:
 
 | Role | Ledger | Length |
 | --- | --- | --- |
