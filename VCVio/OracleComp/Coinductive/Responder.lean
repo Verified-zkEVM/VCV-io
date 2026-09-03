@@ -145,14 +145,6 @@ theorem IsExecutable.answerSPMF_unique (R : ProbResponder spec)
   apply SPMF.toMeasure_injective
   rw [← E₁.answerKernel_eq_toMeasure s t, ← E₂.answerKernel_eq_toMeasure s t]
 
-/-- Read a kernel responder through its coherent executable `SPMF` realization.
-Kernel-valued consumers should use `answerKernel` directly. -/
-@[deprecated "Use `answerKernel` for kernel semantics; this is the executable SPMF bridge."
-  (since := "2026-08-26")]
-noncomputable def answer (R : ProbResponder spec) [R.IsExecutable]
-    (s : R.State) (t : spec.Domain) : SPMF (spec.Range t × R.State) :=
-  IsExecutable.answerSPMF s t
-
 /-- Build a kernel responder from an executable SPMF-valued stateful handler. The
 constructor equips the state and answers with local discrete measurable structures;
 it does not install blanket measurable-space instances on the underlying types. -/
@@ -278,15 +270,6 @@ noncomputable instance pullback.instIsExecutable {ι' : Type u}
     rw [Kernel.map_apply _ (measurable_pullback_answerMap w R t) s]
     rw [IsExecutable.answerKernel_eq_toMeasure]
     exact (SPMF.toMeasure_map _ _ (measurable_pullback_answerMap w R t)).symm
-
-/-- Compatibility alias for the former executable-only pullback constructor. -/
-@[deprecated pullback (since := "2026-08-27"), reducible]
-noncomputable def pullbackSPMF {ι' : Type u}
-    {spec' : OracleSpec.{u, u} ι'}
-    (w : PFunctor.Lens spec.toPFunctor spec'.toPFunctor) (R : ProbResponder spec')
-    [R.IsExecutable] :
-    ProbResponder spec :=
-  pullback w R
 
 /-- The executable pulled-back responder's handler translates each query forward and
 maps the target responder's answer back through the lens. -/

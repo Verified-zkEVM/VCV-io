@@ -61,24 +61,6 @@ namespace StateT
 
 variable {σ : Type u} {m : Type u → Type v} [Monad m] [LawfulMonad m]
 
--- @[simp]
--- theorem liftWith_pure {α : Type u} (a : α) :
---     liftWith (fun _ => pure a) = pure a := by
---   sorry -- Implementation details
-
--- @[simp]
--- theorem restore_bind_eq {α β : Type u} (ma : m (α × σ))
---     (f : α → m (β × σ)) :
---     restoreM (ma >>= fun a => f (← restoreM (pure a))) =
---     restoreM ma >>= fun a => restoreM (f a) := by
---   sorry -- Implementation details
-
--- @[simp]
--- theorem restore_liftWith_eq {α : Type u} (x : StateT σ m α) :
---     restoreM (liftWith fun run => run x) = x := by
---   sorry -- Implementation details
-
--- instance : LawfulMonadControl m (StateT σ m) where
 --   liftWith_pure := liftWith_pure
 --   liftWith_bind := liftWith_bind
 --   liftWith_restoreM := liftWith_restoreM

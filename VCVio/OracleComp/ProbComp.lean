@@ -35,7 +35,7 @@ TODO: Some lemmas here don't exist at the `PMF`/`SPMF` levels.
 @[expose] public section
 
 
-open OracleComp BigOperators ENNReal
+open OracleComp ENNReal
 
 universe u v w
 

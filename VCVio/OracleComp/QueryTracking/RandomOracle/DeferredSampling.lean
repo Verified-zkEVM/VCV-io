@@ -43,7 +43,7 @@ provides is the toolbox that those proofs are built out of.
 @[expose] public section
 
 open OracleComp OracleSpec
-open scoped BigOperators ENNReal
+open scoped ENNReal
 
 namespace OracleComp.DeferredSampling
 

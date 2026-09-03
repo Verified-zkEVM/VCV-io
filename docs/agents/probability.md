@@ -57,8 +57,7 @@ available without restating a finiteness bound. A lossless family should additio
 `IsMarkovKernel` instance or theorem.
 
 `ProbabilitySemantics` is the total/lossless semantics bundle used by transformer adapters.
-`MeasureSemantics` is a deprecated compatibility alias. The lower-level `MeasureSemanticsVia`
-continues to describe potentially lossy surface semantics.
+The lower-level `MeasureSemanticsVia` continues to describe potentially lossy surface semantics.
 
 For `ProbResponder`, the kernel is authoritative. `ProbResponder.IsExecutable` optionally carries
 a coherent SPMF realization for machine execution; the deprecated `ProbResponder.answer` is just

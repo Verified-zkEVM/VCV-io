@@ -61,7 +61,6 @@ section basic
 
 variable {m : Type u → Type v} [Monad m] {ω : Type u} {α β γ : Type u}
 
-
 section monoid
 
 variable [Monoid ω]
@@ -184,13 +183,6 @@ instance [Monoid ω] : AlternativeMonad (WriterT ω m) where
 lemma run_failure [Monoid ω] {α : Type u} : (failure : WriterT ω m α).run = failure := rfl
 
 -- instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] :
---     LawfulAlternative (WriterT ω m) := sorry
-  -- map_failure f := sorry
-  -- failure_seq f := sorry
-  -- orElse_failure f := sorry
-  -- failure_orElse f := sorry
-  -- orElse_assoc x y z := sorry
-  -- map_orElse f := sorry
 
 instance [Monoid ω] [LawfulMonad m] : LawfulMonadLift m (WriterT ω m) where
   monadLift_pure x := map_pure (·, 1) x

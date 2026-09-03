@@ -32,7 +32,6 @@ the structural formulas mirror the loops, but this module does not yet prove the
 public section
 
 
-open scoped BigOperators
 
 namespace MLDSA.Concrete
 
