@@ -327,6 +327,21 @@ theorem fromVector_toVector (a : Adrs)
   · simpa [fromVector, toVector, toBytes, toBytesBE, htakeWord3] using
       toInt_toByte a.word3 4 hword3'
 
+/-- Only the seven FIPS type codes decode, so a canonical address has a type below seven. -/
+theorem type_le_six_of_isCanonical {a : Adrs} (h : a.isCanonical = true) : a.type ≤ 6 := by
+  simp only [isCanonical, Bool.and_eq_true] at h
+  have hsome : (AddrType.ofCode a.type).isSome = true := h.1.2
+  match hty : a.type with
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 => omega
+  | (k + 7) => rw [hty] at hsome; simp [AddrType.ofCode] at hsome
+
+/-- A canonical address therefore has a type that fits the one byte `ADRSc` reserves for it. -/
+theorem fits_one_type_of_isCanonical {a : Adrs} (h : a.isCanonical = true) :
+    Fits 1 a.type = true := by
+  have := type_le_six_of_isCanonical h
+  simp only [Fits, decide_eq_true_eq]
+  omega
+
 /-- Canonicality exposes all six exact field-width checks used by serialization. -/
 theorem fits_of_isCanonical (a : Adrs) (h : a.isCanonical = true) :
     Fits 4 a.layer = true ∧ Fits 12 a.tree = true ∧ Fits 4 a.type = true ∧
