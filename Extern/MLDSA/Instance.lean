@@ -18,7 +18,7 @@ Wires the concrete rounding, NTT, sampling, hashing, and byte encoding layers in
 abstract `Primitives` and `Encoding` bundles used by the ML-DSA specification.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLDSA.Concrete
@@ -30,6 +30,7 @@ def hintWeightVec {k : Nat} (h : Vector Hint k) : Nat :=
 
 /-- Concrete ML-DSA primitives obtained by wiring the concrete FIPS 204 algorithms into the
 abstract `Primitives` interface. -/
+@[expose]
 def concretePrimitives (p : Params) : Primitives p where
   High := High
   Power2High := Power2High
@@ -56,6 +57,7 @@ def concretePrimitives (p : Params) : Primitives p where
   hintWeight := hintWeightVec
 
 /-- Concrete ML-DSA byte encoding bundle for a parameter set. -/
+@[expose]
 def concreteEncoding (p : Params) : Encoding p (concretePrimitives p) where
   EncodedPK := ByteArray
   EncodedSK := ByteArray
@@ -72,6 +74,7 @@ def mldsa44Primitives : Primitives mldsa44 :=
   concretePrimitives mldsa44
 
 /-- Concrete primitives specialized to ML-DSA-65. -/
+@[expose]
 def mldsa65Primitives : Primitives mldsa65 :=
   concretePrimitives mldsa65
 
@@ -84,6 +87,7 @@ def mldsa44Encoding : Encoding mldsa44 mldsa44Primitives :=
   concreteEncoding mldsa44
 
 /-- Concrete encoding bundle specialized to ML-DSA-65. -/
+@[expose]
 def mldsa65Encoding : Encoding mldsa65 mldsa65Primitives :=
   concreteEncoding mldsa65
 

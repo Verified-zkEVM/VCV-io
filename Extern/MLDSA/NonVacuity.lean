@@ -42,7 +42,7 @@ since `concreteNTTRingOps` is the only `NTTRingLaws` instance in the tree.  The 
 hypothesis can be met by the concrete layer (whose NTT-correctness trust assumption it inherits).
 -/
 
-@[expose] public section
+public section
 
 open MLDSA
 

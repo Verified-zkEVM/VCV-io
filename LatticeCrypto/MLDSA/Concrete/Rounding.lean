@@ -29,7 +29,7 @@ ML-DSA ring layer and avoiding conversion overhead in the verifier equation
 `Az - c · (t₁ · 2^d)`.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLDSA.Concrete
@@ -104,6 +104,7 @@ def useHintCoeff (h : Bool) (r : Coeff) (gamma2 : ℕ) : ℕ :=
     r1
 
 /-- Coefficient-wise `Power2Round` high part. -/
+@[expose]
 def power2RoundHigh (r : Rq) : Power2High :=
   Vector.ofFn fun i => ((power2RoundCoeff (r.get i)).1 : Coeff)
 
@@ -112,10 +113,12 @@ def power2RoundLow (r : Rq) : Rq :=
   Vector.ofFn fun i => (power2RoundCoeff (r.get i)).2
 
 /-- Coefficient-wise `Power2Round`. -/
+@[expose]
 def power2Round (r : Rq) : Power2High × Rq :=
   (power2RoundHigh r, power2RoundLow r)
 
 /-- Reconstruct `t₁ · 2^d` from a power-2 rounded high representative. -/
+@[expose]
 def power2RoundShift (r1 : Power2High) : Rq :=
   Vector.map (fun x => (power2Scale : Coeff) * x) r1
 

@@ -80,7 +80,7 @@ The abstract `Primitives.Laws` statement is **not** modified by this file; the b
 theorems make explicit which concrete obligations are discharged and which remain.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLDSA.Concrete

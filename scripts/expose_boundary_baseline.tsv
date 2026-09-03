@@ -1,8 +1,8 @@
 Examples	64
-Extern	10
+Extern	0
 HashSig	46
 HashSigTest	3
-LatticeCrypto	44
+LatticeCrypto	37
 LatticeCryptoTest	0
 ToMathlib	56
 VCVio	272
