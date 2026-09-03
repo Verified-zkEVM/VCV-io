@@ -29,6 +29,7 @@ public import VCVioTest.ProbabilityTactics
 public import VCVioTest.ProgramLogic.GCongr
 public import VCVioTest.QueryHom
 public import VCVioTest.RoundByRound.OneRound
+public import VCVioTest.SMDTDSPR
 public import VCVioTest.SMDTDSPRFinalValidity
 public import VCVioTest.SMDTOpenPREFinalValidity
 public import VCVioTest.SMDTPRE
