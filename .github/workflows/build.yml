@@ -46,6 +46,15 @@ jobs:
         if: github.event_name == 'pull_request'
         run: bash scripts/check-pmf-boundary.sh --report "origin/${{ github.base_ref }}"
 
+      - name: Check broad-expose boundary
+        run: |
+          bash scripts/test-expose-boundary.sh
+          bash scripts/check-expose-boundary.sh
+
+      - name: Report broad-expose boundary trend
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-expose-boundary.sh --report "origin/${{ github.base_ref }}"
+
       - name: Check optional complexity backend isolation
         run: |
           bash scripts/test-complexity-backend-isolation.sh
