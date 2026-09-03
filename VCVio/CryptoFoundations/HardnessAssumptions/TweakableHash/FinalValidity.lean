@@ -205,6 +205,13 @@ theorem collectionOracle_run [DecidableEq Tweak] (tweakOf : Q → Tweak)
       pure (thColl.eval q.1 pk q.2.1 q.2.2, st.recordCollection tweakOf q.2.1) := by
   simp [collectionOracle]
 
+/-- At the empty collection (`ι := Empty`) the oracle's query type is uninhabited, so a game
+instantiated there cannot issue a collection query at all. This is what makes the stand-alone notion
+recovered rather than merely approximated, so it is pinned rather than asserted. -/
+theorem isEmpty_domain_collectionSpec_empty :
+    IsEmpty (collectionSpec (TweakableHashCollection.empty PkSeed Tweak Y)).Domain :=
+  ⟨fun q => q.1.elim⟩
+
 /-! ## Semantic pins -/
 
 variable [DecidableEq Tweak] (tweakOf : Q → Tweak)
