@@ -48,18 +48,12 @@ lemma absDiff_comm (a b : ℝ≥0∞) : ENNReal.absDiff a b = ENNReal.absDiff b 
 lemma absDiff_le_add (a b : ℝ≥0∞) : ENNReal.absDiff a b ≤ a + b :=
   add_le_add tsub_le_self tsub_le_self
 
-private lemma tsub_le_tsub_add_tsub (a b c : ℝ≥0∞) : a - c ≤ (a - b) + (b - c) := by
-  rw [tsub_le_iff_right]
-  calc a ≤ (a - b) + b := le_tsub_add
-    _ ≤ (a - b) + ((b - c) + c) := by gcongr; exact le_tsub_add
-    _ = ((a - b) + (b - c)) + c := (add_assoc _ _ _).symm
-
 lemma absDiff_triangle (a b c : ℝ≥0∞) :
     ENNReal.absDiff a c ≤ ENNReal.absDiff a b + ENNReal.absDiff b c := by
   unfold ENNReal.absDiff
   calc (a - c) + (c - a)
       ≤ ((a - b) + (b - c)) + ((c - b) + (b - a)) :=
-        add_le_add (tsub_le_tsub_add_tsub a b c) (tsub_le_tsub_add_tsub c b a)
+        add_le_add (tsub_le_tsub_add_tsub (b := b)) (tsub_le_tsub_add_tsub (b := b))
     _ = ((a - b) + (b - a)) + ((b - c) + (c - b)) := by ring
 
 /-- `|a - b| + 2·min a b = a + b`, the truncated-subtraction form of the identity that splits a

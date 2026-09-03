@@ -2,15 +2,12 @@ module  -- shake: keep-all --deprecated_module: ignore
 
 public import ToMathlib.Analysis.MeanInequalities
 public import ToMathlib.Analysis.SumIntegralComparisons
-public import ToMathlib.Combinatorics.FinPairs
 public import ToMathlib.Control.AlternativeMonad
 public import ToMathlib.Control.Lawful.MonadControl
 public import ToMathlib.Control.Lawful.MonadFunctor
 public import ToMathlib.Control.Lawful.MonadState
-public import ToMathlib.Control.Monad.Commutative
 public import ToMathlib.Control.Monad.Dijkstra
 public import ToMathlib.Control.Monad.Graded
-public import ToMathlib.Control.Monad.Indexed
 public import ToMathlib.Control.Monad.Ordered
 public import ToMathlib.Control.Monad.RelWP
 public import ToMathlib.Control.Monad.Relation
