@@ -6,7 +6,6 @@ Authors: James Waters
 
 module
 public import VCVio.OracleComp.QueryTracking.Collision
-public import ToMathlib.Combinatorics.FinPairs
 public import ToMathlib.Data.ENNReal.Gauss
 
 /-!
@@ -260,7 +259,8 @@ theorem probEvent_logCollision_le_birthday_total_tight {α : Type}
           · exact key i j hi_lt hj_lt hlt hdist heq
           · exact key j i hj_lt hi_lt hgt hdist.symm heq.symm
     _ = (Nat.choose n 2 : ℝ≥0∞) / (Fintype.card (spec.Range default)) := by
-        rw [Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv, Finset.card_filter_fst_lt_snd]
+        rw [Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv, Fintype.card_product_filter_lt,
+          Fintype.card_fin]
 
 omit [DecidableEq ι] in
 /-- **Birthday bound for `loggingOracle`** (total query bound):
