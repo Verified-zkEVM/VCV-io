@@ -32,14 +32,16 @@ makes the published seed-component injective (matching `ρ` forces the same seed
 `t₀`).  Injectivity of the published seed-component is precisely the structural feature that makes
 `keyVector_t0_determined` satisfiable by a deterministic bundle.
 
-**Trust surface.**  `mldsa_laws_inhabited` depends on `propext`, `Classical.choice`, `Quot.sound`,
-**and** the `native_decide` certificate for the concrete `256×256` NTT matrix inversion
-(`MLDSA.Concrete.invNTTMatrix_nttMatrix_entry`, routed in through `concrete_transform`).  That
-`native_decide` axiom is carried by every concrete ML-DSA fact (e.g. `concrete_transform` itself),
-since `concreteNTTRingOps` is the only `NTTRingLaws` instance in the tree.  The *abstract*
-`Laws`-gated theorems (quantified over `nttOps`) are themselves axiom-clean
-`[propext, Classical.choice, Quot.sound]`; this certificate only witnesses that their `Laws`
-hypothesis can be met by the concrete layer (whose NTT-correctness trust assumption it inherits).
+**Trust surface.**  `mldsa_laws_inhabited` depends only on `propext`, `Classical.choice`, and
+`Quot.sound`; no `native_decide` remains in the proof libraries (the dense `256×256` NTT
+certificate was retired in favour of the structural butterfly stages of
+`LatticeCrypto/Ring/NTTCert.lean`, whose round-trip laws are proved from per-stage twiddle
+identities).  What is still trusted is not an axiom but the `@[implemented_by]` refinement
+boundary: the imperative `loopNTT`/`loopInvNTT` kernels are rebound at runtime and are not proved
+extensionally equal to the structural stages, and `multiplyNTTs` is defined through
+`invNTT`/`ntt` rather than verified pointwise.  The *abstract* `Laws`-gated theorems (quantified
+over `nttOps`) are unaffected; this witness only shows that their `Laws` hypothesis can be met by
+the concrete layer.
 -/
 
 @[expose] public section
@@ -95,7 +97,7 @@ theorem seedRevealingPrims_laws (p : Params) (hp : p.isApproved) :
 bundle whose `Primitives.Laws` is inhabited — so the `Laws`-gated ML-DSA theorems
 (`MLDSA.idsWithAbort_complete`, `MLDSA.idsWithAbort_hvzk`, `MLDSA.fipsSign_fipsVerify_correct`,
 `MLDSA.keyGenFromSeed_wApprox_eq`, `MLDSA.recoverT0_eq`) are not true-but-vacuous.  (See the
-trust-surface note in the module docstring on the inherited concrete NTT `native_decide` axiom.) -/
+trust-surface note in the module docstring on the `implemented_by` refinement boundary.) -/
 theorem mldsa_laws_inhabited :
     ∃ (p : Params) (prims : MLDSA.Primitives p),
       Nonempty (MLDSA.Primitives.Laws prims MLDSA.Concrete.concreteNTTRingOps) :=
