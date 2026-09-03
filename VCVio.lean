@@ -64,6 +64,7 @@ public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTTCRF
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTUD
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTUDFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.ToFinalValidity
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.ToFinalValidity.Core
 public import VCVio.CryptoFoundations.HashCommitment
 public import VCVio.CryptoFoundations.IdenSchemeWithAbort
 public import VCVio.CryptoFoundations.KEMDEM
