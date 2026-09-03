@@ -34,12 +34,14 @@ formula-derived `targetCount` except where the table below records a bound:
 
 Every role additionally carries a completeness lemma in the opposite direction, named `mem_` after
 its ledger: the address of each reachable coordinate in that role is listed, and for the optional
-preimage selection, of each coordinate that selection retains.  For the three roles whose ledger
-applies an index formula, `forsF`, `forsH`, and `xmssH`, these lemmas are what rules out a ledger
-built on a wrong convention, which length and distinctness alone would not; for the rest they say
-the coordinate enumeration is exhaustive.  `mem_perfectInternalCoords` characterizes the node
-coordinates the `forsH` and `xmssH` lemmas quantify over.  Whether the construction's free programs
-query only listed addresses is a separate, trace-level statement and is not proved here.
+preimage selection, of each coordinate that selection retains.  Two of them restate the index
+formula their ledger applies, `mem_forsLeafAddresses` for the global leaf index and
+`mem_forsTreeAddresses` for the node index; those two are what rules out a ledger built on a wrong
+convention, which length and distinctness alone would not.  The rest apply the same address term
+their ledger does, so what they add is that the coordinate enumeration behind it is exhaustive.
+`mem_perfectInternalCoords` characterizes the node coordinates `mem_forsTreeAddresses` and
+`mem_xmssNodeAddresses` quantify over.  Whether the construction's free programs query only listed
+addresses is a separate, trace-level statement and is not proved here.
 
 The address lists remain structural `Adrs` values.  A concrete primitive maps them to its
 `AdrsKey` only after proving injectivity on the listed reachable family; no global injectivity of
@@ -111,8 +113,7 @@ def allWotsInstances (vp : ValidatedParams) : List (LayerPosition vp) :=
       ⟨coord.layer, coord.tree, leaf⟩
 
 @[simp]
-theorem allXmssTrees_nodup (vp : ValidatedParams) : (allXmssTrees vp).Nodup :=
-    by
+theorem allXmssTrees_nodup (vp : ValidatedParams) : (allXmssTrees vp).Nodup := by
   rw [allXmssTrees, List.nodup_flatMap]
   constructor
   · intro layer _
@@ -133,8 +134,7 @@ theorem allXmssTrees_nodup (vp : ValidatedParams) : (allXmssTrees vp).Nodup :=
     exact congrArg (fun coord : LayerTreeCoord vp => coord.layer) hab
 
 @[simp]
-theorem allWotsInstances_nodup (vp : ValidatedParams) : (allWotsInstances vp).Nodup :=
-    by
+theorem allWotsInstances_nodup (vp : ValidatedParams) : (allWotsInstances vp).Nodup := by
   rw [allWotsInstances, List.nodup_flatMap]
   constructor
   · intro coord _
@@ -306,7 +306,8 @@ theorem mem_perfectInternalCoords_of_bounds {h z idx : ℕ} (hz : 0 < z) (hzh : 
 
 /-- The listed internal coordinates are exactly the heights in `1 … h` paired with an index below
 the number of nodes at that height. -/
-@[simp] theorem mem_perfectInternalCoords {h z idx : ℕ} :
+@[simp]
+theorem mem_perfectInternalCoords {h z idx : ℕ} :
     (z, idx) ∈ perfectInternalCoords h ↔ 0 < z ∧ z ≤ h ∧ idx < 2 ^ (h - z) :=
   ⟨fun hmem => ⟨perfectInternalCoords_height_pos hmem, perfectInternalCoords_height_le hmem,
       perfectInternalCoords_index_lt hmem⟩,
@@ -540,16 +541,12 @@ theorem forsTreeAddresses_nodup (vp : ValidatedParams) :
       LayerPosition.toAdrs, Adrs.setTreeHeight, Adrs.setTreeIndex,
       Adrs.setKeyPairAddress, Adrs.setTypeAndClear] using congrArg Adrs.word3 hadrs
   rw [hheight] at hglobal
-  have hcPair :
-      BottomPosition.mk ctree cleaf ∈ allBottomPositions vp ∧
-        cnode ∈ perfectInternalCoords vp.params.a := by
-    simpa [forsTreeAddresses, List.product] using hc
-  have hdPair :
-      BottomPosition.mk ctree cleaf ∈ allBottomPositions vp ∧
-        dnode ∈ perfectInternalCoords vp.params.a := by
-    simpa [forsTreeAddresses, List.product] using hd
-  have hcMembership : cnode ∈ perfectInternalCoords vp.params.a := hcPair.2
-  have hdMembership : dnode ∈ perfectInternalCoords vp.params.a := hdPair.2
+  have hcMembership : cnode ∈ perfectInternalCoords vp.params.a :=
+    (show BottomPosition.mk ctree cleaf ∈ allBottomPositions vp ∧
+        cnode ∈ perfectInternalCoords vp.params.a by simpa [List.product] using hc).2
+  have hdMembership : dnode ∈ perfectInternalCoords vp.params.a :=
+    (show BottomPosition.mk ctree cleaf ∈ allBottomPositions vp ∧
+        dnode ∈ perfectInternalCoords vp.params.a by simpa [List.product] using hd).2
   have hcBound := perfectInternalCoords_index_lt hcMembership
   have hdBound := perfectInternalCoords_index_lt hdMembership
   have hcBound' : cnode.2 < 2 ^ (vp.params.a - dnode.1) := by
@@ -778,12 +775,6 @@ theorem selectedWotsAddresses_length (vp : ValidatedParams)
     (selectedWotsAddresses vp select).length = targetCount vp.params .wotsFUd := by
   simp [selectedWotsAddresses, targetCount]
 
-/-- The WOTS UD and PRE roles have the same one-target-per-chain cap. -/
-theorem selectedWotsAddresses_length_eq_wotsFPre (vp : ValidatedParams)
-    (select : WotsChainCoord vp → Fin (vp.params.w - 1)) :
-    (selectedWotsAddresses vp select).length = targetCount vp.params .wotsFPre := by
-  simp [selectedWotsAddresses, targetCount]
-
 /-- Omitting zero-digit PRE chains can only reduce the one-target-per-chain cap. -/
 theorem optionalWotsAddresses_length_le_targetCount (vp : ValidatedParams)
     (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) :
@@ -900,26 +891,31 @@ theorem wotsPkAddresses_nodup (vp : ValidatedParams) :
 /-! ## Completeness of the ledgers
 
 A length and a distinctness proof do not by themselves say that a ledger holds the right addresses.
-These lemmas close that gap in the other direction.  The first four say each coordinate enumeration
-is exhaustive; the rest say that for every coordinate of a role's reachable space, the address that
-role builds from it occurs in that role's ledger. -/
+These lemmas close that gap in the other direction.  `mem_allXmssTrees`, `mem_allWotsInstances`,
+`mem_allBottomPositions`, and `mem_allWotsChains` say that the four coordinate enumerations list
+every coordinate of their type.  Each remaining lemma takes a coordinate and places the address its
+own ledger builds from it in that ledger. -/
 
-@[simp] theorem mem_allXmssTrees (vp : ValidatedParams) (coord : LayerTreeCoord vp) :
+@[simp]
+theorem mem_allXmssTrees (vp : ValidatedParams) (coord : LayerTreeCoord vp) :
     coord ∈ allXmssTrees vp := by
   rcases coord with ⟨layer, tree⟩
   simp [allXmssTrees]
 
-@[simp] theorem mem_allWotsInstances (vp : ValidatedParams) (pos : LayerPosition vp) :
+@[simp]
+theorem mem_allWotsInstances (vp : ValidatedParams) (pos : LayerPosition vp) :
     pos ∈ allWotsInstances vp := by
   rcases pos with ⟨layer, tree, leaf⟩
   simp [allWotsInstances, allXmssTrees]
 
-@[simp] theorem mem_allBottomPositions (vp : ValidatedParams) (pos : BottomPosition vp) :
+@[simp]
+theorem mem_allBottomPositions (vp : ValidatedParams) (pos : BottomPosition vp) :
     pos ∈ allBottomPositions vp := by
   rcases pos with ⟨tree, leaf⟩
   simp [allBottomPositions]
 
-@[simp] theorem mem_allWotsChains (vp : ValidatedParams) (coord : WotsChainCoord vp) :
+@[simp]
+theorem mem_allWotsChains (vp : ValidatedParams) (coord : WotsChainCoord vp) :
     coord ∈ allWotsChains vp := by
   rcases coord with ⟨pos, chain⟩
   simp [allWotsChains]
@@ -986,6 +982,14 @@ theorem mem_optionalWotsAddresses (vp : ValidatedParams)
   simp only [optionalWotsAddresses, List.mem_filterMap]
   exact ⟨coord, mem_allWotsChains vp coord, by rw [hstep]; rfl⟩
 
+/-- The same for a caller holding a full layer position rather than a tree coordinate.  The
+construction carries `LayerPosition` values, and `LayerTreeCoord.ofPosition` forgets the leaf to
+reach the containing tree. -/
+theorem mem_xmssNodeAddresses_of_position (vp : ValidatedParams) (pos : LayerPosition vp)
+    {z idx : ℕ} (hz : 0 < z) (hzh : z ≤ vp.params.hp) (hidx : idx < 2 ^ (vp.params.hp - z)) :
+    xmssNodeAdrs pos.toAdrs z idx ∈ xmssNodeAddresses vp := by
+  simpa using mem_xmssNodeAddresses vp (LayerTreeCoord.ofPosition pos) hz hzh hidx
+
 /-- A total one-step-per-chain selection lists only executed chain steps. -/
 theorem selectedWotsAddresses_subset (vp : ValidatedParams)
     (select : WotsChainCoord vp → Fin (vp.params.w - 1)) :
@@ -1046,8 +1050,10 @@ theorem encodeTargets_nodup_of_subset (prims : Primitives p)
 /-- Explicit encoded-address obligations for the eight target roles in the security architecture.
 
 The `wotsFUd` and `wotsFPre` fields are stated for convenience, not because they are independent:
-both follow from `wotsFTcr` through `encodeTargets_nodup_of_subset` and the two subset lemmas, since
-every selected step is a step of the complete chain-step ledger.  A context that has already
+both follow from `wotsFTcr` through `encodeTargets_nodup_of_subset`, taking its structural
+distinctness from `selectedWotsAddresses_nodup` or `optionalWotsAddresses_nodup` and its membership
+from the matching subset lemma, since every selected step is a step of the complete chain-step
+ledger.  A context that has already
 discharged `wotsFTcr` can fill them in that way.
 
 `ValidatedParams` deliberately does not imply these facts: concrete address encodings have narrower

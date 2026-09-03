@@ -29,14 +29,15 @@ exactly.  The two that are not are upper bounds in the safe direction:
 - `wotsFPre` counts one step per chain, while a preimage reduction may omit the chains whose
   honest digit is zero.
 
-Every count is the one the machine-checked source proof issues.  In its artifact the FORS roles are
-`t_smdtopenpre = d * k * t`, which the OpenPRE-from-collision-and-second-preimage theory forwards to
-those two games as its own `t`, then `t_smdttcr = d * k * (t - 1)` for the node hash and
-`t_smdttcr = d` for the root compression; the three WOTS+ `F` roles are `t_smdtud = t_smdtpre =
-c * len` and `t_smdttcr = c * len * w`; and `wotsTl` and `xmssH` are the two hypertree sums.  The
-name `t_smdttcr` is reused across those theories, so each is read in its own.  The FORS-instance
+Every count is the one the machine-checked source proof issues.  In its artifact the FORS leaf hash
+carries `t_smdtopenpre = d * k * t`, which the OpenPRE-from-TCR-and-DSPR reduction forwards
+unchanged as the target count of the SM-DT-TCR and SM-DT-DSPR games it reduces to; the FORS node
+hash carries `t_smdttcr = d * k * (t - 1)` and the root compression `t_smdttcr = d`; the three
+WOTS+ `F` roles carry `t_smdtud = t_smdtpre = c * len` and `t_smdttcr = c * len * w`; and `wotsTl`
+and `xmssH` carry the two hypertree sums.  `t_smdttcr` names the target count of whichever
+collision game its own theory clones, so each occurrence is read in that theory.  The FORS-instance
 variable `d` instantiates to `2 ^ h`, the number of bottom-layer leaves, not to the layer count
-`Params.d`, and `c` is `wotsInstanceCount`.
+`Params.d`, and `c` is `wotsInstanceCount`.  `OpenPREFromTCRDSPR` formalizes that reduction.
 
 ## References
 
@@ -143,10 +144,10 @@ theorem targetCount_xmssH_eq (p : Params) (hvalid : p.Valid) :
     targetCount p .xmssH = 2 ^ p.h - 1 :=
   xmssTreeCount_mul_pred p hvalid
 
-/-- The undetectability and preimage roles share the one-target-per-WOTS+-chain cap.  The
-orientation keeps `selectedWotsAddresses_length` in simp-normal form, since that lemma names the
-undetectability role. -/
-@[simp] theorem targetCount_wotsFPre_eq_wotsFUd (p : Params) :
+/-- The undetectability and preimage roles share the one-target-per-WOTS+-chain cap, so a bound
+proved for either transfers to the other.  This is deliberately not a simp lemma: either
+orientation would take one of the two role names out of simp-normal form. -/
+theorem targetCount_wotsFPre_eq_wotsFUd (p : Params) :
     targetCount p .wotsFPre = targetCount p .wotsFUd := rfl
 
 /-! ## Positivity -/
