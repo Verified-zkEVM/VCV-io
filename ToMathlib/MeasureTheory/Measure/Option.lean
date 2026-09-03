@@ -35,6 +35,7 @@ noncomputable def dropNone (μ : Measure (Option α)) : Measure α :=
     | some x => Measure.dirac x
 
 /-- The measure family used by `dropNone` is measurable for every measurable result space. -/
+@[fun_prop]
 theorem measurable_dropNoneKernel : Measurable fun value : Option α =>
     match value with
     | none => 0

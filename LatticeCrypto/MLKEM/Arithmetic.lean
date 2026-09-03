@@ -76,14 +76,6 @@ abbrev Rq := coeffRing.Poly
 /-- Transform-domain polynomials for the ML-KEM bundled ring. -/
 abbrev Tq := LatticeCrypto.TransformPoly coeffRing
 
-instance : DecidableEq Rq := by
-  change DecidableEq (LatticeCrypto.Poly Coeff ringDegree)
-  infer_instance
-
-instance : DecidableEq Tq := by
-  change DecidableEq (LatticeCrypto.TransformPoly coeffRing)
-  infer_instance
-
 /-- Length-`k` vectors over `R_q`. -/
 abbrev RqVec (k : ℕ) := LatticeCrypto.PolyVec Rq k
 
