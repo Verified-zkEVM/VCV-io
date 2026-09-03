@@ -143,8 +143,10 @@ occurrence is docstring prose. VCVio's own `syntax (name := vcgenBasic) "vcgen" 
 both parse into a `choice` node, and `evalChoiceAux` only falls through on `unsupportedSyntax`.
 No file imports both today. Decide the rename with the retarget.
 
-**`docs/agents/program-logic.md:679`** still describes the 4.29 state ("Lean v4.29.0 ships
-`mvcgen`…"); the Sym-based `vcgen` and `@[frameproc]` are in core at 4.33 under `Internal`.
+**`docs/agents/program-logic.md:679`** described the 4.29 state ("Lean v4.29.0 ships
+`mvcgen`…"); the Sym-based `vcgen` is in core at 4.33 under `Lean.Elab.Tactic.Do.Internal`.
+Refreshed in #653, which also adds the name-collision canary `VCVioTest/VCGenAmbiguity.lean`
+and records the Loom import allowlist in `docs/agents/module-system.md`.
 
 **Transparency.** `attribute [implicit_reducible] OracleSpec` (`VCVio/OracleComp/OracleSpec.lean:44`)
 is documented as making the wrapper unfold during instance synthesis, but at the pin
@@ -152,12 +154,19 @@ is documented as making the wrapper unfold during instance synthesis, but at the
 instance synthesis runs at `.instances` (`Lean/Meta/SynthInstance.lean:963`), and `.instances`
 "does *not* unfold `[implicit_reducible]`" (`Init/MetaTypes.lean:123–125`). The `HAdd`
 instance case was already fixed by #542 (left at the `instance_reducible` the `instance`
-command supplies). The remaining attribute needs a canary (`VCVioTest/PFunctorFacade.lean`)
-before it is removed or changed to `[instance_reducible]`; the 13
-`attribute [local implicit_reducible]` sites are plausible for implicit-argument defeq, which
-is what the attribute actually does. `warn.redundantExpose` is on by default
+command supplies). **Resolved by experiment (#650):** removing the attribute leaves instance
+synthesis at the erased `PFunctor.mk` literal intact (the canary in
+`VCVioTest/PFunctorFacade.lean` passes without it) but breaks the `.implicit`-transparency
+checks of dependent types (`QueryTracking/RandomOracle/EagerTable.lean`) and of
+instance-implicit arguments (`Decidable` searches in
+`MerkleTree/Inductive/Batch/Disagreement.lean` time out), so it stays with a comment that says
+so. Of the twelve `attribute [local implicit_reducible]` sites, six are load-bearing
+(`Coupling`, `Structures`, `EvalDist/PFunctor`, `Traversal`, `Coercions/Add`, `ReplayFork`) and
+six compiled without and were deleted. Demoting `evalDist` from `@[reducible]` is deferred to
+after the #637 rework: its first failure is the `LawfulEvalDistSemantics (FreeM P)` instance,
+whose fields only unify through the reducible wrapper. `warn.redundantExpose` is on by default
 (`Lean/Elab/MutualDef.lean:1190`); `linter.redundantVisibility` is off by default
-(`Lean/Elab/DeclModifiers.lean:17`).
+(`Lean/Elab/DeclModifiers.lean:17`) and is switched on by the Track A lakefile PR.
 
 **`QueryCount ι := ι → ℕ`** (`VCVio/OracleComp/QueryTracking/Structures.lean:299`, `@[reducible]`,
 with `instance : Monoid (QueryCount ι)` at `:304` using `mul := +`): because the definition is
@@ -189,12 +198,14 @@ not re-proved. `QueryImpl`/`ProbHandler` vs PolyFun `Sampler`/`Decoration` (item
 two vocabularies for one concept; reconcile when the Kleisli–Mealy wiring lands.
 
 **Deprecated aliases.** 25 `@[deprecated (since := "2026-06-25")] alias` blocks and 5 dated
-2026-08-20 remain; no old name has a use in the repo; `docs/agents/gotchas.md` §18 already
-forbids deprecated aliases.
+2026-08-20 remained; no old name had a use in the repo; `docs/agents/gotchas.md` §18 already
+forbids deprecated aliases. Deleted in #647 (38 of 39; the 39th,
+`evalDist_eq_evalSPMF_toMeasure`, is undeprecated by #637 as the adapter's defining equation).
 
 **Fully commented-out modules.** `Examples/Regev.lean` (2 live lines of 553) and
-`Examples/FrankingProtocol.lean` (2 of 296) are imported by `Examples.lean`; `gotchas.md` §5
-says delete.
+`Examples/FrankingProtocol.lean` (2 of 296) were imported by `Examples.lean`; `gotchas.md` §5
+says delete. Deleted in #647, with the commented blocks in `Dijkstra`/`MonadControl`/`WriterT`
+and 20 no-op `BigOperators` opens.
 
 ## Mathlib reading: idioms and integration candidates
 
@@ -791,6 +802,35 @@ audit before deletion (see Method).
 | `Examples/Regev.lean`, `Examples/FrankingProtocol.lean` | delete (fully commented out) |
 | `Examples/OneTimePad/Basic.lean:12` `public import Mathlib.Data.Vector.Zip` | no `Vector` use in the file; delete |
 | 23 `open (scoped) BigOperators` | the namespace still exists (`Mathlib/Algebra/BigOperators/Group/Finset/Defs.lean`) but the notation is root-level; no-ops |
+
+## Where the queue stands (2026-09-03)
+
+| queue item | PR | note |
+|---|---|---|
+| 1 `gcongr`/`finiteness` | #636, then #642 | #642 is the smell test: the four `Monad/Disagreement.lean` hop lemmas and four prefix-event bounds re-proved through `expectedValue` + `gcongr`, 22–30 proof lines each down to 6–18 |
+| 2 `negligible` bridge | #635 | |
+| 3 measure bridge | #637 (reworked), #644, #646 | the `lintegral_countable'_comm` twin was rejected on review and replaced by the one-class `DiscreteEvalDistCompatible` bridge (mass-left by construction, zero `mul_comm`); #644 is the failure measure, #646 `evalDist_mPi = Measure.pi` via `Measure.pi_eq` on boxes |
+| 4 duplicates | this PR (#632) | |
+| 5 lattice | #634 | |
+| 9 hygiene | #647 (C1), #648 (C2) | |
+| 10 design track | #650 (transparency policy + expose ratchet), #651 (selective-expose pilot), #653 (program-logic) | the `QueryCount` monoid leak, cost-layer unification, NTT laws, Poisson summation, and matrix conventions remain open |
+| tooling | #649 (SHA pins, dependabot, templates), Track A PR (drivers, `check-imports.sh`, dead scripts, options) | `CODEOWNERS` was dropped on review: routing files are boilerplate for a small team |
+| gates | #641 | the one-call tactic contract, machine-checked gaps, the `VCVioTest` warning step |
+
+Items 6 (`Lean.Order` bridge, `MonadAttach`, `simulateQ_traverse`), 7 (HashSig digit bridges)
+and 8 (cslib-inspired lemmas) are not started.
+
+**Drift census (probed on the built tree for #647, nothing patched).** Nine `simp…; rfl` sites
+and 51 norm-then-norm pairs were triaged by the rule in `docs/agents/probability.md` (*Normal
+forms and the tactic contract*). Real drift with a known cause: `probOutput_query`'s `rfl`
+closes a `Fintype` instance diamond on `spec.Range t` (a `Type`-universe probe closes by `simp`,
+the polymorphic statement does not); `probEvent_query` leaves a `DecidablePred` mismatch from
+`Classical.decPred` inside `probEvent_liftM_eq_div`; `allOutputsSatisfy_bind` and
+`someOutputSatisfies_bind` leave a genuine quantifier swap for `aesop`; the `monad_norm` sandwich
+in `Examples/CommitmentScheme/Hiding/LoggingBounds/Average.lean` needs a `StateT.run_*` normal
+set. Deliberate, not drift: the `Compatibility.lean` staging of `fs_simp` calls and the ElGamal
+inverse-rewrite pair. `open Classical in` needs no change (Mathlib's linter exempts the `in`
+form).
 
 ## Maintenance
 
