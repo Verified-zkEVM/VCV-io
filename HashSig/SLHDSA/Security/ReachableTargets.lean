@@ -892,8 +892,10 @@ theorem wotsPkAddresses_nodup (vp : ValidatedParams) :
 A length and a distinctness proof do not by themselves say that a ledger holds the right addresses.
 These lemmas close that gap in the other direction.  `mem_allXmssTrees`, `mem_allWotsInstances`,
 `mem_allBottomPositions`, and `mem_allWotsChains` say that the four coordinate enumerations list
-every coordinate of their type.  Each remaining lemma takes a coordinate and places the address its
-own ledger builds from it in that ledger. -/
+every coordinate of their type.  Each `mem_` lemma named after a ledger takes a coordinate and
+places the address that ledger builds from it in that ledger.  The two `_subset` lemmas run the
+other way, placing the addresses of a selection-dependent ledger inside the complete chain-step
+ledger. -/
 
 @[simp]
 theorem mem_allXmssTrees (vp : ValidatedParams) (coord : LayerTreeCoord vp) :

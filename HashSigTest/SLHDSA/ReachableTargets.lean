@@ -94,7 +94,8 @@ def checkOneLayerSizes : IO Unit := do
     ((optionalWotsAddresses oneLayer fun coord =>
       if coord.2.val = 0 then none else some (firstWotsStep oneLayer)).length == 4)
 
-/-- The formula layer agrees with the same hand-computed constants. -/
+/-- The formula layer agrees with the same hand-computed constants, except at the two roles whose
+formula is a bound: there it exceeds the ledger, by one step per WOTS+ chain. -/
 def checkTargetCounts : IO Unit := do
   ensure "two-layer: xmssTreeCount = 5" (xmssTreeCount twoLayerParams == 5)
   ensure "two-layer: wotsInstanceCount = 20" (wotsInstanceCount twoLayerParams == 20)
@@ -140,7 +141,7 @@ def checkLedgerFamily (profile : String) (vp : ValidatedParams) : IO Unit := do
   checkNodup s!"{profile} WOTS+ base addresses" (wotsInstanceAddresses vp)
   -- A WOTS+ base address is an instance identifier, not a separate hash target: it coincides
   -- with the first executed step of chain zero, so it lies inside the step ledger.
-  ensure s!"{profile} WOTS+ base addresses are the chain-zero step-zero targets"
+  ensure s!"{profile} WOTS+ base addresses lie inside the step ledger"
     ((wotsInstanceAddresses vp).all fun a => steps.contains a)
 
 /-! ## Pinned address content -/
@@ -178,6 +179,13 @@ def checkTwoLayerContent : IO Unit := do
     (!(forsTreeAddresses twoLayer).contains (forsNodeAdrs forsBase 2 2))
   ensure "FORS root compression address is a root target"
     ((forsRootAddresses twoLayer).contains (forsPkAdrs forsBase))
+  -- Changing only the type code moves an address between roles rather than out of the ledgers, so
+  -- the type field is what keeps the roles apart.
+  let wrongType := (forsBase.setTypeAndClear .wotsPk).setKeyPairAddress forsBase.getKeyPairAddress
+  ensure "the FORS root address at a WOTS+ public-key type is not a FORS root target"
+    (!(forsRootAddresses twoLayer).contains wrongType)
+  ensure "it is instead the WOTS+ public-key target at the same position"
+    ((wotsPkAddresses twoLayer).contains wrongType)
   -- The layer-zero XMSS tree `2` and its WOTS+ leaf `1` used by the signature.
   let pos0 := LayerPosition.initial twoLayer twoLayerParts
   ensure "initial position is tree 2, leaf 1 at layer 0"
@@ -189,7 +197,7 @@ def checkTwoLayerContent : IO Unit := do
     (wotsBase == wotsLeafAdrs pos0.toAdrs 1)
   ensure "WOTS+ chain 3 step 14 is an executed-step target"
     ((wotsStepAddresses twoLayer).contains ((wotsChainAdrs wotsBase 3).setHashAddress 14))
-  ensure "WOTS+ chain 3 step 15 = w - 1 is never executed"
+  ensure "WOTS+ chain 3 step 15 = w - 1 is not a listed step target"
     (!(wotsStepAddresses twoLayer).contains ((wotsChainAdrs wotsBase 3).setHashAddress 15))
   ensure "WOTS+ chain 4 exceeds len and is not a step target"
     (!(wotsStepAddresses twoLayer).contains ((wotsChainAdrs wotsBase 4).setHashAddress 0))
@@ -246,7 +254,7 @@ def checkOneLayerContent : IO Unit := do
     ((wotsInstanceAddresses oneLayer).contains wotsBase)
   ensure "WOTS+ chain 1 step 254 is an executed-step target"
     ((wotsStepAddresses oneLayer).contains ((wotsChainAdrs wotsBase 1).setHashAddress 254))
-  ensure "WOTS+ chain 1 step 255 = w - 1 is never executed"
+  ensure "WOTS+ chain 1 step 255 = w - 1 is not a listed step target"
     (!(wotsStepAddresses oneLayer).contains ((wotsChainAdrs wotsBase 1).setHashAddress 255))
   ensure "WOTS+ chain 2 exceeds len and is not a step target"
     (!(wotsStepAddresses oneLayer).contains ((wotsChainAdrs wotsBase 2).setHashAddress 0))
