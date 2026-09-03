@@ -105,6 +105,15 @@ example (mx : OptionT ProbComp Bool) (g : Bool → ℝ≥0∞) :
 example (mx : OptionT ProbComp Bool) (my : OptionT ProbComp (Fin 3)) :
     𝒟[mx >>= fun _ => my] = 𝒟[mx] Set.univ • 𝒟[my] := by simp
 
+/-! ## Failure is missing mass -/
+
+example : 𝒟[(failure : OptionT ProbComp Bool)] = 0 := by simp
+example (mx : OptionT ProbComp Bool) : (𝒟[mx]).withFailure {none} = Pr[⊥ | mx] := by simp
+example (mx : OptionT ProbComp Bool) (x : Bool) :
+    (𝒟[mx]).withFailure {some x} = Pr[= x | mx] := by simp
+example (mx : ProbComp Bool) : IsProbabilityMeasure 𝒟[mx] := inferInstance
+example (mx : ProbComp (Fin 3)) (f : Fin 3 → ProbComp (Fin 2)) : 𝒟[mx >>= f] Set.univ = 1 := by
+  simp
 /-! ## A unit-test program
 
 A coin and a die drawn independently, closed on the measure side by the same calls as the

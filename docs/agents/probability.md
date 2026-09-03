@@ -30,6 +30,12 @@ measure specification in scope; `evalDist_eq_evalSPMF_toMeasure` is its definiti
 `evalDist_bind`/`evalDist_map` are deliberately not `@[simp]` on either side: a bind is expanded
 only on request (`gotchas.md` §10), and the measure side has no separate family of sum lemmas.
 
+Failure on the measure side is missing mass, recorded in `VCVio/EvalDist/FailureMeasure.lean`:
+`Pr[⊥ | mx] = 1 - 𝒟[mx] univ`, `IsProbabilityMeasure 𝒟[mx] ↔ Pr[⊥ | mx] = 0` (an instance under
+`NeverFail mx`), `𝒟[failure] = 0`, the failure-completed `(𝒟[mx]).withFailure : Measure (Option α)`
+with `{none}` mass `Pr[⊥ | mx]`, the success mass of `bind`/`map` in `expectedValue` form, and
+`OptionT.evalDist_eq_dropNone` (an `OptionT` computation denotes the `dropNone` of its run).
+
 ## Core Definitions
 
 | Definition | Type | Notation | Defined in |

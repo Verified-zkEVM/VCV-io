@@ -31,6 +31,15 @@ protected class HasEvalSet.LawfulFailure (m : Type u → Type v)
     [AlternativeMonad m] [MonadLiftT m SetM] : Prop where
   support_failure' {α : Type u} : support (failure : m α) = ∅
 
+/-- `failure` in `SPMF` itself has empty support, so the generic failure laws below apply to the
+finite backend directly. -/
+instance : HasEvalSet.LawfulFailure SPMF where
+  support_failure' := by
+    intro α
+    ext x
+    change x ∈ (failure : SPMF _).support ↔ x ∈ (∅ : Set _)
+    simp [SPMF.mem_support_iff, SPMF.failure_apply]
+
 open HasEvalSet (LawfulFailure)
 
 @[simp, grind =]
