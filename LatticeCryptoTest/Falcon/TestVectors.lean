@@ -17,7 +17,7 @@ All vectors use `logn = 9` (Falcon-512) with raw message mode (no pre-hashing,
 no domain-separation context).
 -/
 
-@[expose] public section
+public section
 
 
 namespace Falcon.Test

@@ -337,6 +337,19 @@ The boundary has three canaries and one ratchet:
   in the PR that converts a file so the ceiling follows the decrease; raise
   it only with a stated reason in the PR description.
 
+Converting a file is compiler-guided: switch it to plain `public section`,
+build, and add `@[expose]` to exactly the definitions the errors name (the
+module-system compiler lists them under "may need to be `@[expose]`d", and a
+public `rfl` theorem reports the unexposed definition it would have to unfold).
+Two kinds of file behave differently under that procedure. Proof-style modules
+(examples, tactic gates, lemma canaries) convert with a handful of marks, since
+their definitions are consumed through lemmas. Executable fixtures (a `main`,
+`decide`/`rfl` over the file's own test data, structures whose every field is
+projected by a later example) need nearly every definition exposed, and for
+them `@[expose] public section` is the honest spelling; leave those broad and
+say so in the file's docstring only when the reason is not obvious from the
+content.
+
 Changes that add PolyFun API and consume it from VCVio require two coordinated
 repository changes:
 

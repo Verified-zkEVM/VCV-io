@@ -35,7 +35,7 @@ Conventions (see *Normal forms and the tactic contract* in `docs/agents/probabil
 reachable. `ProbComp` itself never fails — interesting `Pr[⊥ | _]` lives in `OptionT ProbComp`.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ProbComp ENNReal
 

@@ -36,7 +36,7 @@ Conventions (as in the sibling files):
 * **Only stable tactics.** No example hangs or explodes.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ProbComp ENNReal
 
