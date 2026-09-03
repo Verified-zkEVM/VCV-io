@@ -14,8 +14,12 @@ public import VCVio.EvalDist.Monad.Map
 Failing runs contribute nothing, so on a computation that can fail this is the expectation of the
 conditional-on-success value scaled by the success probability, not a conditional expectation.
 
-The laws below are the ones a recursion consumes: `pure` and `bind` (`expectedValue_bind` is the
-tower property), monotonicity, and linearity over a `Finset` sum. `OracleComp.EvalDist.acceptRatio`
+`expectedValue` itself, its unfolding equation, monotonicity (`expectedValue_mono`,
+`expectedValue_mono_of_support`, both `@[gcongr]`), the constant bounds, and additivity live in
+`VCVio.EvalDist.Defs.Basic`, next to `probOutput`, so that the bind equations of
+`VCVio.EvalDist.Monad.Basic` can be stated through it. The laws below are the ones a recursion
+consumes: `pure` and `bind` (`expectedValue_bind` is the tower property) and linearity over a
+`Finset` sum. `OracleComp.EvalDist.acceptRatio`
 and the coordinate-wise fork's `forkSuccOf` are expectations in this sense, and are left written
 out; this definition is for the places where the functional itself recurses.
 -/
@@ -29,13 +33,6 @@ universe u v w
 namespace OracleComp.EvalDist
 
 variable {α β : Type u} {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF]
-
-/-- The expected value of `g` on the output of `mx`. -/
-noncomputable def expectedValue (mx : m α) (g : α → ℝ≥0∞) : ℝ≥0∞ := ∑' x, Pr[= x | mx] * g x
-
-omit [Monad m] in
-theorem expectedValue_def (mx : m α) (g : α → ℝ≥0∞) :
-    expectedValue mx g = ∑' x, Pr[= x | mx] * g x := rfl
 
 @[simp] theorem expectedValue_pure [LawfulMonadLiftT m SPMF] (x : α) (g : α → ℝ≥0∞) :
     expectedValue (pure x : m α) g = g x := by
@@ -64,21 +61,10 @@ theorem expectedValue_map [LawfulMonad m] [LawfulMonadLiftT m SPMF] (mx : m α) 
   exact tsum_congr fun x => by simp only [Function.comp_apply, expectedValue_pure]
 
 omit [Monad m] in
-theorem expectedValue_mono (mx : m α) {g h : α → ℝ≥0∞} (hgh : ∀ x, g x ≤ h x) :
-    expectedValue mx g ≤ expectedValue mx h :=
-  tsum_probOutput_mul_mono mx hgh
-
-omit [Monad m] in
 /-- A constant functional averages to itself, provided no mass is lost to failure. -/
 theorem expectedValue_const {mx : m α} (hmass : Pr[⊥ | mx] = 0) (c : ℝ≥0∞) :
     expectedValue mx (fun _ => c) = c := by
   rw [expectedValue, ENNReal.tsum_mul_right, tsum_probOutput_eq_one' hmass, one_mul]
-
-omit [Monad m] in
-theorem expectedValue_add (mx : m α) (g h : α → ℝ≥0∞) :
-    expectedValue mx (fun x => g x + h x) = expectedValue mx g + expectedValue mx h := by
-  simp only [expectedValue, mul_add]
-  exact ENNReal.tsum_add
 
 omit [Monad m] in
 /-- Linearity over a finite sum of functionals. -/

@@ -594,40 +594,50 @@ section bounds
 
 variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
-@[simp, grind .] lemma probOutput_le_one [MonadLiftT m SPMF] :
+section spmf
+
+variable [MonadLiftT m SPMF]
+
+@[simp, grind .] lemma probOutput_le_one :
     Pr[= x | mx] ≤ 1 := by rw [probOutput_def]; exact PMF.coe_le_one (𝒮[mx]) x
-@[simp, grind .] lemma probOutput_ne_top [MonadLiftT m SPMF] :
+@[simp, grind ., aesop (rule_sets := [finiteness]) safe apply]
+lemma probOutput_ne_top :
     Pr[= x | mx] ≠ ∞ := by rw [probOutput_def]; exact PMF.apply_ne_top (𝒮[mx]) x
-@[simp, grind .] lemma probOutput_lt_top [MonadLiftT m SPMF] :
+@[simp, grind .] lemma probOutput_lt_top :
     Pr[= x | mx] < ∞ := by rw [probOutput_def]; exact PMF.apply_lt_top (𝒮[mx]) x
-@[simp, grind .] lemma not_one_lt_probOutput [MonadLiftT m SPMF] :
+@[simp, grind .] lemma not_one_lt_probOutput :
     ¬ 1 < Pr[= x | mx] := not_lt.2 probOutput_le_one
 
-@[simp] lemma tsum_probOutput_le_one [MonadLiftT m SPMF] : ∑' x : α, Pr[= x | mx] ≤ 1 :=
+@[simp] lemma tsum_probOutput_le_one : ∑' x : α, Pr[= x | mx] ≤ 1 :=
   le_of_le_of_eq (le_add_self) (probFailure_add_tsum_probOutput mx)
-@[simp] lemma tsum_probOutput_ne_top [MonadLiftT m SPMF] : ∑' x : α, Pr[= x | mx] ≠ ⊤ :=
+@[simp, aesop (rule_sets := [finiteness]) safe apply]
+lemma tsum_probOutput_ne_top : ∑' x : α, Pr[= x | mx] ≠ ⊤ :=
   ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one
 
-@[simp, grind .] lemma probEvent_le_one [MonadLiftT m SPMF] : Pr[ p | mx] ≤ 1 := by
+@[simp, grind .] lemma probEvent_le_one : Pr[ p | mx] ≤ 1 := by
   rw [probEvent_def, PMF.toOuterMeasure_apply]
   refine le_of_le_of_eq (ENNReal.tsum_le_tsum ?_) ((𝒮[mx]).tsum_coe)
   exact Set.indicator_le_self (some '' {x | p x}) _
 
-@[simp, grind .] lemma probEvent_ne_top [MonadLiftT m SPMF] :
+@[simp, grind ., aesop (rule_sets := [finiteness]) safe apply]
+lemma probEvent_ne_top :
     Pr[ p | mx] ≠ ∞ := ne_top_of_le_ne_top one_ne_top probEvent_le_one
-@[simp, grind .] lemma probEvent_lt_top [MonadLiftT m SPMF] :
+@[simp, grind .] lemma probEvent_lt_top :
     Pr[ p | mx] < ∞ := lt_top_iff_ne_top.2 probEvent_ne_top
-@[simp, grind .] lemma not_one_lt_probEvent [MonadLiftT m SPMF] :
+@[simp, grind .] lemma not_one_lt_probEvent :
     ¬ 1 < Pr[ p | mx] := not_lt.2 probEvent_le_one
 
-@[simp, grind .] lemma probFailure_le_one [MonadLiftT m SPMF] :
+@[simp, grind .] lemma probFailure_le_one :
     Pr[⊥ | mx] ≤ 1 := by rw [probFailure_def]; exact PMF.coe_le_one (𝒮[mx]) none
-@[simp, grind .] lemma probFailure_ne_top [MonadLiftT m SPMF] :
+@[simp, grind ., aesop (rule_sets := [finiteness]) safe apply]
+lemma probFailure_ne_top :
     Pr[⊥ | mx] ≠ ∞ := by rw [probFailure_def]; exact PMF.apply_ne_top (𝒮[mx]) none
-@[simp, grind .] lemma probFailure_lt_top [MonadLiftT m SPMF] :
+@[simp, grind .] lemma probFailure_lt_top :
     Pr[⊥ | mx] < ∞ := by rw [probFailure_def]; exact PMF.apply_lt_top (𝒮[mx]) none
-@[simp, grind .] lemma not_one_lt_probFailure [MonadLiftT m SPMF] :
+@[simp, grind .] lemma not_one_lt_probFailure :
     ¬ 1 < Pr[⊥ | mx] := not_lt.2 probFailure_le_one
+
+end spmf
 
 @[simp, grind =]
 lemma one_le_probOutput_iff [MonadLiftT m SPMF] : 1 ≤ Pr[= x | mx] ↔ Pr[= x | mx] = 1 := by
@@ -929,6 +939,7 @@ lemma probEvent_le_tsum_probOutput_mul_cost_of_mem_support
     simp
 
 /-- If `p` implies `q` on the `support` of a computation then it is more likely to happen. -/
+@[gcongr]
 lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] := by
   have := Classical.decPred p; have := Classical.decPred q
   simp only [probEvent_eq_tsum_ite]
@@ -946,6 +957,7 @@ lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
 
 /-- If `p` implies `q` everywhere then `p` is less likely than `q`. Convenience
 specialisation of `probEvent_mono` that drops the support hypothesis. -/
+@[gcongr low]
 lemma probEvent_mono'' (h : ∀ x, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
   probEvent_mono (fun x _ => h x)
 
@@ -1025,3 +1037,67 @@ lemma indicator_objective_eq_probEvent (mx : m (α × β)) (R : α → β → Pr
   by_cases hR : R z.1 z.2 <;> simp [hR]
 
 end probEvent_mono_compl
+
+/-! ## Expected values -/
+
+section expectedValue
+
+variable [MonadLiftT m SPMF]
+
+namespace OracleComp.EvalDist
+
+/-- The expected value `∑' x, Pr[= x | mx] * g x` of `g` on the output of `mx`. Failing runs
+contribute nothing, so on a computation that can fail this is the expectation of the
+conditional-on-success value scaled by the success probability, not a conditional expectation.
+`expectedValue` is the head symbol `gcongr` keys on for bind bounds (see
+`probEvent_bind_eq_expectedValue`). -/
+noncomputable def expectedValue (mx : m α) (g : α → ℝ≥0∞) : ℝ≥0∞ := ∑' x, Pr[= x | mx] * g x
+
+theorem expectedValue_def (mx : m α) (g : α → ℝ≥0∞) :
+    expectedValue mx g = ∑' x, Pr[= x | mx] * g x := rfl
+
+/-- Expectation is monotone in the functional. Tagged at low `gcongr` priority so that
+`expectedValue_mono_of_support`, which only asks for the bound on `support mx`, is tried first. -/
+@[gcongr low]
+theorem expectedValue_mono (mx : m α) {g h : α → ℝ≥0∞} (hgh : ∀ x, g x ≤ h x) :
+    expectedValue mx g ≤ expectedValue mx h :=
+  ENNReal.tsum_le_tsum fun x => mul_le_mul' le_rfl (hgh x)
+
+/-- A pointwise bound on the functional bounds the expectation, since the total mass is at most
+one. -/
+theorem expectedValue_le_of_le (mx : m α) {g : α → ℝ≥0∞} {c : ℝ≥0∞} (h : ∀ x, g x ≤ c) :
+    expectedValue mx g ≤ c :=
+  (expectedValue_mono mx h).trans <| by
+    rw [expectedValue, ENNReal.tsum_mul_right]
+    exact mul_le_of_le_one_left zero_le tsum_probOutput_le_one
+
+theorem expectedValue_add (mx : m α) (g h : α → ℝ≥0∞) :
+    expectedValue mx (fun x => g x + h x) = expectedValue mx g + expectedValue mx h := by
+  simp only [expectedValue, mul_add]
+  exact ENNReal.tsum_add
+
+variable [MonadLiftT m SetM] [EvalDistCompatible m]
+
+/-- `expectedValue_mono` with the hypothesis restricted to `support mx`. After `gcongr with x hx`
+the goal is `g x ≤ h x` with `hx : x ∈ support mx` in context. -/
+@[gcongr]
+theorem expectedValue_mono_of_support {mx : m α} {g h : α → ℝ≥0∞}
+    (hgh : ∀ x ∈ support mx, g x ≤ h x) : expectedValue mx g ≤ expectedValue mx h := by
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · exact mul_le_mul' le_rfl (hgh x hx)
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
+
+/-- A bound on the functional over `support mx` bounds the expectation. -/
+theorem expectedValue_le_of_support {mx : m α} {g : α → ℝ≥0∞} {c : ℝ≥0∞}
+    (h : ∀ x ∈ support mx, g x ≤ c) : expectedValue mx g ≤ c :=
+  (expectedValue_mono_of_support h).trans (expectedValue_le_of_le mx fun _ => le_rfl)
+
+end OracleComp.EvalDist
+
+/-- A constant bound on the functional bounds the expectation `∑' x, Pr[= x | mx] * f x`. -/
+lemma tsum_probOutput_mul_le_of_le (mx : m α) {f : α → ℝ≥0∞} {c : ℝ≥0∞} (h : ∀ x, f x ≤ c) :
+    ∑' x, Pr[= x | mx] * f x ≤ c :=
+  OracleComp.EvalDist.expectedValue_le_of_le mx h
+
+end expectedValue
