@@ -33,6 +33,7 @@ public import VCVioTest.SMDTDSPRFinalValidity
 public import VCVioTest.SMDTOpenPREFinalValidity
 public import VCVioTest.SMDTPRE
 public import VCVioTest.SMDTPREFinalValidity
+public import VCVioTest.SMDTRTCR
 public import VCVioTest.SMDTTCR
 public import VCVioTest.SMDTTCRFinalValidity
 public import VCVioTest.SMDTUDFinalValidity
