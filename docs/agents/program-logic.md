@@ -565,8 +565,9 @@ abbreviations, beta/zeta/eta-reduces, and elaborates universes); `Sym.DiscrTree`
 is a thin wrapper over `Lean.Meta.DiscrTree` whose insertion keys come from
 those preprocessed patterns and whose lookup is the pure structural
 `getMatch`. Core also ships a `Sym.Simp.Theorems` bundle (discrimination-tree
-+ `Sym.Simp.Theorem` records) used by the upcoming `mvcgen'` frontend; we do
-not consume it today (see *Future `mvcgen` bridge (deferred)* below) but
++ `Sym.Simp.Theorem` records) that core's own Sym-based `vcgen` consumes
+(`Lean.Elab.Tactic.Do.Internal`); we do not consume it today (see *Future
+`vcgen` bridge (deferred)* below) but
 `Sym.Simp.mkTheoremFromDecl` lets us reconstruct it on demand from the
 `@[wpStep]` registry once the `SymM → TacticM` proof-application bridge
 stabilises in core.
@@ -639,7 +640,7 @@ same candidate pool.
 `Lean.Meta.Sym.*` is still under active development in core Lean. The APIs
 we depend on today (`Sym.Pattern`, `Sym.DiscrTree`, `Sym.insertPattern`,
 `Sym.getMatch`, `Sym.mkPatternFromDeclWithKey`, and `SpecProof` in
-`Lean.Elab.Tactic.Do.SpecAttr`) are all used by `mvcgen`/`mvcgen'` in core
+`Lean.Elab.Tactic.Do.SpecAttr`) are all used by core's `mvcgen` and `vcgen`
 too, so their direction is broadly stable, but none of them carry a
 compat-preservation promise yet. Expect the following classes of churn each
 time we bump the toolchain:
@@ -656,7 +657,7 @@ time we bump the toolchain:
   clearly-marked `Preprocessed-body head matchers` section.
 - **`Sym.Simp.Theorem` field renames / `mkTheoremFromDecl` moves**. We do
   *not* call `mkTheoremFromDecl` today (the dispatcher works off the
-  `Sym.DiscrTree` alone). When the deferred `mvcgen'`/`SymM` bridge lands,
+  `Sym.DiscrTree` alone). When the deferred `vcgen`/`SymM` bridge lands,
   this is where we'll need to pick the bundle back up; until then this
   churn class is no-op for us.
 - **`SpecProof` variants**. We only use `.global` today. If core splits or
@@ -674,12 +675,20 @@ structural `getMatch` over `isDefEq`, and keep an explicit `TacticM`
 fallback path (`rw` / `simp only`) so failures in any single `Sym` lookup
 stage degrade gracefully.
 
-### Future `mvcgen` bridge (deferred)
+### Future `vcgen` bridge (deferred)
 
-Lean v4.29.0 ships `mvcgen` with the classical `Std.Do` handler catalogue
-but does *not* expose a `SymM`-level rewriter we can hand a goal to (the
-`mvcgen'` pilot lives on a newer toolchain). The planned shape of that
-bridge, for when the API lands:
+Lean v4.33 ships two frontends side by side: the classical `mvcgen` over the
+`Std.Do` handler catalogue, and the Sym-based `vcgen` (`Std.Tactic.Do`, with
+its elaborator under `Lean.Elab.Tactic.Do.Internal`). Neither is deprecated at
+this pin. The `SymM`-level rewriter and the `SymM → TacticM` reifier that
+`vcgen` runs on are internal, so there is still no public entry point we can
+hand a goal to. Core's `vcgen` also collides by name with VCVio's `vcgen`
+(`Tactics/Unary.lean`): both are in scope wherever the root `VCVio` module is
+imported, the parser produces a `choice` node, and
+`VCVioTest/VCGenAmbiguity.lean` pins that a `wp`-triple goal still closes in
+that setting. The rename of VCVio's tactic is scheduled for the toolchain bump
+that publishes the WP layer (`Std.WP`), together with the retarget below. The
+planned shape of that bridge, for when the API lands:
 
 1. Build a `Sym.Simp.Theorems` bundle from the union of `@[wpStep]` and
    `@[vcspec]` registries by mapping `Sym.Simp.mkTheoremFromDecl` over
@@ -690,9 +699,9 @@ bridge, for when the API lands:
    `Sym.Simp.Theorems.rewrite thms goal` (or whichever `simpImpl` variant
    core exposes). Results come back as a `Sym.Simp.Step`.
 3. Reify the resulting rewritten goal and proof term back into `TacticM`
-   via the standard `SymM → MetaM` reifier that accompanies `mvcgen'` in
-   core. Until that reifier is public, we cannot close the loop; the
-   current `TacticM`-side dispatch covers the same rules without it.
+   via the `SymM → MetaM` reifier that core's `vcgen` uses internally.
+   Until that reifier is public, we cannot close the loop; the current
+   `TacticM`-side dispatch covers the same rules without it.
 
 Treat any `Sym.*` bump to Lean core as a signal to re-read the two
 registry files and the `runWpStepRules` docstring. If a bump breaks us,

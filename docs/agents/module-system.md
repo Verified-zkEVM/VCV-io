@@ -242,6 +242,24 @@ application, composition, or extensionality law, or add that law at the owning
 module boundary. Constructor equations and definitions whose reduction is an
 intentional documented API may still use `rfl` directly.
 
+## The Loom import boundary
+
+The pinned `loom2` fork supplies the Loom-style `WP`/`Triple` abstractions
+and the `ℝ≥0∞`/`Prob` lattice instances the program logic runs on. Its blast
+radius is kept explicit so the migration to core's WP layer (`Std.WP`, once it
+is public) touches a known set of files. `Loom.*` may be imported only by:
+
+- `ToMathlib/Control/Monad/RelWP.lean`;
+- `VCVio/ProgramLogic/Unary/Loom/Qualitative.lean`,
+  `VCVio/ProgramLogic/Unary/Loom/Quantitative.lean`, and
+  `VCVio/ProgramLogic/Unary/Loom/Probabilistic.lean`; and
+- `VCVio/ProgramLogic/Tactics/Unary/Internals.lean`.
+
+Everything else reaches Loom through those modules' public surface. A new
+`import Loom.…` elsewhere is a review blocker unless it comes with an entry
+here and a reason the existing bridges cannot carry it. This is a convention
+enforced at review, not a script.
+
 ## Restoring `private` correctly
 
 The module migration changed the meaning of `private`: a public exposed body
