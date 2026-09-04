@@ -47,7 +47,8 @@ by a predicate is the case `M' := Subtype p`, `emb := Subtype.val` (`Subtype.val
 unrestricted notion is recovered exactly at `M' := M`, `emb := id` (`Function.injective_id`), so
 the parameterization costs no generality. It buys the ability to state bounds in `|M'|` rather than
 `|M|`: `SM_DT_UD_Problem.HasUniformInputs` fixes `inputGen` to the uniform distribution on the
-subspace, which is what a quantitative bound of the form `q / |M'|` needs.
+subspace, which is what a quantitative bound of the form `q / |M'|` needs, and
+`SM_DT_UD_Problem.HasUniformOutputs` fixes the ideal response to the uniform distribution on `Y`.
 
 The security quantity is oriented: `SM_DT_UD_DirectedAdvantage` is the signed real gap
 `Pr[real = true] - Pr[ideal = true]`. It can be negative, so swapping the real and ideal worlds is
@@ -117,6 +118,15 @@ Uniformity is asked of the subspace rather than of `M`, which is what lets a bou
 @[expose] def SM_DT_UD_Problem.HasUniformInputs [SampleableType M']
     (prob : SM_DT_UD_Problem ι PkSeed Tweak M M' Y) : Prop :=
   prob.inputGen = $ᵗ M'
+
+/-- The ideal challenge distribution is uniform on the output space. Together with
+`SM_DT_UD_Problem.HasUniformInputs`, this selects the challenge distributions of the standard
+subspace-indexed SM-UD experiment while leaving the abstract game available for other hybrids.
+The source-final-validity presentation carries the same pair of predicates as
+`TweakableHash.SM_DT_UD_SourceFinalValidity.Problem.HasUniformOutputs`. -/
+def SM_DT_UD_Problem.HasUniformOutputs [SampleableType Y]
+    (prob : SM_DT_UD_Problem ι PkSeed Tweak M M' Y) : Prop :=
+  prob.outputGen = $ᵗ Y
 
 /-- The stand-alone SM-UD problem, at the empty collection: the collection oracle's query type is
 uninhabited, so the adversary has only the challenge oracle. -/
