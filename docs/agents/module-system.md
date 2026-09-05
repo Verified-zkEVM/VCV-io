@@ -245,9 +245,12 @@ intentional documented API may still use `rfl` directly.
 ## The Loom import boundary
 
 The pinned `loom2` fork supplies the Loom-style `WP`/`Triple` abstractions
-and the `ℝ≥0∞`/`Prob` lattice instances the program logic runs on. Its blast
-radius is kept explicit so the migration to core's WP layer (`Std.WP`, once it
-is public) touches a known set of files. `Loom.*` may be imported only by:
+and the `ℝ≥0∞`/`Prob` lattice instances the program logic runs on. Its import
+boundary keeps a future migration to core's WP layer limited to a known set
+of files. `Std.Do.WP` is already public at the Lean v4.33.1 pin and is used by
+VCVio's `StdDoBridge`; migrating Loom's quantitative and relational clients
+from its three-parameter `PredTrans` and `EPost` APIs to core's `PostShape`
+API is separate work. `Loom.*` may be imported only by:
 
 - `ToMathlib/Control/Monad/RelWP.lean`;
 - `VCVio/ProgramLogic/Unary/Loom/Qualitative.lean`,

@@ -5,7 +5,6 @@ Authors: Devon Tuma
 -/
 
 module
-
 public import VCVio
 
 /-!
@@ -16,10 +15,9 @@ own `vcgen` (`VCVio.ProgramLogic.Tactics.Unary`). Both are in scope in any file 
 root `VCVio` module, because the `Std.Do` bridges under `VCVio/ProgramLogic/Unary/` import
 core's syntax. The parser then produces a `choice` node and the elaborator tries the
 alternatives in turn; this file pins the behaviour that VCVio proofs rely on, namely that a
-`wp`-triple goal is still closed by `vcgen` in that setting. If a toolchain bump makes the choice
-node stop falling through (an error from core's `vcgen` no longer counts as "try the next
-alternative"), this file fails first, and the fix is the planned rename of VCVio's tactic
-rather than a reorder of imports.
+`wp`-triple goal is still closed by `vcgen` in that setting. These examples exercise
+StateT state operations and lifted oracle computations under the combined tactic imports.
+Changes to tactic dispatch or the imported syntax must preserve this proof-mode behavior.
 -/
 
 public section

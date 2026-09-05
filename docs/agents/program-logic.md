@@ -569,8 +569,8 @@ those preprocessed patterns and whose lookup is the pure structural
 (`Lean.Elab.Tactic.Do.Internal`); we do not consume it today (see *Future
 `vcgen` bridge (deferred)* below) but
 `Sym.Simp.mkTheoremFromDecl` lets us reconstruct it on demand from the
-`@[wpStep]` registry once the `SymM → TacticM` proof-application bridge
-stabilises in core.
+`@[wpStep]` registry when VCVio's symbolic proof-application bridge is
+implemented and validated.
 
 Building on `Sym.Pattern` + `Sym.DiscrTree` means our registries share the
 same pattern preprocessing and lookup cost profile as future core tactics,
@@ -677,31 +677,40 @@ stage degrade gracefully.
 
 ### Future `vcgen` bridge (deferred)
 
-Lean v4.33 ships two frontends side by side: the classical `mvcgen` over the
+Lean v4.33.1 ships two frontends side by side: the classical `mvcgen` over the
 `Std.Do` handler catalogue, and the Sym-based `vcgen` (`Std.Tactic.Do`, with
-its elaborator under `Lean.Elab.Tactic.Do.Internal`). Neither is deprecated at
-this pin. The `SymM`-level rewriter and the `SymM → TacticM` reifier that
-`vcgen` runs on are internal, so there is still no public entry point we can
-hand a goal to. Core's `vcgen` also collides by name with VCVio's `vcgen`
+its elaborator under `Lean.Elab.Tactic.Do.Internal`). Both are experimental;
+neither is deprecated at this pin. Core's `vcgen` collides by name with VCVio's `vcgen`
 (`Tactics/Unary.lean`): both are in scope wherever the root `VCVio` module is
 imported, the parser produces a `choice` node, and
 `VCVioTest/VCGenAmbiguity.lean` pins that a `wp`-triple goal still closes in
-that setting. The rename of VCVio's tactic is scheduled for the toolchain bump
-that publishes the WP layer (`Std.WP`), together with the retarget below. The
-planned shape of that bridge, for when the API lands:
+that setting. Resolve the tactic naming when coordinating a future migration
+of this proof mode.
+
+The pinned core already publicly exposes `Sym.Simp.Theorems.rewrite`,
+`Sym.Simp.SimpM.run`, and `SymM.run` through `Lean.Meta.Sym.Simp.Rewrite`
+and its public imports. `SymM.run` executes symbolic computations in `MetaM`;
+rewriting returns a `Sym.Simp.Result` carrying the equality proof when an
+expression changes. VCVio's deferred work is the adapter from its registries
+and quantitative goals to those operations, including expression sharing,
+normal forms, side conditions, and proof application. Likewise, `Std.Do.WP`
+is already public and used by `StdDoBridge`; Loom's quantitative and relational
+clients need a separate migration to the `PostShape` API. The planned shape
+of the symbolic bridge is:
 
 1. Build a `Sym.Simp.Theorems` bundle from the union of `@[wpStep]` and
    `@[vcspec]` registries by mapping `Sym.Simp.mkTheoremFromDecl` over
    `getAllWpStepEntries` (and the analogous `@[vcspec]` accessor). We do
    not eagerly maintain the bundle in the env extension because it only
    feeds the deferred SymM rewriter and pulls in `Lean.Meta.Sym.Simp.*`.
-2. Translate the current `wp`-bearing goal into `Sym.Simp.SimpM` and run
-   `Sym.Simp.Theorems.rewrite thms goal` (or whichever `simpImpl` variant
-   core exposes). Results come back as a `Sym.Simp.Step`.
-3. Reify the resulting rewritten goal and proof term back into `TacticM`
-   via the `SymM → MetaM` reifier that core's `vcgen` uses internally.
-   Until that reifier is public, we cannot close the loop; the current
-   `TacticM`-side dispatch covers the same rules without it.
+2. Prepare the expression from the current `wp`-bearing goal with the sharing
+   and normalization required by `SymM`, then run
+   `Sym.Simp.Theorems.rewrite` through `Sym.Simp.SimpM.run`. Inspect the
+   resulting `Sym.Simp.Result` and any side conditions.
+3. Execute the symbolic computation through `SymM.run`, apply its equality
+   proof to the current goal, and return the remaining goals to `TacticM`.
+   Validate this adapter against the existing tactic examples before adopting
+   it; the current dispatch continues to use `rw` and `simp only`.
 
 Treat any `Sym.*` bump to Lean core as a signal to re-read the two
 registry files and the `runWpStepRules` docstring. If a bump breaks us,
