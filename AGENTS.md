@@ -210,7 +210,7 @@ For the tactic reference, proof-mode entry points, and workflow details, see
 `Lean.Meta.Sym.Pattern` / `Lean.Meta.Sym.DiscrTree`. `Sym.*` is under active
 development in core Lean; see the *Internal Architecture* and *SymM
 Stability Note* sections of that doc for the churn classes to watch at each
-toolchain bump and the re-entry plan for the deferred `mvcgen'`/`SymM`
+toolchain bump and the re-entry plan for the deferred symbolic
 rewriter bridge (when it lands, `Sym.Simp.mkTheoremFromDecl` rebuilds the
 bundle on demand).
 
