@@ -33,7 +33,6 @@ public import VCVio.CryptoFoundations.FiatShamir.WithAbort
 public import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
 public import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
 public import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
-public import VCVio.CryptoFoundations.Fischlin
 public import VCVio.CryptoFoundations.Fischlin.Completeness
 public import VCVio.CryptoFoundations.Fischlin.CostAccounting
 public import VCVio.CryptoFoundations.Fischlin.Defs

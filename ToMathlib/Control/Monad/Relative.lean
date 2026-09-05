@@ -25,12 +25,6 @@ open Category
 
 universe v₁ v₂ v₃ v₄ u₁ u₂ u₃ u₄
 
-namespace Iso
-
--- def assoc : (f ⋙ g) ⋙ h ≅ f ⋙ (g ⋙ h)
-
-end Iso
-
 -- morphism levels before object levels. See note [CategoryTheory universes].
 variable (C : Type u₁) [Category.{v₁} C] (D : Type u₂) [Category.{v₂} D]
 
@@ -185,24 +179,7 @@ structure RelativeMonadHom (M₁ : RelativeMonad C D₁ J₁) (M₂ : RelativeMo
 
 attribute [reassoc (attr := simp)] RelativeMonadHom.map_η RelativeMonadHom.map_μ
 
-namespace RelativeMonadHom
-
-variable {C' : Type u₄} [Category.{v₄} C'] {J' : C' ⥤ C}
-  {M₁ : RelativeMonad C D₁ J₁} {M₂ : RelativeMonad C D₂ J₂}
-
--- @[simps!]
--- def precompose (f : RelativeMonadHom M₁ M₂) :
---     RelativeMonadHom (M₁.precompose J') (M₂.precompose J') where
---   J₁₂ := f.J₁₂
---   φ := sorry
---   map := f.map
-
-end RelativeMonadHom
-
--- #check CategoryTheory.isoEquivOfFullyFaithful
-
 end CategoryTheory
-
 
 /-! ## Old stuff below.
 
@@ -236,42 +213,17 @@ class RelativeFunctor (j : Type u → Type w) (f : Type u → Type v) where
 
 export RelativeFunctor (mapᵣ mapConstᵣ)
 
--- Don't think sequencing makes sense in the relative setting?
-
--- class RelativeSeq (r : Type u → Type w) (m : Type u → Type v) where
---   /-- The relative seq operation -/
---   seqᵣ : {α β : Type u} → m (α → β) → (Unit → m α) → m β
-
--- export RelativeSeq (seqᵣ)
-
--- class RelativeSeqLeft (r : Type u → Type w) (m : Type u → Type v) where
---   /-- The relative seq left operation -/
---   seqLeftᵣ : {α β : Type u} → m α → (Unit → m β) → m α
-
--- export RelativeSeqLeft (seqLeftᵣ)
-
--- class RelativeSeqRight (r : Type u → Type w) (m : Type u → Type v) where
---   /-- The relative seq right operation -/
---   seqRightᵣ : {α β : Type u} → m α → (Unit → m β) → m β
-
--- export RelativeSeqRight (seqRightᵣ)
+/- The relative interface stops at `pure`, `bind`, and `map`: sequencing operations have no
+relative counterpart here, since a relative applicative would need the sequencing structure on
+the root functor as well. -/
 
 @[inherit_doc] infixl:55  " >>=ᵣ " => RelativeBind.bindᵣ
 @[inherit_doc] infixr:100 " <$>ᵣ " => RelativeFunctor.mapᵣ
-
--- class RelativeApplicative (r : Type u → Type w) (m : Type u → Type v)
---     [Seq r] [SeqLeft r] [SeqRight r] extends
---     RelativeFunctor r m, RelativePure r m, Seq m, SeqLeft m, SeqRight m where
---   map f x := Seq.seq (pureᵣ x) (fun _ => f)
---   seqLeft x y := Seq.seq (mapᵣ (fun y => ·) x) y
---   seqRight x y := Seq.seq (mapᵣ (fun y => y *> ·) x) y
 
 /-- Type class for the relative monad -/
 class RelativeMonad (j : Type u → Type w) (m : Type u → Type v)
     extends RelativePure j m, RelativeBind j m, RelativeFunctor j m where
   mapᵣ f x := bindᵣ x (pureᵣ ∘ f)
-
--- bind f fun y => Functor.map y (x ())
 
 @[reducible] def instFunctorOfRelativeMonad {j : Type u → Type w} [Functor j]
     {m : Type u → Type v}
@@ -354,10 +306,6 @@ theorem map_eq_pure_bindᵣ [RelativeMonad j m] [LawfulRelativeMonad j m]
     (f : j α → j β) (x : m α) : f <$>ᵣ x = x >>=ᵣ fun a => pureᵣ (f a) := by
   rw [← bind_pure_compᵣ]
 
--- theorem seq_eq_bind_mapᵣ [RelativeMonad j m] [LawfulRelativeMonad j m]
---     (f : m (α → β)) (x : m α) : f <*> x = f >>=ᵣ (. <$>ᵣ x) := by
---   rw [← bind_mapᵣ]
-
 theorem bind_congrᵣ [RelativeBind j m] {x : m α} {f g : j α → m β} (h : ∀ a, f a = g a) :
     x >>=ᵣ f = x >>=ᵣ g := by
   simp [funext h]
@@ -369,20 +317,6 @@ theorem bind_pure_unitᵣ [RelativeMonad j m] [LawfulRelativeMonad j m] {x : m P
 theorem map_congrᵣ [RelativeFunctor j m] {x : m α} {f g : j α → j β} (h : ∀ a, f a = g a) :
     (f <$>ᵣ x : m β) = g <$>ᵣ x := by
   simp [funext h]
-
--- theorem seq_eq_bindᵣ [RelativeMonad j m] [LawfulRelativeMonad j m] (mf : m (α → β)) (x : m α) :
---     mf <*> x = mf >>=ᵣ fun f => f <$>ᵣ x := by
---   rw [← bind_mapᵣ]
-
--- theorem seqRight_eq_bind [Monad m] [LawfulMonad m] (x : m α) (y : m β) :
---   x *> y = x >>= fun _ => y := by
---   rw [seqRight_eq]
---   simp only [map_eq_pure_bind, const, seq_eq_bind_map, bind_assoc, pure_bind, id_eq, bind_pure]
-
--- theorem seqLeft_eq_bind [RelativeMonad j m] [LawfulRelativeMonad j m] (x : m α) (y : m β) :
---     x <* y = x >>= fun a => y >>= fun _ => pure a := by
---   rw [seqLeft_eq]
---   simp only [map_eq_pure_bind, seq_eq_bind_map, bind_assoc, pure_bind, const_apply]
 
 @[simp] theorem map_bindᵣ [RelativeMonad j m] [LawfulRelativeMonad j m]
     (f : j β → j γ) (x : m α) (g : j α → m β) :
@@ -405,18 +339,6 @@ instance [RelativeFunctor Id f] [LawfulRelativeFunctor Id f] : LawfulFunctor f w
   id_map := @id_mapᵣ Id f _ _
   comp_map := @comp_mapᵣ Id f _ _
 
--- instance [RelativeMonad Id m] [LawfulRelativeMonad Id m] : LawfulMonad m where
---   seqLeft_eq x y := by simp [instMonadOfRelativeMonadId, instFunctorOfRelativeFunctorId]; sorry
---   seqRight_eq x y := by
---     simp [instMonadOfRelativeMonadId, instFunctorOfRelativeFunctorId]
---     sorry
---   pure_seq g x := by simp only [instMonadOfRelativeMonadId, pure_bindᵣ]
---   bind_pure_comp f x := by simp [instMonadOfRelativeMonadId, instFunctorOfRelativeFunctorId]
---   bind_map f x := by simp only [instMonadOfRelativeMonadId, instFunctorOfRelativeFunctorId]
---   pure_bind x f := by
---     simp only [instMonadOfRelativeMonadId, instFunctorOfRelativeFunctorId, pure_bindᵣ]
---   bind_assoc x f g := by simp only [instMonadOfRelativeMonadId, bind_assocᵣ, Id]
-
 end Lawful
 
 class MonadIso (m : Type u → Type v) (n : Type u → Type w) where
@@ -428,14 +350,6 @@ class MonadIso (m : Type u → Type v) (n : Type u → Type w) where
     Function.RightInverse (toLift.monadLift (α := α)) (invLift.monadLift (α := α))
 
 universe u₁ u₂ v₁ v₂ w₁ w₂
-
--- structure RelativeMonadHom (M₁ : RelativeMonad C D₁) (M₂ : RelativeMonad C D₂) where
---   J₁₂ : D₁ ⥤ D₂
---   φ : M₂.toFunctor ≅ (M₁.toFunctor ⋙ J₁₂)
---   map : ∀ {X}, J₁₂.obj (M₁.T X) ⟶ M₂.T X
---   map_η : ∀ {X}, J₁₂.map (@M₁.η X) ≫ map = φ.inv.app X ≫ (@M₂.η X)
---   map_μ : ∀ {X Y}, ∀ f : (M₁.toFunctor.obj X) ⟶ M₁.T Y,
---     J₁₂.map (M₁.μ f) ≫ map = map ≫ M₂.μ (φ.hom.app _ ≫ J₁₂.map f ≫ map)
 
 class RelativeMonadMorphism (r₁ : Type u → Type v₁) (m₁ : Type u → Type v₁)
     (r₂ : Type u → Type v₂) (m₂ : Type u → Type v₂)
