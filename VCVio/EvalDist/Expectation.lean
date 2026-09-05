@@ -34,7 +34,11 @@ namespace OracleComp.EvalDist
 
 variable {α β : Type u} {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF]
 
-@[simp] theorem expectedValue_pure [LawfulMonadLiftT m SPMF] (x : α) (g : α → ℝ≥0∞) :
+section lawful
+
+variable [LawfulMonadLiftT m SPMF]
+
+@[simp] theorem expectedValue_pure (x : α) (g : α → ℝ≥0∞) :
     expectedValue (pure x : m α) g = g x := by
   classical
   rw [expectedValue]
@@ -43,7 +47,7 @@ variable {α β : Type u} {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF]
   · rw [probOutput_pure_self, one_mul]
 
 /-- The tower property: averaging a bind is averaging the inner averages. -/
-theorem expectedValue_bind [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) (g : β → ℝ≥0∞) :
+theorem expectedValue_bind (mx : m α) (my : α → m β) (g : β → ℝ≥0∞) :
     expectedValue (mx >>= my) g = expectedValue mx fun x => expectedValue (my x) g := by
   simp only [expectedValue, probOutput_bind_eq_tsum]
   calc ∑' y : β, (∑' x : α, Pr[= x | mx] * Pr[= y | my x]) * g y
@@ -55,10 +59,18 @@ theorem expectedValue_bind [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m 
     _ = ∑' x : α, Pr[= x | mx] * ∑' y : β, Pr[= y | my x] * g y :=
         tsum_congr fun _ => ENNReal.tsum_mul_left
 
-theorem expectedValue_map [LawfulMonad m] [LawfulMonadLiftT m SPMF] (mx : m α) (f : α → β)
+theorem expectedValue_map [LawfulMonad m] (mx : m α) (f : α → β)
     (g : β → ℝ≥0∞) : expectedValue (f <$> mx) g = expectedValue mx fun x => g (f x) := by
   rw [map_eq_bind_pure_comp, expectedValue_bind]
   exact tsum_congr fun x => by simp only [Function.comp_apply, expectedValue_pure]
+
+/-- A bound that holds for every inner average bounds the bind. -/
+theorem expectedValue_bind_le_of_le {mx : m α} {my : α → m β}
+    {g : β → ℝ≥0∞} {c : ℝ≥0∞} (h : ∀ x, expectedValue (my x) g ≤ c) :
+    expectedValue (mx >>= my) g ≤ c := by
+  rw [expectedValue_bind]; exact expectedValue_le_of_le mx h
+
+end lawful
 
 omit [Monad m] in
 /-- A constant functional averages to itself, provided no mass is lost to failure. -/

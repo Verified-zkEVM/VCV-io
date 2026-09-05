@@ -6,6 +6,8 @@ Authors: Devon Tuma
 
 module
 public import VCVio.EvalDist.Option
+public import VCVio.OracleComp.Constructions.SampleableType
+public import Mathlib.Tactic.Positivity.Finset
 public import ToMathlib.Data.ENNReal.Finiteness
 
 /-!
@@ -38,5 +40,25 @@ example (mx : m α) : ∑' x, Pr[= x | mx] ≠ ⊤ := by finiteness
 example (mx : m α) (c : ℝ≥0∞) (hc : c ≠ ⊤) : (∑' x, Pr[= x | mx]) * c ≠ ⊤ := by finiteness
 
 example [Fintype α] (mx : m α) : ∑ x : α, Pr[= x | mx] ≠ ⊤ := by finiteness
+
+/-- A quotient by a cardinality, the shape of the slack terms in the tag-reader bounds. The
+nonzero side goal is `positivity`'s, and its `Fintype.card` extension lives in
+`Mathlib.Tactic.Positivity.Finset`, which a file using this shape has to import. -/
+example {D : Type} [Fintype D] [Nonempty D] (a : ℕ) :
+    ((a : ℕ) : ℝ≥0∞) / (Fintype.card D : ℝ≥0∞) ≠ ⊤ := by finiteness
+
+/-- A coin and a die, drawn independently. -/
+def coinDie : ProbComp (Bool × Fin 6) := do
+  let b ← $ᵗ Bool
+  let d ← $ᵗ (Fin 6)
+  pure (b, d)
+
+example : Pr[= (true, 0) | coinDie] * 3 + Pr[⊥ | coinDie] / 2 ≠ ⊤ := by finiteness
+
+/-- Not a `finiteness` rule, by design: an unbounded functional has no finite expectation, so
+the bound is supplied by hand. -/
+example (mx : m α) (g : α → ℝ≥0∞) (c : ℝ≥0∞) (hc : c ≠ ⊤) (h : ∀ x, g x ≤ c) :
+    OracleComp.EvalDist.expectedValue mx g ≠ ⊤ :=
+  ne_top_of_le_ne_top hc (OracleComp.EvalDist.expectedValue_le_of_le mx h)
 
 end VCVioTest.Finiteness

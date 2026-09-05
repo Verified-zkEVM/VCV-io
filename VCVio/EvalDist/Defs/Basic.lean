@@ -1093,6 +1093,12 @@ theorem expectedValue_le_of_support {mx : m α} {g : α → ℝ≥0∞} {c : ℝ
     (h : ∀ x ∈ support mx, g x ≤ c) : expectedValue mx g ≤ c :=
   (expectedValue_mono_of_support h).trans (expectedValue_le_of_le mx fun _ => le_rfl)
 
+/-- Functionals that agree on `support mx` have the same expectation. -/
+theorem expectedValue_congr_of_support {mx : m α} {g h : α → ℝ≥0∞}
+    (hgh : ∀ x ∈ support mx, g x = h x) : expectedValue mx g = expectedValue mx h :=
+  le_antisymm (expectedValue_mono_of_support fun x hx => (hgh x hx).le)
+    (expectedValue_mono_of_support fun x hx => (hgh x hx).ge)
+
 end OracleComp.EvalDist
 
 /-- A constant bound on the functional bounds the expectation `∑' x, Pr[= x | mx] * f x`. -/
