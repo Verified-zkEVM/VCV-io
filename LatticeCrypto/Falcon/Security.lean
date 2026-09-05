@@ -104,7 +104,8 @@ variable (p : Params) (prims : Primitives p)
 If the fuel-bounded signer returns a signature, `verify` accepts it, given two facts about the
 primitives at the honest key:
 
-1. `hcompress`: the codec round-trips (the `compress_decompress` law of `Primitives.Laws`);
+1. `hcompress`: the codec round-trips (the `compress_decompress` law of `Primitives.Laws`,
+   a theorem for the concrete codec: `Falcon.Concrete.decompress_compress`);
 2. `hpreimage`: every output of the trapdoor sampler is a preimage of its target,
    `s₁ + s₂ · h = c`.
 
