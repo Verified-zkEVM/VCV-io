@@ -160,6 +160,13 @@ Downstream escape hatches, since these tags are inherited by importing projects:
 (disable per call), `grind only [...]` (ignore the default set), `attribute [-grind] lemma`
 (unset for a file), and `grind?` (print a minimal `grind only` call).
 
+Tagging discipline, so the split stays deliberate: an unconditional equation tagged `@[simp]` in
+`VCVio/EvalDist/**` or `VCVio/OracleComp/SimSemantics/**` also carries `grind =`, unless it is one
+of the characterization lemmas above (the ratio in those directories is about one to one and the
+gates check both closers). `@[simp, grind]` without `=` is for definitions, where `grind` uses the
+equation lemmas to unfold, not for stated equations. `grind_pattern` and `[grind hom]` are not used
+yet; adopt them per lemma with a gate entry, not as a sweep.
+
 ### 11. Plain `vcstep` may solve a probability equality when you only wanted a rewrite
 
 On `Pr[...] = Pr[...]` goals, plain `vcstep` heuristically tries swap, congruence, and
