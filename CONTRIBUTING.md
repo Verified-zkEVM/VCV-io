@@ -139,6 +139,8 @@ Four rules keep them honest:
    working closer, with a dated `gap(tac, YYYY-MM-DD): reason` comment. The guard errors the moment
    the set improves, so the PR that closes a gap must also retire its guard. One guard covers a
    family of same-shaped entries when the family is named in the section note.
+   Use bare `fail_if_success simp` for an explicit no-progress check; `done` is unreachable
+   when `simp` itself fails without progress. Bare `fail_if_success grind` already tests closure.
 3. **No multi-call scripts.** A `;`/multi-line script is allowed only as the closer of a gap pair.
    A one-call entry that stops closing is fixed in the simp/grind set or filed as a dated gap pair;
    it is never fixed by adding a second call.

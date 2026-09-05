@@ -295,8 +295,8 @@ jobs:
       # The canary library is the tactic gate: a warning there (an unused tactic, a
       # redundant `grind` parameter, a deprecated name) is a gate entry going stale, so
       # it fails the job like a proof-library warning does. Dependency logs are replayed
-      # into this output too, hence the `VCVioTest` path prefixes: the five `sorry`
-      # warnings under `VCVio/CryptoFoundations/**` are the proof-library gate's business.
+      # into this output too, hence the `VCVioTest` path prefixes: existing `sorry`
+      # warnings in dependencies are the proof-library gate's business.
       - name: Check canary warning budget
         run: |
           python3 ./scripts/check-warning-log.py "$BUILD_TIMING_LOG_DIR/test_build.log" \

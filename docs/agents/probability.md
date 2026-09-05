@@ -359,8 +359,8 @@ above it by an existing pathway rather than by a per-rung twin lemma.
 |---|---|---|
 | 0 closed | numerals, `(Fintype.card α)⁻¹`, `if … then 1 else 0`, `#{x \| p x} / Fintype.card α` | `simp` (`probOutput_pure/query/uniformSample/guard/ite`, `probOutput_bind_const`, `probOutput_map_equiv`) |
 | 1 finite sum | `∑ x, Pr[= x \| mx] * g x` | `simp` from rung 2 through Mathlib's `@[simp] tsum_fintype`; `Finset.sum_boole`/`sum_ite_eq` finish |
-| 2 tsum | `∑' x, Pr[= x \| mx] * g x`, which is `expectedValue mx g` | `grind` (bind expansion, `probOutput_bind_eq_tsum` is `@[grind =]`); `rw [probOutput_bind_eq_expectedValue]` when a `gcongr` head is wanted |
-| 3 integral | `∫⁻ x, g x ∂𝒟[mx]` | never a terminal form on a discrete carrier: the measure side reduces *into* the façade (singleton and expectation bridges), then rungs 2–0 apply |
+| 2 tsum | `∑' x, Pr[= x \| mx] * g x`, which is `expectedValue mx g` | `grind` (bind expansion, `probOutput_bind_eq_tsum` is `@[grind =]`); `rw [probOutput_bind_eq_tsum, ← expectedValue_def]` exposes the expectation head |
+| 3 integral | `∫⁻ x, g x ∂𝒟[mx]` | countable discrete compatibility measures admit the expectation bridge below; measure-native proofs can keep this form for Mathlib's integration API |
 
 Mass-left is canonical: it is the orientation of Mathlib's `PMF.bind_apply`,
 `PMF.toMeasure_bind_apply` and Bochner `integral_fintype`, of `expectedValue`, and of every
@@ -379,14 +379,16 @@ normal form.
   and must keep failing fast on the `Pr[…] = 0/1 ↔ …` characterization family
   (`VCVioTest/GrindFailFast.lean`).
 - `gcongr` and `finiteness` are the *bound* closers, with `expectedValue` as the head symbol for
-  rung 2 (a bind is not a `gcongr` head; `probOutput_bind_eq_expectedValue` puts one there).
-  `expectedValue` is a `def` that `simp` does not unfold; `expectedValue_def` is a `rw`/`grind`
-  lemma.
-- The measure side has one public head, `𝒟[…]`. Its Giry laws (`evalDist_pure`, `evalDist_bind`,
-  `evalDist_map`, the const laws) are stated once; the singleton, event and expectation bridges
-  (`𝒟[mx] {x} = Pr[= x | mx]`, `∫⁻ x, g x ∂𝒟[mx] = expectedValue mx g`) are the only crossing
-  into the façade. There is no measure-side family of sum lemmas. (This rung is being completed
-  by the measure-bridge PR; until it lands the bridges are the `SPMF.toMeasure_*` lemmas.)
+  rung 2. Rewrite a bind with `probOutput_bind_eq_tsum` and fold the sum with
+  `← expectedValue_def` to expose that head. `expectedValue` is a `def` that `simp` does not
+  unfold; its untagged `expectedValue_def` equation can be supplied explicitly to `rw` or `grind`.
+- The measure side uses `𝒟[…]`, with `evalDist_pure` and `evalDist_bind` under
+  `LawfulEvalDistSemantics`; bind also requires a measurable continuation. For `FreeM`,
+  `FreeM.evalDist_apply_singleton` and `FreeM.evalDist_apply_setOf` connect observations to
+  `Pr[...]` under their countability, measurability, and query-specification agreement hypotheses.
+  `OracleComp.EvalDist.expectedValue_eq_lintegral` identifies expectations with integrals against
+  the compatibility measure `OracleComp.EvalDist.toMeasure` on countable discrete result spaces.
+  These are explicit coherence boundaries; measure-native proofs keep their measure denotation.
 
 **What the gates enforce.** The gate files (`VCVioTest/ProbabilityTactics.lean`,
 `MonadProbability.lean`, `GrindFailFast.lean`, `Tactic/*.lean`, `EvalDist/*.lean`) state
@@ -399,7 +401,9 @@ normal form.
    the guard in the same diff. One guard covers a family of same-shaped entries when the family
    is named in the section note. (`fail_if_success` takes a tactic sequence, so the closer must be
    on its own line; bare `fail_if_success simp` passes only when `simp` makes *no progress*,
-   hence the `(tac; done)` form.)
+   hence the `(tac; done)` form for partial-progress gaps. Explicit no-progress checks keep
+   bare `fail_if_success simp` to avoid an unreachable `done`. Bare `fail_if_success grind`
+   already tests closure.)
 3. *No multi-call scripts.* A `;`/multi-line script is allowed only as the closer of a gap pair.
    A one-call entry that stops closing is fixed in the set or filed as a dated gap pair, never by
    adding a second call.
