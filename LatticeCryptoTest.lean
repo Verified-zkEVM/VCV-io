@@ -11,3 +11,4 @@ public import LatticeCryptoTest.MLDSA.ACVPVectors
 public import LatticeCryptoTest.MLDSA.Helpers
 public import LatticeCryptoTest.MLKEM.ACVPVectors
 public import LatticeCryptoTest.MLKEM.Helpers
+public import LatticeCryptoTest.Ring.CenteredRepr

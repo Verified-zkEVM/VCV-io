@@ -446,22 +446,14 @@ private theorem alpha_le_natAbs_centeredRepr_mul
     have hz : (z : Coeff) = ((z.toNat : ℕ) : Coeff) := by
       rw [← Int.cast_natCast (R := Coeff), Int.toNat_of_nonneg hznn]
     rw [hz, ← Nat.cast_mul]
-  rw [hcoeff_eq]
-  have hlt : alpha * z.toNat < modulus :=
-    calc alpha * z.toNat < alpha * m := Nat.mul_lt_mul_of_pos_left hzm ctx.hα
-      _ = modulus - 1 := ctx.hqm1
-      _ < modulus := Nat.sub_lt (by decide) one_pos
-  by_cases hle : (((alpha * z.toNat : ℕ) : Coeff).val : ℤ) ≤ (modulus : ℤ) / 2
-  · rw [centeredRepr_of_le hle, ZMod.val_natCast_of_lt hlt, Int.natAbs_natCast]
-    exact Nat.le_mul_of_pos_right alpha (by have := Int.toNat_of_nonneg hznn; omega)
-  · push Not at hle
-    have hq : modulus = alpha * m + 1 := by have := ctx.hsmall; have := ctx.hqm1; omega
-    rw [centeredRepr_of_gt hle, ZMod.val_natCast_of_lt hlt,
-      Int.natAbs_natCast_sub_natCast_of_le hlt.le, Nat.le_sub_iff_add_le hlt.le, hq]
-    calc alpha + alpha * z.toNat
-        = alpha * (z.toNat + 1) := by ring
-      _ ≤ alpha * m             := Nat.mul_le_mul_left alpha (Nat.succ_le_of_lt hzm)
-      _ ≤ alpha * m + 1         := Nat.le_succ _
+  have hq : modulus = alpha * m + 1 := by have := ctx.hsmall; have := ctx.hqm1; omega
+  have hle : alpha * z.toNat + alpha ≤ alpha * m := by
+    have := Nat.mul_le_mul_left alpha hzm; rwa [Nat.mul_succ] at this
+  have hpos : alpha ≤ alpha * z.toNat :=
+    Nat.le_mul_of_pos_right alpha (by have := Int.toNat_of_nonneg hznn; omega)
+  rw [hcoeff_eq, centeredRepr_eq_valMinAbs, ZMod.valMinAbs_natAbs_eq_min,
+    ZMod.val_natCast_of_lt (by omega)]
+  omega
 
 private theorem highBitsCoeff_add_eq_of_centeredRepr_lt
     {alpha m b : ℕ} (ctx : BalancedDecomp alpha m) (r s : Coeff)
