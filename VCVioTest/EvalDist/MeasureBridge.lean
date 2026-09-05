@@ -119,7 +119,8 @@ example (mx : ProbComp (Fin 3)) (f : Fin 3 → ProbComp (Fin 2)) : 𝒟[mx >>= f
 A coin and a die drawn independently, closed on the measure side by the same calls as the
 façade: the point mass is the product of the two uniform masses (the closed form `simp` reaches;
 merging `2⁻¹ * 6⁻¹` into `12⁻¹` is `ℝ≥0∞` arithmetic, not a probability rule), an event on one
-coordinate needs the bind expanded under `Pr[…]` and `ENNReal.div_self` for the total factor. -/
+coordinate needs the bind expanded under `Pr[…]` and `ENNReal.div_self` for the total factor, and
+the failure-side facts need nothing beyond the program never failing. -/
 
 /-- A coin and a die, drawn independently. -/
 def coinDie : ProbComp (Bool × Fin 6) := do
@@ -131,6 +132,9 @@ example : 𝒟[coinDie] {(true, 0)} = 2⁻¹ * 6⁻¹ := by simp [coinDie]
 example : 𝒟[coinDie] {z | z.1 = true} = 2⁻¹ := by
   simp [coinDie, probEvent_bind_eq_tsum, ENNReal.div_self]
 example (g : Bool × Fin 6 → ℝ≥0∞) : ∫⁻ z, g z ∂𝒟[coinDie] = expectedValue coinDie g := by simp
+example : 𝒟[coinDie] Set.univ = 1 := by simp
+example : (𝒟[coinDie]).withFailure {none} = 0 := by simp
+example : IsProbabilityMeasure 𝒟[coinDie] := inferInstance
 
 /-! ## Continuous carriers are untouched -/
 
