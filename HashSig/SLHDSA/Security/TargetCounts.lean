@@ -41,12 +41,13 @@ variable `d` instantiates to `2 ^ h`, the number of bottom-layer leaves, not to 
 
 ## References
 
-- NIST FIPS 205, §4.1, §10
+- NIST FIPS 205, §4.1 (the hash roles), §5 (WOTS+ `len` and `w`), §7 (the hypertree layers and
+  `h = d · h'`), §8 (FORS `k` and `t = 2^a`)
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified"
 -/
 
-@[expose] public section
+public section
 
 namespace SLHDSA.Security
 
@@ -85,20 +86,20 @@ instance : Fintype TargetRole where
 
 /-- The number of XMSS trees at hypertree layer `i`: the top layer has one tree and each lower
 layer has `2 ^ hp` times as many. -/
-def treesAtLayer (p : Params) (i : Fin p.d) : ℕ :=
+@[expose] def treesAtLayer (p : Params) (i : Fin p.d) : ℕ :=
   2 ^ (p.hp * (p.d - i.val - 1))
 
 /-- The total number of XMSS trees across all hypertree layers. -/
-def xmssTreeCount (p : Params) : ℕ :=
+@[expose] def xmssTreeCount (p : Params) : ℕ :=
   ∑ i : Fin p.d, treesAtLayer p i
 
 /-- The total number of WOTS+ instances: every XMSS tree has `2 ^ hp` leaves. -/
-def wotsInstanceCount (p : Params) : ℕ :=
+@[expose] def wotsInstanceCount (p : Params) : ℕ :=
   ∑ i : Fin p.d, treesAtLayer p i * 2 ^ p.hp
 
 /-- Formula-derived cap on the number of targets issued in each named game.  Six roles meet their
 cap exactly; `wotsFTcr` and `wotsFPre` are upper bounds, as the module docstring records. -/
-def targetCount (p : Params) : TargetRole → ℕ
+@[expose] def targetCount (p : Params) : TargetRole → ℕ
   | .forsF => 2 ^ p.h * p.k * 2 ^ p.a
   | .forsH => 2 ^ p.h * p.k * (2 ^ p.a - 1)
   | .forsTl => 2 ^ p.h

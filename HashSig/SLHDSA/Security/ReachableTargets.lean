@@ -49,12 +49,13 @@ per-role encoded-distinctness obligations that a concrete security context must 
 
 ## References
 
-- NIST FIPS 205, Algorithms 10--13
+- NIST FIPS 205, Algorithms 5--6 (WOTS+ chain and public-key addresses), 9--13 (XMSS and
+  hypertree addresses), 15--17 (FORS addresses), and 19 (the digest-derived tree and leaf indices)
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified"
 -/
 
-@[expose] public section
+public section
 
 namespace SLHDSA.Security
 
@@ -71,7 +72,7 @@ deriving Repr, DecidableEq, Fintype
 namespace LayerTreeCoord
 
 /-- Forget the leaf of a canonical position and retain its containing XMSS tree. -/
-def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord vp :=
+@[expose] def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord vp :=
   ⟨pos.layer, pos.tree⟩
 
 end LayerTreeCoord
@@ -101,12 +102,12 @@ theorem treesAtLayer_eq_layerTreeHeight (vp : ValidatedParams) (layer : Fin vp.p
   rw [hsub, Nat.mul_comm]
 
 /-- Enumerate every reachable XMSS tree exactly once. -/
-def allXmssTrees (vp : ValidatedParams) : List (LayerTreeCoord vp) :=
+@[expose] def allXmssTrees (vp : ValidatedParams) : List (LayerTreeCoord vp) :=
   (List.finRange vp.params.d).flatMap fun layer =>
     (List.finRange (2 ^ layerTreeHeight vp layer.val)).map fun tree => ⟨layer, tree⟩
 
 /-- Enumerate every reachable WOTS instance exactly once, using the canonical position type. -/
-def allWotsInstances (vp : ValidatedParams) : List (LayerPosition vp) :=
+@[expose] def allWotsInstances (vp : ValidatedParams) : List (LayerPosition vp) :=
   (allXmssTrees vp).flatMap fun coord =>
     (List.finRange (2 ^ vp.params.hp)).map fun leaf =>
       ⟨coord.layer, coord.tree, leaf⟩
@@ -196,7 +197,7 @@ theorem allWotsInstances_length (vp : ValidatedParams) :
 namespace LayerTreeCoord
 
 /-- The base address of a reachable XMSS tree. -/
-def toAdrs {vp : ValidatedParams} (coord : LayerTreeCoord vp) : Adrs :=
+@[expose] def toAdrs {vp : ValidatedParams} (coord : LayerTreeCoord vp) : Adrs :=
   (Adrs.zero.setLayerAddress coord.layer.val).setTreeAddress coord.tree.val
 
 @[simp]
@@ -216,7 +217,7 @@ end LayerTreeCoord
 /-! ## Perfect-tree internal nodes -/
 
 /-- Internal nodes of a perfect binary tree, listed bottom-up as `(height, index)` pairs. -/
-def perfectInternalCoords : ℕ → List (ℕ × ℕ)
+@[expose] def perfectInternalCoords : ℕ → List (ℕ × ℕ)
   | 0 => []
   | h + 1 =>
       (List.range (2 ^ h)).map (fun i => (1, i)) ++
@@ -325,19 +326,21 @@ deriving Repr, DecidableEq, Fintype
 namespace BottomPosition
 
 /-- View a bottom position through the canonical layer-position API. -/
-def toLayerPosition {vp : ValidatedParams} (pos : BottomPosition vp) : LayerPosition vp where
+@[expose] def toLayerPosition {vp : ValidatedParams} (pos : BottomPosition vp) :
+    LayerPosition vp where
   layer := ⟨0, vp.valid.d_pos⟩
   tree := pos.tree
   leaf := pos.leaf
 
 /-- Turn the indices parsed by Algorithm 19 into their typed bottom position. -/
-def ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.params) : BottomPosition vp where
+@[expose] def ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.params) :
+    BottomPosition vp where
   tree := ⟨parts.idxTree.val, by
     simpa [layerTreeHeight, vp.valid.h_eq_layers, Nat.sub_mul] using parts.idxTree.isLt⟩
   leaf := parts.idxLeaf
 
 /-- The base FORS address consumed by `GeneralScheme.signInternalM` and `verifyInternalM`. -/
-def forsAdrs {vp : ValidatedParams} (pos : BottomPosition vp) : Adrs :=
+@[expose] def forsAdrs {vp : ValidatedParams} (pos : BottomPosition vp) : Adrs :=
   ((pos.toLayerPosition.toAdrs.setTypeAndClear .forsTree).setKeyPairAddress pos.leaf.val)
 
 @[simp]
@@ -362,7 +365,7 @@ theorem forsAdrs_keyPair {vp : ValidatedParams} (pos : BottomPosition vp) :
 end BottomPosition
 
 /-- Enumerate every possible FORS instance position at layer zero exactly once. -/
-def allBottomPositions (vp : ValidatedParams) : List (BottomPosition vp) :=
+@[expose] def allBottomPositions (vp : ValidatedParams) : List (BottomPosition vp) :=
   (List.finRange (2 ^ layerTreeHeight vp 0)).flatMap fun tree =>
     (List.finRange (2 ^ vp.params.hp)).map fun leaf => ⟨tree, leaf⟩
 
@@ -414,20 +417,20 @@ theorem allBottomPositions_length (vp : ValidatedParams) :
 /-! ## FORS target ledgers -/
 
 /-- Every arity-one FORS leaf target over every reachable bottom-layer position. -/
-def forsLeafAddresses (vp : ValidatedParams) : List Adrs :=
+@[expose] def forsLeafAddresses (vp : ValidatedParams) : List Adrs :=
   (((allBottomPositions vp).product (List.finRange vp.params.k)).product
     (List.finRange vp.params.t)).map fun coord =>
       forsNodeAdrs coord.1.1.forsAdrs 0 (coord.1.2.val * vp.params.t + coord.2.val)
 
 /-- Every arity-two FORS internal-node target over every reachable bottom-layer position. -/
-def forsTreeAddresses (vp : ValidatedParams) : List Adrs :=
+@[expose] def forsTreeAddresses (vp : ValidatedParams) : List Adrs :=
   (((allBottomPositions vp).product (List.finRange vp.params.k)).product
     (perfectInternalCoords vp.params.a)).map fun coord =>
       forsNodeAdrs coord.1.1.forsAdrs coord.2.1
         (coord.1.2.val * 2 ^ (vp.params.a - coord.2.1) + coord.2.2)
 
 /-- Every arity-`k` FORS-root-compression target over all bottom-layer positions. -/
-def forsRootAddresses (vp : ValidatedParams) : List Adrs :=
+@[expose] def forsRootAddresses (vp : ValidatedParams) : List Adrs :=
   (allBottomPositions vp).map fun pos => forsPkAdrs pos.forsAdrs
 
 @[simp]
@@ -592,7 +595,7 @@ theorem forsRootAddresses_nodup (vp : ValidatedParams) :
 /-! ## XMSS and WOTS address ledgers -/
 
 /-- Every internal node of every reachable XMSS tree. -/
-def xmssNodeAddresses (vp : ValidatedParams) : List Adrs :=
+@[expose] def xmssNodeAddresses (vp : ValidatedParams) : List Adrs :=
   ((allXmssTrees vp).product (perfectInternalCoords vp.params.hp)).map fun coord =>
     xmssNodeAdrs coord.1.toAdrs coord.2.1 coord.2.2
 
@@ -636,7 +639,7 @@ theorem xmssNodeAddresses_nodup (vp : ValidatedParams) :
         Adrs.setTreeIndex, Adrs.setTypeAndClear] using congrArg Adrs.word3 hadrs
 
 /-- The base WOTS address belonging to a reachable canonical position. -/
-def wotsInstanceAdrs {vp : ValidatedParams} (pos : LayerPosition vp) : Adrs :=
+@[expose] def wotsInstanceAdrs {vp : ValidatedParams} (pos : LayerPosition vp) : Adrs :=
   wotsLeafAdrs pos.toAdrs pos.leaf.val
 
 @[simp]
@@ -678,7 +681,7 @@ theorem wotsInstanceAdrs_injective (vp : ValidatedParams) :
       rfl
 
 /-- One structural base address for every reachable WOTS instance. -/
-def wotsInstanceAddresses (vp : ValidatedParams) : List Adrs :=
+@[expose] def wotsInstanceAddresses (vp : ValidatedParams) : List Adrs :=
   (allWotsInstances vp).map wotsInstanceAdrs
 
 /-- The WOTS-instance address ledger has the exact all-layer instance count. -/
@@ -699,7 +702,7 @@ abbrev WotsChainCoord (vp : ValidatedParams) :=
   LayerPosition vp × Fin vp.params.len
 
 /-- Every WOTS chain in every reachable instance. -/
-def allWotsChains (vp : ValidatedParams) : List (WotsChainCoord vp) :=
+@[expose] def allWotsChains (vp : ValidatedParams) : List (WotsChainCoord vp) :=
   (allWotsInstances vp).product (List.finRange vp.params.len)
 
 @[simp]
@@ -717,34 +720,34 @@ theorem allWotsChains_length (vp : ValidatedParams) :
     _ = wotsInstanceCount vp.params * vp.params.len := by simp
 
 /-- Address one concrete hash step of a reachable WOTS chain. -/
-def wotsStepAdrs {vp : ValidatedParams} (coord : WotsChainCoord vp)
+@[expose] def wotsStepAdrs {vp : ValidatedParams} (coord : WotsChainCoord vp)
     (step : Fin (vp.params.w - 1)) : Adrs :=
   (wotsChainAdrs (wotsInstanceAdrs coord.1) coord.2.val).setHashAddress step.val
 
 /-- Valid parameters always have at least one executable WOTS hash step. -/
-def firstWotsStep (vp : ValidatedParams) : Fin (vp.params.w - 1) :=
+@[expose] def firstWotsStep (vp : ValidatedParams) : Fin (vp.params.w - 1) :=
   ⟨0, Nat.sub_pos_of_lt (Nat.one_lt_two_pow (Nat.ne_of_gt vp.valid.lgw_pos))⟩
 
 /-- The full reachable WOTS hash-step space, containing the `w - 1` executed steps of every
 chain. -/
-def wotsStepAddresses (vp : ValidatedParams) : List Adrs :=
+@[expose] def wotsStepAddresses (vp : ValidatedParams) : List Adrs :=
   ((allWotsChains vp).product (List.finRange (vp.params.w - 1))).map fun coord =>
     wotsStepAdrs coord.1 coord.2
 
 /-- A reduction may select one reachable hash step from each chain, for example as a function of
 the honest WOTS message digits. -/
-def selectedWotsAddresses (vp : ValidatedParams)
+@[expose] def selectedWotsAddresses (vp : ValidatedParams)
     (select : WotsChainCoord vp → Fin (vp.params.w - 1)) : List Adrs :=
   (allWotsChains vp).map fun coord => wotsStepAdrs coord (select coord)
 
 /-- A PRE-style selection may omit chains whose honest digit is zero. -/
-def optionalWotsAddresses (vp : ValidatedParams)
+@[expose] def optionalWotsAddresses (vp : ValidatedParams)
     (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) : List Adrs :=
   (allWotsChains vp).filterMap fun coord =>
     (select coord).map (wotsStepAdrs coord)
 
 /-- Every WOTS public-key-compression target over every reachable instance. -/
-def wotsPkAddresses (vp : ValidatedParams) : List Adrs :=
+@[expose] def wotsPkAddresses (vp : ValidatedParams) : List Adrs :=
   (allWotsInstances vp).map fun pos => wotsPkAdrs (wotsInstanceAdrs pos)
 
 /-- The full executed WOTS step space has `w - 1` entries per chain. -/
@@ -1015,7 +1018,7 @@ theorem optionalWotsAddresses_subset (vp : ValidatedParams)
 variable {p : Params}
 
 /-- Encode a reachable structural-address ledger with the primitive bundle's actual tweak map. -/
-def encodeTargets (prims : Primitives p) (addresses : List Adrs) : List prims.AdrsKey :=
+@[expose] def encodeTargets (prims : Primitives p) (addresses : List Adrs) : List prims.AdrsKey :=
   addresses.map prims.adrsToKey
 
 /-- On a structurally duplicate-free reachable ledger, encoded tweaks are duplicate-free exactly
