@@ -33,14 +33,21 @@ is proved equal to the formula-derived `targetCount` except where the table belo
 
 Every role additionally carries a completeness lemma in the opposite direction, named `mem_` after
 its ledger: the address of each reachable coordinate in that role is listed, and for the optional
-preimage selection, of each coordinate that selection retains.  Two of them restate the index
-formula their ledger applies, `mem_forsLeafAddresses` for the global leaf index and
-`mem_forsTreeAddresses` for the node index; those two are what rules out a ledger built on a wrong
-convention, which length and distinctness alone would not.  The rest apply the same address term
-their ledger does, so what they add is that the coordinate enumeration behind it is exhaustive.
-`mem_perfectInternalCoords` characterizes the node coordinates `mem_forsTreeAddresses` and
-`mem_xmssNodeAddresses` quantify over.  Whether the construction's free programs query only listed
-addresses is a separate, trace-level statement and is not proved here.
+preimage selection, of each coordinate that selection retains.  Two of them,
+`mem_forsLeafAddresses` with the global leaf index `tree * t + leaf` and `mem_forsTreeAddresses`
+with the node index `tree * 2 ^ (a - z) + idx`, surface the index formula their ledger applies in a
+statement that can be read against the construction: `forsSignWith` selects leaf
+`i.val * 2 ^ p.a + forsIdx p md i.val` of tree `i`, and `PerfectMerkleTree.merkleRootM` hashes node
+`(z + 1, t)` from `(z, 2 * t)` and `(z, 2 * t + 1)`, so a node of height `z` is addressed by its
+global index.  They do not rule out a convention shared by the ledger and the lemma, since both
+restate the same formula.  The rest apply the same address term their ledger does, so what they add
+is that the coordinate enumeration behind it is exhaustive.  `mem_perfectInternalCoords`
+characterizes the node coordinates `mem_forsTreeAddresses` and `mem_xmssNodeAddresses` quantify
+over.  Whether the construction's free programs query only listed addresses is a separate,
+trace-level statement left to the next slice; the only mechanical evidence for it today is the
+runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean`, which checks, for one fixed digest per
+profile, addresses assembled from the construction's address helpers against the ledgers rather
+than running its signing or verification programs.
 
 The address lists remain structural `Adrs` values.  A concrete primitive maps them to its
 `AdrsKey` only after proving injectivity on the listed reachable family; no global injectivity of
@@ -49,8 +56,9 @@ per-role encoded-distinctness obligations that a concrete security context must 
 
 ## References
 
-- NIST FIPS 205, Algorithms 5--6 (WOTS+ chain and public-key addresses), 9--13 (XMSS and
-  hypertree addresses), 15--17 (FORS addresses), and 19 (the digest-derived tree and leaf indices)
+- NIST FIPS 205, §4.2 (ADRS member functions), Algorithms 5--6 (WOTS+ chain and public-key
+  addresses), 9--13 (XMSS and hypertree addresses), 15--17 (FORS addresses), and 19--20 (the
+  digest-derived tree and leaf indices)
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified"
 -/
@@ -164,7 +172,7 @@ theorem allWotsInstances_nodup (vp : ValidatedParams) : (allWotsInstances vp).No
         subst tree'
         rfl
 
-/-- The typed XMSS-tree enumeration realizes the game architecture's tree count exactly. -/
+/-- The typed XMSS-tree enumeration realizes the `TargetCounts` tree count exactly. -/
 @[simp]
 theorem allXmssTrees_length (vp : ValidatedParams) :
     (allXmssTrees vp).length = xmssTreeCount vp.params := by
@@ -180,7 +188,7 @@ theorem allXmssTrees_length (vp : ValidatedParams) :
   symm
   exact treesAtLayer_eq_layerTreeHeight vp layer
 
-/-- The typed WOTS-instance enumeration realizes the game architecture's instance count exactly. -/
+/-- The typed WOTS-instance enumeration realizes the `TargetCounts` instance count exactly. -/
 @[simp]
 theorem allWotsInstances_length (vp : ValidatedParams) :
     (allWotsInstances vp).length = wotsInstanceCount vp.params := by
@@ -1013,6 +1021,177 @@ theorem optionalWotsAddresses_subset (vp : ValidatedParams)
   obtain ⟨step, -, rfl⟩ := Option.map_eq_some_iff.mp hmap
   exact mem_wotsStepAddresses vp coord step
 
+/-! ## Cross-role disjointness
+
+The six structural ledgers are pairwise disjoint.  Four of them carry an address type code of their
+own, `wotsStepAddresses` (`WOTS_HASH`), `wotsPkAddresses` (`WOTS_PK`), `xmssNodeAddresses` (`TREE`),
+and `forsRootAddresses` (`FORS_ROOTS`), so any pair involving one of them is separated by the type
+word.  The two FORS node ledgers both use `FORS_TREE` and are separated by the tree-height word
+instead: a leaf sits at height zero and an internal node at height at least one.  These fifteen
+facts are what a union ledger's `Nodup`, or a game played against one hash function across the roles
+that share it (`F` for the WOTS+ chain steps and the FORS leaves, `H` for the XMSS and FORS internal
+nodes, `T_ℓ` for the WOTS+ public keys and the FORS roots), will need.
+`nodup_structuralLedgers_append` states the first over an explicit concatenation; no union ledger is
+defined here. -/
+
+/-- Two address lists whose members carry different type codes share no address. -/
+theorem disjoint_of_type_ne {left right : List Adrs} {tyLeft tyRight : AddrType}
+    (hne : tyLeft ≠ tyRight) (hleft : ∀ a ∈ left, a.type = tyLeft.toCode)
+    (hright : ∀ a ∈ right, a.type = tyRight.toCode) : left.Disjoint right := by
+  intro a haLeft haRight
+  apply hne
+  have hcode : tyLeft.toCode = tyRight.toCode := (hleft a haLeft).symm.trans (hright a haRight)
+  simpa using congrArg AddrType.ofCode hcode
+
+theorem type_of_mem_forsLeafAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ forsLeafAddresses vp) : a.type = AddrType.forsTree.toCode := by
+  simp only [forsLeafAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  rfl
+
+theorem type_of_mem_forsTreeAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ forsTreeAddresses vp) : a.type = AddrType.forsTree.toCode := by
+  simp only [forsTreeAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  rfl
+
+theorem type_of_mem_forsRootAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ forsRootAddresses vp) : a.type = AddrType.forsRoots.toCode := by
+  simp only [forsRootAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  rfl
+
+theorem type_of_mem_wotsStepAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ wotsStepAddresses vp) : a.type = AddrType.wotsHash.toCode := by
+  simp only [wotsStepAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  rfl
+
+theorem type_of_mem_wotsPkAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ wotsPkAddresses vp) : a.type = AddrType.wotsPk.toCode := by
+  simp only [wotsPkAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  rfl
+
+theorem type_of_mem_xmssNodeAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ xmssNodeAddresses vp) : a.type = AddrType.tree.toCode := by
+  simp only [xmssNodeAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  rfl
+
+/-- FORS leaf targets sit at tree height zero. -/
+theorem word2_of_mem_forsLeafAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ forsLeafAddresses vp) : a.word2 = 0 := by
+  simp only [forsLeafAddresses, List.mem_map] at ha
+  obtain ⟨coord, -, rfl⟩ := ha
+  rfl
+
+/-- FORS internal-node targets sit at tree height at least one. -/
+theorem word2_pos_of_mem_forsTreeAddresses (vp : ValidatedParams) {a : Adrs}
+    (ha : a ∈ forsTreeAddresses vp) : 0 < a.word2 := by
+  simp only [forsTreeAddresses, List.mem_map] at ha
+  obtain ⟨⟨⟨pos, tree⟩, node⟩, hcoord, rfl⟩ := ha
+  exact perfectInternalCoords_height_pos (List.mem_product.1 hcoord).2
+
+/-- The two `FORS_TREE` ledgers are separated by the tree-height word. -/
+theorem disjoint_forsLeafAddresses_forsTreeAddresses (vp : ValidatedParams) :
+    (forsLeafAddresses vp).Disjoint (forsTreeAddresses vp) := by
+  intro a haLeaf haTree
+  have hzero := word2_of_mem_forsLeafAddresses vp haLeaf
+  have hpos := word2_pos_of_mem_forsTreeAddresses vp haTree
+  omega
+
+theorem disjoint_forsLeafAddresses_forsRootAddresses (vp : ValidatedParams) :
+    (forsLeafAddresses vp).Disjoint (forsRootAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsLeafAddresses vp)
+    (fun _ => type_of_mem_forsRootAddresses vp)
+
+theorem disjoint_forsLeafAddresses_wotsStepAddresses (vp : ValidatedParams) :
+    (forsLeafAddresses vp).Disjoint (wotsStepAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsLeafAddresses vp)
+    (fun _ => type_of_mem_wotsStepAddresses vp)
+
+theorem disjoint_forsLeafAddresses_wotsPkAddresses (vp : ValidatedParams) :
+    (forsLeafAddresses vp).Disjoint (wotsPkAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsLeafAddresses vp)
+    (fun _ => type_of_mem_wotsPkAddresses vp)
+
+theorem disjoint_forsLeafAddresses_xmssNodeAddresses (vp : ValidatedParams) :
+    (forsLeafAddresses vp).Disjoint (xmssNodeAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsLeafAddresses vp)
+    (fun _ => type_of_mem_xmssNodeAddresses vp)
+
+theorem disjoint_forsTreeAddresses_forsRootAddresses (vp : ValidatedParams) :
+    (forsTreeAddresses vp).Disjoint (forsRootAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsTreeAddresses vp)
+    (fun _ => type_of_mem_forsRootAddresses vp)
+
+theorem disjoint_forsTreeAddresses_wotsStepAddresses (vp : ValidatedParams) :
+    (forsTreeAddresses vp).Disjoint (wotsStepAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsTreeAddresses vp)
+    (fun _ => type_of_mem_wotsStepAddresses vp)
+
+theorem disjoint_forsTreeAddresses_wotsPkAddresses (vp : ValidatedParams) :
+    (forsTreeAddresses vp).Disjoint (wotsPkAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsTreeAddresses vp)
+    (fun _ => type_of_mem_wotsPkAddresses vp)
+
+theorem disjoint_forsTreeAddresses_xmssNodeAddresses (vp : ValidatedParams) :
+    (forsTreeAddresses vp).Disjoint (xmssNodeAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsTreeAddresses vp)
+    (fun _ => type_of_mem_xmssNodeAddresses vp)
+
+theorem disjoint_forsRootAddresses_wotsStepAddresses (vp : ValidatedParams) :
+    (forsRootAddresses vp).Disjoint (wotsStepAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsRootAddresses vp)
+    (fun _ => type_of_mem_wotsStepAddresses vp)
+
+theorem disjoint_forsRootAddresses_wotsPkAddresses (vp : ValidatedParams) :
+    (forsRootAddresses vp).Disjoint (wotsPkAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsRootAddresses vp)
+    (fun _ => type_of_mem_wotsPkAddresses vp)
+
+theorem disjoint_forsRootAddresses_xmssNodeAddresses (vp : ValidatedParams) :
+    (forsRootAddresses vp).Disjoint (xmssNodeAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_forsRootAddresses vp)
+    (fun _ => type_of_mem_xmssNodeAddresses vp)
+
+theorem disjoint_wotsStepAddresses_wotsPkAddresses (vp : ValidatedParams) :
+    (wotsStepAddresses vp).Disjoint (wotsPkAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_wotsStepAddresses vp)
+    (fun _ => type_of_mem_wotsPkAddresses vp)
+
+theorem disjoint_wotsStepAddresses_xmssNodeAddresses (vp : ValidatedParams) :
+    (wotsStepAddresses vp).Disjoint (xmssNodeAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_wotsStepAddresses vp)
+    (fun _ => type_of_mem_xmssNodeAddresses vp)
+
+theorem disjoint_wotsPkAddresses_xmssNodeAddresses (vp : ValidatedParams) :
+    (wotsPkAddresses vp).Disjoint (xmssNodeAddresses vp) :=
+  disjoint_of_type_ne (by decide) (fun _ => type_of_mem_wotsPkAddresses vp)
+    (fun _ => type_of_mem_xmssNodeAddresses vp)
+
+/-- The six structural ledgers, concatenated in the order of the table above with the two
+selection-dependent ledgers left out, are duplicate-free.  A named union ledger belongs to the
+trace-level slice. -/
+theorem nodup_structuralLedgers_append (vp : ValidatedParams) :
+    (forsLeafAddresses vp ++ forsTreeAddresses vp ++ forsRootAddresses vp ++
+      wotsStepAddresses vp ++ wotsPkAddresses vp ++ xmssNodeAddresses vp).Nodup := by
+  refine List.Nodup.append (List.Nodup.append (List.Nodup.append (List.Nodup.append
+    (List.Nodup.append (forsLeafAddresses_nodup vp) (forsTreeAddresses_nodup vp) ?_)
+    (forsRootAddresses_nodup vp) ?_) (wotsStepAddresses_nodup vp) ?_)
+    (wotsPkAddresses_nodup vp) ?_) (xmssNodeAddresses_nodup vp) ?_
+  all_goals
+    simp only [List.disjoint_append_left, disjoint_forsLeafAddresses_forsTreeAddresses,
+      disjoint_forsLeafAddresses_forsRootAddresses, disjoint_forsLeafAddresses_wotsStepAddresses,
+      disjoint_forsLeafAddresses_wotsPkAddresses, disjoint_forsLeafAddresses_xmssNodeAddresses,
+      disjoint_forsTreeAddresses_forsRootAddresses, disjoint_forsTreeAddresses_wotsStepAddresses,
+      disjoint_forsTreeAddresses_wotsPkAddresses, disjoint_forsTreeAddresses_xmssNodeAddresses,
+      disjoint_forsRootAddresses_wotsStepAddresses, disjoint_forsRootAddresses_wotsPkAddresses,
+      disjoint_forsRootAddresses_xmssNodeAddresses, disjoint_wotsStepAddresses_wotsPkAddresses,
+      disjoint_wotsStepAddresses_xmssNodeAddresses, disjoint_wotsPkAddresses_xmssNodeAddresses,
+      and_self]
+
 /-! ## Concrete address encodings -/
 
 variable {p : Params}
@@ -1051,7 +1230,7 @@ theorem encodeTargets_nodup_of_subset (prims : Primitives p)
     (by simpa [encodeTargets] using List.Nodup.of_map _ hsuper)).1 hsuper
   exact hinj a (hmem a ha) b (hmem b hb) hkey
 
-/-- Explicit encoded-address obligations for the eight target roles in the security architecture.
+/-- Explicit encoded-address obligations for the eight `TargetRole`s.
 
 The `wotsFUd` and `wotsFPre` fields are stated for convenience, not because they are independent:
 both follow from `wotsFTcr` through `encodeTargets_nodup_of_subset`, taking its structural

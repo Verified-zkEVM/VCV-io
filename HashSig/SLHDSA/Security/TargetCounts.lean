@@ -37,7 +37,9 @@ WOTS+ `F` roles carry `t_smdtud = t_smdtpre = c * len` and `t_smdttcr = c * len 
 and `xmssH` carry the two hypertree sums.  `t_smdttcr` names the target count of whichever
 collision game its own theory clones, so each occurrence is read in that theory.  The FORS-instance
 variable `d` instantiates to `2 ^ h`, the number of bottom-layer leaves, not to the layer count
-`Params.d`, and `c` is `wotsInstanceCount`.  `OpenPREFromTCRDSPR` formalizes that reduction.
+`Params.d`, and `c` is `wotsInstanceCount`.  The Lean module
+`VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.OpenPREFromTCRDSPR` formalizes that
+reduction; the EasyCrypt theory is `OpenPRE_From_TCR_DSPR_THF`.
 
 ## References
 

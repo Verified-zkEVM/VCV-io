@@ -6,6 +6,8 @@ Authors: Alexander Hicks
 
 module
 public import HashSig.SLHDSA.Security.ReachableTargets
+import HashSig.SLHDSA.Hypertree
+import HashSig.SLHDSA.HypertreeGeneral
 
 /-!
 # SLH-DSA reachable-target ledger canaries
@@ -193,8 +195,13 @@ def checkTwoLayerContent : IO Unit := do
   let wotsBase := wotsInstanceAdrs pos0
   ensure "WOTS+ base address is a listed instance"
     ((wotsInstanceAddresses twoLayer).contains wotsBase)
-  ensure "WOTS+ base address matches the XMSS leaf address"
-    (wotsBase == wotsLeafAdrs pos0.toAdrs 1)
+  -- The general hypertree reaches this leaf through `LayerPosition.initial` and `toAdrs`, the same
+  -- route `wotsInstanceAdrs` takes, so comparing the two would be a tautology.  The independent
+  -- reference is the field layout Algorithms 12 and 10 prescribe for the indices Algorithm 19
+  -- parses: layer `0`, tree `idx_tree`, type code `0` (`WOTS_HASH`), key pair `idx_leaf`, chain and
+  -- hash words zero.
+  ensure "WOTS+ base address has the FIPS WOTS_HASH leaf layout"
+    (wotsBase == { layer := 0, tree := 2, type := 0, word1 := 1, word2 := 0, word3 := 0 })
   ensure "WOTS+ chain 3 step 14 is an executed-step target"
     ((wotsStepAddresses twoLayer).contains ((wotsChainAdrs wotsBase 3).setHashAddress 14))
   ensure "WOTS+ chain 3 step 15 = w - 1 is not a listed step target"
@@ -217,6 +224,13 @@ def checkTwoLayerContent : IO Unit := do
     ((wotsInstanceAddresses twoLayer).contains (wotsInstanceAdrs pos1))
   ensure "top-layer XMSS root is a target"
     ((xmssNodeAddresses twoLayer).contains (xmssNodeAdrs pos1.toAdrs 2 0))
+  -- Key generation commits to the root of `GeneralHypertree.layerAdrs (d - 1) 0`; the ledger lists
+  -- that construction-built address, and it is the top-layer position's root.
+  let keygenRoot := xmssNodeAdrs (GeneralHypertree.layerAdrs 1 0) 2 0
+  ensure "the root address key generation commits to is a target"
+    ((xmssNodeAddresses twoLayer).contains keygenRoot)
+  ensure "and it is the top-layer position's root"
+    (keygenRoot == xmssNodeAdrs pos1.toAdrs 2 0)
   ensure "a second tree at the top layer is unreachable"
     (!(xmssNodeAddresses twoLayer).contains
       (xmssNodeAdrs ((Adrs.zero.setLayerAddress 1).setTreeAddress 1) 2 0))
@@ -252,6 +266,11 @@ def checkOneLayerContent : IO Unit := do
   let wotsBase := wotsInstanceAdrs pos
   ensure "WOTS+ base address is listed"
     ((wotsInstanceAddresses oneLayer).contains wotsBase)
+  -- At `d = 1` the depth-one hypertree signs from `htAdrs`, a construction-side address built
+  -- directly from `idx_tree`, and its XMSS leaf is `wotsLeafAdrs` of that address at `idx_leaf`.
+  ensure "WOTS+ base address is the leaf address the depth-one hypertree signs with"
+    (wotsBase ==
+      wotsLeafAdrs (htAdrs Adrs.zero oneLayerParts.idxTree.val) oneLayerParts.idxLeaf.val)
   ensure "WOTS+ chain 1 step 254 is an executed-step target"
     ((wotsStepAddresses oneLayer).contains ((wotsChainAdrs wotsBase 1).setHashAddress 254))
   ensure "WOTS+ chain 1 step 255 = w - 1 is not a listed step target"
