@@ -661,6 +661,27 @@ def runFalconLowLevelTests (st : IO.Ref TestState) : IO Unit := do
       (Falcon.Concrete.FXR.fxr_double one == two)
     check st "fxr_half(2) = 1"
       (Falcon.Concrete.FXR.fxr_half two == one)
+    -- Signed operands: `fxr_mul` and `fxr_sqr` are the floor of the exact product in 32.32
+    -- units, as in the reference (`int128` product shifted right by 32).
+    let exactMul (x y : UInt64) : UInt64 :=
+      (Int64.ofInt ((x.toInt64.toInt * y.toInt64.toInt) >>> 32)).toUInt64
+    check st "fxr_mul(-1.0, 0.5) = -0.5"
+      (Falcon.Concrete.FXR.fxr_mul 0xFFFFFFFF00000000 0x80000000 == 0xFFFFFFFF80000000)
+    check st "fxr_mul(0.5, -1.0) = -0.5"
+      (Falcon.Concrete.FXR.fxr_mul 0x80000000 0xFFFFFFFF00000000 == 0xFFFFFFFF80000000)
+    check st "fxr_sqr(-1.25) = 1.5625"
+      (Falcon.Concrete.FXR.fxr_sqr 0xFFFFFFFEC0000000 == 0x190000000)
+    let signedVals : List UInt64 :=
+      [0xFFFFFFFC40000000, 0xFFFFFFFEC0000000, 0xFFFFFFFF00000000, 0xFFFFFFFF80000000, 0,
+        0x80000000, 0x100000000, 0x140000000, 0x280000000, 0x7FFFFFFF00000000]
+    let mut mulOk := true
+    let mut sqrOk := true
+    for x in signedVals do
+      sqrOk := sqrOk && (Falcon.Concrete.FXR.fxr_sqr x == exactMul x x)
+      for y in signedVals do
+        mulOk := mulOk && (Falcon.Concrete.FXR.fxr_mul x y == exactMul x y)
+    check st "fxr_mul = floor(x·y / 2^32) on a signed grid" mulOk
+    check st "fxr_sqr = floor(x² / 2^32) on a signed grid" sqrOk
   IO.println ""
   flush
   -- ── 27. Diagnostic: target vector & NTRU relation check ──────────

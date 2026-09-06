@@ -74,13 +74,15 @@ def fxr_round (x : FXR) : Int32 :=
 
 -- fxr_mul: fixed-point multiply.
 -- Portable 4-part decomposition of the 128-bit product:
---   xl, xh = unsigned low / signed high 32-bit halves
+--   xl, xh = unsigned low / signed high 32-bit halves (the high half is an arithmetic
+--   shift of the signed word, as in the reference; a logical shift would drop the sign
+--   and break every product with a negative operand and a nonzero low half)
 --   result = (xl*yl)>>32 + xl*(int)yh + (int)xh*yl + ((int)xh*(int)yh)<<32
 def fxr_mul (x y : FXR) : FXR :=
   let xl : UInt64 := x &&& 0xFFFFFFFF
-  let xh : Int64 := (x >>> 32).toInt64
+  let xh : Int64 := x.toInt64 >>> (32 : Int64)
   let yl : UInt64 := y &&& 0xFFFFFFFF
-  let yh : Int64 := (y >>> 32).toInt64
+  let yh : Int64 := y.toInt64 >>> (32 : Int64)
   let z0 : UInt64 := (xl * yl) >>> 32
   let z1 : UInt64 := xl * yh.toUInt64
   let z2 : UInt64 := xh.toUInt64 * yl
@@ -90,7 +92,7 @@ def fxr_mul (x y : FXR) : FXR :=
 -- fxr_sqr: specialized squaring.
 def fxr_sqr (x : FXR) : FXR :=
   let xl : UInt64 := x &&& 0xFFFFFFFF
-  let xh : Int64 := (x >>> 32).toInt64
+  let xh : Int64 := x.toInt64 >>> (32 : Int64)
   let z0 : UInt64 := (xl * xl) >>> 32
   let z1 : UInt64 := xl * xh.toUInt64
   let z3 : UInt64 := (xh * xh).toUInt64 <<< 32
