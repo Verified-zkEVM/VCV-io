@@ -28,7 +28,7 @@ pipeline `fftInt`/`ifftRound` rounds to the exact lattice point, a deterministic
 bound on those two primitives.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec LatticeCrypto
 
