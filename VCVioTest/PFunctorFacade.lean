@@ -87,6 +87,18 @@ noncomputable example : PFunctor.IsProbabilitySpec boolOracleSpec.toPFunctor := 
 noncomputable example : PFunctor.IsUniformSpec boolOracleSpec.toPFunctor :=
   OracleSpec.IsUniformSpec.toPFunctor
 
+-- Instance synthesis at the erased literal. Tactics that unfold the reducible layers above
+-- `OracleSpec` leave a bare `PFunctor.mk` in the goal; the semantics instances are still found
+-- there with no transparency help from `OracleSpec` itself (see the comment on its
+-- `implicit_reducible` attribute, which serves dependent-type checks, not synthesis).
+noncomputable example : PFunctor.IsProbabilitySpec (PFunctor.mk (Fin 1) fun _ => Bool) :=
+  inferInstance
+
+noncomputable example : MonadLiftT (PFunctor.FreeM (PFunctor.mk (Fin 1) fun _ => Bool)) PMF :=
+  inferInstance
+
+example : MonadLiftT (PFunctor.FreeM (PFunctor.mk (Fin 1) fun _ => Bool)) SetM := inferInstance
+
 example (program : OracleComp boolOracleSpec Bool) :
     𝒮[program] = program.liftM PFunctor.IsProbabilitySpec.toPMF :=
   PFunctor.FreeM.evalSPMF_eq_liftM program

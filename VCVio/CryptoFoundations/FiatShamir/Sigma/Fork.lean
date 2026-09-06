@@ -61,9 +61,6 @@ variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 
 namespace Fork
 
-/- The fork proof repeatedly compares source and wrapped sum-spec response families. -/
-attribute [local implicit_reducible] PFunctor.Obj
-
 /-- Trace used by the Fiat-Shamir forking reduction for managed-RO NMA adversaries. Records
 one run's forgery, the adversary's programmed cache, the live random-oracle cache, the live
 query log, and whether the forgery verifies. -/

@@ -66,9 +66,12 @@ When in doubt, prefer:
 All active Lean libraries and tests use the module system. Put ordinary declarations in a
 `public section` and tactic/elaborator declarations in a `public meta section`. Existing source
 files generally use `@[expose] public section` to preserve pre-migration definitional equality;
-new definitions can instead be exposed individually with `@[expose]` when unfolding is part of
-their intended public API. Executable and runtime implementation modules should use opaque
-`public section` when callers do not need to unfold their definitions.
+new files use plain `public section` and expose individual definitions with `@[expose]` when
+unfolding is part of their intended public API. CI limits broad exposure per library; see the
+[module-system guide](docs/agents/module-system.md#validation-and-coordinated-rollout) for the
+exposure check and baseline workflow.
+Executable and runtime implementation modules should use opaque `public section` when callers do
+not need to unfold their definitions.
 
 Use `public import` for a dependency that downstream importers should receive transitively,
 `public meta import` for exported compile-time dependencies, and plain `import` for a private
