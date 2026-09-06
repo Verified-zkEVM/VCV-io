@@ -26,7 +26,6 @@ the cost profiles of the adversaries or subroutines that implement them.
 
 @[expose] public section
 
-open scoped BigOperators
 
 /-- Structured resource profile for open computations.
 

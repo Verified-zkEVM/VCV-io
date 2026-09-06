@@ -164,9 +164,6 @@ theorem neverFail_runObs_iff [LawfulMonad m] [MonadLiftT m SPMF] [LawfulMonadLif
     NeverFail (runObs base encode oa) ↔ NeverFail (eraseObs base oa) := by
   simp only [neverFail_iff, probFailure_runObs]
 
-@[deprecated (since := "2026-06-25")]
-alias NeverFail_runObs_iff := neverFail_runObs_iff
-
 /-! ### EvalDist Bridge for `runObs`
 
 These lemmas connect the result-marginal distribution of `runObs` to the distribution

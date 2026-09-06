@@ -145,9 +145,6 @@ lemma le_probOutput_bind_of_forall_support {α β : Type} {a : β} {δ : ℝ≥0
         · gcongr; exact h x hx
         · simp [probOutput_eq_zero_of_not_mem_support hx]
 
-@[deprecated (since := "2026-06-25")]
-alias probOutput_bind_ge_of_forall_support := le_probOutput_bind_of_forall_support
-
 end correctness
 
 section unforgeable

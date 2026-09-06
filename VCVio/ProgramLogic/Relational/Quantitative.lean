@@ -1291,9 +1291,6 @@ theorem le_eRelWP_of_isCoupling
   le_iSup (f := fun c' : SPMF.Coupling (𝒮[oa]) (𝒮[ob]) =>
     ∑' z, Pr[= z | c'.1] * post z.1 z.2) ⟨c, hc⟩
 
-@[deprecated (since := "2026-06-25")]
-alias eRelWP_ge_of_isCoupling := le_eRelWP_of_isCoupling
-
 /-- A witness coupling whose score dominates the precondition discharges a
 quantitative relational WP lower-bound obligation. -/
 theorem eRelWP_of_isCoupling

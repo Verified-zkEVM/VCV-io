@@ -32,7 +32,6 @@ from `zmodPolyNormOps`.
 @[expose] public section
 
 
-open scoped BigOperators
 
 namespace LatticeCrypto
 

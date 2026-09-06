@@ -109,9 +109,6 @@ lemma verified_of_forkPoint_eq_some [DecidableEq M] [DecidableEq Commit] {qH : �
     trace.verified = true := by
   simp_all [forkPoint]
 
-@[deprecated (since := "2026-06-25")]
-alias forkPoint_some_imp_verified := verified_of_forkPoint_eq_some
-
 /-- If `forkPoint` selects a rewinding index, the recorded forgery's hash point appears in
 the live query log. -/
 lemma target_mem_queryLog_of_forkPoint_eq_some [DecidableEq M] [DecidableEq Commit] {qH : ℕ}
@@ -119,9 +116,6 @@ lemma target_mem_queryLog_of_forkPoint_eq_some [DecidableEq M] [DecidableEq Comm
     (hs : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH trace = some s) :
     trace.target ∈ trace.queryLog := by
   simp_all [forkPoint]
-
-@[deprecated (since := "2026-06-25")]
-alias forkPoint_some_imp_mem := target_mem_queryLog_of_forkPoint_eq_some
 
 /-- The index selected by `forkPoint` looks up the forgery's hash point in the live query
 log: `trace.queryLog[s]?` equals `some trace.target`. -/
@@ -1150,9 +1144,6 @@ lemma exists_cached_verify_of_runTrace_verified
   subst hxeq
   simp only [Trace.target] at hv ⊢
   split at hv <;> simp_all
-
-@[deprecated (since := "2026-06-25")]
-alias runTrace_verified_imp_verify := exists_cached_verify_of_runTrace_verified
 
 /-- The `forkPoint`-based reachability invariant for `runTrace`: whenever
 `forkPoint qH x = some s`, the outer `QueryLog` of `replayFirstRun (runTrace ...)` has a
