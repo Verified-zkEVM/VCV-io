@@ -23,8 +23,8 @@ only when `Pr[⊥] = 0` (as in `ProbComp`).
 
 As in the concrete battery: where a fact closes by both `simp` and `grind`, both are kept (the
 mirror); otherwise a gap pair (`fail_if_success (tac; done)` guard, dated reason, then the working
-closer; see `CONTRIBUTING.md`, *Tactic Gate Files*). Operations with no probability API yet are
-recorded as prose gaps at the end.
+closer; see *Normal forms and the tactic contract* in `docs/agents/probability.md`). Operations
+with no probability API yet are recorded as prose gaps at the end.
 -/
 
 @[expose] public section

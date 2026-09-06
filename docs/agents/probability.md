@@ -329,7 +329,7 @@ is a *gap pair* (`fail_if_success (tac; done)` then the working closer, with a d
 `gap(tac, …)` reason), so the gap is machine-checked and expires the moment the set improves. A
 regression in either tactic surfaces there in isolation. When adding probability automation, add
 the corresponding battery rows and retire the guards it makes obsolete. The rules are in
-*Normal forms and the tactic contract* below and in `CONTRIBUTING.md`.
+*Normal forms and the tactic contract* below.
 
 `VCVioTest/MonadProbability.lean` is the **generic-`m`** companion: the same gate over an abstract
 monad `m` with the EvalDist instance stack (`[LawfulMonadLiftT m SPMF]`, …) and over the concrete
@@ -394,7 +394,8 @@ normal form.
 `MonadProbability.lean`, `GrindFailFast.lean`, `Tactic/*.lean`, `EvalDist/*.lean`) state
 "goal family → one terminal tactic" and are the gate for every change to these sets:
 
-1. *One terminal call.* A positive entry is `by <one tactic>` or a term.
+1. *One terminal call.* A positive entry is `by <one tactic>` or a term: `simp`, `grind`,
+   `gcongr`, `finiteness`, `simp [S]`, or `simp only [S]`.
 2. *Known gaps are machine-checked and self-expiring.* A gap is a pair: `fail_if_success
    (tac; done)` on its own line, then the working closer, with a dated `gap(tac, date): reason`
    comment. The guard errors as soon as the set improves, so the PR that closes a gap retires
@@ -407,7 +408,9 @@ normal form.
 3. *No multi-call scripts.* A `;`/multi-line script is allowed only as the closer of a gap pair.
    A one-call entry that stops closing is fixed in the set or filed as a dated gap pair, never by
    adding a second call.
-4. *Normalizers pin their normal form* with `guard_target =ₛ …` after `simp only [S]`.
+4. *Normalizers pin their normal form.* For a normalizer such as `simp only [monad_norm]` or
+   `handler_step`, follow the normalizing call with `guard_target =ₛ <expected form>` and then
+   a closer.
 5. *Negatives for every deliberate exclusion*: whatever these docs say is "deliberately not in
    the default set" has a `fail_if_success` entry.
 6. *Fail fast stays fail fast*: a saturating `grind` is a deterministic timeout under the default
