@@ -24,7 +24,7 @@ the polynomial at `exp(rootAngle k j · I)`. Everything else follows from that d
   pair of integer polynomials, because the leaves sample integers and the nodes merge.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec Complex
 
