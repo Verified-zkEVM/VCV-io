@@ -70,6 +70,7 @@ def concreteEncoding (p : Params) : Encoding p (concretePrimitives p) where
   sigDecode := MLDSA.Concrete.sigDecode p
 
 /-- Concrete primitives specialized to ML-DSA-44. -/
+@[expose]
 def mldsa44Primitives : Primitives mldsa44 :=
   concretePrimitives mldsa44
 
@@ -79,10 +80,12 @@ def mldsa65Primitives : Primitives mldsa65 :=
   concretePrimitives mldsa65
 
 /-- Concrete primitives specialized to ML-DSA-87. -/
+@[expose]
 def mldsa87Primitives : Primitives mldsa87 :=
   concretePrimitives mldsa87
 
 /-- Concrete encoding bundle specialized to ML-DSA-44. -/
+@[expose]
 def mldsa44Encoding : Encoding mldsa44 mldsa44Primitives :=
   concreteEncoding mldsa44
 
@@ -92,6 +95,7 @@ def mldsa65Encoding : Encoding mldsa65 mldsa65Primitives :=
   concreteEncoding mldsa65
 
 /-- Concrete encoding bundle specialized to ML-DSA-87. -/
+@[expose]
 def mldsa87Encoding : Encoding mldsa87 mldsa87Primitives :=
   concreteEncoding mldsa87
 
