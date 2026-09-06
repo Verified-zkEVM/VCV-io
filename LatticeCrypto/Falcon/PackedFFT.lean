@@ -39,9 +39,11 @@ variable {k : ℕ}
 /-- The `j`-th packed coordinate as a complex number. -/
 noncomputable def coord (f : RealFFTPoly k) (j : Fin (2 ^ k)) : ℂ := ⟨f.re j, f.im j⟩
 
-@[simp] theorem coord_re (f : RealFFTPoly k) (j : Fin (2 ^ k)) : (coord f j).re = f.re j := rfl
+@[simp] theorem coord_re (f : RealFFTPoly k) (j : Fin (2 ^ k)) : (coord f j).re = f.re j := by
+  simp [coord]
 
-@[simp] theorem coord_im (f : RealFFTPoly k) (j : Fin (2 ^ k)) : (coord f j).im = f.im j := rfl
+@[simp] theorem coord_im (f : RealFFTPoly k) (j : Fin (2 ^ k)) : (coord f j).im = f.im j := by
+  simp [coord]
 
 @[simp] theorem re_pack (a b : Vector ℝ (2 ^ k)) (i : Fin (2 ^ k)) : (pack a b).re i = a.get i := by
   simp [pack, re, i.isLt]
@@ -93,10 +95,6 @@ theorem coord_mulFFT (a b : RealFFTPoly k) (j : Fin (2 ^ k)) :
   apply Complex.ext <;> simp [coord, Primitives.mulFFT]
 
 theorem two_pow_succ_eq (k : ℕ) : 2 ^ (k + 1) = 2 * 2 ^ k := by ring
-
-/-- Half of a coordinate index, as an index one level down. -/
-abbrev half (j : Fin (2 ^ (k + 1))) : Fin (2 ^ k) :=
-  ⟨j.1 / 2, by have := j.2; have := two_pow_succ_eq k; omega⟩
 
 theorem coord_mergeFFT_even (f₀ f₁ : RealFFTPoly k) (i : ℕ) (hi : i < 2 ^ k) :
     coord (Primitives.mergeFFT f₀ f₁) ⟨2 * i, by have := two_pow_succ_eq k; omega⟩ =
