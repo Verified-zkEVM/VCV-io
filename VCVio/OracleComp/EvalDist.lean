@@ -100,7 +100,7 @@ namespace OracleComp
 
 variable {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} {α β γ : Type w}
 
-/-! ## Oracle-facing compatibility names -/
+/-! ## Oracle-facing semantics -/
 
 /- `supportWhen` presents Mathlib's `SetM` interpreter as ordinary sets in
 its public API. Lean 4.33 requires that wrapper at implicit transparency when

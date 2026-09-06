@@ -18,7 +18,7 @@ coalgebra: a measurable state space together with, for each query, a *joint*
 subprobability kernel over the answer and the next state. It is a Mealy machine in the
 Kleisli category of subprobability kernels. An optional coherent executable
 presentation as a stateful handler `QueryImpl spec (StateT State SPMF)` remains
-available through `ProbResponder.IsExecutable`, `ProbResponder.answer`, and
+available through `ProbResponder.IsExecutable`, `ProbResponder.IsExecutable.answerSPMF`, and
 `ProbResponder.toQueryImpl`.
 
 Wiring a responder against an adversary `OracleStrategy` is not a hand-rolled

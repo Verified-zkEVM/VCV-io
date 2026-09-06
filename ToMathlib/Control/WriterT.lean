@@ -182,8 +182,6 @@ instance [Monoid ω] : AlternativeMonad (WriterT ω m) where
 @[simp]
 lemma run_failure [Monoid ω] {α : Type u} : (failure : WriterT ω m α).run = failure := rfl
 
--- instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] :
-
 instance [Monoid ω] [LawfulMonad m] : LawfulMonadLift m (WriterT ω m) where
   monadLift_pure x := map_pure (·, 1) x
   monadLift_bind {_ _} _ _ := by

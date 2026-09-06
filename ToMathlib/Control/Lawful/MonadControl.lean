@@ -61,8 +61,4 @@ namespace StateT
 
 variable {σ : Type u} {m : Type u → Type v} [Monad m] [LawfulMonad m]
 
---   liftWith_pure := liftWith_pure
---   liftWith_bind := liftWith_bind
---   liftWith_restoreM := liftWith_restoreM
-
 end StateT

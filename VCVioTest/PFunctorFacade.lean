@@ -71,9 +71,16 @@ example : zeroHandler.postInsert (fun _ _ => some ()) () = some 0 := by
 noncomputable instance : IsUniformSpec boolOracleSpec :=
   OracleSpec.IsUniformSpec.ofFintypeInhabited _
 
+noncomputable example : IsProbabilitySpec boolOracleSpec :=
+  PFunctor.IsProbabilitySpec.mk fun _ => PMF.uniformOfFintype Bool
+
 noncomputable example : MonadLiftT (OracleComp boolOracleSpec) PMF := inferInstance
 
+noncomputable example : LawfulMonadLiftT (OracleComp boolOracleSpec) PMF := inferInstance
+
 example : MonadLiftT (OracleComp boolOracleSpec) SetM := inferInstance
+
+example : LawfulMonadLiftT (OracleComp boolOracleSpec) SetM := inferInstance
 
 noncomputable example : PFunctor.IsProbabilitySpec boolOracleSpec.toPFunctor := inferInstance
 
