@@ -324,9 +324,12 @@ the `withBadFlag`/`withBadUpdate`/`flattenStateT` run-shapes, `simulateQ_option_
 `VCVioTest/ProbabilityTactics.lean` is the living benchmark and **gate** for all of this: a broad
 corpus of probability / event / failure / support / distribution facts organised by category, each
 closed by a single *terminal* tactic. Where a fact closes by **both** `simp` and `grind`, both are
-kept (the mirror), so each tactic stays exercised on that shape; where only one closes, the gap is a
-`target(simp)` / `target(grind)` note. A regression in either tactic surfaces there in isolation.
-When adding probability automation, add the corresponding battery rows.
+kept (the mirror), so each tactic stays exercised on that shape; where only one closes, the entry
+is a *gap pair* (`fail_if_success (tac; done)` then the working closer, with a dated
+`gap(tac, …)` reason), so the gap is machine-checked and expires the moment the set improves. A
+regression in either tactic surfaces there in isolation. When adding probability automation, add
+the corresponding battery rows and retire the guards it makes obsolete. The rules are in
+*Normal forms and the tactic contract* below.
 
 `VCVioTest/MonadProbability.lean` is the **generic-`m`** companion: the same gate over an abstract
 monad `m` with the EvalDist instance stack (`[LawfulMonadLiftT m SPMF]`, …) and over the concrete
@@ -345,6 +348,79 @@ disable a rule per call (`grind [-bind_pure]`), ignore the default set entirely
 (`grind only [the, lemmas, you, want]`), or unset a tag for a whole file
 (`attribute [-grind] bind_pure`). `grind?` reports a minimal `grind only [...]` call for a goal it
 closes, which is the easiest way to make a fragile call site independent of the default set.
+
+## Normal forms and the tactic contract
+
+The simp, grind and `gcongr` sets of the probability layer are designed around one *normal-form
+ladder*: one canonical spelling per rung, mass-left throughout, each rung reached from the one
+above it by an existing pathway rather than by a per-rung twin lemma.
+
+| rung | form | reached by |
+|---|---|---|
+| 0 closed | numerals, `(Fintype.card α)⁻¹`, `if … then 1 else 0`, `#{x \| p x} / Fintype.card α` | `simp` (`probOutput_pure/query/uniformSample/guard/ite`, `probOutput_bind_const`, `probOutput_map_equiv`) |
+| 1 finite sum | `∑ x, Pr[= x \| mx] * g x` | `simp` from rung 2 through Mathlib's `@[simp] tsum_fintype`; `Finset.sum_boole`/`sum_ite_eq` finish |
+| 2 tsum | `∑' x, Pr[= x \| mx] * g x`, which is `expectedValue mx g` | `grind` (bind expansion, `probOutput_bind_eq_tsum` is `@[grind =]`); `rw [probOutput_bind_eq_tsum, ← expectedValue_def]` exposes the expectation head |
+| 3 integral | `∫⁻ x, g x ∂𝒟[mx]` | countable discrete compatibility measures admit the expectation bridge below; measure-native proofs can keep this form for Mathlib's integration API |
+
+Mass-left is canonical: it is the orientation of Mathlib's `PMF.bind_apply`,
+`PMF.toMeasure_bind_apply` and Bochner `integral_fintype`, of `expectedValue`, and of every
+bind lemma in this library. Mathlib's `lintegral_countable'`/`lintegral_fintype` are mass-right;
+they meet this library exactly once, inside the proof of the measure-to-façade bridge, never as a
+normal form.
+
+**What each tactic promises.**
+
+- `simp` is the *structural* normalizer: it reaches a closed form when one exists, applies the
+  monad laws, and collapses `∑'` to `∑` on a `Fintype`. It never expands a bind into a `tsum`
+  (`gotchas.md` §10); `simp [probOutput_bind_eq_tsum]` is the documented one-step to the sum,
+  and on a `Fintype` that call lands on rung 1 with no library lemma involved.
+- `grind` is the *symbolic* closer after bind expansion: equiprobability, membership, directed
+  iffs, `bind`/`pure`-normalised structure. It is not an `ℝ≥0∞`/`Fintype.card` arithmetic engine
+  and must keep failing fast on the `Pr[…] = 0/1 ↔ …` characterization family
+  (`VCVioTest/GrindFailFast.lean`).
+- `gcongr` and `finiteness` are the *bound* closers, with `expectedValue` as the head symbol for
+  rung 2. Rewrite a bind with `probOutput_bind_eq_tsum` and fold the sum with
+  `← expectedValue_def` to expose that head. `expectedValue` is a `def` that `simp` does not
+  unfold; its untagged `expectedValue_def` equation can be supplied explicitly to `rw` or `grind`.
+- The measure side uses `𝒟[…]`, with `evalDist_pure` and `evalDist_bind` under
+  `LawfulEvalDistSemantics`; bind also requires a measurable continuation. For `FreeM`,
+  `FreeM.evalDist_apply_singleton` and `FreeM.evalDist_apply_setOf` connect observations to
+  `Pr[...]` under their countability, measurability, and query-specification agreement hypotheses.
+  `OracleComp.EvalDist.expectedValue_eq_lintegral` identifies expectations with integrals against
+  the compatibility measure `OracleComp.EvalDist.toMeasure` on countable discrete result spaces.
+  These are explicit coherence boundaries; measure-native proofs keep their measure denotation.
+
+**What the gates enforce.** The gate files (`VCVioTest/ProbabilityTactics.lean`,
+`MonadProbability.lean`, `GrindFailFast.lean`, `Tactic/*.lean`, `EvalDist/*.lean`) state
+"goal family → one terminal tactic" and are the gate for every change to these sets:
+
+1. *One terminal call.* A positive entry is `by <one tactic>` or a term: `simp`, `grind`,
+   `gcongr`, `finiteness`, `simp [S]`, or `simp only [S]`.
+2. *Known gaps are machine-checked and self-expiring.* A gap is a pair: `fail_if_success
+   (tac; done)` on its own line, then the working closer, with a dated `gap(tac, date): reason`
+   comment. The guard errors as soon as the set improves, so the PR that closes a gap retires
+   the guard in the same diff. One guard covers a family of same-shaped entries when the family
+   is named in the section note. (`fail_if_success` takes a tactic sequence, so the closer must be
+   on its own line; bare `fail_if_success simp` passes only when `simp` makes *no progress*,
+   hence the `(tac; done)` form for partial-progress gaps. Explicit no-progress checks keep
+   bare `fail_if_success simp` to avoid an unreachable `done`. Bare `fail_if_success grind`
+   already tests closure.)
+3. *No multi-call scripts.* A `;`/multi-line script is allowed only as the closer of a gap pair.
+   A one-call entry that stops closing is fixed in the set or filed as a dated gap pair, never by
+   adding a second call.
+4. *Normalizers pin their normal form.* For a normalizer such as `simp only [monad_norm]` or
+   `handler_step`, follow the normalizing call with `guard_target =ₛ <expected form>` and then
+   a closer.
+5. *Negatives for every deliberate exclusion*: whatever these docs say is "deliberately not in
+   the default set" has a `fail_if_success` entry.
+6. *Fail fast stays fail fast*: a saturating `grind` is a deterministic timeout under the default
+   heartbeat limit, which escapes `fail_if_success` and fails the build; gate files never raise
+   the limit.
+
+Warnings in `VCVioTest` fail CI, so a stale entry (an unused tactic, a redundant `grind`
+parameter, a deprecated name) cannot linger. A PR that touches a simp/grind/`gcongr` set says
+which rung its lemmas target, which gate entries it adds and which guards it retires, and which
+library proofs got shorter; a set with no library caller is itself a finding.
 
 ## Common Mistakes
 

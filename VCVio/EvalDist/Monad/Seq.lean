@@ -52,7 +52,7 @@ section spmf
 
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 
-@[simp]
+@[simp, grind norm]
 lemma evalSPMF_seq (mf : m (α → β)) (mx : m α) :
     𝒮[mf <*> mx] = 𝒮[mf] <*> 𝒮[mx] := by simp [monad_norm]
 
@@ -111,7 +111,7 @@ variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   [MonadLiftT m SetM] [EvalDistCompatible m]
 
 omit [MonadLiftT m SetM] [EvalDistCompatible m] in
-@[simp]
+@[simp, grind norm]
 lemma evalSPMF_seqLeft (mx : m α) (my : m β) :
     𝒮[mx <* my] = 𝒮[mx] <* 𝒮[my] := by
   simp [seqLeft_eq]
@@ -164,7 +164,7 @@ variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   [MonadLiftT m SetM] [EvalDistCompatible m]
 
 omit [MonadLiftT m SetM] [EvalDistCompatible m] in
-@[simp]
+@[simp, grind norm]
 lemma evalSPMF_seqRight (mx : m α) (my : m β) :
     𝒮[mx *> my] = 𝒮[mx] *> 𝒮[my] := by
   simp [seqRight_eq]

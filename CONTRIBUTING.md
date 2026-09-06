@@ -125,6 +125,9 @@ ASCII banners are visually loud, do not appear in the generated documentation, a
 - Respect the module layering documented in [`AGENTS.md`](AGENTS.md).
 - Use `/-! ## Title -/` doc-headers, not ASCII banners, for inline section breaks (see *Documentation Expectations* above).
 
+For probability tactic tests, follow the
+[tactic-test conventions](docs/agents/probability.md#normal-forms-and-the-tactic-contract).
+
 ## Licensing
 
 This project is licensed under Apache 2.0. By contributing, you agree that your contributions are licensed under the same terms.
