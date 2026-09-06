@@ -6,6 +6,7 @@ Authors: Oleksandr Vovkotrub
 
 module
 public import LatticeCrypto.Falcon.Scheme
+public import LatticeCrypto.Falcon.PackedFFT
 
 /-!
 # The coset condition of Falcon's trapdoor sampler
@@ -23,9 +24,12 @@ carried out in the semantic quotient `ℤ_q[X]/(X^n + 1)` through the soundness 
 (`capRelation_of_validKeyPair`), which Falcon's key generation guarantees and which is what
 makes `h = g · f⁻¹` exist in the first place.
 
-What remains for the concrete primitives is `LandsOnLattice` itself: that the fixed-point FFT
-pipeline `fftInt`/`ifftRound` rounds to the exact lattice point, a deterministic rounding-error
-bound on those two primitives.
+At exact FFT primitives (`Primitives.ExactFFT`) the lattice-point condition is a theorem: every
+sampler output is the packed FFT of an integer pair (`Primitives.ffSampling_support_ofCoeffs`),
+the packed FFT is multiplicative and inverted by the split recursion
+(`RealFFTPoly.ofCoeffs_negacyclic`, `RealFFTPoly.toCoeffs_ofCoeffs`), so the rounded inverse
+transform returns the integer polynomials `z₀ · g + z₁ · G` and `-(z₀ · f + z₁ · F)` exactly
+(`landsOnLattice_of_exactFFT`, `hpreimage_of_exactFFT`).
 -/
 
 public section
@@ -217,6 +221,81 @@ theorem capRelation_of_validKeyPair (hn : 0 < p.n) (pk : PublicKey p) (sk : Secr
   set Q := (coeffSemantics hn).quotientOf with hQ
   linear_combination (-(Q u)) * hq' + (Q u * Q (IntPoly.toRq sk.capF)) * hk +
     (Q (IntPoly.toRq sk.capG) - Q (IntPoly.toRq sk.capF) * Q pk.h) * hu'
+
+/-! ## The lattice-point condition at exact FFT primitives -/
+
+/-- The integer cast commutes with the negacyclic convolution. -/
+theorem intCast_negacyclicConvCoeff {n : ℕ} (a b : Fin n → ℤ) (k : Fin n) :
+    ((negacyclicConvCoeff a b k : ℤ) : ℝ) =
+      negacyclicConvCoeff (fun i => (a i : ℝ)) (fun i => (b i : ℝ)) k := by
+  simp only [negacyclicConvCoeff]
+  push_cast
+  rfl
+
+/-- Reindexing a negacyclic convolution along an equality of lengths. -/
+theorem negacyclicConvCoeff_cast {m n : ℕ} (h : m = n) (f g : Fin n → ℝ) (k : Fin m) :
+    negacyclicConvCoeff (fun i => f (Fin.cast h i)) (fun i => g (Fin.cast h i)) k =
+      negacyclicConvCoeff f g (Fin.cast h k) := by
+  subst h
+  rfl
+
+/-- **The lattice-point condition at exact FFT primitives.** The packed FFT of any integer pair
+`(z₀, z₁)` is mapped by the basis application to `z₀ · g + z₁ · G` and `-(z₀ · f + z₁ · F)`:
+`fftInt` is the packed FFT, `mulFFT` is negacyclic multiplication under it, the split recursion
+inverts the merge recursion, and rounding fixes integers. -/
+theorem landsOnLattice_of_exactFFT (hn : 2 * 2 ^ p.fftDepth = p.n) (hex : prims.ExactFFT hn)
+    (sk : SecretKey p) (z : FFTPair p.fftDepth)
+    (hz : ∃ a b : Fin (2 * 2 ^ p.fftDepth) → ℤ,
+      z.1 = RealFFTPoly.ofCoeffs p.fftDepth (fun i => (a i : ℝ)) ∧
+      z.2 = RealFFTPoly.ofCoeffs p.fftDepth (fun i => (b i : ℝ))) :
+    LandsOnLattice p prims sk z := by
+  obtain ⟨a, b, ha, hb⟩ := hz
+  set z₀ : IntPoly p.n := Poly.ofPi fun i => a (Fin.cast hn.symm i) with hz₀
+  set z₁ : IntPoly p.n := Poly.ofPi fun i => b (Fin.cast hn.symm i) with hz₁
+  have ha' : (fun i => (a i : ℝ)) = fun i => ((z₀.get (Fin.cast hn i) : ℤ) : ℝ) := by
+    funext i
+    rw [hz₀, Poly.get_ofPi]
+    congr 2
+  have hb' : (fun i => (b i : ℝ)) = fun i => ((z₁.get (Fin.cast hn i) : ℤ) : ℝ) := by
+    funext i
+    rw [hz₁, Poly.get_ofPi]
+    congr 2
+  have key : ∀ (u v : IntPoly p.n) (i : Fin p.n),
+      negacyclicConvCoeff (fun j => ((u.get (Fin.cast hn j) : ℤ) : ℝ))
+        (fun j => ((v.get (Fin.cast hn j) : ℤ) : ℝ)) (Fin.cast hn.symm i) =
+        (((intPolyMul u v).get i : ℤ) : ℝ) := by
+    intro u v i
+    rw [negacyclicConvCoeff_cast hn (fun j => ((u.get j : ℤ) : ℝ)) (fun j => ((v.get j : ℤ) : ℝ)),
+      IntPoly.get_mul, intCast_negacyclicConvCoeff]
+    congr 1
+  refine ⟨z₀, z₁, ?_, ?_⟩
+  · rw [ha, hb, ha', hb', hex.fftInt_eq, hex.fftInt_eq, ← RealFFTPoly.ofCoeffs_negacyclic,
+      ← RealFFTPoly.ofCoeffs_negacyclic, ← RealFFTPoly.ofCoeffs_add, hex.ifftRound_eq,
+      RealFFTPoly.toCoeffs_ofCoeffs]
+    apply Poly.ext_get_eq
+    intro i
+    rw [Poly.get_ofPi, Poly.get_add, key, key, ← Int.cast_add, round_intCast]
+  · rw [ha, hb, ha', hb', hex.fftInt_eq, hex.fftInt_eq, ← RealFFTPoly.ofCoeffs_negacyclic,
+      ← RealFFTPoly.ofCoeffs_negacyclic, ← RealFFTPoly.ofCoeffs_add, ← RealFFTPoly.ofCoeffs_neg,
+      hex.ifftRound_eq, RealFFTPoly.toCoeffs_ofCoeffs]
+    apply Poly.ext_get_eq
+    intro i
+    rw [Poly.get_ofPi, Poly.get_neg, Poly.get_add, key, key, ← Int.cast_add, ← Int.cast_neg,
+      round_intCast]
+
+/-- **The coset condition at exact FFT primitives**, from the key relations alone: every sampler
+output is the packed FFT of an integer pair, on which the basis application lands on the
+lattice. -/
+theorem hpreimage_of_exactFFT (hn : 2 * 2 ^ p.fftDepth = p.n) (hex : prims.ExactFFT hn)
+    (pk : PublicKey p) (sk : SecretKey p)
+    (hkey : negacyclicMul (IntPoly.toRq sk.f) pk.h = IntPoly.toRq sk.g)
+    (hcap : negacyclicMul (IntPoly.toRq sk.capF) pk.h = IntPoly.toRq sk.capG) :
+    ∀ (c : Rq p.n) (x : Rq p.n × Rq p.n),
+      x ∈ support ((falconPSF p prims).trapdoorSample pk sk c) →
+        (falconPSF p prims).eval pk x = c :=
+  hpreimage_of_landsOnLattice p prims (by rw [← hn]; positivity) pk sk hkey hcap
+    fun _ z hz => landsOnLattice_of_exactFFT p prims hn hex sk z
+      (Primitives.ffSampling_support_ofCoeffs prims _ _ _ z hz)
 
 end Falcon
 

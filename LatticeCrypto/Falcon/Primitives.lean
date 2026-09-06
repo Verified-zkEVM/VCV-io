@@ -76,6 +76,33 @@ namespace RealFFTPoly
 
 end RealFFTPoly
 
+/-- The root angle of packed coordinate `j` at recursion level `k`.
+
+A packed Falcon FFT polynomial of length `2 * 2^k` stores the values of a real polynomial of
+degree `2 * 2^k` at one root of `X^(2 · 2^k) + 1` from each conjugate pair; `rootAngle k j` is
+the argument of the root of coordinate `j`. Level `0` stores the single evaluation at
+`exp(π/2 · I) = I`. Splitting `f = f₀(X²) + X · f₁(X²)` places `f(ω)` and `f(-ω)` at the adjacent
+coordinates `2i` and `2i + 1`, where `ω²` is the level-`k` root of coordinate `i`, so
+
+- `rootAngle (k + 1) (2 * i) = rootAngle k i / 2`,
+- `rootAngle (k + 1) (2 * i + 1) = rootAngle k i / 2 + π`.
+
+This is the bit-reversed root order of Falcon's `fpoly_FFT` and of its twiddle table
+(`GM_TAB[m] = exp(π · bitrev₁₀(m) / 1024 · I)`): in closed form
+`rootAngle k j = (4 · bitrev_k j + 1) π / 2^(k+1)`. Indices `j ≥ 2^k` are never used. -/
+noncomputable def rootAngle : ℕ → ℕ → ℝ
+  | 0, _ => Real.pi / 2
+  | k + 1, j => rootAngle k (j / 2) / 2 + ((j % 2 : ℕ) : ℝ) * Real.pi
+
+@[simp] theorem rootAngle_zero (j : ℕ) : rootAngle 0 j = Real.pi / 2 := rfl
+
+theorem rootAngle_two_mul (k i : ℕ) : rootAngle (k + 1) (2 * i) = rootAngle k i / 2 := by
+  simp [rootAngle]
+
+theorem rootAngle_two_mul_add_one (k i : ℕ) :
+    rootAngle (k + 1) (2 * i + 1) = rootAngle k i / 2 + Real.pi := by
+  simp [rootAngle, Nat.mul_add_div]
+
 /-- The Falcon tree (LDL tree), a binary tree used by `ffSampling` (Algorithm 11).
 
 - At level 0 (leaves): stores `σ > 0`, the standard deviation for `SamplerZ` at that leaf.
@@ -126,14 +153,16 @@ namespace Primitives
 
 variable {p : Params} (prims : Primitives p)
 
-/-- The canonical split angle for the proof-level Falcon FFT specification.
+/-- The split angle of the proof-level Falcon FFT at level `k`: half the root angle of
+packed coordinate `i`.
 
-For `splitFFT` on a packed Falcon FFT polynomial of length `2 * 2^(k+1)`, we follow the
-implementation order used by Falcon's `fpoly_split_fft` and `fpoly_merge_fft`: the adjacent
-packed coordinates `(2i, 2i+1)` form the pair `f(ωᵢ), f(-ωᵢ)` where
-`ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)`. -/
+For `splitFFT` on a packed Falcon FFT polynomial of length `2 * 2^(k+1)`, the adjacent packed
+coordinates `(2i, 2i+1)` form the pair `f(ωᵢ), f(-ωᵢ)` with `ωᵢ = exp(splitAngle i · I)`, and
+`ωᵢ² = exp(rootAngle k i · I)` is the root of coordinate `i` one level down. This is what makes
+the split/merge recursion a consistent evaluation map (`RealFFTPoly.re_ofCoeffs`), and it is the
+implementation order of Falcon's `fpoly_split_fft` and `fpoly_merge_fft`. -/
 @[inline] noncomputable def splitAngle {k : ℕ} (i : Fin (2 ^ k)) : ℝ :=
-  (((2 * i.1 + 1 : ℕ) : ℝ) * Real.pi) / (((2 ^ (k + 2) : ℕ) : ℝ))
+  rootAngle k i.1 / 2
 
 /-- Hash a message using the verification-key bytes derived from `pk`. -/
 @[inline] def hashToPointForPublicKey (pk : Rq p.n) (salt : Bytes 40) (msg : List Byte) :
@@ -157,8 +186,7 @@ def mulFFT {k : ℕ} (a b : RealFFTPoly k) : RealFFTPoly k :=
 /-- Split a packed Falcon FFT polynomial into its even and odd parts.
 
 If `f = f₀(x²) + x · f₁(x²)` and the adjacent packed coordinates of `f` encode
-`a = f(ωᵢ)`, `b = f(-ωᵢ)` for the canonical implementation-order roots
-`ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)`, then
+`a = f(ωᵢ)`, `b = f(-ωᵢ)` for the implementation-order roots `ωᵢ = exp(splitAngle i · I)`, then
 
 - `f₀(ωᵢ²) = (a + b) / 2`
 - `f₁(ωᵢ²) = (a - b) / (2ωᵢ)`
@@ -201,7 +229,7 @@ noncomputable def splitFFT {k : ℕ}
 /-- Merge two half-size Falcon FFT polynomials into a full-size one.
 
 This inverts `splitFFT`: if `f = f₀(x²) + x · f₁(x²)`, then for each implementation-order
-root `ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)` we reconstruct the adjacent packed pair
+root `ωᵢ = exp(splitAngle i · I)` we reconstruct the adjacent packed pair
 
 - `f(ωᵢ) = f₀(ωᵢ²) + ωᵢ · f₁(ωᵢ²)`
 - `f(-ωᵢ) = f₀(ωᵢ²) - ωᵢ · f₁(ωᵢ²)` -/

@@ -18,9 +18,12 @@ public import LatticeCrypto.Falcon.Coset
 trapdoor sampler lands on the coset. At `Falcon.Concrete.FPRBridge.verifyPrimitives` and
 `Falcon.Concrete.concretePrimitives` the codec is the concrete Golomb-Rice codec, whose round-trip
 `Falcon.Concrete.decompress_compress` is a theorem, so only the coset condition `hpreimage`
-remains. `Falcon.hpreimage_of_landsOnLattice` reduces that condition further, to the
-lattice-point condition `Falcon.LandsOnLattice` on the fixed-point FFT pipeline together with
-the key relations; the `_of_landsOnLattice` variants below take only those.
+remains. `Falcon.hpreimage_of_landsOnLattice` reduces that condition to the lattice-point
+condition `Falcon.LandsOnLattice` on the FFT fields together with the key relations (the
+`_of_landsOnLattice` variants), and at `concretePrimitives`, whose FFT fields are the exact packed
+FFT, `Falcon.hpreimage_of_exactFFT` discharges it:
+`verify_sign_correct_concretePrimitives_of_validKeyPair` needs only a valid key pair with `f`
+invertible modulo `q`.
 -/
 
 public section
@@ -90,6 +93,24 @@ theorem verify_sign_correct_verifyPrimitives_of_landsOnLattice
   exact verify_sign_correct_verifyPrimitives p hn pk sk msg maxAttempts sig
     (hpreimage_of_landsOnLattice p (FPRBridge.verifyPrimitives p hn) hpos pk sk hkey
       (capRelation_of_validKeyPair p hpos pk sk hvalid hunit) hz) hsig
+
+/-- **Verification correctness at the concrete primitives** from key validity and invertibility
+of `f` modulo `q` alone. The coset condition is a theorem at the exact packed FFT
+(`hpreimage_of_exactFFT`); `hlogn` excludes the degenerate degree `n = 1`. -/
+theorem verify_sign_correct_concretePrimitives_of_validKeyPair
+    (p : Params) (hn : p.n = 2 ^ p.logn) (hlogn : 1 ≤ p.logn) (pk : PublicKey p)
+    (sk : SecretKey p) (hvalid : validKeyPair p pk sk = true)
+    (hunit : ∃ u : Rq p.n, negacyclicMul (IntPoly.toRq sk.f) u = 1)
+    (msg : List Byte) (maxAttempts : ℕ) (sig : Signature)
+    (hsig : some sig ∈ support (sign p (concretePrimitives p hn) pk sk msg maxAttempts)) :
+    verify p (concretePrimitives p hn) pk msg sig = true := by
+  have h : 2 * 2 ^ p.fftDepth = p.n := by
+    rw [hn, Params.fftDepth, ← pow_succ', Nat.sub_add_cancel hlogn]
+  have hpos : 0 < p.n := by rw [hn]; positivity
+  have hkey := (validKeyPair_eq_true_iff p pk sk).mp hvalid |>.2
+  exact verify_sign_correct_concretePrimitives p hn pk sk msg maxAttempts sig
+    (hpreimage_of_exactFFT p (concretePrimitives p hn) h (concretePrimitives_exactFFT p hn h)
+      pk sk hkey (capRelation_of_validKeyPair p hpos pk sk hvalid hunit)) hsig
 
 end Falcon.Concrete
 
