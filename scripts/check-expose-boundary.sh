@@ -37,16 +37,7 @@ fi
 count_tree() {
   local tree_root="$1"
   local output="$2"
-  (
-    cd "$tree_root"
-    for lib in "${LIBS[@]}"; do
-      [[ -d "$lib" ]] || continue
-      # `grep -l` exits 1 on no matches, which is a legitimate count of zero under `pipefail`.
-      count="$( (grep -rlE --include='*.lean' '^@\[expose\][[:space:]]+public[[:space:]]+section' "$lib" \
-        || true) | wc -l | tr -d ' ')"
-      printf '%s\t%s\n' "$lib" "$count"
-    done
-  ) | sort > "$output"
+  python3 "$REPO_ROOT/scripts/count-expose-boundary.py" "$tree_root" "${LIBS[@]}" > "$output"
 }
 
 CURRENT="$(mktemp "${TMPDIR:-/tmp}/vcvio-expose-boundary.XXXXXX")"
@@ -63,6 +54,10 @@ trap cleanup EXIT
 count_tree "$REPO_ROOT" "$CURRENT"
 
 if [[ "${1:-}" == "--update-baseline" ]]; then
+  if (( $# != 1 )); then
+    echo 'Expose boundary: --update-baseline takes no arguments.' >&2
+    exit 2
+  fi
   cp "$CURRENT" "$BASELINE"
   echo "Expose boundary: updated $BASELINE."
   exit 0

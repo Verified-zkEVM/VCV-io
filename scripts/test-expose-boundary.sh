@@ -16,6 +16,7 @@ trap 'rm -rf "$FIXTURE_REPO"' EXIT
 
 mkdir -p "$FIXTURE_REPO/scripts" "$FIXTURE_REPO/Lib" "$FIXTURE_REPO/Other"
 cp "$CHECKER_SRC" "$FIXTURE_REPO/scripts/check-expose-boundary.sh"
+cp "$REPO_ROOT/scripts/count-expose-boundary.py" "$FIXTURE_REPO/scripts/"
 CHECKER="$FIXTURE_REPO/scripts/check-expose-boundary.sh"
 
 export EXPOSE_BOUNDARY_LIBS="Lib Other"
@@ -54,7 +55,48 @@ if "$CHECKER" >/dev/null 2>&1; then
 fi
 rm Lib/Broad2.lean
 
-# A broadly exposed file in a library with a zero ceiling is rejected.
+# Whitespace, intervening comments, and section modifiers cannot evade the gate.
+for section in \
+  $'  @[expose]\npublic\nsection' \
+  '@[ expose ] /- documentation -/ public section' \
+  '@[expose] public noncomputable section' \
+  '@[expose] public noncomputable meta section' \
+  '@[expose] public meta section'; do
+  printf '%s\n' 'module' "$section" > Lib/Formatted.lean
+  if "$CHECKER" >/dev/null 2>&1; then
+    echo "ERROR: broadly exposed section escaped the ceiling: $section" >&2
+    exit 1
+  fi
+done
+rm Lib/Formatted.lean
+
+# Documentation and literals, including nested comments and raw strings, consume no budget.
+cat > Other/Literals.lean <<'LEAN'
+module
+/-!
+" /- nested comment -/
+@[expose] public section
+-/
+public section
+def text := "escaped quote: \"
+@[expose] public section
+"
+def rawText := r##"quote: "
+@[expose] public section
+"##
+def «@[expose] public section» := 0
+def quote := '"'
+@[expose] def selective := 0
+LEAN
+"$CHECKER" >/dev/null
+
+# Repeated broad sections still consume one file, not one unit per section.
+printf '%s\n' 'end' '@[expose] public section' >> Lib/Broad.lean
+"$CHECKER" >/dev/null
+
+# A broadly exposed file in a library absent from the baseline is rejected.
+awk -F'\t' '$1 != "Other"' scripts/expose_boundary_baseline.tsv > scripts/without-other.tsv
+mv scripts/without-other.tsv scripts/expose_boundary_baseline.tsv
 printf '%s\n' 'module' '' '@[expose] public section' '' 'def e : Nat := 0' > Other/Broad.lean
 if "$CHECKER" >/dev/null 2>&1; then
   echo 'ERROR: a broadly exposed file in a zero-ceiling library was not rejected.' >&2
@@ -75,6 +117,10 @@ fi
 # An unknown argument is a usage error.
 if "$CHECKER" --bogus >/dev/null 2>&1; then
   echo 'ERROR: an unknown argument was accepted.' >&2
+  exit 1
+fi
+if "$CHECKER" --update-baseline --bogus >/dev/null 2>&1; then
+  echo 'ERROR: --update-baseline accepted an unknown argument.' >&2
   exit 1
 fi
 

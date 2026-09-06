@@ -67,11 +67,9 @@ All active Lean libraries and tests use the module system. Put ordinary declarat
 `public section` and tactic/elaborator declarations in a `public meta section`. Existing source
 files generally use `@[expose] public section` to preserve pre-migration definitional equality;
 new files use plain `public section` and expose individual definitions with `@[expose]` when
-unfolding is part of their intended public API. CI runs `scripts/check-expose-boundary.sh`, which
-holds the number of files per library that open a broad `@[expose] public section` at or below
-`scripts/expose_boundary_baseline.tsv`. Converting a file to selective exposure lowers the count:
-run `scripts/check-expose-boundary.sh --update-baseline` in the same PR so the ceiling follows. A
-PR that needs a higher ceiling raises the baseline explicitly and says why in its description.
+unfolding is part of their intended public API. CI limits broad exposure per library; see the
+[module-system guide](docs/agents/module-system.md#validation-and-coordinated-rollout) for the
+exposure check and baseline workflow.
 Executable and runtime implementation modules should use opaque `public section` when callers do
 not need to unfold their definitions.
 

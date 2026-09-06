@@ -94,7 +94,7 @@ detail of `VCVio/EvalDist/**` and `VCVio/OracleComp/**`. Proofs inside those
 directories may close by `rfl` across them; everywhere else
 (`CryptoFoundations/`, `Examples/`, `LatticeCrypto/`, `HashSig/`, the tests)
 crosses the boundary through the public equation lemmas
-(`evalSPMF_eq_simulateQ`, `probOutput_def`, `support_def`, `evalDist_apply`),
+(`evalSPMF_eq_simulateQ`, `probOutput_def`, `support_def`, `PFunctor.FreeM.evalDist_eq_denote`),
 so the semantics can be re-implemented without touching downstream proofs.
 Existing downstream `rfl` uses are grandfathered rather than a precedent; a
 review may ask a new one to go through the equation lemma.
@@ -331,8 +331,11 @@ The boundary has three canaries and one ratchet:
   that open a broad `@[expose] public section` at or below
   `scripts/expose_boundary_baseline.tsv` (fixtures in
   `scripts/test-expose-boundary.sh`; `--report` prints the delta against the
-  PR base), so the move to selective exposure only goes one way. Lower the
-  baseline in the PR that converts a file; raise it only with a stated reason.
+  PR base). The lexical counter handles whitespace and section modifiers,
+  ignores comments and literals, and counts each file once. It does not
+  elaborate macros. Run `scripts/check-expose-boundary.sh --update-baseline`
+  in the PR that converts a file so the ceiling follows the decrease; raise
+  it only with a stated reason in the PR description.
 
 Changes that add PolyFun API and consume it from VCVio require two coordinated
 repository changes:
