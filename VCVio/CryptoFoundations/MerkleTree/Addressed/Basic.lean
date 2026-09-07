@@ -247,7 +247,7 @@ theorem findCollisionAddressed_isSome_of_opening_ne {s : Skeleton}
     (findCollisionAddressed nodeHash idx proof₁ proof₂ x y).isSome := by
   induction idx with
   | ofLeaf =>
-    simp only [vector_eq_nil] at hroot
+    simp only [List.Vector.eq_nil] at hroot
     exact (hne (Prod.ext hroot (List.Vector.ext fun i => i.elim0))).elim
   | ofLeft idxLeft ih =>
     rw [findCollisionAddressed]

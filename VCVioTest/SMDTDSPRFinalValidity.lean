@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 module
 
-public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPR
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPRFinalValidity
 
 /-!
 # SM-DT-DSPR mutation canaries
@@ -20,7 +20,7 @@ phase split, always-answering final-validity semantics, cap and cross-oracle poi
 
 open OracleComp OracleSpec TweakableHash
 
-namespace SMDTDSPRSourceFinalValidityTest
+namespace SMDTDSPRFinalValidityTest
 
 inductive Seed
   | only
@@ -204,4 +204,4 @@ example : OracleComp (Specs collidingProblem) predictCollision.State :=
 
 example : predictCollision.State → Seed → ProbComp (ℕ × Bool) := predictCollision.guess
 
-end SMDTDSPRSourceFinalValidityTest
+end SMDTDSPRFinalValidityTest

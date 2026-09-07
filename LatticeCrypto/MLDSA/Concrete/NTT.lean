@@ -8,12 +8,14 @@ module
 import all Init.Data.Array.Basic
 import all Init.Data.Vector.Algebra
 import all LatticeCrypto.MLDSA.Arithmetic
+import Mathlib.Tactic.ReduceModChar
 public meta import LatticeCrypto.MLDSA.Arithmetic
 public meta import Mathlib.Data.Fintype.Defs
 public meta import Mathlib.Data.ZMod.Defs
 public import LatticeCrypto.MLDSA.Arithmetic
 public import LatticeCrypto.Ring.NTTCert
 public import Mathlib.Algebra.BigOperators.Ring.Finset
+public import Mathlib.RingTheory.RootsOfUnity.PrimitiveRoots
 
 /-!
 # Concrete NTT for ML-DSA
@@ -32,7 +34,6 @@ the structural formulas mirror the loops, but this module does not yet prove the
 public section
 
 
-open scoped BigOperators
 
 namespace MLDSA.Concrete
 
@@ -74,59 +75,21 @@ private theorem getZ_zetaTable (i : Nat) (hi : i < 256) :
     getZ zetaTable i = zeta ^ bitRev8 i := by
   simp [getZ, zetaTable, hi]
 
-private theorem square_mod (a b : Nat) (h : a ^ 2 % modulus = b) (hb : b < modulus) :
-    (a : Coeff) ^ 2 = b := by
-  rw [← Nat.cast_pow, ZMod.natCast_eq_natCast_iff']
-  simpa [Nat.mod_eq_of_lt hb] using h
-
 private theorem zeta_pow_256 : (zeta : Coeff) ^ 256 = -1 := by
-  have h2 : (zeta : Coeff) ^ 2 = 3073009 := by
-    change (1753 : Coeff) ^ 2 = 3073009
-    exact square_mod 1753 3073009 (by norm_num [modulus]) (by norm_num [modulus])
-  have h4 : (zeta : Coeff) ^ 4 = 3602218 := by
-    calc
-      zeta ^ 4 = (zeta ^ 2) ^ 2 := by ring
-      _ = (3073009 : Coeff) ^ 2 := by rw [h2]
-      _ = 3602218 := square_mod 3073009 3602218
-        (by norm_num [modulus]) (by norm_num [modulus])
-  have h8 : (zeta : Coeff) ^ 8 = 5010068 := by
-    calc
-      zeta ^ 8 = (zeta ^ 4) ^ 2 := by ring
-      _ = (3602218 : Coeff) ^ 2 := by rw [h4]
-      _ = 5010068 := square_mod 3602218 5010068
-        (by norm_num [modulus]) (by norm_num [modulus])
-  have h16 : (zeta : Coeff) ^ 16 = 7778734 := by
-    calc
-      zeta ^ 16 = (zeta ^ 8) ^ 2 := by ring
-      _ = (5010068 : Coeff) ^ 2 := by rw [h8]
-      _ = 7778734 := square_mod 5010068 7778734
-        (by norm_num [modulus]) (by norm_num [modulus])
-  have h32 : (zeta : Coeff) ^ 32 = 5178923 := by
-    calc
-      zeta ^ 32 = (zeta ^ 16) ^ 2 := by ring
-      _ = (7778734 : Coeff) ^ 2 := by rw [h16]
-      _ = 5178923 := square_mod 7778734 5178923
-        (by norm_num [modulus]) (by norm_num [modulus])
-  have h64 : (zeta : Coeff) ^ 64 = 3765607 := by
-    calc
-      zeta ^ 64 = (zeta ^ 32) ^ 2 := by ring
-      _ = (5178923 : Coeff) ^ 2 := by rw [h32]
-      _ = 3765607 := square_mod 5178923 3765607
-        (by norm_num [modulus]) (by norm_num [modulus])
-  have h128 : (zeta : Coeff) ^ 128 = 4808194 := by
-    calc
-      zeta ^ 128 = (zeta ^ 64) ^ 2 := by ring
-      _ = (3765607 : Coeff) ^ 2 := by rw [h64]
-      _ = 4808194 := square_mod 3765607 4808194
-        (by norm_num [modulus]) (by norm_num [modulus])
-  calc
-    zeta ^ 256 = (zeta ^ 128) ^ 2 := by ring
-    _ = (4808194 : Coeff) ^ 2 := by rw [h128]
-    _ = -1 := by
-      rw [eq_neg_iff_add_eq_zero]
-      change (((4808194 ^ 2 + 1 : Nat) : ZMod modulus)) = 0
-      rw [ZMod.natCast_eq_zero_iff]
-      norm_num [modulus]
+  change (1753 : ZMod 8380417) ^ 256 = -1
+  reduce_mod_char
+
+/-- `ζ = 1753` is a primitive `512`-th root of unity in `ℤ_q` (FIPS 204 §7.5): the twiddle half
+of the NTT correctness argument. -/
+theorem zeta_isPrimitiveRoot : IsPrimitiveRoot (zeta : Coeff) 512 := by
+  change IsPrimitiveRoot (1753 : ZMod 8380417) 512
+  rw [IsPrimitiveRoot.iff_orderOf]
+  refine orderOf_eq_of_pow_and_pow_div_prime (by norm_num) (by reduce_mod_char) ?_
+  intro p hp hdvd
+  obtain rfl : p = 2 := (Nat.prime_dvd_prime_iff_eq hp Nat.prime_two).mp
+    (hp.dvd_of_dvd_pow (show p ∣ 2 ^ 9 by simpa using hdvd))
+  reduce_mod_char
+  decide
 
 /-- Forward and complementary inverse-table twiddles in one layer multiply to `-1`. -/
 private theorem zetaTable_layer_partner :

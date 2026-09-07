@@ -32,21 +32,6 @@ This file collects all definitions and basic theorems about adding ordering to m
 
 universe u v w
 
-section Prelude
-
-/-- `pointwiseRelation r f g` is the pullback of a relation `r` on `β` to a relation on `α` via `f`
-  and `g`. -/
-def pointwiseRelation {α β : Type u} (r : β → β → Prop) (f g : α → β) : α → α → Prop :=
-  fun a b => r (f a) (g b)
-
-/-- `Proper R m` states that a value `m` respects the relation `R` by being related to itself.
-This is useful for expressing that certain operations preserve relationships.
-
-NOTE: this is a direct translation from Coq, the Lean version is essentially `IsRefl` -/
-def Proper (A : Type u) (R : A → A → Prop) (m : A) : Prop := R m m
-
-end Prelude
-
 /-- An ordered monad `m` is a monad equipped with a preorder on each type `m α`, such that the bind
     operation preserves the order. -/
 class OrderedMonad (m : Type u → Type v) extends Monad m where

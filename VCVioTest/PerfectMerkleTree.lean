@@ -17,7 +17,7 @@ root reconstruction, and oriented collision extraction. The hashes are deliberat
 noncommutative or collision-heavy so that an address, order, or endpoint regression is visible.
 -/
 
-@[expose] public section
+public section
 
 namespace VCVioTest.PerfectMerkleTreeCanary
 

@@ -292,7 +292,7 @@ This is the clean “exact one query” example.
 
 ### Fischlin
 
-See `VCVio/CryptoFoundations/Fischlin.lean`.
+See the modules under `VCVio/CryptoFoundations/Fischlin/` (`CostAccounting.lean` for the cost side).
 
 This is the first substantial bounded-cost example.
 

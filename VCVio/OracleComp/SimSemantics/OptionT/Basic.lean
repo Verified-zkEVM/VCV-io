@@ -54,18 +54,12 @@ lemma simulateQ_optionT_bind_run
   refine bind_congr fun x => ?_
   induction x <;> simp
 
-@[deprecated (since := "2026-06-25")]
-alias simulateQ_optionT_bind' := simulateQ_optionT_bind_run
-
 /-- `simulateQ` distributes through `OptionT.bind`, stated via `Option.elimM`. -/
 lemma simulateQ_optionT_bind_elimM
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
     simulateQ impl (mx >>= f).run =
     Option.elimM (simulateQ impl mx.run) (pure none) (fun a => simulateQ impl (f a).run) := by
   simp
-
-@[deprecated (since := "2026-06-25")]
-alias simulateQ_optionT_bind'' := simulateQ_optionT_bind_elimM
 
 /-- `simulateQ` distributes through `OptionT.bind`: the simulated OptionT-bind is the
     OptionT-bind of the simulated pieces. -/
@@ -258,6 +252,3 @@ lemma simulateQ_optionT_forIn_yield_pure_none (xs : List α) (init : β)
           rw [hbody x, if_neg hx]
           rfl, failure_bind]
         rfl
-
-@[deprecated (since := "2026-06-25")]
-alias simulateQ_optionT_mapM_pure := simulateQ_optionT_vector_mapM_pure

@@ -71,35 +71,33 @@ example : zeroHandler.postInsert (fun _ _ => some ()) () = some 0 := by
 noncomputable instance : IsUniformSpec boolOracleSpec :=
   OracleSpec.IsUniformSpec.ofFintypeInhabited _
 
-#guard_msgs(drop warning) in
-/-- A custom probability interpretation constructed through the oracle compatibility name. -/
-noncomputable abbrev boolOracleProbability : IsProbabilitySpec boolOracleSpec :=
-  OracleSpec.IsProbabilitySpec.mk fun _ => PMF.uniformOfFintype Bool
-
-#guard_msgs(drop warning) in
-noncomputable example : MonadLiftT (OracleComp boolOracleSpec) PMF :=
-  OracleComp.instMonadLiftTPMF
-
-#guard_msgs(drop warning) in
-noncomputable example : LawfulMonadLiftT (OracleComp boolOracleSpec) PMF :=
-  OracleComp.instLawfulMonadLiftTPMF
-
-#guard_msgs(drop warning) in
-example : MonadLiftT (OracleComp boolOracleSpec) SetM :=
-  OracleComp.instMonadLiftTSetM
-
-#guard_msgs(drop warning) in
-example : LawfulMonadLiftT (OracleComp boolOracleSpec) SetM :=
-  OracleComp.instLawfulMonadLiftTSetM
+noncomputable example : IsProbabilitySpec boolOracleSpec :=
+  PFunctor.IsProbabilitySpec.mk fun _ => PMF.uniformOfFintype Bool
 
 noncomputable example : MonadLiftT (OracleComp boolOracleSpec) PMF := inferInstance
 
+noncomputable example : LawfulMonadLiftT (OracleComp boolOracleSpec) PMF := inferInstance
+
 example : MonadLiftT (OracleComp boolOracleSpec) SetM := inferInstance
+
+example : LawfulMonadLiftT (OracleComp boolOracleSpec) SetM := inferInstance
 
 noncomputable example : PFunctor.IsProbabilitySpec boolOracleSpec.toPFunctor := inferInstance
 
 noncomputable example : PFunctor.IsUniformSpec boolOracleSpec.toPFunctor :=
   OracleSpec.IsUniformSpec.toPFunctor
+
+-- Instance synthesis at the erased literal. Tactics that unfold the reducible layers above
+-- `OracleSpec` leave a bare `PFunctor.mk` in the goal; the semantics instances are still found
+-- there with no transparency help from `OracleSpec` itself (see the comment on its
+-- `implicit_reducible` attribute, which serves dependent-type checks, not synthesis).
+noncomputable example : PFunctor.IsProbabilitySpec (PFunctor.mk (Fin 1) fun _ => Bool) :=
+  inferInstance
+
+noncomputable example : MonadLiftT (PFunctor.FreeM (PFunctor.mk (Fin 1) fun _ => Bool)) PMF :=
+  inferInstance
+
+example : MonadLiftT (PFunctor.FreeM (PFunctor.mk (Fin 1) fun _ => Bool)) SetM := inferInstance
 
 example (program : OracleComp boolOracleSpec Bool) :
     𝒮[program] = program.liftM PFunctor.IsProbabilitySpec.toPMF :=

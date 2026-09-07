@@ -38,7 +38,7 @@ as mirrors at the end). The gate is loud in both failure directions:
   not in the default set.)
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ProbComp ENNReal
 

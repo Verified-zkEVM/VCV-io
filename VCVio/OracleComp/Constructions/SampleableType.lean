@@ -363,11 +363,7 @@ instance instSampleableTypeFunc {β α : Type} [FinEnum β] [SampleableType α] 
 index. The construction goes through the equivalence with `Fin n → α`. -/
 instance instSampleableTypeListVector {α : Type} {n : ℕ} [SampleableType α] :
     SampleableType (List.Vector α n) :=
-  SampleableType.ofEquiv
-    { toFun := List.Vector.ofFn
-      invFun := fun xs i => xs.get i
-      left_inv := fun f => funext fun i => by simp
-      right_inv := fun xs => List.Vector.ext fun i => by simp }
+  SampleableType.ofEquiv (Equiv.vectorEquivFin α n).symm
 
 /-- Select a uniform element from `Matrix ι κ α` by independently selecting an entry for each
 `(i, j)`. Both index types only need to be `FinEnum`; the previous `Fin n × Fin m`-indexed

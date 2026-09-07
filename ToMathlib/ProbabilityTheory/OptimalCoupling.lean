@@ -107,9 +107,6 @@ private lemma pmf_none_eq {γ : Type u} [Finite γ] (p : PMF (Option γ)) :
   refine (SPMF.gap_eq_one_sub_tsum p).trans (congr_arg _ (tsum_eq_sum ?_))
   simp
 
-private lemma spmf_ext {γ : Type u} {p q : SPMF γ}
-    (h : ∀ x, p x = q x) : p = q := SPMF.ext h
-
 def couplings_set (p : SPMF α) (q : SPMF β) : Set (Option (α × β) → ℝ) :=
   letI := Fintype.ofFinite α
   letI := Fintype.ofFinite β
@@ -294,7 +291,7 @@ private lemma exists_coupling_of_mem_couplings_set {p : SPMF α} {q : SPMF β}
     intro b
     rw [map_snd_eval]
     exact h_col_ennreal b
-  have hcpl : SPMF.IsCoupling c_spmf p q := ⟨spmf_ext hfst_some, spmf_ext hsnd_some⟩
+  have hcpl : SPMF.IsCoupling c_spmf p q := ⟨SPMF.ext hfst_some, SPMF.ext hsnd_some⟩
   refine ⟨⟨c_spmf, hcpl⟩, ?_⟩
   intro z
   change (ENNReal.ofReal (c z)).toReal = c z

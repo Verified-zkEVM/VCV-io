@@ -42,6 +42,12 @@ theorem measurable_dropNoneKernel : Measurable fun value : Option α =>
     | some x => Measure.dirac x :=
   Option.measurable_elim measurable_const Measure.measurable_dirac
 
+/-- The optional measure kernel is measurable in its eliminator form. -/
+@[fun_prop]
+theorem measurable_dropNoneKernel_elim : Measurable fun value : Option α =>
+    value.elim (0 : Measure α) Measure.dirac :=
+  Option.measurable_elim measurable_const Measure.measurable_dirac
+
 @[simp]
 theorem dropNone_zero : dropNone (0 : Measure (Option α)) = 0 := by
   simp [dropNone, Measure.bind_zero_left]
