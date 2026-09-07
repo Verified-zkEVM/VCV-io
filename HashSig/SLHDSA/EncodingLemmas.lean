@@ -89,6 +89,21 @@ theorem toInt_toByte (x len : ℕ) (h : x < 256 ^ len) :
     toInt (toByte x len) = x := by
   rw [toInt_toByte_mod, Nat.mod_eq_of_lt h]
 
+/-- At a byte string's own width, Algorithm 3 is an exact left inverse of Algorithm 2. -/
+theorem toByte_toInt (x : List Byte) : toByte (toInt x) x.length = x := by
+  induction x using List.reverseRecOn with
+  | nil => simp [toByte]
+  | append_singleton xs b ih =>
+      have hb : b.toNat < 256 := UInt8.toNat_lt_size b
+      rw [toInt_append_byte, List.length_append, List.length_singleton, toByte_succ,
+        show (toInt xs * 256 + b.toNat) / 256 = toInt xs by omega,
+        show (toInt xs * 256 + b.toNat) % 256 = b.toNat by omega, ih, UInt8.ofNat_toNat]
+
+/-- Algorithm 2 is injective on byte strings of a common width. -/
+theorem toInt_inj_of_length_eq {x y : List Byte} (hlen : x.length = y.length)
+    (h : toInt x = toInt y) : x = y := by
+  rw [← toByte_toInt x, ← toByte_toInt y, hlen, h]
+
 /-! ## Algorithm 4 (`base2b`) closed form -/
 
 /-- One `base2bFill` call started on a consumed prefix of `x` stops at a longer prefix that
