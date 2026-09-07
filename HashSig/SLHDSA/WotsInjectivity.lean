@@ -19,8 +19,9 @@ obligation `lgw ∣ 8n` of `Params.Valid` the `len1` message digits lose no bit 
 message; `CorePrimitives.ByteLaws` transports that from the byte encoding to the abstract node
 carrier `core.Y`. `WotsChecksum.wots_fullDigits_incomparable` is the purely combinatorial
 statement that distinct message-digit vectors yield pointwise-incomparable full digit vectors.
-Together they give `chainStepsCore_two_encodings`: for `msg ≠ msg'` some chain index `i < len`
-has `chainStepsCore core msg i < chainStepsCore core msg' i`. That statement is the Lean
+Together they give `chainLengthsCore_incomparable` and its index-wise form
+`chainStepsCore_two_encodings`: for `msg ≠ msg'` some chain index `i < len` has
+`chainStepsCore core msg i < chainStepsCore core msg' i`. That statement is the Lean
 counterpart of the `two_encodings` axiom of the EasyCrypt SPHINCS+ proof (`WOTS_TW_ES.ec`),
 which is the only fact about the message encoding that proof assumes; here it is proved for the
 concrete FIPS 205 encoding, under `p.Valid` and `core.ByteLaws`.
@@ -39,16 +40,6 @@ open WotsEncoding
 
 variable {p : Params} {core : CorePrimitives p}
 
-/-- The message-digit vector has the intrinsic WOTS `len1` width. -/
-@[simp] theorem wotsMsgDigitsCore_length (core : CorePrimitives p) (msg : core.Y) :
-    (wotsMsgDigitsCore core msg).length = p.len1 :=
-  base2b_length _ _ _
-
-/-- Every message digit is a genuine base-`w` digit (`< w`). -/
-theorem wotsMsgDigitsCore_mem_lt (core : CorePrimitives p) (msg : core.Y) :
-    ∀ d ∈ wotsMsgDigitsCore core msg, d < p.w := fun d hd => by
-  simpa only [Params.w] using base2b_lt (core.yToBytes msg).toList p.lgw p.len1 d hd
-
 /-- Full-width message-encoding injectivity: under the alignment obligation of `Params.Valid`
 and byte coherence of the node carrier, the `len1` message digits determine the node. -/
 theorem wotsMsgDigitsCore_injective (valid : p.Valid) (laws : core.ByteLaws) :
@@ -64,28 +55,9 @@ theorem chainLengthsCore_injective (valid : p.Valid) (laws : core.ByteLaws) :
     Function.Injective (chainLengthsCore core) :=
   (fullDigits_injective p).comp (wotsMsgDigitsCore_injective valid laws)
 
-/-- Two distinct nodes have a chain index at which the first node's step count is strictly
-smaller than the second's. This is the combinatorial core of WOTS+ unforgeability: a forger who
-only advances the honest signer's chains cannot reach the encoding of a different message. It
-combines `wotsMsgDigitsCore_injective` with `WotsChecksum.wots_fullDigits_incomparable`, and is
-the Lean counterpart of the EasyCrypt `two_encodings` axiom. -/
-theorem chainStepsCore_two_encodings (valid : p.Valid) (laws : core.ByteLaws)
-    {msg msg' : core.Y} (hne : msg ≠ msg') :
-    ∃ i, i < p.len ∧ chainStepsCore core msg i < chainStepsCore core msg' i := by
-  by_contra hnot
-  have hle : ∀ i, i < p.len → chainStepsCore core msg' i ≤ chainStepsCore core msg i :=
-    fun i hi => Nat.le_of_not_lt fun hlt => hnot ⟨i, hi, hlt⟩
-  have hF : Forall₂ (· ≤ ·) (chainLengthsCore core msg') (chainLengthsCore core msg) :=
-    Forall₂.of_getD 0 (by simp) fun i hi => hle i (by simpa using hi)
-  simp only [chainLengthsCore_eq_wotsFullDigits valid] at hF
-  have hdig : wotsMsgDigitsCore core msg' = wotsMsgDigitsCore core msg :=
-    wots_fullDigits_pointwiseLE_imp_dig_eq (Params.w_pos p)
-      (wotsMsgDigitsCore_length core msg') (wotsMsgDigitsCore_length core msg)
-      (wotsMsgDigitsCore_mem_lt core msg') (wotsMsgDigitsCore_mem_lt core msg)
-      valid.len1_mul_pred_w_lt_pow_len2 hF
-  exact hne (wotsMsgDigitsCore_injective valid laws hdig).symm
-
-/-- Distinct nodes have distinct chain-length vectors: neither is pointwise `≤` the other. -/
+/-- Distinct nodes have pointwise-incomparable chain-length vectors: neither is pointwise `≤`
+the other. This combines `wotsMsgDigitsCore_injective` (distinct nodes have distinct message
+digits) with `WotsChecksum.wots_fullDigits_incomparable`. -/
 theorem chainLengthsCore_incomparable (valid : p.Valid) (laws : core.ByteLaws)
     {msg msg' : core.Y} (hne : msg ≠ msg') :
     ¬ Forall₂ (· ≤ ·) (chainLengthsCore core msg) (chainLengthsCore core msg') ∧
@@ -96,5 +68,20 @@ theorem chainLengthsCore_incomparable (valid : p.Valid) (laws : core.ByteLaws)
     (wotsMsgDigitsCore_mem_lt core msg) (wotsMsgDigitsCore_mem_lt core msg')
     valid.len1_mul_pred_w_lt_pow_len2
     (fun h => hne ((wotsMsgDigitsCore_injective valid laws) h))
+
+/-- Two distinct nodes have a chain index at which the first node's step count is strictly
+smaller than the second's. This is the combinatorial ingredient a WOTS+ unforgeability
+reduction consumes: a forger who only advances the honest signer's chains cannot reach the
+encoding of a different message. It is the index-wise reading of the second conjunct of
+`chainLengthsCore_incomparable`, and the Lean counterpart of the EasyCrypt `two_encodings`
+axiom. -/
+theorem chainStepsCore_two_encodings (valid : p.Valid) (laws : core.ByteLaws)
+    {msg msg' : core.Y} (hne : msg ≠ msg') :
+    ∃ i, i < p.len ∧ chainStepsCore core msg i < chainStepsCore core msg' i := by
+  by_contra hnot
+  have hle : ∀ i, i < p.len → chainStepsCore core msg' i ≤ chainStepsCore core msg i :=
+    fun i hi => Nat.le_of_not_lt fun hlt => hnot ⟨i, hi, hlt⟩
+  exact (chainLengthsCore_incomparable valid laws hne).2
+    (Forall₂.of_getD 0 (by simp) fun i hi => hle i (by simpa using hi))
 
 end SLHDSA

@@ -20,10 +20,10 @@ checksum to decrease, and equal checksums together with pointwise `≤` force eq
 This module is a standard-model statement over `List ℕ` / `ℕ`, independent of the oracle/hash
 layer; a WOTS+ one-wayness reduction consumes
 `wots_fullDigits_incomparable` as its purely combinatorial ingredient. It says nothing about
-how message digits arise from messages; the companion fact that the FIPS 205 message digits
-determine the message (`WotsEncoding.base2b_msg_injective`) is what lets
-`HashSig.SLHDSA.WotsInjectivity` restate incomparability for distinct *messages*
-(`chainStepsCore_two_encodings`).
+how message digits arise from messages; `HashSig.SLHDSA.WotsInjectivity` combines it with the
+injectivity of the FIPS 205 message digits in the message (`wotsMsgDigitsCore_injective`) to
+restate incomparability for distinct *messages* (`chainLengthsCore_incomparable`,
+`chainStepsCore_two_encodings`).
 
 See FIPS 205 §5 for the WOTS+ specification this validates.
 -/
@@ -328,13 +328,6 @@ def wotsFullDigits (dig : List ℕ) (w _l1 l2 : ℕ) : List ℕ :=
 theorem wotsFullDigits_length (dig : List ℕ) (w l1 l2 : ℕ)
     (hLen : dig.length = l1) : (wotsFullDigits dig w l1 l2).length = l1 + l2 := by
   simp [wotsFullDigits, hLen, digitsOfBaseW_length]
-
-/-- The full digit vector determines the message digits: the checksum suffix has the fixed
-width `l2`, so equal full vectors have equal message prefixes. -/
-theorem wotsFullDigits_inj {dig1 dig2 : List ℕ} {w l1 l2 : ℕ}
-    (h : wotsFullDigits dig1 w l1 l2 = wotsFullDigits dig2 w l1 l2) : dig1 = dig2 := by
-  unfold wotsFullDigits at h
-  exact List.append_inj_left' h (by simp [digitsOfBaseW_length])
 
 /-! ## Checksum algebra -/
 

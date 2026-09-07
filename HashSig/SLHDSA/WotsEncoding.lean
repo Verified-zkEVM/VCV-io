@@ -267,11 +267,4 @@ theorem base2b_msg_injective {p : Params} (valid : p.Valid) :
   intro x y h
   exact Vector.toList_inj.mp (base2b_msg_inj valid (by simp) (by simp) h)
 
-/-- The complete FIPS chain-length vector (message digits followed by checksum digits) of an
-`n`-byte message determines the message. -/
-theorem fullDigits_base2b_msg_injective {p : Params} (valid : p.Valid) :
-    Function.Injective
-      (fun bytes : Bytes p.n => fullDigits p (base2b bytes.toList p.lgw p.len1)) :=
-  (fullDigits_injective p).comp (base2b_msg_injective valid)
-
 end SLHDSA.WotsEncoding
