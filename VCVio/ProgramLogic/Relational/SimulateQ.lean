@@ -2027,6 +2027,7 @@ step of `expectedQuerySlack_mono`. These lemmas are used to bound a
 state-dependent ε by a constant upper bound so the constant-ε bound
 `expectedQuerySlack_const_le_queryBudget_mul` applies. -/
 
+@[gcongr]
 lemma expectedQuerySlackStep_mono
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
@@ -2052,6 +2053,7 @@ lemma expectedQuerySlackStep_mono
         gcongr with z
         exact hk z.1 qS z.2
 
+@[gcongr]
 theorem expectedQuerySlack_mono
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
