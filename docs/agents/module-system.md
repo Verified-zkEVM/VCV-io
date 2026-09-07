@@ -88,6 +88,24 @@ and characterization `…_iff` theorems. Mark a definition `@[expose]` only when
 downstream definitional equality is an intentional part of the API and a
 theorem would materially obstruct ordinary use.
 
+The definitional identities among the semantic façades (`evalDist`,
+`evalSPMF`, `simulateQ`, `support`, `probOutput`) are an implementation
+detail of `VCVio/EvalDist/**` and `VCVio/OracleComp/**`. Proofs inside those
+directories may close by `rfl` across them; everywhere else
+(`CryptoFoundations/`, `Examples/`, `LatticeCrypto/`, `HashSig/`, the tests)
+crosses the boundary through the public equation lemmas
+(`evalSPMF_eq_simulateQ`, `probOutput_def`, `support_def`, `PFunctor.FreeM.evalDist_eq_denote`),
+so the semantics can be re-implemented without touching downstream proofs.
+Existing downstream `rfl` uses are grandfathered rather than a precedent; a
+review may ask a new one to go through the equation lemma.
+
+`@[reducible]` stays on the type-level constructors (`OracleComp`,
+`OracleSpec.toPFunctor`, `ofFn`, `unifSpec`, `ProbComp`, `QueryImpl`): their
+instance discrimination keys depend on it. It is not a substitute for
+`@[expose]` on a value-level definition, and a value-level definition that is
+reducible only so that a downstream `rfl` works is a sign that the equation
+lemma is missing.
+
 ### Visibility and transparency are separate
 
 Four mechanisms that are easy to conflate control different parts of an API:
@@ -151,6 +169,18 @@ dependent recursor directly, or marking the smallest intentional wrapper with
 the appropriate reducibility attribute. Do not globally change the status of
 core eliminators, disable the transparency check, or use `import all` as a
 substitute.
+
+The repository's own instance of the last option is
+`attribute [implicit_reducible] OracleSpec` in `VCVio/OracleComp/OracleSpec.lean`:
+the one-field wrapper `ι → Type v` has to unfold when a dependent type or an
+instance-implicit argument is checked at `.implicit`, and the comment on the
+attribute names the library proofs that fail without it. It is not there for
+instance synthesis, which finds the semantics instances at the erased
+`PFunctor.mk` literal on its own (`VCVioTest/PFunctorFacade.lean` checks
+this). The `attribute [local implicit_reducible]` lines on `PFunctor.Obj`,
+`PFunctor.Idx`, `FreeMonoid`, `SetM`, and `SPMF` in individual files are the
+same device applied where a single proof needs it; each one was checked to be
+load-bearing before being kept.
 
 Use `#guard_msgs` only when the test is meant to preserve an expected
 diagnostic; do not wrap a passing regression canary with it.
@@ -242,6 +272,27 @@ application, composition, or extensionality law, or add that law at the owning
 module boundary. Constructor equations and definitions whose reduction is an
 intentional documented API may still use `rfl` directly.
 
+## The Loom import boundary
+
+The pinned `loom2` fork supplies the Loom-style `WP`/`Triple` abstractions
+and the `ℝ≥0∞`/`Prob` lattice instances the program logic runs on. Its import
+boundary keeps a future migration to core's WP layer limited to a known set
+of files. `Std.Do.WP` is already public at the Lean v4.33.1 pin and is used by
+VCVio's `StdDoBridge`; migrating Loom's quantitative and relational clients
+from its three-parameter `PredTrans` and `EPost` APIs to core's `PostShape`
+API is separate work. `Loom.*` may be imported only by:
+
+- `ToMathlib/Control/Monad/RelWP.lean`;
+- `VCVio/ProgramLogic/Unary/Loom/Qualitative.lean`,
+  `VCVio/ProgramLogic/Unary/Loom/Quantitative.lean`, and
+  `VCVio/ProgramLogic/Unary/Loom/Probabilistic.lean`; and
+- `VCVio/ProgramLogic/Tactics/Unary/Internals.lean`.
+
+Everything else reaches Loom through those modules' public surface. A new
+`import Loom.…` elsewhere is a review blocker unless it comes with an entry
+here and a reason the existing bridges cannot carry it. This is a convention
+enforced at review, not a script.
+
 ## Restoring `private` correctly
 
 The module migration changed the meaning of `private`: a public exposed body
@@ -269,13 +320,22 @@ in review; restore all other helpers using the patterns above.
 
 ## Validation and coordinated rollout
 
-The boundary has three canaries:
+The boundary has three canaries and one ratchet:
 
 - `scripts/check-polyfun-boundary.sh` rejects cross-package private imports;
 - `VCVioTest/PFunctorFacade.lean` exercises the direct PFunctor API and the
-  OracleSpec compatibility API; and
+  OracleSpec compatibility API;
 - the downstream scratch-consumer CI job imports the generic semantics and
-  checks the public handler operations.
+  checks the public handler operations; and
+- `scripts/check-expose-boundary.sh` holds the per-library count of files
+  that open a broad `@[expose] public section` at or below
+  `scripts/expose_boundary_baseline.tsv` (fixtures in
+  `scripts/test-expose-boundary.sh`; `--report` prints the delta against the
+  PR base). The lexical counter handles whitespace and section modifiers,
+  ignores comments and literals, and counts each file once. It does not
+  elaborate macros. Run `scripts/check-expose-boundary.sh --update-baseline`
+  in the PR that converts a file so the ceiling follows the decrease; raise
+  it only with a stated reason in the PR description.
 
 Changes that add PolyFun API and consume it from VCVio require two coordinated
 repository changes:

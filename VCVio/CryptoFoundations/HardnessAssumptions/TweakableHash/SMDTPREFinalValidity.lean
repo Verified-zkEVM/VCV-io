@@ -19,7 +19,9 @@ sticky monitor.
 
 `TweakableHash.SM_DT_PRE_Experiment` is the live rejection-on-arrival experiment. The declarations
 in `TweakableHash.SM_DT_PRE_SourceFinalValidity` name a distinct adaptive game and leave that
-experiment unchanged.
+experiment unchanged, with a proved bridge between the two views:
+`TweakableHash.SM_DT_PRE_advantage_toSourceFinalValidity` converts an adversary against that
+experiment into one against this game at the same advantage.
 
 ## References
 

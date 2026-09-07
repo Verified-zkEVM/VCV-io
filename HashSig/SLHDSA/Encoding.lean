@@ -26,6 +26,19 @@ and by the message-digest split (`Position.splitDigest`).
 
 namespace SLHDSA
 
+/-- Failures exposed by checked fixed-width SLH-DSA decoders. `invalidLength` reports a wrong
+exact byte width and is the sole failure of the structured wire codecs; `zeroDigitWidth` and
+`insufficientInput` classify digit-extraction boundaries; `outOfRange`, `invalidAddressType`,
+and `noncanonicalAddress` classify checked address encodings. -/
+inductive CodecError where
+  | invalidLength (expected actual : ℕ)
+  | zeroDigitWidth
+  | insufficientInput (requiredBits availableBits : ℕ)
+  | outOfRange (widthBytes value : ℕ)
+  | invalidAddressType (code : ℕ)
+  | noncanonicalAddress
+deriving Repr, DecidableEq
+
 /-- `toInt(X, |X|)`: interpret a byte list as a big-endian natural number (FIPS 205 Alg 2). -/
 def toInt (x : List Byte) : ℕ :=
   x.foldl (fun acc b => acc * 256 + b.toNat) 0
@@ -33,6 +46,46 @@ def toInt (x : List Byte) : ℕ :=
 /-- `toByte(x, len)`: big-endian `len`-byte serialization of `x` (FIPS 205 Alg 3). -/
 def toByte (x len : ℕ) : List Byte :=
   (List.range len).map (fun i => UInt8.ofNat (x / 256 ^ (len - 1 - i) % 256))
+
+/-- Decode a list only when its length is exactly the requested wire width. -/
+def decodeExact (n : ℕ) (raw : List Byte) : Except CodecError (Bytes n) :=
+  if h : raw.length = n then
+    .ok ⟨raw.toArray, by simpa using h⟩
+  else
+    .error (.invalidLength n raw.length)
+
+/-- Fixed-width vectors encode without adding or dropping bytes. -/
+def encodeExact {n : ℕ} (bytes : Bytes n) : List Byte := bytes.toList
+
+@[simp] theorem decodeExact_encode {n : ℕ} (bytes : Bytes n) :
+    decodeExact n (encodeExact bytes) = .ok bytes := by
+  simp only [decodeExact, encodeExact, Vector.length_toList, ↓reduceDIte]
+  congr 1
+
+/-- A successful exact-width decode has consumed the complete input. -/
+theorem decodeExact_eq_ok_iff {n : ℕ} {raw : List Byte} {bytes : Bytes n} :
+    decodeExact n raw = .ok bytes ↔ raw = bytes.toList := by
+  simp only [decodeExact]
+  split
+  · constructor
+    · intro h
+      injection h with hbytes
+      subst bytes
+      simp
+    · intro h
+      subst raw
+      congr 1
+  · constructor
+    · simp
+    · intro h
+      subst raw
+      simp_all
+
+/-- Inputs of any other length are rejected before structured parsing begins. -/
+theorem decodeExact_eq_error_of_length_ne (n : ℕ) (raw : List Byte)
+    (h : raw.length ≠ n) :
+    decodeExact n raw = .error (.invalidLength n raw.length) := by
+  simp [decodeExact, h]
 
 /-- Consume bytes from the front of `inp` into the `(total, bits)` accumulator until at least
 `b` bits are buffered (the inner `while` of `base2b`). Returns the leftover input and the

@@ -38,7 +38,6 @@ then composes those local facts and tracks the final normalization factor.
 @[expose] public section
 
 
-open scoped BigOperators
 
 namespace LatticeCrypto.NTTCert
 

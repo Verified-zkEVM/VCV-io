@@ -63,7 +63,6 @@ decapsulations (see `MLKEMTest.lean`).
 public section
 
 
-open scoped BigOperators
 
 namespace MLKEM.Concrete
 
