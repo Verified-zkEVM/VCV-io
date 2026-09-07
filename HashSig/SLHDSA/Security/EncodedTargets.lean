@@ -33,8 +33,9 @@ routes: an address is canonical and its layer and tree lie in the hypertree's ow
 SHA-2 domain follows from it under the narrower widths, so no ledger lemma has to be proved twice.
 
 The UD field of `EncodedTargetLedgerConditions` is stated for a total one-step-per-chain cap
-completion.  The source reduction may omit chains; its partial ledger inherits encoded
-distinctness through `EncodedTargetLedgerConditions.wotsFUd_partial`.
+completion.  A later reduction may omit chains; any such partial selector inherits encoded
+distinctness through `EncodedTargetLedgerConditions.wotsFUd_partial`.  Defining the reduction's
+exact selector and connecting it to program traces remain downstream obligations.
 
 Both records are satisfied by every FIPS 205 parameter set and by the limited SHA2-128-24 profile.
 The scope here is the eight tweakable-hash target roles.  The two secret-key derivation address
@@ -434,7 +435,7 @@ theorem encodeTargets_shake_nodup {p : Params} {addresses : List Adrs}
 
 /-- Every reachable target ledger keeps distinct tweaks under the SHA-2 instantiation.  The UD
 field covers total cap completions; `EncodedTargetLedgerConditions.wotsFUd_partial` specializes
-the resulting structure to every partial source-shaped UD selection. -/
+the resulting structure to every partial UD selection. -/
 theorem sha2EncodedTargetLedgerConditions (vp : ValidatedParams)
     (hb : ApprovedAddressBounds vp.params) :
     EncodedTargetLedgerConditions vp (sha2Primitives vp.params) where
@@ -465,7 +466,7 @@ theorem sha2EncodedTargetLedgerConditions (vp : ValidatedParams)
 
 /-- Every reachable target ledger keeps distinct tweaks under the SHAKE instantiation.  The UD
 field covers total cap completions, and `EncodedTargetLedgerConditions.wotsFUd_partial` derives
-the source-shaped partial selections.  Only the canonical widths are needed, so this covers
+partial selections.  Only the canonical widths are needed, so this covers
 parameter sets whose hypertree is too tall for SHA-2's compressed eight-byte tree field.  Being
 too deep for its one-byte layer field is not possible: `CanonicalAddressBounds.d_le_256` rules
 that out. -/

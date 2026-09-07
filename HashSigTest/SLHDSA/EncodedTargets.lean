@@ -13,8 +13,10 @@ public import HashSig.SLHDSA.Security.EncodedTargets
 Executable checks that the concrete address encoders keep the reachable target ledgers
 duplicate-free, run at the values rather than through the theorems: `Sha2Address.ofAdrs` is applied
 to every ledger entry and the encoded key lists are compared for duplicates at both key widths.
-The checks distinguish the total UD cap completion from a source-shaped partial UD selection and
-also cover an independent optional PRE selection.
+The checks distinguish the total UD cap completion from a synthetic partial UD selection.  The
+synthetic selector exercises only the generic partial-selection interface; it is not the exact
+selector or trace relation of a later reduction.  The checks also cover an independent optional
+PRE selection.
 
 Two further groups pin the negative direction, because the ledgers of a small profile keep every
 field far below its encoded width and so exercise no boundary on their own.  `checkFieldBoundaries`
@@ -142,9 +144,9 @@ theorem deep_sha2_conditions_false :
   rw [htree₁, htree₂] at hcontra
   omega
 
-/-- A synthetic source-shaped UD selection at hybrid index zero: assigning each chain the digit
+/-- A synthetic partial UD selection at hybrid index zero: assigning each chain the digit
 `chain mod 4` omits digit-zero and digit-one chains, while the remaining chains select the first
-executable step. -/
+executable step.  This is an interface canary, not the selector of a concrete reduction. -/
 def partialUdSelection (vp : ValidatedParams) :
     WotsChainCoord vp → Option (Fin (vp.params.w - 1)) := fun coord =>
   if coord.2.val % 4 ≤ 1 then none else some (firstWotsStep vp)
@@ -180,7 +182,7 @@ example (p : Params) (addresses : List Adrs) :
 example (p : Params) (addresses : List Adrs) :
     encodeTargets (shakePrimitives p) addresses = shakeKeys addresses := rfl
 
-/-- The assembled SHA-2 condition discharges the source-shaped partial UD ledger through the
+/-- The assembled SHA-2 condition discharges the synthetic partial UD ledger through the
 total-cap completion bridge. -/
 example :
     (encodeTargets (sha2Primitives twoLayerParams)
