@@ -55,7 +55,7 @@ so that `extract`'s output satisfies it, and then:
   each hypothesis separately inhabited is weaker than a witness for the whole bundle.
 -/
 
-@[expose] public section
+public section
 
 open scoped ENNReal
 

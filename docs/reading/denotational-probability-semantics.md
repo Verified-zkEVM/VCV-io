@@ -52,7 +52,7 @@ agreement theorem are the compatibility route; new semantic definitions should a
 ### Monad transformer stacks
 
 [`VCVio/EvalDist/MeasureSemantics.lean`](../../VCVio/EvalDist/MeasureSemantics.lean) packages a
-lossless interpretation as `MeasureSemantics m`. Transformer semantics do not erase effects:
+lossless interpretation as `ProbabilitySemantics m`. Transformer semantics do not erase effects:
 
 - `optionT` denotes the underlying `m (Option α)`;
 - `exceptT` denotes the underlying `m (Except ε α)`;

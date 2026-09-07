@@ -3,11 +3,12 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-module
 
+module
 public import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 public import Mathlib.Data.Fintype.Card
 public import Mathlib.Topology.Instances.ENNReal.Lemmas
+
 /-!
 # Finite sums over `Function.update`, indicator sums, and the inverse-cardinality sum
 
@@ -58,7 +59,7 @@ lemma sum_filter_update_of_not_pred {ι : Type*} [Fintype ι] [DecidableEq ι]
   have hit : i ≠ t := fun heq => hpt (heq ▸ (Finset.mem_filter.mp hi).2)
   rw [Function.update_of_ne hit]
 
-open BigOperators ENNReal
+open ENNReal
 
 lemma Fintype.sum_inv_card (α : Type*) [Fintype α] [Nonempty α] :
   Finset.sum Finset.univ (fun _ ↦ (Fintype.card α)⁻¹ : α → ℝ≥0∞) = 1 := by

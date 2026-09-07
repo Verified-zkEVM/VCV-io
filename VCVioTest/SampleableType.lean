@@ -16,7 +16,7 @@ changes so that it no longer fires), the build fails and the regression surfaces
 without needing a runtime check.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ProbComp ENNReal
 
@@ -26,6 +26,12 @@ example : SampleableType Bool := inferInstance
 example : SampleableType (Fin 3) := inferInstance
 example : SampleableType (List.Vector Bool 3) := inferInstance
 example : SampleableType (Vector Bool 3) := inferInstance
+
+-- BitVec sampling and finite enumeration share Mathlib's canonical FinEnum-derived Fintype.
+example (n : ℕ) : (inferInstance : Fintype (BitVec n)) = FinEnum.instFintype := rfl
+
+example (n : ℕ) (x : BitVec n) : Pr[= x | $ᵗ (BitVec n)] = (2 ^ n : ℝ≥0∞)⁻¹ := by
+  simp
 
 /-- The `Fin n → α` base instance is still present after the generalization. -/
 example : SampleableType (Fin 3 → Bool) := inferInstance

@@ -3,8 +3,8 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-module
 
+module
 public import Mathlib.Data.Fintype.Card
 public import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 public import Mathlib.Data.List.FinRange
@@ -12,6 +12,7 @@ public import Mathlib.Algebra.BigOperators.Ring.Finset
 public import Mathlib.Algebra.BigOperators.Fin
 public import Mathlib.Algebra.CharP.Defs
 public import Mathlib.Data.Nat.Cast.Basic
+
 /-!
 # Counting predicates over lists, `Fin`, and arrays
 
@@ -21,6 +22,7 @@ public import Mathlib.Data.Nat.Cast.Basic
 
 public section
 
+/-- Summing `1` over list indices that satisfy a predicate is just `countP` applied to `p`. -/
 lemma List.countP_eq_sum_fin_ite {α : Type*} (xs : List α) (p : α → Bool) :
     (∑ i : Fin xs.length, if p xs[i] then 1 else 0) = xs.countP p := by
   induction xs with

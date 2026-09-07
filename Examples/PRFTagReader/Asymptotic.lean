@@ -24,7 +24,7 @@ The concrete unlinkability quantities (`unlinkabilityAdvantage`, `PRFScheme.prfA
 `VCVio.CryptoFoundations.Asymptotics.{Negligible,Security}` is phrased over `ℕ → ℝ≥0∞`. We bridge
 the two exactly as the rest of the repository does (see `VCVio/Interaction/UC/Computational.lean`):
 an `ℝ`-valued error family `ε : ℕ → ℝ` is *negligible* when `fun λ => ENNReal.ofReal (ε λ)` is
-`negligible`, and sums are split with `ENNReal.ofReal_add_le` combined with `negligible_add`. No
+`negligible`, and sums of such families are handled by `negligible_ofReal_add`. No
 parallel framework is introduced; the headline is a plain `negligible` statement over a `ℕ`-indexed
 instance family.
 
@@ -57,31 +57,6 @@ negation.
 open OracleComp OracleSpec ENNReal Filter
 
 namespace PRFTagReader
-
-/-! ## Negligibility helpers -/
-
-/-- A natural-number family bounded by a polynomial times a negligible family is negligible.
-The basic closure used to absorb polynomial query / cardinality numerators into a negligible
-reciprocal-cardinality factor. -/
-theorem negligible_natMul_of_poly_bound {f : ℕ → ℝ≥0∞} (hf : negligible f)
-    {g : ℕ → ℕ} {p : Polynomial ℕ} (hg : ∀ n, g n ≤ p.eval n) :
-    negligible (fun n => (g n : ℝ≥0∞) * f n) :=
-  negligible_of_le (g := fun n => ((p.eval n : ℕ) : ℝ≥0∞) * f n)
-    (fun n => mul_le_mul' (by exact_mod_cast hg n) le_rfl)
-    (negligible_polynomial_mul hf p)
-
-/-- A slack term `numerator / cardinality` is negligible when the numerator is polynomially bounded
-and the reciprocal cardinality is negligible. The `ENNReal.ofReal` wrapper is the framework idiom
-for treating an `ℝ`-valued nonnegative error family asymptotically. -/
-theorem negligible_ofReal_natDiv_of_poly_bound {C : ℕ → ℕ}
-    (hC : negligible (fun n => (C n : ℝ≥0∞)⁻¹))
-    {g : ℕ → ℕ} {p : Polynomial ℕ} (hg : ∀ n, g n ≤ p.eval n) :
-    negligible (fun n => ENNReal.ofReal ((g n : ℝ) / (C n : ℝ))) :=
-  negligible_of_le (g := fun n => (g n : ℝ≥0∞) * (C n : ℝ≥0∞)⁻¹)
-    (fun n => by
-      refine (ENNReal.ofReal_div_le (by positivity)).trans ?_
-      rw [div_eq_mul_inv, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast])
-    (negligible_natMul_of_poly_bound hC hg)
 
 section AbsReductions
 
@@ -273,44 +248,14 @@ theorem negligible_abs_unlinkabilityAdvantage
         rw [Polynomial.eval_mul, Polynomial.eval_mul]
         exact Nat.mul_le_mul (Nat.mul_le_mul (hpReader lam) (hpTagId lam)) (hpSessions lam))
   -- The pointwise abs bound, transported through `ENNReal.ofReal`.
-  refine negligible_of_le (g := fun lam =>
-    ENNReal.ofReal (PRFScheme.prfAdvantage (inst.prfs lam).multiplePRFScheme
-        (unlinkToMultiplePRFReduction (sessionsPerTag := sessionsPerTag lam) (adversary lam))) +
-      ENNReal.ofReal (PRFScheme.prfAdvantage (inst.prfs lam).singlePRFScheme
-        (unlinkToSinglePRFReduction (sessionsPerTag := sessionsPerTag lam) (adversary lam))) +
-      ENNReal.ofReal (PRFScheme.prfAdvantage (inst.prfs lam).multiplePRFScheme
-        (unlinkToMultiplePRFReduction (sessionsPerTag := sessionsPerTag lam)
-          (adversary lam >>= fun b => pure (!b) :
-            OracleComp (UnlinkOracleSpec (TagId lam) (Nonce lam) (Digest lam)) Bool))) +
-      ENNReal.ofReal (PRFScheme.prfAdvantage (inst.prfs lam).singlePRFScheme
-        (unlinkToSinglePRFReduction (sessionsPerTag := sessionsPerTag lam)
-          (adversary lam >>= fun b => pure (!b) :
-            OracleComp (UnlinkOracleSpec (TagId lam) (Nonce lam) (Digest lam)) Bool))) +
-      ENNReal.ofReal (Pr[fun z : Bool ×
-            MultipleBadState (TagId lam) (Nonce lam) (Digest lam) (sessionsPerTag lam) =>
-          z.2.2.bad |
-        (simulateQ (multipleBadQueryImpl (TagId := TagId lam) (Nonce := Nonce lam)
-          (Digest := Digest lam) (sessionsPerTag := sessionsPerTag lam)) (adversary lam)).run
-          ((UnlinkState.init, ∅), UnlinkBadState.init)]).toReal +
-      ENNReal.ofReal (((qReader lam * Fintype.card (TagId lam) : ℕ) : ℝ) /
-        (Fintype.card (Digest lam) : ℝ)) +
-      ENNReal.ofReal (((qReader lam * qTag lam : ℕ) : ℝ) / (Fintype.card (Nonce lam) : ℝ)) +
-      ENNReal.ofReal (((qReader lam * Fintype.card (TagId lam) * sessionsPerTag lam : ℕ) : ℝ) /
-        (Fintype.card (Digest lam) : ℝ))) (fun lam => ?_) ?_
-  · -- Pointwise: `ofReal |unlink| ≤ Σ ofReal(termᵢ)`, by the abs bound + `ofReal_add_le`.
-    refine (ENNReal.ofReal_le_ofReal (abs_unlinkabilityAdvantage_reductions (inst.prfs lam)
-      (adversary lam) (qReader lam) (qTag lam) (hqReader lam) (hqTag lam) (hMnf lam)
-      (hSnf lam))).trans ?_
-    refine (ENNReal.ofReal_add_le).trans (add_le_add ?_ le_rfl)
-    refine (ENNReal.ofReal_add_le).trans (add_le_add ?_ le_rfl)
-    refine (ENNReal.ofReal_add_le).trans (add_le_add ?_ le_rfl)
-    refine (ENNReal.ofReal_add_le).trans (add_le_add ?_ le_rfl)
-    refine (ENNReal.ofReal_add_le).trans (add_le_add ?_ le_rfl)
-    refine (ENNReal.ofReal_add_le).trans (add_le_add ?_ le_rfl)
-    exact ENNReal.ofReal_add_le
-  · -- The bounding sum is negligible: nine negligible summands combined additively.
-    exact (((((((hPRFmulti.add hPRFsingle).add hPRFmulti').add hPRFsingle').add
-      hCollision).add hSlack1).add hSlack2).add hSlack3)
+  -- Pointwise `ofReal |unlink| ≤ ofReal (Σ termᵢ)` by the abs bound; the bounding family is
+  -- negligible as an `ofReal` of eight negligible real summands.
+  exact negligible_of_le
+    (fun lam => ENNReal.ofReal_le_ofReal (abs_unlinkabilityAdvantage_reductions (inst.prfs lam)
+      (adversary lam) (qReader lam) (qTag lam) (hqReader lam) (hqTag lam) (hMnf lam) (hSnf lam)))
+    (negligible_ofReal_add (negligible_ofReal_add (negligible_ofReal_add (negligible_ofReal_add
+      (negligible_ofReal_add (negligible_ofReal_add (negligible_ofReal_add hPRFmulti hPRFsingle)
+        hPRFmulti') hPRFsingle') hCollision) hSlack1) hSlack2) hSlack3)
 
 end AsymptoticInstance
 

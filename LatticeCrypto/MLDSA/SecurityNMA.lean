@@ -164,9 +164,7 @@ lemma polyVecBounded_zero (k b : ℕ) : polyVecBounded (0 : RqVec k) b := by
     have hci : Vector.get (0 : Rq) i = (0 : Coeff) :=
       LatticeCrypto.NegacyclicRing.coeff_zero coeffRing i
     rw [hci]
-    simp only [LatticeCrypto.zmodCenteredCoeffView, LatticeCrypto.centeredRepr, ZMod.val_zero,
-      Int.natCast_zero]
-    split <;> omega
+    simp [LatticeCrypto.zmodCenteredCoeffView, LatticeCrypto.centeredRepr]
   calc normOps.cInfNorm (0 : Rq) = polyNorm (0 : Rq) := rfl
     _ = 0 := h0
     _ ≤ b := Nat.zero_le b

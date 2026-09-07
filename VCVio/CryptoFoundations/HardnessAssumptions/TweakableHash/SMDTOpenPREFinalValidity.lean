@@ -10,7 +10,7 @@ public import VCVio.OracleComp.Constructions.SampleableType
 public import VCVio.OracleComp.SimSemantics.Append
 
 /-!
-# Single-function, distinct-tweak, multi-target open preimage resistance
+# Source-final-validity SM-DT-OpenPRE
 
 In SM-DT-OpenPRE the adversary commits to a list of target tweaks before seeing the public seed or
 any target image. The challenger keeps only the first `numTargets` tweaks, samples one input for

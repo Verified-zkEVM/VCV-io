@@ -16,7 +16,7 @@ Producer-level tests for identity, composition, and free-oracle interpretation t
 checks that `QueryHom.ofSimulateQ` preserves a nontrivial handler's state evolution.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 

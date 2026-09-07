@@ -32,7 +32,6 @@ variable {α β γ : Type v} {ι} {spec : OracleSpec.{u, v} ι}
 
 namespace OracleComp
 
-open scoped BigOperators
 open scoped OracleSpec.PrimitiveQuery
 
 /-- Interpret a raw polynomial free program as an oracle computation.
