@@ -56,9 +56,9 @@ per-role encoded-distinctness obligations that a concrete security context must 
 
 ## References
 
-- NIST FIPS 205, §4.2 (ADRS member functions), Algorithms 5--6 (WOTS+ chain and public-key
-  addresses), 9--13 (XMSS and hypertree addresses), 15--17 (FORS addresses), and 19--20 (the
-  digest-derived tree and leaf indices)
+- NIST FIPS 205, §4.2 (ADRS layout and type codes), §4.3 (ADRS member functions), Algorithms 5--6
+  (WOTS+ chain and public-key addresses), 9--13 (XMSS and hypertree addresses), 15--17 (FORS
+  addresses), and 19--20 (the digest-derived tree and leaf indices)
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified"
 -/
@@ -80,7 +80,7 @@ deriving Repr, DecidableEq, Fintype
 namespace LayerTreeCoord
 
 /-- Forget the leaf of a canonical position and retain its containing XMSS tree. -/
-@[expose] def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord vp :=
+def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord vp :=
   ⟨pos.layer, pos.tree⟩
 
 end LayerTreeCoord
@@ -110,12 +110,12 @@ theorem treesAtLayer_eq_layerTreeHeight (vp : ValidatedParams) (layer : Fin vp.p
   rw [hsub, Nat.mul_comm]
 
 /-- Enumerate every reachable XMSS tree exactly once. -/
-@[expose] def allXmssTrees (vp : ValidatedParams) : List (LayerTreeCoord vp) :=
+def allXmssTrees (vp : ValidatedParams) : List (LayerTreeCoord vp) :=
   (List.finRange vp.params.d).flatMap fun layer =>
     (List.finRange (2 ^ layerTreeHeight vp layer.val)).map fun tree => ⟨layer, tree⟩
 
 /-- Enumerate every reachable WOTS instance exactly once, using the canonical position type. -/
-@[expose] def allWotsInstances (vp : ValidatedParams) : List (LayerPosition vp) :=
+def allWotsInstances (vp : ValidatedParams) : List (LayerPosition vp) :=
   (allXmssTrees vp).flatMap fun coord =>
     (List.finRange (2 ^ vp.params.hp)).map fun leaf =>
       ⟨coord.layer, coord.tree, leaf⟩
@@ -218,7 +218,7 @@ theorem toAdrs_tree {vp : ValidatedParams} (coord : LayerTreeCoord vp) :
 
 @[simp]
 theorem ofPosition_toAdrs {vp : ValidatedParams} (pos : LayerPosition vp) :
-    (ofPosition pos).toAdrs = pos.toAdrs := rfl
+    (ofPosition pos).toAdrs = pos.toAdrs := by rfl
 
 end LayerTreeCoord
 
@@ -341,7 +341,7 @@ namespace BottomPosition
   leaf := pos.leaf
 
 /-- Turn the indices parsed by Algorithm 19 into their typed bottom position. -/
-@[expose] def ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.params) :
+def ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.params) :
     BottomPosition vp where
   tree := ⟨parts.idxTree.val, by
     simpa [layerTreeHeight, vp.valid.h_eq_layers, Nat.sub_mul] using parts.idxTree.isLt⟩
@@ -360,7 +360,7 @@ theorem forsAdrs_ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.pa
 scheduler starts from. -/
 @[simp]
 theorem toLayerPosition_ofDigestParts (vp : ValidatedParams) (parts : DigestParts vp.params) :
-    (ofDigestParts vp parts).toLayerPosition = LayerPosition.initial vp parts := rfl
+    (ofDigestParts vp parts).toLayerPosition = LayerPosition.initial vp parts := by rfl
 
 @[simp]
 theorem forsAdrs_tree {vp : ValidatedParams} (pos : BottomPosition vp) :
@@ -373,7 +373,7 @@ theorem forsAdrs_keyPair {vp : ValidatedParams} (pos : BottomPosition vp) :
 end BottomPosition
 
 /-- Enumerate every possible FORS instance position at layer zero exactly once. -/
-@[expose] def allBottomPositions (vp : ValidatedParams) : List (BottomPosition vp) :=
+def allBottomPositions (vp : ValidatedParams) : List (BottomPosition vp) :=
   (List.finRange (2 ^ layerTreeHeight vp 0)).flatMap fun tree =>
     (List.finRange (2 ^ vp.params.hp)).map fun leaf => ⟨tree, leaf⟩
 
@@ -710,7 +710,7 @@ abbrev WotsChainCoord (vp : ValidatedParams) :=
   LayerPosition vp × Fin vp.params.len
 
 /-- Every WOTS chain in every reachable instance. -/
-@[expose] def allWotsChains (vp : ValidatedParams) : List (WotsChainCoord vp) :=
+def allWotsChains (vp : ValidatedParams) : List (WotsChainCoord vp) :=
   (allWotsInstances vp).product (List.finRange vp.params.len)
 
 @[simp]
@@ -733,7 +733,7 @@ theorem allWotsChains_length (vp : ValidatedParams) :
   (wotsChainAdrs (wotsInstanceAdrs coord.1) coord.2.val).setHashAddress step.val
 
 /-- Valid parameters always have at least one executable WOTS hash step. -/
-@[expose] def firstWotsStep (vp : ValidatedParams) : Fin (vp.params.w - 1) :=
+def firstWotsStep (vp : ValidatedParams) : Fin (vp.params.w - 1) :=
   ⟨0, Nat.sub_pos_of_lt (Nat.one_lt_two_pow (Nat.ne_of_gt vp.valid.lgw_pos))⟩
 
 /-- The full reachable WOTS hash-step space, containing the `w - 1` executed steps of every

@@ -6,7 +6,6 @@ Authors: Alexander Hicks
 
 module
 public import HashSig.SLHDSA.Security.ReachableTargets
-import HashSig.SLHDSA.Hypertree
 import HashSig.SLHDSA.HypertreeGeneral
 
 /-!
@@ -266,8 +265,9 @@ def checkOneLayerContent : IO Unit := do
   let wotsBase := wotsInstanceAdrs pos
   ensure "WOTS+ base address is listed"
     ((wotsInstanceAddresses oneLayer).contains wotsBase)
-  -- At `d = 1` the depth-one hypertree signs from `htAdrs`, a construction-side address built
-  -- directly from `idx_tree`, and its XMSS leaf is `wotsLeafAdrs` of that address at `idx_leaf`.
+  -- At `d = 1` the scheme signs from `htAdrs Adrs.zero 0`, fixing the tree index to `0`, and its
+  -- XMSS leaf is `wotsLeafAdrs` of that address at `idx_leaf`.  The digest's `idx_tree` is a
+  -- `Fin 1`, hence also `0`, so passing `oneLayerParts.idxTree.val` compares the same address.
   ensure "WOTS+ base address is the leaf address the depth-one hypertree signs with"
     (wotsBase ==
       wotsLeafAdrs (htAdrs Adrs.zero oneLayerParts.idxTree.val) oneLayerParts.idxLeaf.val)
