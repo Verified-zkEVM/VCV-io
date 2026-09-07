@@ -46,7 +46,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
-      - uses: alexanderlhicks/lean4repo-utils/review@0.3
+      - uses: alexanderlhicks/lean4repo-utils/review@9404cc0f9aa10d65e4a08d3741a1d41638fb590f # 0.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           api_key: ${{ secrets.OPENROUTER_KEY }}
