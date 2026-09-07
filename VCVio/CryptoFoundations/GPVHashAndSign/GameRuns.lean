@@ -827,7 +827,8 @@ open Classical in
 `progGameRunImplTape` threaded with the same collision flag (set on a signing step when the consumed
 head salt `r` is already a key of the cache). Its `run'`-projection is the original
 `progGameRunImplTape`. -/
-@[expose] noncomputable def progGameRunImplTapeFlag (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose]
+noncomputable def progGameRunImplTapeFlag (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((Salt × M →ₒ Range).QueryCache × List Salt) × Bool) ProbComp) :=
   fun t => StateT.mk fun s =>

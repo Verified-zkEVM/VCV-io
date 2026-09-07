@@ -424,7 +424,8 @@ the short preimage `s ← domainSample pk` *once* and uses it for both the game 
 
 Dropping the table recovers `progGameRunImplNoRecFlagFresh`; dropping the signed-set and flag
 recovers `reductionImpl`. -/
-@[expose] noncomputable def progGameRunImplCombined (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose]
+noncomputable def progGameRunImplCombined (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) ×
         ((Salt × M) → Option Domain))) ProbComp) :=
@@ -1032,7 +1033,8 @@ lemma progGameRunImplCombined_run_cacheImpliesTable (domainSample : PK → ProbC
 lies in the support of the forward sampler `domainSample pk`. Every table write `t ↦ sd` records a
 freshly drawn `sd ← domainSample pk`, so it is in the sampler's support; uniform queries and cache
 hits leave the table untouched. -/
-@[expose] def combinedTableInDomainInv (M Salt : Type) (domainSample : PK → ProbComp Domain) (pk : PK)
+@[expose]
+def combinedTableInDomainInv (M Salt : Type) (domainSample : PK → ProbComp Domain) (pk : PK)
     (s : (((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) × ((Salt × M) → Option Domain)) :
     Prop :=
   ∀ t : Salt × M, ∀ d : Domain, s.2 t = some d → d ∈ support (domainSample pk)
