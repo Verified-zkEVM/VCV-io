@@ -72,9 +72,9 @@ Verified against `origin/main` at `4c48fed3` (2026-09-06).
   refinement-linked optimized path is on `main`, and no benchmark record exists for the six
   numerical shapes.
 - **`d = 1` security gate: not met, in progress.** #630 and #631 use the general scheme without a
-  duplicate implementation and disclaim security content. Missing: WOTS encoding injectivity, a
-  profile-specific statement for SHA2-128-24 beyond the encoded-ledger conditions, and everything
-  from D1B onward. WOTS encoding injectivity is in review (#665).
+  duplicate implementation and disclaim security content. Missing on `main`: WOTS encoding
+  injectivity (in review as #665), a profile-specific statement for SHA2-128-24 beyond the
+  encoded-ledger conditions, and everything from D1B onward.
 - **General-`d` security gate: not started**, and correctly claimed nowhere.
 
 ## Security lane: slices, status, and source correspondence
