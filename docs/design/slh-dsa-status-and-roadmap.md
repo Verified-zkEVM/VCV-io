@@ -28,7 +28,8 @@ unforgeability theorem of any kind exists on `main` today.
 
 Every SLH-DSA test executable runs in `.github/workflows/build.yml`; `linting.yml` style-lints
 `HashSig` and the listed test modules; `scripts/check-expose-boundary.sh` caps the number of
-broadly exposed files per library (new modules use a plain `public section` with per-declaration `@[expose]`);
+broadly exposed files per library (new modules use a plain `public section` with
+per-declaration `@[expose]`);
 `lake exe axiomsweep --check` guards the axiom and `sorry` footprint against
 `scripts/axiom_baseline.json`.
 
@@ -163,8 +164,8 @@ longer true on `main`:
   split without the tree index, one-XMSS `HtSigCore`, 3,856-byte decoder, empty-context wrapper):
   every bullet is resolved by G1–G8.
 - "The Merkle stack runs from #574 through #591 … not a prerequisite": the Merkle PRs in that
-  range (#574, #575, #577–#579, #586–#591) all merged 2026-09-01; the current Merkle work is #618
-  and #621.
+  range (#574, #575, #577–#579, #586–#591) all merged 2026-09-01; the current Merkle work is
+  #618 and #621.
 - The pull-request stack table names no PR numbers. For the record: G5–G8 landed through #617,
   #619, #626, #611 after the original stacked PRs #604–#607 were closed, and #627 and #628
   carried the FORS and hypertree conformance ports in place of #608 and #609.
