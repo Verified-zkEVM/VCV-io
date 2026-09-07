@@ -233,8 +233,9 @@ theorem concrete_sampleInBall_smul_bound
 /-! ## `Primitives.Laws` status for `concretePrimitives` (no full witness — by design)
 
 Thirteen `Primitives.Laws` fields are proven for the concrete instance at any approved parameter
-set. The transform field inherits the repository's disclosed `native_decide` certificate for
-the concrete NTT matrix inversion; the remaining proofs introduce no additional project-specific
+set. The transform field is proved from the structural butterfly stages of
+`LatticeCrypto/Ring/NTTCert.lean` (no `native_decide`; the runtime loop kernels remain an
+`implemented_by` refinement boundary); the remaining proofs introduce no additional project-specific
 trust assumptions. These fields are: the eight algebraic fields (`concrete_transform`,
 `concrete_high_low_decomp`, `concrete_lowBits_bound`, `concrete_hide_low`,
 `concrete_highBitsShift_injective`, `concrete_useHint_makeHint`, `concrete_power2Round_decomp`,

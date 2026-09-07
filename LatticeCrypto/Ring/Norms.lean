@@ -68,84 +68,57 @@ section CenteredRepr
 
 variable {q : ℕ} [NeZero q]
 
-/-- The centered representative of `x : ZMod q`, mapping to the unique integer in
-`[-(q-1)/2, (q-1)/2]` congruent to `x` mod `q`. -/
-def centeredRepr (x : ZMod q) : ℤ :=
-  if (x.val : ℤ) ≤ (q : ℤ) / 2 then (x.val : ℤ) else (x.val : ℤ) - q
+/-- The centered representative of `x : ZMod q` in the FIPS-facing rounding and norm API.
+For nonzero `q`, this is the unique integer congruent to `x` whose double lies in `(-q, q]`. An even
+modulus uses the positive representative at the midpoint. For `q = 0`, `ZMod 0` is `ℤ` and this
+returns the integer itself, following `ZMod.valMinAbs`. -/
+def centeredRepr (x : ZMod q) : ℤ := x.valMinAbs
 
-omit [NeZero q] in
 @[simp] theorem centeredRepr_of_le {x : ZMod q} (h : (x.val : ℤ) ≤ (q : ℤ) / 2) :
     centeredRepr x = x.val := by
-  unfold centeredRepr
-  exact if_pos h
+  rw [centeredRepr, ZMod.valMinAbs_def_pos, if_pos (by omega)]
 
-omit [NeZero q] in
 @[simp] theorem centeredRepr_of_gt {x : ZMod q} (h : (q : ℤ) / 2 < (x.val : ℤ)) :
     centeredRepr x = (x.val : ℤ) - q := by
-  unfold centeredRepr
-  exact if_neg (not_le.mpr h)
+  rw [centeredRepr, ZMod.valMinAbs_def_pos, if_neg (by omega)]
 
 /-- The centered representative is always at most `q / 2`. -/
 theorem centeredRepr_upper_bound (x : ZMod q) : centeredRepr x ≤ (q : ℤ) / 2 := by
-  simp only [centeredRepr]
-  split_ifs with h
-  · exact h
-  · push Not at h
-    have hval := ZMod.val_lt x
-    omega
+  have := (ZMod.valMinAbs_mem_Ioc x).2
+  unfold centeredRepr
+  omega
 
 /-- The centered representative has absolute value at most `q / 2`. -/
-theorem centeredRepr_abs_le (x : ZMod q) : (centeredRepr x).natAbs ≤ q / 2 := by
-  simp only [centeredRepr]
-  have hval := ZMod.val_lt x
-  split_ifs with h <;> omega
+theorem centeredRepr_abs_le (x : ZMod q) : (centeredRepr x).natAbs ≤ q / 2 :=
+  ZMod.natAbs_valMinAbs_le x
 
+omit [NeZero q] in
 /-- Negation preserves the absolute value of the centered representative. -/
 theorem centeredRepr_natAbs_neg (x : ZMod q) :
-    (centeredRepr (-x)).natAbs = (centeredRepr x).natAbs := by
-  by_cases hx : x = 0
-  · simp [hx]
-  · have : NeZero x := ⟨hx⟩
-    simp only [centeredRepr, ZMod.val_neg_of_ne_zero]
-    have hval := ZMod.val_lt x
-    have hpos : 0 < x.val := Nat.pos_of_ne_zero ((ZMod.val_ne_zero x).mpr hx)
-    split_ifs <;> omega
+    (centeredRepr (-x)).natAbs = (centeredRepr x).natAbs :=
+  ZMod.natAbs_valMinAbs_neg x
 
+omit [NeZero q] in
 /-- Casting the centered representative back into `ZMod q` recovers the original element. -/
 theorem centeredRepr_intCast (x : ZMod q) :
-    (x : ZMod q) = ((centeredRepr x : ℤ) : ZMod q) := by
-  by_cases h : (x.val : ℤ) ≤ (q : ℤ) / 2
-  · rw [centeredRepr_of_le h, Int.cast_natCast, ZMod.natCast_zmod_val]
-  · have hgt : (q : ℤ) / 2 < x.val := lt_of_not_ge h
-    rw [centeredRepr_of_gt hgt, Int.cast_sub, Int.cast_natCast,
-      Int.cast_natCast, ZMod.natCast_zmod_val, ZMod.natCast_self]
-    simp
+    (x : ZMod q) = ((centeredRepr x : ℤ) : ZMod q) :=
+  (ZMod.coe_valMinAbs x).symm
 
 /-- Twice the centered representative lies in the interval used by `ZMod.valMinAbs`. -/
 theorem centeredRepr_mem_Ioc (x : ZMod q) :
-    centeredRepr x * 2 ∈ Set.Ioc (-(q : ℤ)) q := by
-  by_cases h : (x.val : ℤ) ≤ (q : ℤ) / 2
-  · rw [centeredRepr_of_le h]
-    have hx : 0 ≤ (x.val : ℤ) := by positivity
-    have hmod : (0 : ℤ) < q := by exact_mod_cast NeZero.pos q
-    constructor <;> omega
-  · have hgt : (q : ℤ) / 2 < x.val := lt_of_not_ge h
-    rw [centeredRepr_of_gt hgt]
-    have hval := ZMod.val_lt x
-    constructor <;> omega
+    centeredRepr x * 2 ∈ Set.Ioc (-(q : ℤ)) q :=
+  ZMod.valMinAbs_mem_Ioc x
 
-/-- The centered representative agrees with `ZMod.valMinAbs`. -/
+omit [NeZero q] in
+/-- The centered representative is `ZMod.valMinAbs` by definition. -/
 theorem centeredRepr_eq_valMinAbs (x : ZMod q) :
-    centeredRepr x = x.valMinAbs := by
-  simpa using ((ZMod.valMinAbs_spec x (centeredRepr x)).2
-    ⟨centeredRepr_intCast x, centeredRepr_mem_Ioc x⟩).symm
+    centeredRepr x = x.valMinAbs := rfl
 
 /-- Casting an integer already in the centered interval preserves that integer. -/
 theorem centeredRepr_intCast_eq (z : ℤ)
     (hzlo : -(q : ℤ) < z * 2) (hzhi : z * 2 ≤ q) :
-    centeredRepr ((z : ZMod q)) = z := by
-  rw [centeredRepr_eq_valMinAbs]
-  exact (ZMod.valMinAbs_spec ((z : ZMod q)) z).2 ⟨rfl, ⟨hzlo, hzhi⟩⟩
+    centeredRepr ((z : ZMod q)) = z :=
+  (ZMod.valMinAbs_spec ((z : ZMod q)) z).2 ⟨rfl, ⟨hzlo, hzhi⟩⟩
 
 /-- A small-enough integer is unchanged by casting into `ZMod q` and taking `centeredRepr`. -/
 theorem centeredRepr_intCast_eq_of_natAbs_le (z : ℤ) {b : ℕ}
@@ -284,6 +257,7 @@ private def intConvCoeff (f g : Fin n → ZMod q) (k : Fin n) : ℤ :=
       else -(centeredRepr (f ij.1) * centeredRepr (g ij.2))
     else 0
 
+omit [NeZero q] in
 /-- `negacyclicConvCoeff` is the `ZMod q` reduction of the integer convolution `intConvCoeff`
 of the centered lifts. -/
 private theorem negacyclicConvCoeff_eq_intCast (f g : Fin n → ZMod q) (k : Fin n) :
