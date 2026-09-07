@@ -140,6 +140,7 @@ public import VCVio.EvalDist.Defs.Support
 public import VCVio.EvalDist.Divergence.KLDivergence
 public import VCVio.EvalDist.Expectation
 public import VCVio.EvalDist.ExpectationMeasure
+public import VCVio.EvalDist.FailureMeasure
 public import VCVio.EvalDist.Fintype
 public import VCVio.EvalDist.IndepProduct
 public import VCVio.EvalDist.Inequalities
