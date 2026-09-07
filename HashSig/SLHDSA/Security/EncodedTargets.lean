@@ -38,12 +38,12 @@ types pass through the same SHA-2 gate but are not hash targets, so they are not
 
 ## References
 
-- NIST FIPS 205, §4.2 (ADRS), §11.2.1 (`ADRSc` compression)
+- NIST FIPS 205, §4.2 (ADRS), §11.2 (`ADRSc` compression, Figure 18 and Table 3)
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified"
 -/
 
-@[expose] public section
+public section
 
 namespace SLHDSA.Security
 
@@ -56,9 +56,10 @@ is FIPS-canonical, and so lies in the domain on which SHAKE's full serialization
 
 There is one field per bounded quantity rather than one per independent condition, so that each
 proof can name the bound it is about; several fields therefore concern the same four-byte word.
-Two of the seven are consequences of their siblings over a validated parameter set: `d_le` of
-`treeBits_canonical`, and `a_le` of `forsIndex_le`.  `d_le_97` and `a_le_of_forsIndex_le` record
-that. -/
+Two of the seven follow from their siblings over a validated parameter set:
+`CanonicalAddressBounds.a_le_of_forsIndex_le` derives `a_le` from `forsIndex_le` and `k_pos`, and
+`CanonicalAddressBounds.d_le_97` derives `d ≤ 97`, sharper than `d_le`, from `treeBits_canonical`
+and `hp_pos`. -/
 structure CanonicalAddressBounds (p : Params) : Prop where
   /-- The four-byte layer word holds every hypertree layer. -/
   d_le : p.d ≤ 2 ^ 32
@@ -104,10 +105,12 @@ theorem CanonicalAddressBounds.d_le_256 {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) : vp.params.d ≤ 256 :=
   le_trans hb.d_le_97 (by norm_num)
 
-/-- The FORS index condition already caps the tree height, because there is at least one tree. -/
+/-- The FORS index condition already caps the tree height at thirty-two, because there is at least
+one tree. -/
 theorem CanonicalAddressBounds.a_le_of_forsIndex_le {vp : ValidatedParams}
-    (hb : CanonicalAddressBounds vp.params) : 2 ^ vp.params.a ≤ 2 ^ 32 :=
-  le_trans (Nat.le_mul_of_pos_left _ vp.valid.k_pos) hb.forsIndex_le
+    (hb : CanonicalAddressBounds vp.params) : vp.params.a ≤ 32 :=
+  (Nat.pow_le_pow_iff_right Nat.one_lt_two).1
+    (le_trans (Nat.le_mul_of_pos_left _ vp.valid.k_pos) hb.forsIndex_le)
 
 /-- Every FIPS 205 parameter set fits the compressed SHA-2 address layout, hence also the wider
 canonical one. -/
