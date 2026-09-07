@@ -127,3 +127,4 @@ jobs:
           HashSigTest.SLHDSA.Sha2KAT HashSigTest.SLHDSA.C13KAT
           HashSigTest.SLHDSA.ReachableTargets
           HashSigTest.SLHDSA.EncodedTargets
+          HashSigTest.SLHDSA.TraceTargets
