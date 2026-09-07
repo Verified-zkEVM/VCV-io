@@ -2,14 +2,14 @@
 
 Status: implementation-status report and forward roadmap, established 2026-09-06. It complements
 the plan in [`slh-dsa-fips205-generalization.md`](slh-dsa-fips205-generalization.md), which fixes
-the target architecture, milestone definitions, acceptance gates, and merge protocol. The plan has
-not changed since 2026-08-30; this document records what has merged since, what is open, where the
-plan's snapshot statements are now stale, and the ordered slices that remain. Where the two
-disagree about *what is on `main`*, this document is right and the plan is a snapshot.
+the target architecture, milestone definitions, acceptance gates, and merge protocol established
+on 2026-08-30. This document records what has merged since, what is open, where the plan's snapshot
+statements are now stale, and the ordered slices that remain. For the `main` snapshot identified in
+the milestone ledger below, use this document rather than the plan's older status statements.
 
 A capability is listed as DONE only when its source and validation are on `main`. Open pull
-requests are named as such. Nothing in this document is a security claim: no SLH-DSA
-unforgeability theorem of any kind exists on `main` today.
+requests are named as such. No item below should be read as an SLH-DSA security theorem: no
+SLH-DSA unforgeability theorem of any kind exists on `main` at the recorded snapshot.
 
 ## Where the work lives
 
@@ -48,8 +48,8 @@ Verified against `origin/main` at `4c48fed3` (2026-09-06).
 | G7 SHA2 and SHAKE suites | DONE | #626 | `sha2Primitives`, `shakePrimitives`, `approvedPrimitives`, `Sha2Address`, `sha2AdrsKey_injective_of_domain`, `compressSha2_injective_of_fits` | several primitives, among them SHA-384, SHA-512/224, SHA-512/256, and both MGF1 variants, are regression-pinned rather than covered by independent NIST vectors (`PrimitiveVectors/NOTICE.md`); abstract `F`/`T₁` identification at arity 1 (#629 item 1) |
 | FORS and hypertree conformance ports | DONE | #627, #628 | `ForsConformance.lean`, `HypertreeConformance.lean`, typed trajectory traces, concrete address bounds | none |
 | G8 external interfaces and prehash | DONE | #611 | `External.lean` (`requireContext`, `signPure*`, `verifyPure*`, prehash variants), `Concrete/Prehash.lean` (12 ACVP names, OIDs), pinned `opt_rand = PK.seed` | "ACVP uses supplied randomness exactly when requested" is untestable until G10 |
-| G9 efficient refinement-linked execution | NOT MERGED | frozen branch `feat/slhdsa-g9-efficient-execution-20260831` | branch-only `HashSig/SLHDSA/Execution.lean` with the full `*_eq_spec` refinement chain | base is 37 commits behind `main` and carries stale pre-merge copies of the G4–G8 files; must be re-sliced, not rebased (see below) |
-| G10 ACVP and KAT coverage | NOT MERGED | frozen branch `feat/slhdsa-g10-acvp-kat-20260831` | branch-only ACVP schema, strict JSON parser, lossless corpus pinned to ACVP-Server `975de31e`, provenance scripts | the branch parses vectors but executes none; on `main` the only whole-scheme KATs are `Sha2KAT.lean` (one SHA2-128-24 vector) and `C13KAT.lean` |
+| G9 efficient refinement-linked execution | NOT MERGED | archived snapshot `0529cefa` (former branch `feat/slhdsa-g9-efficient-execution-20260831`) | snapshot-only `HashSig/SLHDSA/Execution.lean` with the full `*_eq_spec` refinement chain | snapshot base is 37 commits behind the recorded `main` and carries stale pre-merge copies of the G4–G8 files; re-slice it instead of rebasing the whole snapshot (see below) |
+| G10 ACVP and KAT coverage | NOT MERGED | archived snapshot `f14a9a5e` (former branch `feat/slhdsa-g10-acvp-kat-20260831`) | snapshot-only ACVP schema, strict JSON parser, lossless corpus pinned to ACVP-Server `975de31e`, provenance scripts | the snapshot parses vectors but executes none; on `main` the only whole-scheme KATs are `Sha2KAT.lean` (one SHA2-128-24 vector) and `C13KAT.lean` |
 | CF1 final-validity games | DONE | #594, #622, #624 | `TweakableHash/FinalValidity.lean`, `SMDTTCRFinalValidity`, `SMDTPREFinalValidity`, `ToFinalValidity.lean` | none |
 | CF2 DSPR, OpenPRE, UD, ITSR | DONE | #596, #623, #625 | `SMDTDSPRFinalValidity`, `SMDTOpenPREFinalValidity`, `SMDTUDFinalValidity` (message-subspace parameter), `KeyedHash/ITSR.lean`, `OpenPREFromTCRDSPR.lean` (`toTCR`, `toDSPR`, `CountingInterface`) | the OpenPRE probability coupling remains an explicit interface, as the plan allows |
 | CF3 generic SUF surface | DONE | #601 | `SignatureAlg.strongUnforgeableAdv`, `sameMessageAdvantage`, `advantage_eq_euf_add_sameMessage` | SLH-DSA must use the per-adversary partition, not `SameMessageBinding` (#629 item 2b) |
@@ -82,11 +82,13 @@ Verified against `origin/main` at `4c48fed3` (2026-09-06).
 The lane follows the plan's D1A → D1B → conditional theorem order, stated for arbitrary `d` with
 `d = 1` as corollaries, and mirrors the structure of the EasyCrypt proof of SPHINCS+ (Barbosa,
 Dupressoir, Hülsing, Meijers, Strub; `SPHINCS_PLUS.ec`, `WOTS_TW_ES.ec`, `FORS_ES.ec`,
-`FL_SL_XMSS_MT_ES.ec`). Each slice is its own pull request, stacked on the previous one, opened as
-a draft, adversarially reviewed on every commit by an independent read-only reviewer, and taken out
-of draft only when a review round reports nothing to fix. The recurring defect class across every
-review round so far has been prose claiming more than the lemmas prove; reviewers check each
-docstring sentence against the lemma it describes.
+`FL_SL_XMSS_MT_ES.ec`). The prerequisite stack is #630 → #631 → #666. The WOTS encoding proof
+#665 is independent, targets `main`, and can merge separately; later reduction slices will consume
+both lines. Each slice is its own pull request, opened as a draft, adversarially reviewed on every
+commit by an independent read-only reviewer, and taken out of draft only when a review round
+reports nothing to fix. The recurring defect class across every review round so far has been prose
+claiming more than the lemmas prove; reviewers check each docstring sentence against the lemma it
+describes.
 
 | # | Slice | Content | Status | EasyCrypt counterpart |
 |---|---|---|---|---|
@@ -130,10 +132,11 @@ unbounded, so the SUF residual uses `advantage_eq_euf_add_sameMessage`.
   reject-on-arrival problems that `Security.lean` packages today (`thashTcrProblem`,
   `thashPreProblem`).
 
-## Frozen lanes: G9 and G10
+## Archived snapshots: G9 and G10
 
-Both branches predate the merged G4–G8 and carry stale pre-merge copies of their files, so they
-cannot be rebased. Re-slicing:
+The former G9 and G10 branches have been deleted. Their hosted tip commits, `0529cefa` and
+`f14a9a5e`, predate the merged G4–G8 and carry stale pre-merge copies of those files. Use those
+commits as idea sources and re-slice only the owned changes:
 
 - **G9**: a single PR carrying `HashSig/SLHDSA/Execution.lean` (the `treeHash`,
   `authenticationPath`, and `*_eq_spec` refinement theorems restated against the merged
@@ -166,18 +169,20 @@ longer true on `main`:
 - "The Merkle stack runs from #574 through #591 … not a prerequisite": the Merkle PRs in that
   range (#574, #575, #577–#579, #586–#591) all merged 2026-09-01; the current Merkle work is
   #618 and #621.
-- The pull-request stack table names no PR numbers. For the record: G5–G8 landed through #617,
-  #619, #626, #611 after the original stacked PRs #604–#607 were closed, and #627 and #628
-  carried the FORS and hypertree conformance ports in place of #608 and #609.
+- The pull-request stack table names no PR numbers. For the record: G5–G8 landed on `main` through
+  #617, #619, #626, and #611. Of the original stacked PRs, #604–#606 were closed and #607 merged
+  into its feature-branch base; #627 and #628 carried the FORS and hypertree conformance ports in
+  place of #608 and #609.
 - "D1A: d1 target/address ledger": #630 states the ledgers for arbitrary `d`; the depth-one values
   are corollaries.
 - `Params.IsD1` is named as a D1A deliverable but does not exist; `main` threads `p.d = 1`
   hypotheses directly (`DepthOneCompatibility` on `main`, `Security.xmssTreeCount_of_d_eq_one` in
   #630). Either
   the predicate is added in slice 8 where a named profile is needed, or the plan is amended.
-- The plan does not mention the archived donor `origin/archive/slhdsa-pr597-final-88314278`
-  (closed #597), whose `Security/{CanonicalGames,TraceTargets,Architecture}.lean` are the inputs
-  of slices 4 and 6, nor the follow-up issue #629.
+- The plan does not mention the archived donor at commit `88314278` (closed #597), whose
+  `Security/{CanonicalGames,TraceTargets,Architecture}.lean` are the inputs of slices 4 and 6,
+  nor the follow-up issue #629. Its former remote branch
+  `archive/slhdsa-pr597-final-88314278` has been deleted.
 
 ## Follow-ups outside the security lane
 
