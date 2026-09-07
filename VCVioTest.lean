@@ -8,6 +8,7 @@ public import VCVioTest.CryptoFoundations.ComputationalComplexitySoundness
 public import VCVioTest.CryptoFoundations.OracleClosure
 public import VCVioTest.CryptoFoundations.SignatureAlg
 public import VCVioTest.CryptoFoundations.SymmEncAlgMeasure
+public import VCVioTest.EvalDist.MeasureBridge
 public import VCVioTest.ForkMeasure
 public import VCVioTest.Forking.WithoutReplacement
 public import VCVioTest.GrindFailFast
@@ -36,6 +37,8 @@ public import VCVioTest.SMDTTCRFinalValidity
 public import VCVioTest.SMDTUDFinalValidity
 public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
+public import VCVioTest.Tactic.Finiteness
+public import VCVioTest.Tactic.GCongr
 public import VCVioTest.ToMathlib.AbsDiff
 public import VCVioTest.UniformOn
 public import VCVioTest.UniversePolymorphism

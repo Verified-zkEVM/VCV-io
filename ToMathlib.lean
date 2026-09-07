@@ -24,6 +24,7 @@ public import ToMathlib.Control.StateT
 public import ToMathlib.Control.WriterT
 public import ToMathlib.Data.BitVec
 public import ToMathlib.Data.ENNReal.AbsDiff
+public import ToMathlib.Data.ENNReal.Finiteness
 public import ToMathlib.Data.ENNReal.Gauss
 public import ToMathlib.Data.ENNReal.SumSquares
 public import ToMathlib.Data.ENNReal.TsumDistrib

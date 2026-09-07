@@ -56,7 +56,10 @@ The repo also includes a first-class lattice cryptography library under `Lattice
 - `ToMathlib/`: local Mathlib-facing utilities and lemmas intended to remain below the framework layer.
 - `Extern/`: native FFI surface — the `@[extern]` bindings (SHA-3/SHAKE, ML-KEM, ML-DSA, Falcon) and the FFI-backed concrete instances that reach them. No proof library may import it; the backing `extern_lib`s become empty stubs when `third_party/` submodules are absent.
 - `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
-- `HashSig/`: hash-based signatures — SLH-DSA (SPHINCS+, FIPS 205) proof-level specs and security. Peer of `LatticeCrypto/`; depends on `VCVio`/`ToMathlib` but nothing in those imports it back.
+- `HashSig/`: hash-based signatures — SLH-DSA (SPHINCS+, FIPS 205) proof-level specs,
+  component-level FIPS conformance results, and security-facing interfaces (no unforgeability
+  theorem or complete FIPS conformance result yet). Peer of `LatticeCrypto/`; depends on
+  `VCVio`/`ToMathlib` but nothing in those imports it back.
 - `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
 - `VCVioTest/`: framework smoke tests and test support modules.
 - `VCVioWidgets/`: optional widget experiments and visualizations.
@@ -265,6 +268,8 @@ Before working in a specific area, read the relevant guide in `docs/agents/`:
   [`docs/design/computational-complexity.md`](docs/design/computational-complexity.md)
 - **SLH-DSA general-`d` formalization, FIPS 205 conformance, KAT, and security stack plan**:
   [`docs/design/slh-dsa-fips205-generalization.md`](docs/design/slh-dsa-fips205-generalization.md)
+- **SLH-DSA implementation status, stale-plan corrections, and remaining slices**:
+  [`docs/design/slh-dsa-status-and-roadmap.md`](docs/design/slh-dsa-status-and-roadmap.md)
 - **Probability reasoning (EvalDist, ProbComp)**: [`docs/agents/probability.md`](docs/agents/probability.md)
 - **Crypto primitives and reductions**: [`docs/agents/crypto.md`](docs/agents/crypto.md)
 - **End-to-end crypto examples**: [`docs/agents/end-to-end-examples.md`](docs/agents/end-to-end-examples.md)

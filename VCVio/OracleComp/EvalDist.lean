@@ -523,6 +523,7 @@ lemma mem_supportWhen_bind_iff (o : QueryImpl spec Set) (oa : OracleComp spec α
   simp [supportWhen_bind]
 
 /-- Enlarging the set of possible oracle outputs only enlarges the reachable output set. -/
+@[gcongr]
 lemma supportWhen_mono {o₁ o₂ : QueryImpl spec Set}
     (h : ∀ q, o₁ q ⊆ o₂ q) (oa : OracleComp spec α) :
     supportWhen o₁ oa ⊆ supportWhen o₂ oa := by

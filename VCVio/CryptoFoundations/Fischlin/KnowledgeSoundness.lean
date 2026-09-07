@@ -27,7 +27,7 @@ namespace Fischlin
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 
-open ENNReal
+open ENNReal OracleComp.EvalDist
 
 section security
 
@@ -1132,9 +1132,6 @@ private lemma slotPsi_tower (g : Fin ρ → Option (Fin (2 ^ b))) (i : Fin ρ) (
         / ((2 ^ b : ℕ) : ℝ≥0∞)
       = slotPsi ρ b S g := by
   classical
-  have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
-    Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
-  have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
   have hmem : i ∈ Finset.univ.filter fun j : Fin ρ => g j = none :=
     Finset.mem_filter.mpr ⟨Finset.mem_univ i, hi⟩
   have h1 : 1 ≤ missCard g := Finset.card_pos.mpr ⟨i, hmem⟩
@@ -1148,7 +1145,7 @@ private lemma slotPsi_tower (g : Fin ρ → Option (Fin (2 ^ b))) (i : Fin ρ) (
   simp only [hmiss, div_eq_mul_inv]
   rw [← Finset.sum_mul, ← Nat.cast_sum, sum_partialSmallSumCount_update ρ b S g i hi,
     mul_assoc,
-    ← ENNReal.mul_inv (Or.inl (pow_ne_zero _ hD0)) (Or.inl (ENNReal.pow_ne_top hDtop)),
+    ← ENNReal.mul_inv (Or.inl (by positivity)) (Or.inl (by finiteness)),
     ← pow_succ, hm]
 
 omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
@@ -1223,9 +1220,6 @@ private lemma Phi_extend {K : Type} [DecidableEq K] (keys : Finset K)
         / ((2 ^ b : ℕ) : ℝ≥0∞)
       = Phi ρ b S keys st dead := by
   classical
-  have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
-    Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
-  have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
   have hsplit : ∀ u : Fin (2 ^ b),
       Phi ρ b S keys (updateSlot st k₀ i₀ u) dead
         = slotPsi ρ b S (Function.update (st k₀) i₀ (some u))
@@ -1238,7 +1232,8 @@ private lemma Phi_extend {K : Type} [DecidableEq K] (keys : Finset K)
   simp only [hsplit]
   rw [Finset.sum_add_distrib, ENNReal.add_div, slotPsi_tower ρ b S (st k₀) i₀ hi,
     Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_comm,
-    ENNReal.mul_div_cancel_right hD0 hDtop, Phi, ← Finset.add_sum_erase _ _ hk,
+    ENNReal.mul_div_cancel_right (by positivity) (by finiteness), Phi,
+    ← Finset.add_sum_erase _ _ hk,
     if_neg hdead]
 
 omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
@@ -1254,9 +1249,6 @@ private lemma Phi_open_eq {K : Type} [DecidableEq K] (keys : Finset K)
         / ((2 ^ b : ℕ) : ℝ≥0∞)
       = Phi ρ b S keys st dead + slotPsi ρ b S (fun _ => none) := by
   classical
-  have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
-    Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
-  have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
   have hsplit : ∀ u : Fin (2 ^ b),
       Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) dead
         = slotPsi ρ b S (Function.update (st k₀) i₀ (some u)) + Phi ρ b S keys st dead := by
@@ -1269,7 +1261,7 @@ private lemma Phi_open_eq {K : Type} [DecidableEq K] (keys : Finset K)
   rw [Finset.sum_add_distrib, ENNReal.add_div,
     slotPsi_tower ρ b S (st k₀) i₀ (by rw [hfresh]), hfresh,
     Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_comm,
-    ENNReal.mul_div_cancel_right hD0 hDtop, add_comm]
+    ENNReal.mul_div_cancel_right (by positivity) (by finiteness), add_comm]
 
 omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
@@ -1284,10 +1276,7 @@ private lemma Phi_open_le {K : Type} [DecidableEq K] (keys : Finset K)
       ≤ Phi ρ b S keys st dead + slotPsi ρ b S (fun _ => none) := by
   classical
   by_cases hdead : dead k₀
-  · have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
-      Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
-    have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
-    have hsplit : ∀ u : Fin (2 ^ b),
+  · have hsplit : ∀ u : Fin (2 ^ b),
         Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) dead
           = Phi ρ b S keys st dead := by
       intro u
@@ -1296,7 +1285,7 @@ private lemma Phi_open_le {K : Type} [DecidableEq K] (keys : Finset K)
       rw [updateSlot_apply_ne st k₀ i₀ u (fun h => hk (h ▸ hk'))]
     simp only [hsplit]
     rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_comm,
-      ENNReal.mul_div_cancel_right hD0 hDtop]
+      ENNReal.mul_div_cancel_right (by positivity) (by finiteness)]
     exact le_self_add
   · exact le_of_eq (Phi_open_eq ρ b S keys st dead k₀ i₀ hk hdead hfresh)
 
@@ -1327,10 +1316,7 @@ private lemma Phi_extend_le {K : Type} [DecidableEq K] (keys : Finset K)
       ≤ Phi ρ b S keys st dead := by
   classical
   by_cases hdead : dead k₀
-  · have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
-      Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
-    have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
-    have hconst : ∀ u : Fin (2 ^ b),
+  · have hconst : ∀ u : Fin (2 ^ b),
         Phi ρ b S keys (updateSlot st k₀ i₀ u) dead = Phi ρ b S keys st dead := by
       intro u
       refine Finset.sum_congr rfl fun k _ => ?_
@@ -1339,50 +1325,8 @@ private lemma Phi_extend_le {K : Type} [DecidableEq K] (keys : Finset K)
       · rw [updateSlot_apply_ne st k₀ i₀ u hkk]
     simp only [hconst]
     rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_comm,
-      ENNReal.mul_div_cancel_right hD0 hDtop]
+      ENNReal.mul_div_cancel_right (by positivity) (by finiteness)]
   · exact le_of_eq (Phi_extend ρ b S keys st dead k₀ i₀ hk hdead hi)
-
-/-- Expected payoff of a probabilistic computation against a nonnegative payoff function. -/
-private noncomputable def EP {α : Type} (mx : ProbComp α) (f : α → ℝ≥0∞) : ℝ≥0∞ :=
-  ∑' x, Pr[= x | mx] * f x
-
-omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
-private lemma EP_pure {α : Type} (x : α) (f : α → ℝ≥0∞) :
-    EP (pure x : ProbComp α) f = f x := by
-  unfold EP
-  rw [tsum_eq_single x]
-  · rw [probOutput_pure_self, one_mul]
-  · intro y hy
-    rw [probOutput_pure_eq_indicator]
-    simp [Set.indicator, hy]
-
-omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
-private lemma EP_bind {α β : Type} (mx : ProbComp α) (my : α → ProbComp β) (f : β → ℝ≥0∞) :
-    EP (mx >>= my) f = ∑' x, Pr[= x | mx] * EP (my x) f := by
-  unfold EP
-  calc ∑' y, Pr[= y | mx >>= my] * f y
-      = ∑' y, ∑' x, Pr[= x | mx] * Pr[= y | my x] * f y := by
-        refine tsum_congr fun y => ?_
-        rw [probOutput_bind_eq_tsum, ENNReal.tsum_mul_right]
-    _ = ∑' x, ∑' y, Pr[= x | mx] * Pr[= y | my x] * f y := ENNReal.tsum_comm
-    _ = ∑' x, Pr[= x | mx] * ∑' y, Pr[= y | my x] * f y := by
-        refine tsum_congr fun x => ?_
-        simp_rw [mul_assoc]
-        rw [ENNReal.tsum_mul_left]
-
-omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
-private lemma EP_bind_le_const {α β : Type} {mx : ProbComp α} {my : α → ProbComp β}
-    {f : β → ℝ≥0∞} {C : ℝ≥0∞} (h : ∀ x, EP (my x) f ≤ C) :
-    EP (mx >>= my) f ≤ C := by
-  rw [EP_bind]
-  calc ∑' x, Pr[= x | mx] * EP (my x) f
-      ≤ ∑' x, Pr[= x | mx] * C := ENNReal.tsum_le_tsum fun x => mul_le_mul' le_rfl (h x)
-    _ = (∑' x, Pr[= x | mx]) * C := ENNReal.tsum_mul_right
-    _ ≤ 1 * C := mul_le_mul' tsum_probOutput_le_one le_rfl
-    _ = C := one_mul C
 
 /-- The lazy random-oracle simulation for a constant-range hash spec: forward `unifSpec`
 queries, lazily sample-and-cache hash queries. Abstract analogue of `fischlinImpl`. -/
@@ -1524,14 +1468,14 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
     (oa : OracleComp (unifSpec + (T →ₒ Fin (2 ^ b))) α) :
     ∀ (q : ℕ), IsQueryBoundP oa (· matches .inr _) q →
     ∀ cache keys st, INV' ρ b relevant key coord (dead cache) cache keys st →
-    EP ((simulateQ (roImpl b T) oa).run cache) (fun z => leaf z.1 z.2)
+    expectedValue ((simulateQ (roImpl b T) oa).run cache) (fun z => leaf z.1 z.2)
       ≤ (q : ℝ≥0∞) * slotPsi ρ b S (fun _ => none)
         + Phi ρ b S keys st (dead cache) + slotPsi ρ b S (fun _ => none) := by
   classical
   induction oa using OracleComp.inductionOn with
   | pure x =>
       intro q _ cache keys st hINV
-      rw [simulateQ_pure, StateT.run_pure, EP_pure]
+      rw [simulateQ_pure, StateT.run_pure, expectedValue_pure]
       exact (hleaf x cache keys st hINV).trans (add_le_add le_add_self le_rfl)
   | query_bind t mx ih =>
       intro q hq cache keys st hINV
@@ -1544,7 +1488,7 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
         have hbud : (if (Sum.inl n : ℕ ⊕ T) matches Sum.inr _ then q - 1 else q) = q :=
           if_neg (by simp)
         rw [hbud] at hrest
-        change EP ((unifFwdImpl (T →ₒ Fin (2 ^ b)) n).run cache >>=
+        change expectedValue ((unifFwdImpl (T →ₒ Fin (2 ^ b)) n).run cache >>=
             fun p : unifSpec.Range n × (T →ₒ Fin (2 ^ b)).QueryCache =>
               (simulateQ (roImpl b T) (mx p.1)).run p.2) (fun z => leaf z.1 z.2) ≤ _
         have hrun : ((unifFwdImpl (T →ₒ Fin (2 ^ b)) n).run cache >>=
@@ -1556,7 +1500,7 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
           rw [OracleComp.liftM_run_StateT, bind_assoc]
           simp only [pure_bind]
         rw [hrun]
-        exact EP_bind_le_const fun a => ih a q (hrest a) cache keys st hINV
+        exact expectedValue_bind_le_of_le fun a => ih a q (hrest a) cache keys st hINV
       · -- hash query
         have hp : ((Sum.inr s : ℕ ⊕ T) matches Sum.inr _) := rfl
         have hq0 : 0 < q := hcan.resolve_left (by simp)
@@ -1569,7 +1513,7 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
           have hcast : ((q - 1 : ℕ) : ℝ≥0∞) + 1 = (q : ℝ≥0∞) := by
             exact_mod_cast Nat.succ_pred_eq_of_pos hq0
           rw [← hcast, add_mul, one_mul]
-        change EP ((randomOracle (spec := T →ₒ Fin (2 ^ b)) s).run cache >>=
+        change expectedValue ((randomOracle (spec := T →ₒ Fin (2 ^ b)) s).run cache >>=
             fun p : Fin (2 ^ b) × (T →ₒ Fin (2 ^ b)).QueryCache =>
               (simulateQ (roImpl b T) (mx p.1)).run p.2) (fun z => leaf z.1 z.2) ≤ _
         rcases hc : cache s with _ | u
@@ -1589,7 +1533,7 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
             set k₀ := key s with hk₀
             set i₀ := coord s with hi₀
             have hIH : ∀ u : Fin (2 ^ b),
-                EP ((simulateQ (roImpl b T) (mx u)).run (cache.cacheQuery s u))
+                expectedValue ((simulateQ (roImpl b T) (mx u)).run (cache.cacheQuery s u))
                     (fun z => leaf z.1 z.2)
                   ≤ ((q - 1 : ℕ) : ℝ≥0∞) * μ
                     + Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache) + μ := by
@@ -1597,23 +1541,20 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
               refine (ih u (q - 1) (hrest u) (cache.cacheQuery s u) (insert k₀ keys)
                 (updateSlot st k₀ i₀ u)
                 (hINV.cacheQuery_reveal (hdead_mono cache s u) s hc hrel hstn u)).trans ?_
-              exact add_le_add (add_le_add le_rfl
-                (Phi_mono_dead ρ b S _ _ _ _ (hdead_mono cache s u))) le_rfl
-            have hD0 : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ 0 :=
-              Nat.cast_ne_zero.mpr (pow_ne_zero b two_ne_zero)
-            have hDtop : ((2 ^ b : ℕ) : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
-            rw [EP_bind]
-            calc ∑' u, Pr[= u | $ᵗ Fin (2 ^ b)]
-                    * EP ((simulateQ (roImpl b T) (mx u)).run (cache.cacheQuery s u))
-                        (fun z => leaf z.1 z.2)
-                ≤ ∑' u, Pr[= u | $ᵗ Fin (2 ^ b)]
-                    * (((q - 1 : ℕ) : ℝ≥0∞) * μ
+              gcongr
+              exact Phi_mono_dead ρ b S _ _ _ _ (hdead_mono cache s u)
+            rw [expectedValue_bind]
+            calc expectedValue ($ᵗ Fin (2 ^ b)) (fun u =>
+                    expectedValue ((simulateQ (roImpl b T) (mx u)).run (cache.cacheQuery s u))
+                      (fun z => leaf z.1 z.2))
+                ≤ expectedValue ($ᵗ Fin (2 ^ b)) (fun u =>
+                    ((q - 1 : ℕ) : ℝ≥0∞) * μ
                       + Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache) + μ) :=
-                  ENNReal.tsum_le_tsum fun u => mul_le_mul' le_rfl (hIH u)
+                  expectedValue_mono _ hIH
               _ = ∑ u : Fin (2 ^ b), ((2 ^ b : ℕ) : ℝ≥0∞)⁻¹
                     * (((q - 1 : ℕ) : ℝ≥0∞) * μ + μ
                       + Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache)) := by
-                  rw [tsum_fintype]
+                  rw [expectedValue_def, tsum_fintype]
                   refine Finset.sum_congr rfl fun u _ => ?_
                   rw [probOutput_uniformSample, Fintype.card_fin, add_right_comm]
               _ = ((2 ^ b : ℕ) : ℝ≥0∞)⁻¹
@@ -1627,7 +1568,7 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
                         Phi ρ b S (insert k₀ keys) (updateSlot st k₀ i₀ u) (dead cache))
                       / ((2 ^ b : ℕ) : ℝ≥0∞) := by
                   rw [mul_add, nsmul_eq_mul, ← mul_assoc,
-                    ENNReal.inv_mul_cancel hD0 hDtop, one_mul, mul_comm
+                    ENNReal.inv_mul_cancel (by positivity) (by finiteness), one_mul, mul_comm
                       (((2 ^ b : ℕ) : ℝ≥0∞))⁻¹, ← div_eq_mul_inv]
               _ ≤ (q : ℝ≥0∞) * μ + Phi ρ b S keys st (dead cache) + μ := ?_
             rw [hμ]
@@ -1670,12 +1611,12 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
                     hts.symm (hcell s t' hrel ht'rel ht'k.symm ht'i.symm h)
                   exact hdead_kill cache s t' u u' hrel ht'rel ht'k.symm ht'i.symm
                     hchal ht'c
-            refine EP_bind_le_const fun u => ?_
+            refine expectedValue_bind_le_of_le fun u => ?_
             refine (ih u (q - 1) (hrest u) (cache.cacheQuery s u) keys st
               (hINV.cacheQuery_inert (hdead_mono cache s u) s hc u (hinert u))).trans ?_
-            exact add_le_add (add_le_add
-              (mul_le_mul' (Nat.cast_le.mpr (Nat.sub_le q 1)) le_rfl)
-              (Phi_mono_dead ρ b S _ _ _ _ (hdead_mono cache s u))) le_rfl
+            gcongr
+            · exact Nat.sub_le q 1
+            · exact Phi_mono_dead ρ b S _ _ _ _ (hdead_mono cache s u)
         · -- cache hit: no sampling, state unchanged, budget decremented
           have hrun : ((randomOracle (spec := T →ₒ Fin (2 ^ b)) s).run cache >>=
               fun p : Fin (2 ^ b) × (T →ₒ Fin (2 ^ b)).QueryCache =>
@@ -1684,8 +1625,8 @@ private theorem main_induction_gen {T K C : Type} [DecidableEq T]
             rw [QueryImpl.withCaching_run_some uniformSampleImpl hc, pure_bind]
           rw [hrun]
           refine (ih u (q - 1) (hrest u) cache keys st hINV).trans ?_
-          exact add_le_add (add_le_add (mul_le_mul'
-            (Nat.cast_le.mpr (Nat.sub_le q 1)) le_rfl) le_rfl) le_rfl
+          gcongr
+          exact Nat.sub_le q 1
 
 omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
@@ -1708,7 +1649,7 @@ private theorem main_induction_gen_init {T K C : Type} [DecidableEq T]
       leaf a cache ≤ Phi ρ b S keys st (dead cache) + slotPsi ρ b S (fun _ => none))
     (oa : OracleComp (unifSpec + (T →ₒ Fin (2 ^ b))) α)
     (q : ℕ) (hq : IsQueryBoundP oa (· matches .inr _) q) :
-    EP ((simulateQ (roImpl b T) oa).run ∅) (fun z => leaf z.1 z.2)
+    expectedValue ((simulateQ (roImpl b T) oa).run ∅) (fun z => leaf z.1 z.2)
       ≤ ((q + 1 : ℕ) : ℝ≥0∞) * slotPsi ρ b S (fun _ => none) := by
   classical
   have hINV : INV' ρ b relevant key coord (dead ∅) ∅ (∅ : Finset K)
@@ -1846,25 +1787,16 @@ private theorem dropLog_run_eq {ι : Type} {hashSpec : OracleSpec ι} [Decidable
 
 omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
-/-- Reindexing an expected payoff along a `map`. -/
-private lemma EP_map {α β : Type} (mx : ProbComp α) (g : α → β) (f : β → ℝ≥0∞) :
-    EP (g <$> mx) f = EP mx (f ∘ g) := by
-  rw [map_eq_bind_pure_comp, EP_bind]
-  exact tsum_congr fun x => by rw [Function.comp_apply, EP_pure, Function.comp_apply]
-
-omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
 /-- Expected payoffs that ignore the log coincide between the logged and unlogged runs. -/
-private theorem dropLog_EP {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
+private theorem dropLog_expectedValue {ι : Type} {hashSpec : OracleSpec ι} [DecidableEq ι]
     [hashSpec.DecidableEq] [∀ t : hashSpec.Domain, SampleableType (hashSpec.Range t)]
     {α : Type} (oa : OracleComp (unifSpec + hashSpec) α) (cache : hashSpec.QueryCache)
     (f : α → hashSpec.QueryCache → ℝ≥0∞) :
-    EP (((simulateQ (idImplW hashSpec + loggedROW hashSpec) oa).run).run cache)
+    expectedValue (((simulateQ (idImplW hashSpec + loggedROW hashSpec) oa).run).run cache)
         (fun z => f z.1.1 z.2)
-      = EP ((simulateQ (unifFwdImpl hashSpec + hashSpec.randomOracle) oa).run cache)
+      = expectedValue ((simulateQ (unifFwdImpl hashSpec + hashSpec.randomOracle) oa).run cache)
         (fun w => f w.1 w.2) := by
-  rw [← dropLog_run_eq oa cache, EP_map]
-  rfl
+  rw [← dropLog_run_eq oa cache, expectedValue_map]
 
 omit [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] [DecidableEq M] in
@@ -2097,14 +2029,14 @@ omit [SampleableType Chal] in
 accepts while the extractor's scan misses equals the expected value, over the logged prover
 run, of the scan-miss indicator times the verifier's acceptance probability on the final
 cache. -/
-private lemma ksSample_probEvent_eq_EP
+private lemma ksSample_probEvent_eq_expectedValue
     (prover : Stmt → M →
       OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)
         (FischlinProof Commit Chal Resp ρ))
     (x : Stmt) (msg : M) :
     Pr[fun out => out.2 = true ∧ fischlinFindWitness σ ρ b M x out.1.1 out.1.2 = none
         | ksSample σ hr ρ b S M prover x msg]
-      = EP (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+      = expectedValue (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
             + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M))
           (prover x msg)).run).run ∅)
         (fun z =>
@@ -2123,7 +2055,7 @@ private lemma ksSample_probEvent_eq_EP
                   + fischlinROSpec Stmt Commit Chal Resp ρ b M))
                 σ hr ρ b S M).verify x msg z.1.1)).run z.2 >>= fun vc =>
               pure ((z.1.1, z.1.2), vc.1) := rfl
-  rw [hks, probEvent_bind_eq_tsum, EP]
+  rw [hks, probEvent_bind_eq_tsum, expectedValue]
   refine tsum_congr fun z => ?_
   congr 1
   rw [probEvent_bind_eq_tsum]
@@ -2150,7 +2082,7 @@ private lemma EP_scanMiss_eq_EP_ksLeaf
       OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M)
         (FischlinProof Commit Chal Resp ρ))
     (x : Stmt) (msg : M) :
-    EP (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+    expectedValue (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
             + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M))
           (prover x msg)).run).run ∅)
         (fun z =>
@@ -2159,23 +2091,18 @@ private lemma EP_scanMiss_eq_EP_ksLeaf
               ((Fischlin (m := OracleComp (unifSpec
                   + fischlinROSpec Stmt Commit Chal Resp ρ b M))
                 σ hr ρ b S M).verify x msg z.1.1)).run' z.2])
-      = EP (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
+      = expectedValue (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
             + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M))
           (prover x msg)).run).run ∅)
         (fun z => ksLeaf σ hr ρ b S M x msg z.1.1 z.2) := by
   classical
-  rw [EP, EP]
-  refine tsum_congr fun z => ?_
-  by_cases hz : z ∈ support (((simulateQ (idImplW (fischlinROSpec Stmt Commit Chal Resp ρ b M)
-      + loggedROW (fischlinROSpec Stmt Commit Chal Resp ρ b M)) (prover x msg)).run).run ∅)
-  · congr 1
-    unfold ksLeaf
-    have hiff := fischlinFindWitness_eq_none_iff_cachePinned σ ρ b M x z.1.1
-      (log_subset_cache (prover x msg) hz) (cache_subset_log (prover x msg) hz)
-    by_cases hfw : fischlinFindWitness σ ρ b M x z.1.1 z.1.2 = none
-    · rw [if_pos hfw, if_pos (hiff.mp hfw)]
-    · rw [if_neg hfw, if_neg fun hp => hfw (hiff.mpr hp)]
-  · rw [probOutput_eq_zero_of_not_mem_support hz, zero_mul, zero_mul]
+  refine expectedValue_congr_of_support fun z hz => ?_
+  unfold ksLeaf
+  have hiff := fischlinFindWitness_eq_none_iff_cachePinned σ ρ b M x z.1.1
+    (log_subset_cache (prover x msg) hz) (cache_subset_log (prover x msg) hz)
+  by_cases hfw : fischlinFindWitness σ ρ b M x z.1.1 z.1.2 = none
+  · rw [if_pos hfw, if_pos (hiff.mp hfw)]
+  · rw [if_neg hfw, if_neg fun hp => hfw (hiff.mpr hp)]
 
 omit [SampleableType Chal] in
 /-- **Online-extraction reduction (Fischlin 2005, Theorem 2 core).** The Fischlin
@@ -2202,11 +2129,11 @@ private lemma knowledgeSoundness_badEvent_le
   -- Step 1: bound the bad event by the verifier-accepts-while-scan-misses event.
   refine le_trans (knowledgeSoundnessExp_bad_le_misses' σ hr ρ b S M hss adv.run x msg) ?_
   -- Step 2: factor the miss event through the logged prover run as an expected payoff.
-  rw [ksSample_probEvent_eq_EP σ hr ρ b S M adv.run x msg,
+  rw [ksSample_probEvent_eq_expectedValue σ hr ρ b S M adv.run x msg,
     -- Step 3: on the support, swap the scan-miss indicator for the pinning predicate.
     EP_scanMiss_eq_EP_ksLeaf σ hr ρ b S M adv.run x msg,
     -- Step 4: drop the log, moving to the unlogged lazy-random-oracle run.
-    dropLog_EP (adv.run x msg) ∅ (fun π cache => ksLeaf σ hr ρ b S M x msg π cache)]
+    dropLog_expectedValue (adv.run x msg) ∅ (fun π cache => ksLeaf σ hr ρ b S M x msg π cache)]
   -- Step 5: run the supermartingale induction from the empty cache.
   refine le_trans (main_induction_gen_init ρ b S
     (ksRelevant σ ρ M x msg) (fun t => t.comList) (fun t => t.rep) (fun t => t.chal)
