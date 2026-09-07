@@ -40,9 +40,7 @@ private lemma tsum_query_mul_probEvent_le_aux {α : Type}
     (h : ∀ u, Pr[ p u | (simulateQ loggingOracle (mx u)).run] ≤ c) :
     (∑' u, Pr[= u | (query t : OracleComp spec _)] *
       Pr[ p u | (simulateQ loggingOracle (mx u)).run]) ≤ c :=
-  le_trans (ENNReal.tsum_le_tsum fun u => mul_le_mul' le_rfl (h u))
-    (le_trans ENNReal.tsum_mul_right.le
-      (le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl) (one_mul c).le))
+  tsum_probOutput_mul_le_of_le _ h
 
 omit [DecidableEq ι] in
 /-- **ROM uniformity at a log position**: For any `loggingOracle` trace, the

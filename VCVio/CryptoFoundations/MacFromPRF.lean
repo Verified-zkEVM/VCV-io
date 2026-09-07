@@ -343,49 +343,33 @@ private theorem prfIdealExp_macToPRFReduction_probOutput_le [SampleableType R] [
     (prf : PRFScheme K D R) (adversary : (prf.toMacAlg).UF_CMA_Adversary) :
     Pr[= true | prfIdealExp (macToPRFReduction prf adversary)] ≤
       (Fintype.card R : ℝ≥0∞)⁻¹ := by
-  rw [prfIdealExp_macToPRFReduction_eq_ideal_body, probOutput_bind_eq_tsum]
-  calc ∑' x : (((D × R) × QueryLog (D →ₒ R)) × (D →ₒ R).QueryCache),
-        Pr[= x | (simulateQ prfIdealQueryImpl
-          ((simulateQ (macToPRFQueryImpl (D := D) (R := R)) adversary.main).run)).run ∅] *
-        Pr[= true | ((D →ₒ R).randomOracle x.1.1.1).run x.2 >>= fun (t, _) =>
-          (pure (!QueryLog.wasQueried x.1.2 x.1.1.1 && decide (x.1.1.2 = t)) : ProbComp Bool)]
-      ≤ ∑' x, Pr[= x | (simulateQ prfIdealQueryImpl
-          ((simulateQ (macToPRFQueryImpl (D := D) (R := R)) adversary.main).run)).run ∅] *
-        (Fintype.card R : ℝ≥0∞)⁻¹ := by
-        refine ENNReal.tsum_le_tsum fun ⟨((msg, τ), log), cache⟩ => ?_
-        by_cases hmem : (((msg, τ), log), cache) ∈ support
-            ((simulateQ prfIdealQueryImpl
-              ((simulateQ (macToPRFQueryImpl (D := D) (R := R)) adversary.main).run)).run ∅)
-        · refine mul_le_mul' le_rfl ?_
-          cases hcache : cache msg with
-          | some v =>
-            simp only [randomOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind, hcache,
-              StateT.run_pure, log_cache_invariant adversary.main (((msg, τ), log), cache) hmem msg
-                (by change cache msg ≠ none; rw [hcache]; exact Option.some_ne_none _),
-              probOutput_pure]
-            exact zero_le
-          | none =>
-            rw [show ((D →ₒ R).randomOracle msg).run cache =
-                (fun u => (u, cache.cacheQuery msg u)) <$> ($ᵗ R) from
-              QueryImpl.withCaching_run_none _ hcache]
-            simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp, pure_bind]
-            rw [probOutput_bind_eq_tsum]
-            simp only [probOutput_uniformSample, probOutput_pure, mul_ite, mul_one, mul_zero]
-            set c := (Fintype.card R : ℝ≥0∞)⁻¹
-            calc ∑' t, (if (true : Bool) = (!log.wasQueried msg && decide (τ = t))
-                    then c else 0)
-                ≤ ∑' t, (if t = τ then c else 0) :=
-                  ENNReal.tsum_le_tsum fun t => by
-                    split_ifs with h1 h2
-                    · exact le_rfl
-                    · simp only [Bool.true_eq, Bool.and_eq_true, decide_eq_true_eq] at h1
-                      exact absurd h1.2.symm h2
-                    all_goals exact zero_le
-              _ = c := tsum_ite_eq τ (fun _ => c)
-        · simp [probOutput_eq_zero_of_not_mem_support hmem]
-    _ ≤ (Fintype.card R : ℝ≥0∞)⁻¹ := by
-        rw [ENNReal.tsum_mul_right]
-        exact mul_le_of_le_one_left zero_le tsum_probOutput_le_one
+  rw [prfIdealExp_macToPRFReduction_eq_ideal_body, probOutput_bind_eq_expectedValue]
+  refine OracleComp.EvalDist.expectedValue_le_of_support fun ⟨((msg, τ), log), cache⟩ hmem => ?_
+  dsimp only
+  cases hcache : cache msg with
+  | some v =>
+    simp only [randomOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind, hcache,
+      StateT.run_pure, log_cache_invariant adversary.main (((msg, τ), log), cache) hmem msg
+        (by change cache msg ≠ none; rw [hcache]; exact Option.some_ne_none _),
+      probOutput_pure]
+    exact zero_le
+  | none =>
+    rw [show ((D →ₒ R).randomOracle msg).run cache =
+        (fun u => (u, cache.cacheQuery msg u)) <$> ($ᵗ R) from
+      QueryImpl.withCaching_run_none _ hcache]
+    simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp, pure_bind]
+    rw [probOutput_bind_eq_tsum]
+    simp only [probOutput_uniformSample, probOutput_pure, mul_ite, mul_one, mul_zero]
+    set c := (Fintype.card R : ℝ≥0∞)⁻¹
+    calc ∑' t, (if (true : Bool) = (!log.wasQueried msg && decide (τ = t)) then c else 0)
+        ≤ ∑' t, (if t = τ then c else 0) :=
+          ENNReal.tsum_le_tsum fun t => by
+            split_ifs with h1 h2
+            · exact le_rfl
+            · simp only [Bool.true_eq, Bool.and_eq_true, decide_eq_true_eq] at h1
+              exact absurd h1.2.symm h2
+            all_goals exact zero_le
+      _ = c := tsum_ite_eq τ (fun _ => c)
 
 /-- In the ideal PRF experiment (random oracle), the reduction succeeds with probability
 at most `1/|R|` — a fresh random oracle query is independent of the forger's output. -/
