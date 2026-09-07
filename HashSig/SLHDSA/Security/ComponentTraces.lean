@@ -278,4 +278,190 @@ theorem forsPkFromSigM_traceContract (sig : ForsSigCore vp.params core) (md : Li
   ⟨forsPkFromSigM_queriesWithinConstructionTargets core sig md pkSeed pos,
     forsPkFromSigM_isTotalQueryBound core sig md pkSeed pos.forsAdrs⟩
 
+/-! ## XMSS addresses of a reachable tree -/
+
+/-- Every internal node of a reachable XMSS tree is a union-ledger target. -/
+theorem xmssNodeAdrs_mem_constructionAddresses (coord : LayerTreeCoord vp) {h i : ℕ}
+    (hh : 0 < h) (hhp : h ≤ vp.params.hp) (hi : i < 2 ^ (vp.params.hp - h)) :
+    xmssNodeAdrs coord.toAdrs h i ∈ constructionAddresses vp := by
+  rw [mem_constructionAddresses_iff]
+  exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (mem_xmssNodeAddresses vp coord hh hhp hi)))))
+
+/-- The same for a caller holding a full layer position. -/
+theorem xmssNodeAdrs_mem_constructionAddresses_of_position (pos : LayerPosition vp) {h i : ℕ}
+    (hh : 0 < h) (hhp : h ≤ vp.params.hp) (hi : i < 2 ^ (vp.params.hp - h)) :
+    xmssNodeAdrs pos.toAdrs h i ∈ constructionAddresses vp := by
+  rw [mem_constructionAddresses_iff]
+  exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+    (mem_xmssNodeAddresses_of_position vp pos hh hhp hi)))))
+
+/-- A leaf index of a subtree at `(z, t)` inside a height-`hp` tree is below `2 ^ hp`. -/
+private theorem lt_pow_of_div_pow_lt {i z t hp : ℕ} (hz : z ≤ hp) (hi : i / 2 ^ z = t)
+    (ht : t < 2 ^ (hp - z)) : i < 2 ^ hp := by
+  have hlt : i / 2 ^ z < 2 ^ (hp - z) := by
+    rw [hi]
+    exact ht
+  rwa [Nat.div_lt_iff_lt_mul (by positivity), ← pow_add, Nat.sub_add_cancel hz] at hlt
+
+/-! ## XMSS programs -/
+
+/-- The XMSS leaf program at leaf `i` of a reachable tree is WOTS+ public-key generation at the
+reachable instance `(coord.layer, coord.tree, i)`. -/
+theorem xmssLeafM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
+    (coord : LayerTreeCoord vp) {i : ℕ} (hi : i < 2 ^ vp.params.hp) :
+    QueriesWithinConstructionTargets core
+      (xmssLeafM core skSeed pkSeed coord.toAdrs i : OracleComp (publicHashSpec core) core.Y) :=
+  wotsPkGenM_queriesWithinConstructionTargets core skSeed pkSeed ⟨coord.layer, coord.tree, ⟨i, hi⟩⟩
+
+/-- The same for a caller holding a full layer position; the leaf `i` need not be the position's
+own leaf. -/
+theorem xmssLeafM_queriesWithinConstructionTargets_of_position (skSeed : core.SkSeed)
+    (pkSeed : core.PkSeed) (pos : LayerPosition vp) {i : ℕ} (hi : i < 2 ^ vp.params.hp) :
+    QueriesWithinConstructionTargets core
+      (xmssLeafM core skSeed pkSeed pos.toAdrs i : OracleComp (publicHashSpec core) core.Y) :=
+  wotsPkGenM_queriesWithinConstructionTargets core skSeed pkSeed ⟨pos.layer, pos.tree, ⟨i, hi⟩⟩
+
+/-- An XMSS subtree root at `(z, t)` inside a reachable tree, `z ≤ hp` and `t < 2 ^ (hp - z)`,
+issues WOTS+ leaf generation only at that tree's leaves and `H` only at its internal nodes. -/
+theorem xmssNodeM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
+    (coord : LayerTreeCoord vp) {z t : ℕ} (hz : z ≤ vp.params.hp)
+    (ht : t < 2 ^ (vp.params.hp - z)) :
+    QueriesWithinConstructionTargets core
+      (xmssNodeM core skSeed pkSeed coord.toAdrs z t : OracleComp (publicHashSpec core) core.Y) := by
+  apply QueriesWithinConstructionTargets.merkleRootM core
+    (xmssLeafM core skSeed pkSeed coord.toAdrs) (xmssNodeHashM core pkSeed coord.toAdrs) z t
+  · intro i hi
+    exact xmssLeafM_queriesWithinConstructionTargets core skSeed pkSeed coord
+      (lt_pow_of_div_pow_lt hz hi ht)
+  · intro h i hh hhz hi l r
+    apply publicHash_h_queriesWithinConstructionTargets_of_mem core pkSeed _ l r
+    apply xmssNodeAdrs_mem_constructionAddresses coord hh (hhz.trans hz)
+    have hlt : i / 2 ^ (z - h) < 2 ^ (vp.params.hp - z) := by
+      rw [hi]
+      exact ht
+    rwa [Nat.div_lt_iff_lt_mul (by positivity), ← pow_add,
+      show vp.params.hp - z + (z - h) = vp.params.hp - h by omega] at hlt
+
+/-- The root of a reachable XMSS tree queries only union-ledger tweaks. -/
+theorem xmssRootM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
+    (coord : LayerTreeCoord vp) :
+    QueriesWithinConstructionTargets core
+      (xmssRootM core skSeed pkSeed coord.toAdrs : OracleComp (publicHashSpec core) core.Y) :=
+  xmssNodeM_queriesWithinConstructionTargets core skSeed pkSeed coord le_rfl (by positivity)
+
+/-- The root of the XMSS tree containing a reachable position queries only union-ledger tweaks. -/
+theorem xmssRootM_queriesWithinConstructionTargets_of_position (skSeed : core.SkSeed)
+    (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
+    QueriesWithinConstructionTargets core
+      (xmssRootM core skSeed pkSeed pos.toAdrs : OracleComp (publicHashSpec core) core.Y) := by
+  rw [← LayerTreeCoord.ofPosition_toAdrs pos]
+  exact xmssRootM_queriesWithinConstructionTargets core skSeed pkSeed _
+
+/-- XMSS signing at a reachable position queries only union-ledger tweaks: the sibling subtrees
+of the authentication path lie inside the position's tree, and the WOTS+ signature is issued at
+the position's own instance. -/
+theorem xmssSignM_queriesWithinConstructionTargets (msg : core.Y) (skSeed : core.SkSeed)
+    (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
+    QueriesWithinConstructionTargets core
+      (xmssSignM core msg skSeed pkSeed pos.toAdrs pos.leaf.val :
+        OracleComp (publicHashSpec core) (XmssSig vp.params core)) := by
+  have hleaf : pos.leaf.val / 2 ^ vp.params.hp = 0 := Nat.div_eq_of_lt pos.leaf.isLt
+  apply QueriesWithinConstructionTargets.bind
+  · apply QueriesWithinConstructionTargets.intrinsicAuthPathM core
+      (xmssLeafM core skSeed pkSeed pos.toAdrs) (xmssNodeHashM core pkSeed pos.toAdrs)
+      pos.leaf.val vp.params.hp
+    · intro i hi
+      rw [hleaf] at hi
+      exact xmssLeafM_queriesWithinConstructionTargets_of_position core skSeed pkSeed pos
+        (lt_pow_of_div_pow_lt le_rfl hi (by positivity))
+    · intro h i hh hhp hi l r
+      rw [hleaf] at hi
+      apply publicHash_h_queriesWithinConstructionTargets_of_mem core pkSeed _ l r
+      apply xmssNodeAdrs_mem_constructionAddresses_of_position pos hh hhp
+      have hlt : i / 2 ^ (vp.params.hp - h) < 1 := by
+        rw [hi]
+        exact Nat.one_pos
+      rwa [Nat.div_lt_iff_lt_mul (by positivity), Nat.one_mul] at hlt
+  · intro path
+    apply QueriesWithinConstructionTargets.bind
+      (wotsSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos)
+    intro sig
+    exact queriesWithinConstructionTargets_pure core _
+
+/-- XMSS root recovery at a reachable position queries only union-ledger tweaks: the WOTS+ key is
+recovered at the position's own instance, and the climbed ancestors lie inside its tree. -/
+theorem xmssPkFromSigM_queriesWithinConstructionTargets (sig : XmssSig vp.params core)
+    (msg : core.Y) (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
+    QueriesWithinConstructionTargets core
+      (xmssPkFromSigM core pos.leaf.val sig msg pkSeed pos.toAdrs :
+        OracleComp (publicHashSpec core) core.Y) := by
+  apply QueriesWithinConstructionTargets.bind
+    (wotsPkFromSigM_queriesWithinConstructionTargets core sig.wots msg pkSeed pos)
+  intro leaf
+  apply QueriesWithinConstructionTargets.climbM core (xmssNodeHashM core pkSeed pos.toAdrs)
+  intro h hh hhp l r
+  simp only [Vector.length_toList] at hhp
+  apply publicHash_h_queriesWithinConstructionTargets_of_mem core pkSeed _ l r
+  apply xmssNodeAdrs_mem_constructionAddresses_of_position pos hh hhp
+  rw [Nat.div_lt_iff_lt_mul (by positivity), ← pow_add, Nat.sub_add_cancel hhp]
+  exact pos.leaf.isLt
+
+/-! ## XMSS trace contracts -/
+
+/-- An XMSS subtree root inside a reachable tree queries only union-ledger tweaks and makes at
+most `xmssNodeQueryBound p z` queries. -/
+theorem xmssNodeM_traceContract (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
+    (coord : LayerTreeCoord vp) {z t : ℕ} (hz : z ≤ vp.params.hp)
+    (ht : t < 2 ^ (vp.params.hp - z)) :
+    QueriesWithinConstructionTargets core
+        (xmssNodeM core skSeed pkSeed coord.toAdrs z t :
+          OracleComp (publicHashSpec core) core.Y) ∧
+      IsTotalQueryBound
+        (xmssNodeM core skSeed pkSeed coord.toAdrs z t : OracleComp (publicHashSpec core) core.Y)
+        (xmssNodeQueryBound vp.params z) :=
+  ⟨xmssNodeM_queriesWithinConstructionTargets core skSeed pkSeed coord hz ht,
+    xmssNodeM_isTotalQueryBound core skSeed pkSeed coord.toAdrs z t⟩
+
+/-- The root of a reachable XMSS tree queries only union-ledger tweaks and makes at most
+`xmssNodeQueryBound p hp` queries. -/
+theorem xmssRootM_traceContract (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
+    (coord : LayerTreeCoord vp) :
+    QueriesWithinConstructionTargets core
+        (xmssRootM core skSeed pkSeed coord.toAdrs : OracleComp (publicHashSpec core) core.Y) ∧
+      IsTotalQueryBound
+        (xmssRootM core skSeed pkSeed coord.toAdrs : OracleComp (publicHashSpec core) core.Y)
+        (xmssNodeQueryBound vp.params vp.params.hp) :=
+  ⟨xmssRootM_queriesWithinConstructionTargets core skSeed pkSeed coord,
+    xmssRootM_isTotalQueryBound core skSeed pkSeed coord.toAdrs⟩
+
+/-- XMSS signing at a reachable position queries only union-ledger tweaks and makes at most
+`(∑ i, chainStepsCore core msg i) + xmssAuthPathQueryBound p hp` queries. -/
+theorem xmssSignM_traceContract (msg : core.Y) (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
+    (pos : LayerPosition vp) :
+    QueriesWithinConstructionTargets core
+        (xmssSignM core msg skSeed pkSeed pos.toAdrs pos.leaf.val :
+          OracleComp (publicHashSpec core) (XmssSig vp.params core)) ∧
+      IsTotalQueryBound
+        (xmssSignM core msg skSeed pkSeed pos.toAdrs pos.leaf.val :
+          OracleComp (publicHashSpec core) (XmssSig vp.params core))
+        ((∑ i : Fin vp.params.len, chainStepsCore core msg i.val) +
+          xmssAuthPathQueryBound vp.params vp.params.hp) :=
+  ⟨xmssSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos,
+    xmssSignM_isTotalQueryBound core msg skSeed pkSeed pos.toAdrs pos.leaf.val⟩
+
+/-- XMSS root recovery at a reachable position queries only union-ledger tweaks and makes at most
+`(∑ i, (w - 1 - chainStepsCore core msg i)) + 1 + hp` queries. -/
+theorem xmssPkFromSigM_traceContract (sig : XmssSig vp.params core) (msg : core.Y)
+    (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
+    QueriesWithinConstructionTargets core
+        (xmssPkFromSigM core pos.leaf.val sig msg pkSeed pos.toAdrs :
+          OracleComp (publicHashSpec core) core.Y) ∧
+      IsTotalQueryBound
+        (xmssPkFromSigM core pos.leaf.val sig msg pkSeed pos.toAdrs :
+          OracleComp (publicHashSpec core) core.Y)
+        ((∑ i : Fin vp.params.len, (vp.params.w - 1 - chainStepsCore core msg i.val)) + 1 +
+          vp.params.hp) :=
+  ⟨xmssPkFromSigM_queriesWithinConstructionTargets core sig msg pkSeed pos,
+    xmssPkFromSigM_isTotalQueryBound core pos.leaf.val sig msg pkSeed pos.toAdrs⟩
+
 end SLHDSA.Security
