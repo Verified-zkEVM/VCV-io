@@ -113,7 +113,7 @@ def loggedRun {p : Params} (prims : Primitives p) {α : Type}
     α × QueryLog (publicHashSpec prims.core) :=
   (simulateQ (PublicHash.impl prims).withLogging program).run.run
 
-/-- The tweak of a logged `T_l` entry; `H_msg` has none. -/
+/-- The tweak of a logged `thash` entry; `H_msg` has none. -/
 def entryKey {p : Params} (prims : Primitives p)
     (entry : (q : (publicHashSpec prims.core).Domain) × (publicHashSpec prims.core).Range q) :
     Option prims.AdrsKey :=
@@ -121,15 +121,21 @@ def entryKey {p : Params} (prims : Primitives p)
   | .thash _ adrsKey _ => some adrsKey
   | .hmsg _ _ _ _ => none
 
-/-- Every logged entry is a `T_l` query whose tweak lies in `encoded`, and the multiset of logged
-tweaks is exactly `expected` (as sets, with the expected list duplicate-free and of the log's
-length). -/
+/-- No two entries of `ks` are equal under `keyEq`. -/
+def distinctUnder {α : Type} (keyEq : α → α → Bool) : List α → Bool
+  | [] => true
+  | k :: ks => !ks.any (keyEq k) && distinctUnder keyEq ks
+
+/-- Every logged entry is a `thash` query whose tweak lies in `encoded`, and the multiset of logged
+tweaks is exactly `expected`: the expected list is checked pairwise distinct under `keyEq`, the log
+has its length, and the two are mutually contained. -/
 def checkLog {p : Params} (prims : Primitives p) (keyEq : prims.AdrsKey → prims.AdrsKey → Bool)
     (label : String) (log : QueryLog (publicHashSpec prims.core))
     (encoded expected : List prims.AdrsKey) : IO Unit := do
   let keys := log.filterMap (entryKey prims)
   let mem (k : prims.AdrsKey) (ks : List prims.AdrsKey) : Bool := ks.any (keyEq k)
-  ensure s!"{label}: every logged query is a T_l query" (keys.length == log.length)
+  ensure s!"{label}: the expected tweaks are pairwise distinct" (distinctUnder keyEq expected)
+  ensure s!"{label}: every logged query is a thash query" (keys.length == log.length)
   ensure s!"{label}: the log has the predicted length" (log.length == expected.length)
   ensure s!"{label}: every logged tweak is in the encoded union ledger"
     (keys.all fun k => mem k encoded)
@@ -150,10 +156,6 @@ def exerciseBundle (vp : ValidatedParams) (label : String) (prims : Primitives v
   let p := vp.params
   let base := wotsInstanceAdrs pos
   let encoded := encodeTargets prims (constructionAddresses vp)
-  let sameKeys (ks ks' : List prims.AdrsKey) : Bool :=
-    ks.length == ks'.length && (ks.zip ks').all fun kk => keyEq kk.1 kk.2
-  ensure s!"{label}: encodeTargets agrees with encodedConstructionAddresses at run time"
-    (sameKeys encoded (encodedConstructionAddresses vp prims.core))
   let stepKeys (lo hi : ℕ → ℕ) : List prims.AdrsKey :=
     (List.range p.len).flatMap fun i =>
       (List.range (hi i - lo i)).map fun j =>

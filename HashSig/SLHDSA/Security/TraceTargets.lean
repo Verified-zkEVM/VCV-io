@@ -18,17 +18,19 @@ pathwise predicate saying that every public-hash query made by a free `OracleCom
 address from that union.  The predicate is structural: it quantifies over every possible oracle
 answer and is therefore stronger than a statement about one deterministic execution.
 
-`H_msg` has no address and is admitted separately.  Membership is deliberately stated after
-`CorePrimitives.adrsToKey`: compressed SHA-2 encodings need not be globally injective.  The
-distinct-target games can add the restricted injectivity hypotheses from `ReachableTargets`.
+`H_msg` carries no address, so `ConstructionQueryReachable` accepts every `.hmsg` query
+unconditionally; only `.thash` queries are constrained.  Membership is deliberately stated after
+`CorePrimitives.adrsToKey`: compressed SHA-2 encodings need not be globally injective.  A game that
+needs distinct encoded targets combines this with the restricted injectivity hypotheses of
+`ReachableTargets` (`EncodedTargetLedgerConditions`).
 
-The programs certified here are the WOTS+ ones: `chainM`, `wotsPkGenM`, `wotsSignM`, and
-`wotsPkFromSigM` at any reachable `LayerPosition`, each paired with its existing total query
-budget.  The FORS, XMSS, hypertree, and scheme programs are not covered here and are left to the
-next slice.  The logged-execution theorem then applies to any pathwise-certified program
-interpreted through `QueryImpl.withLogging` over an arbitrary deterministic handler
-`QueryImpl (publicHashSpec core) Id`, and in particular through the canonical `PublicHash.impl` of
-a primitive bundle.
+The programs certified here are the WOTS+ ones: `chainM` over any step interval inside
+`[0, w - 1)`, and `wotsPkGenM`, `wotsSignM`, and `wotsPkFromSigM` at any reachable
+`LayerPosition`, the latter three each paired with their total query bounds.  The FORS, XMSS,
+hypertree, and scheme programs are not certified by this module.  The logged-execution theorem
+applies to any pathwise-certified program interpreted through `QueryImpl.withLogging` over an
+arbitrary deterministic handler `QueryImpl (publicHashSpec core) Id`, and in particular through the
+canonical `PublicHash.impl` of a primitive bundle.
 
 ## References
 
@@ -42,7 +44,8 @@ open OracleComp OracleSpec
 
 namespace SLHDSA.Security
 
-/-- All structural addresses that can be used by the public tweakable-hash collection. -/
+/-- The union of the six structural address ledgers, in the order FORS leaves, FORS internal nodes,
+FORS roots, WOTS+ hash steps, WOTS+ public-key compressions, XMSS internal nodes. -/
 def constructionAddresses (vp : ValidatedParams) : List Adrs :=
   forsLeafAddresses vp ++ forsTreeAddresses vp ++ forsRootAddresses vp ++
     wotsStepAddresses vp ++ wotsPkAddresses vp ++ xmssNodeAddresses vp
@@ -257,9 +260,11 @@ theorem wotsPkFromSigM_queriesWithinConstructionTargets {vp : ValidatedParams}
   intro tops
   exact publicHash_tl_wotsPk_queriesWithinConstructionTargets core pkSeed pos tops.toList
 
-/-! The following paired contracts keep address provenance and the existing pathwise query budgets
-together, so later game reductions cannot silently use one without the other. -/
+/-! The following contracts pair address provenance with the total query bound of the same program,
+kept together for downstream use. -/
 
+/-- WOTS+ public-key generation at a reachable position queries only union-ledger tweaks and makes
+at most `len * (w - 1) + 1` queries. -/
 theorem wotsPkGenM_traceContract {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
     (pos : LayerPosition vp) :
@@ -273,6 +278,8 @@ theorem wotsPkGenM_traceContract {vp : ValidatedParams}
   exact ⟨wotsPkGenM_queriesWithinConstructionTargets core skSeed pkSeed pos,
     wotsPkGenM_isTotalQueryBound core skSeed pkSeed (wotsInstanceAdrs pos)⟩
 
+/-- WOTS+ signing at a reachable position queries only union-ledger tweaks and makes at most
+`∑ i, chainStepsCore core msg i` queries. -/
 theorem wotsSignM_traceContract {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (msg : core.Y) (skSeed : core.SkSeed)
     (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
@@ -286,6 +293,8 @@ theorem wotsSignM_traceContract {vp : ValidatedParams}
   exact ⟨wotsSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos,
     wotsSignM_isTotalQueryBound core msg skSeed pkSeed (wotsInstanceAdrs pos)⟩
 
+/-- WOTS+ public-key recovery at a reachable position queries only union-ledger tweaks and makes at
+most `(∑ i, (w - 1 - chainStepsCore core msg i)) + 1` queries. -/
 theorem wotsPkFromSigM_traceContract {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (sig : WotsSig vp.params core) (msg : core.Y)
     (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
