@@ -1,0 +1,27 @@
+import ToMathlib.Perf
+
+meta section
+
+open Lean ToMathlib.Perf
+
+def reference (left right : List MVarId) : List MVarId :=
+  left.filter fun goal => !(right.map (·.name)).contains goal.name
+
+def benchmark (label : String) (f : List MVarId → List MVarId → List MVarId)
+    (n rounds : Nat) : IO Unit := do
+  let left := (List.range n).map fun i => MVarId.mk (Name.num `goal i)
+  let right := (List.range n).map fun i => MVarId.mk (Name.num `goal (i * 2))
+  let start ← IO.monoNanosNow
+  let mut checksum := 0
+  for i in [:rounds] do
+    let input := if i % 2 == 0 then left else left.reverse
+    checksum := checksum + (f input right).length
+  let elapsed := (← IO.monoNanosNow) - start
+  unless checksum == rounds * (n / 2) do
+    throw <| IO.userError "incorrect benchmark result"
+  IO.println s!"{label} n={n} rounds={rounds} ns={elapsed} checksum={checksum}"
+
+#eval do
+  for n in [0, 1, 4, 16, 64, 256] do
+    benchmark "list" reference n 200
+    benchmark "indexed" goalDifference n 200

@@ -1,0 +1,48 @@
+--- a/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Compatibility.lean
++++ b/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Compatibility.lean
+@@ -464,8 +464,12 @@
+     rw [simulateQ_spec_query]
+     ext st
+     rcases st with ⟨signed, st⟩
+-    simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase, QueryImpl.flattenStateT,
+-      map_eq_bind_pure_comp]
++    simp only [cmaRealLoggedProdImpl, QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaSignLogImpl,
++        StateT.run_monadLift, monadLift_self, bind_pure_comp, map_eq_bind_pure_comp, simulateQ_bind, simulateQ_query,
++        OracleQuery.input_query, OracleQuery.cont_query, cmaReal, cmaRealSourceFull, CompTriple.comp_eq, bind_pure,
++        Function.comp_apply, simulateQ_pure, StateT.run_mk, StateT.run_bind, StateT.run_pure, bind_assoc, pure_bind,
++        Prod.mk.eta, cmaRealAppendProdImpl, QueryImpl.extendStateLeft, add_apply_inl, cmaRealSourceFullSum,
++        cmaRealAppendAux]
+   · change simulateQ
+         (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
+           (Commit := Commit) (Chal := Chal) (Resp := Resp))
+@@ -476,8 +480,11 @@
+     ext st
+     rcases st with ⟨signed, st⟩
+     cases hcache : st.1.2.1 mc <;>
+-      simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase,
+-        QueryImpl.flattenStateT, hcache]
++      simp only [cmaRealLoggedProdImpl, QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaSignLogImpl,
++          StateT.run_monadLift, monadLift_self, bind_pure_comp, simulateQ_map, simulateQ_query, OracleQuery.input_query,
++          OracleQuery.cont_query, cmaReal, cmaRealSourceFull, Prod.mk.eta, id_map, StateT.run_mk, StateT.run_map,
++          Functor.map_map, hcache, map_pure, cmaRealAppendProdImpl, QueryImpl.extendStateLeft, add_apply_inl, add_apply_inr,
++          cmaRealSourceFullSum, cmaRealAppendAux]
+   · change simulateQ
+         (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
+           (Commit := Commit) (Chal := Chal) (Resp := Resp))
+@@ -487,8 +494,14 @@
+     rw [simulateQ_spec_query]
+     ext st
+     rcases st with ⟨signed, st⟩
+-    simp [fs_simp, QueryImpl.extendStateLeft, QueryImpl.mapStateTBase,
+-      QueryImpl.flattenStateT, StateT.run_bind, monad_norm]
++    simp only [cmaRealLoggedProdImpl, QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaSignLogImpl,
++        bind_pure_comp, map_eq_bind_pure_comp, StateT.run_bind, StateT.run_get, StateT.run_monadLift, monadLift_self,
++        StateT.run_set, Function.comp_apply, StateT.run_pure, map_pure, map_bind, pure_bind, simulateQ_bind,
++        simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query, cmaReal, cmaRealSourceFull, Prod.mk.eta, id_map,
++        simulateQ_pure, StateT.run_mk, cmaRealAppendProdImpl, QueryImpl.extendStateLeft, add_apply_inr,
++        cmaRealSourceFullSum, cmaRealAppendAux]
++    simp only [bind_assoc, Function.comp_apply, pure_bind]
++    rfl
+ 
+ private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
+     (oa : SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal)

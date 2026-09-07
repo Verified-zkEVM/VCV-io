@@ -1,0 +1,56 @@
+diff --git a/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain.lean b/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain.lean
+index c042f567..39b73114 100644
+--- a/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain.lean
++++ b/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain.lean
+@@ -35,6 +35,23 @@ open ENNReal OracleSpec OracleComp ProbComp OracleComp.ProgramLogic.Relational
+ `PFunctor.Obj` presentation. Keep that reduction local to this proof module. -/
+ attribute [local implicit_reducible] PFunctor.Obj
+ 
++namespace QueryImpl
++
++/-- Membership in an auxiliary-state handler's support is witnessed by a base-handler result. -/
++private theorem mem_support_extendState_iff
++    {ι : Type u} {spec : OracleSpec ι} {σ Q : Type u} {m : Type u → Type u}
++    [Monad m] [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
++    (so : QueryImpl spec (StateT σ m))
++    (aux : (t : spec.Domain) → σ → spec.Range t → σ → Q → Q)
++    (t : spec.Domain) (s : σ × Q) (z : spec.Range t × (σ × Q)) :
++    z ∈ support ((extendState so aux t).run s) ↔
++      ∃ y ∈ support ((so t).run s.1),
++        (y.1, (y.2, aux t s.1 y.1 y.2 s.2)) = z := by
++  rw [extendState_apply, mem_support_bind_iff]
++  simp only [support_pure, Set.mem_singleton_iff, eq_comm]
++
++end QueryImpl
++
+ namespace FiatShamir.Stateful
+ 
+ /-! Tag the CMA-to-NMA simulator handler family from `Sigma/CmaToNma.lean`
+@@ -807,13 +824,15 @@ private lemma forkLoggedImpl_preserves_inv_step
+   rcases hs with ⟨hfreshInv, hlogInv⟩
+   rcases t with ((n | mc) | m)
+   · have hz' := by
+-      simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
++      rw [forkLoggedImpl, QueryImpl.mem_support_extendState_iff] at hz
++      simpa [fs_simp, QueryImpl.flattenStateT,
+         QueryImpl.mapStateTBase] using hz
+     rcases hz' with ⟨w, hw, rfl⟩
+     exact And.intro hfreshInv hlogInv
+   · by_cases hadv : advCache (.inr mc) = none
+     · have hz' := by
+-        simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
++        rw [forkLoggedImpl, QueryImpl.mem_support_extendState_iff] at hz
++        simpa [fs_simp, QueryImpl.flattenStateT,
+           QueryImpl.mapStateTBase, hadv] using hz
+       rcases hz' with ⟨ch, liveCache', queryLog', hw, rfl⟩
+       by_cases hlive : liveCache mc = none
+@@ -910,7 +929,8 @@ private lemma forkLoggedImpl_preserves_inv_step
+     · rcases hadv' : advCache (.inr mc) with _ | advCh
+       · exact (hadv hadv').elim
+       · have hz' := by
+-          simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
++          rw [forkLoggedImpl, QueryImpl.mem_support_extendState_iff] at hz
++          simpa [fs_simp, QueryImpl.flattenStateT,
+             QueryImpl.mapStateTBase, hadv'] using hz
+         rcases hz' with ⟨w, hw, rfl⟩
+         constructor

@@ -1,0 +1,15 @@
+--- a/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain.lean
++++ b/VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain.lean
+@@ -783,8 +783,10 @@
+           xLiveCache, xQueryLog),
+         signed ++ [m]) = z := by
+   have hz' := by
+-    simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
+-      QueryImpl.mapStateTBase] using hz
++    simpa only [add_apply_inr, forkLoggedImpl, QueryImpl.extendState, forkBaseImpl, QueryImpl.flattenStateT,
++        QueryImpl.mapStateTBase, simulatedNmaImpl, simulatedNmaBaseSim, QueryImpl.add_apply_inr, simulatedNmaSigSim,
++        StateT.run_bind, StateT.run_modifyGet, Prod.mk.eta, bind_pure_comp, simulateQ_map, StateT.run_mk, StateT.run_map,
++        Functor.map_map, cmaOracleSignLogAux, support_map, Set.mem_image, Prod.exists] using hz
+   rcases hz' with ⟨xCommit, xChal, xResp, xAdvCache, xLiveCache,
+     xQueryLog, hxmem, hout⟩
+   refine ⟨xCommit, xChal, xResp, xAdvCache, xLiveCache, xQueryLog, hxmem, ?_⟩

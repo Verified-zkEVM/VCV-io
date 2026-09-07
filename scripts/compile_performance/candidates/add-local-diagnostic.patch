@@ -1,0 +1,27 @@
+--- a/VCVio/OracleComp/Coercions/Add.lean
++++ b/VCVio/OracleComp/Coercions/Add.lean
+@@ -281,6 +281,17 @@
+ 
+ end OracleQuery
+ 
++/-- Reflexive computation lifts retain the identity normal form. -/
++local instance (priority := 1200) fastLiftSelf {ι : Type _} {spec : OracleSpec ι} :
++    MonadLiftT (OracleComp spec) (OracleComp spec) where
++  monadLift mx := mx
++
++/-- Lift computations by synthesizing a chain between their query signatures. -/
++local instance (priority := 1100) fastLift {ι τ : Type _} {spec : OracleSpec ι}
++    {superSpec : OracleSpec τ} [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
++    MonadLiftT (OracleComp spec) (OracleComp superSpec) where
++  monadLift mx := OracleComp.liftComp mx superSpec
++
+ section tests
+ 
+ -- This set of examples serves as sort of a "unit test" for the coercions above
+@@ -398,4 +409,6 @@
+ example (px : ProbComp α) :
+     (px : OracleComp (unifSpec + spec₁) α) = OracleComp.liftComp px (unifSpec + spec₁) := rfl
+ 
++example (oa : OracleComp spec₁ α) : (liftM oa : OracleComp spec₁ α) = oa := rfl
++
+ end tests

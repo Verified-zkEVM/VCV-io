@@ -1,0 +1,105 @@
+diff --git a/Examples/PRFTagReader/BadEvent.lean b/Examples/PRFTagReader/BadEvent.lean
+index 91d2325a..f1929138 100644
+--- a/Examples/PRFTagReader/BadEvent.lean
++++ b/Examples/PRFTagReader/BadEvent.lean
+@@ -6,7 +6,7 @@ Authors: Oleksandr Vovkotrub
+ 
+ module
+ 
+-public import Examples.PRFTagReader.Collision
++public import Examples.PRFTagReader.Defs
+ 
+ /-!
+ # PRF Tag/Reader Protocol — Bad-Event Bound
+diff --git a/Examples/PRFTagReader/Collision.lean b/Examples/PRFTagReader/Collision.lean
+index 0b2456fc..c175ad2c 100644
+--- a/Examples/PRFTagReader/Collision.lean
++++ b/Examples/PRFTagReader/Collision.lean
+@@ -7,6 +7,7 @@ Authors: Oleksandr Vovkotrub
+ module
+ 
+ public import Examples.PRFTagReader.Collision.ForgeStep
++public import Examples.PRFTagReader.Auth
+ 
+ /-!
+ # PRF Tag/Reader Protocol — Collision Bound
+diff --git a/Examples/PRFTagReader/Collision/ForgeStep.lean b/Examples/PRFTagReader/Collision/ForgeStep.lean
+index f920e00d..4b685958 100644
+--- a/Examples/PRFTagReader/Collision/ForgeStep.lean
++++ b/Examples/PRFTagReader/Collision/ForgeStep.lean
+@@ -6,7 +6,7 @@ Authors: Oleksandr Vovkotrub
+ 
+ module
+ 
+-public import Examples.PRFTagReader.Auth
++public import Examples.PRFTagReader.Defs
+ 
+ /-!
+ # PRF Tag/Reader Protocol — Collision Bound, Per-Step Forge Infrastructure
+diff --git a/Examples/PRFTagReader/MultipleBadCollision.lean b/Examples/PRFTagReader/MultipleBadCollision.lean
+index 34b8a4fb..da0c157a 100644
+--- a/Examples/PRFTagReader/MultipleBadCollision.lean
++++ b/Examples/PRFTagReader/MultipleBadCollision.lean
+@@ -7,6 +7,7 @@ Authors: Oleksandr Vovkotrub
+ module
+ 
+ public import Examples.PRFTagReader.DirectCoupling.Compose
++public import Examples.PRFTagReader.BadEvent
+ public import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
+ 
+ /-!
+diff --git a/Examples/PRFTagReader/MultipleToHybrid/EagerSetup.lean b/Examples/PRFTagReader/MultipleToHybrid/EagerSetup.lean
+index 3f19dd0e..85c2e3d2 100644
+--- a/Examples/PRFTagReader/MultipleToHybrid/EagerSetup.lean
++++ b/Examples/PRFTagReader/MultipleToHybrid/EagerSetup.lean
+@@ -7,6 +7,7 @@ Authors: Oleksandr Vovkotrub
+ module
+ 
+ public import Examples.PRFTagReader.MultipleToHybrid.Setup
++public import Examples.PRFTagReader.Table
+ 
+ /-!
+ # PRF Tag/Reader Protocol — Multiple-to-hybrid eager coupling, shared setup
+diff --git a/Examples/PRFTagReader/MultipleToHybrid/Setup.lean b/Examples/PRFTagReader/MultipleToHybrid/Setup.lean
+index 2b965894..1f0f20f8 100644
+--- a/Examples/PRFTagReader/MultipleToHybrid/Setup.lean
++++ b/Examples/PRFTagReader/MultipleToHybrid/Setup.lean
+@@ -6,7 +6,8 @@ Authors: Oleksandr Vovkotrub
+ 
+ module
+ 
+-public import Examples.PRFTagReader.Table
++public import Examples.PRFTagReader.PRFReductions.IdealHandlers
++import VCVio.ProgramLogic.Relational.SimulateQ
+ 
+ /-!
+ # PRF Tag/Reader Protocol — Instrumented multiple-session handler
+diff --git a/Examples/PRFTagReader/PRFReductions/Reductions.lean b/Examples/PRFTagReader/PRFReductions/Reductions.lean
+index 206a173c..73cad5a7 100644
+--- a/Examples/PRFTagReader/PRFReductions/Reductions.lean
++++ b/Examples/PRFTagReader/PRFReductions/Reductions.lean
+@@ -6,9 +6,7 @@ Authors: Oleksandr Vovkotrub
+ 
+ module
+ 
+-public import Examples.PRFTagReader
+-public import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
+-public import VCVio.ProgramLogic.Relational.SimulateQ
++public import Examples.PRFTagReader.Defs
+ 
+ /-!
+ # PRF Tag/Reader Protocol — Reductions and Bridge Lemmas
+diff --git a/Examples/PRFTagReader/Table.lean b/Examples/PRFTagReader/Table.lean
+index e44636e5..c9974366 100644
+--- a/Examples/PRFTagReader/Table.lean
++++ b/Examples/PRFTagReader/Table.lean
+@@ -6,7 +6,8 @@ Authors: Oleksandr Vovkotrub
+ 
+ module
+ 
+-public import Examples.PRFTagReader.PRFReductions
++public import Examples.PRFTagReader.PRFReductions.IdealHandlers
++public import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
+ 
+ /-!
+ # PRF Tag/Reader Protocol — Composed-Handler Eager-Table Equivalence

@@ -1,0 +1,37 @@
+/-
+Copyright (c) 2026 Quang Dao. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Quang Dao
+-/
+
+module
+
+public meta import VCVio.ProgramLogic.Tactics.Common
+public import VCVio.ProgramLogic.Relational.Basic
+public meta import VCVio.ProgramLogic.Tactics.Relational.Internals
+public import Loom.Triple.SpecLemmas
+
+/-! # Dotted-constructor elaboration performance probe -/
+
+public meta section
+
+namespace CompilePerformance
+
+inductive Action where
+  | congr | congrNoSupport | swap
+
+def plans (n : Nat) : List (List Action) := List.replicate n [.congr]
+
+set_option trace.profiler true in
+def overloaded : List (List Action) :=
+  plans 4 ++ plans 3 ++
+    [[.congr], [.congrNoSupport], [.congr, .swap], [.congrNoSupport, .swap], [.swap]]
+
+set_option trace.profiler true in
+def explicitAppend : List (List Action) :=
+  List.append (List.append (plans 4) (plans 3))
+    [[.congr], [.congrNoSupport], [.congr, .swap], [.congrNoSupport, .swap], [.swap]]
+
+example : overloaded = explicitAppend := rfl
+
+end CompilePerformance

@@ -1,0 +1,547 @@
+{
+  "baseline_commit": "ffd0ca198fe6e640c0dd7f0f9c599943caacbf64",
+  "toolchain": "v4.33.1",
+  "platform": "macOS arm64",
+  "native_submodules_present": false,
+  "builds": [
+    {
+      "label": "combined-screen-1-baseline",
+      "start": 333660.541499,
+      "end": 333795.743408,
+      "wall_seconds": 135.2019100000034,
+      "user_seconds": 948.276683,
+      "system_seconds": 454.710863,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "combined-screen-1-candidate",
+      "start": 333528.046898,
+      "end": 333660.414245,
+      "wall_seconds": 132.36734699999215,
+      "user_seconds": 945.956278,
+      "system_seconds": 449.65654,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "combined-screen-2-baseline",
+      "start": 333795.8755,
+      "end": 333929.467807,
+      "wall_seconds": 133.59230699995533,
+      "user_seconds": 947.299447,
+      "system_seconds": 434.032931,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "combined-screen-2-candidate",
+      "start": 333929.588182,
+      "end": 334061.605375,
+      "wall_seconds": 132.01719400001457,
+      "user_seconds": 946.40561,
+      "system_seconds": 449.754259,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "combined-screen-3-baseline",
+      "start": 334193.795212,
+      "end": 334328.270452,
+      "wall_seconds": 134.47523999999976,
+      "user_seconds": 943.532495,
+      "system_seconds": 450.014579,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "combined-screen-3-candidate",
+      "start": 334061.730952,
+      "end": 334193.680881,
+      "wall_seconds": 131.9499300000025,
+      "user_seconds": 948.341874,
+      "system_seconds": 449.176624,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "remediation-import-baseline",
+      "start": 365984.400488,
+      "end": 366113.734612,
+      "wall_seconds": 129.33412499999395,
+      "user_seconds": 949.800987,
+      "system_seconds": 467.387458,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "remediation-import-candidate",
+      "start": 366113.855243,
+      "end": 366259.065602,
+      "wall_seconds": 145.2103599999682,
+      "user_seconds": 963.688259,
+      "system_seconds": 496.434479,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "label": "remediation-combined-screen-candidate-1",
+      "start": 366847.485062,
+      "end": 366924.532113,
+      "wall_seconds": 77.04705200000899,
+      "user_seconds": 503.576196,
+      "system_seconds": 300.360426,
+      "exit_code": -15,
+      "timed_out": false
+    }
+  ],
+  "profile": {
+    "result": {
+      "start": 337058.47494,
+      "end": 337226.410713,
+      "wall_seconds": 167.93577400001232,
+      "user_seconds": 972.443512,
+      "system_seconds": 762.347888,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    "module_count": 553,
+    "module_cpu_seconds": 1680.9130140000002,
+    "residual_cpu_seconds": 53.878385999999864,
+    "peak_compilers": 14,
+    "weighted_path": [
+      127.16886900027748,
+      [
+        "ToMathlib.General",
+        "ToMathlib.ProbabilityTheory.SPMF",
+        "VCVio.EvalDist.Defs.Support",
+        "VCVio.EvalDist.Defs.Measure",
+        "VCVio.EvalDist.Defs.Basic",
+        "VCVio.EvalDist.Monad.Basic",
+        "VCVio.EvalDist.Monad.Map",
+        "VCVio.EvalDist.Monad.Seq",
+        "VCVio.EvalDist.Defs.NeverFails",
+        "VCVio.EvalDist.Option",
+        "VCVio.EvalDist.Instances.OptionT",
+        "VCVio.OracleComp.EvalDist",
+        "VCVio.OracleComp.ProbComp",
+        "VCVio.OracleComp.Constructions.SampleableType",
+        "VCVio.OracleComp.SimSemantics.QueryImpl.Constructions",
+        "VCVio.OracleComp.QueryTracking.Tracing",
+        "VCVio.OracleComp.QueryTracking.CountingOracle",
+        "VCVio.OracleComp.QueryTracking.QueryBound",
+        "VCVio.OracleComp.QueryTracking.CachingOracle",
+        "VCVio.OracleComp.QueryTracking.RandomOracle.Basic",
+        "VCVio.CryptoFoundations.PRF",
+        "Examples.PRFTagReader.Defs",
+        "Examples.PRFTagReader.Auth",
+        "Examples.PRFTagReader.Collision.ForgeStep",
+        "Examples.PRFTagReader.Collision",
+        "Examples.PRFTagReader.BadEvent",
+        "Examples.PRFTagReader",
+        "Examples.PRFTagReader.PRFReductions.Reductions",
+        "Examples.PRFTagReader.PRFReductions.IdealHandlers",
+        "Examples.PRFTagReader.PRFReductions.Structural",
+        "Examples.PRFTagReader.PRFReductions",
+        "Examples.PRFTagReader.Table",
+        "Examples.PRFTagReader.MultipleToHybrid.Setup",
+        "Examples.PRFTagReader.MultipleToHybrid.EagerSetup",
+        "Examples.PRFTagReader.DirectCoupling.StepLemmas",
+        "Examples.PRFTagReader.DirectCoupling.ReaderCase",
+        "Examples.PRFTagReader.DirectCoupling.Compose",
+        "Examples.PRFTagReader.MultipleBadCollision",
+        "Examples.PRFTagReader.UnlinkReduction",
+        "Examples.PRFTagReader.Asymptotic",
+        "Examples"
+      ]
+    ]
+  },
+  "handler_reuse": [
+    {
+      "label": "candidate-0",
+      "wall_seconds": 4.4402448340000005,
+      "user_seconds": 15.629858,
+      "system_seconds": 1.345451,
+      "exit_code": 0,
+      "source_sha256": "ff898f2c1a3a4abaccec6ead4be8856acf87d20a7f6ffd9676d0a8afb733c9e1"
+    },
+    {
+      "label": "candidate-1",
+      "wall_seconds": 4.301158208,
+      "user_seconds": 15.583618,
+      "system_seconds": 1.193429,
+      "exit_code": 0,
+      "source_sha256": "ff898f2c1a3a4abaccec6ead4be8856acf87d20a7f6ffd9676d0a8afb733c9e1"
+    },
+    {
+      "label": "candidate-2",
+      "wall_seconds": 4.316946917,
+      "user_seconds": 15.564733,
+      "system_seconds": 1.267536,
+      "exit_code": 0,
+      "source_sha256": "ff898f2c1a3a4abaccec6ead4be8856acf87d20a7f6ffd9676d0a8afb733c9e1"
+    },
+    {
+      "label": "candidate-3",
+      "wall_seconds": 4.3711646250000005,
+      "user_seconds": 15.270442,
+      "system_seconds": 1.280872,
+      "exit_code": 0,
+      "source_sha256": "ff898f2c1a3a4abaccec6ead4be8856acf87d20a7f6ffd9676d0a8afb733c9e1"
+    },
+    {
+      "label": "candidate-4",
+      "wall_seconds": 4.211297834,
+      "user_seconds": 15.094238,
+      "system_seconds": 1.112533,
+      "exit_code": 0,
+      "source_sha256": "ff898f2c1a3a4abaccec6ead4be8856acf87d20a7f6ffd9676d0a8afb733c9e1"
+    },
+    {
+      "label": "candidate-5",
+      "wall_seconds": 4.198089749999999,
+      "user_seconds": 15.038596,
+      "system_seconds": 1.168169,
+      "exit_code": 0,
+      "source_sha256": "ff898f2c1a3a4abaccec6ead4be8856acf87d20a7f6ffd9676d0a8afb733c9e1"
+    },
+    {
+      "label": "original-0",
+      "wall_seconds": 4.682405917,
+      "user_seconds": 15.602256,
+      "system_seconds": 1.382372,
+      "exit_code": 0,
+      "source_sha256": "394bbafc0a83611a39e3d0ee9686918a3a850ba4afdad0cec4cc722d238cf806"
+    },
+    {
+      "label": "original-1",
+      "wall_seconds": 4.250812291,
+      "user_seconds": 14.667532,
+      "system_seconds": 1.2649,
+      "exit_code": 0,
+      "source_sha256": "394bbafc0a83611a39e3d0ee9686918a3a850ba4afdad0cec4cc722d238cf806"
+    },
+    {
+      "label": "original-2",
+      "wall_seconds": 4.2480002080000006,
+      "user_seconds": 14.670196,
+      "system_seconds": 1.203247,
+      "exit_code": 0,
+      "source_sha256": "394bbafc0a83611a39e3d0ee9686918a3a850ba4afdad0cec4cc722d238cf806"
+    },
+    {
+      "label": "original-3",
+      "wall_seconds": 4.172415083,
+      "user_seconds": 14.271368,
+      "system_seconds": 1.2382009999999999,
+      "exit_code": 0,
+      "source_sha256": "394bbafc0a83611a39e3d0ee9686918a3a850ba4afdad0cec4cc722d238cf806"
+    },
+    {
+      "label": "original-4",
+      "wall_seconds": 4.1742430839999995,
+      "user_seconds": 14.523312,
+      "system_seconds": 1.172548,
+      "exit_code": 0,
+      "source_sha256": "394bbafc0a83611a39e3d0ee9686918a3a850ba4afdad0cec4cc722d238cf806"
+    },
+    {
+      "label": "original-5",
+      "wall_seconds": 4.209796625,
+      "user_seconds": 14.489051,
+      "system_seconds": 1.204228,
+      "exit_code": 0,
+      "source_sha256": "394bbafc0a83611a39e3d0ee9686918a3a850ba4afdad0cec4cc722d238cf806"
+    }
+  ],
+  "native_linter": [
+    {
+      "module": "ToMathlib.General",
+      "round": 0,
+      "variant": "original",
+      "wall_seconds": 2.585299458,
+      "cpu_seconds": 5.2629079999999995,
+      "exit_code": 0
+    },
+    {
+      "module": "ToMathlib.General",
+      "round": 0,
+      "variant": "native",
+      "wall_seconds": 3.108264917,
+      "cpu_seconds": 4.96209,
+      "exit_code": 0
+    },
+    {
+      "module": "ToMathlib.General",
+      "round": 1,
+      "variant": "native",
+      "wall_seconds": 2.4576787079999995,
+      "cpu_seconds": 4.743131,
+      "exit_code": 0
+    },
+    {
+      "module": "ToMathlib.General",
+      "round": 1,
+      "variant": "original",
+      "wall_seconds": 2.545373209000001,
+      "cpu_seconds": 5.233689,
+      "exit_code": 0
+    },
+    {
+      "module": "ToMathlib.General",
+      "round": 2,
+      "variant": "original",
+      "wall_seconds": 2.5349900830000003,
+      "cpu_seconds": 5.147459,
+      "exit_code": 0
+    },
+    {
+      "module": "ToMathlib.General",
+      "round": 2,
+      "variant": "native",
+      "wall_seconds": 2.5099231250000003,
+      "cpu_seconds": 4.8203309999999995,
+      "exit_code": 0
+    },
+    {
+      "module": "ToMathlib.General",
+      "round": 3,
+      "variant": "native",
+      "wall_seconds": 2.439686,
+      "cpu_seconds": 4.777885,
+      "exit_code": 0
+    },
+    {
+      "module": "ToMathlib.General",
+      "round": 3,
+      "variant": "original",
+      "wall_seconds": 2.4450502499999978,
+      "cpu_seconds": 5.016838,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 0,
+      "variant": "original",
+      "wall_seconds": 4.474290917000001,
+      "cpu_seconds": 16.113817,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 0,
+      "variant": "native",
+      "wall_seconds": 4.282996582999999,
+      "cpu_seconds": 15.404848,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 1,
+      "variant": "native",
+      "wall_seconds": 4.317469125000002,
+      "cpu_seconds": 15.411659,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 1,
+      "variant": "original",
+      "wall_seconds": 4.387047333999995,
+      "cpu_seconds": 16.120623,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 2,
+      "variant": "original",
+      "wall_seconds": 4.453565708000006,
+      "cpu_seconds": 16.330952,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 2,
+      "variant": "native",
+      "wall_seconds": 4.522592875000001,
+      "cpu_seconds": 15.80991,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 3,
+      "variant": "native",
+      "wall_seconds": 4.456011374999996,
+      "cpu_seconds": 15.563637,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain",
+      "round": 3,
+      "variant": "original",
+      "wall_seconds": 4.521555208000002,
+      "cpu_seconds": 16.422551,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 0,
+      "variant": "original",
+      "wall_seconds": 3.302497416999998,
+      "cpu_seconds": 6.188769,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 0,
+      "variant": "native",
+      "wall_seconds": 3.2748864170000047,
+      "cpu_seconds": 5.90195,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 1,
+      "variant": "native",
+      "wall_seconds": 3.3546776250000008,
+      "cpu_seconds": 6.010407,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 1,
+      "variant": "original",
+      "wall_seconds": 3.3147835829999934,
+      "cpu_seconds": 6.212804,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 2,
+      "variant": "original",
+      "wall_seconds": 3.2955952089999982,
+      "cpu_seconds": 6.18921,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 2,
+      "variant": "native",
+      "wall_seconds": 3.3488054170000083,
+      "cpu_seconds": 6.006579,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 3,
+      "variant": "native",
+      "wall_seconds": 3.335286874999994,
+      "cpu_seconds": 5.969548,
+      "exit_code": 0
+    },
+    {
+      "module": "VCVio.ProgramLogic.Tactics.Unary.Internals",
+      "round": 3,
+      "variant": "original",
+      "wall_seconds": 3.3028854580000058,
+      "cpu_seconds": 6.258804,
+      "exit_code": 0
+    }
+  ],
+  "goal_difference": [
+    {
+      "variant": "list",
+      "n": 0,
+      "rounds": 200,
+      "ns": 147375,
+      "checksum": 0
+    },
+    {
+      "variant": "indexed",
+      "n": 0,
+      "rounds": 200,
+      "ns": 144542,
+      "checksum": 0
+    },
+    {
+      "variant": "list",
+      "n": 1,
+      "rounds": 200,
+      "ns": 173750,
+      "checksum": 0
+    },
+    {
+      "variant": "indexed",
+      "n": 1,
+      "rounds": 200,
+      "ns": 433292,
+      "checksum": 0
+    },
+    {
+      "variant": "list",
+      "n": 4,
+      "rounds": 200,
+      "ns": 495083,
+      "checksum": 400
+    },
+    {
+      "variant": "indexed",
+      "n": 4,
+      "rounds": 200,
+      "ns": 1210292,
+      "checksum": 400
+    },
+    {
+      "variant": "list",
+      "n": 16,
+      "rounds": 200,
+      "ns": 4912000,
+      "checksum": 1600
+    },
+    {
+      "variant": "indexed",
+      "n": 16,
+      "rounds": 200,
+      "ns": 6120333,
+      "checksum": 1600
+    },
+    {
+      "variant": "list",
+      "n": 64,
+      "rounds": 200,
+      "ns": 69216417,
+      "checksum": 6400
+    },
+    {
+      "variant": "indexed",
+      "n": 64,
+      "rounds": 200,
+      "ns": 28356584,
+      "checksum": 6400
+    },
+    {
+      "variant": "list",
+      "n": 256,
+      "rounds": 200,
+      "ns": 1071333083,
+      "checksum": 25600
+    },
+    {
+      "variant": "indexed",
+      "n": 256,
+      "rounds": 200,
+      "ns": 117176417,
+      "checksum": 25600
+    }
+  ],
+  "candidate_patch_sha256": {
+    "encoding-kernel.patch": "1b5b0bfa13e887fc57a305fc42a0fabea0376553a917f15bcd1d0a4eea94e18b",
+    "chain-simp-only.patch": "76ad18fff5478ab217f788bc34bb51dbe70ea17a932605fa7e423e0a1e946d6f",
+    "handler-support-reuse.patch": "f02796740c845b65135631ce9549c31000f49ab8bc17694cd206df53454f0a60",
+    "compatibility-simp-only.patch": "1ef70a2f21e59c785b315aa1a464fd4d506ff42c9a359716ad6c3ecc456886cc",
+    "import-cleanup.patch": "2001896803ab5223baa9ba2f4e808d7adb35aef90aeb360ff254accf0981e044",
+    "add-local-diagnostic.patch": "82af2b9e1b9316e1d156e06137d2cf6d4a874c891d00b89f626932d9f2a07feb",
+    "unary-expected-type.patch": "d36dcc3834ce58f780df387147b60c76bc5a689332da1ffcc03fa670fd512ed9",
+    "unary-split.patch": "699bb4fa7760d040f0fd40c38a0cb7216e12eda30530f97b19b53fdc8aebe56f"
+  }
+}

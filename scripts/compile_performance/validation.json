@@ -1,0 +1,22 @@
+{
+  "baseline_commit": "ffd0ca198fe6e640c0dd7f0f9c599943caacbf64",
+  "phase": "historical isolated-candidate validation before source fixes were applied; see compile-performance-remediation.md for subsequent validation",
+  "isolated_candidates": ["encoding-kernel.patch", "unary-expected-type.patch"],
+  "production_lean_files_changed": false,
+  "clean_project_build": {
+    "protocol": "Project build directory moved aside; dependencies cached; one run per variant; seven non-test libraries",
+    "baseline": {"wall_seconds": 135.27, "user_seconds": 951.02, "system_seconds": 429.41, "exit_code": 0},
+    "candidate": {"wall_seconds": 138.56, "user_seconds": 948.12, "system_seconds": 427.87, "exit_code": 0},
+    "overall_speedup_demonstrated": false
+  },
+  "test_libraries": {"wall_seconds": 15.51, "jobs": 3769, "exit_code": 0},
+  "smoke": {"wall_seconds": 1.99, "exit_code": 0},
+  "warm_rebuild": {"wall_seconds": 1.34, "exit_code": 0},
+  "axiomsweep": {"passed": true, "declarations": 17878, "modules": 553, "existing_sorry_tainted": 40, "nonstandard_axiom_tainted": 0, "new_taint": false},
+  "axiomsweep_fixture_matrix": "passed",
+  "extern_isolation": "passed",
+  "interop_isolation": "passed",
+  "pmf_boundary": "passed",
+  "native_backends": "absent; stubs; native differential executables not run",
+  "runner_checks": ["syntax", "successful replay", "invalid count", "duplicate label", "stale toolchain", "timeout"]
+}

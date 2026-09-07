@@ -51,6 +51,7 @@ public import ToMathlib.MeasureTheory.Measure.Option
 public import ToMathlib.MeasureTheory.Measure.Subprobability
 public import ToMathlib.MeasureTheory.Measure.TotalVariation
 public import ToMathlib.OrderEnrichedCategory
+public import ToMathlib.Perf
 public import ToMathlib.Probability.Divergence.Renyi
 public import ToMathlib.Probability.Divergence.RenyiDiscrete
 public import ToMathlib.Probability.Divergence.TotalVariation
