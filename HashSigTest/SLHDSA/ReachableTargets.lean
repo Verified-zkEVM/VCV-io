@@ -14,10 +14,11 @@ import HashSig.SLHDSA.HypertreeGeneral
 Executable, mutation-sensitive checks for the security target ledgers over small validated
 parameter profiles whose ledgers can be enumerated completely at run time.  The expected sizes are
 hand-computed constants, not the `targetCount` formulas, so a wrong ledger and a wrong formula
-cannot cancel.  The checks also pin the exact address content of the ledgers: the addresses the
-construction actually hashes for a fixed digest are members, and near-miss addresses (wrong type,
-wrong height, hash step `w - 1`, out-of-range tree) are not.  Cross-role ledgers are checked to
-be pairwise disjoint on these profiles.
+cannot cancel.  The checks also pin address-helper outputs associated with a fixed digest: selected
+addresses with the layouts prescribed by FIPS 205 are members, and near-miss addresses (wrong type,
+wrong height, hash step `w - 1`, out-of-range tree) are not.  These checks do not execute the
+signing or verification programs; full coverage requires separate trace-level proofs and is not
+established here.  Cross-role ledgers are checked to be pairwise disjoint on these profiles.
 -/
 
 public section
@@ -71,6 +72,18 @@ def checkTwoLayerSizes : IO Unit := do
   ensure "two-layer: 20 WOTS+ public keys" ((wotsPkAddresses twoLayer).length == 20)
   ensure "two-layer: 80 selected UD steps"
     ((selectedWotsAddresses twoLayer fun _ => firstWotsStep twoLayer).length == 80)
+  -- At UD hybrid index zero, the source predicate `0 < digit - 1` omits digits zero and one.
+  -- This synthetic digit assignment exercises that nonvacuous partial-selection shape.
+  let partialUd := fun coord : WotsChainCoord twoLayer =>
+    if coord.2.val % 4 ≤ 1 then none else some (firstWotsStep twoLayer)
+  let completedUd := fun coord : WotsChainCoord twoLayer =>
+    (partialUd coord).getD (firstWotsStep twoLayer)
+  let partialUdLedger := optionalWotsAddresses twoLayer partialUd
+  let completedUdLedger := selectedWotsAddresses twoLayer completedUd
+  ensure "two-layer: a partial UD-shaped selection can use fewer than the 80-target cap"
+    (partialUdLedger.length == 40)
+  ensure "two-layer: the partial UD-shaped selection is covered by its cap completion"
+    (partialUdLedger.all fun a => completedUdLedger.contains a)
   ensure "two-layer: an optional PRE selection drops chain index zero"
     ((optionalWotsAddresses twoLayer fun coord =>
       if coord.2.val = 0 then none else some (firstWotsStep twoLayer)).length == 60)
@@ -153,8 +166,9 @@ def twoLayerDigest : Bytes twoLayerParams.m :=
 
 def twoLayerParts : DigestParts twoLayerParams := splitDigest twoLayerParams twoLayerDigest
 
-/-- The FORS and hypertree addresses that Algorithms 18--20 hash for the fixed digest are members
-of the ledgers, and structurally near addresses are not. -/
+/-- Address-helper outputs for the fixed digest have the layouts prescribed by Algorithms 18--20
+and are members of the ledgers; structurally near addresses are not.  This canary does not run the
+three algorithms. -/
 def checkTwoLayerContent : IO Unit := do
   ensure "two-layer digest: idx_tree = 2" (twoLayerParts.idxTree.val == 2)
   ensure "two-layer digest: idx_leaf = 1" (twoLayerParts.idxLeaf.val == 1)

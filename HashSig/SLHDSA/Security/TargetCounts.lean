@@ -12,24 +12,28 @@ import Mathlib.Algebra.Ring.GeomSum
 /-!
 # SLH-DSA security target roles and formula-derived target counts
 
-An SLH-DSA security reduction issues one distinct-target hash challenge per reachable address in
-each hash role.  This module names those roles and gives the closed formulas for the number of
-targets each role can reach in a hypertree with `d` layers of height `hp`:
+The classical SLH-DSA security proof uses upper bounds on the number of distinct-target hash
+challenges in each hash role.  This module names those roles and gives the closed formulas for
+their caps in a hypertree with `d` layers of height `hp`:
 
 - `treesAtLayer p i = 2 ^ (hp * (d - i - 1))` XMSS trees at layer `i`;
 - `xmssTreeCount p` XMSS trees in total and `wotsInstanceCount p` WOTS+ instances in total;
 - `targetCount p role` for each of the eight `TargetRole`s.
 
-The counts are pure parameter arithmetic.  `HashSig.SLHDSA.Security.ReachableTargets` realizes
-each of them by an executable, duplicate-free address ledger.  Six of the eight are realized
-exactly.  The two that are not are upper bounds in the safe direction:
+The counts are pure parameter arithmetic.  `HashSig.SLHDSA.Security.ReachableTargets` relates
+them to executable, duplicate-free structural address ledgers.  Five complete ledgers have exactly
+the corresponding count.  The WOTS+ roles require the following qualifications:
 
+- `wotsFUd` is a cap of one target per chain.  The source reduction's target list is partial: at
+  hybrid index `j` it omits a chain unless `j < digit - 1`.  The total-selection ledger is a
+  duplicate-free completion used to witness the cap, not the reduction's exact target list;
 - `wotsFTcr` counts `w` steps per WOTS+ chain, while a chain executes only the `w - 1` steps its
   ledger lists; the source proof's looser cap is kept so the term matches the literature; and
 - `wotsFPre` counts one step per chain, while a preimage reduction may omit the chains whose
   honest digit is zero.
 
-Every count is the one the machine-checked source proof issues.  In its artifact the FORS leaf hash
+Every count is the cap instantiated by the machine-checked source proof.  In its artifact the FORS
+leaf hash
 carries `t_smdtopenpre = d * k * t`, which the OpenPRE-from-TCR-and-DSPR reduction forwards
 unchanged as the target count of the SM-DT-TCR and SM-DT-DSPR games it reduces to; the FORS node
 hash carries `t_smdttcr = d * k * (t - 1)` and the root compression `t_smdttcr = d`; the three
@@ -47,6 +51,8 @@ reduction; the EasyCrypt theory is `OpenPRE_From_TCR_DSPR_THF`.
   `h = d · h'`), §8 (FORS `k` and `t = 2^a`)
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified"
+- EasyCrypt artifact `MM45/FV-SPHINCSPLUS-EC`, commit `a28e4c53897a4bb57b575a177225862d48f824b7`
+  (`proofs/WOTS_TW_ES.ec`, `proofs/FORS_ES.ec`, and `proofs/FL_SL_XMSS_MT_ES.ec`)
 -/
 
 public section
@@ -57,8 +63,9 @@ namespace SLHDSA.Security
 
 /-- The eight distinct-target hash roles of the classical SLH-DSA security argument.  The WOTS+
 `F` role appears three times because its three games select their targets differently: the
-undetectability game takes one step per chain and the preimage game at most one, while the
-target-collision game ranges over every step of every chain. -/
+undetectability and preimage games take at most one step per chain, under different selection
+rules, while the target-collision game takes a suffix of up to `w - 1` executable steps per
+chain. -/
 inductive TargetRole
   /-- FORS leaf hash `F` (arity one). -/
   | forsF
@@ -66,9 +73,9 @@ inductive TargetRole
   | forsH
   /-- FORS root compression `T_k`. -/
   | forsTl
-  /-- WOTS+ chain hash `F`, undetectability targets (one selected step per chain). -/
+  /-- WOTS+ chain hash `F`, undetectability targets (at most one selected step per chain). -/
   | wotsFUd
-  /-- WOTS+ chain hash `F`, target-collision-resistance targets (every step of every chain). -/
+  /-- WOTS+ chain hash `F`, target-collision-resistance cap (all executable chain steps). -/
   | wotsFTcr
   /-- WOTS+ chain hash `F`, preimage targets (at most one selected step per chain). -/
   | wotsFPre
@@ -99,8 +106,10 @@ layer has `2 ^ hp` times as many. -/
 @[expose] def wotsInstanceCount (p : Params) : ℕ :=
   ∑ i : Fin p.d, treesAtLayer p i * 2 ^ p.hp
 
-/-- Formula-derived cap on the number of targets issued in each named game.  Six roles meet their
-cap exactly; `wotsFTcr` and `wotsFPre` are upper bounds, as the module docstring records. -/
+/-- Formula-derived cap on the number of targets issued in each named game.  Five complete
+structural ledgers have exactly the corresponding cap.  The `wotsFUd` cap has an exact total
+completion but a potentially smaller source list; `wotsFTcr` and `wotsFPre` are upper bounds, as
+the module docstring records. -/
 @[expose] def targetCount (p : Params) : TargetRole → ℕ
   | .forsF => 2 ^ p.h * p.k * 2 ^ p.a
   | .forsH => 2 ^ p.h * p.k * (2 ^ p.a - 1)

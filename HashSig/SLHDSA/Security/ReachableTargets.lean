@@ -25,7 +25,7 @@ is proved equal to the formula-derived `targetCount` except where the table belo
 | `forsF` | `forsLeafAddresses` | `2^h * k * 2^a` |
 | `forsH` | `forsTreeAddresses` | `2^h * k * (2^a - 1)` |
 | `forsTl` | `forsRootAddresses` | `2^h` |
-| `wotsFUd` | `selectedWotsAddresses` | `wotsInstanceCount * len` |
+| `wotsFUd` | `selectedWotsAddresses` (total cap completion) | `wotsInstanceCount * len` |
 | `wotsFPre` | `optionalWotsAddresses` | `≤ wotsInstanceCount * len` |
 | `wotsFTcr` | `wotsStepAddresses` | `wotsInstanceCount * len * (w - 1)`, at most `… * w` |
 | `wotsTl` | `wotsPkAddresses` | `wotsInstanceCount` |
@@ -742,13 +742,15 @@ chain. -/
   ((allWotsChains vp).product (List.finRange (vp.params.w - 1))).map fun coord =>
     wotsStepAdrs coord.1 coord.2
 
-/-- A reduction may select one reachable hash step from each chain, for example as a function of
-the honest WOTS message digits. -/
+/-- A total one-step-per-chain completion of a WOTS target cap.  The source UD reduction can omit
+chains; `optionalWotsAddresses_subset_selectedWotsAddresses` embeds any such partial selection in
+one of these total ledgers. -/
 @[expose] def selectedWotsAddresses (vp : ValidatedParams)
     (select : WotsChainCoord vp → Fin (vp.params.w - 1)) : List Adrs :=
   (allWotsChains vp).map fun coord => wotsStepAdrs coord (select coord)
 
-/-- A PRE-style selection may omit chains whose honest digit is zero. -/
+/-- A partial one-step-per-chain selection.  The source UD and PRE reductions both have this shape,
+with different predicates deciding which chains to omit. -/
 @[expose] def optionalWotsAddresses (vp : ValidatedParams)
     (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) : List Adrs :=
   (allWotsChains vp).filterMap fun coord =>
@@ -778,7 +780,8 @@ theorem wotsStepAddresses_length_le_targetCount (vp : ValidatedParams) :
   exact Nat.mul_le_mul_left (wotsInstanceCount vp.params * vp.params.len)
     (Nat.sub_le vp.params.w 1)
 
-/-- A total one-step-per-chain selection realizes the UD/PRE target cap exactly. -/
+/-- A total one-step-per-chain completion has exactly the UD/PRE target cap.  This is a statement
+about the completed structural ledger, not the cardinality of either reduction's partial list. -/
 @[simp]
 theorem selectedWotsAddresses_length (vp : ValidatedParams)
     (select : WotsChainCoord vp → Fin (vp.params.w - 1)) :
@@ -1021,6 +1024,21 @@ theorem optionalWotsAddresses_subset (vp : ValidatedParams)
   obtain ⟨step, -, rfl⟩ := Option.map_eq_some_iff.mp hmap
   exact mem_wotsStepAddresses vp coord step
 
+/-- Every partial one-step-per-chain selection is contained in a total completion.  In particular,
+this covers the source UD target list, which omits a chain at hybrid index `j` unless
+`j < digit - 1`, while retaining the exact `wotsFUd` cap for the completed ledger. -/
+theorem optionalWotsAddresses_subset_selectedWotsAddresses (vp : ValidatedParams)
+    (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) :
+    ∃ complete : WotsChainCoord vp → Fin (vp.params.w - 1),
+      ∀ a ∈ optionalWotsAddresses vp select, a ∈ selectedWotsAddresses vp complete := by
+  refine ⟨fun coord => (select coord).getD (firstWotsStep vp), ?_⟩
+  intro a ha
+  simp only [optionalWotsAddresses, List.mem_filterMap] at ha
+  obtain ⟨coord, hcoord, hmap⟩ := ha
+  obtain ⟨step, hstep, rfl⟩ := Option.map_eq_some_iff.mp hmap
+  simp only [selectedWotsAddresses, List.mem_map]
+  exact ⟨coord, hcoord, by simp [hstep]⟩
+
 /-! ## Cross-role disjointness
 
 The six structural ledgers are pairwise disjoint.  Four of them carry an address type code of their
@@ -1233,11 +1251,11 @@ theorem encodeTargets_nodup_of_subset (prims : Primitives p)
 /-- Explicit encoded-address obligations for the eight `TargetRole`s.
 
 The `wotsFUd` and `wotsFPre` fields are stated for convenience, not because they are independent:
-both follow from `wotsFTcr` through `encodeTargets_nodup_of_subset`, taking its structural
-distinctness from `selectedWotsAddresses_nodup` or `optionalWotsAddresses_nodup` and its membership
-from the matching subset lemma, since every selected step is a step of the complete chain-step
-ledger.  A context that has already
-discharged `wotsFTcr` can fill them in that way.
+both follow from `wotsFTcr` through `encodeTargets_nodup_of_subset`, taking their structural
+distinctness from `selectedWotsAddresses_nodup` or `optionalWotsAddresses_nodup` and their
+membership from the matching subset lemma.  The `wotsFUd` field is phrased over total cap
+completions; `wotsFUd_partial` below derives encoded distinctness for an arbitrary partial UD
+selection.  A context that has already discharged `wotsFTcr` can fill both fields directly.
 
 `ValidatedParams` deliberately does not imply these facts: concrete address encodings have narrower
 field domains, most visibly SHA-2's one-byte layer and eight-byte tree.  A concrete security context
@@ -1252,7 +1270,7 @@ structure EncodedTargetLedgerConditions (vp : ValidatedParams)
   forsH : (encodeTargets prims (forsTreeAddresses vp)).Nodup
   /-- Encoded FORS root-compression tweaks are distinct. -/
   forsTl : (encodeTargets prims (forsRootAddresses vp)).Nodup
-  /-- Every total one-step-per-WOTS-chain UD selection has distinct encoded tweaks. -/
+  /-- Every total completion of the one-step-per-WOTS-chain UD cap has distinct encoded tweaks. -/
   wotsFUd : ∀ select : WotsChainCoord vp → Fin (vp.params.w - 1),
     (encodeTargets prims (selectedWotsAddresses vp select)).Nodup
   /-- The complete executed WOTS hash-step ledger has distinct encoded tweaks. -/
@@ -1264,5 +1282,17 @@ structure EncodedTargetLedgerConditions (vp : ValidatedParams)
   wotsTl : (encodeTargets prims (wotsPkAddresses vp)).Nodup
   /-- Encoded XMSS internal-node tweaks are distinct. -/
   xmssH : (encodeTargets prims (xmssNodeAddresses vp)).Nodup
+
+/-- The total-completion condition for UD implies encoded distinctness for every partial UD target
+selection.  This is the shape used by the source reduction, whose chain predicate can omit
+targets. -/
+theorem EncodedTargetLedgerConditions.wotsFUd_partial {vp : ValidatedParams}
+    {prims : Primitives vp.params} (conditions : EncodedTargetLedgerConditions vp prims)
+    (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) :
+    (encodeTargets prims (optionalWotsAddresses vp select)).Nodup := by
+  obtain ⟨complete, hsubset⟩ :=
+    optionalWotsAddresses_subset_selectedWotsAddresses vp select
+  exact encodeTargets_nodup_of_subset prims (optionalWotsAddresses_nodup vp select) hsubset
+    (conditions.wotsFUd complete)
 
 end SLHDSA.Security
