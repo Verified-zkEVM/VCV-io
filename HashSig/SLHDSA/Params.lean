@@ -123,6 +123,32 @@ theorem len_pos (p : Params) : 0 < p.len := by
   unfold Params.len Params.len2
   omega
 
+/-- `0 < w = 2^lgw`. -/
+theorem w_pos (p : Params) : 0 < p.w := Nat.two_pow_pos p.lgw
+
+/-- Under the alignment obligation `lgw ∣ 8n`, the ceiling in Eq 5.2 is attained: the `len1`
+message digits carry exactly the `8n` message bits. -/
+theorem Valid.len1_mul_lgw {p : Params} (valid : p.Valid) : p.len1 * p.lgw = 8 * p.n := by
+  obtain ⟨k, hk⟩ := valid.wots_input_aligned
+  have hpos : 0 < p.lgw := valid.lgw_pos
+  have hnum : 8 * p.n + p.lgw - 1 = p.lgw * k + (p.lgw - 1) := by omega
+  have hlen1 : p.len1 = k := by
+    unfold len1
+    rw [hnum, Nat.mul_add_div hpos, Nat.div_eq_of_lt (by omega), Nat.add_zero]
+  rw [hlen1, hk, Nat.mul_comm]
+
+/-- The `len1` base-`w` digits of a valid parameter set range over exactly the values of one
+`n`-byte node: `w ^ len1 = 256 ^ n`. -/
+theorem Valid.w_pow_len1 {p : Params} (valid : p.Valid) : p.w ^ p.len1 = 256 ^ p.n := by
+  rw [w, ← pow_mul, Nat.mul_comm, valid.len1_mul_lgw, pow_mul]
+  norm_num
+
+/-- The `len2` checksum digits of a valid parameter set have room for the largest possible
+checksum `len1 · (w − 1)` (FIPS 205 Eq 5.3). -/
+theorem Valid.len1_mul_pred_w_lt_pow_len2 {p : Params} (valid : p.Valid) :
+    p.len1 * (p.w - 1) < p.w ^ p.len2 :=
+  Nat.lt_pow_succ_log_self (Nat.one_lt_two_pow (Nat.ne_of_gt valid.lgw_pos)) _
+
 /-- Number of leaves in one FORS tree, `t = 2^a`. -/
 def t (p : Params) : ℕ := 2 ^ p.a
 

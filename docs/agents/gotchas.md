@@ -342,7 +342,6 @@ use opaque `public section` when downstream code does not need definitional unfo
 information to avoid public metavariables.
 
 The dormant `Interop` library is intentionally excluded until its separate migration.
-`LibSodium/SHA2.lean` is also excluded because it is a dormant source outside every Lake library.
 `LatticeCryptoTest.lean` remains a curated umbrella and `HashSigTest` has no root umbrella because
 their executable modules contain colliding root-level `main` declarations.
 

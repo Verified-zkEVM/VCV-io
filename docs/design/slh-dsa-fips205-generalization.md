@@ -4,7 +4,10 @@ Status: implementation plan, established 2026-08-30. This document fixes the tar
 pull-request ownership, dependency order, acceptance gates, and restacking protocol for moving the
 current reduced-profile `d = 1` SLH-DSA development to a general, executable formalization of
 FIPS 205. It is a plan, not an implementation-status report. A capability is present only when the
-corresponding source and validation have merged.
+corresponding source and validation have merged. The implementation status, the list of plan
+statements that are now stale, and the ordered remaining slices are maintained in
+[`slh-dsa-status-and-roadmap.md`](slh-dsa-status-and-roadmap.md); the "Planning baseline" and
+"Existing `d = 1` security work" sections below describe the 2026-08-30 snapshot.
 
 The key outcome is one canonical SLH-DSA scheme that:
 

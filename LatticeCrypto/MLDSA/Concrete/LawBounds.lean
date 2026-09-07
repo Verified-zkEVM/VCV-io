@@ -42,7 +42,7 @@ The `Primitives.Laws` fields that mention the assembled bundle `MLDSA.Concrete.c
 are proven in `Extern/MLDSA/Laws.lean`, on top of the lemmas banked here.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLDSA.Concrete

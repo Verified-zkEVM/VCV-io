@@ -48,5 +48,6 @@ public import HashSig.SLHDSA.Security.TraceTargets
 public import HashSig.SLHDSA.Wots
 public import HashSig.SLHDSA.WotsChecksum
 public import HashSig.SLHDSA.WotsEncoding
+public import HashSig.SLHDSA.WotsInjectivity
 public import HashSig.SLHDSA.Xmss
 public import HashSig.SLHDSA.XmssConformance
