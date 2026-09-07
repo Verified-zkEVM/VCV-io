@@ -6,6 +6,7 @@ Authors: Alexander Hicks
 
 module
 public import HashSig.SLHDSA.Wots
+import Mathlib.Data.List.GetD
 
 /-!
 # WOTS+ Message-Encoding Injectivity
@@ -60,10 +61,10 @@ the other. This combines `wotsMsgDigitsCore_injective` (distinct nodes have dist
 digits) with `WotsChecksum.wots_fullDigits_incomparable`. -/
 theorem chainLengthsCore_incomparable (valid : p.Valid) (laws : core.ByteLaws)
     {msg msg' : core.Y} (hne : msg ≠ msg') :
-    ¬ Forall₂ (· ≤ ·) (chainLengthsCore core msg) (chainLengthsCore core msg') ∧
-    ¬ Forall₂ (· ≤ ·) (chainLengthsCore core msg') (chainLengthsCore core msg) := by
+    ¬ List.Forall₂ (· ≤ ·) (chainLengthsCore core msg) (chainLengthsCore core msg') ∧
+    ¬ List.Forall₂ (· ≤ ·) (chainLengthsCore core msg') (chainLengthsCore core msg) := by
   simp only [chainLengthsCore_eq_wotsFullDigits valid]
-  exact wots_fullDigits_incomparable (Params.w_pos p)
+  exact wots_fullDigits_incomparable
     (wotsMsgDigitsCore_length core msg) (wotsMsgDigitsCore_length core msg')
     (wotsMsgDigitsCore_mem_lt core msg) (wotsMsgDigitsCore_mem_lt core msg')
     valid.len1_mul_pred_w_lt_pow_len2
@@ -82,6 +83,9 @@ theorem chainStepsCore_two_encodings (valid : p.Valid) (laws : core.ByteLaws)
   have hle : ∀ i, i < p.len → chainStepsCore core msg' i ≤ chainStepsCore core msg i :=
     fun i hi => Nat.le_of_not_lt fun hlt => hnot ⟨i, hi, hlt⟩
   exact (chainLengthsCore_incomparable valid laws hne).2
-    (Forall₂.of_getD 0 (by simp) fun i hi => hle i (by simpa using hi))
+    (List.forall₂_of_length_eq_of_get (by simp) fun i hi hi' => by
+      rw [← List.getD_eq_get (l := chainLengthsCore core msg') (d := 0) ⟨i, hi⟩,
+        ← List.getD_eq_get (l := chainLengthsCore core msg) (d := 0) ⟨i, hi'⟩]
+      exact hle i (by simpa using hi))
 
 end SLHDSA

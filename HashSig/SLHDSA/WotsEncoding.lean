@@ -249,7 +249,7 @@ theorem fromBaseW_base2b_msg {p : Params} (valid : p.Valid) (x : List Byte)
     (hx : x.length = p.n) :
     fromBaseW p.w (base2b x p.lgw p.len1) = toInt x := by
   rw [base2b_msg_eq_digitsOfBaseW valid x hx]
-  apply fromBaseW_digitsOfBaseW_of_lt _ _ _ (Params.w_pos p)
+  apply fromBaseW_digitsOfBaseW_of_lt
   rw [valid.w_pow_len1, ← hx]
   exact toInt_lt_pow x
 

@@ -62,19 +62,6 @@ theorem Forall₂.append_inv {R : α → α → Prop} {xs₁ xs₂ ys₁ ys₂ :
   ⟨by simpa [hlen] using List.forall₂_take_append _ _ _ h,
    by simpa [hlen] using List.forall₂_drop_append _ _ _ h⟩
 
-/-- Equal-length lists whose entries are related at every index (read through `getD`) are
-related by `Forall₂`. -/
-theorem Forall₂.of_getD {R : α → α → Prop} (d : α) :
-    ∀ {xs ys : List α}, xs.length = ys.length →
-      (∀ i, i < xs.length → R (xs.getD i d) (ys.getD i d)) → Forall₂ R xs ys
-  | [], [], _, _ => .nil
-  | x :: xs, y :: ys, hlen, h =>
-      .cons (by simpa using h 0 (Nat.succ_pos _))
-        (Forall₂.of_getD d (by simpa using hlen) fun i hi => by
-          simpa using h (i + 1) (by simpa using hi))
-  | [], _ :: _, hlen, _ => by simp at hlen
-  | _ :: _, [], hlen, _ => by simp at hlen
-
 /-! ## Base-w digit arithmetic -/
 
 /-- Reconstruct a natural number from its big-endian base-`w` digit list. -/
