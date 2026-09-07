@@ -167,7 +167,8 @@ open Classical in
 cache `cache` and freshly drawn salt `r`, forward-sample a short preimage `s ← domainSample pk` and
 record `(r, msgs n) ↦ psf.eval pk s` in the cache. This is the per-step handler used as `stepProg`
 in the GPV `signRunF` presentation of the programmed (simulator) run. -/
-@[expose] noncomputable def gpvStepProg (pk : PK) (domainSample : PK → ProbComp Domain) (msgs : ℕ → M) :
+@[expose]
+noncomputable def gpvStepProg (pk : PK) (domainSample : PK → ProbComp Domain) (msgs : ℕ → M) :
     ℕ → (Salt × M →ₒ Range).QueryCache → Salt → ProbComp ((Salt × M →ₒ Range).QueryCache) :=
   fun n cache r => do
     let s ← domainSample pk

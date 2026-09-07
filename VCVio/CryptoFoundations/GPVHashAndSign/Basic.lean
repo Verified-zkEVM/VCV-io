@@ -60,7 +60,8 @@ accepted by the shortness predicate. -/
 /-- A PSF is correct *at a fixed key pair* `(pk, sk)` if the trapdoor sampler at that key always
 produces a valid preimage that is accepted by the shortness predicate. This is the per-key slice of
 `Correct`: `Correct psf` is definitionally `∀ pk sk, psf.CorrectAt pk sk`. -/
-@[expose] def CorrectAt (psf : PreimageSampleableFunction PK SK Domain Range) (pk : PK) (sk : SK) : Prop :=
+@[expose]
+def CorrectAt (psf : PreimageSampleableFunction PK SK Domain Range) (pk : PK) (sk : SK) : Prop :=
   ∀ (t : Range) (x : Domain), x ∈ support (psf.trapdoorSample pk sk t) →
     psf.eval pk x = t ∧ psf.isShort x = true
 

@@ -74,7 +74,8 @@ open Classical in
 `progGameRunImplNoRec` threaded with the same collision flag (set on a signing step when the
 inline-drawn salt `r` is already a key of the cache). Its `run'`-projection is the original
 `progGameRunImplNoRec`. -/
-@[expose] noncomputable def progGameRunImplNoRecFlag (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose]
+noncomputable def progGameRunImplNoRecFlag (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × Bool) ProbComp) :=
   fun t => StateT.mk fun s =>
@@ -942,7 +943,8 @@ open Classical in
 `gpvRealImplFlagFresh`: `progGameRunImplNoRecFlag` extended with the same passive signed-set,
 inserting the message on each signing step. Projecting the signed-set away recovers
 `progGameRunImplNoRecFlag`. -/
-@[expose] noncomputable def progGameRunImplNoRecFlagFresh (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose]
+noncomputable def progGameRunImplNoRecFlagFresh (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) ProbComp) :=
   fun t => StateT.mk fun s =>

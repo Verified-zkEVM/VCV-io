@@ -75,7 +75,7 @@ namespace Falcon.NonVacuity
 
 /-- Ring degree `2` at Falcon's modulus, with the verifier's squared-norm bound `q`. Reducible,
 so that `toyP.n` unfolds to `2` wherever the scheme's types meet the degree-2 arithmetic. -/
-@[expose] noncomputable abbrev toyP : Params :=
+noncomputable abbrev toyP : Params :=
   { n := 2, sigma := 0, sigmaMin := 0, betaSquared := modulus, sbytelen := 0 }
 
 theorem toyP_n : toyP.n = 2 := rfl
@@ -314,7 +314,7 @@ target pair `(t₀, t₁)`; with `toySamplerZ` each returns the rounded coordina
 lattice basis and Falcon's norm check. -/
 
 /-- The perturbation box: four independent draws from `Fin 3`, read as offsets in `{−1, 0, 1}`. -/
-@[expose] abbrev Box : Type := Fin 3 × Fin 3 × Fin 3 × Fin 3
+abbrev Box : Type := Fin 3 × Fin 3 × Fin 3 × Fin 3
 
 /-- The offset encoded by a box coordinate. -/
 @[expose] def off (d : Fin 3) : ℤ := ((d : ℕ) : ℤ) - 1
@@ -617,12 +617,14 @@ theorem toy_center_accepts (c : Rq 2) :
 /-! ## The ideal PSF: the attempt's accept-conditional -/
 
 /-- The box points whose candidate passes the norm check. -/
-@[expose] def accepts (c : Rq 2) (δ : Box) : Prop := (falconPSF toyP toyPrims).isShort (sOf c δ) = true
+@[expose]
+def accepts (c : Rq 2) (δ : Box) : Prop := (falconPSF toyP toyPrims).isShort (sOf c δ) = true
 
-@[expose] noncomputable instance (c : Rq 2) : DecidablePred (accepts c) :=
+noncomputable instance (c : Rq 2) : DecidablePred (accepts c) :=
   fun _ => inferInstanceAs (Decidable (_ = true))
 
-@[expose] instance (c : Rq 2) : Nonempty {δ : Box // accepts c δ} := ⟨⟨center, toy_center_accepts c⟩⟩
+@[expose]
+instance (c : Rq 2) : Nonempty {δ : Box // accepts c δ} := ⟨⟨center, toy_center_accepts c⟩⟩
 
 /-- Uniform over the accepting box points, mapped to their candidates: the attempt conditioned
 on acceptance. -/
@@ -799,10 +801,14 @@ theorem zOf_zero (δ : Box) :
   simp only [zOf, h1, h2, h3, h4, round_zero, zero_add]
 
 /-- The candidate's coefficients at the zero target, as integer linear forms in the offsets. -/
-@[expose] def w10 (δ : Box) : ℤ := -(5 * off δ.1 - 2 * off δ.2.1 - 106 * off δ.2.2.1 + 32 * off δ.2.2.2)
-@[expose] def w11 (δ : Box) : ℤ := -(2 * off δ.1 + 5 * off δ.2.1 - 32 * off δ.2.2.1 - 106 * off δ.2.2.2)
-@[expose] def w20 (δ : Box) : ℤ := -(106 * off δ.1 + 32 * off δ.2.1 + 5 * off δ.2.2.1 + 2 * off δ.2.2.2)
-@[expose] def w21 (δ : Box) : ℤ := 32 * off δ.1 - 106 * off δ.2.1 + 2 * off δ.2.2.1 - 5 * off δ.2.2.2
+@[expose]
+def w10 (δ : Box) : ℤ := -(5 * off δ.1 - 2 * off δ.2.1 - 106 * off δ.2.2.1 + 32 * off δ.2.2.2)
+@[expose]
+def w11 (δ : Box) : ℤ := -(2 * off δ.1 + 5 * off δ.2.1 - 32 * off δ.2.2.1 - 106 * off δ.2.2.2)
+@[expose]
+def w20 (δ : Box) : ℤ := -(106 * off δ.1 + 32 * off δ.2.1 + 5 * off δ.2.2.1 + 2 * off δ.2.2.2)
+@[expose]
+def w21 (δ : Box) : ℤ := 32 * off δ.1 - 106 * off δ.2.1 + 2 * off δ.2.2.1 - 5 * off δ.2.2.2
 
 /-- The candidate at the zero target, coefficient by coefficient. -/
 theorem sOf_zero_eq (δ : Box) :
