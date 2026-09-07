@@ -360,6 +360,6 @@ theorem nma_to_hard_relation_bound
     (B := fun pkw => Pr[ fun w : Wit => rel pkw.1 w = true |
       nmaReduction σ hr M nmaAdv qH pkw.1])
     (q := (qH : ENNReal) + 1) (hinv := challengeSpaceInv Chal)
-    challengeSpaceInv_ne_top (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
+    (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
 
 end FiatShamir

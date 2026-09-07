@@ -144,11 +144,6 @@ instance (ring : NegacyclicRing Coeff) : Neg ring.Poly :=
 instance (ring : NegacyclicRing Coeff) : Mul ring.Poly :=
   ⟨ring.mul⟩
 
-/-- Two `ring.Poly` values are equal iff they agree on every coefficient. -/
-theorem poly_ext {ring : NegacyclicRing Coeff} {p q : ring.Poly}
-    (h : ∀ i, ring.backend.coeff p i = ring.backend.coeff q i) : p = q :=
-  PolyBackend.ext_coeff h
-
 /-- The `i`-th coefficient of `f + g` equals the sum of the individual coefficients. -/
 @[simp] theorem coeff_add (ring : NegacyclicRing Coeff) (f g : ring.Poly) (i : Fin ring.degree) :
     ring.backend.coeff (f + g) i = ring.backend.coeff f i + ring.backend.coeff g i :=
