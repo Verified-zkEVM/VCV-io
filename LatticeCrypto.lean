@@ -17,6 +17,7 @@ public import LatticeCrypto.Falcon.Encoding
 public import LatticeCrypto.Falcon.PackedFFT
 public import LatticeCrypto.Falcon.Params
 public import LatticeCrypto.Falcon.Primitives
+public import LatticeCrypto.Falcon.SamplerMinEntropy
 public import LatticeCrypto.Falcon.Scheme
 public import LatticeCrypto.Falcon.Security
 public import LatticeCrypto.HardnessAssumptions.LearningWithErrors
