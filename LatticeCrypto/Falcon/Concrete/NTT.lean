@@ -5,7 +5,9 @@ Authors: Quang Dao
 -/
 
 module
+import Mathlib.Tactic.ReduceModChar
 public import LatticeCrypto.Falcon.Arithmetic
+public import Mathlib.RingTheory.RootsOfUnity.PrimitiveRoots
 
 /-!
 # Concrete NTT for Falcon
@@ -33,6 +35,31 @@ open Falcon
 
 private def primitiveRoot2N (logn : ℕ) : Coeff :=
   (11 : Coeff) ^ ((modulus - 1) / (2 * (2 ^ logn)))
+
+/-- `primitiveRoot2N 10 = 11 ^ 6` is a primitive `2048`-th root of unity in `ℤ_q` (`n = 1024`): the
+twiddle half of an NTT correctness argument for the concrete backend. -/
+private theorem primitiveRoot2N_isPrimitiveRoot_1024 :
+    IsPrimitiveRoot (primitiveRoot2N 10) 2048 := by
+  change IsPrimitiveRoot ((11 : ZMod 12289) ^ 6) 2048
+  rw [IsPrimitiveRoot.iff_orderOf]
+  refine orderOf_eq_of_pow_and_pow_div_prime (by norm_num) (by reduce_mod_char) ?_
+  intro p hp hdvd
+  obtain rfl : p = 2 := (Nat.prime_dvd_prime_iff_eq hp Nat.prime_two).mp
+    (hp.dvd_of_dvd_pow (show p ∣ 2 ^ 11 by simpa using hdvd))
+  reduce_mod_char
+  decide
+
+/-- `primitiveRoot2N 9 = 11 ^ 12` is a primitive `1024`-th root of unity in `ℤ_q` (`n = 512`). -/
+private theorem primitiveRoot2N_isPrimitiveRoot_512 :
+    IsPrimitiveRoot (primitiveRoot2N 9) 1024 := by
+  change IsPrimitiveRoot ((11 : ZMod 12289) ^ 12) 1024
+  rw [IsPrimitiveRoot.iff_orderOf]
+  refine orderOf_eq_of_pow_and_pow_div_prime (by norm_num) (by reduce_mod_char) ?_
+  intro p hp hdvd
+  obtain rfl : p = 2 := (Nat.prime_dvd_prime_iff_eq hp Nat.prime_two).mp
+    (hp.dvd_of_dvd_pow (show p ∣ 2 ^ 10 by simpa using hdvd))
+  reduce_mod_char
+  decide
 
 private def bitRevN (logn : ℕ) (i : Nat) : Nat := Id.run do
   let mut r := 0

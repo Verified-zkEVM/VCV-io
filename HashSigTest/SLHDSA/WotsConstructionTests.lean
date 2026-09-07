@@ -19,7 +19,7 @@ every WOTS secret, hash-step, and public-key address used by these executions th
 fallback cannot mask the equality.
 -/
 
-@[expose] public section
+public section
 
 
 namespace SLHDSA.WotsConstructionTests

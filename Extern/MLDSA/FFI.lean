@@ -20,7 +20,7 @@ The C side is compiled from `csrc/mldsa/lean_mldsa{,44,87}_ffi.c`, linking
 against mldsa-native's monolithic `mldsa_native.c`.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLDSA.Concrete.FFI

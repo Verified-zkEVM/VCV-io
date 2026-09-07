@@ -15,7 +15,7 @@ the independent-pair characterization, and the bijective pushforward used by one
 arguments.
 -/
 
-@[expose] public section
+public section
 
 open MeasureTheory ProbabilityTheory
 open scoped ENNReal

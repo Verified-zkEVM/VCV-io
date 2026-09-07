@@ -1,0 +1,44 @@
+name: Proof obligation
+description: Track a `sorry`, or an assumption a theorem depends on, until it is discharged.
+title: "Proof obligation for `<declaration>` in `<file>`"
+labels: ["proof wanted"]
+body:
+  - type: input
+    id: declaration
+    attributes:
+      label: Declaration
+      description: >-
+        Name and location, for example `ind_cca_security` in `LatticeCrypto/MLKEM/Security.lean:163`.
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: Statement and current proof
+      description: >-
+        The declaration with its docstring and the `sorry` (or the axiom or hypothesis it relies on).
+      render: lean
+    validations:
+      required: true
+  - type: textarea
+    id: consumers
+    attributes:
+      label: What depends on it
+      description: >-
+        Theorems whose sorry-free status is transitively false while this stays open, and the PR
+        that introduced the obligation.
+  - type: textarea
+    id: plan
+    attributes:
+      label: Proof sketch or blockers
+      description: >-
+        The intended argument or the paper result it follows, missing Mathlib or ToMathlib lemmas,
+        or a design decision that has to come first.
+  - type: checkboxes
+    id: baseline
+    attributes:
+      label: Baseline
+      options:
+        - label: >-
+            The obligation is listed in `scripts/axiom_baseline.json` (the PR that adds a `sorry`
+            runs `lake exe axiomsweep --update-baseline` and commits the diff).

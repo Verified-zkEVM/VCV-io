@@ -23,6 +23,12 @@ reasoning that led to the decision; the baseline and agent guide state the rules
 not infer current API names or PR status from an old snapshot without checking its later-status
 section or the pinned source tree.
 
+## Upstream alignment
+
+| Document | Status | Question it answers |
+|---|---|---|
+| [`upstream-alignment.md`](upstream-alignment.md) | Living ledger, re-run at each pin bump | Which of VCVio's general-purpose machinery and tooling does Lean core, Mathlib, Batteries, cslib, or PolyFun already own, and what is the verdict (adopt / keep / upstream / track) for each, with the evidence? Includes a broad reading of the adjacent Mathlib areas and the idioms they suggest. |
+
 ## Keeping these honest
 
 Two conventions, both learned the hard way and worth preserving:

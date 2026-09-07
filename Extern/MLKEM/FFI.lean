@@ -26,7 +26,7 @@ The C side is compiled from `csrc/mlkem/lean_mlkem_ffi.c`, which `#include`s
 mlkem-native's monolithic `mlkem_native.c` (pinned at `v1.1.0`).
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLKEM.Concrete.FFI

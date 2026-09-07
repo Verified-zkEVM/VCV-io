@@ -16,7 +16,7 @@ cover traversal and child order, mixed authentication paths, global subtree addr
 and the height-zero boundary.
 -/
 
-@[expose] public section
+public section
 
 namespace VCVioTest.MerkleTreeMonadicCanary
 

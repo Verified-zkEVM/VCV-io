@@ -126,11 +126,6 @@ lemma run_bind' [LawfulMonad m] (x : WriterT ω m α) (f : α → WriterT ω m �
     (x >>= f).run = x.run >>= fun (a, w₁) => Prod.map id (w₁ ++ ·) <$> (f a).run := rfl
 
 @[simp]
-lemma run_seqLeft' {m : Type u → Type v} [Monad m] {ω : Type u} [Monoid ω] {α β : Type u}
-    (x : WriterT ω m α) (y : WriterT ω m β) :
-    (x *> y).run = x.run >>= fun z => Prod.map id (z.2 * ·) <$> y.run := rfl
-
-@[simp]
 lemma run_map' (x : WriterT ω m α) (f : α → β) : (f <$> x).run = Prod.map f id <$> x.run := rfl
 
 /-- `Prod.fst <$> WriterT.run` preserves `pure` (Append flavour). -/

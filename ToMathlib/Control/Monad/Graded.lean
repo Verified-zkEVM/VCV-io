@@ -6,7 +6,7 @@ Authors: Quang Dao
 module
 
 public import Mathlib.Algebra.Group.Basic
-public import ToMathlib.Control.Monad.Indexed
+public import PolyFun.Control.Monad.Indexed
 
 /-!
 # Graded Monads
@@ -246,7 +246,7 @@ end LawfulGradedMonad'
 When the grading monoid is a **group** `G`, every graded monad `F : G → Type → Type` gives rise
 to an indexed monad `IxM i j α := F (i⁻¹ * j) α`.
 
-The group structure is essential: `ireturn` needs `i⁻¹ * i = 1` (left inverse), and `ibind`
+The group structure is essential: `ipure` needs `i⁻¹ * i = 1` (left inverse), and `ibind`
 needs `(i⁻¹ * j) * (j⁻¹ * k) = i⁻¹ * k` (cancellation). For a mere monoid, this construction
 is not available — graded monads and indexed monads are genuinely parallel generalizations. -/
 
@@ -262,7 +262,7 @@ abbrev IxF (F : G → Type u → Type v) (i j : G) (α : Type u) : Type v :=
 /-- A graded monad over a group `G` gives rise to an indexed monad via
 `IxF F i j α := F (i⁻¹ * j) α`. -/
 instance toIndexedMonad : IndexedMonad G (IxF F) where
-  ireturn {α i} a := by
+  ipure {α i} a := by
     change F (i⁻¹ * i) α
     rw [inv_mul_cancel]
     exact gpure a
