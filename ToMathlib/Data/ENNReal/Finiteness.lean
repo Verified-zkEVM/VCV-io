@@ -17,7 +17,7 @@ Mathlib registers `finiteness` rules for `+`, `*`, `-`, `⁻¹`, `/`, powers, an
 rule set's `intros` rule.
 -/
 
-@[expose] public section
+public section
 
 open scoped ENNReal
 

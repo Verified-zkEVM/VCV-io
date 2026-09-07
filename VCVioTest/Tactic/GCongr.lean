@@ -29,6 +29,14 @@ universe u v
 variable {α β : Type u} {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF]
   [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
 
+variable {m' : Type u → Type v} [Monad m'] [MonadLiftT m' SPMF]
+
+/-- The low-priority pointwise fallback does not require support semantics. -/
+example (mx : m' α) (p q : α → Prop) (h : ∀ x, p x → q x) :
+    Pr[ p | mx] ≤ Pr[ q | mx] := by
+  gcongr with x
+  exact h x
+
 example (mx : m α) (f g : α → ℝ≥0∞) (h : ∀ x, f x ≤ g x) :
     ∑' x, Pr[= x | mx] * f x ≤ ∑' x, Pr[= x | mx] * g x := by
   gcongr with x

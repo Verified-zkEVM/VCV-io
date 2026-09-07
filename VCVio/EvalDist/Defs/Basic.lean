@@ -955,11 +955,16 @@ lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
     (h : ∀ x ∈ finSupport mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
   probEvent_mono (fun x hx hpx => h x (mem_finSupport_of_mem_support hx) hpx)
 
+omit [MonadLiftT m SetM] [EvalDistCompatible m] in
 /-- If `p` implies `q` everywhere then `p` is less likely than `q`. Convenience
 specialisation of `probEvent_mono` that drops the support hypothesis. -/
 @[gcongr low]
-lemma probEvent_mono'' (h : ∀ x, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
-  probEvent_mono (fun x _ => h x)
+lemma probEvent_mono'' (h : ∀ x, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] := by
+  have := Classical.decPred p
+  have := Classical.decPred q
+  simp only [probEvent_eq_tsum_ite]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hp : p x <;> by_cases hq : q x <;> simp_all
 
 -- `simp`-only: `grind` saturates on this support-quantifier characterization.
 @[simp low]
