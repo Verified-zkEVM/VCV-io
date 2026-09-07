@@ -16,7 +16,7 @@ runtime to the bare random oracle, the U2 sign-then-hash hop up to the
 programming bad event, and the Step-1 wiring toward the headline bounds.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 
@@ -50,7 +50,7 @@ unforgeability experiment, with the public/random-oracle base simulated by the r
 is the GPV analogue of FiatShamir's fused `base.writerTMapBase implW`: it equals
 `baseW + withLogging signBody`, where `signBody msg = gpvRealImpl … (Sum.inr msg)` is the real GPV
 signing body run on the cache (`reconstructImplW_eq`). -/
-noncomputable def gpvOuter :
+@[expose] noncomputable def gpvOuter :
     QueryImpl (unifSpec + (Salt × M →ₒ Range))
       (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp) :=
   (QueryImpl.ofLift unifSpec ProbComp).liftTarget
@@ -284,7 +284,7 @@ the random oracle at `(r, msg)` and return `eval pk s = c ∧ isShort s` — the
 GPV scheme phrased as a single random-oracle query into the sum spec.  It issues exactly one
 random-oracle query and *no* signing query, so it is a valid signing-free continuation for the
 verify-Bool coupling. -/
-def gpvVerifyRead (pk : PK) (out : M × (Salt × Domain)) :
+@[expose] def gpvVerifyRead (pk : PK) (out : M × (Salt × Domain)) :
     OracleComp ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain))) Bool :=
   let (msg, (r, s)) := out
   (liftM (((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain))).query
@@ -308,7 +308,7 @@ open Classical in
 followed by the verification read, simulated on the *real* fresh flag handler from the empty cache,
 empty signed-set, and unset flag; the winning Bool combines the verification result `z.1.2` with the
 EUF-CMA freshness mask `z.1.1.1 ∉ z.2.1.2` (the forged message is not among the signed messages). -/
-noncomputable def realGameVerifyFresh
+@[expose] noncomputable def realGameVerifyFresh
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt))
     (pk : PK) (sk : SK) : SPMF Bool :=
@@ -324,7 +324,7 @@ open Classical in
 /-- **Programmed verify-Bool game on the freshness-tracking vehicle.** The programmed dual of
 `realGameVerifyFresh`: the same adversary-plus-verification computation simulated on the
 *programmed* fresh flag handler. -/
-noncomputable def progGameVerifyFresh
+@[expose] noncomputable def progGameVerifyFresh
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt))
     (domainSample : PK → ProbComp Domain) (pk : PK) : SPMF Bool :=

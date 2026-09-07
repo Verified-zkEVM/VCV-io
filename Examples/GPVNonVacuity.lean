@@ -34,7 +34,7 @@ and then forges at that same point, so its forgery key is constant and always ca
   `(bijPSF, hr, adv)`, in exactly the shape the headline bounds consume them.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 

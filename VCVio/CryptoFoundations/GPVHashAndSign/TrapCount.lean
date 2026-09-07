@@ -14,7 +14,7 @@ The N5 counter-augmented trap run tagging the forged point with its programming
 index, and its agreement with the untagged run.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 
@@ -50,7 +50,7 @@ open Classical in
 `(Salt × M) → Option ℕ`.  At each programming event (random-oracle miss or signing step) it records
 the current counter value into the index table at the freshly written key and increments the
 counter; on uniform queries and random-oracle cache hits the instrument is left untouched. -/
-noncomputable def progGameRunImplCombinedTrapCount (pk : PK) (sk : SK) :
+@[expose] noncomputable def progGameRunImplCombinedTrapCount (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) ×
         ((Salt × M) → Option Domain)) × (((Salt × M) → Option ℕ) × ℕ)) ProbComp) :=
@@ -531,7 +531,7 @@ external target draw `y ← $ᵗ Range` *equals* this inline-fresh run distribut
 (`evalSPMF_frontDraw_embedTrapImpl_eq_embedTrapFresh`), because the count-`w` miss happens at most
 once and there caching a front-loaded `y` versus an inline-fresh `v` is the same uniform draw, while
 every other step is literally independent of `y` (`embedTrapImpl_run_step_indep_of_target`). -/
-noncomputable def embedTrapFreshImpl (pk : PK) (sk : SK) :
+@[expose] noncomputable def embedTrapFreshImpl (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × ℕ) ProbComp) :=
   let State := (Salt × M →ₒ Range).QueryCache × ℕ
@@ -798,7 +798,7 @@ passive: projecting it away recovers `embedTrapImpl … j y` exactly (`embedTrap
 The point of the augmentation is that at the count-`j` winner random-oracle miss the cached image is
 `y` *and* the recorded index is `j`: this is the run-only witness that the forged point being the
 embedded winner slot (`cache(forged) = some y`) coincides with `idx(forged) = some j`. -/
-noncomputable def embedTrapIdxImpl (pk : PK) (sk : SK) (j : ℕ) (y : Range) :
+@[expose] noncomputable def embedTrapIdxImpl (pk : PK) (sk : SK) (j : ℕ) (y : Range) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((Salt × M →ₒ Range).QueryCache × ℕ) × ((Salt × M) → Option ℕ)) ProbComp) :=
   let State := ((Salt × M →ₒ Range).QueryCache × ℕ) × ((Salt × M) → Option ℕ)
@@ -941,7 +941,7 @@ This is the embed-side mirror of `progGameRunImplCombinedTrapCount`'s index inst
 at each fresh random-oracle miss, the running counter value into an index table keyed at the missed
 point.  It is the run-only bookkeeping that replaces the `y`-reading win literal
 `cache(forged) = some y` of `embedTrapImpl` by the run-only predicate `idx(forged) = some j`. -/
-noncomputable def embedTrapFreshIdxImpl (pk : PK) (sk : SK) :
+@[expose] noncomputable def embedTrapFreshIdxImpl (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((Salt × M →ₒ Range).QueryCache × ℕ) × ((Salt × M) → Option ℕ)) ProbComp) :=
   let State := ((Salt × M →ₒ Range).QueryCache × ℕ) × ((Salt × M) → Option ℕ)

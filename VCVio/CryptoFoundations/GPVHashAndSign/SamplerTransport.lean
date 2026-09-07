@@ -31,7 +31,7 @@ The headline accumulation is `advantage_le_advantage_add_of_trapdoorSample_tvDis
 symmetric two-sided corollary `abs_advantage_toReal_sub_le_of_trapdoorSample_tvDist`.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 

@@ -15,7 +15,7 @@ combined draw-then-query step, the salt-collision coupling at hash-only
 granularity, and the salt-inclusive identical-until-bad coupling primitives.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 
@@ -72,7 +72,7 @@ land at the same image under `psf.eval`.
 
 The detailed construction simulates the adversary's oracle interactions by maintaining
 a programmable RO state, using PSF correctness to ensure consistency. -/
-noncomputable def reduction
+@[expose] noncomputable def reduction
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt))
     (domainSample : PK → ProbComp Domain) :
@@ -141,7 +141,7 @@ symmetric budget below the difference is immaterial.
 
 For Falcon with 40-byte salts (`|Salt| = 2^320`) and `qSign, qHash ≤ 2^64`:
   `collisionBound (Bytes 40) (2^64) (2^64) = 2^130 / (2 · 2^320) = 2^{-191}`. -/
-noncomputable def collisionBound (qSign qHash : ℕ) : ENNReal :=
+@[expose] noncomputable def collisionBound (qSign qHash : ℕ) : ENNReal :=
   ((qSign + qHash : ℕ) : ENNReal) ^ 2 / (2 * Fintype.card Salt)
 
 open scoped Classical in
@@ -243,7 +243,7 @@ membership in the recorded random-oracle input set `c j` (the salts and hash inp
 `j`-th signing query). It returns `true` iff some draw collides with its recorded set. This is the
 salt-averaged abstraction of "draw a fresh signing salt, then query the random oracle at it":
 firing is integrated over the fresh draw rather than evaluated at a fixed query input. -/
-noncomputable def saltSeq (c : ℕ → Finset Salt) : (n : ℕ) → ProbComp Bool
+@[expose] noncomputable def saltSeq (c : ℕ → Finset Salt) : (n : ℕ) → ProbComp Bool
   | 0 => pure false
   | (n + 1) => do
       let r ← ($ᵗ Salt : ProbComp Salt)

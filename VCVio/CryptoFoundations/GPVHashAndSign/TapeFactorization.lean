@@ -14,7 +14,7 @@ The front salt-tape factorization of the game runs and the direct front-tape
 derivation of the Step-1 total-variation bound.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 

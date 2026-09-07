@@ -23,7 +23,7 @@ structural query-bound predicates, and the collision-finding and
 programmed-preimage adversary interfaces with their experiments.
 -/
 
-@[expose] public section
+public section
 
 universe v
 
@@ -60,7 +60,7 @@ def Correct (psf : PreimageSampleableFunction PK SK Domain Range) : Prop :=
 /-- A PSF is correct *at a fixed key pair* `(pk, sk)` if the trapdoor sampler at that key always
 produces a valid preimage that is accepted by the shortness predicate. This is the per-key slice of
 `Correct`: `Correct psf` is definitionally `∀ pk sk, psf.CorrectAt pk sk`. -/
-def CorrectAt (psf : PreimageSampleableFunction PK SK Domain Range) (pk : PK) (sk : SK) : Prop :=
+@[expose] def CorrectAt (psf : PreimageSampleableFunction PK SK Domain Range) (pk : PK) (sk : SK) : Prop :=
   ∀ (t : Range) (x : Domain), x ∈ support (psf.trapdoorSample pk sk t) →
     psf.eval pk x = t ∧ psf.isShort x = true
 
@@ -84,7 +84,7 @@ The property is satisfiable in principle: when `eval pk` is a bijection,
 `trapdoorSample pk sk c := pure ((eval pk)⁻¹ c)` and `domainSample pk := $ᵗ Domain` realize
 the equality. It is also non-trivial: the equation genuinely constrains `domainSample` against
 the trapdoor sampler, so it is not vacuously true. -/
-def Regularity [SampleableType Range]
+@[expose] def Regularity [SampleableType Range]
     (psf : PreimageSampleableFunction PK SK Domain Range) : Prop :=
   ∃ domainSample : PK → ProbComp Domain,
     ∀ (pk : PK) (sk : SK),
@@ -109,7 +109,7 @@ Given a preimage sampleable function `psf`, a generable key relation `hr`, and a
 
 The signature type is `Salt × Domain` (salt paired with the short preimage).
 The oracle spec is `unifSpec + (Salt × M →ₒ Range)` (uniform sampling + random oracle). -/
-def GPVHashAndSign
+@[expose] def GPVHashAndSign
     {m : Type → Type v} [Monad m]
     {PK SK Domain Range : Type}
     (psf : PreimageSampleableFunction PK SK Domain Range)
@@ -140,7 +140,7 @@ variable {PK SK Domain Range : Type}
   (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt] [Fintype Salt]
 
 /-- Runtime bundle for the GPV hash-and-sign random-oracle world. -/
-noncomputable def runtime :
+@[expose] noncomputable def runtime :
     ProbCompRuntime (OracleComp (unifSpec + (Salt × M →ₒ Range))) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := (randomOracle :
@@ -155,7 +155,7 @@ unrestricted.
 Defined as the conjunction of two predicate-targeted query bounds `IsQueryBoundP`, one per
 counted oracle. Because the two index predicates are disjoint, the conjunction is
 equivalent to the prior single-vector `IsQueryBound` formulation. -/
-def signHashQueryBound {S' α : Type}
+@[expose] def signHashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ S')) α)
     (qSign qHash : ℕ) : Prop :=
   oa.IsQueryBoundP (· matches .inr _) qSign ∧
@@ -166,7 +166,7 @@ short preimages with the same image under `psf.eval`. -/
 abbrev CollisionAdversary := PK → ProbComp (Domain × Domain)
 
 /-- Keyed collision-finding experiment for a preimage sampleable function. -/
-def collisionFindingExp [DecidableEq Domain]
+@[expose] def collisionFindingExp [DecidableEq Domain]
     (adversary : CollisionAdversary (PK := PK) (Domain := Domain)) :
     ProbComp Bool := do
   let pk ← do
@@ -179,7 +179,7 @@ def collisionFindingExp [DecidableEq Domain]
     psf.isShort x₂
 
 /-- Success probability in the keyed collision-finding experiment. -/
-noncomputable def collisionFindingAdvantage [DecidableEq Domain]
+@[expose] noncomputable def collisionFindingAdvantage [DecidableEq Domain]
     (adversary : CollisionAdversary (PK := PK) (Domain := Domain)) :
     ℝ≥0∞ :=
   Pr[= true | collisionFindingExp (psf := psf) (hr := hr) adversary]
@@ -193,7 +193,7 @@ abbrev ProgrammedPreimageAdversary := PK → Range → ProbComp Domain
 The challenger samples an honest key pair, then chooses a uniformly random target `y` and a
 hidden short preimage `x ← trapdoorSample pk sk y`. The adversary sees only `(pk, y)` and
 succeeds iff it reproduces exactly the hidden programmed preimage `x`. -/
-def programmedPreimageExp [DecidableEq Domain]
+@[expose] def programmedPreimageExp [DecidableEq Domain]
     (adversary : ProgrammedPreimageAdversary
       (PK := PK) (Domain := Domain) (Range := Range)) :
     ProbComp Bool := do
@@ -204,7 +204,7 @@ def programmedPreimageExp [DecidableEq Domain]
   return decide (x' = x)
 
 /-- Success probability in the exact-match programmed-preimage experiment. -/
-noncomputable def programmedPreimageAdvantage [DecidableEq Domain]
+@[expose] noncomputable def programmedPreimageAdvantage [DecidableEq Domain]
     (adversary : ProgrammedPreimageAdversary
       (PK := PK) (Domain := Domain) (Range := Range)) :
     ℝ≥0∞ :=

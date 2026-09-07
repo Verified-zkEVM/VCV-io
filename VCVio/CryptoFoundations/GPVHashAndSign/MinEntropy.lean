@@ -33,7 +33,7 @@ turns the exact-match branch of `GPVHashAndSign.euf_cma_collision_bound` into a 
 negligible term.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal
 

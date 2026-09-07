@@ -22,7 +22,7 @@ all-adversaries corollaries `euf_cma_split_bound_of_queryBound` and
 the adversary is the query bound.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 

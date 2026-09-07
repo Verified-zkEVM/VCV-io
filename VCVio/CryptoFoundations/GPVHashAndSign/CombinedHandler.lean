@@ -15,7 +15,7 @@ lockstep, its projections onto each factor, the write-only-table deferral, and
 the cache/table coherence invariant.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 
@@ -60,7 +60,7 @@ the hidden table at the queried point; the signing handler does the same at the 
 `(r, msg)`. Cache hits and uniform queries leave the table untouched. The reduction's body equals
 running the adversary under this handler from `(∅, fun _ => none)` and reading the hidden preimage
 off the final table (`reduction_eq_run_reductionImpl`). -/
-noncomputable def reductionImpl (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose] noncomputable def reductionImpl (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × ((Salt × M) → Option Domain)) ProbComp) :=
   let State := (Salt × M →ₒ Range).QueryCache × ((Salt × M) → Option Domain)
@@ -112,7 +112,7 @@ at every other entry and at every signing entry, and NEVER overwriting an alread
 embed index `w` is fixed before the run, so the simulated random oracle is consistent under
 re-query. Signing entries always return a valid signature `(r, s)` with `psf.eval pk s` the cached
 value. -/
-noncomputable def embedAtIndexImpl (domainSample : PK → ProbComp Domain) (pk : PK)
+@[expose] noncomputable def embedAtIndexImpl (domainSample : PK → ProbComp Domain) (pk : PK)
     (w : ℕ) (y : Range) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × ℕ) ProbComp) :=
@@ -212,7 +212,7 @@ signing step the joint law of the `(returned domain component, cached image)` pa
 Threaded through the adaptive fold by the same-state engine
 (`evalSPMF_run_embedAtIndexImpl_eq_embedTrap`), it makes the embed run an all-uniform consistent
 random oracle (modulo `y` at the winner), matching the trapdoor-recording combined run's cache. -/
-noncomputable def embedTrapImpl (pk : PK) (sk : SK)
+@[expose] noncomputable def embedTrapImpl (pk : PK) (sk : SK)
     (w : ℕ) (y : Range) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × ℕ) ProbComp) :=
@@ -424,7 +424,7 @@ the short preimage `s ← domainSample pk` *once* and uses it for both the game 
 
 Dropping the table recovers `progGameRunImplNoRecFlagFresh`; dropping the signed-set and flag
 recovers `reductionImpl`. -/
-noncomputable def progGameRunImplCombined (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose] noncomputable def progGameRunImplCombined (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) ×
         ((Salt × M) → Option Domain))) ProbComp) :=
@@ -644,7 +644,7 @@ Because the recorded preimage is never read during the run (the table is write-o
 `progGameRunImplCombined` under GPV regularity `hreg`
 (`evalSPMF_run_progGameRunImplCombinedTrap_eq`): the only per-step difference is the joint law of
 the `(cached image, recorded preimage)` pair, which `hreg` equates. -/
-noncomputable def progGameRunImplCombinedTrap (pk : PK) (sk : SK) :
+@[expose] noncomputable def progGameRunImplCombinedTrap (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) ×
         ((Salt × M) → Option Domain))) ProbComp) :=
@@ -866,7 +866,7 @@ a genuine `psf.eval`-collision off any forged fresh point. -/
 
 /-- **Cache/table coherence predicate.** At every programmed point, a recorded hidden preimage in
 the table is a `psf.eval pk`-preimage of the cached random-oracle value there. -/
-def combinedCacheTableInv (pk : PK)
+@[expose] def combinedCacheTableInv (pk : PK)
     (s : (((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) × ((Salt × M) → Option Domain)) :
     Prop :=
   ∀ t : Salt × M, ∀ d : Domain, s.2 t = some d → s.1.1.1 t = some (psf.eval pk d)
@@ -951,7 +951,7 @@ lemma progGameRunImplCombined_run_inv (domainSample : PK → ProbComp Domain) (p
 is the `psf.eval pk`-image of a recorded hidden preimage in the table.  This is the direction the
 distinct-collision transfer needs: a verifying forgery hits a *cached* point, and this invariant
 exhibits the simulator's hidden preimage there. -/
-def combinedCacheImpliesTableInv (pk : PK)
+@[expose] def combinedCacheImpliesTableInv (pk : PK)
     (s : (((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) × ((Salt × M) → Option Domain)) :
     Prop :=
   ∀ t : Salt × M, ∀ v : Range, s.1.1.1 t = some v → ∃ d : Domain, s.2 t = some d ∧ v = psf.eval pk d
@@ -1032,7 +1032,7 @@ lemma progGameRunImplCombined_run_cacheImpliesTable (domainSample : PK → ProbC
 lies in the support of the forward sampler `domainSample pk`. Every table write `t ↦ sd` records a
 freshly drawn `sd ← domainSample pk`, so it is in the sampler's support; uniform queries and cache
 hits leave the table untouched. -/
-def combinedTableInDomainInv (M Salt : Type) (domainSample : PK → ProbComp Domain) (pk : PK)
+@[expose] def combinedTableInDomainInv (M Salt : Type) (domainSample : PK → ProbComp Domain) (pk : PK)
     (s : (((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) × ((Salt × M) → Option Domain)) :
     Prop :=
   ∀ t : Salt × M, ∀ d : Domain, s.2 t = some d → d ∈ support (domainSample pk)

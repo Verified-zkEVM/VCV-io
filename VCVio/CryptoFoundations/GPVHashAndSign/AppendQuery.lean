@@ -40,7 +40,7 @@ unstated convention at the instantiation. The `ForgesQueriedPoint`-hypothesis fo
 `Security.lean` are the primitives the compiler chains through.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal
 
@@ -91,7 +91,7 @@ once at the forgery point `(salt, msg) = (out.2.1, out.1)` (an ambient `.inl (.i
 no signing query), and returns the forgery unchanged.  The compiled adversary satisfies the
 `ForgesQueriedPoint` convention unconditionally, makes one extra hash query, and has the same
 EUF-CMA advantage as `adv` (`advantage_appendForgeQuery`). -/
-def appendForgeQuery
+@[expose] def appendForgeQuery
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt)) :
     SignatureAlg.unforgeableAdv

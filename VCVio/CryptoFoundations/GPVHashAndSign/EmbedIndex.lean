@@ -14,7 +14,7 @@ The signed-set-augmented index embed handlers realizing the pre-sampled
 embed-index programming of the random oracle.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 
@@ -45,7 +45,7 @@ the signing branch inserts the queried message; random-oracle misses and uniform
 signed set unchanged.  The signed set is never *read* during the run, so it is distributionally
 passive: projecting it away recovers `embedTrapIdxImpl … j y` exactly
 (`embedTrapIdxSigImpl_proj`). -/
-noncomputable def embedTrapIdxSigImpl (pk : PK) (sk : SK) (j : ℕ) (y : Range) :
+@[expose] noncomputable def embedTrapIdxSigImpl (pk : PK) (sk : SK) (j : ℕ) (y : Range) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((((Salt × M →ₒ Range).QueryCache × ℕ) × ((Salt × M) → Option ℕ)) × Finset M)
         ProbComp) :=
@@ -190,7 +190,7 @@ passive signed-set `Finset M`: the signing branch inserts the queried message; r
 and uniform queries leave the signed set unchanged.  The signed set is never *read* during the run,
 so it is distributionally passive: projecting it away recovers `embedTrapFreshIdxImpl` exactly
 (`embedTrapFreshIdxSigImpl_proj`). -/
-noncomputable def embedTrapFreshIdxSigImpl (pk : PK) (sk : SK) :
+@[expose] noncomputable def embedTrapFreshIdxSigImpl (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((((Salt × M →ₒ Range).QueryCache × ℕ) × ((Salt × M) → Option ℕ)) × Finset M)
         ProbComp) :=

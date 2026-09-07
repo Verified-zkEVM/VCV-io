@@ -15,7 +15,7 @@ game, the forger-queries-its-forgery-point predicate, and the programmed
 verify-game machinery it feeds.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 
@@ -413,7 +413,7 @@ hash query at its forgery point (absorbed into `qHash`).  It rules out the degen
 "forge on a never-queried point" case, in which the verification read would program the point
 *fresh* — a value independent of the forged preimage — which neither the collision nor the
 programmed-preimage reduction observes. -/
-def ForgesQueriedPoint
+@[expose] def ForgesQueriedPoint
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt))
     (domainSample : PK → ProbComp Domain) : Prop :=
@@ -911,7 +911,7 @@ survives.  The recorded winner is the index of the entry at which the reduction 
 external target.  Its winner marginal is the data-independent core of the reservoir analysis:
 `probOutput_reservoirWinnerIndex_eq` shows each of the `N` entries is the winner with probability
 exactly `1 / N`. -/
-noncomputable def reservoirWinnerIndex : ℕ → ProbComp (Option ℕ)
+@[expose] noncomputable def reservoirWinnerIndex : ℕ → ProbComp (Option ℕ)
   | 0 => pure none
   | k + 1 => do
       let w ← reservoirWinnerIndex k
@@ -1126,7 +1126,7 @@ lemma probOutput_reservoirWinnerIndex_ge (N j Q : ℕ) (hj : j < N) (hNQ : N ≤
 the adversary under `embedAtIndexImpl` from the empty state and returns the forged preimage. Unlike
 the online reservoir handler, the embed index is fixed before the run, so the simulated random
 oracle is consistent under re-query. -/
-noncomputable def programmedPreimageReduction
+@[expose] noncomputable def programmedPreimageReduction
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt))
     (domainSample : PK → ProbComp Domain) (qSign qHash : ℕ) :

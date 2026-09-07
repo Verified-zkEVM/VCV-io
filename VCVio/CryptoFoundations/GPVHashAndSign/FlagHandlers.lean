@@ -14,7 +14,7 @@ The flag-instrumented original (inline-salt) handlers and the
 freshness-tracking vehicle carrying the signed-set product factor.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic.Relational
 
@@ -56,7 +56,7 @@ Unlike the tape handler `gpvRealImplTapeFlag`, the salt is drawn *inline at the 
 the collision decision is made against the cache the body actually queries, and there is no
 empty-tape fallback branch: the off-bad per-query agreement is genuinely universal (no spurious bad
 state). -/
-noncomputable def gpvRealImplFlag (pk : PK) (sk : SK) :
+@[expose] noncomputable def gpvRealImplFlag (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × Bool) ProbComp) :=
   fun t => StateT.mk fun s =>
@@ -74,7 +74,7 @@ open Classical in
 `progGameRunImplNoRec` threaded with the same collision flag (set on a signing step when the
 inline-drawn salt `r` is already a key of the cache). Its `run'`-projection is the original
 `progGameRunImplNoRec`. -/
-noncomputable def progGameRunImplNoRecFlag (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose] noncomputable def progGameRunImplNoRecFlag (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × Bool) ProbComp) :=
   fun t => StateT.mk fun s =>
@@ -923,7 +923,7 @@ and random-oracle-read queries leave the signed-set and flag untouched; a signin
 fresh inline salt `r ← $ᵗ Salt`, runs the underlying real signing body on the cache component,
 *inserts the message* into the signed-set, and OR-s the collision flag with `saltKeyed`. Projecting
 the signed-set away recovers `gpvRealImplFlag`. -/
-noncomputable def gpvRealImplFlagFresh (pk : PK) (sk : SK) :
+@[expose] noncomputable def gpvRealImplFlagFresh (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) ProbComp) :=
   fun t => StateT.mk fun s =>
@@ -942,7 +942,7 @@ open Classical in
 `gpvRealImplFlagFresh`: `progGameRunImplNoRecFlag` extended with the same passive signed-set,
 inserting the message on each signing step. Projecting the signed-set away recovers
 `progGameRunImplNoRecFlag`. -/
-noncomputable def progGameRunImplNoRecFlagFresh (domainSample : PK → ProbComp Domain) (pk : PK) :
+@[expose] noncomputable def progGameRunImplNoRecFlagFresh (domainSample : PK → ProbComp Domain) (pk : PK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT (((Salt × M →ₒ Range).QueryCache × Finset M) × Bool) ProbComp) :=
   fun t => StateT.mk fun s =>
@@ -1315,7 +1315,7 @@ the signed-set; non-signing queries leave the signed-set untouched. Projecting t
 `gpvRealImplFlagFresh` recovers this handler.  Because the winning Bool of the freshness verify
 games (`decide (msg ∉ signedSet) && verified`) never reads the flag, the flag-free vehicle carries
 exactly the information the game observes. -/
-noncomputable def gpvRealImplFresh (pk : PK) (sk : SK) :
+@[expose] noncomputable def gpvRealImplFresh (pk : PK) (sk : SK) :
     QueryImpl ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ (Salt × Domain)))
       (StateT ((Salt × M →ₒ Range).QueryCache × Finset M) ProbComp) :=
   fun t => StateT.mk fun s =>
