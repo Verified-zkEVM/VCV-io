@@ -123,8 +123,8 @@ lemma enncard_empty : enncard (∅ : QueryCache spec) = 0 := by
 
 variable [DecidableEq ι] (cache : QueryCache spec)
 
-/- `simp` does not currently specialize Mathlib's dependent `Function.update` equations through
-the `QueryCache` abbreviation. Keep that representation detail behind cache-specific equations. -/
+/- Named wrappers keep the dependent `Function.update` representation detail available for
+explicit rewriting at the `QueryCache` API boundary; generic `simp` also handles these forms. -/
 lemma functionUpdate_self (t : spec.Domain) (u : spec.Range t) :
     Function.update cache t (some u) t = some u :=
   Function.update_self t (some u) cache
