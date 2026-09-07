@@ -1383,7 +1383,7 @@ def probEqActionPlans : List (List ProbEqAction) :=
   ]
 
 private def probEqPlannerActionPlans : List (List ProbEqAction) :=
-  probEqRewritePlans 4 ++ probEqCongrPlans 3 ++
+  List.append (List.append (probEqRewritePlans 4) (probEqCongrPlans 3))
     [ [.congr]
     , [.congrNoSupport]
     , [.congr, .swap]
@@ -1424,7 +1424,7 @@ private def probEqBindDepth? (target : Expr) : Option Nat := do
 private def probEqPlannerActionPlansForDepth (bindDepth : Nat) : List (List ProbEqAction) :=
   let maxRewriteDepth := Nat.min 4 (bindDepth - 2)
   let maxCongrDepth := Nat.min 3 bindDepth
-  probEqRewritePlans maxRewriteDepth ++ probEqCongrPlans maxCongrDepth ++
+  List.append (List.append (probEqRewritePlans maxRewriteDepth) (probEqCongrPlans maxCongrDepth))
     [ [.congr]
     , [.congrNoSupport]
     , [.congr, .swap]

@@ -77,7 +77,7 @@ private theorem bitOf_lt_two_fin (b : UInt8) (j : Fin 8) : bitOf b j.val < 2 :=
 
 private theorem packByte_bitOf_fin :
     ∀ n : Fin (2 ^ 8), packByte (fun j => bitOf n.val.toUInt8 j.val) = n.val.toUInt8 := by
-  intro n; fin_cases n <;> rfl
+  decide +kernel
 
 private theorem packByte_bitOf_byte (b : UInt8) :
     packByte (fun j => bitOf b j.val) = b := by
