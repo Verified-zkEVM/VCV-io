@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Workflow actions are pinned to commit SHAs (with the tag in a trailing comment); this keeps
+  # the pins current. The native backends under third_party/ are deliberately not bumped here.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: ci

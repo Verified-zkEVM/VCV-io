@@ -23,7 +23,6 @@ quotient ring `R[X] / (X^n + 1)`. The proof decomposes into:
 
 @[expose] public section
 
-open scoped BigOperators
 open Polynomial
 
 namespace LatticeCrypto

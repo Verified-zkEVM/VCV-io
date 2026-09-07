@@ -104,7 +104,7 @@ class SubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
 | `onQuery : spec.Domain → superSpec.Domain` | `toFunA : P.A → Q.A` |
 | `onResponse t : superSpec.Range (onQuery t) → spec.Range t` | `toFunB t : Q.B (toFunA t) → P.B t` |
 
-By the Yoneda lemma for polynomial functors this lens data is in bijection with natural transformations `OracleQuery spec ⟹ OracleQuery superSpec`. The `MonadLift` parent records that natural transformation; the `liftM_eq_lift` field is the propositional coherence axiom forcing it to agree with the lens. Concrete `SubSpec` instances spell `monadLift` out *by hand* (rather than letting it default from the lens data), so that the lifted query reduces fully under `isDefEq` — this is what makes pattern-matching simp lemmas like `probEvent_liftComp` actually fire.
+By the Yoneda lemma for polynomial functors this lens data is in bijection with natural transformations `OracleQuery spec ⟹ OracleQuery superSpec`. The `MonadLift` parent records that natural transformation; the `liftM_eq_lift` field is the propositional coherence axiom forcing it to agree with the lens. Concrete `SubSpec` instances spell `monadLift` out *by hand* (rather than letting it default from the lens data), so that the lifted query reduces fully under `isDefEq` — this lets pattern-matching equations such as `probEvent_liftComp` apply through their registered automation or explicitly by name.
 
 `SubSpec.toLens` exposes the underlying lens; `SubSpec.trans` is composition of these lenses; `MonadLiftT.refl` covers the identity.
 
@@ -265,15 +265,16 @@ For `OracleComp`, `support` is always available and is *definitionally* `simulat
 `evalSPMF : OracleComp spec α → SPMF α` is available under `[IsProbabilitySpec spec]` and is *definitionally* (`rfl`) `simulateQ` into `PMF`, then lifted to `SPMF`, with each query interpreted by `IsProbabilitySpec.toPMF`:
 
 ```lean
-noncomputable instance instMonadLiftTPMF [IsProbabilitySpec spec] :
-    MonadLiftT (OracleComp spec) PMF where
+-- `PFunctor.FreeM.instMonadLiftTPMF`, specialised to `OracleComp spec`:
+noncomputable instance [IsProbabilitySpec spec] : MonadLiftT (OracleComp spec) PMF where
   monadLift mx := simulateQ IsProbabilitySpec.toPMF mx
 ```
 
 The primary `evalDist` / `𝒟[…]` façade is the successful-output Mathlib measure. Whenever an
 `IsMeasureSpec` is installed, `FreeM.evalDist_eq_denote` identifies it definitionally with the
-direct recursive measure fold. `Pr[...]` stays a scalar adapter; use `probOutput_eq_evalDist`,
-`probEvent_eq_evalDist`, and `probFailure_eq_evalDist` to cross that boundary.
+direct recursive measure fold (`𝒟[…]` stays the public head; the lemma is a transport, not a
+simp rule). `Pr[...]` stays a scalar adapter; `evalDist_apply_singleton`, `evalDist_apply_setOf`,
+`evalDist_apply_univ` and `lintegral_evalDist` cross that boundary in the simp direction.
 
 Uniform response semantics are supplied by `[IsUniformSpec spec]`, which bundles `[spec.Fintype]`, `[spec.Inhabited]`, `[IsProbabilitySpec spec]`, and a proof that `toPMF` is `PMF.uniformOfFintype`. The bridge from `support` to `SPMF.support 𝒮[...]` is `EvalDistCompatible (OracleComp spec)` and also requires `[IsUniformSpec spec]`.
 

@@ -18,7 +18,7 @@ The `invSigmaRaw` array stores 11 `UInt64` values (for `logn` 0..10) representin
 inverse of the normalization factor `sigma`.
 -/
 
-@[expose] public section
+public section
 
 
 namespace Falcon.Concrete.GMTable

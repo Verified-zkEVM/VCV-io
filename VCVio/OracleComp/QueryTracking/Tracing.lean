@@ -116,9 +116,6 @@ lemma neverFail_run_simulateQ_withTraceBefore_iff [LawfulMonad m]
     NeverFail (simulateQ (so.withTraceBefore traceFn) mx).run ↔ NeverFail (simulateQ so mx) := by
   simp only [neverFail_iff, probFailure_run_simulateQ_withTraceBefore]
 
-@[deprecated (since := "2026-06-25")]
-alias NeverFail_run_simulateQ_withTraceBefore_iff := neverFail_run_simulateQ_withTraceBefore_iff
-
 /-- When every query traces to the monoid identity `1`, `withTraceBefore` is a
 no-op up to pairing with `1`. -/
 @[simp]
@@ -203,9 +200,6 @@ lemma neverFail_run_simulateQ_withTrace_iff [LawfulMonad m] [MonadLiftT m SPMF]
     NeverFail (simulateQ (so.withTrace traceFn) mx).run ↔ NeverFail (simulateQ so mx) := by
   simp only [neverFail_iff, probFailure_run_simulateQ_withTrace]
 
-@[deprecated (since := "2026-06-25")]
-alias NeverFail_run_simulateQ_withTrace_iff := neverFail_run_simulateQ_withTrace_iff
-
 /-- When every query/response pair traces to the monoid identity `1`,
 `withTrace` is a no-op up to pairing with `1`. -/
 @[simp]
@@ -288,10 +282,6 @@ lemma neverFail_run_simulateQ_withTraceAppendBefore_iff [LawfulMonad m]
       NeverFail (simulateQ so mx) := by
   simp only [neverFail_iff, probFailure_run_simulateQ_withTraceAppendBefore]
 
-@[deprecated (since := "2026-06-25")]
-alias NeverFail_run_simulateQ_withTraceAppendBefore_iff :=
-  neverFail_run_simulateQ_withTraceAppendBefore_iff
-
 /-! #### `evalSPMF` / `probOutput` / `support` bridges for `withTraceAppendBefore` -/
 
 lemma evalSPMF_fst_run_withTraceAppendBefore [LawfulMonad m] [LawfulAppend ω] [MonadLiftT m SPMF]
@@ -365,9 +355,6 @@ lemma neverFail_run_simulateQ_withTraceAppend_iff [LawfulMonad m]
     NeverFail (simulateQ (so.withTraceAppend traceFn) mx).run ↔
       NeverFail (simulateQ so mx) := by
   simp only [neverFail_iff, probFailure_run_simulateQ_withTraceAppend]
-
-@[deprecated (since := "2026-06-25")]
-alias NeverFail_run_simulateQ_withTraceAppend_iff := neverFail_run_simulateQ_withTraceAppend_iff
 
 /-! #### `evalSPMF` / `probOutput` / `support` bridges for `withTraceAppend` -/
 

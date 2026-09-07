@@ -392,7 +392,8 @@ script test (args) do
     #["exe", "slhdsa_xmss_tests"],
     #["exe", "slhdsa_fors_tests"],
     #["exe", "slhdsa_hypertree_tests"],
-    #["exe", "slhdsa_external_tests"]]
+    #["exe", "slhdsa_external_tests"],
+    #["exe", "slhdsa_target_ledger_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -449,6 +450,9 @@ lean_exe slhdsa_hypertree_tests where
 /-- Algorithms 21--25 message boundary and all twelve ACVP pre-hash digest/OID canaries. -/
 lean_exe slhdsa_external_tests where
   root := `HashSigTest.SLHDSA.External
+
+lean_exe slhdsa_target_ledger_tests where
+  root := `HashSigTest.SLHDSA.ReachableTargets
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop

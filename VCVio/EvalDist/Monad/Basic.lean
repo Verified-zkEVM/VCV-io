@@ -417,6 +417,19 @@ end support
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   [MonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [MonadLiftT m SetM] [EvalDistCompatible m] in
+/-- The compatibility adapter satisfies the Giry `pure`/`bind` laws for every lawful `SPMF`
+lift, so the `𝒟`-level laws (`evalDist_pure`, `evalDist_bind`, `evalDist_map`, …) hold with no
+measure specification in scope. -/
+instance instLawfulEvalDistSemanticsOfMonadLiftTSPMF : LawfulEvalDistSemantics m where
+  denote_pure x := by
+    change (𝒮[(pure x : m _)]).toMeasure = _
+    simp
+  denote_bind mx f hf := by
+    change (𝒮[mx >>= f]).toMeasure = _
+    rw [evalSPMF_bind]
+    exact (𝒮[mx]).toMeasure_bind' _ hf
+
 lemma probOutput_bind_of_const (mx : m α)
     {my : α → m β} {y : β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[= y | my x] = r) :
     Pr[= y | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
@@ -918,9 +931,6 @@ lemma probEvent_compl_le_of_one_sub_le
     simpa [hfail, add_comm] using probEvent_compl mx p
   rwa [ENNReal.eq_sub_of_add_eq probEvent_ne_top hsum, tsub_le_iff_tsub_le]
 
-@[deprecated (since := "2026-06-25")]
-alias probEvent_compl_le_of_ge := probEvent_compl_le_of_one_sub_le
-
 omit [Monad m] in
 /-- If `Pr[ ¬p | mx] ≤ ε` and `mx` never fails, then `1 - ε ≤ Pr[ p | mx]`. -/
 lemma probEvent_one_sub_le_of_compl_le
@@ -932,9 +942,6 @@ lemma probEvent_one_sub_le_of_compl_le
     simpa [hfail] using probEvent_compl mx p
   rw [ENNReal.eq_sub_of_add_eq probEvent_ne_top hsum]
   exact tsub_le_tsub_left h _
-
-@[deprecated (since := "2026-06-25")]
-alias probEvent_ge_of_compl_le := probEvent_one_sub_le_of_compl_le
 
 end swap_compl
 

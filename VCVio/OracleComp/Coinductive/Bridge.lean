@@ -16,7 +16,8 @@ same polynomial functor. Every finite, terminating `OracleComp` program has
 a canonical embedding into the (potentially-infinite) ITree world.
 
 This module provides that embedding, `OracleComp.toITree`, together with the
-structural simp lemmas (`toITree_pure`, `toITree_queryBind`) that compute it.
+structural equations (`toITree_pure`, `toITree_queryBind`) that compute it;
+`toITree_pure` is also registered as a simp lemma.
 
 The reverse map "ITree-to-OracleComp" exists *only* on terminating ITrees
 and requires productivity / well-foundedness arguments that are not yet

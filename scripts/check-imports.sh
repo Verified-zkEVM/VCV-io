@@ -15,6 +15,15 @@ cd "$REPO_ROOT"
 UMBRELLAS=(ToMathlib.lean VCVio.lean LatticeCrypto.lean Extern.lean HashSig.lean Examples.lean
   VCVioWidgets.lean VCVioTest.lean Interop.lean)
 
+# A missing umbrella must fail before regeneration: otherwise it would be created without
+# comparison or an original file to restore, silently turning this check into a repair.
+for f in "${UMBRELLAS[@]}"; do
+  if [[ ! -f "$f" ]]; then
+    echo "ERROR: required umbrella $f is missing; run ./scripts/update-lib.sh." >&2
+    exit 1
+  fi
+done
+
 STASH="$(mktemp -d "${TMPDIR:-/tmp}/vcvio-umbrellas.XXXXXX")"
 restore() {
   local f

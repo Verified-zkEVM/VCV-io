@@ -33,7 +33,6 @@ public import VCVio.CryptoFoundations.FiatShamir.WithAbort
 public import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
 public import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
 public import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
-public import VCVio.CryptoFoundations.Fischlin
 public import VCVio.CryptoFoundations.Fischlin.Completeness
 public import VCVio.CryptoFoundations.Fischlin.CostAccounting
 public import VCVio.CryptoFoundations.Fischlin.Defs
@@ -55,13 +54,14 @@ public import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.Collection
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.FinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.OpenPREFromTCRDSPR
-public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPR
-public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTOpenPRE
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPRFinalValidity
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTOpenPREFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTPRE
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTPREFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTTCR
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTTCRFinalValidity
-public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTUDC
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTUDFinalValidity
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.ToFinalValidity
 public import VCVio.CryptoFoundations.HashCommitment
 public import VCVio.CryptoFoundations.IdenSchemeWithAbort
 public import VCVio.CryptoFoundations.KEMDEM
@@ -140,6 +140,7 @@ public import VCVio.EvalDist.Defs.Support
 public import VCVio.EvalDist.Divergence.KLDivergence
 public import VCVio.EvalDist.Expectation
 public import VCVio.EvalDist.ExpectationMeasure
+public import VCVio.EvalDist.FailureMeasure
 public import VCVio.EvalDist.Fintype
 public import VCVio.EvalDist.IndepProduct
 public import VCVio.EvalDist.Inequalities

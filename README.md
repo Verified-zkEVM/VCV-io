@@ -24,9 +24,10 @@ Assuming Lean and Lake are already installed, the project can be built by just r
 lake exe cache get && lake build
 ```
 
-`lake build` covers the seven proof libraries. `./scripts/validate.sh` runs the per-PR CI
-checks locally, `lake test` builds the test libraries and runs the test executables, and
-`lake lint` runs the environment linters (see `AGENTS.md`, *Building*).
+`lake build` covers the seven proof libraries. `./scripts/validate.sh` runs the fast per-PR
+checks locally; add `--lint`, `--test`, or `--axioms` for those CI passes. `lake test` builds the
+test libraries and runs the test executables, and `lake lint` runs the environment linters
+(see `AGENTS.md`, *Building*).
 
 CI's timed build covers the non-test Lean libraries `ToMathlib`, `VCVio`,
 `LatticeCrypto`, `Extern`, `HashSig`, `Examples`, and `VCVioWidgets`.
@@ -58,7 +59,10 @@ infrastructure and some tooling and automation remain under active development.
 - `VCVio/` contains the oracle-computation framework, probability semantics, program logic, and generic crypto abstractions.
 - `LatticeCrypto/` contains lattice algebra, hardness assumptions, ML-DSA, ML-KEM, Falcon, and their concrete implementations.
 - `Extern/` contains the native FFI surface: the `@[extern]` bindings and the FFI-backed concrete instances. Its `extern_lib`s build as empty stubs when the `third_party/` submodules are absent.
-- `HashSig/` contains hash-based signatures, including proof-level specifications and security for SLH-DSA.
+- `HashSig/` contains hash-based signatures: proof-level specifications, component-level FIPS 205
+  conformance results, and security-facing interfaces for SLH-DSA. Neither an unforgeability
+  theorem nor a complete FIPS conformance result is proved yet; see
+  `docs/design/slh-dsa-status-and-roadmap.md`.
 - `LatticeCryptoTest/` contains ACVP vectors, regression tests, and differential checks against native backends.
 - `HashSigTest/` contains hash-signature test and validation modules.
 - `Examples/` contains compact framework proofs including OneTimePad, ElGamal, and Schnorr.

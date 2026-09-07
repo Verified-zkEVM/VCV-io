@@ -40,15 +40,6 @@ namespace List
 
 variable {α : Type u} {p : α → Bool}
 
-/-- Every position either satisfies `p` or does not. -/
-theorem length_eq_countP_add_countP_not (l : List α) (p : α → Bool) :
-    l.length = l.countP p + l.countP (fun x => !p x) := by
-  induction l with
-  | nil => simp
-  | cons x xs ih =>
-      rw [countP_cons, countP_cons, length_cons, ih]
-      cases hx : p x <;> simp <;> omega
-
 /-- Deleting an accepting position lowers the accepting count by one. -/
 theorem countP_eraseIdx_of_pos {l : List α} {i : ℕ} (hi : i < l.length) (hp : p l[i] = true) :
     (l.eraseIdx i).countP p + 1 = l.countP p := by
@@ -91,16 +82,6 @@ theorem countP_eraseIdx_of_neg {l : List α} {i : ℕ} (hi : i < l.length) (hp :
   simp
 
 end List
-
-namespace Finset
-
-/-- Counting a `Finset`'s elements through its list is filtering it. -/
-theorem countP_toList {α : Type u} (s : Finset α) (p : α → Bool) :
-    s.toList.countP p = (s.filter fun x => p x).card := by
-  classical
-  rw [List.countP_eq_sum_map, Finset.sum_map_toList, Finset.card_filter]
-
-end Finset
 
 namespace ProbComp
 
@@ -309,7 +290,9 @@ theorem expectedValue_length_drawUntil (accept : S → Bool) (n : ℕ) :
         subst hxs
         set G : ℕ := (x :: xs).countP accept with hG
         set B : ℕ := (x :: xs).countP (fun y => !accept y) with hB
-        have hGB : xs.length + 1 = G + B := List.length_eq_countP_add_countP_not (x :: xs) accept
+        have hGB : xs.length + 1 = G + B := by
+          simpa only [List.length_cons, decide_not, Bool.decide_eq_true] using
+            List.length_eq_countP_add_countP accept (l := x :: xs)
         have hne : ((xs.length : ℝ≥0∞) + 1) ≠ 0 := by positivity
         have htop : ((xs.length : ℝ≥0∞) + 1) ≠ ⊤ := by finiteness
         -- Drawing at index `i` leaves a pool one shorter, with one fewer accepting value exactly

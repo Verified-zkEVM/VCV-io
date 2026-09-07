@@ -14,7 +14,7 @@ public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.OpenPREF
 
 open OracleComp OracleSpec TweakableHash
 
-namespace SMDTOpenPRESourceFinalValidityTest
+namespace SMDTOpenPREFinalValidityTest
 
 inductive Seed
   | only
@@ -237,4 +237,4 @@ theorem exact_game_canary :
     experiment_openedSelected, experiment_duplicateTargets, experiment_openedOther,
     tcr_reduction_valid, dspr_reduction_valid, dspr_reduction_openedSelected⟩
 
-end SMDTOpenPRESourceFinalValidityTest
+end SMDTOpenPREFinalValidityTest

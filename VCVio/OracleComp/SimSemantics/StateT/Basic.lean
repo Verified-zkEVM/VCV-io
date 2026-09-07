@@ -248,7 +248,7 @@ namespace OracleComp
 
 variable {ι : Type*} {spec : OracleSpec ι}
 
-open Option ENNReal BigOperators
+open Option ENNReal
 open scoped OracleSpec.PrimitiveQuery
 
 section simulateQ_evalSPMF
@@ -314,9 +314,6 @@ lemma evalSPMF_simulateQ_run_congr
     𝒮[(simulateQ impl₁ comp).run s] =
       𝒮[(simulateQ impl₂ comp).run s] := by
   induction comp using OracleComp.inductionOn generalizing s <;> simp_all
-
-@[deprecated (since := "2026-06-25")]
-alias evalSPMF_simulateQ_run_eq_of_impl_evalSPMF_eq := evalSPMF_simulateQ_run_congr
 
 end simulateQ_evalSPMF
 

@@ -61,7 +61,6 @@ section basic
 
 variable {m : Type u → Type v} [Monad m] {ω : Type u} {α β γ : Type u}
 
-
 section monoid
 
 variable [Monoid ω]
@@ -125,11 +124,6 @@ lemma run_pure' [LawfulMonad m] (x : α) :
 lemma run_bind' [LawfulMonad m] (x : WriterT ω m α) (f : α → WriterT ω m β) :
     (x >>= f).run = x.run >>= fun (a, w₁) => Prod.map id (w₁ ++ ·) <$> (f a).run := rfl
 
-@[simp]
-lemma run_seqLeft' {m : Type u → Type v} [Monad m] {ω : Type u} [Monoid ω] {α β : Type u}
-    (x : WriterT ω m α) (y : WriterT ω m β) :
-    (x *> y).run = x.run >>= fun z => Prod.map id (z.2 * ·) <$> y.run := rfl
-
 lemma run_map' (x : WriterT ω m α) (f : α → β) : (f <$> x).run = Prod.map f id <$> x.run := rfl
 
 /-- `Prod.fst <$> WriterT.run` preserves `pure` (Append flavour). -/
@@ -180,15 +174,6 @@ instance [Monoid ω] : AlternativeMonad (WriterT ω m) where
 
 @[simp]
 lemma run_failure [Monoid ω] {α : Type u} : (failure : WriterT ω m α).run = failure := rfl
-
--- instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] :
---     LawfulAlternative (WriterT ω m) := sorry
-  -- map_failure f := sorry
-  -- failure_seq f := sorry
-  -- orElse_failure f := sorry
-  -- failure_orElse f := sorry
-  -- orElse_assoc x y z := sorry
-  -- map_orElse f := sorry
 
 instance [Monoid ω] [LawfulMonad m] : LawfulMonadLift m (WriterT ω m) where
   monadLift_pure x := map_pure (·, 1) x

@@ -547,9 +547,6 @@ theorem simulateQ_countingOracle_preserves_le {α : Type}
   rw [(triple_writerT_iff_forall_support_monoid ..).mp (countingOracle_triple t qc) qc rfl _ w hmem]
   exact fun i => (hqc i).trans (Nat.le_add_right _ _)
 
-@[deprecated (since := "2026-06-25")]
-alias simulateQ_countingOracle_preserves_ge := simulateQ_countingOracle_preserves_le
-
 end countingOracle
 
 section costOracle

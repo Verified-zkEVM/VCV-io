@@ -31,10 +31,6 @@ universe u
 
 open ENNReal OracleSpec OracleComp ProbComp OracleComp.ProgramLogic.Relational
 
-/- The stateful hops compare routed sum-spec response families through their
-`PFunctor.Obj` presentation. Keep that reduction local to this proof module. -/
-attribute [local implicit_reducible] PFunctor.Obj
-
 namespace FiatShamir.Stateful
 
 /-! Tag the CMA-to-NMA simulator handler family from `Sigma/CmaToNma.lean`

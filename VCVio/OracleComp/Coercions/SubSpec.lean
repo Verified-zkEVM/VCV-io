@@ -47,7 +47,7 @@ predicate.
 
 @[expose] public section
 
-open OracleSpec OracleComp BigOperators ENNReal
+open OracleSpec OracleComp ENNReal
 
 universe u u' v v' w w'
 

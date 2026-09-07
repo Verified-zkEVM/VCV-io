@@ -7,16 +7,18 @@ Authors: Nicolas Consigny
 module
 
 public import HashSig.SLHDSA.Wots
+public import HashSig.SLHDSA.WotsInjectivity
 
 /-!
 # WOTS+ Checksum Encoding Canaries
 
 Discriminating checks for the FIPS 205 checksum byte pipeline.  The reduced `lg_w = 2` profile
 is byte aligned and therefore exercises the outer modulus in the padding formula; a historical
-shift-by-eight interpretation truncates to a different digit vector.
+shift-by-eight interpretation truncates to a different digit vector.  The final canaries
+evaluate the two-encodings property on a concrete pair of nodes.
 -/
 
-@[expose] public section
+public section
 
 
 namespace SLHDSA.WotsEncodingTest
@@ -27,6 +29,7 @@ def limited : Params := slhdsaSha2_128_24
 def zeroDigits : List ℕ := List.replicate limited.len1 0
 
 /-- Minimal byte-backed context used to exercise the operational WOTS digit path. -/
+@[expose]
 def limitedCore : CorePrimitives limited where
   PkSeed := Unit
   SkSeed := Unit
@@ -217,5 +220,28 @@ example :
   apply checksumDigits_eq_digitsOfBaseW limited_valid
   · decide
   · exact limited_zeroDigits_lt
+
+/-- The byte-backed limited context is byte coherent because its node encoding is the identity. -/
+theorem limitedCore_byteLaws : limitedCore.ByteLaws := ⟨fun _ _ h => h⟩
+
+/-- The node whose every byte is `0x01`. -/
+def oneNode : limitedCore.Y := Vector.replicate limited.n 1
+
+theorem zeroNode_ne_oneNode : zeroNode ≠ oneNode := fun h =>
+  absurd (congrArg (fun v : Bytes limited.n => v.toList) h) (by decide)
+
+/-- The two nodes are distinct, so `chainStepsCore_two_encodings` applies to them. -/
+example : ∃ i, i < limited.len ∧
+    chainStepsCore limitedCore zeroNode i < chainStepsCore limitedCore oneNode i :=
+  chainStepsCore_two_encodings limited_valid limitedCore_byteLaws zeroNode_ne_oneNode
+
+/-- Concretely, digit `3` (the low two bits of the first byte) witnesses the strict increase. -/
+example :
+    chainStepsCore limitedCore zeroNode 3 = 0 ∧ chainStepsCore limitedCore oneNode 3 = 1 := by
+  decide
+
+/-- Distinct nodes give distinct message-digit vectors. -/
+example : wotsMsgDigitsCore limitedCore zeroNode ≠ wotsMsgDigitsCore limitedCore oneNode := by
+  decide
 
 end SLHDSA.WotsEncodingTest

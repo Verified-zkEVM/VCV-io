@@ -18,9 +18,13 @@ connects it to the legacy discrete `IsProbabilitySpec` evaluator.
 
 ## Main statements
 
-* `PFunctor.FreeM.denote_eq_toMeasure` — agreement with the `PMF` denotation of
-  `VCVio.EvalDist.PFunctor`.
-* `PFunctor.FreeM.denote_apply_setOf` — existing `Pr[...]` facts are measurable-event facts.
+* `PFunctor.IsMeasureSpec.Compatible` — the measure and probability specifications of an
+  interface agree; `IsProbabilitySpec.toMeasureSpec` satisfies it definitionally.
+* `PFunctor.FreeM.denote_eq_toMeasure` — under agreement, the fold is the measure of the `PMF`
+  denotation of `VCVio.EvalDist.PFunctor`.
+* The `DiscreteEvalDistCompatible (FreeM P)` instance — under agreement, `𝒟[…]` satisfies the
+  façade bridge, so `evalDist_apply_singleton`, `evalDist_apply_setOf` and `lintegral_evalDist`
+  read existing `Pr[…]` facts off the measure denotation.
 -/
 
 @[expose] public section
@@ -60,10 +64,23 @@ noncomputable instance (priority := 20) instEvalDistSemanticsFreeM :
   apply_univ_le_one := denote_apply_univ_le_one
 
 /-- With a measure specification in scope, primary notation is definitionally the direct
-free-monad measure fold. -/
-@[simp]
+free-monad measure fold. `𝒟[…]` is the public head: this is a transport lemma, not a simp rule,
+so the `𝒟`-keyed laws below and in `Defs.Measure` are the ones `simp` uses. -/
 theorem evalDist_eq_denote [MeasurableSpace α] (program : FreeM P α) :
     𝒟[program] = denote program := rfl
+
+/-- A one-operation program denotes its configured answer measure. -/
+@[simp]
+theorem evalDist_lift (a : P.A) :
+    𝒟[(FreeM.lift a : FreeM P (P.B a))] = IsMeasureSpec.toMeasure a :=
+  denote_lift a
+
+/-- An operation followed by a continuation denotes the Giry bind of its answer measure with
+the denotation of the continuation. -/
+@[simp]
+theorem evalDist_liftBind [MeasurableSpace α] (a : P.A) (cont : P.B a → FreeM P α) :
+    𝒟[FreeM.liftBind a cont] = Measure.bind (IsMeasureSpec.toMeasure a) fun b => 𝒟[cont b] :=
+  rfl
 
 variable [∀ a, DiscreteMeasurableSpace (P.B a)]
 
@@ -80,9 +97,17 @@ For a polynomial interface carrying both interpretations compatibly, the measure
 the measure of the `PMF` denotation. This is what lets a `Pr[…]` statement proved against
 `VCVio.EvalDist.PFunctor` be transported here rather than reproved. -/
 
-theorem denote_eq_toMeasure [P.IsProbabilitySpec] [∀ a, Countable (P.B a)] [MeasurableSpace α]
-    (h : ∀ a : P.A, IsMeasureSpec.toMeasure a = (IsProbabilitySpec.toPMF a).toMeasure)
-    (program : FreeM P α) :
+/-- The measure and probability interpretations of an interface agree. Instances are explicit
+(`IsProbabilitySpec.toMeasureSpec`) or proved per interface, never derived from finiteness
+alone. -/
+class _root_.PFunctor.IsMeasureSpec.Compatible (P : PFunctor.{uA, u})
+    [∀ a, MeasurableSpace (P.B a)] [probSpec : P.IsProbabilitySpec]
+    [measureSpec : P.IsMeasureSpec] : Prop where
+  /-- Every answer measure is the measure of the answer distribution. -/
+  toMeasure_eq (a : P.A) : IsMeasureSpec.toMeasure a = (IsProbabilitySpec.toPMF a).toMeasure
+
+theorem denote_eq_toMeasure [P.IsProbabilitySpec] [IsMeasureSpec.Compatible P]
+    [MeasurableSpace α] (program : FreeM P α) :
     denote program = (program.liftM IsProbabilitySpec.toPMF).toMeasure := by
   induction program with
   | pure x => simpa using (PMF.toMeasure_pure x).symm
@@ -90,7 +115,7 @@ theorem denote_eq_toMeasure [P.IsProbabilitySpec] [∀ a, Countable (P.B a)] [Me
       change Measure.bind (IsMeasureSpec.toMeasure a) (fun b => denote (cont b))
           = ((IsProbabilitySpec.toPMF a).bind
               fun u => (cont u).liftM IsProbabilitySpec.toPMF).toMeasure
-      rw [PMF.toMeasure_bind, h a]
+      rw [PMF.toMeasure_bind, IsMeasureSpec.Compatible.toMeasure_eq a]
       exact Measure.bind_congr_right (Filter.Eventually.of_forall fun b => ih b)
 
 /-- Every `PMF`-valued interpretation induces a measure-valued one, by taking the measure of
@@ -98,65 +123,30 @@ each answer distribution.
 
 Deliberately not an instance, matching `PFunctor.IsUniformSpec.ofFintypeInhabited`: measure
 semantics stay an explicit opt-in rather than being derived silently wherever a `PMF`
-interpretation happens to be in scope. Introduce it with `letI` at a use site; the agreement
-hypothesis of `denote_eq_toMeasure` then holds by `rfl`. -/
+interpretation happens to be in scope. Introduce it with `letI` or a local instance at a use
+site; it is `IsMeasureSpec.Compatible` by `rfl`. -/
 @[instance_reducible]
 noncomputable def _root_.PFunctor.IsProbabilitySpec.toMeasureSpec (P : PFunctor.{uA, u})
     [∀ a, MeasurableSpace (P.B a)] [P.IsProbabilitySpec] : P.IsMeasureSpec where
   toMeasure a := (IsProbabilitySpec.toPMF a).toMeasure
   isProbabilityMeasure _ := PMF.toMeasure.isProbabilityMeasure _
 
-/-- The measure of a singleton is the output probability.
+instance _root_.PFunctor.IsProbabilitySpec.toMeasureSpec_compatible (P : PFunctor.{uA, u})
+    [∀ a, MeasurableSpace (P.B a)] [P.IsProbabilitySpec] :
+    IsMeasureSpec.Compatible P (measureSpec := IsProbabilitySpec.toMeasureSpec P) := by
+  let _ := IsProbabilitySpec.toMeasureSpec P
+  exact ⟨fun _ => rfl⟩
 
-This is the bridge that lets an existing `Pr[= x | _]` result be read off the measure
-denotation instead of reproved against it. -/
-theorem denote_apply_singleton [P.IsProbabilitySpec] [∀ a, Countable (P.B a)]
-    [MeasurableSpace α] [MeasurableSingletonClass α]
-    (h : ∀ a : P.A, IsMeasureSpec.toMeasure a = (IsProbabilitySpec.toPMF a).toMeasure)
-    (program : FreeM P α) (x : α) :
-    denote program {x} = Pr[= x | program] := by
-  rw [denote_eq_toMeasure h program,
-    PMF.toMeasure_apply_singleton _ x (measurableSet_singleton x)]
-  rw [probOutput_def]
-  exact (SPMF.liftM_apply _ x).symm
-
-/-- The primary measure notation assigns the existing point probability to a singleton whenever
-the measure and probability query specifications agree. -/
-theorem evalDist_apply_singleton [P.IsProbabilitySpec] [∀ a, Countable (P.B a)]
-    [MeasurableSpace α] [MeasurableSingletonClass α]
-    (h : ∀ a : P.A, IsMeasureSpec.toMeasure a = (IsProbabilitySpec.toPMF a).toMeasure)
-    (program : FreeM P α) (x : α) :
-    𝒟[program] {x} = Pr[= x | program] :=
-  denote_apply_singleton h program x
-
-/-- The measure denotation of a measurable predicate is the existing `Pr[...]` value.
-
-The result keeps predicate notation convenient for discrete cryptographic proofs while presenting
-the semantics to Mathlib as an ordinary measurable event. -/
-theorem denote_apply_setOf [P.IsProbabilitySpec] [∀ a, Countable (P.B a)]
-    [MeasurableSpace α]
-    (h : ∀ a : P.A, IsMeasureSpec.toMeasure a = (IsProbabilitySpec.toPMF a).toMeasure)
-    (program : FreeM P α) (p : α → Prop) (hp : MeasurableSet {x | p x}) :
-    denote program {x | p x} = Pr[p | program] := by
-  rw [denote_eq_toMeasure h program,
-    (program.liftM IsProbabilitySpec.toPMF).toMeasure_apply hp,
-    probEvent_eq_tsum_indicator]
-  apply tsum_congr
-  intro x
-  by_cases hx : p x
-  · simp only [Set.indicator, Set.mem_ofPred_eq, hx, ↓reduceIte]
-    rw [probOutput_def]
-    exact (SPMF.liftM_apply _ x).symm
-  · simp [Set.indicator, hx]
-
-/-- The primary measure notation assigns the existing predicate probability to any measurable
-event whenever the measure and probability query specifications agree. -/
-theorem evalDist_apply_setOf [P.IsProbabilitySpec] [∀ a, Countable (P.B a)]
-    [MeasurableSpace α]
-    (h : ∀ a : P.A, IsMeasureSpec.toMeasure a = (IsProbabilitySpec.toPMF a).toMeasure)
-    (program : FreeM P α) (p : α → Prop) (hp : MeasurableSet {x | p x}) :
-    𝒟[program] {x | p x} = Pr[p | program] :=
-  denote_apply_setOf h program p hp
+/-- Under an agreeing measure specification the free-monad fold satisfies the façade bridge, so
+the generic `evalDist_apply_singleton`/`evalDist_apply_setOf`/`lintegral_evalDist` read existing
+`Pr[…]` facts off the measure denotation. -/
+instance [P.IsProbabilitySpec] [IsMeasureSpec.Compatible P] :
+    DiscreteEvalDistCompatible (FreeM P) where
+  lintegral_evalDist mx _ hg := by
+    rw [evalDist_eq_denote, denote_eq_toMeasure, PMF.lintegral_toMeasure _ hg]
+    exact tsum_congr fun x => by
+      rw [probOutput_def]
+      exact congrArg (fun r => r * _) (SPMF.liftM_apply _ x).symm
 
 end FreeM
 end PFunctor
