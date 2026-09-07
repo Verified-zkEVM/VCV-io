@@ -50,21 +50,6 @@ noncomputable def evalDist {m : Type u → Type v} [EvalDistSemantics m]
 /-- Evaluation-measure notation. -/
 notation "𝒟[" mx "]" => evalDist mx
 
-/-- The canonical discrete reading of a computation's measure.
-
-This chooses the top measurable space explicitly rather than installing a blanket instance. It is
-the semantics used by point/event probability notation, whose traditional API does not carry a
-measurable-space parameter. General and continuous developments should use `𝒟[…]` with their
-ambient measurable space instead. -/
-noncomputable def discreteEvalDist {m : Type u → Type v} [EvalDistSemantics m]
-    {α : Type u} (mx : m α) : @Measure α ⊤ :=
-  @EvalDistSemantics.denote m _ α ⊤ mx
-
-@[simp]
-theorem discreteEvalDist_apply_univ_le_one {m : Type u → Type v} [EvalDistSemantics m]
-    {α : Type u} (mx : m α) : discreteEvalDist mx Set.univ ≤ 1 := by
-  exact @EvalDistSemantics.apply_univ_le_one m _ α ⊤ mx
-
 @[simp]
 theorem evalDist_apply_univ_le_one {m : Type u → Type v} [EvalDistSemantics m]
     {α : Type u} [MeasurableSpace α] (mx : m α) : 𝒟[mx] Set.univ ≤ 1 :=
@@ -105,31 +90,66 @@ theorem evalDist_bind_of_discrete {m : Type u → Type v} [Monad m] [EvalDistSem
     𝒟[mx >>= f] = Measure.bind 𝒟[mx] fun x => 𝒟[f x] :=
   evalDist_bind mx f Measurable.of_discrete
 
-/-- Discrete coherence between syntactic support and positive singleton mass.
+/-- `Functor.map` along a measurable function denotes the pushforward measure. -/
+theorem evalDist_map {m : Type u → Type v} [Monad m] [LawfulMonad m] [EvalDistSemantics m]
+    [LawfulEvalDistSemantics m] {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
+    (mx : m α) {f : α → β} (hf : Measurable f) : 𝒟[f <$> mx] = 𝒟[mx].map f := by
+  have hd : Measurable fun x => 𝒟[(pure (f x) : m β)] := by
+    simp only [evalDist_pure]
+    exact Measure.measurable_dirac.comp hf
+  rw [map_eq_bind_pure_comp, evalDist_bind mx (pure ∘ f) hd]
+  simp only [Function.comp_apply, evalDist_pure]
+  exact Measure.bind_dirac_eq_map 𝒟[mx] hf
 
-The characterization is intentionally restricted to discrete output spaces. General measures
-can have support points whose singleton mass is zero, so that statement is not a sound continuous
-API. -/
-class DiscreteEvalDistCompatible (m : Type u → Type v) [MonadLiftT m SetM]
-    [EvalDistSemantics m] : Prop where
-  /-- Reachable discrete outputs are exactly the positive-mass singleton outcomes. -/
-  mem_support_iff_measure_singleton_ne_zero {α : Type u} [MeasurableSpace α]
-      [DiscreteMeasurableSpace α] (mx : m α) (x : α) :
-    x ∈ support mx ↔ 𝒟[mx] {x} ≠ 0
+/-- On a discrete source type, every `Functor.map` denotes a pushforward. -/
+theorem evalDist_map_of_discrete {m : Type u → Type v} [Monad m] [LawfulMonad m]
+    [EvalDistSemantics m] [LawfulEvalDistSemantics m] {α β : Type u} [MeasurableSpace α]
+    [DiscreteMeasurableSpace α] [MeasurableSpace β] (mx : m α) (f : α → β) :
+    𝒟[f <$> mx] = 𝒟[mx].map f :=
+  evalDist_map mx Measurable.of_discrete
 
-export DiscreteEvalDistCompatible (mem_support_iff_measure_singleton_ne_zero)
+/-- A constant continuation scales the continuation's measure by the success mass
+(`Measure.bind_const`); the measure form of `probOutput_bind_const`. -/
+@[simp]
+theorem evalDist_bind_const {m : Type u → Type v} [Monad m] [EvalDistSemantics m]
+    [LawfulEvalDistSemantics m] {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
+    (mx : m α) (my : m β) : 𝒟[mx >>= fun _ => my] = 𝒟[mx] Set.univ • 𝒟[my] := by
+  rw [evalDist_bind mx (fun _ => my) measurable_const, Measure.bind_const]
+
+/-- A constant map denotes the success mass at a point (`Measure.map_const`); the measure form
+of `probOutput_map_const`. -/
+@[simp]
+theorem evalDist_map_const {m : Type u → Type v} [Monad m] [LawfulMonad m] [EvalDistSemantics m]
+    [LawfulEvalDistSemantics m] {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
+    (mx : m α) (c : β) : 𝒟[(fun _ => c) <$> mx] = 𝒟[mx] Set.univ • Measure.dirac c := by
+  rw [evalDist_map mx measurable_const, Measure.map_const]
+
+/-- Tower property on the measure side: the `∫⁻` twin of `expectedValue_bind`. -/
+theorem lintegral_evalDist_bind {m : Type u → Type v} [Monad m] [EvalDistSemantics m]
+    [LawfulEvalDistSemantics m] {α β : Type u} [MeasurableSpace α] [DiscreteMeasurableSpace α]
+    [MeasurableSpace β] (mx : m α) (f : α → m β) {g : β → ENNReal} (hg : Measurable g) :
+    ∫⁻ y, g y ∂𝒟[mx >>= f] = ∫⁻ x, ∫⁻ y, g y ∂𝒟[f x] ∂𝒟[mx] := by
+  rw [evalDist_bind_of_discrete mx f,
+    Measure.lintegral_bind Measurable.of_discrete.aemeasurable hg.aemeasurable]
+
+/-- Change of variables on the measure side: the `∫⁻` twin of `expectedValue_map`. -/
+theorem lintegral_evalDist_map {m : Type u → Type v} [Monad m] [LawfulMonad m]
+    [EvalDistSemantics m] [LawfulEvalDistSemantics m] {α β : Type u} [MeasurableSpace α]
+    [MeasurableSpace β] (mx : m α) {f : α → β} (hf : Measurable f) {g : β → ENNReal}
+    (hg : Measurable g) : ∫⁻ y, g y ∂𝒟[f <$> mx] = ∫⁻ x, g (f x) ∂𝒟[mx] := by
+  rw [evalDist_map mx hf, lintegral_map hg hf]
 
 namespace SPMF
 
-variable {α : Type u} [MeasurableSpace α]
+variable {α : Type u} [MeasurableSpace α] (p : SPMF α)
 
 /-- Read an `SPMF` as the measure of its successful outputs. This is the explicit compatibility
 bridge from the finite executable backend to the primary measure API. -/
-noncomputable def toMeasure (p : SPMF α) : Measure α :=
+noncomputable def toMeasure : Measure α :=
   p.toPMF.toMeasure.dropNone
 
 @[simp]
-theorem toMeasure_apply_univ_le_one (p : SPMF α) : p.toMeasure Set.univ ≤ 1 := by
+theorem toMeasure_apply_univ_le_one : p.toMeasure Set.univ ≤ 1 := by
   have hTotal : p.toPMF.toMeasure Set.univ = 1 := measure_univ
   exact (Measure.dropNone_apply_univ_le p.toPMF.toMeasure).trans_eq hTotal
 
@@ -137,34 +157,44 @@ theorem toMeasure_apply_univ_le_one (p : SPMF α) : p.toMeasure Set.univ ≤ 1 :
 theorem toMeasure_pure (x : α) : (pure x : SPMF α).toMeasure = Measure.dirac x := by
   rw [toMeasure, SPMF.toPMF_pure, PMF.toMeasure_pure, Measure.dropNone_dirac_some]
 
+/-- Failure carries no successful-output mass. -/
 @[simp]
-theorem toMeasure_apply_singleton [MeasurableSingletonClass α] (p : SPMF α) (x : α) :
+theorem toMeasure_failure : (failure : SPMF α).toMeasure = 0 := by
+  rw [toMeasure, SPMF.toPMF_failure, PMF.toMeasure_pure, Measure.dropNone_dirac_none]
+
+@[simp]
+theorem toMeasure_apply_singleton [MeasurableSingletonClass α] (x : α) :
     p.toMeasure {x} = p x := by
   rw [toMeasure, Measure.dropNone_apply_singleton,
     PMF.toMeasure_apply_singleton _ _ (measurableSet_singleton (some x))]
   rfl
 
-/-- On a discrete output space, applying the successful-output measure to a set agrees with the
-corresponding event in the option-valued probability-mass-function backend. -/
-theorem toMeasure_apply [DiscreteMeasurableSpace α] (p : SPMF α) (s : Set α) :
-    p.toMeasure s = p.toPMF.toOuterMeasure (some '' s) := by
-  rw [toMeasure, Measure.dropNone,
-    Measure.bind_apply MeasurableSet.of_discrete Measure.measurable_dropNoneKernel.aemeasurable]
-  refine Eq.trans (lintegral_congr (g := Set.indicator (some '' s) 1) ?_) ?_
-  · rintro (_ | x)
-    · simp
-    · by_cases hx : x ∈ s <;> simp [hx]
-  · rw [lintegral_indicator_one MeasurableSet.of_discrete]
-    exact PMF.toMeasure_apply_eq_toOuterMeasure_apply _ MeasurableSet.of_discrete
+/-- Integrating a measurable function against the successful-output measure is the
+mass-weighted sum over successful outputs, with the mass on the left as in
+`bind_apply_eq_tsum`. This is the one place where the transitional option-valued backend meets
+Lebesgue integration; every singleton, event and expectation bridge derives from it, and it is
+the glue that disappears once the façade is defined from `𝒟[…]` directly. -/
+theorem lintegral_toMeasure {g : α → ENNReal} (hg : Measurable g) :
+    ∫⁻ x, g x ∂p.toMeasure = ∑' x, p x * g x := by
+  rw [toMeasure, Measure.lintegral_dropNone _ hg]
+  refine (PMF.lintegral_toMeasure p.toPMF (g := fun o => o.elim 0 g)
+    (Option.measurable_elim (f := fun o => o.elim 0 g) measurable_const fun s hs => hg hs)).trans ?_
+  rw [tsum_option _ ENNReal.summable]
+  simp [SPMF.apply_eq_toPMF_some]
+
+/-- The successful-output measure of a measurable set is the sum of the point masses it
+contains. -/
+theorem toMeasure_apply {s : Set α} (hs : MeasurableSet s) :
+    p.toMeasure s = ∑' x, p x * s.indicator 1 x := by
+  rw [← lintegral_indicator_one hs, lintegral_toMeasure _ (measurable_one.indicator hs)]
 
 /-- The total mass of the successful-output measure is the sum of the `SPMF` point masses. -/
 @[simp]
-theorem toMeasure_apply_univ [DiscreteMeasurableSpace α] (p : SPMF α) :
-    p.toMeasure Set.univ = ∑' x, p x := by
-  rw [toMeasure_apply, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable]
-  simp [SPMF.apply_eq_toPMF_some]
+theorem toMeasure_apply_univ : p.toMeasure Set.univ = ∑' x, p x := by
+  rw [toMeasure_apply _ MeasurableSet.univ]
+  simp
 
-/-- On a discrete output space, the successful-output measure retains the complete `SPMF`.
+/-- The successful-output measure retains the complete `SPMF`.
 
 Failure mass is determined by the successful masses, so dropping the explicit `none` outcome does
 not lose information. -/
@@ -176,8 +206,7 @@ theorem toMeasure_injective [MeasurableSingletonClass α] :
   rw [← toMeasure_apply_singleton p x, ← toMeasure_apply_singleton q x, hpq]
 
 /-- The successful-output measure commutes with measurable maps. -/
-theorem toMeasure_map {β : Type u} [MeasurableSpace β]
-    (p : SPMF α) (f : α → β) (hf : Measurable f) :
+theorem toMeasure_map {β : Type u} [MeasurableSpace β] (f : α → β) (hf : Measurable f) :
     (f <$> p).toMeasure = p.toMeasure.map f := by
   have hOptionMap : Measurable (Option.map f) :=
     Option.measurable_elim measurable_const (Option.measurable_some.comp hf)
@@ -201,18 +230,24 @@ theorem toMeasure_map {β : Type u} [MeasurableSpace β]
     · exact (Measure.measurable_coe hs).comp Measure.measurable_dropNoneKernel
     · exact hOptionMap
 
-/-- On countable discrete spaces, successful-output measures commute with `SPMF` bind. -/
-theorem toMeasure_bind {β : Type u} [Countable α] [DiscreteMeasurableSpace α]
-    [MeasurableSpace β] [Countable β] [DiscreteMeasurableSpace β]
-    (p : SPMF α) (f : α → SPMF β) :
+/-- Successful-output measures commute with `SPMF` bind whenever the measure-valued
+continuation is measurable. -/
+theorem toMeasure_bind' {β : Type u} [MeasurableSpace β] (f : α → SPMF β)
+    (hf : Measurable fun x => (f x).toMeasure) :
     (p >>= f).toMeasure = Measure.bind p.toMeasure fun x => (f x).toMeasure := by
-  apply Measure.ext_of_singleton
-  intro y
-  rw [toMeasure_apply_singleton, bind_apply_eq_tsum,
-    Measure.bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable,
-    MeasureTheory.lintegral_countable']
-  simp only [toMeasure_apply_singleton]
-  exact tsum_congr fun x => mul_comm _ _
+  ext s hs
+  rw [Measure.bind_apply hs hf.aemeasurable,
+    lintegral_toMeasure p (g := fun x => (f x).toMeasure s) ((Measure.measurable_coe hs).comp hf),
+    toMeasure_apply _ hs]
+  simp only [toMeasure_apply _ hs, bind_apply_eq_tsum, ← ENNReal.tsum_mul_right,
+    ← ENNReal.tsum_mul_left, mul_assoc]
+  exact ENNReal.tsum_comm
+
+/-- On a discrete source type every measure-valued continuation is measurable. -/
+theorem toMeasure_bind {β : Type u} [DiscreteMeasurableSpace α] [MeasurableSpace β]
+    (f : α → SPMF β) :
+    (p >>= f).toMeasure = Measure.bind p.toMeasure fun x => (f x).toMeasure :=
+  toMeasure_bind' p f Measurable.of_discrete
 
 end SPMF
 

@@ -10,24 +10,22 @@ public import Mathlib.MeasureTheory.Measure.GiryMonad
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
 
 /-!
-# `PMF.toMeasure` is a monad morphism
+# `PMF.toMeasure` as a sum of Dirac masses, and as a monad morphism
 
-Mathlib records two thirds of this: `PMF.toMeasure_pure` sends `PMF.pure` to `Measure.dirac`,
-and `PMF.toMeasure_map` commutes `toMeasure` with `map`. For `bind` it provides only the
-applied form, `PMF.toMeasure_bind_apply`, which evaluates `(p.bind f).toMeasure` at a
-measurable set as a `tsum`.
+Mathlib records two thirds of the monad-morphism statement: `PMF.toMeasure_pure` sends
+`PMF.pure` to `Measure.dirac`, and `PMF.toMeasure_map` commutes `toMeasure` with `map`. For
+`bind` it provides only the applied form `PMF.toMeasure_bind_apply`, which evaluates
+`(p.bind f).toMeasure` at a measurable set as a `tsum`.
 
-`PMF.toMeasure_bind` below is the measure-level equality. It is what a monad-morphism
-argument needs — in particular, transporting a proof about a `PMF`-valued denotation to the
-corresponding `Measure`-valued one — and it is the natural companion to the two lemmas already
-upstream. It stays in `ToMathlib` during the migration and can be removed if the upstream API
-acquires the same equality.
+The lemmas here derive everything from one decomposition, `PMF.toMeasure_eq_sum_smul_dirac`:
+`p.toMeasure` is the weighted sum of the Dirac masses at its outcomes. Integrals against it are
+then mass-weighted sums with the mass on the *left* (`PMF.lintegral_toMeasure`), the orientation
+of `PMF.bind_apply`, with no commutativity step and no countability assumption on the carrier;
+Mathlib's `lintegral_countable'` puts the mass on the right and needs `[Countable α]`.
 
-## Hypotheses
-
-Only `[DiscreteMeasurableSpace α]` is required. The proof restricts the source measure to the
-countable support of `p`, then applies `lintegral_countable`; no countability assumption on the
-ambient carrier is needed.
+`PMF.toMeasure_bind'` is the measure-level bind law under the natural measurability hypothesis
+on the continuation, and `PMF.toMeasure_bind` its discrete specialization. Both stay in
+`ToMathlib` during the migration and can go once the upstream API acquires the same equalities.
 -/
 
 @[expose] public section
@@ -36,30 +34,39 @@ open MeasureTheory ENNReal
 
 namespace PMF
 
-variable {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+variable {α β : Type*} [MeasurableSpace α] [MeasurableSpace β] (p : PMF α) (f : α → PMF β)
 
-/-- `PMF.toMeasure` commutes with `bind`: the measure of a bound computation is the Giry bind
-of the measures.
+/-- A probability mass function's measure is the weighted sum of the Dirac masses at its
+outcomes. No countability of the carrier is needed: both sides are determined on measurable
+sets by `PMF.toMeasure_apply`. -/
+theorem toMeasure_eq_sum_smul_dirac :
+    p.toMeasure = Measure.sum fun a => p a • Measure.dirac a := by
+  ext s hs
+  rw [toMeasure_apply p hs, Measure.sum_apply _ hs]
+  simp only [Measure.smul_apply, Measure.dirac_apply' _ hs, smul_eq_mul]
+  exact tsum_congr fun a => by by_cases ha : a ∈ s <;> simp [ha]
+
+/-- Integrating a measurable function against `p.toMeasure` is the mass-weighted sum of its
+values, with the mass on the left as in `PMF.bind_apply`. -/
+theorem lintegral_toMeasure {g : α → ℝ≥0∞} (hg : Measurable g) :
+    ∫⁻ a, g a ∂p.toMeasure = ∑' a, p a * g a := by
+  rw [toMeasure_eq_sum_smul_dirac, lintegral_sum_measure]
+  exact tsum_congr fun a => by rw [lintegral_smul_measure, lintegral_dirac' a hg, smul_eq_mul]
+
+/-- `PMF.toMeasure` commutes with `bind` whenever the measure-valued continuation is measurable.
 
 This is the measure-level form of `PMF.toMeasure_bind_apply`, and together with
 `PMF.toMeasure_pure` it says that `PMF.toMeasure` is a monad morphism from `PMF` into the Giry
 monad. -/
-lemma toMeasure_bind [DiscreteMeasurableSpace α]
-    (p : PMF α) (f : α → PMF β) :
+theorem toMeasure_bind' (hf : Measurable fun a => (f a).toMeasure) :
     (p.bind f).toMeasure = Measure.bind p.toMeasure fun a => (f a).toMeasure := by
   ext s hs
-  rw [toMeasure_bind_apply _ _ _ hs,
-    Measure.bind_apply hs (Measurable.of_discrete).aemeasurable]
-  conv_rhs => rw [← PMF.restrict_toMeasure_support p]
-  rw [lintegral_countable _ p.support_countable]
-  have hind : (fun a => p a * (f a).toMeasure s)
-      = p.support.indicator (fun a => p a * (f a).toMeasure s) := by
-    funext a
-    by_cases ha : a ∈ p.support
-    · simp [ha]
-    · simp [ha, (PMF.apply_eq_zero_iff p a).mpr ha]
-  rw [hind, ← tsum_subtype]
-  exact tsum_congr fun a => by
-    rw [p.toMeasure_apply_singleton a MeasurableSet.of_discrete, mul_comm]
+  rw [toMeasure_bind_apply _ _ _ hs, Measure.bind_apply hs hf.aemeasurable,
+    lintegral_toMeasure p (g := fun a => (f a).toMeasure s) ((Measure.measurable_coe hs).comp hf)]
+
+/-- On a discrete source type every measure-valued continuation is measurable. -/
+theorem toMeasure_bind [DiscreteMeasurableSpace α] :
+    (p.bind f).toMeasure = Measure.bind p.toMeasure fun a => (f a).toMeasure :=
+  toMeasure_bind' p f Measurable.of_discrete
 
 end PMF
