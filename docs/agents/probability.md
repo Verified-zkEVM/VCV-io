@@ -35,6 +35,12 @@ Independent products denote product measures: `evalDist_mOfFn` and `evalDist_mPi
 `evalDist_map_eval_mPi` reads one coordinate back off the product through Mathlib's
 `Measure.pi_map_eval` when the other factors never fail.
 
+Failure on the measure side is missing mass, recorded in `VCVio/EvalDist/FailureMeasure.lean`:
+`Pr[⊥ | mx] = 1 - 𝒟[mx] univ`, `IsProbabilityMeasure 𝒟[mx] ↔ Pr[⊥ | mx] = 0` (an instance under
+`NeverFail mx`), `𝒟[failure] = 0`, the failure-completed `(𝒟[mx]).withFailure : Measure (Option α)`
+with `{none}` mass `Pr[⊥ | mx]`, the success mass of `bind`/`map` in `expectedValue` form, and
+`OptionT.evalDist_eq_dropNone` (an `OptionT` computation denotes the `dropNone` of its run).
+
 ## Core Definitions
 
 | Definition | Type | Notation | Defined in |
