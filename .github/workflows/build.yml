@@ -17,13 +17,13 @@ jobs:
     name: Check Library File Imports
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The PMF/SPMF boundary ratchet diffs against the pull-request base.
           fetch-depth: 0
 
       - name: Set up Lean environment
-        uses: leanprover/lean-action@v1
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1
         with:
           auto-config: false
           build: false
@@ -45,6 +45,15 @@ jobs:
       - name: Report PMF/SPMF boundary trend
         if: github.event_name == 'pull_request'
         run: bash scripts/check-pmf-boundary.sh --report "origin/${{ github.base_ref }}"
+
+      - name: Check broad-expose boundary
+        run: |
+          bash scripts/test-expose-boundary.sh
+          bash scripts/check-expose-boundary.sh
+
+      - name: Report broad-expose boundary trend
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-expose-boundary.sh --report "origin/${{ github.base_ref }}"
 
       - name: Check optional complexity backend isolation
         run: |
@@ -79,10 +88,9 @@ jobs:
     name: Optional Complexity Backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up Lean environment
-        uses: leanprover/lean-action@v1
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1
         with:
           auto-config: false
           build: false
@@ -112,9 +120,9 @@ jobs:
       # downstream `require VCVio` never has the third_party/ submodules
       # checked out, yet Lake links every dependency `extern_lib` into any
       # consumer `lean_exe`, so the native targets must degrade gracefully.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up Lean environment
-        uses: leanprover/lean-action@v1
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1
         with:
           auto-config: false
           build: false
@@ -188,7 +196,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -219,14 +227,14 @@ jobs:
           echo "BUILD_TIMING_BASE_REF=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_ENV"
       - name: Restore Lake cache
         id: lake-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .lake
           key: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}-${{ github.sha }}
           restore-keys: |
             lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}
       - name: Set up Lean environment
-        uses: leanprover/lean-action@v1
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1
         with:
           auto-config: false
           build: false
@@ -290,7 +298,19 @@ jobs:
       # not elaborate anything. Kept out of the timed build commands on purpose: the
       # timing report compares exactly the seven non-test libraries.
       - name: Build the canary library
-        run: lake build VCVioTest
+        shell: bash  # explicit bash gives pipefail; the default `bash -e {0}` does not
+        run: lake build VCVioTest 2>&1 | tee "$BUILD_TIMING_LOG_DIR/test_build.log"
+      # The canary library is the tactic gate: a warning there (an unused tactic, a
+      # redundant `grind` parameter, a deprecated name) is a gate entry going stale, so
+      # it fails the job like a proof-library warning does. Dependency logs are replayed
+      # into this output too, hence the `VCVioTest` path prefixes: existing `sorry`
+      # warnings in dependencies are the proof-library gate's business.
+      - name: Check canary warning budget
+        run: |
+          python3 ./scripts/check-warning-log.py "$BUILD_TIMING_LOG_DIR/test_build.log" \
+            --path-prefix VCVioTest/ \
+            --path-prefix VCVioTest.lean \
+            --label 'VCVioTest warnings'
       # `LatticeCryptoTest.lean` deliberately omits the native `Main` executables,
       # which remain covered by the nightly FFI workflow. Building this library
       # elaborates every Lean-only lattice helper, vector, and regression canary.
@@ -321,7 +341,7 @@ jobs:
       #     .lake/build/bin/mlkem_test
       - name: Save Lake cache
         if: success() && steps.lake-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .lake
           key: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}-${{ github.sha }}
@@ -338,7 +358,7 @@ jobs:
           fi
       - name: Upload timing artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ env.BUILD_TIMING_ARTIFACT_NAME }}
           path: ${{ env.BUILD_TIMING_ARTIFACT_DIR }}
@@ -347,7 +367,7 @@ jobs:
       - name: Determine comparison baseline artifact
         if: always() && github.event_name == 'pull_request'
         id: timing-baseline
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -434,7 +454,7 @@ jobs:
             core.setOutput('label', '');
       - name: Download comparison baseline artifact
         if: always() && steps.timing-baseline.outputs.run-id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ${{ env.BUILD_TIMING_ARTIFACT_NAME }}
           path: ${{ env.BUILD_TIMING_BASELINE_DIR }}
@@ -462,7 +482,7 @@ jobs:
           always() &&
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const fs = require('fs');

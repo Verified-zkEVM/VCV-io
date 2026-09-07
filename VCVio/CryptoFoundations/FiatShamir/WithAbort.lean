@@ -42,7 +42,6 @@ lemmas, expected-cost PMFs, and the EUF-CMA security statement live in the
 universe u v
 
 open OracleComp OracleSpec
-open scoped BigOperators
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type}
   {rel : Stmt → Wit → Bool}

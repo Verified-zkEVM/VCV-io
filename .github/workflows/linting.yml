@@ -9,10 +9,12 @@ on:
       - "VCVioTest/SMDTPREFinalValidity.lean"
       - "VCVioTest/SMDTTCRFinalValidity.lean"
       - "VCVioTest/ITSR.lean"
-      - "VCVioTest/SMDTDSPR.lean"
-      - "VCVioTest/SMDTOpenPRE.lean"
-      - "VCVioTest/SMDTUDC.lean"
+      - "VCVioTest/SMDTDSPRFinalValidity.lean"
+      - "VCVioTest/SMDTOpenPREFinalValidity.lean"
+      - "VCVioTest/SMDTUDFinalValidity.lean"
       - "VCVioTest/CryptoFoundations/SignatureAlg.lean"
+      - "VCVioTest/SMDTTCR.lean"
+      - "VCVioTest/SMDTPRE.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -37,10 +39,12 @@ on:
       - "VCVioTest/SMDTPREFinalValidity.lean"
       - "VCVioTest/SMDTTCRFinalValidity.lean"
       - "VCVioTest/ITSR.lean"
-      - "VCVioTest/SMDTDSPR.lean"
-      - "VCVioTest/SMDTOpenPRE.lean"
-      - "VCVioTest/SMDTUDC.lean"
+      - "VCVioTest/SMDTDSPRFinalValidity.lean"
+      - "VCVioTest/SMDTOpenPREFinalValidity.lean"
+      - "VCVioTest/SMDTUDFinalValidity.lean"
       - "VCVioTest/CryptoFoundations/SignatureAlg.lean"
+      - "VCVioTest/SMDTTCR.lean"
+      - "VCVioTest/SMDTPRE.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -64,8 +68,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       # Repo-wide hygiene checks that the old `scripts/lint-style.sh` enforced.
       - name: Check for executable Lean files
         run: |
@@ -86,7 +89,7 @@ jobs:
           fi
 
       - name: Set up Lean environment
-        uses: leanprover/lean-action@v1
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1
         with:
           auto-config: false
           build: false
@@ -104,8 +107,10 @@ jobs:
       - name: Run text-based style linters
         run: >-
           lake exe lint-style ToMathlib VCVio Extern LatticeCrypto HashSig Examples VCVioWidgets
-          Interop VCVioTest.SMDTPREFinalValidity VCVioTest.SMDTTCRFinalValidity
-          VCVioTest.ITSR VCVioTest.SMDTDSPR VCVioTest.SMDTOpenPRE VCVioTest.SMDTUDC
+          Interop VCVioTest.SMDTTCR VCVioTest.SMDTPRE
+          VCVioTest.SMDTPREFinalValidity VCVioTest.SMDTTCRFinalValidity
+          VCVioTest.ITSR VCVioTest.SMDTDSPRFinalValidity VCVioTest.SMDTOpenPREFinalValidity
+          VCVioTest.SMDTUDFinalValidity
           VCVioTest.CryptoFoundations.SignatureAlg
           HashSigTest.SLHDSA.Params HashSigTest.SLHDSA.Position HashSigTest.SLHDSA.Oracle
           HashSigTest.SLHDSA.DataCodecTests

@@ -15,7 +15,7 @@ jobs:
       contents: write
     steps:
     - name: lean-release-tag action
-      uses: leanprover-community/lean-release-tag@v4.18804.0
+      uses: leanprover-community/lean-release-tag@e3858bd52f5d8e45dc5a0166ae18334bf7d23c76 # v4.18804.0
       with:
         do-release: true
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

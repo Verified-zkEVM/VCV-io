@@ -42,10 +42,6 @@ open OracleSpec ENNReal
 
 open scoped PFunctor
 
-/- Oracle traces are `PFunctor.Idx` values; the cursor probability proofs
-specialize dependent trace entries at implicit transparency. -/
-attribute [local implicit_reducible] PFunctor.Idx
-
 namespace OracleComp
 
 variable {ι : Type} {spec : OracleSpec ι} {α β : Type}

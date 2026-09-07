@@ -286,9 +286,6 @@ lemma simulate_eq_map_simulate_zero (oa : OracleComp spec α) (qc : QueryCount �
   funext ⟨x, q⟩
   simp
 
-@[deprecated (since := "2026-06-25")]
-alias run_simulateT_eq_run_simulateT_zero := simulate_eq_map_simulate_zero
-
 /-- We can always reduce simulation with counting to start with `0`,
 and add the initial count back at the end. -/
 lemma support_simulate (oa : OracleComp spec α) (qc : QueryCount ι) :

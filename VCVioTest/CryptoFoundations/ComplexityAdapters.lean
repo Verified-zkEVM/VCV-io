@@ -17,7 +17,7 @@ ranked-certificate and uniform-security-family facades, while the adaptive and p
 make the rank depend observably on an oracle answer and on the runtime input.
 -/
 
-@[expose] public section
+public section
 
 namespace OracleComp.Complexity.ComplexityAdaptersTest
 
@@ -27,6 +27,7 @@ open PFunctor.DynSystem.DynComputation
 
 /-! ## Synthetic structural fixture -/
 
+@[expose]
 def zeroBackend : QuantitativeStepClass.{0, 0, 0} StepClass.unconstrained.{0, 0} where
   Realizer _ _ _ := PUnit
   size _ _ := 0
@@ -59,6 +60,7 @@ instance : zeroBackend.IsDistributive where
 
 /-! ## Ranked strict PPT for one genuinely uniform security family -/
 
+@[expose]
 def familySpec (_n : ℕ) : OracleSpec PUnit := fun _ ↦ PEmpty
 
 /-- The member input and output types vary with the security parameter. -/
@@ -75,6 +77,7 @@ abbrev familyBoundary : Boundary StepClass.unconstrained
   Boundary.unconstrained _ _ _
 
 /-- One machine implements every member of the nonconstant family. -/
+@[expose]
 def familyRealization : QuantitativeRealization zeroBackend familyBoundary where
   machine := ofFn id
   state := PUnit.unit
@@ -99,6 +102,7 @@ def familyOutputRecovery : zeroBackend.PolyOutputSizeRecovery familyBoundary whe
   output_le _ := le_rfl
 
 /-- Local ranked resource evidence for the packed immediate-return realization. -/
+@[expose]
 def familyResourcePotential : RankedRun.ResourcePotentialCertificate familyRealization
     familyResourceModel.allows (fun _ ↦ 0) where
   toRankedRunCertificate := {
@@ -156,6 +160,7 @@ def adaptiveView : AdaptiveState → Bool ⊕ coinSpec.toPFunctor.Obj AdaptiveSt
   | .second => Sum.inr ⟨(), fun answer ↦ .done answer⟩
   | .done result => Sum.inl result
 
+@[expose]
 def adaptiveMachine : DynComputation coinSpec.toPFunctor Unit Bool where
   State := AdaptiveState
   toDynSystem :=
@@ -246,6 +251,7 @@ def parityView : (ℕ × Bool) → Bool ⊕ coinSpec.toPFunctor.Obj (ℕ × Bool
   | (remaining + 1, parity) =>
       Sum.inr ⟨(), fun answer ↦ (remaining, Bool.xor parity answer)⟩
 
+@[expose]
 def parityMachine : DynComputation coinSpec.toPFunctor ℕ Bool where
   State := ℕ × Bool
   toDynSystem :=
