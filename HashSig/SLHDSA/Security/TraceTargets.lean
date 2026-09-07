@@ -21,8 +21,9 @@ answer and is therefore stronger than a statement about one deterministic execut
 `H_msg` carries no address, so `ConstructionQueryReachable` accepts every `.hmsg` query
 unconditionally; only `.thash` queries are constrained.  Membership is deliberately stated after
 `CorePrimitives.adrsToKey`: compressed SHA-2 encodings need not be globally injective.  A game that
-needs distinct encoded targets must refine the trace to the relevant role and use the corresponding
-field of `ReachableTargets.EncodedTargetLedgerConditions`.  That record proves encoded distinctness
+needs distinct encoded targets can refine the trace to the relevant role and use the corresponding
+field of `EncodedTargetLedgerConditions`, or separately establish cross-role encoded disjointness.
+That record proves encoded distinctness
 per role; it does not by itself prove cross-role encoded disjointness or duplicate-freedom of this
 encoded union.
 
