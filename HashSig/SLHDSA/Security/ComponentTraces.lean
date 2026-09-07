@@ -9,13 +9,13 @@ public import HashSig.SLHDSA.Security.TraceTargets
 import VCVio.CryptoFoundations.MerkleTree.Addressed.NatIndexed.QueryBound
 
 /-!
-# Trace provenance of the FORS and XMSS programs
+# Trace provenance of the FORS, XMSS, hypertree, and internal scheme programs
 
 This module extends the pathwise predicate `QueriesWithinConstructionTargets` of
-`HashSig.SLHDSA.Security.TraceTargets` from the WOTS+ programs to the FORS and XMSS programs.  Each
-theorem says that every public-hash query a program can issue, under any oracle answers, uses an
-encoded address from the union ledger `constructionAddresses`; the `*_traceContract` theorems pair
-that with the program's total query bound.
+`HashSig.SLHDSA.Security.TraceTargets` from the WOTS+ programs to the FORS, XMSS, hypertree, and
+internal scheme programs.  Each theorem says that every public-hash query a program can issue,
+under any oracle answers, uses an encoded address from the union ledger `constructionAddresses`;
+the `*_traceContract` theorems pair that with the program's total query bound.
 
 The FORS programs are certified at the FORS address of a reachable `BottomPosition`, and through
 `BottomPosition.ofDigestParts` at the digest-derived address `DigestParts.forsAdrs` that
@@ -36,10 +36,22 @@ leaf and the Merkle lemmas above to the sibling subtrees and the climbed ancesto
 addresses are consumed by `core.PRF`, which is not a query of `publicHashSpec`, so no lemma here
 mentions them.
 
+The hypertree loops `GeneralHypertree.signFromPositionM` and `recoverFromPositionM` are certified
+from any reachable `LayerPosition` by induction on the remaining layers, each layer applying the
+XMSS lemmas at the current position before `LayerPosition.next`; `GeneralHypertree.signM`,
+`pkFromSigM`, and `verifyM` are their instances at `LayerPosition.initial`, and
+`GeneralHypertree.rootM` is `xmssRootM` at the top tree `LayerTreeCoord.top`.  The internal scheme
+programs `GeneralScheme.keygenInternalM`, `signInternalM`, and `verifyInternalM` sequence `H_msg`,
+which the predicate accepts unconditionally, with the FORS programs at the digest-derived address
+and the hypertree programs above.  The contracts at these two levels pair the predicate with the
+bounds of `HashSig.SLHDSA.HypertreeGeneral.QueryBound` and `GeneralSchemeQueryBound`, which are
+upper bounds rather than exact counts.
+
 ## References
 
-- NIST FIPS 205, §6 (Algorithms 9--11, the XMSS programs) and §8 (Algorithms 14--17, the FORS
-  programs)
+- NIST FIPS 205, §6 (Algorithms 9--11, the XMSS programs), §7 (Algorithms 12--13, the hypertree
+  programs), §8 (Algorithms 14--17, the FORS programs), and §9 (Algorithms 18--20, the internal
+  scheme programs)
 -/
 
 public section
@@ -478,5 +490,248 @@ theorem xmssPkFromSigM_traceContract (sig : XmssSig vp.params core) (msg : core.
           vp.params.hp) :=
   ⟨xmssPkFromSigM_queriesWithinConstructionTargets core sig msg pkSeed pos,
     xmssPkFromSigM_isTotalQueryBound core pos.leaf.val sig msg pkSeed pos.toAdrs⟩
+
+/-! ## The top-layer tree -/
+
+/-- The unique XMSS tree at the final layer `d - 1`, tree zero, whose root Algorithm 18 publishes
+as the public key. -/
+def LayerTreeCoord.top (vp : ValidatedParams) : LayerTreeCoord vp :=
+  ⟨⟨vp.params.d - 1, Nat.sub_one_lt (Nat.pos_iff_ne_zero.mp vp.valid.d_pos)⟩, ⟨0, by positivity⟩⟩
+
+/-- The top tree's base address is the one `GeneralHypertree.rootM` computes its root at. -/
+theorem LayerTreeCoord.top_toAdrs (vp : ValidatedParams) :
+    (LayerTreeCoord.top vp).toAdrs = GeneralHypertree.layerAdrs (vp.params.d - 1) 0 := by
+  simp [LayerTreeCoord.top, LayerTreeCoord.toAdrs, GeneralHypertree.layerAdrs]
+
+/-! ## Hypertree programs -/
+
+/-- The typed layer loop of Algorithm 12 from any reachable position queries only union-ledger
+tweaks: each layer signs at the current position, recovers the root at the same position unless it
+is the unrecovered final component, and continues at the next position. -/
+theorem signFromPositionM_queriesWithinConstructionTargets (skSeed : core.SkSeed)
+    (pkSeed : core.PkSeed) (recoverFinal : Bool) (pos : LayerPosition vp) (layers : ℕ)
+    (hremaining : pos.layer.val + layers = vp.params.d) (msg : core.Y) :
+    QueriesWithinConstructionTargets core
+      (GeneralHypertree.signFromPositionM vp core skSeed pkSeed recoverFinal pos layers
+          hremaining msg :
+        OracleComp (publicHashSpec core) (Vector (XmssSig vp.params core) layers)) := by
+  induction layers using Nat.twoStepInduction generalizing recoverFinal pos msg with
+  | zero => simp [GeneralHypertree.signFromPositionM, GeneralHypertree.signFromPositionWith]
+  | one =>
+      cases recoverFinal with
+      | false =>
+          have h := QueriesWithinConstructionTargets.bind
+            (xmssSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos)
+            (fun sig => queriesWithinConstructionTargets_pure core
+              (#v[sig] : Vector (XmssSig vp.params core) 1))
+          simpa [GeneralHypertree.signFromPositionM, GeneralHypertree.signFromPositionWith,
+            xmssSignM] using h
+      | true =>
+          have h := QueriesWithinConstructionTargets.bind
+            (xmssSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos)
+            (fun sig => QueriesWithinConstructionTargets.bind
+              (xmssPkFromSigM_queriesWithinConstructionTargets core sig msg pkSeed pos)
+              (fun _ => queriesWithinConstructionTargets_pure core
+                (#v[sig] : Vector (XmssSig vp.params core) 1)))
+          simpa [GeneralHypertree.signFromPositionM, GeneralHypertree.signFromPositionWith,
+            xmssSignM, xmssPkFromSigM] using h
+  | more layers _ ih =>
+      let next := pos.next (by omega)
+      have h := QueriesWithinConstructionTargets.bind
+        (xmssSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos)
+        (fun sig => QueriesWithinConstructionTargets.bind
+          (xmssPkFromSigM_queriesWithinConstructionTargets core sig msg pkSeed pos)
+          (fun root => QueriesWithinConstructionTargets.bind
+            (ih (recoverFinal := false) (pos := next) (hremaining := by simp [next]; omega)
+              (msg := root))
+            (fun rest => queriesWithinConstructionTargets_pure core (rest.insertIdx 0 sig))))
+      simpa [GeneralHypertree.signFromPositionM, GeneralHypertree.signFromPositionWith,
+        xmssSignM, xmssPkFromSigM, next, bind_assoc] using h
+
+/-- The typed layer loop of Algorithm 13 from any reachable position queries only union-ledger
+tweaks: each layer recovers one XMSS root at the current position and continues at the next. -/
+theorem recoverFromPositionM_queriesWithinConstructionTargets (pkSeed : core.PkSeed)
+    (pos : LayerPosition vp) (layers : ℕ) (hremaining : pos.layer.val + layers = vp.params.d)
+    (msg : core.Y) (sigs : Vector (XmssSig vp.params core) layers) :
+    QueriesWithinConstructionTargets core
+      (GeneralHypertree.recoverFromPositionM vp core pkSeed pos layers hremaining msg sigs :
+        OracleComp (publicHashSpec core) core.Y) := by
+  induction layers using Nat.twoStepInduction generalizing pos msg with
+  | zero =>
+      simp [GeneralHypertree.recoverFromPositionM, GeneralHypertree.recoverFromPositionWith]
+  | one =>
+      simpa [GeneralHypertree.recoverFromPositionM, GeneralHypertree.recoverFromPositionWith,
+        xmssPkFromSigM] using
+        xmssPkFromSigM_queriesWithinConstructionTargets core sigs.head msg pkSeed pos
+  | more layers _ ih =>
+      let next := pos.next (by omega)
+      have h := QueriesWithinConstructionTargets.bind
+        (xmssPkFromSigM_queriesWithinConstructionTargets core sigs.head msg pkSeed pos)
+        (fun root => ih (pos := next) (hremaining := by simp [next]; omega) (msg := root)
+          (sigs := sigs.tail))
+      simpa [GeneralHypertree.recoverFromPositionM, GeneralHypertree.recoverFromPositionWith,
+        xmssPkFromSigM, next] using h
+
+/-- Hypertree signing (Algorithm 12) at the digest-derived layer-zero position queries only
+union-ledger tweaks. -/
+theorem hypertreeSignM_queriesWithinConstructionTargets (msg : core.Y) (skSeed : core.SkSeed)
+    (pkSeed : core.PkSeed) (parts : DigestParts vp.params) :
+    QueriesWithinConstructionTargets core
+      (GeneralHypertree.signM vp core msg skSeed pkSeed parts :
+        OracleComp (publicHashSpec core) (GeneralHypertree.Signature vp core)) :=
+  signFromPositionM_queriesWithinConstructionTargets core skSeed pkSeed _ _ _ _ msg
+
+/-- Hypertree root recovery (Algorithm 13) at the digest-derived layer-zero position queries only
+union-ledger tweaks. -/
+theorem hypertreePkFromSigM_queriesWithinConstructionTargets (msg : core.Y)
+    (sig : GeneralHypertree.Signature vp core) (pkSeed : core.PkSeed)
+    (parts : DigestParts vp.params) :
+    QueriesWithinConstructionTargets core
+      (GeneralHypertree.pkFromSigM vp core msg sig pkSeed parts :
+        OracleComp (publicHashSpec core) core.Y) :=
+  recoverFromPositionM_queriesWithinConstructionTargets core pkSeed _ _ _ msg sig
+
+/-- Hypertree verification queries exactly what its root recovery queries. -/
+theorem hypertreeVerifyM_queriesWithinConstructionTargets [DecidableEq core.Y] (msg : core.Y)
+    (sig : GeneralHypertree.Signature vp core) (pkSeed : core.PkSeed)
+    (parts : DigestParts vp.params) (pkRoot : core.Y) :
+    QueriesWithinConstructionTargets core
+      (GeneralHypertree.verifyM vp core msg sig pkSeed parts pkRoot :
+        OracleComp (publicHashSpec core) Bool) :=
+  QueriesWithinConstructionTargets.bind
+    (hypertreePkFromSigM_queriesWithinConstructionTargets core msg sig pkSeed parts)
+    (fun recovered => queriesWithinConstructionTargets_pure core (decide (recovered = pkRoot)))
+
+/-- The top-layer root is the root of the reachable tree `LayerTreeCoord.top`. -/
+theorem hypertreeRootM_queriesWithinConstructionTargets (skSeed : core.SkSeed)
+    (pkSeed : core.PkSeed) :
+    QueriesWithinConstructionTargets core
+      (GeneralHypertree.rootM vp core skSeed pkSeed : OracleComp (publicHashSpec core) core.Y) :=
+  xmssRootM_queriesWithinConstructionTargets core skSeed pkSeed (LayerTreeCoord.top vp)
+
+/-! ## Internal scheme programs -/
+
+/-- Algorithm 18 queries only union-ledger tweaks: it computes the top-layer root. -/
+theorem keygenInternalM_queriesWithinConstructionTargets (skSeed : core.SkSeed)
+    (skPrf : core.SkPrf) (pkSeed : core.PkSeed) :
+    QueriesWithinConstructionTargets core
+      (GeneralScheme.keygenInternalM vp core skSeed skPrf pkSeed :
+        OracleComp (publicHashSpec core) (PublicKeyCore core × SecretKeyCore core)) :=
+  QueriesWithinConstructionTargets.bind
+    (hypertreeRootM_queriesWithinConstructionTargets core skSeed pkSeed)
+    (fun pkRoot => queriesWithinConstructionTargets_pure core
+      (PublicKeyCore.mk pkSeed pkRoot, SecretKeyCore.mk skSeed skPrf pkSeed pkRoot))
+
+/-- Algorithm 19 queries only union-ledger tweaks: `H_msg` carries no address, and the FORS and
+hypertree programs run at the addresses derived from its digest. -/
+theorem signInternalM_queriesWithinConstructionTargets (msg : List Byte)
+    (sk : SecretKeyCore core) (addrnd : core.Y) :
+    QueriesWithinConstructionTargets core
+      (GeneralScheme.signInternalM vp core msg sk addrnd :
+        OracleComp (publicHashSpec core) (GeneralScheme.SignatureCore vp core)) := by
+  apply QueriesWithinConstructionTargets.bind
+    (publicHash_hmsg_queriesWithinConstructionTargets core _ sk.pkSeed sk.pkRoot msg)
+  intro digest
+  apply QueriesWithinConstructionTargets.bind
+    (forsSignM_queriesWithinConstructionTargets_digest core _ sk.skSeed sk.pkSeed
+      (splitDigest vp.params digest))
+  intro forsSig
+  apply QueriesWithinConstructionTargets.bind
+    (forsPkFromSigM_queriesWithinConstructionTargets_digest core forsSig _ sk.pkSeed
+      (splitDigest vp.params digest))
+  intro forsPk
+  apply QueriesWithinConstructionTargets.bind
+    (hypertreeSignM_queriesWithinConstructionTargets core forsPk sk.skSeed sk.pkSeed
+      (splitDigest vp.params digest))
+  intro htSig
+  exact queriesWithinConstructionTargets_pure core _
+
+/-- Algorithm 20 queries only union-ledger tweaks: `H_msg`, then FORS and hypertree recovery at
+the addresses derived from its digest. -/
+theorem verifyInternalM_queriesWithinConstructionTargets [DecidableEq core.Y] (msg : List Byte)
+    (sig : GeneralScheme.SignatureCore vp core) (pk : PublicKeyCore core) :
+    QueriesWithinConstructionTargets core
+      (GeneralScheme.verifyInternalM vp core msg sig pk :
+        OracleComp (publicHashSpec core) Bool) := by
+  apply QueriesWithinConstructionTargets.bind
+    (publicHash_hmsg_queriesWithinConstructionTargets core sig.randomness pk.pkSeed pk.pkRoot msg)
+  intro digest
+  apply QueriesWithinConstructionTargets.bind
+    (forsPkFromSigM_queriesWithinConstructionTargets_digest core sig.fors _ pk.pkSeed
+      (splitDigest vp.params digest))
+  intro forsPk
+  exact hypertreeVerifyM_queriesWithinConstructionTargets core forsPk sig.hypertree pk.pkSeed
+    (splitDigest vp.params digest) pk.pkRoot
+
+/-! ## Hypertree and scheme trace contracts -/
+
+/-- Hypertree signing at the digest-derived position queries only union-ledger tweaks and makes at
+most `GeneralHypertree.signQueryBound p` queries. -/
+theorem hypertreeSignM_traceContract (msg : core.Y) (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
+    (parts : DigestParts vp.params) :
+    QueriesWithinConstructionTargets core
+        (GeneralHypertree.signM vp core msg skSeed pkSeed parts :
+          OracleComp (publicHashSpec core) (GeneralHypertree.Signature vp core)) ∧
+      IsTotalQueryBound
+        (GeneralHypertree.signM vp core msg skSeed pkSeed parts :
+          OracleComp (publicHashSpec core) (GeneralHypertree.Signature vp core))
+        (GeneralHypertree.signQueryBound vp.params) :=
+  ⟨hypertreeSignM_queriesWithinConstructionTargets core msg skSeed pkSeed parts,
+    GeneralHypertree.signM_isTotalQueryBound vp core msg skSeed pkSeed parts⟩
+
+/-- Hypertree root recovery at the digest-derived position queries only union-ledger tweaks and
+makes at most `GeneralHypertree.recoverQueryBound p` queries. -/
+theorem hypertreePkFromSigM_traceContract (msg : core.Y) (sig : GeneralHypertree.Signature vp core)
+    (pkSeed : core.PkSeed) (parts : DigestParts vp.params) :
+    QueriesWithinConstructionTargets core
+        (GeneralHypertree.pkFromSigM vp core msg sig pkSeed parts :
+          OracleComp (publicHashSpec core) core.Y) ∧
+      IsTotalQueryBound
+        (GeneralHypertree.pkFromSigM vp core msg sig pkSeed parts :
+          OracleComp (publicHashSpec core) core.Y)
+        (GeneralHypertree.recoverQueryBound vp.params) :=
+  ⟨hypertreePkFromSigM_queriesWithinConstructionTargets core msg sig pkSeed parts,
+    GeneralHypertree.pkFromSigM_isTotalQueryBound vp core msg sig pkSeed parts⟩
+
+/-- Internal key generation queries only union-ledger tweaks and makes at most
+`GeneralScheme.keygenInternalQueryBound p` queries. -/
+theorem keygenInternalM_traceContract (skSeed : core.SkSeed) (skPrf : core.SkPrf)
+    (pkSeed : core.PkSeed) :
+    QueriesWithinConstructionTargets core
+        (GeneralScheme.keygenInternalM vp core skSeed skPrf pkSeed :
+          OracleComp (publicHashSpec core) (PublicKeyCore core × SecretKeyCore core)) ∧
+      IsTotalQueryBound
+        (GeneralScheme.keygenInternalM vp core skSeed skPrf pkSeed :
+          OracleComp (publicHashSpec core) (PublicKeyCore core × SecretKeyCore core))
+        (GeneralScheme.keygenInternalQueryBound vp.params) :=
+  ⟨keygenInternalM_queriesWithinConstructionTargets core skSeed skPrf pkSeed,
+    GeneralScheme.keygenInternalM_isTotalQueryBound vp core skSeed skPrf pkSeed⟩
+
+/-- Internal signing queries only union-ledger tweaks and makes at most
+`GeneralScheme.signInternalQueryBound p` queries. -/
+theorem signInternalM_traceContract (msg : List Byte) (sk : SecretKeyCore core) (addrnd : core.Y) :
+    QueriesWithinConstructionTargets core
+        (GeneralScheme.signInternalM vp core msg sk addrnd :
+          OracleComp (publicHashSpec core) (GeneralScheme.SignatureCore vp core)) ∧
+      IsTotalQueryBound
+        (GeneralScheme.signInternalM vp core msg sk addrnd :
+          OracleComp (publicHashSpec core) (GeneralScheme.SignatureCore vp core))
+        (GeneralScheme.signInternalQueryBound vp.params) :=
+  ⟨signInternalM_queriesWithinConstructionTargets core msg sk addrnd,
+    GeneralScheme.signInternalM_isTotalQueryBound vp core msg sk addrnd⟩
+
+/-- Internal verification queries only union-ledger tweaks and makes at most
+`GeneralScheme.verifyInternalQueryBound p` queries. -/
+theorem verifyInternalM_traceContract [DecidableEq core.Y] (msg : List Byte)
+    (sig : GeneralScheme.SignatureCore vp core) (pk : PublicKeyCore core) :
+    QueriesWithinConstructionTargets core
+        (GeneralScheme.verifyInternalM vp core msg sig pk :
+          OracleComp (publicHashSpec core) Bool) ∧
+      IsTotalQueryBound
+        (GeneralScheme.verifyInternalM vp core msg sig pk :
+          OracleComp (publicHashSpec core) Bool)
+        (GeneralScheme.verifyInternalQueryBound vp.params) :=
+  ⟨verifyInternalM_queriesWithinConstructionTargets core msg sig pk,
+    GeneralScheme.verifyInternalM_isTotalQueryBound vp core msg sig pk⟩
 
 end SLHDSA.Security
