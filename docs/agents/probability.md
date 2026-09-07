@@ -1,5 +1,10 @@
 # Probability Reasoning (EvalDist and ProbComp)
 
+For theorem attributes and proof-simplification reviews, use the
+[tactic usability review procedure](../reviews/tactics.md). `/review tactics` requests the
+same focused review on a PR; it covers function properties, normalization, and proof-mode
+registrations as well as probability inequalities.
+
 For the cross-project survey of SPMF, Mathlib measures and kernels, PolyFun
 coalgebraic limits, ArkLib, Bluebell/Iris, and possible long-term migration paths, see
 [`Probability Semantics for Computations: Landscape and Design Options`](../reading/probability-semantics-landscape.md).
@@ -367,6 +372,29 @@ disable a rule per call (`grind [-bind_pure]`), ignore the default set entirely
 closes, which is the easiest way to make a fragile call site independent of the default set.
 
 ## Normal forms and the tactic contract
+
+### Registered interfaces
+
+Use the tactic that matches the mathematical obligation:
+
+| Obligation | Interface |
+|---|---|
+| Ordered expectations or postconditions | `gcongr with x hx` on `expectedValue` or `OracleComp.ProgramLogic.wp` exposes support membership. |
+| A finite expectation on a finite result type | `finiteness` uses `expectedValue_ne_top_of_finite` / `wp_ne_top_of_finite` and asks for finite functional values. |
+| A supplied finite bound on an arbitrary result type | Apply `expectedValue_ne_top_of_le mx hc h`; the bound remains explicit. |
+| Nonnegative total variation arithmetic | Import `VCVio.EvalDist.TVDist.Positivity` and use `positivity`; this also arrives through `VCVio.ProgramLogic.Tactics`. |
+| Measurability through optional or exception-valued maps | `fun_prop` uses `Option.measurable_map`, `Except.measurable_map`, and `Option.measurable_elim'` on arbitrary measurable spaces. |
+
+For a local abbreviation hiding a probability, use a targeted `change` or `dsimp only` before
+`finiteness`. For named definitions, `finiteness (add unfold [name])` is also available.
+`finiteness [proof]` supplies an explicit finiteness fact. The tactic does not infer finiteness
+of an expectation over an infinite result type merely from pointwise finiteness of its functional.
+
+The registrations and their failure boundaries are exercised in `VCVioTest/Tactic/` and
+`VCVioTest/ProgramLogic/GCongr.lean`. The expression-specific `fun_prop` rules avoid globally
+registering eliminator theorems whose conclusion is the unrestricted `Measurable f`.
+
+### Normalization discipline
 
 The simp, grind and `gcongr` sets of the probability layer are designed around one *normal-form
 ladder*: one canonical spelling per rung, mass-left throughout, each rung reached from the one

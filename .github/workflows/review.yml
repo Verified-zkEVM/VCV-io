@@ -31,22 +31,25 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # Everything after `/review` is freeform focus text; URLs and existing
-      # repo paths it mentions become review context automatically.
+      # Read the profile and parser from the workflow's trusted revision before
+      # the review action checks out the PR head (which may predate the profile).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .review-policy
+          persist-credentials: false
+
       - name: Extract instructions from /review comment
         id: get_args
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          EOF=$(openssl rand -hex 8)
-          {
-            echo "instructions<<$EOF"
-            printf '%s\n' "$COMMENT_BODY" | sed -E '1s|^/review[[:space:]]*||'
-            echo "$EOF"
-          } >> "$GITHUB_OUTPUT"
+          python3 .review-policy/scripts/prepare-review.py \
+            --profile .review-policy/docs/reviews/tactics.md
         shell: bash
 
       - uses: alexanderlhicks/lean4repo-utils/review@9404cc0f9aa10d65e4a08d3741a1d41638fb590f # 0.3
+        if: steps.get_args.outputs.requested == 'true'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           api_key: ${{ secrets.OPENROUTER_KEY }}

@@ -1,5 +1,8 @@
 # Program Logic Tactics and Relational Reasoning
 
+The [tactic usability review procedure](../reviews/tactics.md) covers theorem registration,
+proof simplification, and replayable suggestions. Request it on a PR with `/review tactics`.
+
 ## Current Module Boundary
 
 - Import `VCVio.ProgramLogic.Tactics` for normal proof work. This is the canonical user-facing proof mode.
@@ -26,6 +29,19 @@ compatibility layer while measure-native tactic support is developed.
 - `VCVio/ProgramLogic/Relational/Examples.lean`: compact API examples for the relational layer.
 
 ## Tactic Quick Reference
+
+### Postcondition bounds
+
+For `wp oa f ≤ wp oa g`, `gcongr with x hx` exposes `hx : x ∈ support oa` and the
+pointwise obligation `f x ≤ g x`. The unrestricted `wp_mono` theorem remains available as a
+lower-priority fallback. On raw `Std.Do'.wp` expressions, first write
+`change OracleComp.ProgramLogic.wp oa f ≤ OracleComp.ProgramLogic.wp oa g` to expose the
+head that `gcongr` indexes. `wp_eq_expectedValue` is an explicit bridge, not a global simp rule.
+
+Use `finiteness` for `wp oa post ≠ ⊤` when the result type is finite and the postcondition is
+pointwise finite. An arbitrary quantitative postcondition may still take the value `⊤`.
+The regression module `VCVioTest/ProgramLogic/GCongr.lean` checks the support binders and the
+explicit raw-WP script, so these examples can be pasted into ordinary-import proofs.
 
 ### Proof Mode Entry
 
