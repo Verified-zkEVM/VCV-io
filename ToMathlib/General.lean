@@ -5,6 +5,7 @@ Authors: Devon Tuma
 -/
 module
 
+public import Mathlib.Data.FinEnum
 public import Mathlib.Data.Finset.Card
 public import Mathlib.Data.Vector.Defs
 public import Mathlib.Probability.Distributions.Uniform
@@ -38,43 +39,17 @@ lemma sum_update_succ_count {ι : Type} [Fintype ι] [DecidableEq ι]
     (counts : ι → ℕ) (i : ι) :
     ∑ j : ι, Function.update counts i (counts i + 1) j =
       (∑ j : ι, counts j) + 1 := by
-  classical
-  calc
-    ∑ j : ι, Function.update counts i (counts i + 1) j =
-        Function.update counts i (counts i + 1) i +
-          Finset.sum (Finset.univ.erase i)
-            (fun j : ι => Function.update counts i (counts i + 1) j) := by
-          symm
-          exact Finset.univ.add_sum_erase
-            (f := fun j : ι => Function.update counts i (counts i + 1) j) (Finset.mem_univ i)
-    _ = counts i + 1 + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) := by
-          simp only [Function.update_self]
-          congr 1
-          refine Finset.sum_congr rfl ?_
-          intro j hj
-          rw [Function.update_of_ne (Finset.ne_of_mem_erase hj)]
-    _ = counts i + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) + 1 := by
-          omega
-    _ = (∑ j : ι, counts j) + 1 := by
-          rw [← Finset.univ.add_sum_erase (f := fun j : ι => counts j) (Finset.mem_univ i)]
+  rw [Finset.sum_update_of_mem (Finset.mem_univ i), ← Finset.sum_erase_add _ _ (Finset.mem_univ i),
+    Finset.sdiff_singleton_eq_erase]
+  omega
 
 /-- Updating one coordinate of a `ℕ`-valued function by `-1` at a positive-valued coordinate
 decreases the total sum by exactly one. -/
 lemma sum_update_pred {ι : Type*} [Fintype ι] [DecidableEq ι]
     {qc : ι → ℕ} {t : ι} (ht : 0 < qc t) :
     ∑ i, Function.update qc t (qc t - 1) i = (∑ i, qc i) - 1 := by
-  have hsub : ∑ i, Function.update qc t (qc t - 1) i + 1 = (∑ i, qc i) := by
-    rw [← Finset.add_sum_erase Finset.univ (fun i => Function.update qc t (qc t - 1) i)
-      (Finset.mem_univ t)]
-    simp only [Function.update_self]
-    conv_rhs => rw [← Finset.add_sum_erase Finset.univ qc (Finset.mem_univ t)]
-    have herase : ∑ x ∈ Finset.univ.erase t,
-        Function.update qc t (qc t - 1) x = ∑ x ∈ Finset.univ.erase t, qc x := by
-      apply Finset.sum_congr rfl
-      intro i hi
-      rw [Function.update_of_ne (Finset.ne_of_mem_erase hi)]
-    rw [herase]
-    omega
+  rw [Finset.sum_update_of_mem (Finset.mem_univ t), ← Finset.sum_erase_add _ _ (Finset.mem_univ t),
+    Finset.sdiff_singleton_eq_erase]
   omega
 
 /-- Filtered sum after updating a `ℕ`-valued function by `-1` at a positive-valued coordinate
@@ -85,17 +60,8 @@ lemma sum_filter_update_of_pred_pos {ι : Type*} [Fintype ι] [DecidableEq ι]
       (∑ i ∈ Finset.univ.filter p, qc i) - 1 := by
   have htmem : t ∈ Finset.univ.filter p :=
     Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩
-  have hsub :
-      ∑ i ∈ Finset.univ.filter p, Function.update qc t (qc t - 1) i + 1 =
-        ∑ i ∈ Finset.univ.filter p, qc i := by
-    rw [← Finset.add_sum_erase _ (fun i => Function.update qc t (qc t - 1) i) htmem]
-    simp only [Function.update_self]
-    conv_rhs => rw [← Finset.add_sum_erase _ qc htmem]
-    have herase : ∑ x ∈ (Finset.univ.filter p).erase t,
-        Function.update qc t (qc t - 1) x = ∑ x ∈ (Finset.univ.filter p).erase t, qc x := by
-      refine Finset.sum_congr rfl (fun i hi => ?_)
-      rw [Function.update_of_ne (Finset.ne_of_mem_erase hi)]
-    rw [herase]; omega
+  rw [Finset.sum_update_of_mem htmem, ← Finset.sum_erase_add _ _ htmem,
+    Finset.sdiff_singleton_eq_erase]
   omega
 
 /-- Updating a `ℕ`-valued function at an index outside the filter leaves the filtered sum
@@ -147,30 +113,6 @@ lemma List.prod_map_const {α M : Type*} [CommMonoid M] (xs : List α) (c : M) :
   | nil => simp
   | cons _ _ ih => simp only [List.map_cons, List.prod_cons, ih,
       List.length_cons, pow_succ, mul_comm]
-
-section sum_thing
-
-open Filter Finset Function Topology SummationFilter
-
-@[to_additive (attr := simp)]
-theorem tprod_ite_eq_apply {α β} [CommMonoid α] [TopologicalSpace α]
-    (b : β) [DecidablePred (· = b)] (f : β → α)
-    (L := unconditional β) [L.LeAtTop] :
-    ∏'[L] b', (if b' = b then f b' else 1) = f b := by
-  rw [tprod_eq_mulSingle b]
-  · simp
-  · intro b' hb'; simp [hb']
-
-@[to_additive (attr := simp)]
-theorem tprod_ite_eq_apply' {α β} [CommMonoid α] [TopologicalSpace α]
-    (b : β) [DecidablePred (b = ·)] (f : β → α)
-    (L := unconditional β) [L.LeAtTop] :
-    ∏'[L] b', (if b = b' then f b' else 1) = f b := by
-  rw [tprod_eq_mulSingle b]
-  · simp
-  · intro b' hb'; simp [hb', @eq_comm _ b]
-
-end sum_thing
 
 lemma Fin.ofNat_Icc_iff {n m : ℕ} (h : n < m) (x : Fin (m + 1)) :
     (Fin.ofNat (m + 1) n ≤ x ∧ x ≤ Fin.ofNat (m + 1) m) ↔ n ≤ x.val := by
@@ -241,11 +183,6 @@ section List.Vector
 open List (Vector)
 
 -- mathlib?
-set_option warning.simp.varHead false in
-@[simp]
-lemma vector_eq_nil {α : Type*} (xs : List.Vector α 0) : xs = Vector.nil :=
-  List.Vector.ext (IsEmpty.forall_iff.2 True.intro)
-
 lemma List.injective2_cons {α : Type*} : Function.Injective2 (List.cons (α := α)) := by
   simp [Function.Injective2]
 
@@ -276,10 +213,6 @@ lemma Prod.mk.injective2 {α β : Type*} :
 lemma Function.injective2_swap_iff {α β γ : Type*} (f : α → β → γ) :
     (Function.swap f).Injective2 ↔ f.Injective2 :=
   ⟨fun h _ _ _ _ h' ↦ and_comm.1 (h h'), fun h _ _ _ _ h' ↦ and_comm.1 (h h')⟩
-
-@[simp] theorem Finset.image_const_univ {α β} [DecidableEq β] [Fintype α]
-    [Nonempty α] (b : β) : (Finset.univ.image fun _ : α => b) = singleton b :=
-  Finset.univ.image_const Finset.univ_nonempty b
 
 /-- Summing `1` over list indices that satisfy a predicate is just `countP` applied to `p`. -/
 lemma List.countP_eq_sum_fin_ite {α : Type*} (xs : List α) (p : α → Bool) :
@@ -404,42 +337,11 @@ calc (∑ x ∈ s, if p x then r else 0 : β) = (∑ x ∈ s, if p x then 1 else
     by simp only [← Finset.sum_nsmul_assoc, ite_smul, one_smul, zero_smul]
   _ = (s.filter p).card • r := by simp only [sum_boole, Nat.cast_id]
 
+
+/-- `BitVec n` has `2 ^ n` elements, read off Mathlib's `FinEnum (BitVec n)`. -/
 @[simp]
-lemma Finset.count_toList {α} [DecidableEq α] (x : α) (s : Finset α) :
-    s.toList.count x = if x ∈ s then 1 else 0 := by
-  by_cases hx : x ∈ s
-  · simp only [hx, ↓reduceIte]
-    refine List.count_eq_one_of_mem ?_ ?_
-    · exact nodup_toList s
-    · simp [hx]
-  · simp only [hx, ↓reduceIte]
-    refine List.count_eq_zero_of_not_mem ?_
-    simp [hx]
-
-lemma BitVec.toFin_bijective (n : ℕ) :
-    Function.Bijective (BitVec.toFin : BitVec n → Fin (2 ^ n)) := by
-  refine ⟨?_, ?_⟩
-  · intro i j h
-    cases i
-    cases j
-    simp at h
-    simp [h]
-  · intro i
-    simp only [exists_apply_eq_apply]
-
-instance (n : ℕ) : Fintype (BitVec n) := by
-  refine Fintype.ofBijective (α := Fin (2 ^ n)) ?_ ?_
-  · refine fun x ↦ ?_
-    refine BitVec.ofFin x
-  · refine ⟨?_, ?_⟩
-    · intro i j
-      simp only [BitVec.ofFin.injEq, imp_self]
-    · intro i
-      simp only [exists_apply_eq_apply]
-
-@[simp]
-lemma card_bitVec (n : ℕ) : Fintype.card (BitVec n) = 2 ^ n :=
-  (Fintype.card_of_bijective (BitVec.toFin_bijective _)).trans <| Fintype.card_fin (2 ^ n)
+lemma Fintype.card_bitVec (n : ℕ) : Fintype.card (BitVec n) = 2 ^ n :=
+  FinEnum.card_eq_fintypeCard.symm.trans (FinEnum.card_bitVec n)
 
 @[simp]
 lemma BitVec.xor_self_xor {n : ℕ} (x y : BitVec n) : x ^^^ (x ^^^ y) = y := by
@@ -576,19 +478,6 @@ def Fin.mOfFn {m : Type u → Type v} [Monad m] {α : Type u} :
     let rest ← Fin.mOfFn n (fun i => f i.succ)
     return Fin.cons a rest
 
-@[simp]
-lemma List.foldlM_range {m : Type u → Type v} [Monad m] [LawfulMonad m]
-    {s : Type u} (n : ℕ) (f : s → Fin n → m s) (init : s) :
-    List.foldlM f init (List.finRange n) =
-      Fin.foldlM n f init := by
-  revert init
-  induction n with
-  | zero => simp
-  | succ n hn =>
-      intro init
-      simp only [List.finRange_succ, List.foldlM_cons, Fin.foldlM_succ]
-      refine congr_arg (_ >>= ·) (funext fun x ↦ ?_)
-      rw [← hn, List.foldlM_map]
 
 lemma list_mapM_loop_eq {m : Type u → Type v} [Monad m] [LawfulMonad m]
     {α : Type w} {β : Type u} (xs : List α) (f : α → m β) (ys : List β) :

@@ -18,7 +18,7 @@ shift-by-eight interpretation truncates to a different digit vector.  The final 
 evaluate the two-encodings property on a concrete pair of nodes.
 -/
 
-@[expose] public section
+public section
 
 
 namespace SLHDSA.WotsEncodingTest
@@ -29,6 +29,7 @@ def limited : Params := slhdsaSha2_128_24
 def zeroDigits : List ℕ := List.replicate limited.len1 0
 
 /-- Minimal byte-backed context used to exercise the operational WOTS digit path. -/
+@[expose]
 def limitedCore : CorePrimitives limited where
   PkSeed := Unit
   SkSeed := Unit

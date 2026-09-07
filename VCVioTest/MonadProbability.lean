@@ -27,7 +27,7 @@ closer; see *Normal forms and the tactic contract* in `docs/agents/probability.m
 with no probability API yet are recorded as prose gaps at the end.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ProbComp ENNReal
 

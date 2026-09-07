@@ -23,7 +23,7 @@ Shared test infrastructure: pass/fail counter, hex formatting, and utility
 functions used by the Falcon test suite.
 -/
 
-@[expose] public section
+public section
 
 
 namespace Falcon.Test

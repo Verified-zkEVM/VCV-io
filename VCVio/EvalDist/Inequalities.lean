@@ -7,6 +7,7 @@ Authors: Quang Dao
 module
 public import VCVio.EvalDist.Defs.Basic
 public import ToMathlib.Data.ENNReal.SumSquares
+import ToMathlib.Data.ENNReal.AbsDiff
 
 /-!
 # Probability-weighted Cauchy-Schwarz / Jensen inequalities
@@ -38,11 +39,6 @@ namespace OracleComp.EvalDist
 
 variable {m : Type → Type v} [Monad m] [MonadLiftT m SPMF]
 
-private lemma tsum_sub_tsum_le_tsum_sub {ι : Type*} (f g : ι → ℝ≥0∞)
-    (_hg : ∑' i, g i ≠ ⊤) : (∑' i, f i) - ∑' i, g i ≤ ∑' i, (f i - g i) := by
-  rw [tsub_le_iff_right, ← ENNReal.tsum_add]
-  exact ENNReal.tsum_le_tsum fun i => le_tsub_add
-
 omit [Monad m] in
 /-- **Marginalized Jensen / Cauchy-Schwarz step for the forking lemma.**
 
@@ -70,7 +66,6 @@ keygen reaches). -/
 lemma marginalized_jensen_forking_bound
     {X : Type} (mx : m X)
     (acc B : X → ℝ≥0∞) (q hinv : ℝ≥0∞)
-    (hinv_ne_top : hinv ≠ ⊤)
     (hacc_le : ∀ x, acc x ≤ 1)
     (hper : ∀ x, acc x * (acc x / q - hinv) ≤ B x) :
     (∑' x, Pr[= x | mx] * acc x) *
@@ -86,8 +81,6 @@ lemma marginalized_jensen_forking_bound
       _ = ∑' x, w x := by simp
       _ ≤ 1 := hw_tsum_le_one
   have hμ_ne_top : μ ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top hμ_le_one
-  have hμ_hinv_ne_top : ∑' x, w x * acc x * hinv ≠ ⊤ := by
-    rw [ENNReal.tsum_mul_right]; exact ENNReal.mul_ne_top hμ_ne_top hinv_ne_top
   have hCS : μ ^ 2 ≤ ∑' x, w x * acc x ^ 2 :=
     ENNReal.sq_tsum_le_tsum_sq w acc hw_tsum_le_one
   calc μ * (μ / q - hinv)
@@ -98,7 +91,7 @@ lemma marginalized_jensen_forking_bound
         rw [hμ_def]
         simp_rw [div_eq_mul_inv, ENNReal.tsum_mul_right]
     _ ≤ ∑' x, (w x * acc x ^ 2 / q - w x * acc x * hinv) :=
-        tsum_sub_tsum_le_tsum_sub _ _ hμ_hinv_ne_top
+        ENNReal.tsum_tsub_le_tsum_tsub _ _
     _ = ∑' x, w x * (acc x * (acc x / q - hinv)) := by
         refine tsum_congr fun x => ?_
         have hwx_ne_top : w x ≠ ⊤ :=
