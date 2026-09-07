@@ -7,6 +7,7 @@ module
 
 public import ToMathlib.MeasureTheory.MeasurableSpace.Option
 public import Mathlib.MeasureTheory.Measure.GiryMonad
+import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
 
 /-!
 # Discarding the `none` part of an option-valued measure
@@ -83,6 +84,15 @@ theorem dropNone_apply_univ_le (μ : Measure (Option α)) :
   apply lintegral_mono
   intro value
   cases value <;> simp
+
+/-- Integrating against `dropNone μ` integrates against `μ` with the `none` outcome discarded. -/
+theorem lintegral_dropNone (μ : Measure (Option α)) {g : α → ENNReal} (hg : Measurable g) :
+    ∫⁻ x, g x ∂dropNone μ = ∫⁻ o, o.elim 0 g ∂μ := by
+  rw [dropNone, Measure.lintegral_bind measurable_dropNoneKernel.aemeasurable hg.aemeasurable]
+  refine lintegral_congr fun o => ?_
+  cases o with
+  | none => simp
+  | some x => simp [lintegral_dirac' x hg]
 
 /-! ## Completing a subprobability measure with an explicit failure outcome -/
 

@@ -323,11 +323,14 @@ diacritics in cited author names, which the Mathlib allowlist would otherwise re
 
 A trailing `set_option linter.style.longFile <ceiling>` in a file above 1500 lines is not a
 dodge either: it is how that linter is meant to be used (Mathlib does the same), the linter
-rejects a ceiling more than a hundred lines above the file's length, and the number only moves
-down as the file is split. Likewise `scripts/nolints.json` grandfathers the environment-linter
-findings (`lake lint`) that predate the gate; entries leave it when the finding is fixed
-(`lake lint -- --update` regenerates it from the current findings), and nothing is added to it
-to silence a new one.
+accepts only its narrow rounded candidate range above the current line count, and the number
+only moves down as the file is split. Likewise `scripts/nolints.json` grandfathers the
+environment-linter findings (`lake lint`) that predate the gate; entries leave it when the finding
+is fixed, and nothing is added to it to silence a new one. Batteries rejects unlisted findings but
+does not report stale baseline entries, so removing fixed entries is a review requirement. Do not
+use `lake lint -- --update` to replace this multi-library file: Batteries overwrites it once per
+root module, leaving only the last library. Generate each proof library's current findings
+separately, then merge, deduplicate, sort, and audit the delta before replacing the baseline.
 
 ### 24. After adding new `.lean` files, run `./scripts/update-lib.sh`
 
