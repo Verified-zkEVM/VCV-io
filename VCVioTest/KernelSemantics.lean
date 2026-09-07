@@ -6,6 +6,7 @@ Authors: Devon Tuma
 module
 
 public import VCVio.OracleComp.Coinductive.Responder
+public import VCVio.EvalDist.FailureMeasure
 public import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
 
 /-!
@@ -38,32 +39,16 @@ example (input : Bool) : lossyKernel input Set.univ ≤ 1 := by
   exact Kernel.measure_univ_le (evalDistKernelOfDiscrete lossyFamily) input
 
 example : lossyKernel true = Measure.dirac true := by
-  rw [lossyKernel, evalDistKernelOfDiscrete_apply]
-  change (lossyFamily true).toMeasure = Measure.dirac true
-  rw [lossyFamily, if_pos rfl]
-  simp [SPMF.toMeasure, PMF.toMeasure_pure]
+  simp [lossyKernel, lossyFamily]
 
 example : lossyKernel false = 0 := by
-  rw [lossyKernel, evalDistKernelOfDiscrete_apply]
-  change (lossyFamily false).toMeasure = 0
-  rw [lossyFamily, if_neg (by decide)]
-  simp [SPMF.toMeasure, PMF.toMeasure_pure]
+  simp [lossyKernel, lossyFamily]
 
 example : lossyKernel true Set.univ = 1 := by
-  rw [show lossyKernel true = Measure.dirac true by
-    rw [lossyKernel, evalDistKernelOfDiscrete_apply]
-    change (lossyFamily true).toMeasure = Measure.dirac true
-    rw [lossyFamily, if_pos rfl]
-    simp [SPMF.toMeasure, PMF.toMeasure_pure]]
-  simp
+  simp [lossyKernel, lossyFamily]
 
 example : lossyKernel false Set.univ = 0 := by
-  rw [show lossyKernel false = 0 by
-    rw [lossyKernel, evalDistKernelOfDiscrete_apply]
-    change (lossyFamily false).toMeasure = 0
-    rw [lossyFamily, if_neg (by decide)]
-    simp [SPMF.toMeasure, PMF.toMeasure_pure]]
-  simp
+  simp [lossyKernel, lossyFamily]
 
 /-! ## Executable responders -/
 
@@ -134,26 +119,19 @@ example (p : Bool × Bool) :
 
 example (p : Bool × Bool) : togglingIterKernel 0 p = Measure.dirac p := by
   rw [togglingIterKernel, OracleStrategy.iterateAgainstKernel_eq_toMeasure]
-  change (pure p : SPMF (Bool × Bool)).toMeasure = Measure.dirac p
-  simp [SPMF.toMeasure, PMF.toMeasure_pure]
+  simp
 
 example (p : Bool × Bool) :
     togglingIterKernel 1 p = Measure.dirac (!p.1, p.1) := by
   rw [togglingIterKernel, OracleStrategy.iterateAgainstKernel_eq_toMeasure]
-  rw [show OracleStrategy.iterateAgainst echoStrategy togglingResponder 1 p =
-    pure (!p.1, p.1) by
-      simp [OracleStrategy.iterateAgainst_succ, OracleStrategy.stepAgainst_apply,
-        togglingResponder, echoStrategy]]
-  simp [SPMF.toMeasure, PMF.toMeasure_pure]
+  simp [OracleStrategy.iterateAgainst_succ, OracleStrategy.stepAgainst_apply, togglingResponder,
+    echoStrategy]
 
 example (p : Bool × Bool) :
     togglingIterKernel 2 p = Measure.dirac (p.1, !p.1) := by
   rw [togglingIterKernel, OracleStrategy.iterateAgainstKernel_eq_toMeasure]
-  rw [show OracleStrategy.iterateAgainst echoStrategy togglingResponder 2 p =
-    pure (p.1, !p.1) by
-      simp [OracleStrategy.iterateAgainst_succ, OracleStrategy.stepAgainst_apply,
-        togglingResponder, echoStrategy]]
-  simp [SPMF.toMeasure, PMF.toMeasure_pure]
+  simp [OracleStrategy.iterateAgainst_succ, OracleStrategy.stepAgainst_apply, togglingResponder,
+    echoStrategy]
 
 end DiscreteWiredCanaries
 
