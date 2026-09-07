@@ -65,7 +65,7 @@ forger with `ExpandA` access needs that engine to forward a third oracle; the se
 short-model CMA compositions in `SecurityNMA` keep their abstract MLWE bridge hypothesis instead.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal
 open LatticeCrypto TransformOps

@@ -45,7 +45,7 @@ The witness values are:
   unconditionally (`expandAIdealization_one`) since advantages are differences of probabilities.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal
 open LatticeCrypto TransformOps
