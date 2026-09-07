@@ -27,7 +27,7 @@ representability, recognized types, and type-specific canonical padding at exter
 
 ## References
 
-- NIST FIPS 205, §4.2 (ADRS), Table 1 (member functions), §11.2.1 (ADRSc compression)
+- NIST FIPS 205, §4.2 (ADRS), Table 1 (member functions), §11.2 (ADRSc compression)
 -/
 
 @[expose] public section
@@ -93,6 +93,10 @@ namespace Adrs
 
 /-- Executable check that a natural number fits in an unsigned big-endian field. -/
 def Fits (widthBytes value : ℕ) : Bool := decide (value < 256 ^ widthBytes)
+
+/-- A field of the given byte width holds exactly the values below `256 ^ width`. -/
+theorem fits_iff {width value : ℕ} : Fits width value = true ↔ value < 256 ^ width := by
+  simp [Fits]
 
 /-- Shared rejecting range check for ADRS setters. -/
 def requireFits (widthBytes value : ℕ) : Except CodecError ℕ :=
@@ -210,7 +214,7 @@ def toBytes (a : Adrs) : List Byte :=
   toBytesBE a.layer 4 ++ toBytesBE a.tree 12 ++ toBytesBE a.type 4 ++
     toBytesBE a.word1 4 ++ toBytesBE a.word2 4 ++ toBytesBE a.word3 4
 
-/-- The 22-byte SHA-2 compressed address `ADRSc` (FIPS 205 §11.2.1): the low layer byte, low
+/-- The 22-byte SHA-2 compressed address `ADRSc` (FIPS 205 §11.2): the low layer byte, low
 eight tree bytes, low type byte, then the three four-byte type-dependent words. -/
 def compressSha2 (a : Adrs) : List Byte :=
   toBytesBE a.layer 1 ++ toBytesBE a.tree 8 ++ toBytesBE a.type 1 ++
@@ -333,6 +337,49 @@ theorem fits_of_isCanonical (a : Adrs) (h : a.isCanonical = true) :
       Fits 4 a.word1 = true ∧ Fits 4 a.word2 = true ∧ Fits 4 a.word3 = true := by
   simp only [isCanonical, Bool.and_eq_true] at h
   aesop
+
+/-- Field-level sufficient condition for canonicality at an address type with no unused words. -/
+theorem isCanonical_of_fields_free {a : Adrs} {ty : AddrType}
+    (hfree : ty = .wotsHash ∨ ty = .forsTree)
+    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
+    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
+    a.isCanonical = true := by
+  rcases hfree with rfl | rfl <;>
+    simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
+      Fits, decide_eq_true_eq, Option.isSome_some] <;>
+    and_intros <;> first | omega | decide
+
+/-- Field-level sufficient condition at a compression type, whose last two words are unused. -/
+theorem isCanonical_of_fields_compress {a : Adrs} {ty : AddrType}
+    (hcompress : ty = .wotsPk ∨ ty = .forsRoots)
+    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
+    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 = 0) (hword3 : a.word3 = 0) :
+    a.isCanonical = true := by
+  rcases hcompress with rfl | rfl <;>
+    simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
+      Fits, decide_eq_true_eq, Option.isSome_some, hword2, hword3] <;>
+    and_intros <;> first | omega | decide
+
+/-- Field-level sufficient condition at the tree type, whose first word is unused. -/
+theorem isCanonical_of_fields_tree {a : Adrs}
+    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = AddrType.tree.toCode)
+    (hword1 : a.word1 = 0) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
+    a.isCanonical = true := by
+  simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
+    Fits, decide_eq_true_eq, Option.isSome_some, hword1]
+  and_intros <;> first | omega | decide
+
+/-- Only the seven FIPS type codes decode, so a canonical address has a type below seven. -/
+theorem type_le_six_of_isCanonical {a : Adrs} (h : a.isCanonical = true) : a.type ≤ 6 := by
+  simp only [isCanonical, Bool.and_eq_true] at h
+  have hsome : (AddrType.ofCode a.type).isSome = true := h.1.2
+  match hty : a.type with
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 => omega
+  | (k + 7) => rw [hty] at hsome; simp [AddrType.ofCode] at hsome
+
+/-- A canonical address therefore has a type that fits the one byte `ADRSc` reserves for it. -/
+theorem fits_one_type_of_isCanonical {a : Adrs} (h : a.isCanonical = true) :
+    Fits 1 a.type = true := fits_iff.2 (by have := type_le_six_of_isCanonical h; omega)
 
 /-- Full serialization/parsing is identity for every canonical structured address. -/
 theorem fromVector_toVector_of_isCanonical (a : Adrs) (h : a.isCanonical = true) :
