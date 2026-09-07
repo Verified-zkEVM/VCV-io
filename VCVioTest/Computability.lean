@@ -26,7 +26,7 @@ No `#eval` is used: outputs are random, so any runtime assertion would be flaky.
 is compilation itself.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 

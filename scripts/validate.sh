@@ -70,6 +70,7 @@ python3 ./scripts/check-warning-log.py "$BUILD_LOG" "${warning_args[@]}" \
 
 echo ""
 echo "# Checking generated umbrella modules"
+python3 ./scripts/test-check-imports.py
 ./scripts/check-imports.sh
 
 echo ""
@@ -92,7 +93,10 @@ echo "# Running the text-based style linters"
 # `lake exe lint-style` resolves to Mathlib's linter (the project defines no `lint-style` exe, so
 # no FFI backend is linked). Libraries are passed by name; the test modules are expanded from git
 # because `HashSigTest` has no umbrella and `LatticeCryptoTest.lean` is curated.
-mapfile -t test_modules < <(git ls-files 'VCVioTest/*.lean' 'LatticeCryptoTest/*.lean' \
+test_modules=()
+while IFS= read -r module; do
+  test_modules+=("$module")
+done < <(git ls-files 'VCVioTest/*.lean' 'LatticeCryptoTest/*.lean' \
   'HashSigTest/*.lean' | sed -e 's/\.lean$//' -e 's#/#.#g')
 lake exe lint-style "${PROOF_LIBS[@]}" Interop "${test_modules[@]}"
 

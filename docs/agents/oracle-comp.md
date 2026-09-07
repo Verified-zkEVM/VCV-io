@@ -265,8 +265,8 @@ For `OracleComp`, `support` is always available and is *definitionally* `simulat
 `evalSPMF : OracleComp spec α → SPMF α` is available under `[IsProbabilitySpec spec]` and is *definitionally* (`rfl`) `simulateQ` into `PMF`, then lifted to `SPMF`, with each query interpreted by `IsProbabilitySpec.toPMF`:
 
 ```lean
-noncomputable instance instMonadLiftTPMF [IsProbabilitySpec spec] :
-    MonadLiftT (OracleComp spec) PMF where
+-- `PFunctor.FreeM.instMonadLiftTPMF`, specialised to `OracleComp spec`:
+noncomputable instance [IsProbabilitySpec spec] : MonadLiftT (OracleComp spec) PMF where
   monadLift mx := simulateQ IsProbabilitySpec.toPMF mx
 ```
 

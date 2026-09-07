@@ -35,7 +35,7 @@ TODO: Some lemmas here don't exist at the `PMF`/`SPMF` levels.
 @[expose] public section
 
 
-open OracleComp BigOperators ENNReal
+open OracleComp ENNReal
 
 universe u v w
 
@@ -282,8 +282,7 @@ end uniformSelectList
 
 section uniformSelectVector
 
-/-- Select a random element from a vector by indexing into it with a uniform value.
-TODO: different types of vectors in mathlib now -/
+/-- Select a random element from a vector by indexing into it with a uniform value. -/
 instance hasUniformSelectVector (α : Type) (n : ℕ) :
     HasUniformSelect! (Vector α (n + 1)) α where
   uniformSelect! xs := (xs[·]) <$> $[0..n]
@@ -368,6 +367,8 @@ lemma finSupport_uniformSelectFinset [DecidableEq α] :
 @[simp, grind =]
 lemma probOutput_uniformSelectFinset [DecidableEq α] (x : α) :
     Pr[= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
+  have hcount : s.toList.count x = if x ∈ s then 1 else 0 := by
+    simpa using (Finset.nodup_toList s).count (a := x)
   aesop (add norm uniformSelectFinset_def)
 
 @[simp, grind =]

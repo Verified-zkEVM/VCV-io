@@ -318,12 +318,13 @@ instance : Monoid (QueryCount ι) where
 @[simp] lemma monoid_one_def :
     (@OfNat.ofNat (QueryCount ι) 1 (@One.toOfNat1 _ (Monoid.toOne))) = (0 : ι → ℕ) := rfl
 
-def single [DecidableEq ι] (i : ι) : QueryCount ι := Function.update 0 i 1
+/-- The query count recording one query at index `i` and none elsewhere. -/
+def single [DecidableEq ι] (i : ι) : QueryCount ι := Pi.single i 1
 
 @[simp]
 lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount ι) :
     single i ≤ qc ↔ 0 < qc i := by
-  simp [single, update_le_iff, Nat.lt_iff_add_one_le]
+  simp [single, Pi.single, update_le_iff, Nat.lt_iff_add_one_le]
 
 end QueryCount
 

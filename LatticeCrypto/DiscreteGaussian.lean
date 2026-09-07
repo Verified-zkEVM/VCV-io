@@ -38,7 +38,7 @@ framework, Falcon) and masking (ML-DSA / Dilithium).
 @[expose] public section
 
 
-open Real BigOperators
+open Real
 
 namespace LatticeCrypto
 

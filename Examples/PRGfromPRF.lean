@@ -424,7 +424,7 @@ lemma tvDist_seedOutputs_le_collision_gen (N : ℕ) (s : S)
     rw [tvDist_eq_zero_iff]
     simp only [oracleOutputs, simulateQ_pure, StateT.run'_eq, StateT.run_pure, map_pure]
     refine evalSPMF_ext fun y => ?_
-    simp
+    simp [List.Vector.eq_nil y]
   | succ N ih =>
     cases hc : c.isCached s with
     | false =>

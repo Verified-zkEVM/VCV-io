@@ -16,7 +16,7 @@ distributions**, each discharged by a single *terminal* tactic — `simp` or `gr
 **gates `simp` and `grind` as stable terminal tactics** over this surface, so a regression in
 either surfaces here in isolation rather than deep inside a downstream proof.
 
-Conventions (the full rules are in `CONTRIBUTING.md`, *Tactic Gate Files*):
+Conventions (see *Normal forms and the tactic contract* in `docs/agents/probability.md`):
 * **Mirrors.** Where a fact is closed by *both* `simp` and `grind`, both are kept, so each tactic
   stays exercised on that shape. This is the bulk of the file.
 * **Gap pairs.** Where only one tactic closes a goal, the entry is a *gap pair*: a
@@ -35,7 +35,7 @@ Conventions (the full rules are in `CONTRIBUTING.md`, *Tactic Gate Files*):
 reachable. `ProbComp` itself never fails — interesting `Pr[⊥ | _]` lives in `OptionT ProbComp`.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ProbComp ENNReal
 

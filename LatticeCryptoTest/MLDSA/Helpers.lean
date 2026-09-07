@@ -16,12 +16,36 @@ Shared test infrastructure: pass/fail counter, hex formatting, and FIPS 204 seri
 helpers used by the ML-DSA test suite.
 -/
 
-@[expose] public section
+public section
 
 
 open MLDSA MLDSA.Concrete
 
 namespace MLDSA.Test
+
+/-! ## Concrete parameter-set interfaces -/
+
+-- All parameter sets expose their byte encodings and arithmetic carrier types to importers.
+example (bytes : ByteArray) : mldsa44Encoding.EncodedPK := bytes
+example (bytes : ByteArray) : mldsa44Encoding.EncodedSK := bytes
+example (bytes : ByteArray) : mldsa44Encoding.EncodedSig := bytes
+example (value : High) : mldsa44Primitives.High := value
+example (value : Power2High) : mldsa44Primitives.Power2High := value
+example (value : Hint) : mldsa44Primitives.Hint := value
+
+example (bytes : ByteArray) : mldsa65Encoding.EncodedPK := bytes
+example (bytes : ByteArray) : mldsa65Encoding.EncodedSK := bytes
+example (bytes : ByteArray) : mldsa65Encoding.EncodedSig := bytes
+example (value : High) : mldsa65Primitives.High := value
+example (value : Power2High) : mldsa65Primitives.Power2High := value
+example (value : Hint) : mldsa65Primitives.Hint := value
+
+example (bytes : ByteArray) : mldsa87Encoding.EncodedPK := bytes
+example (bytes : ByteArray) : mldsa87Encoding.EncodedSK := bytes
+example (bytes : ByteArray) : mldsa87Encoding.EncodedSig := bytes
+example (value : High) : mldsa87Primitives.High := value
+example (value : Power2High) : mldsa87Primitives.Power2High := value
+example (value : Hint) : mldsa87Primitives.Hint := value
 
 /-! ## Test harness -/
 

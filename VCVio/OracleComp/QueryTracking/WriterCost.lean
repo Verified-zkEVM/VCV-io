@@ -26,7 +26,6 @@ It also equips `QueryImpl` with additive writer-cost instrumentation.
 @[expose] public section
 
 open OracleSpec
-open scoped BigOperators
 
 namespace QueryImpl
 
@@ -328,9 +327,6 @@ lemma le_expectedCost_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Pre
             gcongr
             exact hval (h z hz)
           · rw [probOutput_eq_zero_of_not_mem_support hc, zero_mul, zero_mul]
-
-@[deprecated (since := "2026-06-25")]
-alias expectedCost_ge_of_pathwiseCostAtLeast := le_expectedCost_of_pathwiseCostAtLeast
 
 omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [EvalDistCompatible m] in
@@ -773,9 +769,6 @@ lemma le_expectedCostNat_of_queryBoundedBelowBy [LawfulMonad m] [EvalDistCompati
   refine le_expectedCost_of_pathwiseCostAtLeast
     (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h Nat.mono_cast
     (probFailure_of_liftM_PMF _)
-
-@[deprecated (since := "2026-06-25")]
-alias expectedCostNat_ge_of_queryBoundedBelowBy := le_expectedCostNat_of_queryBoundedBelowBy
 
 lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m] [EvalDistCompatible m]
     {oa : AddWriterT ℕ m α} {n : ℕ}
