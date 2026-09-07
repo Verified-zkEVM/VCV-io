@@ -21,7 +21,7 @@ Part of the hybrid signing-body development for the CMA-to-NMA reduction;
 chain and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 open scoped BigOperators ENNReal

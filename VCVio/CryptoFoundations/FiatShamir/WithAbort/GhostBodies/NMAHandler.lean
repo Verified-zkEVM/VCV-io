@@ -19,7 +19,7 @@ Part of the hybrid signing-body development for the CMA-to-NMA reduction;
 chain and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 open scoped BigOperators ENNReal
@@ -54,7 +54,7 @@ and proves that overlay projection (sub-lemma (a) of the bridge). -/
 /-- Ghost-layer programming continuation: like `signProgramCont`, but the accepted
 transcript's challenge is written to the *ghost* layer of a `(base, ghost)` cache pair.
 An all-abort loop outcome produces no signature and no programming. -/
-noncomputable def ghostSignProgramCont (msg : M) :
+@[expose] noncomputable def ghostSignProgramCont (msg : M) :
     Option (Commit × Chal × Resp) →
       StateT ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache)
         ProbComp (Option (Commit × Resp))
@@ -66,7 +66,7 @@ noncomputable def ghostSignProgramCont (msg : M) :
 /-- Signing body of the simulated hybrid on the layered cache: run the simulator loop
 privately, programming the accepted transcript into the *ghost* layer (`ghostSignProgramCont`).
 The base layer is untouched. -/
-noncomputable def simGhostSignBody (pk : Stmt) (msg : M) :
+@[expose] noncomputable def simGhostSignBody (pk : Stmt) (msg : M) :
     StateT ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache)
       ProbComp (Option (Commit × Resp)) :=
   liftM (firstSome (sim pk) maxAttempts) >>= ghostSignProgramCont M msg
@@ -146,7 +146,7 @@ the linked managed run, which is keyed by the sum spec `unifSpec + (M × Commit 
 uniform-query slots are empty (the runtime forwards uniform queries through `unifFwdImpl`
 without caching), and the random-oracle slots carry the base entries. This is the left
 component of the linked-run projection `proj₂` for sub-lemma (b). -/
-def baseEmbed (base : (M × Commit →ₒ Chal).QueryCache) :
+@[expose] def baseEmbed (base : (M × Commit →ₒ Chal).QueryCache) :
     (unifSpec + (M × Commit →ₒ Chal)).QueryCache
   | .inl _ => none
   | .inr mc => base mc
@@ -193,7 +193,7 @@ caching random oracle) write live RO reads to the *base* layer, reading through 
 so that signing-programmed (ghost) points are visible to the adversary; the signing oracle
 records the signed message and runs `simGhostSignBody`, writing the accepted-transcript
 programming to the *ghost* layer. -/
-noncomputable def ghostNmaImpl (pk : Stmt) (_sk : Wit) :
+@[expose] noncomputable def ghostNmaImpl (pk : Stmt) (_sk : Wit) :
     QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (StateT (NmaGhostState M Commit Chal) ProbComp) :=
   fun t => match t with

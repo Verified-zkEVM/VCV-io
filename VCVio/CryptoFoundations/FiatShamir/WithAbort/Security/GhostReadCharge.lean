@@ -20,7 +20,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 

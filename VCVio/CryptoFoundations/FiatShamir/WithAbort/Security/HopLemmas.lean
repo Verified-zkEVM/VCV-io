@@ -20,7 +20,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 
@@ -256,7 +256,7 @@ lemma probOutput_unforgeableExp_eq_hybridExpAtKey_real :
 state, so the `expectedQuerySlack` bridge of `ProgramLogic/Relational/SimulateQ.lean`
 applies. The flag is preserved on every step, hence stays `false` along any run started
 from `false`. -/
-noncomputable def flagLift {ι : Type} {spec : OracleSpec ι} {σ : Type}
+@[expose] noncomputable def flagLift {ι : Type} {spec : OracleSpec ι} {σ : Type}
     (impl : QueryImpl spec (StateT σ ProbComp)) :
     QueryImpl spec (StateT (σ × Bool) ProbComp) :=
   fun t => StateT.mk fun p =>

@@ -21,7 +21,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 
@@ -423,7 +423,7 @@ holds the rejected commitments and `uncacheQuery`-s the accepted one. Forgetting
 recovers `transSignBody` (the value-free output and real cache), and the drawn list is exactly the
 list of i.i.d. raw `Prod.fst <$> ids.commit pk sk` samples taken on the *rejected* attempts — the
 value-free side-data that never feeds back into the run's outputs. -/
-noncomputable def ghostSignDrawBody (pk : Stmt) (sk : Wit) (msg : M) :
+@[expose] noncomputable def ghostSignDrawBody (pk : Stmt) (sk : Wit) (msg : M) :
     ℕ → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
       (Option (Commit × Resp) × List Commit)
   | 0 => pure (none, [])
@@ -535,7 +535,7 @@ commitment draw `(Commit × PrvState)` is *consumed* from a pre-drawn tape (head
 drawn inline. The challenge sampling and response stay inline. On accept the remaining tape suffix
 is discarded; an empty tape ends the loop (mirroring budget exhaustion). The recorded
 rejected-commit list is built exactly as in `ghostSignDrawBody`. -/
-noncomputable def tapeSignBody (pk : Stmt) (sk : Wit) (msg : M) :
+@[expose] noncomputable def tapeSignBody (pk : Stmt) (sk : Wit) (msg : M) :
     List (Commit × PrvState) → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
       (Option (Commit × Resp) × List Commit)
   | [] => pure (none, [])
@@ -981,7 +981,7 @@ lemma ghostSignDrawBody_readManyList_le_drawList (pk : Stmt) (sk : Wit) (msg : M
 /-- The deferred-draw handler for the adversary's oracles, driving the distribution-level mono
 skeleton against `ghostBlindImpl`. Carries the accumulated drawn-commitment list and a monotone
 read-hit flag in place of the eager ghost cache (see `DeferredState`). -/
-noncomputable def deferredDrawImpl (pk : Stmt) (sk : Wit) :
+@[expose] noncomputable def deferredDrawImpl (pk : Stmt) (sk : Wit) :
     QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (StateT (DeferredState M Commit Chal) ProbComp) :=
   fun t => match t with
@@ -1195,7 +1195,7 @@ omit [SampleableType Stmt] in
 /-- The coupling invariant between the eager ghost-blind state and the deferred-draw state: real
 cache and signed list agree, every ghost-cache key's commitment is in the drawn list, and the bad
 flag is ordered. -/
-def deferredCoupleInv
+@[expose] def deferredCoupleInv
     (s₁ : GhostState M Commit Chal) (s₂ : DeferredState M Commit Chal) : Prop :=
   s₁.1.1.1 = s₂.1.1.1 ∧ s₁.1.2 = s₂.1.1.2 ∧
     (∀ mc : M × Commit, s₁.1.1.2 mc ≠ none → mc.2 ∈ s₂.1.2) ∧

@@ -25,7 +25,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 
@@ -65,7 +65,7 @@ for collisions among the signing oracle's own commitments. The third term glues 
 per-attempt simulator across the restart loop, whose expected length is at most
 `1/(1-p)` (see `tvDist_firstSome_le_geometric`); a simulator for the accepted-transcript
 distribution itself (the paper's acHVZK notion) would shave this `1/(1-p)` factor. -/
-noncomputable def cmaToNmaLoss (qS qH : ℕ) (ε p ζ_zk δ : ℝ) (_hp : p < 1) : ℝ :=
+@[expose] noncomputable def cmaToNmaLoss (qS qH : ℕ) (ε p ζ_zk δ : ℝ) (_hp : p < 1) : ℝ :=
   2 * qS * (qH + 1) * ε / (1 - p) +
   qS * ε * (qS + 1) / (2 * (1 - p) ^ 2) +
   qS * ζ_zk / (1 - p) +
@@ -74,7 +74,7 @@ noncomputable def cmaToNmaLoss (qS qH : ℕ) (ε p ζ_zk δ : ℝ) (_hp : p < 1)
 /-- The per-key part of `cmaToNmaLoss`: the statistical loss of the three signing-oracle
 hybrid hops at a fixed good key pair. `cmaToNmaLoss` is this quantity plus the
 key-regularity failure probability `δ`. -/
-noncomputable def perKeyLoss (qS qH : ℕ) (ε p ζ_zk : ℝ) : ℝ :=
+@[expose] noncomputable def perKeyLoss (qS qH : ℕ) (ε p ζ_zk : ℝ) : ℝ :=
   2 * qS * (qH + 1) * ε / (1 - p) +
   qS * ε * (qS + 1) / (2 * (1 - p) ^ 2) +
   qS * ζ_zk / (1 - p)
