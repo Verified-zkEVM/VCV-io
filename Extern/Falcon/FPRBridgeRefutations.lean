@@ -47,7 +47,7 @@ cannot weaken anything it refutes.
 
 set_option maxRecDepth 40000
 
-@[expose] public section
+public section
 
 namespace Falcon.Concrete.FPRBridge
 

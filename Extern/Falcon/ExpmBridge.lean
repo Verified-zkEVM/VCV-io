@@ -30,7 +30,7 @@ half — certifying the coefficient table against `Real.exp` — is a numerical-
 of a different character, described in `docs/agents/expm-certification.md`.
 -/
 
-@[expose] public section
+public section
 
 namespace Falcon.Concrete.FPRBridge
 
