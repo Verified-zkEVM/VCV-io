@@ -64,4 +64,47 @@ theorem isTotalQueryBound_getPutativeRootAddressedM_skeleton_depth
   have h := isTotalQueryBound_getPutativeRootAddressedM nodeHash 1 idx node proof hnode
   exact h.mono (by simpa using idx.depth_le_skeleton_depth)
 
+/-! ## Pathwise predicates
+
+A predicate on the programs of a monad that holds of every `pure` and is preserved by `bind`
+holds of a root recomputation as soon as it holds of every node hash the recomputation issues.
+Those node hashes are exactly the internal nodes on the root path of the opened leaf
+(`SkeletonInternalIndex.IsAncestorOf`), one per level.  For an `OracleComp`, one such predicate
+is `fun oa => OracleComp.IsQueryBound oa () (fun t _ => P t) (fun _ _ => ())` for any query
+predicate `P`, by `OracleComp.isQueryBound_pure` and `OracleComp.isQueryBound_bind`. -/
+
+section PathwisePredicate
+
+universe w
+
+variable {m : Type u → Type w} [Monad m]
+  (Q : ∀ {α : Type u}, m α → Prop)
+  (hpure : ∀ {α : Type u} (x : α), Q (pure x))
+  (hbind : ∀ {α β : Type u} (oa : m α) (ob : α → m β), Q oa → (∀ x, Q (ob x)) → Q (oa >>= ob))
+
+include hpure hbind in
+/-- Root recomputation issues one node hash per ancestor of the opened leaf and nothing else, so
+a `pure`/`bind`-closed predicate holding of every ancestor's hash holds of the recomputation. -/
+theorem getPutativeRootAddressedM_pred_of_ancestors {s : Skeleton}
+    (nodeHash : SkeletonInternalIndex s → Y → Y → m Y)
+    (idx : SkeletonLeafIndex s) (node : Y) (proof : List.Vector Y idx.depth)
+    (hnode : ∀ a, a.IsAncestorOf idx → ∀ l r, Q (nodeHash a l r)) :
+    Q (getPutativeRootAddressedM nodeHash idx node proof) := by
+  induction idx generalizing node with
+  | ofLeaf => exact hpure node
+  | ofLeft idx ih =>
+      simp only [getPutativeRootAddressedM]
+      exact hbind _ _
+        (ih (nodeHash := fun a => nodeHash (.ofLeft a)) node proof.tail
+          (fun a ha => hnode (.ofLeft a) ha))
+        (fun child => hnode .ofInternal (by simp) child proof.head)
+  | ofRight idx ih =>
+      simp only [getPutativeRootAddressedM]
+      exact hbind _ _
+        (ih (nodeHash := fun a => nodeHash (.ofRight a)) node proof.tail
+          (fun a ha => hnode (.ofRight a) ha))
+        (fun child => hnode .ofInternal (by simp) proof.head child)
+
+end PathwisePredicate
+
 end AddressedMerkleTree
