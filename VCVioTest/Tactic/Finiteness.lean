@@ -55,8 +55,8 @@ def coinDie : ProbComp (Bool × Fin 6) := do
 
 example : Pr[= (true, 0) | coinDie] * 3 + Pr[⊥ | coinDie] / 2 ≠ ⊤ := by finiteness
 
-/-- Not a `finiteness` rule, by design: an unbounded functional has no finite expectation, so
-the bound is supplied by hand. -/
+/-- Not a `finiteness` rule, by design: an arbitrary functional need not have finite expectation,
+so the bound is supplied by hand. -/
 example (mx : m α) (g : α → ℝ≥0∞) (c : ℝ≥0∞) (hc : c ≠ ⊤) (h : ∀ x, g x ≤ c) :
     OracleComp.EvalDist.expectedValue mx g ≠ ⊤ :=
   ne_top_of_le_ne_top hc (OracleComp.EvalDist.expectedValue_le_of_le mx h)
