@@ -8,6 +8,7 @@ module
 
 public import VCVio.ProgramLogic.Relational.Basic
 public import VCVio.EvalDist.TVDist
+import VCVio.EvalDist.TVDist.Positivity
 public import VCVio.OracleComp.EvalDist
 public import VCVio.OracleComp.QueryTracking.QueryBound
 public import VCVio.OracleComp.SimSemantics.StateT.StateProjection
@@ -1318,7 +1319,7 @@ private theorem tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
   have h_p_summable : Summable (fun z : β => Pr[= z | mx].toReal) :=
     ENNReal.summable_toReal h_p_sum_ne_top
   have h_lhs_summand_nn : ∀ z : β, 0 ≤ Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
-    fun z => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
+    fun z => by positivity
   have h_lhs_summand_le : ∀ z : β,
       Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤ Pr[= z | mx].toReal :=
     fun z => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)
@@ -1452,7 +1453,7 @@ private theorem tvDist_simulateQ_run_query_bind_le
             f₁ z].toReal) := fun z => by
     apply mul_le_mul_of_nonneg_left _ ENNReal.toReal_nonneg
     simpa [hf₁_def, hf₂_def] using ih z.1 z.2
-  have h_const_nonneg : (0 : ℝ) ≤ ↑(q - 1) * ε := mul_nonneg (Nat.cast_nonneg _) hε
+  have h_const_nonneg : (0 : ℝ) ≤ ↑(q - 1) * ε := by positivity
   have h_first :
       tvDist sim₁ mid ≤ ↑(q - 1) * ε +
         Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁].toReal := by
@@ -1515,7 +1516,7 @@ private theorem tvDist_simulateQ_run_le_qeps_plus_probEvent_output_bad_aux
                 (simulateQ impl₁ (query t >>= cont)).run (s, true)].toReal := by
             rw [h_bad₁]
             simp only [ENNReal.toReal_one]
-            have hqε : (0 : ℝ) ≤ ↑q * ε := mul_nonneg (Nat.cast_nonneg _) hε
+            have hqε : (0 : ℝ) ≤ ↑q * ε := by positivity
             linarith
           exact le_trans h_tv_le_one h_target_ge_one
       | false =>
@@ -1622,7 +1623,7 @@ private theorem tvDist_simulateQ_run_free_query_bind_le
             f₁ z].toReal) := fun z => by
     apply mul_le_mul_of_nonneg_left _ ENNReal.toReal_nonneg
     simpa [hf₁_def, hf₂_def] using ih z.1 z.2
-  have h_qSε_nonneg : (0 : ℝ) ≤ ↑qS * ε := mul_nonneg (Nat.cast_nonneg _) hε
+  have h_qSε_nonneg : (0 : ℝ) ≤ ↑qS * ε := by positivity
   rw [hsim₁_eq, hsim₂_eq]
   exact le_trans h_bd
     (tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
@@ -1678,7 +1679,7 @@ private theorem tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad_
                 (simulateQ impl₁ (query t >>= cont)).run (s, true)].toReal := by
             rw [h_bad₁]
             simp only [ENNReal.toReal_one]
-            have hqε : (0 : ℝ) ≤ ↑qS * ε := mul_nonneg (Nat.cast_nonneg _) hε
+            have hqε : (0 : ℝ) ≤ ↑qS * ε := by positivity
             linarith
           exact le_trans h_tv_le_one h_target_ge_one
       | false =>
@@ -1785,7 +1786,7 @@ private lemma tsum_probOutput_mul_tvDist_le_const {β γ : Type} (mx : OracleCom
   calc (∑' z : β, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z))
       ≤ ∑' z : β, Pr[= z | mx].toReal * c :=
         Summable.tsum_le_tsum h_le' (h_rhs_summable.of_nonneg_of_le
-          (fun z => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)) h_le') h_rhs_summable
+          (fun z => by positivity) h_le') h_rhs_summable
     _ = (∑' z : β, Pr[= z | mx].toReal) * c := tsum_mul_right
     _ ≤ c := mul_le_of_le_one_left hc h_sum_toReal_le_one
 
@@ -1817,7 +1818,7 @@ theorem tvDist_simulateQ_run_le_queryBoundP_mul
   induction oa using OracleComp.inductionOn generalizing qS s₀ with
   | pure x =>
       simp only [simulateQ_pure, StateT.run_pure, tvDist_self]
-      exact mul_nonneg (Nat.cast_nonneg _) hε
+      positivity
   | query_bind t cont ih =>
       rw [isQueryBoundP_query_bind_iff] at h_qb
       obtain ⟨h_can, h_cont⟩ := h_qb
@@ -2147,7 +2148,7 @@ private lemma tsum_probOutput_mul_ofReal_tvDist_le_tsum_cost_plus_probEvent_bad
     ENNReal.summable_toReal h_p_sum_ne_top
   have h_lhs_summand_nn : ∀ z : γ,
       0 ≤ Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
-    fun z => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
+    fun z => by positivity
   have h_lhs_summand_le : ∀ z : γ,
       Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤ Pr[= z | mx].toReal :=
     fun z => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)
