@@ -9,7 +9,7 @@ public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.FinalVal
 public import VCVio.OracleComp.SimSemantics.Append
 
 /-!
-# Single-function, distinct-tweak, multi-target decisional second-preimage resistance
+# Source-final-validity SM-DT-DSPR
 
 SM-DT-DSPR asks an adversary to predict whether one of the targets it selected has a second
 preimage. The public seed is sampled by the experiment and withheld while targets are selected,

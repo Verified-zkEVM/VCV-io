@@ -16,7 +16,7 @@ Shared test infrastructure: pass/fail counter, hex formatting, and FIPS 203 seri
 helpers used by the ML-KEM test suite.
 -/
 
-@[expose] public section
+public section
 
 
 open MLKEM MLKEM.Concrete

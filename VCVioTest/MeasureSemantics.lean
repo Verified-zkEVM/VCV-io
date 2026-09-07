@@ -37,6 +37,17 @@ open MeasureTheory ProbabilityTheory PFunctor OracleSpec OracleComp ENNReal
 
 namespace VCVioTest.MeasureSemantics
 
+/-! ## Optional measure kernels -/
+
+example {α : Type*} [MeasurableSpace α] :
+    Measurable (fun value : Option α => value.elim (0 : Measure α) Measure.dirac) := by
+  fun_prop
+
+example {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    (f : β → Option α) (hf : Measurable f) :
+    Measurable (fun b => (f b).elim (0 : Measure α) Measure.dirac) := by
+  fun_prop
+
 /-! ## A continuous oracle -/
 
 /-- An interface with a single operation, answered by a real number. -/

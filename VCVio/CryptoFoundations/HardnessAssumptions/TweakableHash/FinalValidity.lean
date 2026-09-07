@@ -16,8 +16,10 @@ all hold. This file packages an equivalent sticky poison-bit monitor: every quer
 and recorded, while the first validity violation changes `State.valid` permanently to `false`.
 
 The monitor is intentionally separate from `TweakableHash.collectionOracle`, whose
-rejection-on-arrival semantics define a different adaptive experiment. A reduction can use this
-monitor when it targets the source final-predicate experiment or supplies a separate game bridge.
+rejection-on-arrival semantics define a different adaptive experiment.
+`TweakableHash.ToFinalValidity` relates the two, one conversion per game: each sends a
+rejection-on-arrival adversary to an adversary for the corresponding monitor game at exactly the
+same advantage, so a bound proved against either presentation is usable against the other.
 -/
 
 @[expose] public section

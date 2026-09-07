@@ -286,9 +286,6 @@ lemma simulate_eq_map_simulate_zero (oa : OracleComp spec α) (qc : QueryCount �
   funext ⟨x, q⟩
   simp
 
-@[deprecated (since := "2026-06-25")]
-alias run_simulateT_eq_run_simulateT_zero := simulate_eq_map_simulate_zero
-
 /-- We can always reduce simulation with counting to start with `0`,
 and add the initial count back at the end. -/
 lemma support_simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
@@ -410,7 +407,7 @@ lemma apply_ne_zero_of_mem_support_simulate_queryBind {t : spec.Domain}
   have hqt : qc t + q0 t = z.2 t := congrFun hqsum t
   have hq0t : q0 t = QueryCount.single t t + b t := by
     simpa [Pi.add_apply] using (congrFun hq0 t).symm
-  simp only [QueryCount.single, Function.update_self] at hq0t
+  simp only [QueryCount.single, Pi.single_eq_same] at hq0t
   omega
 
 lemma exists_mem_support_of_mem_support_simulate_queryBind {t : spec.Domain}
@@ -430,10 +427,11 @@ lemma exists_mem_support_of_mem_support_simulate_queryBind {t : spec.Domain}
   have hq0j : q0 j = QueryCount.single t j + b j := by
     simpa [Pi.add_apply] using (congrFun hq0 j).symm
   rcases eq_or_ne j t with rfl | hj
-  · simp only [Pi.add_apply, QueryCount.single, Function.update_self] at hq0j ⊢
-    omega
-  · simp only [Pi.add_apply, QueryCount.single, Function.update_of_ne hj, Pi.zero_apply]
+  · simp only [Pi.add_apply, QueryCount.single, Pi.single_eq_same, Function.update_self]
       at hq0j ⊢
+    omega
+  · simp only [Pi.add_apply, QueryCount.single, Pi.single_eq_of_ne hj,
+          Function.update_of_ne hj] at hq0j ⊢
     omega
 
 lemma mem_support_simulate_queryBind_iff (t : spec.Domain)
@@ -467,10 +465,11 @@ lemma mem_support_simulate_queryBind_iff (t : spec.Domain)
         simpa [Pi.add_apply] using congrFun hbEq j
       rcases eq_or_ne j t with rfl | hj
       · have hzpos : 0 < z.2 j := Nat.pos_of_ne_zero hz0
-        simp only [q0, Pi.add_apply, QueryCount.single, Function.update_self] at hbEqj ⊢
+        simp only [q0, Pi.add_apply, QueryCount.single, Pi.single_eq_same, Function.update_self]
+          at hbEqj ⊢
         omega
-      · simp only [q0, Pi.add_apply, QueryCount.single, Function.update_of_ne hj,
-          Pi.zero_apply] at hbEqj ⊢
+      · simp only [q0, Pi.add_apply, QueryCount.single, Pi.single_eq_of_ne hj,
+          Function.update_of_ne hj] at hbEqj ⊢
         omega
     exact (mem_support_simulate_iff (oa := ((query t : OracleComp spec _) >>= oa))
       qc z).2 ⟨q0, hq0mem, hqsum⟩

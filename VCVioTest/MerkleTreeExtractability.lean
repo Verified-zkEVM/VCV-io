@@ -17,7 +17,7 @@ queries sample independently, and `extractabilityGame`, where the full experimen
 through one shared cache.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 

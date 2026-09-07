@@ -107,9 +107,6 @@ theorem relTriple_of_triple_of_implies {oa : OracleComp spec₁ α} {ob : Oracle
     RelTriple oa ob R :=
   relTriple_post_mono (relTriple_prod_of_triple hP hQ) (fun _ _ ⟨hp, hq⟩ => hImp _ _ hp hq)
 
-@[deprecated (since := "2026-06-25")]
-alias relTriple_of_triple_of_imp := relTriple_of_triple_of_implies
-
 /-! ## Smoke tests -/
 
 /-- Smoke test: two independent pure computations compose into a product relational
