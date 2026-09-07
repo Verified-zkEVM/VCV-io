@@ -20,7 +20,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 
@@ -87,7 +87,7 @@ abbrev DeferredReadState (M Commit Chal : Type) : Type :=
 `DeferredState`, additionally appending the read's commitment component `mc.2` to the recorded
 read-commit list on every adversarial random-oracle read. Uniform and signing steps leave the
 read-commit list untouched. -/
-noncomputable def deferredDrawReadImpl (pk : Stmt) (sk : Wit) :
+@[expose] noncomputable def deferredDrawReadImpl (pk : Stmt) (sk : Wit) :
     QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (StateT (DeferredReadState M Commit Chal) ProbComp) :=
   fun t => match t with
@@ -106,7 +106,7 @@ omit [SampleableType Stmt] in
 and whenever the deferred bad flag is set there is a recorded read-commit already in the deferred
 drawn list. The drawn list grows monotonically, so a read-time hit (recorded in the bad flag) is
 witnessed by a recorded read-commit lying in the *current* (hence final) drawn list. -/
-def deferredReadInv
+@[expose] def deferredReadInv
     (s₁ : DeferredState M Commit Chal) (s₂ : DeferredReadState M Commit Chal) : Prop :=
   s₁.1 = s₂.1.1 ∧ (s₁.2 = true → ∃ rc ∈ s₂.2, rc ∈ s₂.1.1.2)
 

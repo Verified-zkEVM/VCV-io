@@ -21,7 +21,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 
@@ -749,7 +749,7 @@ instead of drawing each attempt's commitment inline; uniform and random-oracle-r
 exactly as `deferredDrawReadImpl` and leave the tape untouched. Over-provisioning the tape (length
 `maxAttempts · #signing-queries`) makes the front-loaded draw block independent of the value-free
 read list. -/
-noncomputable def tapeDrawReadImpl (pk : Stmt) (sk : Wit) :
+@[expose] noncomputable def tapeDrawReadImpl (pk : Stmt) (sk : Wit) :
     QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (StateT (DeferredReadState M Commit Chal × List (Commit × PrvState)) ProbComp) :=
   fun t => match t with

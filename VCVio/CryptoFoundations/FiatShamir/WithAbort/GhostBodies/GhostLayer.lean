@@ -21,7 +21,7 @@ Part of the hybrid signing-body development for the CMA-to-NMA reduction;
 chain and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 open scoped BigOperators ENNReal
@@ -55,12 +55,12 @@ Two projection lemmas make the deferred-sampling step of the hop precise:
   subsequently read is distributionally removable. -/
 
 /-- Overlay a ghost cache onto a real cache; ghost entries shadow real ones. -/
-def overlayCache (re gh : (M × Commit →ₒ Chal).QueryCache) :
+@[expose] def overlayCache (re gh : (M × Commit →ₒ Chal).QueryCache) :
     (M × Commit →ₒ Chal).QueryCache :=
   fun q => (gh q).or (re q)
 
 /-- Remove a single point from a query cache. -/
-def uncacheQuery (cache : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) :
+@[expose] def uncacheQuery (cache : (M × Commit →ₒ Chal).QueryCache) (q : M × Commit) :
     (M × Commit →ₒ Chal).QueryCache :=
   fun q' => if q' = q then none else cache q'
 
@@ -130,7 +130,7 @@ lemma overlayCache_cacheQuery_real_of_ghost_none
 /-- Signing body on the layered cache: run the abort loop privately, recording each
 rejected attempt's would-be programming in the ghost layer and programming the accepted
 transcript into the real layer (clearing any stale ghost entry at that point). -/
-noncomputable def ghostSignBody (pk : Stmt) (sk : Wit) (msg : M) :
+@[expose] noncomputable def ghostSignBody (pk : Stmt) (sk : Wit) (msg : M) :
     ℕ → StateT ((M × Commit →ₒ Chal).QueryCache × (M × Commit →ₒ Chal).QueryCache)
       ProbComp (Option (Commit × Resp))
   | 0 => pure none
@@ -238,7 +238,7 @@ identical-until-bad shape of `tvDist_simulateQ_run_le_probEvent_output_bad`. -/
 
 /-- One caching random-oracle step on a bare cache, as a `ProbComp`. Agrees with
 `(randomOracle mc).run re` (see `randomOracle_run_eq_roStep`). -/
-noncomputable def roStep (re : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
+@[expose] noncomputable def roStep (re : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
     ProbComp (Chal × (M × Commit →ₒ Chal).QueryCache) :=
   match re mc with
   | some v => pure (v, re)
@@ -265,7 +265,7 @@ abbrev GhostState (M Commit Chal : Type) : Type :=
 `progSide` selects the answer at a ghost hit: the ghost value (Prog side) or a fresh
 caching read of the real layer (Trans side). The bad flag fires on ghost hits and is
 otherwise preserved; signing queries run `ghostSignBody` on the cache layers. -/
-noncomputable def ghostHybridImpl (progSide : Bool) (pk : Stmt) (sk : Wit) :
+@[expose] noncomputable def ghostHybridImpl (progSide : Bool) (pk : Stmt) (sk : Wit) :
     QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (StateT (GhostState M Commit Chal) ProbComp) :=
   fun t => match t with
@@ -361,7 +361,7 @@ adversarial random-oracle read at a ghost-cache hit answers from the real layer 
 the same as a miss) while still flipping the bad flag. The ghost value never influences the
 run. Definitionally the Trans-side handler `ghostHybridImpl … false`
 (`ghostBlindImpl_eq_ghostHybridImpl_false`). -/
-noncomputable def ghostBlindImpl (pk : Stmt) (sk : Wit) :
+@[expose] noncomputable def ghostBlindImpl (pk : Stmt) (sk : Wit) :
     QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (StateT (GhostState M Commit Chal) ProbComp) :=
   ghostHybridImpl ids M maxAttempts false pk sk
@@ -402,7 +402,7 @@ lemma ghostBlindImpl_bad_mono (pk : Stmt) (sk : Wit)
 
 /-- Run a cache-level action inside the hybrid state (random-oracle cache plus the list
 of signed messages), acting on the cache component. -/
-def onCache {α : Type}
+@[expose] def onCache {α : Type}
     (action : StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp α) :
     StateT ((M × Commit →ₒ Chal).QueryCache × List M) ProbComp α :=
   fun s => (fun (a, c) => (a, (c, s.2))) <$> action.run s.1
@@ -410,7 +410,7 @@ def onCache {α : Type}
 /-- Handler for the adversary's base oracles in the hybrid games: uniform queries are
 forwarded and random-oracle queries go through the caching random oracle on the cache
 component of the hybrid state. -/
-noncomputable def hybridBaseImpl :
+@[expose] noncomputable def hybridBaseImpl :
     QueryImpl (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache × List M) ProbComp) :=
   let base : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
@@ -422,7 +422,7 @@ noncomputable def hybridBaseImpl :
 
 /-- Handler for the adversary's signing oracle in the hybrid games: record the signed
 message (for the freshness check) and run the given signing body on the cache. -/
-noncomputable def hybridSignImpl
+@[expose] noncomputable def hybridSignImpl
     (signBody : M → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
       (Option (Commit × Resp))) :
     QueryImpl (M →ₒ Option (Commit × Resp))

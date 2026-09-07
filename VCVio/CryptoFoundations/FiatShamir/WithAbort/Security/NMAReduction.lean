@@ -21,7 +21,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 
@@ -519,7 +519,7 @@ forwarding uniform queries, answering live hash queries through a managed cache,
 answering signing queries with the simulator loop of `simSignBody` (programming the
 accepted transcript's challenge into the managed cache). Returns the forgery together
 with the managed cache, in the interface of `SignatureAlg.managedRoNmaAdv`. -/
-noncomputable def simulatedNmaAdv :
+@[expose] noncomputable def simulatedNmaAdv :
     SignatureAlg.managedRoNmaAdv
       (FiatShamirWithAbort
         (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) ids hr M maxAttempts) where

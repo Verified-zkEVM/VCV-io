@@ -21,7 +21,7 @@ Part of the hybrid signing-body development for the CMA-to-NMA reduction;
 chain and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 open scoped BigOperators ENNReal
@@ -598,7 +598,7 @@ charged-step premise of `probEvent_bad_simulateQ_run_le_expectedQuerySlack` hold
 /-- Deferred-sampling ghost-instrumented hybrid handler: signs with `ghostSignBody`, answers
 uniform queries by forwarding, and answers adversarial random-oracle reads from the real
 layer while firing the bad flag lazily (`lazyGhostFire` over the pending ghost count). -/
-noncomputable def lazyGhostHybridImpl (pk : Stmt) (sk : Wit) :
+@[expose] noncomputable def lazyGhostHybridImpl (pk : Stmt) (sk : Wit) :
     QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ Option (Commit × Resp)))
       (StateT (GhostState M Commit Chal) ProbComp) :=
   fun t => match t with
@@ -1167,7 +1167,7 @@ charge rises by `≤ (∑_{a<n} pᵃ) · ε` above the starting `gh`-membership.
 
 /-- **Membership indicator** of a fixed key `mc` in a query cache: `1` if cached, `0`
 otherwise. The per-target ghost charge tracked by the charge route. -/
-noncomputable def memCharge (gh : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
+@[expose] noncomputable def memCharge (gh : (M × Commit →ₒ Chal).QueryCache) (mc : M × Commit) :
     ℝ≥0∞ :=
   if gh mc = none then 0 else 1
 

@@ -30,7 +30,7 @@ Every pin is a closed probability obtained by normalisation; nothing here is a s
 statement.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal FiatShamirWithAbort
 

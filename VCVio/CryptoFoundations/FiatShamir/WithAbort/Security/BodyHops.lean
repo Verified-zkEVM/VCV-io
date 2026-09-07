@@ -21,7 +21,7 @@ transform; `VCVio.CryptoFoundations.FiatShamir.WithAbort.Security` assembles
 the headline `euf_cma_to_nma` and holds the overview docstring.
 -/
 
-@[expose] public section
+public section
 
 universe u v
 
@@ -83,7 +83,7 @@ base handlers and the given signing body, then verify the forgery under the fina
 and apply the freshness check. Instantiating `signBody` with `realSignBody`,
 `progSignBody`, `transSignBody`, and `simSignBody` yields the games G₀ — G₃ of the
 CMA-to-NMA hybrid chain. -/
-noncomputable def hybridExpAtKey
+@[expose] noncomputable def hybridExpAtKey
     (signBody : M → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
       (Option (Commit × Resp)))
     (pk : Stmt) : ProbComp Bool := do
@@ -104,7 +104,7 @@ noncomputable def hybridExpAtKey
 
 /-- Verification-and-freshness continuation of `hybridExpAtKey`, as a function of the
 adversary's forgery and the final hybrid state. -/
-noncomputable def hybridVerifyCont (pk : Stmt)
+@[expose] noncomputable def hybridVerifyCont (pk : Stmt)
     (z : (M × Option (Commit × Resp)) × ((M × Commit →ₒ Chal).QueryCache × List M)) :
     ProbComp Bool := do
   let ok ← StateT.run'

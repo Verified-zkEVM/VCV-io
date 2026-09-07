@@ -47,7 +47,7 @@ invariant), `BodyBounds` (the body-level collision and deferred-sampling
 bounds), and `NMAHandler` (the layered ghost-tagged NMA handler).
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 open scoped BigOperators ENNReal
@@ -71,7 +71,7 @@ can be reduced to a single distributional lemma about retry loops. -/
 
 /-- Iterate an optional sampler up to `n` times, returning the first non-`none` result
 (or `none` when every attempt fails). -/
-def firstSome {α : Type} (attempt : ProbComp (Option α)) : ℕ → ProbComp (Option α)
+@[expose] def firstSome {α : Type} (attempt : ProbComp (Option α)) : ℕ → ProbComp (Option α)
   | 0 => pure none
   | n + 1 => do
     match ← attempt with
@@ -158,7 +158,7 @@ paper (adapted to the bounded restart loop):
 /-- Real signing-oracle body: the cache-level semantics of `fsAbortSignLoop` under the
 caching random oracle. Each attempt queries the random oracle at `(msg, w)`, so aborted
 attempts leave their challenge in the cache exactly as in the real experiment. -/
-noncomputable def realSignBody (pk : Stmt) (sk : Wit) (msg : M) :
+@[expose] noncomputable def realSignBody (pk : Stmt) (sk : Wit) (msg : M) :
     StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp (Option (Commit × Resp)) :=
   simulateQ (unifFwdImpl (M × Commit →ₒ Chal) +
       (randomOracle : QueryImpl (M × Commit →ₒ Chal)
@@ -167,7 +167,7 @@ noncomputable def realSignBody (pk : Stmt) (sk : Wit) (msg : M) :
 
 /-- One signing attempt of the all-attempts-reprogramming hybrid: commit honestly, then
 overwrite the cache at `(msg, w)` with a fresh uniform challenge before responding. -/
-noncomputable def progSignAttempt (pk : Stmt) (sk : Wit) (msg : M) :
+@[expose] noncomputable def progSignAttempt (pk : Stmt) (sk : Wit) (msg : M) :
     StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp (Commit × Option Resp) := do
   let (w, st) ← liftM (ids.commit pk sk)
   let c ← (liftM (uniformSample Chal) :
@@ -179,7 +179,7 @@ noncomputable def progSignAttempt (pk : Stmt) (sk : Wit) (msg : M) :
 /-- Signing-oracle body of the all-attempts-reprogramming hybrid (Prog): run the restart
 loop with `progSignAttempt`, so every attempt (accepted or rejected) reprograms the
 random-oracle cache with a fresh challenge. -/
-noncomputable def progSignBody (pk : Stmt) (sk : Wit) (msg : M) :
+@[expose] noncomputable def progSignBody (pk : Stmt) (sk : Wit) (msg : M) :
     ℕ → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp (Option (Commit × Resp))
   | 0 => pure none
   | n + 1 => do
@@ -195,7 +195,7 @@ signature `(w, z)`; an all-abort loop outcome produces no signature and no progr
 The continuation is a deterministic function of the loop outcome, so the gap between
 the two hybrids reduces entirely to the gap between their private loops (see
 `tvDist_run_transSignBody_simSignBody_le`). -/
-noncomputable def signProgramCont (msg : M) :
+@[expose] noncomputable def signProgramCont (msg : M) :
     Option (Commit × Chal × Resp) →
       StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp (Option (Commit × Resp))
   | some (w, c, z) => do
@@ -207,14 +207,14 @@ noncomputable def signProgramCont (msg : M) :
 loop runs privately on honest executions (`ids.honestExecution`, which samples its own
 uniform challenge and never touches the cache); only the accepted transcript is
 programmed into the cache. Rejected attempts leave no trace. -/
-noncomputable def transSignBody (pk : Stmt) (sk : Wit) (msg : M) :
+@[expose] noncomputable def transSignBody (pk : Stmt) (sk : Wit) (msg : M) :
     StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp (Option (Commit × Resp)) :=
   liftM (firstSome (ids.honestExecution pk sk) maxAttempts) >>= signProgramCont M msg
 
 /-- Signing-oracle body of the simulated hybrid (Sim): as `transSignBody`, with the
 per-attempt HVZK simulator replacing the honest execution. The secret key is unused, so
 this body can be run by the NMA reduction. -/
-noncomputable def simSignBody (pk : Stmt) (_sk : Wit) (msg : M) :
+@[expose] noncomputable def simSignBody (pk : Stmt) (_sk : Wit) (msg : M) :
     StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp (Option (Commit × Resp)) :=
   liftM (firstSome (sim pk) maxAttempts) >>= signProgramCont M msg
 
