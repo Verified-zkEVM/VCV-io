@@ -230,7 +230,7 @@ lemma probEvent_coord_mOfFn_le [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
                 * Pr[fun v => p (v 0) | (Fin.mOfFn n fun j => g j.succ) >>=
                     fun rest => (pure (Fin.cons a rest) : m (Fin (n + 1) → α))]
             ≤ ∑' a, Pr[= a | g 0] * (if p a then (1 : ℝ≥0∞) else 0) := by
-                refine ENNReal.tsum_le_tsum fun a => mul_le_mul' le_rfl ?_
+                gcongr with a
                 refine probEvent_bind_le_of_forall_le fun rest _ => ?_
                 exact le_of_eq (by simp [probEvent_pure])
           _ = Pr[p | g 0] := by
@@ -243,15 +243,14 @@ lemma probEvent_coord_mOfFn_le [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
                 * Pr[fun v => p (v j.succ) | (Fin.mOfFn n fun l => g l.succ) >>=
                     fun rest => (pure (Fin.cons a rest) : m (Fin (n + 1) → α))]
             ≤ ∑' a, Pr[= a | g 0] * Pr[p | g j.succ] := by
-                refine ENNReal.tsum_le_tsum fun a => mul_le_mul' le_rfl ?_
+                gcongr with a
                 refine le_trans (le_of_eq ?_) (ih (fun l => g l.succ) j)
                 rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
                 refine tsum_congr fun rest => ?_
                 simp only [probEvent_pure, Fin.cons_succ]
                 split <;> simp
           _ ≤ Pr[p | g j.succ] := by
-                rw [ENNReal.tsum_mul_right]
-                exact le_trans (mul_le_mul' tsum_probOutput_le_one le_rfl) (le_of_eq (one_mul _))
+                exact tsum_probOutput_mul_le_of_le _ fun _ => le_rfl
 
 end marginal
 
