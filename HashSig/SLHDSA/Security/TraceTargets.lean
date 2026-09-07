@@ -21,8 +21,10 @@ answer and is therefore stronger than a statement about one deterministic execut
 `H_msg` carries no address, so `ConstructionQueryReachable` accepts every `.hmsg` query
 unconditionally; only `.thash` queries are constrained.  Membership is deliberately stated after
 `CorePrimitives.adrsToKey`: compressed SHA-2 encodings need not be globally injective.  A game that
-needs distinct encoded targets combines this with the restricted injectivity hypotheses of
-`ReachableTargets` (`EncodedTargetLedgerConditions`).
+needs distinct encoded targets must refine the trace to the relevant role and use the corresponding
+field of `ReachableTargets.EncodedTargetLedgerConditions`.  That record proves encoded distinctness
+per role; it does not by itself prove cross-role encoded disjointness or duplicate-freedom of this
+encoded union.
 
 The programs certified here are the WOTS+ ones: `chainM` over any step interval inside
 `[0, w - 1)`, and `wotsPkGenM`, `wotsSignM`, and `wotsPkFromSigM` at any reachable
@@ -31,6 +33,11 @@ hypertree, and scheme programs are not certified by this module.  The logged-exe
 applies to any pathwise-certified program interpreted through `QueryImpl.withLogging` over an
 arbitrary deterministic handler `QueryImpl (publicHashSpec core) Id`, and in particular through the
 canonical `PublicHash.impl` of a primitive bundle.
+
+The union is a complete structural ledger, not the partial, source-shaped WOTS+ target selection
+used by the undetectability reduction.  These provenance theorems neither execute the ledger's
+unqueried addresses nor establish a game equivalence; a later reduction must connect its actual
+partial selection to the relevant ledger entries.
 
 ## References
 
@@ -355,8 +362,9 @@ theorem mem_logged_query_isConstructionReachable {vp : ValidatedParams}
 
 /-- The logged-execution bridge at the canonical deterministic interpretation of a primitive
 bundle: every `thash` entry (an `F`, `H`, or `T_l` call) the log records carries a tweak from the
-bundle's encoded union ledger, stated through `encodeTargets` so it composes with
-`EncodedTargetLedgerConditions`. -/
+bundle's encoded union ledger.  The conclusion uses the same `encodeTargets` notation as
+`EncodedTargetLedgerConditions`, but does not identify a query's component role or prove encoded
+duplicate-freedom across roles. -/
 theorem mem_logged_query_impl_isConstructionReachable {vp : ValidatedParams}
     (prims : Primitives vp.params) {α : Type}
     (program : OracleComp (publicHashSpec prims.core) α)

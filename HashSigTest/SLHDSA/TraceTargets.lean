@@ -17,13 +17,16 @@ be enumerated completely at run time.
 
 The union ledger is checked to have the length of its six components and no duplicate address, and
 near-miss addresses (the unexecuted hash step `w - 1`, a secret-key derivation type code, a chain
-past `len`) are checked to be absent.  The trace canary runs `wotsPkGenM`, `wotsSignM`, and
-`wotsPkFromSigM` at a reachable position under `QueryImpl.withLogging` of the SHA-2 and SHAKE
-primitive bundles' canonical `PublicHash.impl` handler, and checks that every logged `thash` query
-(an `F` or `T_len` call) carries a tweak from `encodeTargets` of the union ledger, that the log has
-exactly the length the total query bound predicts, and that the exact set of tweaks each run logs
-is the one the WOTS+ address helpers name for that instance.  The recovered public key is compared
-with the generated one so that the logged programs are the WOTS+ programs and not a stub.
+past `len`) are checked to be absent.  A deliberately out-of-bounds one-step `chainM` execution
+also checks that the logged `w - 1` tweak is rejected by the encoded ledger.  The trace canary runs
+`wotsPkGenM`, `wotsSignM`, and `wotsPkFromSigM` at a reachable position under
+`QueryImpl.withLogging` of the SHA-2 and SHAKE primitive bundles' canonical `PublicHash.impl`
+handler, and checks that every logged `thash` query (an `F` or `T_len` call) carries a tweak from
+`encodeTargets` of the union ledger, that the log has exactly the length the total query bound
+predicts, and that the exact set of tweaks each run logs is the one the WOTS+ address helpers name
+for that instance.  The recovered public key is compared with the generated one so that the
+logged programs are the WOTS+ programs and not a stub.  These canaries concern the complete WOTS+
+step ledger; they do not model the partial target selection or game hops of the UD reduction.
 -/
 
 public section
@@ -142,6 +145,29 @@ def checkLog {p : Params} (prims : Primitives p) (keyEq : prims.AdrsKey → prim
   ensure s!"{label}: every expected tweak was logged" (expected.all fun k => mem k keys)
   ensure s!"{label}: every logged tweak was expected" (keys.all fun k => mem k expected)
 
+/-- Execute the first step outside the WOTS+ chain domain and confirm that its concrete logged
+tweak is absent from the encoded construction ledger.  This is a mutation canary for the strict
+upper bound in `chainM_queriesWithinConstructionTargets`, not a valid WOTS+ execution. -/
+def checkRejectedChainStep (vp : ValidatedParams) (label : String)
+    (prims : Primitives vp.params)
+    (keyEq : prims.AdrsKey → prims.AdrsKey → Bool) (pkSeed : prims.PkSeed)
+    (x : prims.Y) (pos : LayerPosition vp) : IO Unit := do
+  let p := vp.params
+  let base := wotsInstanceAdrs pos
+  let badAdrs := (wotsChainAdrs base 0).setHashAddress (p.w - 1)
+  let (_, log) := loggedRun prims
+    (chainM prims.core pkSeed (wotsChainAdrs base 0) x (p.w - 1) 1 :
+      OracleComp (publicHashSpec prims.core) prims.Y)
+  let keys := log.filterMap (entryKey prims)
+  let badKey := prims.adrsToKey badAdrs
+  let encoded := encodeTargets prims (constructionAddresses vp)
+  ensure s!"{label}: the out-of-bounds chain logs exactly one thash query"
+    (log.length == 1 && keys.length == 1)
+  ensure s!"{label}: the out-of-bounds chain logs the w - 1 tweak"
+    (keys.all fun k => keyEq k badKey)
+  ensure s!"{label}: the logged w - 1 tweak is rejected by the encoded ledger"
+    (keys.all fun k => !encoded.any (keyEq k))
+
 def fixedBytes (n salt : ℕ) : Bytes n :=
   Vector.ofFn fun i => UInt8.ofNat (salt + 17 * i.val)
 
@@ -193,6 +219,10 @@ def shakeKeyEq (p : Params) :
   fun a b : Bytes 32 => a == b
 
 def checkTwoLayerTraces : IO Unit := do
+  checkRejectedChainStep twoLayer "two-layer SHA-2" (sha2Primitives twoLayerParams)
+    (sha2KeyEq _) (fixedBytes 1 2) (fixedBytes 1 3) twoLayerPosition
+  checkRejectedChainStep twoLayer "two-layer SHAKE" (shakePrimitives twoLayerParams)
+    (shakeKeyEq _) (fixedBytes 1 2) (fixedBytes 1 3) twoLayerPosition
   exerciseBundle twoLayer "two-layer SHA-2" (sha2Primitives twoLayerParams) (sha2KeyEq _)
     (fixedBytes 1 1) (fixedBytes 1 2) (fixedBytes 1 3) twoLayerPosition
   exerciseBundle twoLayer "two-layer SHAKE" (shakePrimitives twoLayerParams) (shakeKeyEq _)
@@ -202,6 +232,10 @@ def checkTwoLayerTraces : IO Unit := do
     (twoLayerPosition.next (by decide))
 
 def checkOneLayerTraces : IO Unit := do
+  checkRejectedChainStep oneLayer "one-layer SHA-2" (sha2Primitives oneLayerParams)
+    (sha2KeyEq _) (fixedBytes 1 2) (fixedBytes 1 3) oneLayerPosition
+  checkRejectedChainStep oneLayer "one-layer SHAKE" (shakePrimitives oneLayerParams)
+    (shakeKeyEq _) (fixedBytes 1 2) (fixedBytes 1 3) oneLayerPosition
   exerciseBundle oneLayer "one-layer SHA-2" (sha2Primitives oneLayerParams) (sha2KeyEq _)
     (fixedBytes 1 1) (fixedBytes 1 2) (fixedBytes 1 3) oneLayerPosition
   exerciseBundle oneLayer "one-layer SHAKE" (shakePrimitives oneLayerParams) (shakeKeyEq _)
@@ -215,8 +249,8 @@ def main : IO Unit := do
   checkTwoLayerTraces
   checkOneLayerTraces
   IO.println "SLH-DSA WOTS+ trace-target tests: PASS \
-    (two small profiles; union ledger size and distinctness, near misses, logged WOTS+ \
-    executions under SHA-2 and SHAKE handlers)"
+    (two small profiles; union ledger size and distinctness, near misses, rejected boundary \
+    chains, logged WOTS+ executions under SHA-2 and SHAKE handlers)"
 
 end SLHDSA.TraceTargetsTest
 
