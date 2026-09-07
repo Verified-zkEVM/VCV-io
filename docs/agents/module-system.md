@@ -337,6 +337,20 @@ The boundary has three canaries and one ratchet:
   in the PR that converts a file so the ceiling follows the decrease; raise
   it only with a stated reason in the PR description.
 
+Start a conversion by switching to plain `public section` and building. The
+compiler identifies definitions that existing public declarations need exposed
+under "may need to be `@[expose]`d". Then review the intended downstream API:
+repository callers may exercise only some parameter sets. In particular,
+bundles with concrete type fields must expose those projections when callers
+need to supply ordinary values of those types. Add public-import canaries for
+such interfaces, including every exported specialization.
+
+Proof modules often need only a few selectively exposed definitions. Fixtures
+whose public proofs intentionally unfold nearly every definition may retain
+`@[expose] public section`; explain that need in the module docstring when it
+is not apparent from the contents. Runtime execution alone (including `main`)
+does not require exposing definition bodies to proof reduction.
+
 Changes that add PolyFun API and consume it from VCVio require two coordinated
 repository changes:
 

@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Generate PR Summary
-        uses: alexanderlhicks/lean4repo-utils/summary@0.3
+        uses: alexanderlhicks/lean4repo-utils/summary@9404cc0f9aa10d65e4a08d3741a1d41638fb590f # 0.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           api_key: ${{ secrets.OPENROUTER_KEY }}

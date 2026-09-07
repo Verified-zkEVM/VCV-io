@@ -962,8 +962,7 @@ example {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α β : Type 
 support lemmas that peel off one `QueryCount.single t` per query step. -/
 private lemma sum_single_eq_one [DecidableEq ι] [Fintype ι] (t : ι) :
     ∑ i, QueryCount.single t i = 1 := by
-  rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_univ t)]
-  simp
+  simp [QueryCount.single]
 
 namespace countingOracle
 
@@ -979,7 +978,7 @@ lemma add_single_mem_support_simulate_queryBind [DecidableEq ι]
   refine ⟨by simp [QueryCount.single], ⟨u, ?_⟩⟩
   convert hz using 2
   funext j
-  by_cases hj : j = t <;> simp [Function.update, hj, QueryCount.single]
+  by_cases hj : j = t <;> simp [hj, QueryCount.single]
 
 section CostSupport
 
@@ -1174,15 +1173,14 @@ variable {p : ι → Prop} [DecidablePred p]
 by the counting-oracle characterizations that peel off one `QueryCount.single t` per step. -/
 private lemma sum_single_filter_eq_one [DecidableEq ι] [Fintype ι] {t : ι} (hpt : p t) :
     ∑ i ∈ Finset.univ.filter p, QueryCount.single t i = 1 := by
-  rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)]
-  simp
+  simp [QueryCount.single, hpt]
 
 /-- The `p`-filtered total of a single-query `QueryCount` is zero when `t` fails `p`. -/
 private lemma sum_single_filter_eq_zero [DecidableEq ι] [Fintype ι] {t : ι} (hpt : ¬ p t) :
     ∑ i ∈ Finset.univ.filter p, QueryCount.single t i = 0 :=
   Finset.sum_eq_zero fun j hj =>
     have hjt : j ≠ t := fun he => hpt (he ▸ (Finset.mem_filter.mp hj).2)
-    by simp [QueryCount.single, Function.update_of_ne hjt]
+    by simp [QueryCount.single, hjt]
 
 /-- A total query bound implies a predicate-targeted bound for every predicate `p`. -/
 theorem IsTotalQueryBound.isQueryBoundP {oa : OracleComp spec α} {n : ℕ}

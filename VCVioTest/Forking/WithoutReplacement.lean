@@ -21,7 +21,7 @@ collect `r` successes and instead drains the pool, and the closed form is then s
 why the coordinate-wise extractor can use one bound for both cases.
 -/
 
-@[expose] public section
+public section
 
 open ProbComp NegHypergeom OracleComp.EvalDist
 

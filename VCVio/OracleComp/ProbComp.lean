@@ -367,6 +367,8 @@ lemma finSupport_uniformSelectFinset [DecidableEq α] :
 @[simp, grind =]
 lemma probOutput_uniformSelectFinset [DecidableEq α] (x : α) :
     Pr[= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
+  have hcount : s.toList.count x = if x ∈ s then 1 else 0 := by
+    simpa using (Finset.nodup_toList s).count (a := x)
   aesop (add norm uniformSelectFinset_def)
 
 @[simp, grind =]

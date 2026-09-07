@@ -16,11 +16,12 @@ The equations ensure packing retains the parameter and both branch-dependent pay
 collapsing the family to a pointwise collection.
 -/
 
-@[expose] public section
+public section
 
 namespace OracleComp.SecurityFamily
 
 /-- A genuinely nonconstant oracle family: at parameter `n`, a query returns `Fin (n + 1)`. -/
+@[expose]
 def indexedSpec (n : Nat) : OracleSpec Unit :=
   fun _ ↦ Fin (n + 1)
 

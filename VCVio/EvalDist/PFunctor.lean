@@ -130,7 +130,7 @@ theorem support_lift_eq_univ (operation : P.A) :
     support (FreeM.lift operation : FreeM P (P.B operation)) = Set.univ := by
   change SetM.run ((FreeM.lift operation).liftM fun _ => Set.univ) = Set.univ
   rw [FreeM.liftM_lift]
-  exact SetM.run_eq Set.univ
+  rfl
 
 /-- Syntactic support and distribution support agree for a uniformly
 interpreted polynomial free monad.
