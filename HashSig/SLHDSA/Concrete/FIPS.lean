@@ -215,14 +215,17 @@ theorem sha2AdrsKey_eq_compressed (address : Adrs)
   simp [sha2AdrsKey, Adrs.compressSha2Checked, hcanonical, hlayer, htree]
 
 /-- The total SHA-2 primitive address key is injective between two checked-domain addresses.
-The one-byte type hypothesis is explicit because `ADRSc` compresses the full four-byte ADRS type
-field; canonicality supplies the three four-byte word bounds. -/
+`ADRSc` compresses the full four-byte ADRS type field into one byte, and canonicality supplies both
+that bound and the three four-byte word bounds, so the checked domain is exactly the three
+conditions of `Sha2Address`. -/
 theorem sha2AdrsKey_injective_of_domain {a b : Adrs}
     (haCanonical : a.isCanonical = true) (haLayer : Adrs.Fits 1 a.layer = true)
-    (haTree : Adrs.Fits 8 a.tree = true) (haType : Adrs.Fits 1 a.type = true)
+    (haTree : Adrs.Fits 8 a.tree = true)
     (hbCanonical : b.isCanonical = true) (hbLayer : Adrs.Fits 1 b.layer = true)
-    (hbTree : Adrs.Fits 8 b.tree = true) (hbType : Adrs.Fits 1 b.type = true)
+    (hbTree : Adrs.Fits 8 b.tree = true)
     (hkey : sha2AdrsKey a = sha2AdrsKey b) : a = b := by
+  have haType := Adrs.fits_one_type_of_isCanonical haCanonical
+  have hbType := Adrs.fits_one_type_of_isCanonical hbCanonical
   rcases Adrs.fits_of_isCanonical a haCanonical with
     ⟨_, _, _, haWord1, haWord2, haWord3⟩
   rcases Adrs.fits_of_isCanonical b hbCanonical with

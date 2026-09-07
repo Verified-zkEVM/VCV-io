@@ -406,6 +406,16 @@ lean_exe slhdsa_hypertree_tests where
 lean_exe slhdsa_external_tests where
   root := `HashSigTest.SLHDSA.External
 
+/-- Sizes, distinctness, cross-role disjointness, and pinned membership of the reachable security
+target ledgers, on small validated profiles. -/
+lean_exe slhdsa_target_ledger_tests where
+  root := `HashSigTest.SLHDSA.ReachableTargets
+
+/-- Encoded distinctness of those ledgers under both approved address encoders, together with the
+encoder field boundaries and the out-of-domain aliasing that makes the obligation real. -/
+lean_exe slhdsa_encoded_ledger_tests where
+  root := `HashSigTest.SLHDSA.EncodedTargets
+
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
 TCB-isolation gate: that gate bounds imports, this one accounts for the axioms every
