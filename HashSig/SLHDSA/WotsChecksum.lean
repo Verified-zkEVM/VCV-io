@@ -22,7 +22,11 @@ checksum to decrease, and equal checksums together with pointwise `≤` force eq
 
 This module is a standard-model statement over `List ℕ` / `ℕ`, independent of the oracle/hash
 layer; a WOTS+ one-wayness reduction consumes
-`wots_fullDigits_incomparable` as its purely combinatorial ingredient.
+`wots_fullDigits_incomparable` as its purely combinatorial ingredient. It says nothing about
+how message digits arise from messages; `HashSig.SLHDSA.WotsInjectivity` combines it with the
+injectivity of the FIPS 205 message digits in the message (`wotsMsgDigitsCore_injective`) to
+restate incomparability for distinct *messages* (`chainLengthsCore_incomparable`,
+`chainStepsCore_two_encodings`).
 
 See FIPS 205 §5 for the WOTS+ specification this validates.
 -/
