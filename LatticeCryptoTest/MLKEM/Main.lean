@@ -24,7 +24,7 @@ lake build mlkem_test
 ```
 -/
 
-@[expose] public section
+public section
 
 open MLKEM MLKEM.Concrete MLKEM.Test
 

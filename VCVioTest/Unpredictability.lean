@@ -17,7 +17,7 @@ distinct target values rather than the number of positions from which those valu
 They also exercise the bound in a strictly nonzero universe.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal
 

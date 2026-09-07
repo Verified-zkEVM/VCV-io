@@ -17,7 +17,7 @@ reveals its Boolean message has unequal measure rows and therefore cannot satisf
 perfect secrecy.
 -/
 
-@[expose] public section
+public section
 
 open MeasureTheory
 

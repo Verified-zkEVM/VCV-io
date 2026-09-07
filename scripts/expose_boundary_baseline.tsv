@@ -1,10 +1,10 @@
 Examples	64
-Extern	10
+Extern	0
 HashSig	46
-HashSigTest	6
-LatticeCrypto	44
-LatticeCryptoTest	8
+HashSigTest	3
+LatticeCrypto	37
+LatticeCryptoTest	0
 ToMathlib	56
 VCVio	272
-VCVioTest	29
+VCVioTest	9
 VCVioWidgets	0

@@ -15,7 +15,7 @@ Small compile-time instantiations of the whole-adversary game theorem with real 
 checkpoint-dependent claims, and proof-frontier disagreement.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 
@@ -37,6 +37,7 @@ def model : MerkleTreeExtractability.NodeQueryModel Query Unit Bool where
   address_mkQuery := by intros; rfl
   input_mkQuery := by intros; rfl
 
+@[expose]
 def skeleton : Skeleton :=
   .internal .leaf .leaf
 
@@ -181,6 +182,7 @@ theorem claimingGlobalStrongBound (rounds : ℕ) :
 
 /-! ## Proof-only full-opening disagreement -/
 
+@[expose]
 def selectRight : LeafData Bool skeleton :=
   .internal (.leaf false) (.leaf true)
 

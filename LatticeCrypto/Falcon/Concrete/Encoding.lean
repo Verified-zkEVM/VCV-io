@@ -35,7 +35,7 @@ packed 4 coefficients into 7 bytes.
 - Falcon specification v1.2, Section 3.12 (Algorithms 17–18)
 -/
 
-@[expose] public section
+public section
 
 
 namespace Falcon.Concrete
