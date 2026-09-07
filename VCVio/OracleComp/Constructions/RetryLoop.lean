@@ -179,7 +179,7 @@ lemma tvDist_retryToDefault_le_div [Inhabited α] (a₁ a₂ : ProbComp (Option 
 reproduces `cond`'s own law.  This is the defining property of a rejection sampler for `cond`:
 the accepted outputs of `attempt` are distributed as `cond` conditioned on acceptance, and the
 rejection event carries no information about the eventual value. -/
-def ResamplesTo (attempt : ProbComp (Option α)) (cond : ProbComp α) : Prop :=
+@[expose] def ResamplesTo (attempt : ProbComp (Option α)) (cond : ProbComp α) : Prop :=
   𝒮[attempt >>= fun o =>
       match o with
       | some v => (pure v : ProbComp α)

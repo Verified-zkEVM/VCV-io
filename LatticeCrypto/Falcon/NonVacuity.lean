@@ -75,7 +75,7 @@ namespace Falcon.NonVacuity
 
 /-- Ring degree `2` at Falcon's modulus, with the verifier's squared-norm bound `q`. Reducible,
 so that `toyP.n` unfolds to `2` wherever the scheme's types meet the degree-2 arithmetic. -/
-noncomputable abbrev toyP : Params :=
+@[expose] noncomputable abbrev toyP : Params :=
   { n := 2, sigma := 0, sigmaMin := 0, betaSquared := modulus, sbytelen := 0 }
 
 theorem toyP_n : toyP.n = 2 := rfl
@@ -85,7 +85,7 @@ theorem toyP_fftDepth : toyP.fftDepth = 0 := rfl
 theorem toyP_betaSquared : toyP.betaSquared = modulus := rfl
 
 /-- The degree-2 integer polynomial `a + b x`. -/
-def polyOfPair (a b : ℤ) : IntPoly 2 := Poly.ofPi ![a, b]
+@[expose] def polyOfPair (a b : ℤ) : IntPoly 2 := Poly.ofPi ![a, b]
 
 @[simp] theorem polyOfPair_get_zero (a b : ℤ) : (polyOfPair a b).get 0 = a := by
   simp [polyOfPair]
@@ -94,16 +94,16 @@ def polyOfPair (a b : ℤ) : IntPoly 2 := Poly.ofPi ![a, b]
   simp [polyOfPair]
 
 /-- `f = −106 + 32x`. -/
-def keyF : IntPoly 2 := polyOfPair (-106) 32
+@[expose] def keyF : IntPoly 2 := polyOfPair (-106) 32
 /-- `g = 5 + 2x`. -/
-def keyG : IntPoly 2 := polyOfPair 5 2
+@[expose] def keyG : IntPoly 2 := polyOfPair 5 2
 /-- `F = −5 + 2x`. -/
-def keyCapF : IntPoly 2 := polyOfPair (-5) 2
+@[expose] def keyCapF : IntPoly 2 := polyOfPair (-5) 2
 /-- `G = −106 − 32x`. -/
-def keyCapG : IntPoly 2 := polyOfPair (-106) (-32)
+@[expose] def keyCapG : IntPoly 2 := polyOfPair (-106) (-32)
 
 /-- The public key `h = g · f⁻¹ mod q = 8915 + 8488x`. -/
-noncomputable def keyH : Rq 2 := Poly.ofPi ![(8915 : ZMod modulus), 8488]
+@[expose] noncomputable def keyH : Rq 2 := Poly.ofPi ![(8915 : ZMod modulus), 8488]
 
 /-- Reduction of a degree-2 integer polynomial modulo `q`, coefficientwise. -/
 theorem toRq_polyOfPair (a b : ℤ) :
@@ -196,7 +196,7 @@ theorem toy_capRelation :
     Fintype.sum_prod_type, Fin.sum_univ_two, keyH]
 
 /-- The public key. -/
-noncomputable def toyPk : PublicKey toyP := { h := keyH }
+@[expose] noncomputable def toyPk : PublicKey toyP := { h := keyH }
 
 /-- The public key is not degenerate: `h ≠ 0`. -/
 theorem toyPk_h_ne_zero : toyPk.h ≠ 0 := by
@@ -209,10 +209,10 @@ theorem toyPk_h_ne_zero : toyPk.h ≠ 0 := by
   exact absurd this (by decide)
 
 /-- The Falcon tree at depth `0`. -/
-noncomputable def toyTree : FalconTree toyP.fftDepth := FalconTree.leaf 0
+@[expose] noncomputable def toyTree : FalconTree toyP.fftDepth := FalconTree.leaf 0
 
 /-- The secret key: the NTRU basis `(f, g, F, G)`. -/
-noncomputable def toySk : SecretKey toyP :=
+@[expose] noncomputable def toySk : SecretKey toyP :=
   { f := keyF, g := keyG, capF := keyCapF, capG := keyCapG, tree := toyTree }
 
 /-- **The key pair is a valid Falcon key.** -/
@@ -227,15 +227,15 @@ polynomial `a + bx` at `x = i`. On this encoding the packed pointwise product is
 multiplication, i.e. multiplication in `ℤ[x]/(x² + 1)`. -/
 
 /-- The exact packed FFT of a degree-2 integer polynomial. -/
-noncomputable def fftInt2 (a : IntPoly 2) : RealFFTPoly 0 :=
+@[expose] noncomputable def fftInt2 (a : IntPoly 2) : RealFFTPoly 0 :=
   Vector.ofFn fun j : Fin 2 => ((a.get j : ℤ) : ℝ)
 
 /-- The packed FFT of a hash target, its coefficients read in `[0, q)`. -/
-noncomputable def fftTarget2 (c : Rq 2) : RealFFTPoly 0 :=
+@[expose] noncomputable def fftTarget2 (c : Rq 2) : RealFFTPoly 0 :=
   Vector.ofFn fun j : Fin 2 => (((c.get j).val : ℕ) : ℝ)
 
 /-- Inverse packed FFT with rounding: the pair `(re, im)` becomes `round re + (round im) x`. -/
-noncomputable def ifftRound2 (v : RealFFTPoly 0) : IntPoly 2 :=
+@[expose] noncomputable def ifftRound2 (v : RealFFTPoly 0) : IntPoly 2 :=
   Poly.ofPi fun j : Fin 2 => round (v.get j)
 
 theorem re_fftInt2 (a : IntPoly 2) : RealFFTPoly.re (fftInt2 a) 0 = (a.get 0 : ℝ) := by
@@ -286,14 +286,14 @@ theorem pack_eq_fftInt2 (x y : ℤ) :
 /-! ## The primitives: exact arithmetic and a perturbed-rounding sampler -/
 
 /-- `SamplerZ(μ, σ)` as randomized rounding: `round μ + δ` with `δ` uniform on `{−1, 0, 1}`. -/
-noncomputable def toySamplerZ (μ : ℝ) (_σ : ℝ) : ProbComp ℤ := do
+@[expose] noncomputable def toySamplerZ (μ : ℝ) (_σ : ℝ) : ProbComp ℤ := do
   let δ ← $ᵗ (Fin 3)
   pure (round μ + ((δ : ℕ) : ℤ) - 1)
 
 /-- The primitives of the instance: exact packed FFT, perturbed rounding, and trivial
 encodings. Only the sampler pipeline (`samplerZ`, `fftTarget`, `fftInt`, `ifftRound`) is ever
 executed by the security statements. -/
-noncomputable def toyPrims : Primitives toyP where
+@[expose] noncomputable def toyPrims : Primitives toyP where
   publicKeyBytes := fun _ => ByteArray.empty
   hashToPoint := fun _ _ _ => 0
   samplerZ := toySamplerZ
@@ -314,22 +314,22 @@ target pair `(t₀, t₁)`; with `toySamplerZ` each returns the rounded coordina
 lattice basis and Falcon's norm check. -/
 
 /-- The perturbation box: four independent draws from `Fin 3`, read as offsets in `{−1, 0, 1}`. -/
-abbrev Box : Type := Fin 3 × Fin 3 × Fin 3 × Fin 3
+@[expose] abbrev Box : Type := Fin 3 × Fin 3 × Fin 3 × Fin 3
 
 /-- The offset encoded by a box coordinate. -/
-def off (d : Fin 3) : ℤ := ((d : ℕ) : ℤ) - 1
+@[expose] def off (d : Fin 3) : ℤ := ((d : ℕ) : ℤ) - 1
 
 /-- The center of the box: no perturbation. -/
-def center : Box := (1, 1, 1, 1)
+@[expose] def center : Box := (1, 1, 1, 1)
 
 @[simp] theorem off_one : off 1 = 0 := rfl
 
 /-- The target pair `toFFTTarget` at this key, for target `c`. -/
-noncomputable def tgt (c : Rq 2) : FFTPair 0 := toFFTTarget toyP toyPrims c toySk
+@[expose] noncomputable def tgt (c : Rq 2) : FFTPair 0 := toFFTTarget toyP toyPrims c toySk
 
 /-- The sampled lattice coordinates `(z₀, z₁)` for target `c` and box point `δ`: the rounded
 target coordinates, each offset by the corresponding box coordinate. -/
-noncomputable def zOf (c : Rq 2) (δ : Box) : IntPoly 2 × IntPoly 2 :=
+@[expose] noncomputable def zOf (c : Rq 2) (δ : Box) : IntPoly 2 × IntPoly 2 :=
   (polyOfPair (round (RealFFTPoly.re (tgt c).1 0) + off δ.1)
       (round (RealFFTPoly.im (tgt c).1 0) + off δ.2.1),
    polyOfPair (round (RealFFTPoly.re (tgt c).2 0) + off δ.2.2.1)
@@ -337,7 +337,7 @@ noncomputable def zOf (c : Rq 2) (δ : Box) : IntPoly 2 × IntPoly 2 :=
 
 /-- The candidate preimage for target `c` and box point `δ`: `(c − v₀, −v₁)` for the lattice
 point `v = z · B`. -/
-noncomputable def sOf (c : Rq 2) (δ : Box) : Rq 2 × Rq 2 :=
+@[expose] noncomputable def sOf (c : Rq 2) (δ : Box) : Rq 2 × Rq 2 :=
   fromFFTPreimage toyP toyPrims c toySk (fftInt2 (zOf c δ).1, fftInt2 (zOf c δ).2)
 
 /-- Falcon's trapdoor sampler at these primitives is the box sampler. -/
@@ -459,21 +459,21 @@ theorem tgt_coords (c : Rq 2) :
   refine ⟨?_, ?_, ?_, ?_⟩ <;> ring
 
 /-- The coordinates read by the sampler at target `c`. -/
-noncomputable def ta (c : Rq 2) : ℝ := RealFFTPoly.re (tgt c).1 0
-noncomputable def tb (c : Rq 2) : ℝ := RealFFTPoly.im (tgt c).1 0
-noncomputable def tc (c : Rq 2) : ℝ := RealFFTPoly.re (tgt c).2 0
-noncomputable def td (c : Rq 2) : ℝ := RealFFTPoly.im (tgt c).2 0
+@[expose] noncomputable def ta (c : Rq 2) : ℝ := RealFFTPoly.re (tgt c).1 0
+@[expose] noncomputable def tb (c : Rq 2) : ℝ := RealFFTPoly.im (tgt c).1 0
+@[expose] noncomputable def tc (c : Rq 2) : ℝ := RealFFTPoly.re (tgt c).2 0
+@[expose] noncomputable def td (c : Rq 2) : ℝ := RealFFTPoly.im (tgt c).2 0
 
 /-- The integer coefficients of the unperturbed candidate `(c̃ − z·B)`, with `z = round t`. -/
-noncomputable def s10 (c : Rq 2) : ℤ :=
+@[expose] noncomputable def s10 (c : Rq 2) : ℤ :=
   ((c.get 0).val : ℤ) - (5 * round (ta c) - 2 * round (tb c) - 106 * round (tc c) +
     32 * round (td c))
-noncomputable def s11 (c : Rq 2) : ℤ :=
+@[expose] noncomputable def s11 (c : Rq 2) : ℤ :=
   ((c.get 1).val : ℤ) - (2 * round (ta c) + 5 * round (tb c) - 32 * round (tc c) -
     106 * round (td c))
-noncomputable def s20 (c : Rq 2) : ℤ :=
+@[expose] noncomputable def s20 (c : Rq 2) : ℤ :=
   -(106 * round (ta c) + 32 * round (tb c) + 5 * round (tc c) + 2 * round (td c))
-noncomputable def s21 (c : Rq 2) : ℤ :=
+@[expose] noncomputable def s21 (c : Rq 2) : ℤ :=
   32 * round (ta c) - 106 * round (tb c) + 2 * round (tc c) - 5 * round (td c)
 
 theorem zOf_center (c : Rq 2) :
@@ -505,10 +505,10 @@ theorem sOf_center_eq (c : Rq 2) :
       ring
 
 /-- The rounding residuals `u = t − round t`. -/
-noncomputable def ua (c : Rq 2) : ℝ := ta c - round (ta c)
-noncomputable def ub (c : Rq 2) : ℝ := tb c - round (tb c)
-noncomputable def uc (c : Rq 2) : ℝ := tc c - round (tc c)
-noncomputable def ud (c : Rq 2) : ℝ := td c - round (td c)
+@[expose] noncomputable def ua (c : Rq 2) : ℝ := ta c - round (ta c)
+@[expose] noncomputable def ub (c : Rq 2) : ℝ := tb c - round (tb c)
+@[expose] noncomputable def uc (c : Rq 2) : ℝ := tc c - round (tc c)
+@[expose] noncomputable def ud (c : Rq 2) : ℝ := td c - round (td c)
 
 theorem modulus_real : (modulus : ℝ) = 12289 := by norm_num [modulus]
 
@@ -617,22 +617,22 @@ theorem toy_center_accepts (c : Rq 2) :
 /-! ## The ideal PSF: the attempt's accept-conditional -/
 
 /-- The box points whose candidate passes the norm check. -/
-def accepts (c : Rq 2) (δ : Box) : Prop := (falconPSF toyP toyPrims).isShort (sOf c δ) = true
+@[expose] def accepts (c : Rq 2) (δ : Box) : Prop := (falconPSF toyP toyPrims).isShort (sOf c δ) = true
 
-noncomputable instance (c : Rq 2) : DecidablePred (accepts c) :=
+@[expose] noncomputable instance (c : Rq 2) : DecidablePred (accepts c) :=
   fun _ => inferInstanceAs (Decidable (_ = true))
 
-instance (c : Rq 2) : Nonempty {δ : Box // accepts c δ} := ⟨⟨center, toy_center_accepts c⟩⟩
+@[expose] instance (c : Rq 2) : Nonempty {δ : Box // accepts c δ} := ⟨⟨center, toy_center_accepts c⟩⟩
 
 /-- Uniform over the accepting box points, mapped to their candidates: the attempt conditioned
 on acceptance. -/
-noncomputable def condSample (c : Rq 2) : ProbComp (Rq 2 × Rq 2) :=
+@[expose] noncomputable def condSample (c : Rq 2) : ProbComp (Rq 2 × Rq 2) :=
   (fun δ : {δ : Box // accepts c δ} => sOf c δ.1) <$>
     (@uniformSample {δ : Box // accepts c δ} (SampleableType.ofFintype _))
 
 /-- The ideal preimage-sampleable function: Falcon's `eval` and `isShort`, with the trapdoor
 sampler the attempt's accept-conditional. -/
-noncomputable def toyIdealPSF :
+@[expose] noncomputable def toyIdealPSF :
     PreimageSampleableFunction (PublicKey toyP) (SecretKey toyP) (Rq toyP.n × Rq toyP.n)
       (Rq toyP.n) where
   eval := (falconPSF toyP toyPrims).eval
@@ -640,7 +640,7 @@ noncomputable def toyIdealPSF :
   trapdoorSample := fun _ _ c => condSample c
 
 /-- The honest key relation: the single key pair `(toyPk, toySk)`. -/
-noncomputable def toyHr :
+@[expose] noncomputable def toyHr :
     GenerableRelation (PublicKey toyP) (SecretKey toyP) (validKeyPair toyP) where
   gen := pure (toyPk, toySk)
   gen_sound := fun pk sk h => by
@@ -799,10 +799,10 @@ theorem zOf_zero (δ : Box) :
   simp only [zOf, h1, h2, h3, h4, round_zero, zero_add]
 
 /-- The candidate's coefficients at the zero target, as integer linear forms in the offsets. -/
-def w10 (δ : Box) : ℤ := -(5 * off δ.1 - 2 * off δ.2.1 - 106 * off δ.2.2.1 + 32 * off δ.2.2.2)
-def w11 (δ : Box) : ℤ := -(2 * off δ.1 + 5 * off δ.2.1 - 32 * off δ.2.2.1 - 106 * off δ.2.2.2)
-def w20 (δ : Box) : ℤ := -(106 * off δ.1 + 32 * off δ.2.1 + 5 * off δ.2.2.1 + 2 * off δ.2.2.2)
-def w21 (δ : Box) : ℤ := 32 * off δ.1 - 106 * off δ.2.1 + 2 * off δ.2.2.1 - 5 * off δ.2.2.2
+@[expose] def w10 (δ : Box) : ℤ := -(5 * off δ.1 - 2 * off δ.2.1 - 106 * off δ.2.2.1 + 32 * off δ.2.2.2)
+@[expose] def w11 (δ : Box) : ℤ := -(2 * off δ.1 + 5 * off δ.2.1 - 32 * off δ.2.2.1 - 106 * off δ.2.2.2)
+@[expose] def w20 (δ : Box) : ℤ := -(106 * off δ.1 + 32 * off δ.2.1 + 5 * off δ.2.2.1 + 2 * off δ.2.2.2)
+@[expose] def w21 (δ : Box) : ℤ := 32 * off δ.1 - 106 * off δ.2.1 + 2 * off δ.2.2.1 - 5 * off δ.2.2.2
 
 /-- The candidate at the zero target, coefficient by coefficient. -/
 theorem sOf_zero_eq (δ : Box) :

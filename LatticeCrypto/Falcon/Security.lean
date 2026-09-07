@@ -423,16 +423,16 @@ For the ideal (exact-arithmetic) discrete Gaussian over the NTRU lattice coset �
 GPV08 and [FGdG+25] analyze — the literature value is `εpp = 2^(-H∞)` of the coset Gaussian
 `D_{Λ+c,σ}`, and GPV08 Lemma 2.10 gives `H∞ ≥ n - 1` bits once `σ` exceeds the smoothing
 parameter of the lattice, so `εpp` is negligible at Falcon parameters (`n = 512` / `1024`).
-The formal discharge of a concrete numeric `εpp` awaits a discrete-Gaussian pointwise-mass
-theory: `LatticeCrypto.DiscreteGaussian` currently provides the one-dimensional
-`discreteGaussianPMF` with positivity and normalization but no pointwise *upper* bound.
-Missing are (i) a max-mass lemma
-`discreteGaussianPMF σ μ z ≤ discreteGaussianWeight σ μ ⌊μ⌉ / discreteGaussianSum σ μ`
-with a quantitative lower bound on `discreteGaussianSum σ μ` (e.g. `≥ σ√(2π) - 1` by integral
-comparison), and (ii) their lift to the `2n`-dimensional coset Gaussian over the NTRU lattice
-via the smoothing-parameter bound (GPV08 Lemma 2.10).  Until then this remains a named
-assumption with inspectable content; it is trivially satisfiable at `εpp = 1`
-(`idealSamplerGuessBound_one`), since pointwise masses of any sampler are probabilities. -/
+The formal discharge of a concrete numeric `εpp` goes through the Klein structure of
+`Primitives.ffSampling` rather than through the smoothing parameter: the one-dimensional bound
+`LatticeCrypto.discreteGaussianPMF_le_one_div_sub_one` controls each of the `4 · 2^κ` leaf draws
+and the merge steps are injective, so the sampler's integer output has pointwise mass at most
+`(1 / (σ_min √(2π) - 1)) ^ (4 · 2^κ)`. On honest keys only short preimages carry mass
+(`idealSamplerGuessBound_of_short`), and a short preimage determines the lattice point modulo `q`
+except for representatives at distance at least `q - β`; bounding the mass of those far
+representatives is the remaining obligation. Until then this is a named assumption with
+inspectable content; it is trivially satisfiable at `εpp = 1` (`idealSamplerGuessBound_one`),
+since pointwise masses of any sampler are probabilities. -/
 def idealSamplerGuessBound
     (hr : GenerableRelation (PublicKey p) (SecretKey p) (validKeyPair p))
     (idealPSF : PreimageSampleableFunction
@@ -449,6 +449,26 @@ theorem idealSamplerGuessBound_one
       (PublicKey p) (SecretKey p) (Rq p.n × Rq p.n) (Rq p.n)) :
     idealSamplerGuessBound p hr idealPSF 1 :=
   fun _pk _sk _h _c _x => probOutput_le_one
+
+/-- **The guessing bound only needs the short preimages.** On honest keys `CorrectAt` puts every
+output of the ideal sampler inside the short set, so a preimage that is not short has no output
+mass at all; a pointwise bound on the short preimages therefore bounds every preimage. This is
+the form a sampler min-entropy theorem delivers (the reduction of a lattice point modulo `q` is
+injective only on short vectors), and it is all the exact-match branch consumes. -/
+theorem idealSamplerGuessBound_of_short
+    (hr : GenerableRelation (PublicKey p) (SecretKey p) (validKeyPair p))
+    (idealPSF : PreimageSampleableFunction
+      (PublicKey p) (SecretKey p) (Rq p.n × Rq p.n) (Rq p.n))
+    (hCorrect : ∀ pk sk, (pk, sk) ∈ support hr.gen → idealPSF.CorrectAt pk sk)
+    (εpp : ℝ≥0∞)
+    (hShort : ∀ pk sk, (pk, sk) ∈ support hr.gen → ∀ (c : Rq p.n) (x : Rq p.n × Rq p.n),
+      idealPSF.isShort x = true → Pr[= x | idealPSF.trapdoorSample pk sk c] ≤ εpp) :
+    idealSamplerGuessBound p hr idealPSF εpp := by
+  intro pk sk hmem c x
+  by_cases hx : x ∈ support (idealPSF.trapdoorSample pk sk c)
+  · exact hShort pk sk hmem c x (hCorrect pk sk hmem c x hx).2
+  · rw [probOutput_eq_zero_of_not_mem_support hx]
+    exact zero_le
 
 /-! ## Falcon's rejection loop: attempt-level sampler transport
 
