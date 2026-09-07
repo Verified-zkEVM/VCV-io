@@ -579,8 +579,8 @@ theorem probOutput_contextForkCollision_le_main_div [IsUniformSpec spec]
         rcases hlocated : PFunctor.FreeM.Cursor.locateAt?
             (P := spec.toPFunctor) i main path s with _ | located
         · simp
-        · calc
-            Pr[fun result => result = some s | do
+        · have hevent :
+              Pr[fun result => result = some s | do
                 let secondAnswer ← (liftM (spec.query i) : OracleComp spec (spec.Range i))
                 if located.completion.answer = secondAnswer ∧
                     cf (PFunctor.FreeM.output main path) = some s then
@@ -588,13 +588,12 @@ theorem probOutput_contextForkCollision_le_main_div [IsUniformSpec spec]
                 else pure none] =
               Pr[fun secondAnswer => located.completion.answer = secondAnswer |
                 (liftM (spec.query i) : OracleComp spec (spec.Range i))] := by
-                rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
-                refine tsum_congr fun secondAnswer => ?_
-                by_cases heq : located.completion.answer = secondAnswer <;>
-                  simp [hcf, heq]
-            _ ≤ (Fintype.card (spec.Range i) : ℝ≥0∞)⁻¹ := probEvent_query_le_inv_of_unique i _
-              (fun (x y : spec.Range i) (hx : located.completion.answer = x)
-                (hy : located.completion.answer = y) => hx.symm.trans hy)
+            rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
+            refine tsum_congr fun secondAnswer => ?_
+            by_cases heq : located.completion.answer = secondAnswer <;>
+              simp [hcf, heq]
+          rw [hevent]
+          simp [eq_comm]
       · intro path _ hcf
         simp only [collision, contextForkCollisionCont]
         rcases hlocated : PFunctor.FreeM.Cursor.locateAt?

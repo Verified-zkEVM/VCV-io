@@ -24,7 +24,8 @@ Use `VCVio/` when you are changing framework abstractions such as `SignatureAlg`
 - `LatticeCrypto/Ring/Norms.lean`: centered representatives, `NormOps`, and generic norm infrastructure.
 - `LatticeCrypto/Ring/Rounding.lean`: abstract `RoundingOps` and `Power2RoundOps` used by ML-DSA.
 - `LatticeCrypto/Ring/IntegralLift.lean`: `IntegralLift` for Falcon integer-polynomial arithmetic.
-- `LatticeCrypto/Ring/NTTCert.lean`: shared matrix certification scaffolding for concrete NTTs.
+- `LatticeCrypto/Ring/NTTCert.lean`: shared matrix scaffolding plus structural butterfly layouts,
+  stage composition, normalization, and coefficient-backend lifts for concrete NTT certificates.
 - `LatticeCrypto/DiscreteGaussian.lean`: generic discrete Gaussian support used by Falcon.
 
 ### Hardness assumptions

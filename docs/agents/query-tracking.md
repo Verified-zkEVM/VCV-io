@@ -14,6 +14,11 @@ The stack is also intentionally split into:
 - a thin `OracleComp` facade
 - a small `ToMathlib` probability layer for reusable tail-sum facts
 
+`AdaptivePrefix.lean` is separate from the cost semantics above. It owns the probabilistic
+stopping-time argument used when an adaptive prefix and a transcript-dependent suffix share one
+lazy random function. Protocol-specific files should instantiate this theorem rather than copy its
+cache/log induction.
+
 ## Main Files
 
 | File | Role |
@@ -21,6 +26,7 @@ The stack is also intentionally split into:
 | `VCVio/OracleComp/QueryTracking/WriterCost.lean` | `AddWriterT` cost facts and `QueryImpl` writer-cost instrumentation |
 | `VCVio/OracleComp/QueryTracking/QueryCost.lean` | Generic query-cost accounting for direct-style `HasQuery.Program` computations |
 | `VCVio/OracleComp/QueryTracking/CostModel.lean` | `OracleComp`-specific facade over the generic semantics |
+| `VCVio/OracleComp/QueryTracking/AdaptivePrefix.lean` | Shared-ROM stopping-time bounds for an adaptive prefix followed by a transcript-dependent suffix |
 | `ToMathlib/Control/WriterT.lean` | Pathwise and output-indexed cost predicates for `AddWriterT` |
 | `ToMathlib/Probability/ProbabilityMassFunction/TailSums.lean` | Generic PMF tail-sum identities used for expected runtime |
 
@@ -286,7 +292,7 @@ This is the clean “exact one query” example.
 
 ### Fischlin
 
-See `VCVio/CryptoFoundations/Fischlin.lean`.
+See the modules under `VCVio/CryptoFoundations/Fischlin/` (`CostAccounting.lean` for the cost side).
 
 This is the first substantial bounded-cost example.
 

@@ -304,7 +304,12 @@ private lemma cmaSignHashQueryBound_query_bind_iff {α : Type}
             (Resp := Resp) (Stmt := Stmt) t then qS - 1 else qS)
           (if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt) t then qH - 1 else qH) := by
-  grind [cmaSignHashQueryBound]
+  simp only [cmaSignHashQueryBound, isQueryBoundP_query_bind_iff]
+  constructor
+  · rintro ⟨⟨hCostly, hCostBound⟩, hHash, hHashBound⟩
+    exact ⟨⟨hCostly, hHash⟩, fun u => ⟨hCostBound u, hHashBound u⟩⟩
+  · rintro ⟨⟨hCostly, hHash⟩, hBound⟩
+    exact ⟨⟨hCostly, fun u => (hBound u).1⟩, hHash, fun u => (hBound u).2⟩
 
 omit [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- A bind is joint-bounded by the sum of the budgets for its prefix and

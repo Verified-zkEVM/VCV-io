@@ -697,6 +697,30 @@ lemma isTotalQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp s
     IsTotalQueryBound (oa >>= ob) (n₁ + n₂) := by
   refine isQueryBound_bind (combine := fun a b => a + b) ?_ ?_ h1 h2 <;> grind
 
+/-- Support-aware bind rule. Under uniform oracle semantics every syntactically reachable
+continuation value lies in `support oa`, so it suffices to bound the continuation on that support
+rather than on every value of its result type. -/
+theorem isTotalQueryBound_bind_of_mem_support
+    [IsUniformSpec spec]
+    {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {prefixBound suffixBound : ℕ}
+    (hprefix : IsTotalQueryBound oa prefixBound)
+    (hsuffix : ∀ x ∈ support oa, IsTotalQueryBound (ob x) suffixBound) :
+    IsTotalQueryBound (oa >>= ob) (prefixBound + suffixBound) := by
+  induction oa using OracleComp.inductionOn generalizing prefixBound with
+  | pure x =>
+      simpa using (hsuffix x (by simp)).mono (by omega : suffixBound ≤ prefixBound + suffixBound)
+  | query_bind t next ih =>
+      rw [isTotalQueryBound_query_bind_iff] at hprefix
+      rw [bind_assoc, isTotalQueryBound_query_bind_iff]
+      refine ⟨by omega, fun response => ?_⟩
+      apply (ih response (prefixBound := prefixBound - 1) (hprefix.2 response) ?_).mono
+      · omega
+      · intro x hx
+        apply hsuffix x
+        rw [mem_support_bind_iff]
+        exact ⟨response, by simp, hx⟩
+
 /-- If `oa >>= ob` has a total query bound `n`, then `oa` alone has total query bound `n`
 (the continuation can only add queries, not remove them). -/
 lemma IsTotalQueryBound.of_bind_left

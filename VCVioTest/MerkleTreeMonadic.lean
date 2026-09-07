@@ -11,8 +11,8 @@ public import VCVio.CryptoFoundations.MerkleTree.Addressed.NatIndexed.Monadic
 /-!
 # Effectful addressed-Merkle canaries
 
-The noncommutative trace distinguishes leaf production from ordered node hashing.  The retained
-examples cover traversal and child order, mixed authentication paths, global subtree addressing,
+The noncommutative trace distinguishes leaf production from ordered node hashing. The examples
+cover traversal and child order, mixed authentication paths, global subtree addressing,
 and the height-zero boundary.
 -/
 

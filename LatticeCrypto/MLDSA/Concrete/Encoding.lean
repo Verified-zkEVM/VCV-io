@@ -322,11 +322,32 @@ private theorem packBitsList_getD (vals : Array Nat) (width i bit : Nat)
 
 /-! ## `bitsToBytes` / `bytesToBits` roundtrip helpers (size a multiple of 8) -/
 
-set_option maxRecDepth 1200 in
 private theorem bitOf_packByte_fin :
     ∀ bits : Fin 8 → Fin 2, ∀ j : Fin 8,
       bitOf (packByte fun i => (bits i).val) j.val = (bits j).val := by
-  intro bits j; fin_cases j <;> revert bits <;> decide
+  intro bits j
+  let digits := List.ofFn fun i => (bits i).val
+  have hdigits : ∀ x ∈ digits, x < 2 := by
+    intro x hx
+    obtain ⟨i, rfl⟩ := List.mem_ofFn.mp hx
+    exact (bits i).isLt
+  have hvalue : Nat.ofDigits 2 digits < 2 ^ 8 := by
+    simpa [digits] using Nat.ofDigits_lt_base_pow_length (by decide) hdigits
+  have hj : j.val.toUInt8.toNat = j.val := by
+    rw [UInt8.toNat_ofNat']
+    exact Nat.mod_eq_of_lt (Nat.lt_trans j.isLt (by decide))
+  have hhead : (digits.drop j.val).head! = (bits j).val := by
+    rw [List.head!_eq_getElem!, List.getElem!_eq_getElem?_getD, List.getElem?_drop]
+    simp only [Nat.add_zero]
+    rw [List.getElem?_eq_getElem (by simp [digits, j.isLt])]
+    exact List.getElem_ofFn (by simp [j.isLt])
+  unfold bitOf packByte
+  simp only [UInt8.toNat_and, UInt8.toNat_shiftRight]
+  rw [UInt8.toNat_ofNat', Nat.mod_eq_of_lt hvalue, hj,
+    Nat.mod_eq_of_lt j.isLt, show (1 : UInt8).toNat = 1 from rfl,
+    Nat.and_one_is_mod, Nat.shiftRight_eq_div_pow,
+    Nat.ofDigits_div_pow_eq_ofDigits_drop j.val (by decide) digits hdigits,
+    Nat.ofDigits_mod_eq_head!, hhead, Nat.mod_eq_of_lt (bits j).isLt]
 
 private theorem bytearray_mk_getByteD {arr : Array UInt8} {i : Nat} (h : i < arr.size) :
     getByteD (ByteArray.mk arr) i = arr[i] := by

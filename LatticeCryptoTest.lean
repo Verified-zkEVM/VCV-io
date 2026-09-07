@@ -4,6 +4,7 @@ module
 -- imported here: each defines a root-level `main` for its `lean_exe` target
 -- (`falcon_test`, `mldsa_test`, `mlkem_test`), and two such modules cannot be
 -- imported into the same environment.
+public import LatticeCryptoTest.ArithmeticInstances
 public import LatticeCryptoTest.Falcon.Helpers
 public import LatticeCryptoTest.Falcon.TestVectors
 public import LatticeCryptoTest.MLDSA.ACVPVectors

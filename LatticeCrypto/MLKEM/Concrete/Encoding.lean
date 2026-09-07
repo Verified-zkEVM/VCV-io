@@ -35,12 +35,32 @@ private def bitOf (b : UInt8) (j : Nat) : Nat :=
 private def packByte (bits : Fin 8 → Nat) : UInt8 :=
   (Nat.ofDigits 2 (List.ofFn bits)).toUInt8
 
--- These finite bit-twiddling identities are auxiliary byte-level facts.
-set_option maxRecDepth 1200 in
 private theorem bitOf_packByte_fin :
     ∀ bits : Fin 8 → Fin 2, ∀ j : Fin 8,
       bitOf (packByte fun i => (bits i).val) j.val = (bits j).val := by
-  intro bits j; fin_cases j <;> revert bits <;> decide
+  intro bits j
+  let digits := List.ofFn fun i => (bits i).val
+  have hdigits : ∀ x ∈ digits, x < 2 := by
+    intro x hx
+    obtain ⟨i, rfl⟩ := List.mem_ofFn.mp hx
+    exact (bits i).isLt
+  have hvalue : Nat.ofDigits 2 digits < 2 ^ 8 := by
+    simpa [digits] using Nat.ofDigits_lt_base_pow_length (by decide) hdigits
+  have hj : j.val.toUInt8.toNat = j.val := by
+    rw [UInt8.toNat_ofNat']
+    exact Nat.mod_eq_of_lt (Nat.lt_trans j.isLt (by decide))
+  have hhead : (digits.drop j.val).head! = (bits j).val := by
+    rw [List.head!_eq_getElem!, List.getElem!_eq_getElem?_getD, List.getElem?_drop]
+    simp only [Nat.add_zero]
+    rw [List.getElem?_eq_getElem (by simp [digits, j.isLt])]
+    exact List.getElem_ofFn (by simp [j.isLt])
+  unfold bitOf packByte
+  simp only [UInt8.toNat_and, UInt8.toNat_shiftRight]
+  rw [UInt8.toNat_ofNat', Nat.mod_eq_of_lt hvalue, hj,
+    Nat.mod_eq_of_lt j.isLt, show (1 : UInt8).toNat = 1 from rfl,
+    Nat.and_one_is_mod, Nat.shiftRight_eq_div_pow,
+    Nat.ofDigits_div_pow_eq_ofDigits_drop j.val (by decide) digits hdigits,
+    Nat.ofDigits_mod_eq_head!, hhead, Nat.mod_eq_of_lt (bits j).isLt]
 
 private theorem bitOf_lt_two (b : UInt8) (j : Nat) : bitOf b j < 2 := by
   unfold bitOf
@@ -489,11 +509,16 @@ private def byteDecode12VecPoly {k : Nat} (bytes : ByteArray) (poly : Fin k) : T
 
 private theorem decode12Pair_fst {a b : Nat} (ha : a < 4096) :
     a % 256 + 256 * ((a / 256 + 16 * (b % 16)) % 16) = a := by
-  grind
+  have hdiv : a / 256 < 16 := by omega
+  rw [Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt hdiv]
+  exact Nat.mod_add_div a 256
 
 private theorem decode12Pair_snd {a b : Nat} (ha : a < 4096) :
     (a / 256 + 16 * (b % 16)) / 16 + 16 * (b / 16) = b := by
-  grind
+  have hdiv : a / 256 < 16 := by omega
+  rw [Nat.mul_comm 16, Nat.add_mul_div_right _ _ (by decide), Nat.div_eq_of_lt hdiv,
+    zero_add]
+  exact Nat.mod_add_div b 16
 
 private theorem getByteD_eq_getElem {bytes : ByteArray} {i : Nat} (hi : i < bytes.size) :
     getByteD bytes i = bytes[i] := by

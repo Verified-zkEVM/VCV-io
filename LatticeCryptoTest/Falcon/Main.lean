@@ -27,8 +27,6 @@ lake build falcon_test
 
 public section
 
-set_option maxRecDepth 2048
-
 open Falcon Falcon.Concrete Falcon.Concrete.FPR Falcon.Concrete.SamplerZ
      Falcon.Concrete.FFTOps Falcon.Concrete.Sign Falcon.Test
 

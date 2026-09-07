@@ -69,7 +69,12 @@ theorem probEvent_log_entry_eq_le {α : Type}
         calc _ ≤ ∑' x : spec.Range entry.1,
                 (Fintype.card (spec.Range entry.1) : ℝ≥0∞)⁻¹ * if x = entry.2 then 1 else 0 :=
               ENNReal.tsum_le_tsum fun x => mul_le_mul' le_rfl <| by
-                split <;> simp_all [Sigma.ext_iff]
+                by_cases hx : x = entry.2
+                · subst hx; simp
+                · have hentry : (⟨entry.1, x⟩ : (t : spec.Domain) × spec.Range t) ≠ entry := by
+                    intro h
+                    exact hx (eq_of_heq (Sigma.ext_iff.mp h).2)
+                  simp [hx, hentry]
           _ = _ := by simp
       · refine le_of_eq_of_le (ENNReal.tsum_eq_zero.mpr fun x => ?_) zero_le
         rw [if_neg fun h => ht (by cases h; rfl), mul_zero]
@@ -191,13 +196,21 @@ theorem probEvent_pair_collision_le {α : Type}
       refine tsum_query_mul_probEvent_le_aux t mx _ _ fun u => key u j' _ fun z hev => ?_
       match hz : z.2[j']? with
       | none => simp [hz] at hev
-      | some ⟨s, v⟩ => exact ⟨s, v, rfl, by simp_all⟩
+      | some ⟨s, v⟩ =>
+        simp only [hz, Option.map_some] at hev
+        change some (t ≠ s ∧ HEq u v) = some (true = true) at hev
+        have hp : t ≠ s ∧ HEq u v := (Option.some.inj hev).symm ▸ rfl
+        exact ⟨s, v, rfl, hp.2⟩
     | i' + 1, 0, _ =>
       simp only [List.getElem?_cons_zero, List.getElem?_cons_succ]
       refine tsum_query_mul_probEvent_le_aux t mx _ _ fun u => key u i' _ fun z hev => ?_
       match hz : z.2[i']? with
       | none => simp [hz] at hev
-      | some ⟨s, v⟩ => exact ⟨s, v, rfl, (by simp_all : v ≍ u).symm⟩
+      | some ⟨s, v⟩ =>
+        simp only [hz, Option.bind_some, Option.map_some] at hev
+        change some (s ≠ t ∧ HEq v u) = some (true = true) at hev
+        have hp : s ≠ t ∧ HEq v u := (Option.some.inj hev).symm ▸ rfl
+        exact ⟨s, v, rfl, hp.2.symm⟩
     | i' + 1, j' + 1, hij =>
       simp only [List.getElem?_cons_succ]
       exact tsum_query_mul_probEvent_le_aux t mx _ _ fun u => ih u i' j' (by lia)

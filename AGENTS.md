@@ -27,11 +27,14 @@ Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution 
 ## Module Scopes
 
 Active Lean libraries and tests use Lean's module system. Put declarations in a `public section`;
-use `public meta section` for tactic and elaborator code. During this compatibility-first migration,
-ordinary source files use `@[expose] public section` so existing downstream definitional equalities
-remain available. New code may expose individual definitions instead when an opaque API boundary is
-intentional and covered by public lemmas. Executable and runtime implementation modules should use
-opaque `public section` when callers do not need to unfold their definitions.
+use `public meta section` for tactic and elaborator code. Existing ordinary source files use
+`@[expose] public section` so pre-migration downstream definitional equalities remain available; new
+files use plain `public section` and expose individual definitions with `@[expose]` where unfolding
+is part of the intended API. The per-library count of broadly exposed files is a ceiling
+(`scripts/check-expose-boundary.sh`, baseline `scripts/expose_boundary_baseline.tsv`): converting a
+file lowers it, and raising it needs an explicit baseline change under review. Executable and
+runtime implementation modules should use opaque `public section` when callers do not need to
+unfold their definitions.
 
 - Use `public import` for dependencies that form part of the module's transitive public surface and
   `public meta import` for exported tactic/elaborator dependencies.
@@ -112,7 +115,7 @@ or `VCVioTest/`. This contract is enforced by
 
 1. **Probability assumptions are explicit.** `support` on `OracleComp spec` works for arbitrary specs. `evalSPMF` / `Pr[...]` need `[IsProbabilitySpec spec]`; `evalDist` / `𝒟[…]` additionally need an ambient `MeasurableSpace` on the result. Uniform/cardinality lemmas and `support ↔ Pr[= _] ≠ 0` need `[IsUniformSpec spec]`. Use `IsUniformSpec.ofFintypeInhabited` when you have `[spec.Fintype] [spec.Inhabited]` and intend uniform semantics.
 2. **`autoImplicit = false` is set globally in `lakefile.lean`**. Do not add `set_option autoImplicit false` in individual files. Every variable must be explicitly declared.
-3. **`evalSPMF` IS `simulateQ`** with `IsProbabilitySpec.toPMF`; under `[IsUniformSpec spec]` this is uniform. This is definitional (`rfl`). `evalDist` is its successful-output measure façade on the discrete compatibility path and agrees with the direct `FreeM.denote` measure fold when both specifications are present.
+3. **`evalSPMF` IS `simulateQ`** with `IsProbabilitySpec.toPMF`; under `[IsUniformSpec spec]` this is uniform. This is definitional (`rfl`). `evalDist` is its successful-output measure façade on the discrete compatibility path and agrees with the direct `FreeM.denote` measure fold when both specifications are present. These identities are internal to `VCVio/EvalDist/**` and `VCVio/OracleComp/**`: code outside those directories crosses them through the public equation lemmas (`evalSPMF_eq_simulateQ`, `probOutput_def`, `support_def`). Existing downstream `rfl` uses are grandfathered; new proofs use the public equations.
 4. **`++ₒ` is dead** — use `+` for combining oracle specs.
 5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad/Basic.lean` as canonical reference.
 6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
@@ -169,8 +172,8 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Independent products of computations: `VCVio/EvalDist/IndepProduct.lean`
 - Drawing without replacement and its expected draw count: `VCVio/OracleComp/Constructions/WithoutReplacement.lean`, `ToMathlib/Probability/NegativeHypergeometric.lean`
 - Expected values of `ℝ≥0∞`-valued functionals: `VCVio/EvalDist/Expectation.lean`
-- Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
-- Interaction spec and transcript: `PolyFun/Interaction/Basic/Spec.lean`
+- Fischlin transform: `VCVio/CryptoFoundations/Fischlin/` (`Defs`, `CostAccounting`, `Completeness`, `KnowledgeSoundness`)
+- Interaction type tree and path: `PolyFun/Interaction/Basic/TypeTree.lean`
 - Two-party roles and strategies: `PolyFun/Interaction/TwoParty/Strategy.lean`
 - Two-party composition and factorization: `PolyFun/Interaction/TwoParty/Compose.lean`
 - Multiparty local views: `PolyFun/Interaction/Multiparty/Core.lean`
@@ -178,17 +181,17 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Concurrent processes and execution: `PolyFun/Interaction/Concurrent/Process.lean`
 - Open systems (interfaces, composition): `PolyFun/Interaction/UC/OpenTheory.lean`
 - Open processes (boundary traffic, UC bridge): `PolyFun/Interaction/UC/OpenProcess.lean` (monad-parametric `OpenProcess m Party Δ` with intrinsic `stepSampler` field and `OpenStep.boundaryTrace`)
-- Concrete open-theory model: `PolyFun/Interaction/UC/OpenProcessModel.lean` (`openTheory m Party schedulerSampler` threads `Spec.Sampler` through `map` / `par` / `wire` / `plug`)
+- Concrete open-theory model: `PolyFun/Interaction/UC/OpenProcessModel.lean` (`openTheory Party m schedulerSampler` threads `TypeTree.Sampler` through `map` / `par` / `wire` / `plug`)
 - UC emulation and security: `PolyFun/Interaction/UC/Emulates.lean`
 - Computational UC observation layer: `VCVio/Interaction/UC/Computational.lean`
-- Per-node samplers as data (`Spec.Sampler m spec` = `Decoration (fun X => m X) spec`): `PolyFun/Interaction/Basic/Sampler.lean`
-- `Spec.Fintype` ornament + canonical uniform sampler: `PolyFun/Interaction/Basic/SpecFintype.lean`, `VCVio/Interaction/UC/Runtime.lean`
+- Per-node samplers as data (`TypeTree.Sampler m tree` = `Decoration (fun X => m X) tree`): `PolyFun/Interaction/Basic/Sampler.lean`
+- `TypeTree.Fintype` / `TypeTree.Nonempty` ornaments + canonical uniform sampler: `PolyFun/Interaction/Basic/TypeTreeFintype.lean`, `VCVio/Interaction/UC/Runtime.lean`
 - Oracle-aware runtime semantics (monad-parametric process execution, `processSemanticsOracle`): `VCVio/Interaction/UC/Runtime.lean` (no `sampler` argument; pulled from `process.stepSampler`)
 - End-to-end UC `ObservedCompEmulates 0` at a three-port boundary: `Examples/OneTimePad/UC.lean`
-- Interaction examples: `PolyFun/Interaction/TwoParty/Examples.lean`, `PolyFun/Interaction/Multiparty/Examples.lean`, `PolyFun/Interaction/Concurrent/Examples.lean`
+- Interaction examples: `PolyFunTest/Interaction/TwoParty/Examples.lean`, `PolyFunTest/Interaction/Multiparty/Examples.lean`, `PolyFunTest/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 - Program logic tactic walkthroughs: `Examples/ProgramLogic/`
-- Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
+- Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/NTTCert.lean` (matrix and structural butterfly-stage certificates), `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
 - ML-DSA proof-level IDS: `LatticeCrypto/MLDSA/Scheme.lean`
 - ML-DSA FIPS signing layer: `LatticeCrypto/MLDSA/Signature.lean`
 - ML-KEM internal deterministic core: `LatticeCrypto/MLKEM/Internal.lean`
@@ -210,7 +213,7 @@ For the tactic reference, proof-mode entry points, and workflow details, see
 `Lean.Meta.Sym.Pattern` / `Lean.Meta.Sym.DiscrTree`. `Sym.*` is under active
 development in core Lean; see the *Internal Architecture* and *SymM
 Stability Note* sections of that doc for the churn classes to watch at each
-toolchain bump and the re-entry plan for the deferred `mvcgen'`/`SymM`
+toolchain bump and the re-entry plan for the deferred symbolic
 rewriter bridge (when it lands, `Sym.Simp.mkTheoremFromDecl` rebuilds the
 bundle on demand).
 

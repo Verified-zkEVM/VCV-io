@@ -25,10 +25,10 @@ of the existing pure engine, not a second Merkle-tree semantics.
 This module is deliberately a companion to the pre-existing unaddressed
 `InductiveMerkleTree.buildMerkleTree` / `getPutativeRoot` API, not its replacement.  The
 addressed engine is required by XMSS and FORS because the hash query includes the node address.
-Re-expressing the unaddressed entry points as constant-address specializations would also require
-migrating their extractability, batch-opening, uniqueness, and query-bound consumers.  That
-definitional migration is outside this layer; `Addressed.Basic` records the existing
-propositional constant-address bridges and the precise deferred boundary.
+Single-opening homogeneous extractability and its query bounds now use a generic complete-query
+owner, with the unaddressed theorem recovered by unit-address specialization. Batch opening,
+uniqueness, and wholesale replacement of the older construction API remain outside this layer;
+`Addressed.Basic` records the existing propositional constant-address bridges.
 -/
 
 @[expose] public section

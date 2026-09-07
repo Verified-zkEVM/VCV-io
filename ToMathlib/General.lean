@@ -229,7 +229,7 @@ lemma abs_mul_of_nonpos (h : b < 0) : |a| * b = - |a * b| := by
 
 end abs
 
-open BigOperators ENNReal
+open ENNReal
 
 lemma Fintype.sum_inv_card (α : Type*) [Fintype α] [Nonempty α] :
   Finset.sum Finset.univ (fun _ ↦ (Fintype.card α)⁻¹ : α → ℝ≥0∞) = 1 := by

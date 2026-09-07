@@ -55,9 +55,16 @@ def wotsLeafAdrs (adrs : Adrs) (t : ℕ) : Adrs :=
 def xmssNodeAdrs (adrs : Adrs) (z t : ℕ) : Adrs :=
   ((adrs.setTypeAndClear .tree).setTreeHeight z).setTreeIndex t
 
-/-- An XMSS signature: a WOTS+ signature of the leaf message paired with the authentication
-path (`h'` sibling nodes). -/
-abbrev XmssSig (p : Params) (core : CorePrimitives p) := WotsSig p core × List core.Y
+/-- An XMSS signature whose WOTS+ component and authentication path have their FIPS-prescribed
+lengths in the type, so no caller-supplied length invariant is needed downstream. -/
+structure XmssSigCore (p : Params) (core : CorePrimitives p) where
+  /-- The `len` WOTS+ chain values. -/
+  wots : WotsSig p core
+  /-- The `h'` sibling nodes, from the leaf level upward. -/
+  auth : Vector core.Y p.hp
+
+/-- Alias for the canonical intrinsically shaped XMSS signature. -/
+abbrev XmssSig := XmssSigCore
 
 /-! ### Low-level callback-parametric helpers -/
 
@@ -99,10 +106,11 @@ def xmssSignWith (core : CorePrimitives p) {m : Type → Type*} [Monad m]
     (nodeHash : Adrs → core.Y → core.Y → m core.Y)
     (msg : core.Y) (sk : core.SkSeed) (pk : core.PkSeed)
     (adrs : Adrs) (idx : ℕ) : m (XmssSig p core) := do
-  let path ← PerfectMerkleTree.authPathM (xmssLeafWith core hash compress sk pk adrs)
+  let path ← PerfectMerkleTree.intrinsicAuthPathM
+    (xmssLeafWith core hash compress sk pk adrs)
     (xmssNodeHashWith nodeHash adrs) idx p.hp
   let sig ← wotsSignWith core hash msg sk pk (wotsLeafAdrs adrs idx)
-  return (sig, path)
+  return ⟨sig, path⟩
 
 /-- Low-level callback-parametric XMSS root recovery. The WOTS+ public key is
 recovered before the authentication path is climbed. -/
@@ -111,8 +119,8 @@ def xmssPkFromSigWith (core : CorePrimitives p) {m : Type → Type*} [Monad m]
     (compress : Adrs → List core.Y → m core.Y)
     (nodeHash : Adrs → core.Y → core.Y → m core.Y)
     (idx : ℕ) (sig : XmssSig p core) (msg : core.Y) (adrs : Adrs) : m core.Y := do
-  let leaf ← wotsPkFromSigWith core hash compress sig.1 msg (wotsLeafAdrs adrs idx)
-  PerfectMerkleTree.climbM (xmssNodeHashWith nodeHash adrs) idx leaf sig.2
+  let leaf ← wotsPkFromSigWith core hash compress sig.wots msg (wotsLeafAdrs adrs idx)
+  PerfectMerkleTree.climbM (xmssNodeHashWith nodeHash adrs) idx leaf sig.auth.toList
 
 /-! ### Canonical explicit-public-hash programs -/
 
@@ -234,22 +242,23 @@ theorem xmssRoot_eq_node (prims : Primitives p) (sk : prims.SkSeed)
     xmssRoot prims sk pk adrs = xmssNode prims sk pk adrs p.hp 0 := by
   rfl
 
-/-- The pure signing API is the FIPS authentication path paired with the WOTS+ signature. -/
+/-- The pure signing API contains the WOTS+ signature and the intrinsically shaped FIPS
+authentication path. -/
 @[simp]
 theorem xmssSign_eq_pair (prims : Primitives p) (msg : prims.Y) (sk : prims.SkSeed)
     (pk : prims.PkSeed) (adrs : Adrs) (idx : ℕ) :
     xmssSign prims msg sk pk adrs idx =
-      (wotsSign prims msg sk pk (wotsLeafAdrs adrs idx),
-        PerfectMerkleTree.authPath (xmssLeaf prims sk pk adrs)
-          (xmssNodeHash prims pk adrs) idx p.hp) := by
-  unfold xmssSign
+      ⟨wotsSign prims msg sk pk (wotsLeafAdrs adrs idx),
+        PerfectMerkleTree.intrinsicAuthPath (xmssLeaf prims sk pk adrs)
+          (xmssNodeHash prims pk adrs) idx p.hp⟩ := by
+  unfold xmssSign xmssSignM xmssSignWith
   change simulateQ (PublicHash.impl prims) (do
-    let path ← PerfectMerkleTree.authPathM (xmssLeafM prims.core sk pk adrs)
+    let path ← PerfectMerkleTree.intrinsicAuthPathM (xmssLeafM prims.core sk pk adrs)
       (xmssNodeHashM prims.core pk adrs) idx p.hp
     let sig ← wotsSignM prims.core msg sk pk (wotsLeafAdrs adrs idx)
-    return (sig, path)) = _
+    return XmssSigCore.mk sig path) = _
   simp only [simulateQ_bind, simulateQ_pure]
-  rw [PerfectMerkleTree.simulateQ_authPathM, simulateQ_wotsSignM]
+  rw [PerfectMerkleTree.simulateQ_intrinsicAuthPathM, simulateQ_wotsSignM]
   rfl
 
 /-- The pure recovery API first recovers the WOTS+ leaf and then climbs the authentication path. -/
@@ -258,11 +267,11 @@ theorem xmssPkFromSig_eq_climb (prims : Primitives p) (idx : ℕ)
     (sig : XmssSig p prims) (msg : prims.Y) (pk : prims.PkSeed) (adrs : Adrs) :
     xmssPkFromSig prims idx sig msg pk adrs =
       PerfectMerkleTree.climb (xmssNodeHash prims pk adrs) idx
-        (wotsPkFromSig prims sig.1 msg pk (wotsLeafAdrs adrs idx)) sig.2 := by
+        (wotsPkFromSig prims sig.wots msg pk (wotsLeafAdrs adrs idx)) sig.auth.toList := by
   unfold xmssPkFromSig
   change simulateQ (PublicHash.impl prims) (do
-    let leaf ← wotsPkFromSigM prims.core sig.1 msg pk (wotsLeafAdrs adrs idx)
-    PerfectMerkleTree.climbM (xmssNodeHashM prims.core pk adrs) idx leaf sig.2) = _
+    let leaf ← wotsPkFromSigM prims.core sig.wots msg pk (wotsLeafAdrs adrs idx)
+    PerfectMerkleTree.climbM (xmssNodeHashM prims.core pk adrs) idx leaf sig.auth.toList) = _
   simp only [simulateQ_bind, simulateQ_wotsPkFromSigM]
   simp_rw [PerfectMerkleTree.simulateQ_climbM]
   rfl
@@ -349,7 +358,7 @@ theorem xmssSignWith_natural {m n : Type → Type*} [Monad m] [LawfulMonad m]
       xmssSignWith core hashn compressn nodeHashn msg sk pk adrs idx := by
   simp only [xmssSignWith, F.mmap_bind]
   simp_rw [wotsSignWith_natural F core hashm hashn hhash]
-  simp_rw [PerfectMerkleTree.authPathM_natural F
+  simp_rw [PerfectMerkleTree.intrinsicAuthPathM_natural F
     (xmssLeafWith core hashm compressm sk pk adrs)
     (xmssNodeHashWith nodeHashm adrs)
     (xmssLeafWith core hashn compressn sk pk adrs)
@@ -543,12 +552,12 @@ at every level. -/
 theorem xmssAuthPathM_isTotalQueryBound (core : CorePrimitives p)
     (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) (idx z : ℕ) :
     IsTotalQueryBound
-      (PerfectMerkleTree.authPathM (xmssLeafM core sk pk adrs)
+      (PerfectMerkleTree.intrinsicAuthPathM (xmssLeafM core sk pk adrs)
         (xmssNodeHashM core pk adrs) idx z :
-          OracleComp (publicHashSpec core) (List core.Y))
+          OracleComp (publicHashSpec core) (Vector core.Y z))
       (xmssAuthPathQueryBound p z) := by
   simpa [xmssAuthPathQueryBound] using
-    (PerfectMerkleTree.isTotalQueryBound_authPathM
+    (PerfectMerkleTree.isTotalQueryBound_intrinsicAuthPathM
       (xmssLeafM core sk pk adrs) (xmssNodeHashM core pk adrs)
       (p.len * (p.w - 1) + 1) 1 idx z
       (fun i => by
@@ -576,13 +585,13 @@ theorem xmssPkFromSigM_isTotalQueryBound (core : CorePrimitives p)
     IsTotalQueryBound
       (xmssPkFromSigM core idx sig msg pk adrs :
         OracleComp (publicHashSpec core) core.Y)
-      ((∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) + 1 + sig.2.length) := by
+      ((∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) + 1 + p.hp) := by
   change IsTotalQueryBound (do
-    let leaf ← wotsPkFromSigM core sig.1 msg pk (wotsLeafAdrs adrs idx)
-    PerfectMerkleTree.climbM (xmssNodeHashM core pk adrs) idx leaf sig.2) _
+    let leaf ← wotsPkFromSigM core sig.wots msg pk (wotsLeafAdrs adrs idx)
+    PerfectMerkleTree.climbM (xmssNodeHashM core pk adrs) idx leaf sig.auth.toList) _
   exact isTotalQueryBound_bind
-    (wotsPkFromSigM_isTotalQueryBound core sig.1 msg pk (wotsLeafAdrs adrs idx)) fun leaf =>
-      xmssClimbM_isTotalQueryBound core pk adrs idx leaf sig.2
+    (wotsPkFromSigM_isTotalQueryBound core sig.wots msg pk (wotsLeafAdrs adrs idx)) fun leaf =>
+      by simpa using xmssClimbM_isTotalQueryBound core pk adrs idx leaf sig.auth.toList
 
 /-- XMSS signing composes the message-selected WOTS+ chain budget with the sibling-subtree
 authentication-path budget. -/
@@ -594,17 +603,19 @@ theorem xmssSignM_isTotalQueryBound (core : CorePrimitives p)
         OracleComp (publicHashSpec core) (XmssSig p core))
       ((∑ i : Fin p.len, chainStepsCore core msg i.val) +
         xmssAuthPathQueryBound p p.hp) := by
+  unfold xmssSignM xmssSignWith
   change IsTotalQueryBound (do
-    let path ← PerfectMerkleTree.authPathM (xmssLeafM core sk pk adrs)
+    let path ← PerfectMerkleTree.intrinsicAuthPathM (xmssLeafM core sk pk adrs)
       (xmssNodeHashM core pk adrs) idx p.hp
     let sig ← wotsSignM core msg sk pk (wotsLeafAdrs adrs idx)
-    return (sig, path)) _
+    return XmssSigCore.mk sig path) _
   have hbound := isTotalQueryBound_bind
     (xmssAuthPathM_isTotalQueryBound core sk pk adrs idx p.hp) fun path =>
       isTotalQueryBound_bind
         (wotsSignM_isTotalQueryBound core msg sk pk (wotsLeafAdrs adrs idx)) fun sig =>
           show IsTotalQueryBound
-            (pure (sig, path) : OracleComp (publicHashSpec core) (XmssSig p core)) 0 from trivial
+            (pure ⟨sig, path⟩ : OracleComp (publicHashSpec core) (XmssSig p core)) 0 from
+              trivial
   simpa [Nat.add_comm] using hbound
 
 /-- Signing followed by recovery stays within one complete pass over every WOTS+ chain, one
@@ -619,44 +630,17 @@ theorem xmssSignM_then_xmssPkFromSigM_isTotalQueryBound (core : CorePrimitives p
       xmssPkFromSigM core idx sig msg pk adrs) :
         OracleComp (publicHashSpec core) core.Y)
       ((p.len * (p.w - 1) + 1) + xmssAuthPathQueryBound p p.hp + p.hp) := by
-  simp only [xmssSignM, xmssSignWith, xmssPkFromSigM, xmssPkFromSigWith,
-    bind_assoc, pure_bind]
-  have hbody : ∀ path : List core.Y, path.length = p.hp →
-      IsTotalQueryBound ((do
-        let sig ← wotsSignM core msg sk pk (wotsLeafAdrs adrs idx)
-        let leaf ← wotsPkFromSigM core sig msg pk (wotsLeafAdrs adrs idx)
-        PerfectMerkleTree.climbM (xmssNodeHashM core pk adrs) idx leaf path) :
-          OracleComp (publicHashSpec core) core.Y)
-        ((p.len * (p.w - 1) + 1) + p.hp) := by
-    intro path hlen
-    have hbound := isTotalQueryBound_bind
-      (wotsSignM_isTotalQueryBound core msg sk pk (wotsLeafAdrs adrs idx)) fun sig =>
-        isTotalQueryBound_bind
-          (wotsPkFromSigM_isTotalQueryBound core sig msg pk (wotsLeafAdrs adrs idx)) fun leaf =>
-            xmssClimbM_isTotalQueryBound core pk adrs idx leaf path
-    have hsum :
-        (∑ i : Fin p.len, chainStepsCore core msg i.val) +
-            (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) =
-          p.len * (p.w - 1) := by
-      rw [← Finset.sum_add_distrib]
-      simp_rw [Nat.add_sub_of_le (chainStepsCore_le core msg _)]
-      simp
-    simpa [hlen, ← Nat.add_assoc, hsum] using hbound
-  have hbound := PerfectMerkleTree.isTotalQueryBound_authPathM_bind
-    (xmssLeafM core sk pk adrs) (xmssNodeHashM core pk adrs)
-    (p.len * (p.w - 1) + 1) 1 idx p.hp
-    ((p.len * (p.w - 1) + 1) + p.hp)
-    (fun i => by
-      simpa [xmssLeafM, xmssLeafWith, wotsPkGenM] using
-        wotsPkGenM_isTotalQueryBound core sk pk (wotsLeafAdrs adrs i))
-    (fun h i l r => xmssNodeHashM_isTotalQueryBound_one core pk adrs h i l r)
-    (fun path => do
-      let sig ← wotsSignM core msg sk pk (wotsLeafAdrs adrs idx)
-      let leaf ← wotsPkFromSigM core sig msg pk (wotsLeafAdrs adrs idx)
-      PerfectMerkleTree.climbM (xmssNodeHashM core pk adrs) idx leaf path) hbody
-  unfold xmssLeafM xmssNodeHashM at hbound
-  simpa only [xmssAuthPathQueryBound, Nat.mul_one, wotsSignM, wotsPkFromSigM,
-    Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hbound
+  have hbound := isTotalQueryBound_bind
+    (xmssSignM_isTotalQueryBound core msg sk pk adrs idx) fun sig =>
+      xmssPkFromSigM_isTotalQueryBound core idx sig msg pk adrs
+  have hsum :
+      (∑ i : Fin p.len, chainStepsCore core msg i.val) +
+          (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) =
+        p.len * (p.w - 1) := by
+    rw [← Finset.sum_add_distrib]
+    simp_rw [Nat.add_sub_of_le (chainStepsCore_le core msg _)]
+    simp
+  simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm, hsum] using hbound
 
 /-! ### Deterministic interpretations -/
 
@@ -801,7 +785,7 @@ theorem xmssPkFromSig_xmssSign (prims : Primitives p) (msg : prims.Y) (sk : prim
   have key := PerfectMerkleTree.climb_authPath (xmssLeaf prims sk pk adrs)
     (xmssNodeHash prims pk adrs) idx p.hp
   rw [Nat.div_eq_of_lt hidx] at key
-  exact key
+  simpa using key
 
 /-- Functional XMSS completeness for one fixed total public-hash answer function shared by
 signing, recovery, and root computation. This is a deterministic interpretation theorem; it does
@@ -827,10 +811,10 @@ a distinct pair hash to the same value. The first endpoint is fixed by the hones
 determined by `(idx, h)` (a valid target for a multi-target target-collision reduction). -/
 theorem xmssPkFromSig_binding (prims : Primitives p) (msg : prims.Y) (sk : prims.SkSeed)
     (pk : prims.PkSeed) (adrs : Adrs) (idx : ℕ) (hidx : idx < 2 ^ p.hp)
-    (sig : XmssSig p prims) (hlen : sig.2.length = p.hp)
+    (sig : XmssSig p prims)
     (hroot : xmssPkFromSig prims idx sig msg pk adrs = xmssRoot prims sk pk adrs)
     (hne : xmssLeaf prims sk pk adrs idx
-      ≠ wotsPkFromSig prims sig.1 msg pk (wotsLeafAdrs adrs idx)) :
+      ≠ wotsPkFromSig prims sig.wots msg pk (wotsLeafAdrs adrs idx)) :
     ∃ (h : ℕ) (c : prims.Y × prims.Y), 0 < h ∧ h ≤ p.hp ∧
       (xmssNode prims sk pk adrs (h - 1) (2 * (idx / 2 ^ h)),
           xmssNode prims sk pk adrs (h - 1) (2 * (idx / 2 ^ h) + 1))
@@ -840,13 +824,13 @@ theorem xmssPkFromSig_binding (prims : Primitives p) (msg : prims.Y) (sk : prims
           (xmssNode prims sk pk adrs (h - 1) (2 * (idx / 2 ^ h) + 1))
         = prims.H pk (xmssNodeAdrs adrs h (idx / 2 ^ h)) c.1 c.2 := by
   have hroot' : PerfectMerkleTree.climb (xmssNodeHash prims pk adrs) idx
-      (wotsPkFromSig prims sig.1 msg pk (wotsLeafAdrs adrs idx)) sig.2
+      (wotsPkFromSig prims sig.wots msg pk (wotsLeafAdrs adrs idx)) sig.auth.toList
       = PerfectMerkleTree.merkleRoot (xmssLeaf prims sk pk adrs) (xmssNodeHash prims pk adrs)
           p.hp (idx / 2 ^ p.hp) := by
     rw [Nat.div_eq_of_lt hidx]
     simpa only [xmssPkFromSig_eq_climb, xmssRoot_eq_node, xmssNode_eq_merkleRoot] using hroot
   simpa only [xmssNode_eq_merkleRoot, xmssNodeHash_eq_h] using
     (PerfectMerkleTree.climb_binding (xmssLeaf prims sk pk adrs)
-      (xmssNodeHash prims pk adrs) p.hp idx _ sig.2 hlen hroot' hne)
+      (xmssNodeHash prims pk adrs) p.hp idx _ sig.auth.toList (by simp) hroot' hne)
 
 end SLHDSA

@@ -466,7 +466,7 @@ theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
     intro z hz
     rcases (mem_support_bind_iff
       (𝒮[(impl₂ t).run s₁])
-      (fun a => (pure (a, a) : SPMF ((spec.Range t × σ) × (spec.Range t × σ)))) z).1 hz with
+      (fun a => pure (a, a)) z).1 hz with
       ⟨a, ha, hz'⟩
     have hzEq : z = (a, a) := by
       simpa [support_pure, Set.mem_singleton_iff] using hz'
@@ -1008,7 +1008,7 @@ private lemma probEvent_output_bad_eq
     rintro ⟨a, s, b⟩
     by_cases hb : b = true
     · simp [hb]
-    · have hb' : b = false := by cases b <;> simp_all
+    · have hb' : b = false := Bool.eq_false_of_not_eq_true hb
       subst hb'
       simpa using
         probOutput_simulateQ_run_eq_of_not_output_bad impl₁ impl₂ h_agree_good
@@ -1053,7 +1053,7 @@ theorem tvDist_simulateQ_le_probEvent_output_bad
   set sim₂ := (simulateQ impl₂ oa).run (s₀, false)
   have h_eq : ∀ (z : α × σ × Bool), ¬(z.2.2 = true) → Pr[= z | sim₁] = Pr[= z | sim₂] := by
     rintro ⟨x, s, b⟩ hb
-    have hb' : b = false := by cases b <;> simp_all
+    have hb' : b = false := Bool.eq_false_of_not_eq_true hb
     subst hb'
     exact probOutput_simulateQ_run_eq_of_not_output_bad impl₁ impl₂ h_agree_good
       h_mono₁ h_mono₂ oa s₀ x s
@@ -1287,7 +1287,7 @@ theorem tvDist_simulateQ_run_le_probEvent_output_bad
   set sim₂ := (simulateQ impl₂ oa).run (s₀, false)
   have h_eq : ∀ (z : α × σ × Bool), ¬(z.2.2 = true) → Pr[= z | sim₁] = Pr[= z | sim₂] := by
     rintro ⟨x, s, b⟩ hb
-    have hb' : b = false := by cases b <;> simp_all
+    have hb' : b = false := Bool.eq_false_of_not_eq_true hb
     subst hb'
     exact probOutput_simulateQ_run_eq_of_not_output_bad' impl₁ impl₂ h_agree_good
       h_mono₁ h_mono₂ oa s₀ x s
@@ -2484,6 +2484,21 @@ private lemma tsum_probOutput_mul_le_const {β : Type} (mx : OracleComp spec' β
     _ = (∑' z : β, Pr[= z | mx]) * c := ENNReal.tsum_mul_right
     _ ≤ c := mul_le_of_le_one_left zero_le tsum_probOutput_le_one
 
+/-- A probability-weighted quantity is bounded by `c` when it is bounded by `c` on the
+support of the computation. Values off support are irrelevant because their output
+probability is zero. -/
+private lemma tsum_probOutput_mul_le_const_of_mem_support
+    {β : Type} (mx : OracleComp spec' β) {F : β → ℝ≥0∞} {c : ℝ≥0∞}
+    (h_le : ∀ z ∈ support mx, F z ≤ c) : (∑' z : β, Pr[= z | mx] * F z) ≤ c := by
+  calc
+    (∑' z : β, Pr[= z | mx] * F z) ≤ ∑' z : β, Pr[= z | mx] * c :=
+      ENNReal.tsum_le_tsum fun z => by
+        by_cases hz : z ∈ support mx
+        · exact mul_le_mul_right (h_le z hz) _
+        · simp [probOutput_eq_zero_of_not_mem_support hz]
+    _ = (∑' z : β, Pr[= z | mx]) * c := ENNReal.tsum_mul_right
+    _ ≤ c := mul_le_of_le_one_left zero_le tsum_probOutput_le_one
+
 /-- **Constant-ε query-budget bound for `expectedQuerySlack`.**
 
 For the constant per-query slack `fun _ => ε`, a computation firing at most `queryBudget`
@@ -2618,20 +2633,14 @@ lemma expectedQuerySlack_resource_le
                 · ring_nf; exact le_refl _
           exact h_tail qS hcontS hbudget
       intro n hcont' hRz_bound
-      calc slackSum n
-          ≤ ∑' z, Pr[= z | (impl t).run (s, false)] * ((n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β) :=
-              ENNReal.tsum_le_tsum fun z => by
-                by_cases hz : z ∈ support ((impl t).run (s, false))
-                · gcongr
-                  obtain ⟨u, s', bad'⟩ := z
-                  cases bad' with
-                  | false => exact (ih u (hcont' u) (hcontH u) s').trans
-                               (by gcongr; exact hRz_bound _ hz)
-                  | true  => simp [expectedQuerySlack_bad_eq_zero]
-                · simp [probOutput_eq_zero_of_not_mem_support hz]
-        _ ≤ (n : ℝ≥0∞) * ζ + (n : ℝ≥0∞) * B * β := by
-              rw [ENNReal.tsum_mul_right]
-              exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
+      apply tsum_probOutput_mul_le_const_of_mem_support
+      intro z hz
+      rcases z with ⟨u, s', bad'⟩
+      cases bad' with
+      | false =>
+          exact (ih u (hcont' u) (hcontH u) s').trans
+            (by gcongr; exact hRz_bound _ hz)
+      | true => simp [expectedQuerySlack_bad_eq_zero]
 
 /-- Expected-growth resource bound for `expectedQuerySlack`.
 
@@ -2761,21 +2770,7 @@ lemma expectedQuerySlack_expected_resource_le
               · have hRs' : R s' ≤ R s := h_free t (s, false) rfl hSt hHt _ hz
                 rw [if_neg hHt]
                 gcongr
-        calc (∑' z : spec.Range t × σ × Bool,
-              Pr[= z | (impl t).run (s, false)] *
-                expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) (cont z.1) qS z.2)
-            ≤ ∑' z : spec.Range t × σ × Bool,
-                Pr[= z | (impl t).run (s, false)] *
-                  ((qS : ℝ≥0∞) * ζ + ((qS : ℝ≥0∞) * R s + (qS : ℝ≥0∞) * (qH : ℝ≥0∞)
-                    + (qS.choose 2 : ℝ≥0∞) * g) * β) :=
-              ENNReal.tsum_le_tsum fun z => by
-                by_cases hz : z ∈ support ((impl t).run (s, false))
-                · exact mul_le_mul_right (h_z z hz) _
-                · simp [probOutput_eq_zero_of_not_mem_support hz]
-          _ ≤ (qS : ℝ≥0∞) * ζ + ((qS : ℝ≥0∞) * R s + (qS : ℝ≥0∞) * (qH : ℝ≥0∞)
-                + (qS.choose 2 : ℝ≥0∞) * g) * β := by
-              rw [ENNReal.tsum_mul_right]
-              exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
+        exact tsum_probOutput_mul_le_const_of_mem_support _ h_z
 
 /-- **Charged-read / expected-growth resource bound for `expectedQuerySlack`.**
 
@@ -2838,25 +2833,14 @@ lemma expectedQuerySlack_charged_read_expected_growth_le
               Pr[= z | (impl t).run (s, false)] *
                 expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) m z.2)
               ≤ (m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
-          calc (∑' z : spec.Range t × σ × Bool,
-                Pr[= z | (impl t).run (s, false)] *
-                  expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) m z.2)
-              ≤ ∑' z : spec.Range t × σ × Bool,
-                  Pr[= z | (impl t).run (s, false)] *
-                    ((m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β) :=
-                ENNReal.tsum_le_tsum fun z => by
-                  by_cases hz : z ∈ support ((impl t).run (s, false))
-                  · obtain ⟨u, s', bad'⟩ := z
-                    cases bad' with
-                    | true => simp
-                    | false =>
-                        refine mul_le_mul_right ((ih u (hcontS u) (hcontH u) s').trans ?_) _
-                        have hRs' : R s' ≤ R s := h_charged t (s, false) rfl hSt _ hz
-                        gcongr
-                  · simp [probOutput_eq_zero_of_not_mem_support hz]
-            _ ≤ (m : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
-                rw [ENNReal.tsum_mul_right]
-                exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
+          apply tsum_probOutput_mul_le_const_of_mem_support
+          rintro ⟨u, s', bad'⟩ hz
+          cases bad' with
+          | true => simp
+          | false =>
+              refine (ih u (hcontS u) (hcontH u) s').trans ?_
+              have hRs' : R s' ≤ R s := h_charged t (s, false) rfl hSt _ hz
+              gcongr
         calc R s * β +
               (∑' z : spec.Range t × σ × Bool,
                 Pr[= z | (impl t).run (s, false)] *
@@ -2906,25 +2890,14 @@ lemma expectedQuerySlack_charged_read_expected_growth_le
             _ = (qS : ℝ≥0∞) * (R s + ((h + 1 : ℕ) : ℝ≥0∞) * g) * β := by push_cast; ring
         · -- Free query: `R` does not grow, budgets unchanged.
           simp only [hHt, if_false] at hcontH
-          calc (∑' z : spec.Range t × σ × Bool,
-                Pr[= z | (impl t).run (s, false)] *
-                  expectedQuerySlack impl chargedQuery (fun s => R s * β) (cont z.1) qS z.2)
-              ≤ ∑' z : spec.Range t × σ × Bool,
-                  Pr[= z | (impl t).run (s, false)] *
-                    ((qS : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β) :=
-                ENNReal.tsum_le_tsum fun z => by
-                  by_cases hz : z ∈ support ((impl t).run (s, false))
-                  · obtain ⟨u, s', bad'⟩ := z
-                    cases bad' with
-                    | true => simp
-                    | false =>
-                        refine mul_le_mul_right ((ih u (hcontS u) (hcontH u) s').trans ?_) _
-                        have hRs' : R s' ≤ R s := h_free t (s, false) rfl hSt hHt _ hz
-                        gcongr
-                  · simp [probOutput_eq_zero_of_not_mem_support hz]
-            _ ≤ (qS : ℝ≥0∞) * (R s + (qH : ℝ≥0∞) * g) * β := by
-                rw [ENNReal.tsum_mul_right]
-                exact mul_le_of_le_one_left (by positivity) tsum_probOutput_le_one
+          apply tsum_probOutput_mul_le_const_of_mem_support
+          rintro ⟨u, s', bad'⟩ hz
+          cases bad' with
+          | true => simp
+          | false =>
+              refine (ih u (hcontS u) (hcontH u) s').trans ?_
+              have hRs' : R s' ≤ R s := h_free t (s, false) rfl hSt hHt _ hz
+              gcongr
 
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
@@ -3450,7 +3423,8 @@ lemma avgBadM_query_bind_eq
           Pr[= z | (impl t).run p] *
             Pr[fun w : γ × σ × Bool => w.2.2 = true |
               (simulateQ impl (cont z.1)).run z.2] := by
-  simp [avgBadM, probEvent_bind_eq_tsum]
+  simp only [avgBadM, simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+    OracleQuery.cont_query, id_map, StateT.run_bind, probEvent_bind_eq_tsum]
 
 /-- **Post-step joint measure of a query step (bare-measure form).** The measure over
 `(output, post-state)` produced by averaging the per-state impl step `Pr[= z | (impl t).run p]`

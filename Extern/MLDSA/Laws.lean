@@ -87,8 +87,6 @@ namespace MLDSA.Concrete
 
 open MLDSA LatticeCrypto
 
-set_option maxRecDepth 4000
-
 variable (p : Params)
 
 /-! ## Provable algebraic fields (banked) -/
@@ -148,6 +146,7 @@ The concrete `expandMask` decodes each coefficient through `polyZUnpack p`. The 
 after generalizing the byte argument; the two side conditions on the `z`-range bit width come from
 `approved_gamma1_width`. -/
 
+set_option maxRecDepth 1200 in
 /-- `Primitives.Laws.expandMask_bound` (bound `γ₁`) for the concrete instance, at any
 approved parameter set. -/
 theorem concrete_expandMask_bound (hp : p.isApproved) (rhoDoublePrime : Bytes 64) (kappa : ℕ) :

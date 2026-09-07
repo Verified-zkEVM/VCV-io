@@ -8,20 +8,20 @@ instructions — for how to *use* the probability layer, see
 
 Read in this order; each answers a different question.
 
-| # | Document | Question it answers |
-|---|---|---|
-| 1 | [`probability-semantics-landscape.md`](probability-semantics-landscape.md) | What are the options, and what is actually true upstream? The evidence ledger. §19 is its verification log. |
-| 2 | `measure-semantics-spike.md` | What happened when one option was built? Findings and friction, including what it did *not* settle. |
-| 3 | `denotational-probability-semantics.md` | Which design was accepted, and what is now settled? The baseline for new work. |
-| 4 | [`mathlib-integration-shape.md`](mathlib-integration-shape.md) | What should the resulting statements *look like* so Mathlib's library applies to them? Short- and long-term shape. |
+| # | Document | Status | Question it answers |
+|---|---|---|---|
+| 1 | [`probability-semantics-landscape.md`](probability-semantics-landscape.md) | Historical survey plus current-status appendix | What options were considered, what evidence supported the decision, and which volatile upstream facts were later rechecked? §19 preserves the original verification log; §20 records later disposition. |
+| 2 | [`measure-semantics-spike.md`](measure-semantics-spike.md) | Historical implementation record | What happened when the measure-native option was built? Findings and friction, including what it did *not* settle. |
+| 3 | [`denotational-probability-semantics.md`](denotational-probability-semantics.md) | Accepted baseline | Which design was accepted, and what rules govern new work? |
+| 4 | [`mathlib-integration-shape.md`](mathlib-integration-shape.md) | Design guidance | What should the resulting statements *look like* so Mathlib's library applies to them? Short- and long-term shape. |
 
 Start at 3 if you only want the current rule. Start at 1 if you want to know why, or to check a
 claim before relying on it.
 
-Documents 2 and 3 are unlinked above because they are not here yet: they describe the Lean files
-of the measure-semantics work and travel with it, so that a reader on `main` is never pointed at a
-design whose implementation is absent. 1 and 4 are about upstream and about direction, and hold
-whether or not that work lands.
+The documents deliberately serve different time horizons. The landscape and spike preserve the
+reasoning that led to the decision; the baseline and agent guide state the rules to apply now. Do
+not infer current API names or PR status from an old snapshot without checking its later-status
+section or the pinned source tree.
 
 ## Keeping these honest
 
@@ -34,4 +34,5 @@ tree is the evidence.
 
 **Re-check volatile facts at the moment of editing.** Upstream tags, PR statuses, and draft-versus-
 open state change faster than the documents that cite them — the PolyFun tag in §19.4 went stale
-twice in a single day. A fact that was verified last week is not verified.
+twice in a single day. Preserve the dated result as history, then add a new dated disposition backed
+by the pinned source tree. A fact that was verified last week is not verified today.

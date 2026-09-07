@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-08-31",
+  "classification": "exact projections of cited NIST examples plus explicitly labeled derived regressions; not a validation certificate",
+  "sources": {
+    "fips202": {
+      "url": "https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf",
+      "size_bytes": 1459683,
+      "sha256": "1592607831ff0908cc590632ce371c6c95e94025bb1a0c8ae90a4d0ec1ed025e",
+      "locator": "Section 6.2 SHAKE; SHAKE256 capacity 512 and 1088-bit rate",
+      "license": "NIST-authored U.S. government work; attribution and no-endorsement boundary retained in NOTICE.md"
+    },
+    "sha_archive": {
+      "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip",
+      "size_bytes": 4909729,
+      "sha256": "929ef80b7b3418aca026643f6f248815913b60e01741a44bba9e118067f4c9b8",
+      "members": {
+        "shabytetestvectors/SHA256ShortMsg.rsp": "75e1cb83994638481808e225b9eb0c1ebd0c232d952ac42b61abce6363be283c",
+        "shabytetestvectors/SHA512ShortMsg.rsp": "e53a36c03609e5a3e3cc4b6e117a499db7864c23ec825c6cec99503a45f40764"
+      }
+    },
+    "shake_archive": {
+      "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/shakebytetestvectors.zip",
+      "size_bytes": 2116268,
+      "sha256": "debfebc3157b3ceea002b84ca38476420389a3bf7e97dc5f53ea4689a16de4c7",
+      "members": {
+        "SHAKE256ShortMsg.rsp": "a21dd9180a0f0139fa8d4056919f8194ddaca2f36dc5aafa70723682099d64f5",
+        "SHAKE256VariableOut.rsp": "90fb72336900b22284477b76d0868fc2822ae42a114079c6c8a7fbda12eb52ca"
+      }
+    },
+    "hmac_sha256_example": {
+      "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/HMAC_SHA256.pdf",
+      "size_bytes": 97884,
+      "sha256": "ebb45f0b987ce07fc433cc5598c8948f127d6d0e1ebcbfd1af5a27944856c786"
+    },
+    "hmac_sha512_example": {
+      "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/HMAC_SHA512.pdf",
+      "size_bytes": 109794,
+      "sha256": "391a955dfd884bcb3b310cb25679c36e3c7fbd058332cb3571b2a9e8fb63c09f"
+    },
+    "shake_empty_example": {
+      "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHAKE256_Msg0.pdf",
+      "size_bytes": 251349,
+      "sha256": "d736c1a93eb6440e1e6b640402e31ea5258281b2b9237f84ea0ba4186518fc59"
+    },
+    "shake_1600_example": {
+      "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHAKE256_Msg1600.pdf",
+      "size_bytes": 316397,
+      "sha256": "f4226f5c72914e5d2b331812c5973d8d685c8af1ccb97c2a3a2fd1c02fd173d1"
+    }
+  },
+  "derivation_tools": {
+    "python_hashlib": {
+      "tool": "Python 3.12.3 hashlib.shake_256",
+      "method": "hashlib.shake_256(bytes.fromhex('61') * input_len_bytes).hexdigest(out_len)",
+      "corroboration": "OpenSSL 3.0.13 dgst -shake256 -xoflen 32 over the same generated input",
+      "classification": "independent derived regression only; no copied vector corpus",
+      "license": "tool outputs are locally derived facts; Python/OpenSSL implementations are not vendored"
+    },
+    "python_hashlib_prehash": {
+      "tool": "Python 3.12.3 hashlib",
+      "method": "named SHA-2/SHA-3 digest or SHAKE XOF over the byte recipe recorded per case",
+      "corroboration": "OpenSSL 3.0.13 dgst with the corresponding named digest or XOF length",
+      "classification": "independent derived regression only; no copied vector corpus",
+      "license": "tool outputs are locally derived facts; Python/OpenSSL implementations are not vendored"
+    }
+  },
+  "vectors": {
+    "sha256": [
+      {"source":"SHA256ShortMsg.rsp","len_bits":0,"msg":"","md":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"source":"SHA256ShortMsg.rsp","len_bits":440,"msg":"3ebfb06db8c38d5ba037f1363e118550aad94606e26835a01af05078533cc25f2f39573c04b632f62f68c294ab31f2a3e2a1a0d8c2be51","md":"6595a2ef537a69ba8583dfbf7f5bec0ab1f93ce4c8ee1916eff44a93af5749c4"},
+      {"source":"SHA256ShortMsg.rsp","len_bits":448,"msg":"2d52447d1244d2ebc28650e7b05654bad35b3a68eedc7f8515306b496d75f3e73385dd1b002625024b81a02f2fd6dffb6e6d561cb7d0bd7a","md":"cfb88d6faf2de3a69d36195acec2e255e2af2b7d933997f348e09f6ce5758360"},
+      {"source":"SHA256ShortMsg.rsp","len_bits":512,"msg":"5a86b737eaea8ee976a0a24da63e7ed7eefad18a101c1211e2b3650c5187c2a8a650547208251f6d4237e661c7bf4c77f335390394c37fa1a9f9be836ac28509","md":"42e61e174fbb3897d6dd6cef3dd2802fe67b331953b06114a65c772859dfc1aa"}
+    ],
+    "sha512": [
+      {"source":"SHA512ShortMsg.rsp","len_bits":0,"msg":"","md":"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"},
+      {"source":"SHA512ShortMsg.rsp","len_bits":888,"msg":"324533e685f1852e358eea8ea8b81c288b3f3beb1f2bc2b8d3fdbac318382e3d7120de30c9c237aa0a34831deb1e5e060a7969cd3a9742ec1e64b354f7eb290cba1c681c66cc7ea994fdf5614f604d1a2718aab581c1c94931b1387e4b7dc73635bf3a7301174075fa70a9227d85d3","md":"3b26c5170729d0814153becb95f1b65cd42f9a6d0649d914e4f69d938b5e9dc041cd0f5c8da0b484d7c7bc7b1bdefb08fe8b1bfedc81109345bc9e9a399feedf"},
+      {"source":"SHA512ShortMsg.rsp","len_bits":896,"msg":"518985977ee21d2bf622a20567124fcbf11c72df805365835ab3c041f4a9cd8a0ad63c9dee1018aa21a9fa3720f47dc48006f1aa3dba544950f87e627f369bc2793ede21223274492cceb77be7eea50e5a509059929a16d33a9f54796cde5770c74bd3ecc25318503f1a41976407aff2","md":"c00926a374cde55b8fbd77f50da1363da19744d3f464e07ce31794c5a61b6f9c85689fa1cfe136553527fd876be91673c2cac2dd157b2defea360851b6d92cf4"},
+      {"source":"SHA512ShortMsg.rsp","len_bits":1024,"msg":"fd2203e467574e834ab07c9097ae164532f24be1eb5d88f1af7748ceff0d2c67a21f4e4097f9d3bb4e9fbf97186e0db6db0100230a52b453d421f8ab9c9a6043aa3295ea20d2f06a2f37470d8a99075f1b8a8336f6228cf08b5942fc1fb4299c7d2480e8e82bce175540bdfad7752bc95b577f229515394f3ae5cec870a4b2f8","md":"a21b1077d52b27ac545af63b32746c6e3c51cb0cb9f281eb9f3580a6d4996d5c9917d2a6e484627a9d5a06fa1b25327a9d710e027387fc3e07d7c4d14c6086cc"}
+    ],
+    "hmac_sha256": [
+      {"source":"HMAC_SHA256.pdf","key":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f","msg_ascii":"Sample message for keylen<blocklen","mac":"a28cf43130ee696a98f14a37678b56bcfcbdd9e5cf69717fecf5480f0ebdf790"},
+      {"source":"HMAC_SHA256.pdf","key":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60616263","msg_ascii":"Sample message for keylen=blocklen","mac":"bdccb6c72ddeadb500ae768386cb38cc41c63dbb0878ddb9c7a38a431b78378d"}
+    ],
+    "hmac_sha512": [
+      {"source":"HMAC_SHA512.pdf","key":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f","msg_ascii":"Sample message for keylen<blocklen","mac":"fd44c18bda0bb0a6ce0e82b031bf2818f6539bd56ec00bdc10a8a2d730b3634de2545d639b0f2cf710d0692c72a1896f1f211c2b922d1a96c392e07e7ea9fedc"},
+      {"source":"HMAC_SHA512.pdf","key":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7","msg_ascii":"Sample message for keylen=blocklen","mac":"d93ec8d2de1ad2a9957cb9b83f14e76ad6b5e0cce285079a127d3b14bccb7aa7286d4ac0d4ce64215f2bc9e6870b33d97438be4aaa20cda5c5a912b48b8e27f3"}
+    ],
+    "mgf1_derived_regression": [
+      {"algorithm":"MGF1-SHA-256","seed":"616263","out_len":33,"mask":"cf2db1ac9867debdf8ce91f99f141e5544bf26ca36b3fd4f8e4035eec42cab0d46"},
+      {"algorithm":"MGF1-SHA-512","seed":"616263","out_len":65,"mask":"7231a01ead7829a9af72bc1022b1021d69302e97d7888bf7e06e00dee9826108b5a092e9eca7623bde11f0486e3d47c64e78754d9277e6d689557a75b6be7a8bf7"}
+    ],
+    "prehash_digest_regression": [
+      {"algorithm":"SHA-224","message_ascii":"abc","output":"23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7"},
+      {"algorithm":"SHA-224","input_recipe":{"byte":"61","count":55},"output":"fb0bd626a70c28541dfa781bb5cc4d7d7f56622a58f01a0b1ddd646f"},
+      {"algorithm":"SHA-224","input_recipe":{"byte":"61","count":56},"output":"d40854fc9caf172067136f2e29e1380b14626bf6f0dd06779f820dcd"},
+      {"algorithm":"SHA-384","message_ascii":"abc","output":"cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7"},
+      {"algorithm":"SHA-384","input_recipe":{"byte":"61","count":111},"output":"3c37955051cb5c3026f94d551d5b5e2ac38d572ae4e07172085fed81f8466b8f90dc23a8ffcdea0b8d8e58e8fdacc80a"},
+      {"algorithm":"SHA-384","input_recipe":{"byte":"61","count":112},"output":"187d4e07cb306103c69967bf544d0dfbe9042577599c73c330abc0cb64c61236d5ed565ee19119d8c31779a38f791fcd"},
+      {"algorithm":"SHA-512/224","message_ascii":"abc","output":"4634270f707b6a54daae7530460842e20e37ed265ceee9a43e8924aa"},
+      {"algorithm":"SHA-512/224","input_recipe":{"byte":"61","count":111},"output":"3ebe1b48e8c66acb9ae014db95b4bec93de7e9572bff41cf566bd7d0"},
+      {"algorithm":"SHA-512/224","input_recipe":{"byte":"61","count":112},"output":"79b41fef2a0439d2705724a67615f7bcbcd2bf5664a7774b80818eb6"},
+      {"algorithm":"SHA-512/256","message_ascii":"abc","output":"53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23"},
+      {"algorithm":"SHA-512/256","input_recipe":{"byte":"61","count":111},"output":"0239e429f98d0ed61ee8e2a7c30afe98c1c3a80ce5dff62a107e9c538f7632ce"},
+      {"algorithm":"SHA-512/256","input_recipe":{"byte":"61","count":112},"output":"9216b5303edb66504570bee90e48ea5beaa5e9fe9f760bbd3e0460559fc005f6"},
+      {"algorithm":"SHA3-224","message_ascii":"abc","output":"e642824c3f8cf24ad09234ee7d3c766fc9a3a5168d0c94ad73b46fdf"},
+      {"algorithm":"SHA3-224","input_recipe":{"byte":"61","count":144},"output":"f9019111996dcf160e284e320fd6d8825cabcd41a5ffdc4c5e9d64b6"},
+      {"algorithm":"SHA3-384","message_ascii":"abc","output":"ec01498288516fc926459f58e2c6ad8df9b473cb0fc08c2596da7cf0e49be4b298d88cea927ac7f539f1edf228376d25"},
+      {"algorithm":"SHA3-384","input_recipe":{"byte":"61","count":104},"output":"3a4f3b6284e571238884e95655e8c8a60e068e4059a9734abc08823a900d161592860243f00619ae699a29092ed91a16"},
+      {"algorithm":"SHA3-512","message_ascii":"abc","output":"b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0"},
+      {"algorithm":"SHA3-512","input_recipe":{"byte":"61","count":72},"output":"a8ae722a78e10cbbc413886c02eb5b369a03f6560084aff566bd597bb7ad8c1ccd86e81296852359bf2faddb5153c0a7445722987875e74287adac21adebe952"},
+      {"algorithm":"SHAKE128","message_ascii":"abc","out_len":32,"output":"5881092dd818bf5cf8a3ddb793fbcba74097d5c526a6d35f97b83351940f2cc8"},
+      {"algorithm":"SHAKE128","input_recipe":{"byte":"61","count":168},"out_len":32,"output":"c22e11586c22b713bde373fce93314d76829de2c21d940a28eb659b8dec953a2"},
+      {"algorithm":"SHAKE128","message":"","out_len":200,"output":"7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef263cb1eea988004b93103cfb0aeefd2a686e01fa4a58e8a3639ca8a1e3f9ae57e235b8cc873c23dc62b8d260169afa2f75ab916a58d974918835d25e6a435085b2badfd6dfaac359a5efbb7bcc4b59d538df9a04302e10c8bc1cbf1a0b3a5120ea17cda7cfad765f5623474d368ccca8af0007cd9f5e4c849f167a580b14aabdefaee7eef47cb0fca9767be1fda69419dfb927e9df07348b196691abaeb580b32def58538b8d23f877"}
+    ],
+    "shake256": [
+      {"source":"SHAKE256ShortMsg.rsp","msg":"","out_len":32,"output":"46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f"},
+      {"source":"SHAKE256_Msg0.pdf","msg":"","out_len":137,"output":"46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762fd75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be141e96616fb13957692cc7edd0b45ae3dc07223c8e92937bef84bc0eab862853349ec75546f58fb7c2775c38462c5010d846c185c15111e595522a6bcd16cf86f3d122109e3b1fdd94"},
+      {"id":"shake256-empty-out272","algorithm":"SHAKE256","mode":"XOF","source":"SHAKE256_Msg0.pdf","source_locator":"4096-bit output for the empty message; exact leading 272 bytes","classification":"official-nist-example-prefix","transformation":"leading-byte projection only; lowercase hex","license":"NIST-authored U.S. government work; attribution and no-endorsement boundary retained in NOTICE.md","msg":"","input_len_bytes":0,"out_len":272,"output":"46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762fd75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be141e96616fb13957692cc7edd0b45ae3dc07223c8e92937bef84bc0eab862853349ec75546f58fb7c2775c38462c5010d846c185c15111e595522a6bcd16cf86f3d122109e3b1fdd943b6aec468a2d621a7c06c6a957c62b54dafc3be87567d677231395f6147293b68ceab7a9e0c58d864e8efde4e1b9a46cbe854713672f5caaae314ed9083dab4b099f8e300f01b8650f1f4b1d8fcf3f3cb53fb8e9eb2ea203bdc970f50ae55428a91f7f53ac266b28419c3778a15fd248d339ede785fb7f5a1aaa96d313eacc890936c173cdcd0f"},
+      {"source":"SHAKE256_Msg1600.pdf","msg_repeat":{"byte":"a3","count":200},"out_len":64,"output":"cd8a920ed141aa0407a22d59288652e9d9f1a7ee0c1e7c1ca699424da84a904d2d700caae7396ece96604440577da4f3aa22aeb8857f961c4cd8e06f0ae6610b"},
+      {"id":"shake256-a61-in135-out32","algorithm":"SHAKE256","mode":"XOF","authority":"FIPS 202 Section 6.2","derivation":"python_hashlib","classification":"derived-regression-only","input_recipe":{"byte":"61","count":135},"input_len_bytes":135,"out_len":32,"output":"55b991ece1e567b6e7c2c714444dd201cd51f4f3832d08e1d26bebc63e07a3d7"},
+      {"id":"shake256-a61-in136-out32","algorithm":"SHAKE256","mode":"XOF","authority":"FIPS 202 Section 6.2","derivation":"python_hashlib","classification":"derived-regression-only","input_recipe":{"byte":"61","count":136},"input_len_bytes":136,"out_len":32,"output":"8fcc5a08f0a1f6827c9cf64ee8d16e0443106359ca6c8efd230759256f44996a"},
+      {"id":"shake256-a61-in137-out32","algorithm":"SHAKE256","mode":"XOF","authority":"FIPS 202 Section 6.2","derivation":"python_hashlib","classification":"derived-regression-only","input_recipe":{"byte":"61","count":137},"input_len_bytes":137,"out_len":32,"output":"a44e1a438dad6273d540be65ee26386c59588efb09139dc086385d2db0c25782"}
+    ]
+  },
+  "profile_fingerprints": {
+    "method": "SHA-256 of F||H||Tl||PRF||PRF_msg||H_msg for the fixed inputs documented in PrimitiveTests.lean; independently generated with Python 3 hashlib/hmac from FIPS 205 Section 11",
+    "SLH-DSA-SHA2-128s": "126bdad7c0379199d768a61d767412a505785bfe348f013e97720384938e661e",
+    "SLH-DSA-SHAKE-128s": "8c5c29c4ecfd8be0f2ab778a4d869846d3861b6a6639e6c54e9be8c66334bf3e",
+    "SLH-DSA-SHA2-128f": "a70faae3a69a68a6dec37a659dc1c48baf005f868eb2a58a6dcb00a25f927bed",
+    "SLH-DSA-SHAKE-128f": "d7d0222381c39e6ade4aa762907e9b31eda867b7a0428deafa12a7e20e220718",
+    "SLH-DSA-SHA2-192s": "ad1bbec52bed4cb9ba363f500a484e75aa34412aef409ae6384bd0657622ac88",
+    "SLH-DSA-SHAKE-192s": "1c6edf520ce447cef2b03cb676177efb882425d2489ea0f7f1ff3544c4da2a30",
+    "SLH-DSA-SHA2-192f": "4bf0c27c23b639d49a0334550af4eba4f27db1a22add231f8579b2d3c79a95e5",
+    "SLH-DSA-SHAKE-192f": "010573b253a885bcea685fb26c9b5aa7be0dec697412a3d6bb427fdf75f90cdc",
+    "SLH-DSA-SHA2-256s": "412034667c7f084546c39cd6ee7b1426cf32705cff083e8dc41a2bb157aac89f",
+    "SLH-DSA-SHAKE-256s": "5b7baf6c7e135155a66636c6670b55a68a1b54981cd903d265599f1af1780256",
+    "SLH-DSA-SHA2-256f": "9352f0249a322a2a1397fcfd1cfca97200d1aefba55a083587cf42988e72c73b",
+    "SLH-DSA-SHAKE-256f": "56217933da0de7175fed5d132c030717eea4cc9d9b827ae3e234bce79a0973d8"
+  }
+}

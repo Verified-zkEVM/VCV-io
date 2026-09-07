@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 module
+public import VCVio.OracleComp.QueryTracking.AdaptivePrefix
 public import VCVio.OracleComp.QueryTracking.Birthday
 public import VCVio.OracleComp.QueryTracking.CachingLoggingOracle
 public import VCVio.OracleComp.QueryTracking.CachingOracle

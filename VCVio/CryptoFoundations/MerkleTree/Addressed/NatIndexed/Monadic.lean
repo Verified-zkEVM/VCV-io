@@ -21,9 +21,10 @@ program with one handler.  In particular, random-oracle consumers must install o
 oracle across construction, signing, the adversary, and verification. The `Id` interpretation
 laws connect these effectful traversals to the established pure API.
 
-The natural-number adapter specializes the addressed engine used by XMSS/FORS.  It does not
-replace the older unaddressed inductive or vector Merkle APIs, and no claim is made here that their
-extractability or batch-opening proofs have been migrated to this representation.
+The natural-number adapter specializes the addressed engine used by XMSS/FORS. Single-opening
+homogeneous extractability is available through `AddressedMerkleTree.Extractability`; batch
+opening, full heterogeneous SLH-DSA public-hash accounting, and replacement of the older
+unaddressed/vector construction APIs remain separate work.
 -/
 
 @[expose] public section
@@ -78,6 +79,47 @@ def authPathM {m : Type v → Type*} [Monad m] (leaf : ℕ → m Y)
       let path ← authPathM leaf nodeHash idx z
       let siblingRoot ← merkleRootM leaf nodeHash z (sibling (idx / 2 ^ z))
       return path ++ [siblingRoot]
+
+/-- Effectfully compute an authentication path whose height is retained in the result type.
+Only sibling subtrees are evaluated, in leaf-to-root order. -/
+def intrinsicAuthPathM {m : Type v → Type*} [Monad m] (leaf : ℕ → m Y)
+    (nodeHash : ℕ → ℕ → Y → Y → m Y) (idx : ℕ) : (z : ℕ) → m (Vector Y z)
+  | 0 => pure #v[]
+  | z + 1 => do
+      let path ← intrinsicAuthPathM leaf nodeHash idx z
+      let siblingRoot ← merkleRootM leaf nodeHash z (sibling (idx / 2 ^ z))
+      return path.push siblingRoot
+
+/-- Pure authentication path with its exact height retained in the result type. -/
+def intrinsicAuthPath (leaf : ℕ → Y) (nodeHash : ℕ → ℕ → Y → Y → Y)
+    (idx : ℕ) : (z : ℕ) → Vector Y z
+  | 0 => #v[]
+  | z + 1 => (intrinsicAuthPath leaf nodeHash idx z).push
+      (merkleRoot leaf nodeHash z (sibling (idx / 2 ^ z)))
+
+/-- Erasing the intrinsic length agrees with the list-valued authentication path. -/
+@[simp]
+theorem intrinsicAuthPath_toList (leaf : ℕ → Y) (nodeHash : ℕ → ℕ → Y → Y → Y)
+    (idx z : ℕ) :
+    (intrinsicAuthPath leaf nodeHash idx z).toList = authPath leaf nodeHash idx z := by
+  induction z with
+  | zero => rfl
+  | succ z ih =>
+      rw [intrinsicAuthPath, Vector.toList_push, ih, authPath_succ]
+
+/-- Forgetting the intrinsic path width preserves the complete monadic program, including the
+order of all leaf and node callbacks. This is the bridge that lets distributional and
+query-tracking facts about `authPathM` transfer to `intrinsicAuthPathM` and back inside any
+lawful monad, `OracleComp` included. -/
+theorem intrinsicAuthPathM_toList {m : Type v → Type*} [Monad m] [LawfulMonad m]
+    (leaf : ℕ → m Y) (nodeHash : ℕ → ℕ → Y → Y → m Y) (idx z : ℕ) :
+    (fun path => path.toList) <$> intrinsicAuthPathM leaf nodeHash idx z =
+      authPathM leaf nodeHash idx z := by
+  induction z with
+  | zero => simp [intrinsicAuthPathM, authPathM]
+  | succ z ih =>
+      rw [intrinsicAuthPathM, authPathM, ← ih]
+      simp [Vector.toList_push]
 
 /-- Effectfully recover a root from a leaf value and a leaf-first authentication path. -/
 def climbM {m : Type v → Type*} [Monad m] (nodeHash : ℕ → ℕ → Y → Y → m Y)
@@ -138,6 +180,21 @@ theorem authPathM_natural (F : m →ᵐ n)
   | zero => simp [authPathM]
   | succ z ih =>
       simp [authPathM, F.mmap_bind, ih,
+        merkleRootM_natural F leafₘ hashₘ leafₙ hashₙ hleaf hhash]
+
+/-- Intrinsic authentication-path construction commutes with a monad morphism mapping its
+leaf and node callbacks pointwise. -/
+theorem intrinsicAuthPathM_natural (F : m →ᵐ n)
+    (leafₘ : ℕ → m Y) (hashₘ : ℕ → ℕ → Y → Y → m Y)
+    (leafₙ : ℕ → n Y) (hashₙ : ℕ → ℕ → Y → Y → n Y)
+    (hleaf : ∀ i, F (leafₘ i) = leafₙ i)
+    (hhash : ∀ h i l r, F (hashₘ h i l r) = hashₙ h i l r)
+    (idx z : ℕ) :
+    F (intrinsicAuthPathM leafₘ hashₘ idx z) = intrinsicAuthPathM leafₙ hashₙ idx z := by
+  induction z with
+  | zero => simp [intrinsicAuthPathM, F.mmap_pure]
+  | succ z ih =>
+      simp [intrinsicAuthPathM, F.mmap_bind, ih,
         merkleRootM_natural F leafₘ hashₘ leafₙ hashₙ hleaf hhash]
 
 /-- Root recovery commutes with any monad morphism mapping node hashing pointwise. -/
@@ -233,6 +290,22 @@ theorem simulateQ_merkleRootM (impl : QueryImpl spec Id) (leaf : ℕ → OracleC
   | zero => rfl
   | succ z ih =>
       simp only [merkleRootM, simulateQ_bind, merkleRoot_succ, ih]
+      rfl
+
+/-- Simulating an intrinsic authentication-path program with a deterministic oracle handler
+maps its leaves and node hashes pointwise. -/
+@[simp]
+theorem simulateQ_intrinsicAuthPathM (impl : QueryImpl spec Id)
+    (leaf : ℕ → OracleComp spec Y)
+    (nodeHash : ℕ → ℕ → Y → Y → OracleComp spec Y) (idx z : ℕ) :
+    simulateQ impl (intrinsicAuthPathM leaf nodeHash idx z) =
+      intrinsicAuthPath (fun i => simulateQ impl (leaf i))
+        (fun h i l r => simulateQ impl (nodeHash h i l r)) idx z := by
+  induction z with
+  | zero => rfl
+  | succ z ih =>
+      simp only [intrinsicAuthPathM, simulateQ_bind, simulateQ_pure, intrinsicAuthPath, ih,
+        simulateQ_merkleRootM]
       rfl
 
 /-- A deterministic handler commutes with effectful authentication-path production. -/

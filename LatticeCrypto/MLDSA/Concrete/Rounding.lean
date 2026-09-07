@@ -249,7 +249,10 @@ private theorem lowBitsCoeff_bound (r : Coeff) {r1 gamma2 : ℕ} {r0 : ℤ} (hγ
   set alpha : ℕ := 2 * gamma2
   set t : ℕ := r.val % alpha
   have htlt : t < alpha := Nat.mod_lt _ (by omega)
-  grind
+  split_ifs at hdec with ht hwrap hwrap <;>
+    simp only [Prod.mk.injEq] at hdec <;>
+    obtain ⟨rfl, rfl⟩ := hdec
+  all_goals omega
 
 private theorem centeredRepr_intCast_lowBitsCoeff (r : Coeff) {gamma2 : ℕ}
     (hγ : 0 < gamma2) (hq : 2 * gamma2 < modulus) :

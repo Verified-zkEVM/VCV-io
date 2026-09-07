@@ -32,7 +32,6 @@ from `zmodPolyNormOps`.
 @[expose] public section
 
 
-open scoped BigOperators
 
 namespace LatticeCrypto
 
@@ -402,5 +401,13 @@ end PolyVec
 /-- The canonical backend-generic norm bundle for `ZMod q` coefficients. -/
 def zmodPolyNormOps (q : ℕ) [NeZero q] (backend : PolyBackend (ZMod q)) : NormOps backend :=
   normOpsOfCenteredView backend (zmodCenteredCoeffView q)
+
+/-- The canonical norm bundle specializes definitionally to the vector-backed centered
+infinity norm. Keeping this bridge at the generic layer prevents clients from unfolding an
+entire concrete ring bundle merely to expose the shared coefficient formula. -/
+@[simp]
+theorem zmodPolyNormOps_cInfNorm {q n : ℕ} [NeZero q] (p : Poly (ZMod q) n) :
+    (zmodPolyNormOps q (vectorBackend (ZMod q) n)).cInfNorm p = cInfNorm p :=
+  rfl
 
 end LatticeCrypto

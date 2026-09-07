@@ -122,12 +122,16 @@ example :
   · change shaAdrsKey Adrs.zero = shaAdrsKey (Adrs.zero.setLayerAddress 256)
     apply Vector.toArray_inj.mp
     simpa [shaAdrsKey] using
-      (show Adrs.zero.compressSha2 = (Adrs.zero.setLayerAddress 256).compressSha2 by decide)
+      (show Adrs.zero.compressSha2 = (Adrs.zero.setLayerAddress 256).compressSha2 by
+        norm_num [Adrs.compressSha2, Adrs.toBytesBE, toByte, Adrs.zero, Adrs.setLayerAddress])
   · change shaAdrsKey Adrs.zero = shaAdrsKey (Adrs.zero.setTreeAddress (2 ^ 64))
     apply Vector.toArray_inj.mp
     simpa [shaAdrsKey] using
       (show Adrs.zero.compressSha2 =
-        (Adrs.zero.setTreeAddress (2 ^ 64)).compressSha2 by decide)
+        (Adrs.zero.setTreeAddress (2 ^ 64)).compressSha2 by
+          norm_num [Adrs.compressSha2, Adrs.toBytesBE, toByte, Adrs.zero,
+            Adrs.setTreeAddress]
+          decide)
 
 /-- Every retained SHA-2 address field is observable in the compressed key. -/
 example :
@@ -137,6 +141,40 @@ example :
     Adrs.zero.compressSha2 ≠ (Adrs.zero.setKeyPairAddress 1).compressSha2 ∧
     Adrs.zero.compressSha2 ≠ (Adrs.zero.setChainAddress 1).compressSha2 ∧
     Adrs.zero.compressSha2 ≠ (Adrs.zero.setHashAddress 1).compressSha2 := by
-  decide
+  constructor
+  · intro h
+    exact (by decide : Adrs.zero ≠ Adrs.zero.setLayerAddress 1)
+      (Adrs.compressSha2_injective_of_fits
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) h)
+  constructor
+  · intro h
+    exact (by decide : Adrs.zero ≠ Adrs.zero.setTreeAddress 1)
+      (Adrs.compressSha2_injective_of_fits
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) h)
+  constructor
+  · intro h
+    exact (by decide : Adrs.zero ≠ Adrs.zero.setTypeAndClear .wotsPk)
+      (Adrs.compressSha2_injective_of_fits
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) h)
+  constructor
+  · intro h
+    exact (by decide : Adrs.zero ≠ Adrs.zero.setKeyPairAddress 1)
+      (Adrs.compressSha2_injective_of_fits
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) h)
+  constructor
+  · intro h
+    exact (by decide : Adrs.zero ≠ Adrs.zero.setChainAddress 1)
+      (Adrs.compressSha2_injective_of_fits
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) h)
+  · intro h
+    exact (by decide : Adrs.zero ≠ Adrs.zero.setHashAddress 1)
+      (Adrs.compressSha2_injective_of_fits
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) h)
 
 end SLHDSA.PublicHashTest

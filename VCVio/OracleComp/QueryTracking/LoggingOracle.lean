@@ -37,9 +37,6 @@ open OracleSpec OracleComp
 
 open scoped OracleSpec.PrimitiveQuery
 
--- `QueryLog spec` is the list presentation of the corresponding PolyFun trace.
-attribute [local implicit_reducible] PFunctor.Idx
-
 variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
 
 namespace QueryImpl
@@ -432,6 +429,14 @@ end isQueryBound
 @[reducible] def withQueryLog {α} (mx : OracleComp spec α) :
     OracleComp spec (α × QueryLog spec) :=
   WriterT.run (simulateQ (QueryImpl.ofLift spec (OracleComp spec)).withLogging mx)
+
+/-- Query logging is resource-transparent: it preserves the exact total query-bound predicate. -/
+theorem isTotalQueryBound_withQueryLog_iff {α : Type}
+    (mx : OracleComp spec α) (n : ℕ) :
+    IsTotalQueryBound mx.withQueryLog n ↔ IsTotalQueryBound mx n := by
+  simpa [withQueryLog] using
+    (isTotalQueryBound_run_simulateQ_withLogging_iff
+      (QueryImpl.ofLift spec (OracleComp spec)) mx n)
 
 /-- Erase an intrinsic execution path to its output and query log. -/
 @[reducible] def pathLogResult {i : Type} {oSpec : OracleSpec.{0, 0} i} {β : Type}
