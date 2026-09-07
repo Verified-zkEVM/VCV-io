@@ -42,10 +42,6 @@ open WotsEncoding
 
 variable {p : Params}
 
-/-- `0 < w = 2^lgw`. -/
-theorem Params.w_pos (p : Params) : 0 < p.w := by
-  unfold Params.w; positivity
-
 /-! ### The hash chain (FIPS 205 Algorithm 5) -/
 
 /-- Low-level callback-parametric implementation of the WOTS+ chain. -/
@@ -175,6 +171,16 @@ implementation-independent context. -/
 def wotsMsgDigitsCore (core : CorePrimitives p) (msg : core.Y) : List ℕ :=
   base2b (core.yToBytes msg).toList p.lgw p.len1
 
+/-- The message-digit vector has the intrinsic WOTS `len1` width. -/
+@[simp] theorem wotsMsgDigitsCore_length (core : CorePrimitives p) (msg : core.Y) :
+    (wotsMsgDigitsCore core msg).length = p.len1 :=
+  base2b_length _ _ _
+
+/-- Every message digit is a genuine base-`w` digit (`< w`). -/
+theorem wotsMsgDigitsCore_mem_lt (core : CorePrimitives p) (msg : core.Y) :
+    ∀ d ∈ wotsMsgDigitsCore core msg, d < p.w := fun d hd => by
+  simpa only [Params.w] using base2b_lt (core.yToBytes msg).toList p.lgw p.len1 d hd
+
 /-- The full step-count list: message digits followed by the base-`w` checksum digits; length
 `len`, computed from the implementation-independent context. -/
 def chainLengthsCore (core : CorePrimitives p) (msg : core.Y) : List ℕ :=
@@ -184,26 +190,19 @@ def chainLengthsCore (core : CorePrimitives p) (msg : core.Y) : List ℕ :=
 theorem chainLengthsCore_eq_wotsFullDigits (valid : p.Valid) (core : CorePrimitives p)
     (msg : core.Y) :
     chainLengthsCore core msg =
-      wotsFullDigits (wotsMsgDigitsCore core msg) p.w p.len1 p.len2 := by
-  apply fullDigits_eq_wotsFullDigits valid
-  · exact base2b_length _ _ _
-  · intro d hd
-    simpa only [Params.w] using
-      base2b_lt (core.yToBytes msg).toList p.lgw p.len1 d hd
+      wotsFullDigits (wotsMsgDigitsCore core msg) p.w p.len1 p.len2 :=
+  fullDigits_eq_wotsFullDigits valid _ (wotsMsgDigitsCore_length core msg)
+    (wotsMsgDigitsCore_mem_lt core msg)
 
 /-- The operational chain-length list has the intrinsic WOTS `len` width. -/
 @[simp] theorem chainLengthsCore_length (core : CorePrimitives p) (msg : core.Y) :
-    (chainLengthsCore core msg).length = p.len := by
-  apply fullDigits_length
-  exact base2b_length _ _ _
+    (chainLengthsCore core msg).length = p.len :=
+  fullDigits_length p _ (wotsMsgDigitsCore_length core msg)
 
 /-- Every entry of `chainLengthsCore` is a genuine base-`w` digit (`< w`). -/
 theorem chainLengthsCore_mem_lt (core : CorePrimitives p) (msg : core.Y) :
-    ∀ d ∈ chainLengthsCore core msg, d < p.w := by
-  apply fullDigits_lt
-  intro d hd
-  simpa only [Params.w] using
-    base2b_lt (core.yToBytes msg).toList p.lgw p.len1 d hd
+    ∀ d ∈ chainLengthsCore core msg, d < p.w :=
+  fullDigits_lt p _ (wotsMsgDigitsCore_mem_lt core msg)
 
 /-- The step count of chain `i`: the `i`-th entry of `chainLengthsCore` (`0` past the end). -/
 def chainStepsCore (core : CorePrimitives p) (msg : core.Y) (i : ℕ) : ℕ :=

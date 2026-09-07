@@ -81,6 +81,7 @@ lemma etvDist_le_one (p q : PMF α) : p.etvDist q ≤ 1 := by
     _ = 2 / 2 := by norm_num
     _ = 1 := ENNReal.div_self two_ne_zero ofNat_ne_top
 
+@[aesop (rule_sets := [finiteness]) safe apply]
 lemma etvDist_ne_top (p q : PMF α) : p.etvDist q ≠ ⊤ :=
   ne_top_of_le_ne_top one_ne_top (etvDist_le_one p q)
 
