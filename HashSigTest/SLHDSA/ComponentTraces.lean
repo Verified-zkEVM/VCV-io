@@ -16,16 +16,17 @@ Executable checks for the FORS, XMSS, hypertree, and internal scheme trace theor
 two small validated profiles whose ledgers can be enumerated completely at run time.
 
 Each FORS and XMSS program is run under `QueryImpl.withLogging` of the SHA-2 and SHAKE primitive
-bundles' canonical `PublicHash.impl` handler, at the digest-derived FORS address and at every
-reachable layer position of the profile.  The log is checked to contain only `thash` queries whose
-tweaks lie in `encodeTargets` of the union ledger, to have exactly the length its total query bound
-predicts, and to hit exactly the tweak set the FIPS 205 algorithm visits: all leaves and internal
-nodes for root generation, the sibling subtrees and the signing chain steps for signing, and the
-revealed leaf, its ancestors, and the recovery chain steps for recovery.  Recovered roots are
-compared with generated ones so the logged programs are the real ones.  The internal scheme
-programs are run end to end: key generation logs exactly the top-layer tree, signing and
-verification log one `H_msg` query and otherwise only ledger tweaks within their query bounds, and
-verification accepts.
+bundles' canonical `PublicHash.impl` handler, at the FORS address derived from one fixed digest and
+at the layer positions on that digest's hypertree trajectory.  The log is checked to contain only
+`thash` queries whose tweaks lie in `encodeTargets` of the union ledger, to hit exactly the tweak
+set the FIPS 205 algorithm visits (all leaves and internal nodes for root generation, the sibling
+subtrees and the signing chain steps for signing, and the revealed leaf, its ancestors, and the
+recovery chain steps for recovery), and to have the length the total query bounds predict: exactly
+for the FORS programs and XMSS root generation, and jointly for XMSS signing and recovery, whose
+individual lengths depend on the message.  Recovered roots are compared with generated ones so the
+logged programs are the real ones.  The internal scheme programs are run end to end: key generation
+logs exactly the top-layer tree, signing and verification log one `H_msg` query and otherwise only
+ledger tweaks within their query bounds, and verification accepts.
 -/
 
 public section
