@@ -45,25 +45,19 @@ private lemma authRFLookup_responses_some_preservesInv
     StateT.PreservesInv
       (authRFLookup (TagId := TagId) (Nonce := Nonce) (Digest := Digest) tag nonce)
       (fun st => st.responses t₀ = some d) := by
-  intro st hst z hz
-  unfold authRFLookup at hz
-  simp only [StateT.run_bind, StateT.run_get, pure_bind] at hz
+  unfold authRFLookup
+  refine StateT.preservesInv_get_bind _ fun st hst => ?_
   cases hresp : st.responses (tag, nonce) with
-  | some out =>
-    simp only [hresp, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
-    rcases hz with rfl
-    exact hst
+  | some out => exact StateT.preservesInv_pure _ _
   | none =>
-    simp only [hresp, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self, bind_pure_comp,
-      StateT.run_map, StateT.run_set, support_bind, support_uniformSample, Set.mem_univ,
-      Set.mem_iUnion, support_map, Set.mem_image, support_pure,
-      Set.mem_singleton_iff] at hz
-    obtain ⟨i, -, x, rfl, rfl⟩ := hz
+    refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_monadLift _ _) fun i => ?_
+    refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_set_of _ ?_) fun _ =>
+      StateT.preservesInv_pure _ _
     have hkey : t₀ ≠ (tag, nonce) := by
       rintro rfl
       rw [hresp] at hst
       simp at hst
-    change (st.responses.cacheQuery (tag, nonce) i.1) t₀ = some d
+    change (st.responses.cacheQuery (tag, nonce) i) t₀ = some d
     rw [QueryCache.cacheQuery_of_ne _ _ hkey]
     exact hst
 
@@ -77,22 +71,43 @@ private lemma authRFLookup_mapM_responses_some_preservesInv
       (tags.mapM (fun tag => do
         let dg ← authRFLookup (TagId := TagId) (Nonce := Nonce) (Digest := Digest) tag nonce
         pure (tag, dg)))
+      (fun st => st.responses t₀ = some d) :=
+  StateT.preservesInv_mapM _ (fun tag => StateT.preservesInv_bind _ _ _
+    (authRFLookup_responses_some_preservesInv t₀ d tag nonce) fun _ =>
+      StateT.preservesInv_pure _ _) tags
+
+omit [Fintype TagId] [Nonempty TagId] [NeZero sessionsPerTag] in
+/-- One honest tag query preserves `responses t₀ = some d`: a cache hit rewrites nothing, and a
+miss writes only at the fresh point `(tag, nonce)`, which is not `t₀`. -/
+private lemma authIdealTagQueryImpl_responses_some_preservesInv
+    (t₀ : TagId × Nonce) (d : Digest) :
+    QueryImpl.PreservesInv
+      (authIdealTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
       (fun st => st.responses t₀ = some d) := by
-  induction tags with
-  | nil =>
-    simp only [List.mapM_nil]
-    exact StateT.preservesInv_of_statePreserving _ _ (StateT.statePreserving_pure _)
-  | cons hd tl ih =>
-    rw [List.mapM_cons]
-    refine StateT.preservesInv_bind _ _ _ ?_ ?_
-    · refine StateT.preservesInv_bind _ _ _ ?_ ?_
-      · exact authRFLookup_responses_some_preservesInv t₀ d hd nonce
-      · intro dg
-        exact StateT.preservesInv_of_statePreserving _ _ (StateT.statePreserving_pure _)
-    · intro p
-      refine StateT.preservesInv_bind _ _ _ ih ?_
-      intro ps
-      exact StateT.preservesInv_of_statePreserving _ _ (StateT.statePreserving_pure _)
+  intro tag
+  unfold authIdealTagQueryImpl
+  refine StateT.preservesInv_get_bind _ fun st hst => ?_
+  refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_monadLift _ _) fun nonce => ?_
+  dsimp only
+  cases hresp : st.responses (tag, nonce) with
+  | some out =>
+    dsimp only
+    rw [pure_bind]
+    exact StateT.preservesInv_bind _ _ _ (StateT.preservesInv_set_of _ hst) fun _ =>
+      StateT.preservesInv_pure _ _
+  | none =>
+    dsimp only
+    refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_monadLift _ _) fun out => ?_
+    rw [pure_bind]
+    refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_set_of _ ?_) fun _ =>
+      StateT.preservesInv_pure _ _
+    have hkey : t₀ ≠ (tag, nonce) := by
+      rintro rfl
+      rw [hresp] at hst
+      simp at hst
+    change (st.responses.cacheQuery (tag, nonce) out) t₀ = some d
+    rw [QueryCache.cacheQuery_of_ne _ _ hkey]
+    exact hst
 
 omit [Nonempty TagId] [NeZero sessionsPerTag] in
 /-- The lazy random-oracle cache threaded by `authRFQueryImpl` only grows: once a point `t₀`
@@ -102,51 +117,13 @@ private lemma authRFQueryImpl_responses_some_preservesInv
     QueryImpl.PreservesInv
       (authRFQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
       (fun st => st.responses t₀ = some d) := by
-  intro t st hst z hz
-  cases t with
-  | inl tag =>
-    have htag : (authRFQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (Sum.inl tag)).run st =
-        (authIdealTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest) tag).run st :=
-      rfl
-    rw [htag] at hz
-    unfold authIdealTagQueryImpl at hz
-    simp only [bind_pure_comp, pure_bind, StateT.run_bind, StateT.run_get, StateT.run_monadLift,
-      monadLift_eq_self, bind_map_left] at hz
-    obtain ⟨nonce, -, hz⟩ := (mem_support_bind_iff _ _ _).1 hz
-    cases hresp : st.responses (tag, nonce) with
-    | none =>
-      simp only [hresp, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self, bind_pure_comp,
-        StateT.run_map, StateT.run_set, map_pure, Functor.map_map] at hz
-      rw [map_eq_bind_pure_comp] at hz
-      obtain ⟨auth, -, hz⟩ := (mem_support_bind_iff _ _ _).1 hz
-      simp only [Function.comp_apply] at hz
-      subst hz
-      have hkey : t₀ ≠ (tag, nonce) := by
-        rintro rfl
-        rw [hresp] at hst
-        simp at hst
-      change (st.responses.cacheQuery (tag, nonce) auth) t₀ = some d
-      rw [QueryCache.cacheQuery_of_ne _ _ hkey]
-      exact hst
-    | some out =>
-      simp only [hresp, StateT.run_map, StateT.run_set, map_pure] at hz
-      rcases hz with rfl
-      exact hst
-  | inr transcript =>
-    have hrd : (authRFQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-        (Sum.inr transcript)).run st =
-        (authRFReaderQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest)
-          transcript).run st :=
-      rfl
-    rw [hrd] at hz
-    unfold authRFReaderQueryImpl at hz
-    simp only [bind_pure_comp, StateT.run_bind] at hz
-    obtain ⟨p, hp, hz⟩ := (mem_support_bind_iff _ _ _).1 hz
-    simp only [StateT.run_get, pure_bind, StateT.run_map, StateT.run_set, map_pure] at hz
-    obtain ⟨w, -, rfl⟩ := hz
-    exact authRFLookup_mapM_responses_some_preservesInv t₀ d transcript.nonce
-      (Finset.univ : Finset TagId).toList st hst p hp
+  refine (authIdealTagQueryImpl_responses_some_preservesInv t₀ d).add fun transcript => ?_
+  unfold authRFReaderQueryImpl
+  refine StateT.preservesInv_bind _ _ _
+    (authRFLookup_mapM_responses_some_preservesInv t₀ d transcript.nonce _) fun pairs => ?_
+  refine StateT.preservesInv_get_bind _ fun st hst => ?_
+  exact StateT.preservesInv_bind _ _ _ (StateT.preservesInv_set_of _ hst) fun _ =>
+    StateT.preservesInv_pure _ _
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [NeZero sessionsPerTag] in
@@ -157,21 +134,15 @@ private lemma authRFLookup_responses_none_preservesInv
     StateT.PreservesInv
       (authRFLookup (TagId := TagId) (Nonce := Nonce) (Digest := Digest) tag nonce)
       (fun st => st.responses t₀ = none) := by
-  intro st hst z hz
-  unfold authRFLookup at hz
-  simp only [StateT.run_bind, StateT.run_get, pure_bind] at hz
+  unfold authRFLookup
+  refine StateT.preservesInv_get_bind _ fun st hst => ?_
   cases hresp : st.responses (tag, nonce) with
-  | some out =>
-    simp only [hresp, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
-    rcases hz with rfl
-    exact hst
+  | some out => exact StateT.preservesInv_pure _ _
   | none =>
-    simp only [hresp, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self, bind_pure_comp,
-      StateT.run_map, StateT.run_set, support_bind, support_uniformSample, Set.mem_univ,
-      Set.mem_iUnion, support_map, Set.mem_image, support_pure,
-      Set.mem_singleton_iff] at hz
-    obtain ⟨i, -, x, rfl, rfl⟩ := hz
-    change (st.responses.cacheQuery (tag, nonce) i.1) t₀ = none
+    refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_monadLift _ _) fun i => ?_
+    refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_set_of _ ?_) fun _ =>
+      StateT.preservesInv_pure _ _
+    change (st.responses.cacheQuery (tag, nonce) i) t₀ = none
     rw [QueryCache.cacheQuery_of_ne _ _ (fun h => hne h.symm)]
     exact hst
 
@@ -185,24 +156,10 @@ private lemma authRFLookup_mapM_responses_none_preservesInv
       (tags.mapM (fun tag => do
         let dg ← authRFLookup (TagId := TagId) (Nonce := Nonce) (Digest := Digest) tag nonce
         pure (tag, dg)))
-      (fun st => st.responses t₀ = none) := by
-  induction tags with
-  | nil =>
-    simp only [List.mapM_nil]
-    exact StateT.preservesInv_of_statePreserving _ _ (StateT.statePreserving_pure _)
-  | cons hd tl ih =>
-    rw [List.mapM_cons]
-    refine StateT.preservesInv_bind _ _ _ ?_ ?_
-    · refine StateT.preservesInv_bind _ _ _ ?_ ?_
-      · refine authRFLookup_responses_none_preservesInv t₀ hd nonce ?_
-        intro hcontra
-        exact hne (congrArg Prod.snd hcontra)
-      · intro dg
-        exact StateT.preservesInv_of_statePreserving _ _ (StateT.statePreserving_pure _)
-    · intro p
-      refine StateT.preservesInv_bind _ _ _ ih ?_
-      intro ps
-      exact StateT.preservesInv_of_statePreserving _ _ (StateT.statePreserving_pure _)
+      (fun st => st.responses t₀ = none) :=
+  StateT.preservesInv_mapM _ (fun tag => StateT.preservesInv_bind _ _ _
+    (authRFLookup_responses_none_preservesInv t₀ tag nonce fun h => hne (congrArg Prod.snd h))
+    fun _ => StateT.preservesInv_pure _ _) tags
 
 omit [Fintype TagId] [Nonempty TagId] [SampleableType Nonce] [DecidableEq Digest]
   [NeZero sessionsPerTag] in

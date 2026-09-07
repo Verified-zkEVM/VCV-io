@@ -28,6 +28,7 @@ section or the pinned source tree.
 | Document | Status | Question it answers |
 |---|---|---|
 | [`upstream-alignment.md`](upstream-alignment.md) | Living ledger, re-run at each pin bump | Which of VCVio's general-purpose machinery and tooling does Lean core, Mathlib, Batteries, cslib, or PolyFun already own, and what is the verdict (adopt / keep / upstream / track) for each, with the evidence? Includes a broad reading of the adjacent Mathlib areas and the idioms they suggest. |
+| [`internal-duplication.md`](internal-duplication.md) | Living record | Where does VCVio say the same thing twice *inside* the repository (cost layers, invariant predicates, the two Merkle engines, `OracleSpec` operations versus PolyFun's), which spelling is canonical, and what blocks folding the rest? |
 
 ## Keeping these honest
 

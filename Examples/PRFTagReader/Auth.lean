@@ -395,13 +395,10 @@ theorem authIdealExp_eq_zero
     exact hst
   have himpl :
       QueryImpl.PreservesInv (authIdealQueryImpl (TagId := TagId))
-        (fun st => ForgedInv st ∧ CacheInv st) := by
-    intro t st hst z hz
-    cases t with
-    | inl tag =>
-        exact (QueryImpl.PreservesInv.and htagForged htagCached) tag st hst z hz
-    | inr transcript =>
-        exact ⟨hreaderForged transcript st hst z hz, hreaderCached transcript st hst.2 z hz⟩
+        (fun st => ForgedInv st ∧ CacheInv st) :=
+    (htagForged.and htagCached).add (by
+      intro transcript st hst z hz
+      exact ⟨hreaderForged transcript st hst z hz, hreaderCached transcript st hst.2 z hz⟩)
   have hfinal :
       ∀ z ∈ support ((simulateQ (authIdealQueryImpl (TagId := TagId))
             adversary).run AuthIdealState.init),
