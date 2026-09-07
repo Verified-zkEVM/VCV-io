@@ -340,6 +340,8 @@ jobs:
         run: lake exe slhdsa_target_ledger_tests
       - name: Run SLH-DSA encoded target-ledger tests
         run: lake exe slhdsa_encoded_ledger_tests
+      - name: Run SLH-DSA WOTS+ trace-target tests
+        run: lake exe slhdsa_trace_target_tests
       # - name: Run ML-KEM tests
       #   run: |
       #     .lake/build/bin/mlkem_test
