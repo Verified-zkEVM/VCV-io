@@ -26,9 +26,9 @@ unforgeability theorem of any kind exists on `main` today.
 | Security lane (open PRs) | `Security/TargetCounts.lean`, `Security/ReachableTargets.lean` (#630); `Security/EncodedTargets.lean` (#631) | `slhdsa_target_ledger_tests`, `slhdsa_encoded_ledger_tests` |
 | Generic hash games consumed | `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/*.lean`, `KeyedHash/ITSR.lean`, `VCVio/CryptoFoundations/SignatureAlg.lean` | `VCVioTest/SMDT*.lean` |
 
-Every SLH-DSA test executable runs in `.github/workflows/build.yml`; `linting.yml` style-lints `HashSig`
-and the listed test modules; `scripts/check-expose-boundary.sh` caps the number of broadly exposed files per
-library (new modules use a plain `public section` with per-declaration `@[expose]`);
+Every SLH-DSA test executable runs in `.github/workflows/build.yml`; `linting.yml` style-lints
+`HashSig` and the listed test modules; `scripts/check-expose-boundary.sh` caps the number of
+broadly exposed files per library (new modules use a plain `public section` with per-declaration `@[expose]`);
 `lake exe axiomsweep --check` guards the axiom and `sorry` footprint against
 `scripts/axiom_baseline.json`.
 
@@ -62,8 +62,9 @@ Verified against `origin/main` at `4c48fed3` (2026-09-06).
 - **General formalization gate (G1–G5): met.** Arbitrary validated `d`, intrinsic shapes, complete
   digest and layer recurrence, composing oracle-parametric and deterministic interpretations,
   general-`d` perfect completeness (`GeneralScheme.verifyInternal_signInternal`), explicit
-  depth-one specialization. The random-oracle `PerfectlyComplete` packaging exists only for `d = 1`
-  (`SLHDSA.slhdsaAlg_perfectlyComplete` in `RandomOracle.lean`); no general-`d` `SignatureAlg` packaging exists.
+  depth-one specialization. The random-oracle `PerfectlyComplete` packaging exists only for
+  `d = 1` (`SLHDSA.slhdsaAlg_perfectlyComplete` in `RandomOracle.lean`); no general-`d`
+  `SignatureAlg` packaging exists.
 - **FIPS conformance gate (G6–G10): not met.** Twelve sets instantiated, formulas executable,
   codecs strict, interfaces match Algorithms 18–25, and 128f runs end to end through the
   specification path. Missing: the pinned ACVP corpus is not executed anywhere, no
@@ -161,9 +162,9 @@ longer true on `main`:
 - "Planning baseline" and the "reduced-profile boundaries" list (`h = d·hp` unenforced, digest
   split without the tree index, one-XMSS `HtSigCore`, 3,856-byte decoder, empty-context wrapper):
   every bullet is resolved by G1–G8.
-- "The Merkle stack runs from #574 through #591 … not a prerequisite": the Merkle PRs in that range
-  (#574, #575, #577–#579, #586–#591) all merged 2026-09-01; the current Merkle work is #618 and
-  #621.
+- "The Merkle stack runs from #574 through #591 … not a prerequisite": the Merkle PRs in that
+  range (#574, #575, #577–#579, #586–#591) all merged 2026-09-01; the current Merkle work is #618
+  and #621.
 - The pull-request stack table names no PR numbers. For the record: G5–G8 landed through #617,
   #619, #626, #611 after the original stacked PRs #604–#607 were closed, and #627 and #628
   carried the FORS and hypertree conformance ports in place of #608 and #609.
