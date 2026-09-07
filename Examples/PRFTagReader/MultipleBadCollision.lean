@@ -7,6 +7,7 @@ Authors: Oleksandr Vovkotrub
 module
 
 public import Examples.PRFTagReader.DirectCoupling.Compose
+public import Examples.PRFTagReader.BadEvent
 public import Examples.PRFTagReader.MultipleToHybrid.EagerSetup
 
 /-!

@@ -6,7 +6,7 @@ Authors: Oleksandr Vovkotrub
 
 module
 
-public import Examples.PRFTagReader.Collision
+public import Examples.PRFTagReader.Defs
 
 /-!
 # PRF Tag/Reader Protocol — Bad-Event Bound

@@ -6,7 +6,8 @@ Authors: Oleksandr Vovkotrub
 
 module
 
-public import Examples.PRFTagReader.Table
+public import Examples.PRFTagReader.PRFReductions.IdealHandlers
+import VCVio.ProgramLogic.Relational.SimulateQ
 
 /-!
 # PRF Tag/Reader Protocol — Instrumented multiple-session handler

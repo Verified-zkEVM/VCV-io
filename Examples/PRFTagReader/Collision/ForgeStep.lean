@@ -6,7 +6,7 @@ Authors: Oleksandr Vovkotrub
 
 module
 
-public import Examples.PRFTagReader.Auth
+public import Examples.PRFTagReader.Defs
 
 /-!
 # PRF Tag/Reader Protocol — Collision Bound, Per-Step Forge Infrastructure

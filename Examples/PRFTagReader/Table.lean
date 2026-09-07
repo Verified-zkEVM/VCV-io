@@ -6,7 +6,8 @@ Authors: Oleksandr Vovkotrub
 
 module
 
-public import Examples.PRFTagReader.PRFReductions
+public import Examples.PRFTagReader.PRFReductions.IdealHandlers
+public import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
 
 /-!
 # PRF Tag/Reader Protocol — Composed-Handler Eager-Table Equivalence

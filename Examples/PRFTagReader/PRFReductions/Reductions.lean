@@ -6,9 +6,7 @@ Authors: Oleksandr Vovkotrub
 
 module
 
-public import Examples.PRFTagReader
-public import VCVio.OracleComp.QueryTracking.RandomOracle.EagerTable
-public import VCVio.ProgramLogic.Relational.SimulateQ
+public import Examples.PRFTagReader.Defs
 
 /-!
 # PRF Tag/Reader Protocol — Reductions and Bridge Lemmas

@@ -7,6 +7,7 @@ Authors: Oleksandr Vovkotrub
 module
 
 public import Examples.PRFTagReader.Collision.ForgeStep
+public import Examples.PRFTagReader.Auth
 
 /-!
 # PRF Tag/Reader Protocol — Collision Bound
