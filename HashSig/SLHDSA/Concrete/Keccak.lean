@@ -8,13 +8,12 @@ module
 public import HashSig.SLHDSA.Params
 
 /-!
-# Pure-Lean Keccak-f[1600] / keccak256 (and SHA3-256)
+# Pure-Lean Keccak-f[1600], SHAKE, Keccak-256, and SHA-3
 
-An executable, FFI-free Keccak-f[1600] permutation (FIPS 202) and the sponge for the EVM
-`keccak256` (pad byte `0x01`) and FIPS 202 `SHA3-256` (pad byte `0x06`). `keccak256` is the
-hash used by the C13 SLH-DSA variant (`keccak256` substituted for SHAKE-256, truncated to
-`n = 16` bytes); `SHA3-256` is provided for completeness. The permutation is adapted from the
-`sphincsminus` reference; absorb/squeeze are total `for`-loops here.
+An executable, FFI-free Keccak-f[1600] permutation (FIPS 202) and distinct sponge domains for
+FIPS SHAKE (`0x1f`), FIPS SHA-3 (`0x06`), and the EVM's original Keccak (`0x01`) domains.
+SHAKE128 and SHAKE256 support arbitrary whole-byte output lengths by permuting between squeeze
+blocks. `keccak256` remains the hash used by the separate C13 SLH-DSA variant.
 
 ## References
 
@@ -81,17 +80,89 @@ def absorb (input : ByteArray) (rate : ℕ) (padByte : UInt8) : Array UInt64 := 
     s := f1600 s
   return s
 
-/-- Squeeze `outLen ≤ rate` bytes from the state (one block; sufficient for 32-byte digests). -/
-def squeeze (s : Array UInt64) (outLen : ℕ) : ByteArray := Id.run do
-  let mut out := ByteArray.empty
-  for i in [0:outLen] do
-    out := out.push (((s[i / 8]! >>> ((i % 8) * 8).toUInt64) &&& 0xFF).toUInt8)
-  return out
+/-- Squeeze the first `outLen` bytes from one state block. Callers keep `outLen ≤ rate`. -/
+def squeeze (s : Array UInt64) (outLen : ℕ) : ByteArray :=
+  ByteArray.mk (Array.ofFn fun i : Fin outLen =>
+    ((s[i.val / 8]! >>> ((i.val % 8) * 8).toUInt64) &&& 0xFF).toUInt8)
+
+@[simp] theorem squeeze_size (s : Array UInt64) (outLen : ℕ) :
+    (squeeze s outLen).size = outLen := by
+  change (Array.ofFn fun i : Fin outLen =>
+    ((s[i.val / 8]! >>> ((i.val % 8) * 8).toUInt64) &&& 0xFF).toUInt8).size = outLen
+  exact Array.size_ofFn
+
+/-- Emit `blocks` complete XOF blocks and return the state for the following block. -/
+def squeezeFullBlocks (initial : Array UInt64) (rate : ℕ) :
+    ℕ → Array UInt64 × ByteArray
+  | 0 => (initial, ByteArray.empty)
+  | blocks + 1 =>
+      let prior := squeezeFullBlocks initial rate blocks
+      (f1600 prior.1, prior.2 ++ squeeze prior.1 rate)
+
+@[simp] theorem squeezeFullBlocks_size (initial : Array UInt64) (rate blocks : ℕ) :
+    (squeezeFullBlocks initial rate blocks).2.size = blocks * rate := by
+  induction blocks with
+  | zero => simp [squeezeFullBlocks]
+  | succ blocks ih => simp [squeezeFullBlocks, ih, Nat.succ_mul]
+
+/-- Multi-block XOF squeeze. Complete rate blocks are followed by the exact residual prefix.
+A zero rate is outside the sponge domain and returns the empty byte array. -/
+def squeezeXof (initial : Array UInt64) (rate outLen : ℕ) : ByteArray :=
+  if rate = 0 then
+    ByteArray.empty
+  else
+    let full := squeezeFullBlocks initial rate (outLen / rate)
+    full.2 ++ squeeze full.1 (outLen % rate)
+
+@[simp] theorem squeezeXof_size (initial : Array UInt64) (rate outLen : ℕ)
+    (hrate : 0 < rate) :
+    (squeezeXof initial rate outLen).size = outLen := by
+  simp only [squeezeXof, if_neg (Nat.ne_of_gt hrate), ByteArray.size_append,
+    squeezeFullBlocks_size, squeeze_size]
+  simpa [Nat.mul_comm] using Nat.div_add_mod outLen rate
 
 /-- EVM `keccak256` (rate 136, pad `0x01`), 32-byte digest. -/
 def keccak256 (input : ByteArray) : ByteArray := squeeze (absorb input 136 0x01) 32
 
 /-- FIPS 202 `SHA3-256` (rate 136, pad `0x06`), 32-byte digest. -/
 def sha3_256 (input : ByteArray) : ByteArray := squeeze (absorb input 136 0x06) 32
+
+/-- FIPS 202 `SHA3-224` (rate 144, pad `0x06`), 28-byte digest. -/
+def sha3_224 (input : ByteArray) : ByteArray := squeeze (absorb input 144 0x06) 28
+
+/-- FIPS 202 `SHA3-384` (rate 104, pad `0x06`), 48-byte digest. -/
+def sha3_384 (input : ByteArray) : ByteArray := squeeze (absorb input 104 0x06) 48
+
+/-- FIPS 202 `SHA3-512` (rate 72, pad `0x06`), 64-byte digest. -/
+def sha3_512 (input : ByteArray) : ByteArray := squeeze (absorb input 72 0x06) 64
+
+/-- FIPS 202 SHAKE128 with a whole-byte output length. -/
+def shake128 (input : ByteArray) (outLen : ℕ) : ByteArray :=
+  squeezeXof (absorb input 168 0x1f) 168 outLen
+
+/-- FIPS 202 SHAKE256 with a whole-byte output length. The `0x1f` delimited suffix is distinct
+from both SHA3's `0x06` and Ethereum Keccak's `0x01`. -/
+def shake256 (input : ByteArray) (outLen : ℕ) : ByteArray :=
+  squeezeXof (absorb input 136 0x1f) 136 outLen
+
+@[simp] theorem shake128_size (input : ByteArray) (outLen : ℕ) :
+    (shake128 input outLen).size = outLen := by
+  simp [shake128]
+
+@[simp] theorem shake256_size (input : ByteArray) (outLen : ℕ) :
+    (shake256 input outLen).size = outLen := by
+  simp [shake256]
+
+@[simp] theorem sha3_224_size (input : ByteArray) : (sha3_224 input).size = 28 := by
+  simp [sha3_224]
+
+@[simp] theorem sha3_256_size (input : ByteArray) : (sha3_256 input).size = 32 := by
+  simp [sha3_256]
+
+@[simp] theorem sha3_384_size (input : ByteArray) : (sha3_384 input).size = 48 := by
+  simp [sha3_384]
+
+@[simp] theorem sha3_512_size (input : ByteArray) : (sha3_512 input).size = 64 := by
+  simp [sha3_512]
 
 end SLHDSA.Concrete.Keccak

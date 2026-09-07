@@ -24,7 +24,6 @@ invocation; the expected-value versions live in
 universe u v
 
 open OracleComp OracleSpec
-open scoped BigOperators
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 
@@ -124,9 +123,6 @@ lemma signAttempt_run_withUnitCost_eq
   exact signAttempt_run_withAddCost_eq
       (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
       (costFn := fun _ ↦ (1 : ℕ))
-
-@[deprecated (since := "2026-06-25")]
-alias signAttempt_run_formula_withUnitCost := signAttempt_run_withUnitCost_eq
 
 /-- A single signing attempt has query cost determined by its output: the returned commitment
 `w'` is exactly the random-oracle query point. -/

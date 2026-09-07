@@ -6,8 +6,7 @@ Authors: Nicolas Consigny
 
 module
 public import HashSig.SLHDSA.Oracle
-public import HashSig.SLHDSA.Encoding
-public import HashSig.SLHDSA.WotsChecksum
+public import HashSig.SLHDSA.WotsEncoding
 public import VCVio.OracleComp.HasQuery.Morphism
 public import VCVio.OracleComp.QueryTracking.QueryBound
 
@@ -39,6 +38,7 @@ namespace SLHDSA
 
 open OracleComp
 open WotsChecksum
+open WotsEncoding
 
 variable {p : Params}
 
@@ -134,6 +134,40 @@ def wotsChainAdrs (adrs : Adrs) (i : ℕ) : Adrs :=
 def wotsPkAdrs (adrs : Adrs) : Adrs :=
   (adrs.setTypeAndClear .wotsPk).setKeyPairAddress adrs.getKeyPairAddress
 
+/-- A canonical narrow base address yields a canonical WOTS secret-key address whenever the
+chain index fits its four-byte field. -/
+theorem wotsSkAdrs_isCanonical (adrs : Adrs) (i : ℕ)
+    (hbase : adrs.isCanonical = true) (hi : Adrs.Fits 4 i = true) :
+    (wotsSkAdrs adrs i).isCanonical = true := by
+  rcases Adrs.fits_of_isCanonical adrs hbase with
+    ⟨hlayer, htree, _htype, hword1, _hword2, _hword3⟩
+  simp [wotsSkAdrs, Adrs.setTypeAndClear, Adrs.setKeyPairAddress,
+    Adrs.setChainAddress, Adrs.getKeyPairAddress, Adrs.isCanonical,
+    hlayer, htree, hword1, hi]
+  norm_num [Adrs.Fits, AddrType.toCode]
+
+/-- Every WOTS hash-step address is canonical when its chain and hash indices fit their
+four-byte fields. -/
+theorem wotsChainHashAdrs_isCanonical (adrs : Adrs) (i j : ℕ)
+    (hbase : adrs.isCanonical = true) (hi : Adrs.Fits 4 i = true)
+    (hj : Adrs.Fits 4 j = true) :
+    ((wotsChainAdrs adrs i).setHashAddress j).isCanonical = true := by
+  rcases Adrs.fits_of_isCanonical adrs hbase with
+    ⟨hlayer, htree, _htype, hword1, _hword2, _hword3⟩
+  simp [wotsChainAdrs, Adrs.setTypeAndClear, Adrs.setKeyPairAddress,
+    Adrs.setChainAddress, Adrs.setHashAddress, Adrs.getKeyPairAddress,
+    Adrs.isCanonical, hlayer, htree, hword1, hi, hj]
+  norm_num [Adrs.Fits, AddrType.toCode]
+
+/-- WOTS public-key compression preserves canonicality of a canonical base address. -/
+theorem wotsPkAdrs_isCanonical (adrs : Adrs) (hbase : adrs.isCanonical = true) :
+    (wotsPkAdrs adrs).isCanonical = true := by
+  rcases Adrs.fits_of_isCanonical adrs hbase with
+    ⟨hlayer, htree, _htype, hword1, _hword2, _hword3⟩
+  simp [wotsPkAdrs, Adrs.setTypeAndClear, Adrs.setKeyPairAddress,
+    Adrs.getKeyPairAddress, Adrs.isCanonical, hlayer, htree, hword1]
+  norm_num [Adrs.Fits, AddrType.toCode]
+
 /-! ### Message-to-digit derivation (FIPS 205 §5.2–5.4) -/
 
 /-- The `len1` base-`w` message digits of the node being signed, computed from the
@@ -144,17 +178,32 @@ def wotsMsgDigitsCore (core : CorePrimitives p) (msg : core.Y) : List ℕ :=
 /-- The full step-count list: message digits followed by the base-`w` checksum digits; length
 `len`, computed from the implementation-independent context. -/
 def chainLengthsCore (core : CorePrimitives p) (msg : core.Y) : List ℕ :=
-  wotsFullDigits (wotsMsgDigitsCore core msg) p.w p.len1 p.len2
+  WotsEncoding.fullDigits p (wotsMsgDigitsCore core msg)
+
+/-- The operational FIPS byte pipeline is exactly the mathematical checksum view. -/
+theorem chainLengthsCore_eq_wotsFullDigits (valid : p.Valid) (core : CorePrimitives p)
+    (msg : core.Y) :
+    chainLengthsCore core msg =
+      wotsFullDigits (wotsMsgDigitsCore core msg) p.w p.len1 p.len2 := by
+  apply fullDigits_eq_wotsFullDigits valid
+  · exact base2b_length _ _ _
+  · intro d hd
+    simpa only [Params.w] using
+      base2b_lt (core.yToBytes msg).toList p.lgw p.len1 d hd
+
+/-- The operational chain-length list has the intrinsic WOTS `len` width. -/
+@[simp] theorem chainLengthsCore_length (core : CorePrimitives p) (msg : core.Y) :
+    (chainLengthsCore core msg).length = p.len := by
+  apply fullDigits_length
+  exact base2b_length _ _ _
 
 /-- Every entry of `chainLengthsCore` is a genuine base-`w` digit (`< w`). -/
 theorem chainLengthsCore_mem_lt (core : CorePrimitives p) (msg : core.Y) :
     ∀ d ∈ chainLengthsCore core msg, d < p.w := by
+  apply fullDigits_lt
   intro d hd
-  unfold chainLengthsCore wotsFullDigits at hd
-  rcases List.mem_append.mp hd with h | h
-  · have hb := base2b_lt (core.yToBytes msg).toList p.lgw p.len1 d h
-    rwa [Params.w]
-  · exact digitsOfBaseW_lt _ p.w p.len2 (Params.w_pos p) d h
+  simpa only [Params.w] using
+    base2b_lt (core.yToBytes msg).toList p.lgw p.len1 d hd
 
 /-- The step count of chain `i`: the `i`-th entry of `chainLengthsCore` (`0` past the end). -/
 def chainStepsCore (core : CorePrimitives p) (msg : core.Y) (i : ℕ) : ℕ :=

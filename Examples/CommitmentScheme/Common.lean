@@ -58,8 +58,6 @@ variable {M S C : Type}
   [Fintype M] [Fintype S] [Fintype C]
   [Inhabited M] [Inhabited S] [Inhabited C]
 
-instance : DecidableEq (M × S) := instDecidableEqProd
-
 noncomputable instance : IsUniformSpec (CMOracle M S C) :=
   IsUniformSpec.ofFintypeInhabited _
 

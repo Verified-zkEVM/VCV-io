@@ -12,37 +12,26 @@ public import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 /-!
 # Inductive Merkle Trees
 
-This file implements Merkle Trees. In contrast to the other Merkle tree implementation in
-`VCVio.CryptoFoundations.MerkleTree`, this one is defined inductively.
+This file defines the core raw-leaf Merkle tree over finite ordered binary-tree skeletons.
+Every internal node has two children, but the tree need not be perfect or balanced. The same
+type `α` represents leaf labels and internal digests, and only internal nodes query the binary
+oracle `spec α`; callers that hash structured leaf payloads do so before entering this layer.
 
-## Implementation Notes
+The API builds a full labeled tree, generates the intrinsically sized authentication path for a
+leaf index, recomputes a putative root, and verifies it against a claimed root. Completeness,
+binding, uniqueness, query bounds, transcript extraction, batch openings, and addressed hashing
+are developed in the sibling `MerkleTree` modules.
 
-This works with trees that are indexed inductive binary trees,
-(i.e. indexed in that their definitions and methods carry parameters regarding their structure)
-as defined in `ToMathlib.Data.IndexedBinaryTree`.
+## Representation
 
-* We found that the inductive definition seems likely to be convenient for a few reasons:
-  * It allows us to handle non-perfect trees.
-  * It can allow us to use trees of arbitrary structure in the extractor.
-* I considered the indexed type useful because the completeness theorem and extractibility theorems
-  take indices or sets of indices as parameters,
-  and because we are working with trees of arbitrary structure,
-  this lets us avoid having to check that these indices are valid.
+Trees use the indexed inductive representation from `ToMathlib.Data.IndexedBinaryTree`. The
+skeleton appears in the types of leaf data, node data, leaf indices, and authentication paths.
+Consequently, an index is valid for its tree by construction, and a proof contains exactly one
+sibling digest per ancestor of the selected leaf.
 
-## Plan/TODOs
-
-- [x] Basic Merkle tree API
-  - [x] `buildMerkleTree`
-  - [x] `generateProof`
-  - [x] `getPutativeRoot`
-  - [x] `verifyProof`
-- [x] Completeness theorem
-- [x] Collision Lemma (See SNARGs book 18.3)
-  - (this is really not a lemma about oracles, so it could go with the binary tree API)
-- [ ] Extractibility (See SNARGs book 18.5)
-- [x] Multi-leaf proofs (see `VCVio.CryptoFoundations.MerkleTree.Inductive.Batch.Defs`)
-- [ ] Arbirary arity trees
-- [ ] Multi-instance
+This core deliberately models a homogeneous binary hash with already-labeled leaves and one root.
+Leaf encodings and leaf hashing, non-binary hash operations, commitment caps, and logical data
+layouts require separate abstractions rather than additional cases in this skeleton.
 
 -/
 

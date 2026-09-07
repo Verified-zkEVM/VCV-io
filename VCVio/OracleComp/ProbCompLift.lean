@@ -8,6 +8,7 @@ module
 public import VCVio.OracleComp.ProbComp
 public import VCVio.EvalDist.Defs.Semantics
 public import PolyFun.Control.Monad.Hom
+import VCVio.EvalDist.Monad.Map
 
 /-!
 # Bundled Lifts from `ProbComp`
@@ -86,5 +87,16 @@ def liftProbComp (runtime : ProbCompRuntime m) : ProbComp →ᵐ m :=
 noncomputable def probComp : ProbCompRuntime ProbComp where
   toSPMFSemantics := SPMFSemantics.ofMonadLift ProbComp
   toProbCompLift := ProbCompLift.id
+
+/-- The canonical `ProbComp` runtime satisfies the pure-return factoring law: `evalSPMF`
+commutes with binding a pure function. Security decompositions that couple several
+experiments through one joint execution (e.g. the exact SUF-CMA partition in
+`VCVio.CryptoFoundations.SignatureAlg`) take exactly this equation as their pull-through
+hypothesis, so consumers instantiating them at `ProbCompRuntime.probComp` can use this
+lemma directly. -/
+lemma probComp_evalSPMF_bind_pure {α β : Type} (f : α → β) (mx : ProbComp α) :
+    probComp.evalSPMF (mx >>= fun x => pure (f x)) = f <$> probComp.evalSPMF mx := by
+  change _root_.evalSPMF (mx >>= fun x => pure (f x)) = f <$> _root_.evalSPMF mx
+  rw [bind_pure_comp, evalSPMF_map]
 
 end ProbCompRuntime

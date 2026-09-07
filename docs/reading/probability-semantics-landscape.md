@@ -1,14 +1,17 @@
 # Probability Semantics for Computations: Landscape and Design Options
 
-> Status: living evidence survey. The accepted implementation baseline is
-> `denotational-probability-semantics.md`, which lands with the measure-semantics work.
+> Status: historical evidence survey and decision record. For current implementation guidance,
+> use [`denotational-probability-semantics.md`](denotational-probability-semantics.md) and
+> [`docs/agents/probability.md`](../agents/probability.md).
 >
-> Snapshot date: 2026-08-21. Independently re-verified against source on disk and
-> against the live repositories on 2026-08-21; see [§19](#19-verification-log).
+> Original snapshot: 2026-08-21. Section 19 preserves that audit in its original time context.
+> Section 20 records the focused 2026-08-30 recheck against current VCVio `main`, VCVio's pinned
+> PolyFun checkout, and PolyFun's canonical `main`. Unless §20 explicitly supersedes a volatile
+> fact, read it as a claim about the original snapshot rather than current upstream state.
 >
 > The original repository snapshot used Mathlib/PolyFun `v4.32.2`; implementation findings were
-> rechecked on the current Mathlib `v4.33.0` and PolyFun `v4.33.2` pins. Open-PR descriptions and
-> upstream-`master` observations are explicitly identified below.
+> rechecked on the then-current Mathlib `v4.33.0` and PolyFun `v4.33.2` pins. Open-PR descriptions
+> and upstream-`master` observations are explicitly identified below.
 >
 > **Evidence discipline.** Every claim that upstream already provides something must
 > be checked mechanically — reading the declaration in the pinned tree, or `exact?`
@@ -18,8 +21,8 @@
 
 ## Purpose
 
-VCVio currently gives probabilistic meaning to computations through `SPMF`, a small
-`OptionT PMF` layer. That design has been unusually effective for cryptographic proofs:
+At the original snapshot, VCVio gave probabilistic meaning to computations through `SPMF`, a
+small `OptionT PMF` layer. That design had been unusually effective for cryptographic proofs:
 it supports ordinary Lean monad notation, point probabilities, finite sums, failure,
 couplings, statistical distance, and a fairly strong program logic. It is also sitting
 on top of an upstream abstraction, `PMF`, that Mathlib is actively trying to retire in
@@ -47,9 +50,9 @@ consumers.
 The following decisions look safe independently of the eventual distribution backend.
 
 1. **Qualitative support belongs to `MonadAttach`, not to probability.** PolyFun's
-   proposed exact `MonadAttach` support gives a probability-independent account of
-   possible returns. This should replace the current use of `SetM` as the primary public
-   explanation of reachability.
+   exact `MonadAttach` support gives a probability-independent account of possible
+   returns. The implementation proposed in the original survey has since landed and is
+   included in VCVio's PolyFun pin; see §20.
 2. **Discrete and general probability should be different capability layers.** A
    pointwise `α → ℝ≥0∞` API is excellent on discrete types and wrong as the universal
    interface for continuous measures. Conversely, raw `Measure` is too measurability-
@@ -68,10 +71,10 @@ The following decisions look safe independently of the eventual distribution bac
 6. **Keep the current `evalDist`/`Pr[...]` surface during migration.** It is the stable
    interface used throughout VCVio and ArkLib. Backend correspondence theorems should
    come before any attempt to rewrite clients.
-7. **There is more time than the PMF deprecation makes it look, and less than the
-   surrounding churn makes it look.** `PMF` is untouched at Mathlib `v4.34.0-rc1`, and
-   the PR that would deprecate the type is a draft — so no upstream deadline is forcing
-   a backend choice. Meanwhile the *program-logic* substrate is moving quickly:
+7. **The 2026-08-21 urgency picture separated backend pressure from program-logic
+   churn.** At that snapshot, `PMF` was untouched at Mathlib `v4.34.0-rc1`, and the PR
+   that would deprecate the type was a draft, so no upstream deadline forced a backend
+   choice. Meanwhile the *program-logic* substrate was moving quickly:
    `mvcgen` is being retired in favour of `vcgen`, Loom's WP design is landing in Lean
    core, and VCVio's `loom2` pin targets an already-superseded toolchain. The scarce
    resource is attention on the program-logic side, not the distribution side, and the
@@ -120,7 +123,7 @@ There is also an important logical asymmetry:
 Therefore the existing bridge “`x ∈ support` iff `Pr[= x] ≠ 0`” should remain a theorem
 for discrete compatible semantics, not the definition of support in the general theory.
 
-## 2. Current VCVio Semantics
+## 2. VCVio Semantics at the Original Snapshot
 
 ### 2.1 `SPMF` and observable probabilities
 
@@ -311,7 +314,7 @@ One immediate consequence is a name collision rather than a semantic one: core a
 declares a bare `vcgen` tactic token at `v4.33.0`, so VCVio's `vcgen` now shares a
 leading token with it and survives only by careful syntax-kind splitting.
 
-## 3. Current Consumers
+## 3. Consumers at the Original Snapshot
 
 ### 3.1 VCVio examples
 
@@ -582,8 +585,9 @@ not presently an alternative semantic backend.
 
 ### 5.2 PolyFun support and weakest preconditions
 
-Two current PolyFun PRs remove important accidental dependencies between probability and
-program logic:
+At the original snapshot, two PolyFun PRs proposed removing important accidental dependencies
+between probability and program logic. Both have since landed, and both commits are ancestors of
+VCVio's current PolyFun pin:
 
 - [PolyFun#138](https://github.com/Verified-zkEVM/PolyFun/pull/138) defines exact monadic
   support through Lean core's `MonadAttach`, adding the introduction laws needed to show
@@ -605,22 +609,25 @@ PolyFun FreeM / MonadAttach / wpFold
                  └── coupling / relational semantics
 ```
 
-`SetM` can remain a useful implementation and theorem-proving target, but public support
-should use the upstream vocabulary once the PRs land. This keeps PolyFun probability-free
-and lets VCVio change distribution representations without changing reachability.
+`SetM` can remain a useful implementation and theorem-proving target, but public support should
+use the upstream `MonadAttach` vocabulary. The required PolyFun surface is now available at the
+VCVio pin. This keeps PolyFun probability-free and lets VCVio change distribution representations
+without changing reachability.
 
 #### 5.2.1 The wider PolyFun upstream-alignment push
 
-#138 and #139 are two of six non-draft PRs now in flight, and the other four are the
-result of a deliberate audit of PolyFun's generic layers against core, Batteries,
-Mathlib, and cslib:
+At the original audit, #138 and #139 were two of six non-draft PRs in flight. All six
+subsequently landed. The table records both their architectural role and the exact commits included
+in VCVio's current PolyFun pin:
 
-| PR | Content | Bearing on this document |
-|---|---|---|
-| [#141](https://github.com/Verified-zkEVM/PolyFun/pull/141) | `docs/reading/upstream-alignment.md`, an adopt/keep/upstream/track ledger | The companion survey to this one. The two should cross-reference rather than re-derive; §19 here is the analogue of its method section. |
-| [#142](https://github.com/Verified-zkEVM/PolyFun/pull/142) | Bridges `Control/Bisimulation.lean` onto cslib's `LTS`; transports Sangiorgi's Lemma 4.2.10 | Shrinks §11's trace work: the *qualitative* process equivalences come from cslib, leaving only the probabilistic limit to invent. Delay bisimulation has no cslib counterpart and is flagged as an upstream contribution candidate. |
-| [#143](https://github.com/Verified-zkEVM/PolyFun/pull/143) | Settles the monad-morphism hierarchy | Directly ratifies §2.2 — see below. |
-| [#144](https://github.com/Verified-zkEVM/PolyFun/pull/144) | Hygiene: duplicate `Category PFunctor` instances, `Filter`-based temporal operators, `MonoidHom.compLeft` | Non-breaking for VCVio; also the source of the retraction that motivates §19's evidence discipline. |
+| PR | Included commit | Content | Bearing on this document |
+|---|---|---|---|
+| [#138](https://github.com/Verified-zkEVM/PolyFun/pull/138) | `f51fb3d` | Exact monadic support over core `MonadAttach` | Makes qualitative return support probability-independent. |
+| [#139](https://github.com/Verified-zkEVM/PolyFun/pull/139) | `fe2a140` | Free-monad weakest preconditions, `Std.Do` quarantine, and `WPSound` adequacy | Supplies the generic program-logic boundary described above. |
+| [#141](https://github.com/Verified-zkEVM/PolyFun/pull/141) | `3355f18` | `docs/reading/upstream-alignment.md`, an adopt/keep/upstream/track ledger | The companion survey to this one. The two should cross-reference rather than re-derive; §19 here is the analogue of its method section. |
+| [#142](https://github.com/Verified-zkEVM/PolyFun/pull/142) | `f7e1234` | Bridges `Control/Bisimulation.lean` onto cslib's `LTS`; transports Sangiorgi's Lemma 4.2.10 | Shrinks §11's trace work: the *qualitative* process equivalences come from cslib, leaving only the probabilistic limit to invent. Delay bisimulation has no cslib counterpart and is flagged as an upstream contribution candidate. |
+| [#143](https://github.com/Verified-zkEVM/PolyFun/pull/143) | `7d1daac` | Settles the monad-morphism hierarchy | Directly ratifies §2.2 — see below. |
+| [#144](https://github.com/Verified-zkEVM/PolyFun/pull/144) | `814952a` | Hygiene: duplicate `Category PFunctor` instances, `Filter`-based temporal operators, `MonoidHom.compLeft` | Non-breaking for VCVio; also the source of the retraction that motivates §19's evidence discipline. |
 
 **#143 matters more than its size suggests.** It settles the division as: when a
 morphism is *canonical for the pair* and should be found by instance search, it is
@@ -1134,6 +1141,10 @@ This does not change the division of labor above. It changes who owns the name.
 
 ## 13. No-Regret Roadmap
 
+This section preserves the staged roadmap from the original survey. Dated disposition notes record
+the parts rechecked on 2026-08-30; unannotated bullets remain design history, not a claim that work
+is still pending on current `main`.
+
 ### Phase 0: vocabulary and source map
 
 - Maintain this document as the cross-project index.
@@ -1142,21 +1153,30 @@ This does not change the division of labor above. It changes who owns the name.
 
 ### Phase 1: qualitative support cutover
 
-After PolyFun#138/#139 stabilize:
+The PolyFun #138/#139 prerequisites have landed and are included in VCVio's pin. The remaining
+VCVio work is to:
 
-- give `OracleComp`, relevant transformers, and semantic monads exact `MonadAttach`
-  instances;
+- expose PolyFun's exact support surface for `OracleComp`, which already inherits
+  `PFunctor.FreeM.instExactMonadAttach` through its reducible free-monad definition; do not add a
+  competing `OracleComp` instance;
+- add exact `MonadAttach` instances only for compatibility transformers or semantic carriers that
+  do not already inherit one;
 - redefine the public support API through `MonadAttach.support` where possible;
 - prove compatibility aliases for existing `SetM` support lemmas;
 - keep probability/support equivalences as discrete compatibility theorems;
 - use `WPSound` to connect upstream `mvcgen` results to support-sensitive correctness.
 
-This phase should not change `evalDist`.
+In the original staging, this phase was intended not to change `evalDist`.
 
 ### Phase 2: measure bridge without backend replacement
 
-- Add canonical total-measure and output-submeasure views of SPMF. **In progress:** the PMF/FreeM
-  measure bridge, point/event correspondence, and option success observer are implemented.
+**Current disposition (2026-08-30):** the measure-primary surface and its discrete compatibility
+bridge are on `main`. The bullets below are the original acceptance goals, retained to explain what
+the bridge was required to demonstrate.
+
+- Add canonical total-measure and output-submeasure views of SPMF. At the original snapshot, the
+  PMF/FreeM measure bridge, point/event correspondence, and option success observer were already
+  implemented.
 - Prove pure, bind, map, event, point, failure, uniform, expectation, and product correspondence.
 - Re-express a small set of existing theorems through those views while keeping their
   public statements unchanged.
@@ -1380,8 +1400,8 @@ users retain ordinary discrete probability notation.
 - [Verified-zkEVM iris-lean](https://github.com/Verified-zkEVM/iris-lean)
 - [Lean community iris-lean](https://github.com/leanprover-community/iris-lean)
 - [`docs/reading/mathlib-integration-shape.md`](mathlib-integration-shape.md)
-- `docs/reading/denotational-probability-semantics.md` and
-  `docs/reading/measure-semantics-spike.md` (they document the prototype and land with it)
+- [`docs/reading/denotational-probability-semantics.md`](denotational-probability-semantics.md)
+- [`docs/reading/measure-semantics-spike.md`](measure-semantics-spike.md)
 - [`docs/agents/probability.md`](../agents/probability.md)
 - [`docs/agents/program-logic.md`](../agents/program-logic.md)
 
@@ -1389,13 +1409,15 @@ users retain ordinary discrete probability notation.
 
 When an upstream PR lands or a spike is completed:
 
-1. update the snapshot/status statement rather than silently rewriting history;
+1. keep the original snapshot date and add a new dated disposition rather than silently rewriting
+   history;
 2. link the merged declaration and release tag;
 3. record which decision criterion changed;
 4. add the canary result, including proof/API regressions;
 5. move accepted decisions into the relevant agent guide while keeping the alternatives
    and rationale here;
-6. add or amend the corresponding row in §19, including **how** the claim was checked.
+6. add a later-status entry such as §20, including **how** the claim was checked; do not mutate a
+   historical verification result into a present-tense claim.
 
 Point 6 is not bookkeeping. The failure mode this document is most exposed to is
 asserting that upstream already provides something on the strength of a name — the
@@ -1416,7 +1438,7 @@ The document is complete when it ceases to be needed: the chosen architecture is
 the compatibility migration is documented in the ordinary probability guide, and the
 remaining alternatives are only historical context.
 
-## 19. Verification Log
+## 19. Original Verification Log (2026-08-21)
 
 Independent re-verification pass, 2026-08-21. "Pinned tree" means the checkouts under
 `.lake/packages/` (Mathlib and cslib at `v4.33.0`, PolyFun at `v4.32.2`); "toolchain"
@@ -1440,7 +1462,7 @@ read through the GitHub API rather than from PR prose.
 | PolyFun `v4.32.2` has **no** `MonadAttach` | Grepped the pinned PolyFun checkout |
 | `DynComputation.unroll`, `runWith`, `Resumption.truncate`, `Run_n`, `ITree` exist | Grepped the pinned PolyFun checkout (`Run_n` is in `Dynamical/RunN.lean`) |
 | `RunLimit.lean` existed historically | `git log --all --name-only -- '*RunLimit*'` → commits `cc976bb3`, `35f2af63`, `c73a676c` |
-| All nine originally cited PR numbers exist and are open | GitHub API |
+| All nine originally cited PR numbers existed and were open at the audit date | GitHub API |
 
 ### 19.2 Corrected
 
@@ -1478,21 +1500,84 @@ them are distance/coupling files whose content §4.5 already identifies as havin
 counterpart. That is a different problem from the evaluator migration and should be scheduled
 separately.
 
-The per-file figures above are the occurrence counts maintained by
-`scripts/pmf_boundary_baseline.tsv` and its CI gate, which land with the measure-semantics work
-rather than on `main`. They supersede an earlier revision of this section whose per-file numbers were
-produced with `grep -c` and therefore counted matching *lines* rather than occurrences; the totals
-were unaffected, the breakdown was not.
+These are historical bare-`PMF` measurements, not the current CI allowance. The later
+[`scripts/check-pmf-boundary.sh`](../../scripts/check-pmf-boundary.sh) guard deliberately counts
+both standalone `PMF` and `SPMF`, because every explicit `SPMF` use retains a transitive `PMF`
+dependency. At the 2026-08-30 VCVio base, its committed
+[`scripts/pmf_boundary_baseline.tsv`](../../scripts/pmf_boundary_baseline.tsv) contains 1,923
+occurrences across 109 files. The earlier bare-`PMF` breakdown above superseded an even older
+revision produced with `grep -c`, which counted matching *lines* rather than occurrences; its
+aggregate totals were unaffected, but its per-file breakdown was not.
 
-### 19.4 Release timing
+### 19.4 Release timing at the original audit
 
-Lean's cadence is about four weeks: `v4.31.0` 2026-06-15, `v4.32.0` 2026-07-13,
-`v4.33.0` 2026-08-10, so `v4.34.0` is expected around 2026-09-07. At the time of this
-pass Lean, Mathlib, and cslib all carry `v4.34.0-rc2`; PolyFun's newest tag is `v4.33.2`. PolyFun
-#138 is still open, so no tagged PolyFun release carries `MonadAttach` and that workstream has
-nothing to build against yet.
+At the original audit, Lean's cadence was about four weeks: `v4.31.0` 2026-06-15, `v4.32.0`
+2026-07-13, `v4.33.0` 2026-08-10, with `v4.34.0` expected around 2026-09-07. Lean, Mathlib, and
+cslib then carried `v4.34.0-rc2`; PolyFun's newest tag was `v4.33.2`. PolyFun #138 was still open,
+so no tagged PolyFun release carried `MonadAttach` and that workstream had nothing to build against
+yet. This paragraph is retained as scheduling evidence from that date; §20 supersedes its PolyFun
+status.
 
-This line has gone stale twice in a day — `v4.33.1` was current when §19 was first written, and
-again when it was first corrected. Re-check the tags at the moment of editing rather than trusting
-a recent reading; the substantive claim (no tagged `MonadAttach`) has held throughout, but the tag
-number has not.
+This line went stale twice in a day — `v4.33.1` was current when §19 was first written, and again
+when it was first corrected. Re-check tags and source pins at the moment of editing rather than
+trusting a recent reading.
+
+## 20. Focused Reverification (2026-08-30)
+
+This pass updates the facts that control how VCVio readers should act on the PolyFun discussion.
+It does not silently re-date the broader Mathlib, Lean, cslib, ArkLib, or Bluebell audit in §19.
+
+### 20.1 Frozen revisions
+
+| Tree | Revision | Role in this check |
+|---|---|---|
+| VCVio canonical `main` | `f9dc47d9dacfc5cb51dae9f92f1e34cb5ce2cc24` | Repository state whose documentation is being corrected |
+| PolyFun pinned by VCVio | `c0c923693fc827a41d17116579a0c16ed4873b19` | Dependency surface VCVio can actually use |
+| PolyFun canonical `main` | `3937f7ff0830cca33d6b35a24aef55bcbe3b6bc9` | Freshness check; the VCVio pin is an ancestor of this revision |
+
+The pin, rather than the newest upstream head, is the authority for VCVio API guidance. The
+upstream head is recorded separately so that “present in PolyFun main” is not conflated with
+“available to this VCVio checkout.”
+
+### 20.2 PolyFun PR disposition
+
+The six PolyFun commits discussed in §5.2 are ancestors of both VCVio's pin and PolyFun's canonical
+`main`:
+
+| PR | Commit included in the VCVio pin | Current consequence |
+|---|---|---|
+| [#138](https://github.com/Verified-zkEVM/PolyFun/pull/138) | `f51fb3d` | Exact `MonadAttach` support is available; it is no longer a proposed prerequisite. |
+| [#139](https://github.com/Verified-zkEVM/PolyFun/pull/139) | `fe2a140` | Free-monad WP and `WPSound` adequacy are available. |
+| [#141](https://github.com/Verified-zkEVM/PolyFun/pull/141) | `3355f18` | The companion upstream-alignment survey is part of the pinned tree. |
+| [#142](https://github.com/Verified-zkEVM/PolyFun/pull/142) | `f7e1234` | The cslib LTS bridge is part of the pinned tree. |
+| [#143](https://github.com/Verified-zkEVM/PolyFun/pull/143) | `7d1daac` | The monad-morphism hierarchy used by the architectural argument is settled at the pin. |
+| [#144](https://github.com/Verified-zkEVM/PolyFun/pull/144) | `814952a` | The upstream-reuse cleanup and its evidence-discipline corrections are part of the pin. |
+
+This changes the operational reading of the roadmap: Phase 1's upstream prerequisites are
+satisfied, but the downstream VCVio cutover tasks listed there remain real work. A landed
+dependency surface is an invitation to implement the migration, not evidence that the migration
+has already happened.
+
+### 20.3 Documentation and implementation disposition
+
+The measure-semantics spike, accepted baseline, PMF boundary guard, and measure-primary probability
+surface are all present on VCVio `main`. Readers should therefore follow this order:
+
+1. use [`docs/agents/probability.md`](../agents/probability.md) for current proof and API guidance;
+2. use [`denotational-probability-semantics.md`](denotational-probability-semantics.md) for the
+   accepted architecture and migration policy;
+3. use [`measure-semantics-spike.md`](measure-semantics-spike.md) for implementation evidence and
+   known friction;
+4. return to this survey for the rejected options, original upstream audit, and dated
+   re-verification records.
+
+### 20.4 Method
+
+- Read the VCVio dependency revision from `lakefile.lean` and confirmed the materialized checkout
+  with `git rev-parse HEAD`.
+- Read the declarations and module docstrings at the pin rather than inferring APIs from filenames
+  or PR descriptions.
+- For each of #138, #139, and #141–#144, ran `git merge-base --is-ancestor` against the VCVio pin
+  and PolyFun canonical `main`.
+- Confirmed that the accepted design documents and their referenced implementation files exist on
+  VCVio `main`.

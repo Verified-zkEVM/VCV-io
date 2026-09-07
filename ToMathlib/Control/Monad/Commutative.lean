@@ -6,7 +6,7 @@ Authors: Quang Dao
 module
 
 public import PolyFun.Control.Monad.Hom
-public import Mathlib
+public import Mathlib.Data.Set.Functor
 
 /-!
 # Commutative monads

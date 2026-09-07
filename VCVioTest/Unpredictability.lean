@@ -7,6 +7,7 @@ Authors: Quang Dao
 module
 
 public import VCVio.OracleComp.QueryTracking.Unpredictability
+public import VCVio.OracleComp.QueryTracking.AdaptivePrefix
 
 /-!
 # ROM Unpredictability Canaries
@@ -117,5 +118,76 @@ example :
 /-- Deduplicating positional labels records two semantic target values, not three positions. -/
 example : ({0, 1, 0} : Finset (Fin 4)).card = 2 := by
   decide
+
+/-! ## Adaptive-prefix cache hit accounting -/
+
+namespace AdaptivePrefixCanary
+
+abbrev PrefixSpec : OracleSpec Bool := Bool →ₒ Bool
+
+/-- The syntactic prefix asks the same query twice. -/
+def repeatedPrefix : OracleComp PrefixSpec Unit := do
+  let _ ← (PrefixSpec.query false : OracleComp PrefixSpec Bool)
+  let _ ← (PrefixSpec.query false : OracleComp PrefixSpec Bool)
+  return ()
+
+/-- Repeated cached queries still consume the total syntactic query budget. -/
+example : IsTotalQueryBound repeatedPrefix 2 := by
+  rw [repeatedPrefix, isTotalQueryBound_query_bind_iff]
+  refine ⟨by omega, fun _ => ?_⟩
+  rw [isTotalQueryBound_query_bind_iff]
+  exact ⟨by omega, fun _ => trivial⟩
+
+/-- The bound is sharp: deleting the second syntactic query would make this false. -/
+example : ¬ IsTotalQueryBound repeatedPrefix 1 := by
+  rw [repeatedPrefix, isTotalQueryBound_query_bind_iff]
+  simp only [Nat.lt_add_one_iff, nonpos_iff_eq_zero, true_and]
+  intro h
+  have hsecond := h false
+  rw [isTotalQueryBound_query_bind_iff] at hsecond
+  omega
+
+/-- The suffix exposes the complete prefix log; it does not issue another oracle query. -/
+def returnLog (_ : Unit) (log : PrefixSpec.QueryLog) :
+    OracleComp PrefixSpec PrefixSpec.QueryLog :=
+  pure log
+
+def onceCached (answer : Bool) : PrefixSpec.QueryCache :=
+  (∅ : PrefixSpec.QueryCache).cacheQuery false answer
+
+def cachedKeyCount (cache : PrefixSpec.QueryCache) : Nat :=
+  (Finset.univ.filter fun input => (cache input).isSome).card
+
+@[simp] lemma cachedKeyCount_onceCached (answer : Bool) :
+    cachedKeyCount (onceCached answer) = 1 := by
+  cases answer <;> decide
+
+/-- For either miss response, the first query populates one key and the repeated query is a hit:
+the log has length two, while the final cache is exactly the once-populated cache. This catches
+both accidentally charging only cache misses to the total query budget and accidentally growing
+the cache on a hit. -/
+example (answer : Bool) :
+    ([⟨false, answer⟩, ⟨false, answer⟩], onceCached answer) ∈ support
+      (adaptivePrefixRunFrom returnLog repeatedPrefix
+        (∅ : PrefixSpec.QueryCache) ([] : PrefixSpec.QueryLog)) := by
+  simp [adaptivePrefixRunFrom, repeatedPrefix, returnLog, onceCached]
+
+/-- The miss/hit branches are distinguishable at another input: the populated cache contains
+exactly the queried key and leaves the other Boolean key fresh. -/
+example (answer : Bool) :
+    (onceCached answer) false = some answer ∧ (onceCached answer) true = none := by
+  simp [onceCached, QueryCache.cacheQuery_of_ne]
+
+/-- A nonempty input transcript is preserved, and two hits on a preloaded key neither overwrite
+the cache nor disturb the earlier entry. -/
+example (falseAnswer trueAnswer : Bool) :
+    let cache := (onceCached falseAnswer).cacheQuery true trueAnswer
+    let log : PrefixSpec.QueryLog := [⟨true, trueAnswer⟩]
+    (log ++ [⟨false, falseAnswer⟩, ⟨false, falseAnswer⟩], cache) ∈ support
+      (adaptivePrefixRunFrom returnLog repeatedPrefix cache log) := by
+  simp [adaptivePrefixRunFrom, repeatedPrefix, returnLog, onceCached,
+    QueryCache.cacheQuery_of_ne]
+
+end AdaptivePrefixCanary
 
 end VCVioTest.Unpredictability

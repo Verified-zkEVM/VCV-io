@@ -6,6 +6,15 @@ on:
     paths:
       - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
+      - "VCVioTest/SMDTPREFinalValidity.lean"
+      - "VCVioTest/SMDTTCRFinalValidity.lean"
+      - "VCVioTest/ITSR.lean"
+      - "VCVioTest/SMDTDSPRFinalValidity.lean"
+      - "VCVioTest/SMDTOpenPREFinalValidity.lean"
+      - "VCVioTest/SMDTUDFinalValidity.lean"
+      - "VCVioTest/CryptoFoundations/SignatureAlg.lean"
+      - "VCVioTest/SMDTTCR.lean"
+      - "VCVioTest/SMDTPRE.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -18,11 +27,24 @@ on:
       - "lakefile.lean"
       - "scripts/nolints-style.txt"
       - ".github/workflows/linting.yml"
+  # Merge-queue refs must run independently of PR path filters: the group can
+  # contain changes from several pull requests.
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
     paths:
       - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
+      - "VCVioTest/SMDTPREFinalValidity.lean"
+      - "VCVioTest/SMDTTCRFinalValidity.lean"
+      - "VCVioTest/ITSR.lean"
+      - "VCVioTest/SMDTDSPRFinalValidity.lean"
+      - "VCVioTest/SMDTOpenPREFinalValidity.lean"
+      - "VCVioTest/SMDTUDFinalValidity.lean"
+      - "VCVioTest/CryptoFoundations/SignatureAlg.lean"
+      - "VCVioTest/SMDTTCR.lean"
+      - "VCVioTest/SMDTPRE.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -84,4 +106,22 @@ jobs:
       # project deliberately defines no `lint-style` exe, so it does not link the
       # FFI backends). Pass the libraries explicitly for full coverage.
       - name: Run text-based style linters
-        run: lake exe lint-style ToMathlib VCVio Extern LatticeCrypto HashSig Examples VCVioWidgets Interop HashSigTest.SLHDSA.Oracle HashSigTest.SLHDSA.Wots HashSigTest.SLHDSA.Xmss HashSigTest.SLHDSA.Fors HashSigTest.SLHDSA.Hypertree HashSigTest.SLHDSA.Scheme HashSigTest.SLHDSA.Sha2KAT HashSigTest.SLHDSA.C13KAT
+        run: >-
+          lake exe lint-style ToMathlib VCVio Extern LatticeCrypto HashSig Examples VCVioWidgets
+          Interop VCVioTest.SMDTTCR VCVioTest.SMDTPRE
+          VCVioTest.SMDTPREFinalValidity VCVioTest.SMDTTCRFinalValidity
+          VCVioTest.ITSR VCVioTest.SMDTDSPRFinalValidity VCVioTest.SMDTOpenPREFinalValidity
+          VCVioTest.SMDTUDFinalValidity
+          VCVioTest.CryptoFoundations.SignatureAlg
+          HashSigTest.SLHDSA.Params HashSigTest.SLHDSA.Position HashSigTest.SLHDSA.Oracle
+          HashSigTest.SLHDSA.DataCodecTests
+          HashSigTest.SLHDSA.External
+          HashSig.SLHDSA.Concrete.Prehash
+          HashSigTest.SLHDSA.PrimitiveTests HashSigTest.SLHDSA.WotsEncoding
+          HashSigTest.SLHDSA.WotsConstructionTests HashSigTest.SLHDSA.XmssConstructionTests
+          HashSigTest.SLHDSA.ForsConstructionTests
+          HashSigTest.SLHDSA.HypertreeConformanceTests
+          HashSigTest.SLHDSA.Wots HashSigTest.SLHDSA.Xmss HashSigTest.SLHDSA.Fors
+          HashSigTest.SLHDSA.Hypertree HashSigTest.SLHDSA.HypertreeGeneral
+          HashSigTest.SLHDSA.Scheme HashSigTest.SLHDSA.GeneralScheme
+          HashSigTest.SLHDSA.Sha2KAT HashSigTest.SLHDSA.C13KAT

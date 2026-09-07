@@ -35,7 +35,6 @@ computable and carries no quotient types, while `NegacyclicRingSemantics` is
 @[expose] public section
 
 
-open scoped BigOperators
 
 universe u v
 

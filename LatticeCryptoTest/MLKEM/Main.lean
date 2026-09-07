@@ -26,8 +26,6 @@ lake build mlkem_test
 
 @[expose] public section
 
-set_option maxRecDepth 2048
-
 open MLKEM MLKEM.Concrete MLKEM.Test
 
 /-- Entry point for the ML-KEM regression and interoperability test runner. -/

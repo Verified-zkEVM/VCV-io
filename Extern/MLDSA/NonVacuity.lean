@@ -46,8 +46,6 @@ hypothesis can be met by the concrete layer (whose NTT-correctness trust assumpt
 
 open MLDSA
 
-set_option maxRecDepth 4000
-
 namespace MLDSA
 
 /-- `concretePrimitives p` with the public `ρ`-component of `expandSeed` overridden to be the

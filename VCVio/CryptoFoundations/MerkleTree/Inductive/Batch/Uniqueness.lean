@@ -50,16 +50,6 @@ open BinaryTree
 
 variable {α : Type _}
 
-/-- A batch proof exists only for selectors that select at least one leaf: the `BatchProof`
-family is uninhabited on selectors with `anySelected = false`. -/
-theorem BatchProof.anySelected_of_batchProof {s : Skeleton} {sel : LeafData Bool s}
-    (proof : BatchProof α sel) : sel.anySelected = true := by
-  induction proof with
-  | leaf => rfl
-  | internalBoth pl pr ihl ihr => simp [LeafData.anySelected, ihl, ihr]
-  | pruneRight hr rightRoot pl ih => simp [LeafData.anySelected, ih]
-  | pruneLeft hl leftRoot pr ih => simp [LeafData.anySelected, ih]
-
 /-- Over a selector with no selected leaves, the type of claimed values is degenerate: any
 two values tuples are equal (every component is a `PUnit`). -/
 theorem selectedValues_eq_of_not_anySelected {s : Skeleton} {sel : LeafData Bool s}

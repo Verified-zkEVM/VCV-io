@@ -9,7 +9,6 @@ public import VCVio.CryptoFoundations.SymmEncAlg
 public import VCVio.OracleComp.Constructions.BitVec
 public import VCVio.ProgramLogic.Tactics.Relational
 public import VCVioWidgets.GameHop.Panel
-public import Mathlib.Data.Vector.Zip
 
 /-!
 # One Time Pad
@@ -29,7 +28,7 @@ The file includes two proof styles:
 
 show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
 
-open Mathlib OracleSpec OracleComp ENNReal BigOperators
+open Mathlib OracleSpec OracleComp ENNReal
 
 /-- The one-time-pad scheme body, parameterized only by its key sampler.
 

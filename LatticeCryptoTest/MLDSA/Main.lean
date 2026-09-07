@@ -26,7 +26,6 @@ lake build mldsa_test
 
 @[expose] public section
 
-set_option maxRecDepth 2048
 open MLDSA MLDSA.Concrete MLDSA.Test
 
 attribute [local instance] MLDSA.Concrete.concreteNTTRingOps

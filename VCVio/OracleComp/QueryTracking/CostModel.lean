@@ -39,7 +39,6 @@ Uses `AddWriterT` (defined in `ToMathlib.Control.WriterT`) for additive cost acc
 @[expose] public section
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal
-open scoped BigOperators
 
 /-! ## Cost Model, Cost Oracle, Cost Distribution
 

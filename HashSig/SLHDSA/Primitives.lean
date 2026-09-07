@@ -30,9 +30,14 @@ abstract `High`/`Hint` types:
 | `PRFmsg` | `PRF_msg(SK.prf, opt_rand, M)`   | message randomizer `R` |
 | `Hmsg`   | `H_msg(R, PK.seed, PK.root, M)`  | message digest (`m` bytes) |
 
-## A note on correctness vs. security
+## Byte coherence and correctness vs. security
 
-Unlike `MLDSA.Primitives`, this bundle carries **no algebraic `Laws`**: SLH-DSA correctness
+The operational bundle carries no cryptographic assumption. `Primitives.ByteLaws` is a separate,
+optional structural law bundle asserting that the exposed `n`-byte representation distinguishes
+nodes. Keeping it separate avoids burdening generic tree correctness with a property needed only
+when byte-level digit extraction is related back to the abstract node carrier.
+
+Unlike `MLDSA.Primitives`, this bundle carries no algebraic hash laws: SLH-DSA correctness
 (`verify ∘ sign = accept`) is a *deterministic hash-tree consistency identity* that holds for
 **any** choice of the opaque hash fields — it reduces to the fact that `wotsPkFromSig`/
 `computeRoot` re-fold the *same* `F`/`H`/`Tl` at the *same* addresses the honest signer used,
@@ -122,5 +127,22 @@ variable {p : Params}
   prims.Thash pkSeed (prims.adrsToKey adrs) xs
 
 end Primitives
+
+namespace CorePrimitives
+
+/-- The byte bridge is coherent when equal encodings imply equal abstract nodes. This is the only
+representation law required by downstream digit-extraction arguments; it is not a collision-
+resistance or pseudorandomness assumption. -/
+structure ByteLaws {p : Params} (primitives : CorePrimitives p) : Prop where
+  yToBytes_injective : Function.Injective primitives.yToBytes
+
+/-- Under byte coherence, node equality is characterized by equality of the fixed-width byte
+encodings. -/
+theorem ByteLaws.yToBytes_eq_iff {p : Params} {primitives : CorePrimitives p}
+    (laws : primitives.ByteLaws) (x y : primitives.Y) :
+    primitives.yToBytes x = primitives.yToBytes y ↔ x = y :=
+  ⟨fun h => laws.yToBytes_injective h, congrArg primitives.yToBytes⟩
+
+end CorePrimitives
 
 end SLHDSA
