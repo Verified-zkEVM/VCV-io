@@ -3,6 +3,7 @@ Copyright (c) 2026 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
+
 module
 
 public import VCVio.EvalDist.ExpectationMeasure
@@ -30,7 +31,7 @@ account of failure against the façade bridge `DiscreteEvalDistCompatible`:
   the `none` branch is discarded mass, not an output.
 -/
 
-@[expose] public section
+public section
 
 open MeasureTheory OracleComp.EvalDist
 open scoped ENNReal

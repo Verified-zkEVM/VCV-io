@@ -114,6 +114,23 @@ example (mx : OptionT ProbComp Bool) (x : Bool) :
 example (mx : ProbComp Bool) : IsProbabilityMeasure 𝒟[mx] := inferInstance
 example (mx : ProbComp (Fin 3)) (f : Fin 3 → ProbComp (Fin 2)) : 𝒟[mx >>= f] Set.univ = 1 := by
   simp
+
+/-- A lossy computation that succeeds exactly on the `true` outcome of a fair coin. -/
+def lossyCoin : OptionT ProbComp Bool := do
+  let b ← liftM ($ᵗ Bool)
+  if b then pure true else failure
+
+example : 𝒟[lossyCoin] {true} = 2⁻¹ := by
+  simp [lossyCoin, OptionT.probOutput_eq, probOutput_bind_eq_tsum]
+example : 𝒟[lossyCoin] {false} = 0 := by
+  simp [lossyCoin, OptionT.probOutput_eq, probOutput_bind_eq_tsum]
+example : (𝒟[lossyCoin]).withFailure {none} = 2⁻¹ := by
+  simp [lossyCoin, OptionT.probFailure_eq, probOutput_bind_eq_tsum]
+example : (𝒟[lossyCoin]).withFailure {some true} = 2⁻¹ := by
+  simp [lossyCoin, OptionT.probOutput_eq, probOutput_bind_eq_tsum]
+example : 𝒟[lossyCoin] = (𝒟[lossyCoin.run]).dropNone :=
+  OptionT.evalDist_eq_dropNone lossyCoin
+
 /-! ## A unit-test program
 
 A coin and a die drawn independently, closed on the measure side by the same calls as the
