@@ -9,13 +9,13 @@ public import HashSig.SLHDSA.Security.TraceTargets
 import VCVio.CryptoFoundations.MerkleTree.Addressed.NatIndexed.QueryBound
 
 /-!
-# Trace provenance of the FORS programs
+# Trace provenance of the FORS and XMSS programs
 
 This module extends the pathwise predicate `QueriesWithinConstructionTargets` of
-`HashSig.SLHDSA.Security.TraceTargets` from the WOTS+ programs to the FORS programs.  Each theorem
-says that every public-hash query a program can issue, under any oracle answers, uses an encoded
-address from the union ledger `constructionAddresses`; the `*_traceContract` theorems pair that
-with the program's total query bound.
+`HashSig.SLHDSA.Security.TraceTargets` from the WOTS+ programs to the FORS and XMSS programs.  Each
+theorem says that every public-hash query a program can issue, under any oracle answers, uses an
+encoded address from the union ledger `constructionAddresses`; the `*_traceContract` theorems pair
+that with the program's total query bound.
 
 The FORS programs are certified at the FORS address of a reachable `BottomPosition`, and through
 `BottomPosition.ofDigestParts` at the digest-derived address `DigestParts.forsAdrs` that
@@ -25,9 +25,21 @@ handled by the generic address-tracking lemmas `PerfectMerkleTree.merkleRootM_pr
 construction predicate; the leaf and node addresses those lemmas surface are placed in the FORS
 ledgers by `mem_forsLeafAddresses`, `mem_forsTreeAddresses`, and `mem_forsRootAddresses`.
 
+The XMSS programs are certified inside a reachable tree, given either as a `LayerTreeCoord` or as
+the tree containing a `LayerPosition`.  A subtree root `xmssNodeM` at `(z, t)` with `z ≤ hp` and
+`t < 2 ^ (hp - z)`, and the tree root `xmssRootM`, compute each WOTS+ leaf `i < 2 ^ hp` through
+`wotsPkGenM_queriesWithinConstructionTargets` at the reachable instance `(layer, tree, i)`, and
+issue `H` only at internal nodes `(h, i)` with `0 < h ≤ hp` and `i < 2 ^ (hp - h)`, which
+`mem_xmssNodeAddresses` places in the ledger.  `xmssSignM` and `xmssPkFromSigM` are certified at a
+position's own leaf, where the WOTS+ signing and recovery lemmas of `TraceTargets` apply to the
+leaf and the Merkle lemmas above to the sibling subtrees and the climbed ancestors.  The `WOTS_PRF`
+addresses are consumed by `core.PRF`, which is not a query of `publicHashSpec`, so no lemma here
+mentions them.
+
 ## References
 
-- NIST FIPS 205, §8 (Algorithms 14--17, the FORS programs)
+- NIST FIPS 205, §6 (Algorithms 9--11, the XMSS programs) and §8 (Algorithms 14--17, the FORS
+  programs)
 -/
 
 public section
@@ -73,8 +85,8 @@ theorem QueriesWithinConstructionTargets.intrinsicAuthPathM {Y : Type}
 /-- The construction predicate holds of a root recovery whenever it holds of the node-hash program
 at every ancestor of the opened leaf up to the path length. -/
 theorem QueriesWithinConstructionTargets.climbM {Y : Type}
-    (nodeHash : ℕ → ℕ → Y → Y → OracleComp (publicHashSpec core) Y) (idx : ℕ) (node : Y)
-    (auth : List Y)
+    (nodeHash : ℕ → ℕ → Y → Y → OracleComp (publicHashSpec core) Y) (idx : ℕ)
+    (node : Y) (auth : List Y)
     (hnode : ∀ h, 0 < h → h ≤ auth.length → ∀ l r,
       QueriesWithinConstructionTargets core (nodeHash h (idx / 2 ^ h) l r)) :
     QueriesWithinConstructionTargets core (PerfectMerkleTree.climbM nodeHash idx node auth) :=
@@ -311,7 +323,8 @@ theorem xmssLeafM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSee
     (coord : LayerTreeCoord vp) {i : ℕ} (hi : i < 2 ^ vp.params.hp) :
     QueriesWithinConstructionTargets core
       (xmssLeafM core skSeed pkSeed coord.toAdrs i : OracleComp (publicHashSpec core) core.Y) :=
-  wotsPkGenM_queriesWithinConstructionTargets core skSeed pkSeed ⟨coord.layer, coord.tree, ⟨i, hi⟩⟩
+  wotsPkGenM_queriesWithinConstructionTargets core skSeed pkSeed
+    ⟨coord.layer, coord.tree, ⟨i, hi⟩⟩
 
 /-- The same for a caller holding a full layer position; the leaf `i` need not be the position's
 own leaf. -/
@@ -319,7 +332,8 @@ theorem xmssLeafM_queriesWithinConstructionTargets_of_position (skSeed : core.Sk
     (pkSeed : core.PkSeed) (pos : LayerPosition vp) {i : ℕ} (hi : i < 2 ^ vp.params.hp) :
     QueriesWithinConstructionTargets core
       (xmssLeafM core skSeed pkSeed pos.toAdrs i : OracleComp (publicHashSpec core) core.Y) :=
-  wotsPkGenM_queriesWithinConstructionTargets core skSeed pkSeed ⟨pos.layer, pos.tree, ⟨i, hi⟩⟩
+  wotsPkGenM_queriesWithinConstructionTargets core skSeed pkSeed
+    ⟨pos.layer, pos.tree, ⟨i, hi⟩⟩
 
 /-- An XMSS subtree root at `(z, t)` inside a reachable tree, `z ≤ hp` and `t < 2 ^ (hp - z)`,
 issues WOTS+ leaf generation only at that tree's leaves and `H` only at its internal nodes. -/
@@ -327,7 +341,8 @@ theorem xmssNodeM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSee
     (coord : LayerTreeCoord vp) {z t : ℕ} (hz : z ≤ vp.params.hp)
     (ht : t < 2 ^ (vp.params.hp - z)) :
     QueriesWithinConstructionTargets core
-      (xmssNodeM core skSeed pkSeed coord.toAdrs z t : OracleComp (publicHashSpec core) core.Y) := by
+      (xmssNodeM core skSeed pkSeed coord.toAdrs z t :
+        OracleComp (publicHashSpec core) core.Y) := by
   apply QueriesWithinConstructionTargets.merkleRootM core
     (xmssLeafM core skSeed pkSeed coord.toAdrs) (xmssNodeHashM core pkSeed coord.toAdrs) z t
   · intro i hi
