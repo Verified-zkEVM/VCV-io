@@ -68,9 +68,10 @@ section CenteredRepr
 
 variable {q : ℕ} [NeZero q]
 
-/-- The centered representative of `x : ZMod q`, the unique integer in `(-q/2, q/2]` congruent to
-`x`. This is `ZMod.valMinAbs`; the name is kept because it is the FIPS-facing vocabulary of the
-rounding and norm layers, and the lemmas below are its API restated on that name. -/
+/-- The centered representative of `x : ZMod q` in the FIPS-facing rounding and norm API.
+For nonzero `q`, this is the unique integer congruent to `x` whose double lies in `(-q, q]`. An even
+modulus uses the positive representative at the midpoint. For `q = 0`, `ZMod 0` is `ℤ` and this
+returns the integer itself, following `ZMod.valMinAbs`. -/
 def centeredRepr (x : ZMod q) : ℤ := x.valMinAbs
 
 @[simp] theorem centeredRepr_of_le {x : ZMod q} (h : (x.val : ℤ) ≤ (q : ℤ) / 2) :

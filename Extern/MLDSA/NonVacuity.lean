@@ -33,11 +33,10 @@ makes the published seed-component injective (matching `ρ` forces the same seed
 `keyVector_t0_determined` satisfiable by a deterministic bundle.
 
 **Trust surface.**  `mldsa_laws_inhabited` depends only on `propext`, `Classical.choice`, and
-`Quot.sound`; no `native_decide` remains in the proof libraries (the dense `256×256` NTT
-certificate was retired in favour of the structural butterfly stages of
-`LatticeCrypto/Ring/NTTCert.lean`, whose round-trip laws are proved from per-stage twiddle
-identities).  What is still trusted is not an axiom but the `@[implemented_by]` refinement
-boundary: the imperative `loopNTT`/`loopInvNTT` kernels are rebound at runtime and are not proved
+`Quot.sound`. The structural butterfly stages in `LatticeCrypto/Ring/NTTCert.lean` have
+round-trip laws proved from per-stage twiddle identities. The executable implementation has
+an `@[implemented_by]` refinement boundary: the imperative `loopNTT`/`loopInvNTT` kernels are
+rebound at runtime and are not proved
 extensionally equal to the structural stages, and `multiplyNTTs` is defined through
 `invNTT`/`ntt` rather than verified pointwise.  The *abstract* `Laws`-gated theorems (quantified
 over `nttOps`) are unaffected; this witness only shows that their `Laws` hypothesis can be met by

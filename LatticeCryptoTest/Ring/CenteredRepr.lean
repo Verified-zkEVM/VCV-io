@@ -3,8 +3,8 @@ Copyright (c) 2026 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-module
 
+module
 public import LatticeCrypto.Ring.Norms
 import Mathlib.Tactic.ReduceModChar
 
@@ -25,6 +25,15 @@ namespace LatticeCryptoTest.CenteredRepr
 
 example : centeredRepr (12 : ZMod 17) = -5 := by decide
 example : centeredRepr (3 : ZMod 17) = 3 := by decide
+
+-- The even-modulus midpoint uses the positive representative, including after negation.
+example : centeredRepr (4 : ZMod 8) = 4 := by decide
+example : centeredRepr (-4 : ZMod 8) = 4 := by decide
+example : centeredRepr (5 : ZMod 8) = -3 := by decide
+example : centeredRepr (0 : ZMod 1) = 0 := by decide
+
+-- Modulus zero follows the signed integer interpretation of ZMod 0.
+example (z : ℤ) : centeredRepr (q := 0) (z : ZMod 0) = z := rfl
 
 example : (centeredRepr (12 : ZMod 17)).natAbs = 5 := by
   rw [centeredRepr_eq_valMinAbs, ZMod.valMinAbs_natAbs_eq_min]
