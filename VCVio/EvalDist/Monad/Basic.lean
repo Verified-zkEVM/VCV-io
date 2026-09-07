@@ -283,14 +283,11 @@ lemma probEvent_bind_le_probEvent [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     (h : ∀ x ∈ support mx, ¬ p x → Pr[ q | my x] = 0) :
     Pr[ q | mx >>= my] ≤ Pr[ p | mx] := by
   classical
-  rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_indicator]
-  refine ENNReal.tsum_le_tsum fun x ↦ ?_
+  rw [probEvent_bind_eq_expectedValue, ← expectedValue_ite_one]
+  gcongr with x hx
   by_cases hp : p x
-  · refine le_trans (mul_le_mul' le_rfl probEvent_le_one) ?_
-    simp [hp]
-  · by_cases hx : x ∈ support mx
-    · simp [h x hx hp]
-    · simp [probOutput_eq_zero_of_not_mem_support hx]
+  · simp only [if_pos hp]; exact probEvent_le_one
+  · simp only [if_neg hp, h x hx hp, le_refl]
 
 /-- If a continuation event is bounded by `ε` exactly on a prefix event and is
 impossible off that event, then only the prefix mass is charged. -/
@@ -301,13 +298,11 @@ lemma probEvent_bind_le_probEvent_mul [MonadLiftT m SPMF] [LawfulMonadLiftT m SP
     (hzero : ∀ x ∈ support mx, ¬ p x → Pr[ q | my x] = 0) :
     Pr[ q | mx >>= my] ≤ Pr[ p | mx] * ε := by
   classical
-  rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_indicator, ← ENNReal.tsum_mul_right]
-  refine ENNReal.tsum_le_tsum fun x ↦ ?_
-  by_cases hx : x ∈ support mx
-  · by_cases hp : p x
-    · exact (mul_le_mul' le_rfl (hle x hx hp)).trans_eq (by simp [hp])
-    · simp [hp, hzero x hx hp]
-  · simp [probOutput_eq_zero_of_not_mem_support hx]
+  rw [probEvent_bind_eq_expectedValue, ← expectedValue_ite_one, ← expectedValue_mul_const]
+  gcongr with x hx
+  by_cases hp : p x
+  · simp only [if_pos hp, one_mul]; exact hle x hx hp
+  · simp only [if_neg hp, zero_mul, hzero x hx hp, le_refl]
 
 /-- Division-form corollary of `probEvent_bind_le_probEvent_mul`. -/
 lemma probEvent_bind_le_probEvent_div [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
@@ -335,24 +330,18 @@ lemma probEvent_bind_le_probEvent_add [MonadLiftT m SPMF] [LawfulMonadLiftT m SP
     (h : ∀ x ∈ support mx, ¬ p x → Pr[ q | my x] ≤ ε) :
     Pr[ q | mx >>= my] ≤ Pr[ p | mx] + ε := by
   classical
-  rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_indicator]
-  calc ∑' x, Pr[= x | mx] * Pr[ q | my x]
-      ≤ ∑' x, ({x | p x}.indicator (Pr[= · | mx]) x
-          + {x | ¬ p x}.indicator (fun x ↦ Pr[= x | mx] * ε) x) := by
-        refine ENNReal.tsum_le_tsum fun x ↦ ?_
+  rw [probEvent_bind_eq_expectedValue]
+  calc expectedValue mx (fun x => Pr[ q | my x])
+      ≤ expectedValue mx (fun x => (if p x then 1 else 0) + ε) := by
+        gcongr with x hx
         by_cases hp : p x
-        · refine le_trans (mul_le_mul' le_rfl probEvent_le_one) ?_
-          simp [hp]
-        · by_cases hx : x ∈ support mx
-          · refine le_trans (mul_le_mul' le_rfl (h x hx hp)) ?_
-            simp [hp]
-          · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (∑' x, {x | p x}.indicator (Pr[= · | mx]) x)
-          + ∑' x, {x | ¬ p x}.indicator (fun x ↦ Pr[= x | mx] * ε) x := ENNReal.tsum_add
-    _ ≤ (∑' x, {x | p x}.indicator (Pr[= · | mx]) x) + ε := by
+        · simp only [if_pos hp]; exact probEvent_le_one.trans le_self_add
+        · simp only [if_neg hp, zero_add]; exact h x hx hp
+    _ = Pr[ p | mx] + expectedValue mx (fun _ => ε) := by
+        rw [expectedValue_add, expectedValue_ite_one]
+    _ ≤ Pr[ p | mx] + ε := by
         gcongr
-        exact (ENNReal.tsum_le_tsum fun x ↦ Set.indicator_le_self _ _ x).trans
-          (tsum_probOutput_mul_le_of_le mx fun _ => le_rfl)
+        exact expectedValue_le_of_le mx fun _ => le_rfl
 
 /-- Convex prefix-event split for a bind. The off-prefix tail bound `ε` is charged
 only on the mass outside `p`, giving `Pr[p] + (1 - Pr[p]) * ε`. -/
@@ -362,35 +351,21 @@ lemma probEvent_bind_le_probEvent_convex [MonadLiftT m SPMF] [LawfulMonadLiftT m
     (h : ∀ x ∈ support mx, ¬ p x → Pr[ q | my x] ≤ ε) :
     Pr[ q | mx >>= my] ≤ Pr[ p | mx] + (1 - Pr[ p | mx]) * ε := by
   classical
-  have hsplit : Pr[ q | mx >>= my] ≤ Pr[ p | mx] + Pr[ fun x ↦ ¬ p x | mx] * ε := by
-    rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_indicator (p := p),
-      probEvent_eq_tsum_indicator (p := fun x ↦ ¬ p x)]
-    calc ∑' x, Pr[= x | mx] * Pr[ q | my x]
-        ≤ ∑' x, ({x | p x}.indicator (Pr[= · | mx]) x
-            + {x | ¬ p x}.indicator (fun x ↦ Pr[= x | mx] * ε) x) := by
-          refine ENNReal.tsum_le_tsum fun x ↦ ?_
-          by_cases hp : p x
-          · refine le_trans (mul_le_mul' le_rfl probEvent_le_one) ?_
-            simp [hp]
-          · by_cases hx : x ∈ support mx
-            · refine le_trans (mul_le_mul' le_rfl (h x hx hp)) ?_
-              simp [hp]
-            · simp [probOutput_eq_zero_of_not_mem_support hx]
-      _ = (∑' x, {x | p x}.indicator (Pr[= · | mx]) x)
-            + ∑' x, {x | ¬ p x}.indicator (fun x ↦ Pr[= x | mx] * ε) x :=
-          ENNReal.tsum_add
-      _ = (∑' x, {x | p x}.indicator (Pr[= · | mx]) x)
-            + (∑' x, {x | ¬ p x}.indicator (Pr[= · | mx]) x) * ε := by
-          rw [← ENNReal.tsum_mul_right]
-          refine congrArg _ (tsum_congr fun x ↦ ?_)
-          by_cases hp : p x <;> simp [Set.indicator, hp]
-  have hle_one : Pr[ p | mx] + Pr[ fun x ↦ ¬ p x | mx] ≤ 1 := by
-    rw [probEvent_eq_tsum_indicator (p := p), probEvent_eq_tsum_indicator (p := fun x ↦ ¬ p x),
-      ← ENNReal.tsum_add]
-    refine le_trans (ENNReal.tsum_le_tsum fun x ↦ ?_) (tsum_probOutput_le_one (mx := mx))
-    by_cases hp : p x <;> simp [Set.indicator, hp]
-  refine le_trans hsplit (add_le_add le_rfl (mul_le_mul' ?_ le_rfl))
-  exact ENNReal.le_sub_of_add_le_left probEvent_ne_top hle_one
+  rw [probEvent_bind_eq_expectedValue]
+  calc expectedValue mx (fun x => Pr[ q | my x])
+      ≤ expectedValue mx (fun x => (if p x then 1 else 0) + (if ¬ p x then 1 else 0) * ε) := by
+        gcongr with x hx
+        by_cases hp : p x
+        · simp only [if_pos hp, if_neg (not_not_intro hp), zero_mul, add_zero]
+          exact probEvent_le_one
+        · simp only [if_neg hp, if_pos hp, zero_add, one_mul]; exact h x hx hp
+    _ = Pr[ p | mx] + Pr[ fun x => ¬ p x | mx] * ε := by
+        rw [expectedValue_add, expectedValue_mul_const, expectedValue_ite_one,
+          expectedValue_ite_one]
+    _ ≤ Pr[ p | mx] + (1 - Pr[ p | mx]) * ε := by
+        gcongr
+        exact ENNReal.le_sub_of_add_le_left probEvent_ne_top
+          ((probEvent_compl mx p).trans_le tsub_le_self)
 
 lemma probOutput_bind_eq_sum_finSupport [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [MonadLiftT m SetM] [EvalDistCompatible m] [HasEvalFinset m]

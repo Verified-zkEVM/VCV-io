@@ -25,6 +25,7 @@ public import VCVioTest.OracleComp.SecurityFamily
 public import VCVioTest.PFunctorFacade
 public import VCVioTest.PerfectMerkleTree
 public import VCVioTest.ProbabilityTactics
+public import VCVioTest.ProgramLogic.GCongr
 public import VCVioTest.QueryHom
 public import VCVioTest.RoundByRound.OneRound
 public import VCVioTest.SMDTDSPRFinalValidity
