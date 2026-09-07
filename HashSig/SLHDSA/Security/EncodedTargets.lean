@@ -32,6 +32,10 @@ The two encoders need different amounts of the parameter set:
 routes: an address is canonical and its layer and tree lie in the hypertree's own ranges.  The
 SHA-2 domain follows from it under the narrower widths, so no ledger lemma has to be proved twice.
 
+The UD field of `EncodedTargetLedgerConditions` is stated for a total one-step-per-chain cap
+completion.  The source reduction may omit chains; its partial ledger inherits encoded
+distinctness through `EncodedTargetLedgerConditions.wotsFUd_partial`.
+
 Both records are satisfied by every FIPS 205 parameter set and by the limited SHA2-128-24 profile.
 The scope here is the eight tweakable-hash target roles.  The two secret-key derivation address
 types pass through the same SHA-2 gate but are not hash targets, so they are not covered.
@@ -428,7 +432,9 @@ theorem encodeTargets_shake_nodup {p : Params} {addresses : List Adrs}
   rw [ha', hb'] at hvec
   exact hvec
 
-/-- Every reachable target ledger keeps distinct tweaks under the SHA-2 instantiation. -/
+/-- Every reachable target ledger keeps distinct tweaks under the SHA-2 instantiation.  The UD
+field covers total cap completions; `EncodedTargetLedgerConditions.wotsFUd_partial` specializes
+the resulting structure to every partial source-shaped UD selection. -/
 theorem sha2EncodedTargetLedgerConditions (vp : ValidatedParams)
     (hb : ApprovedAddressBounds vp.params) :
     EncodedTargetLedgerConditions vp (sha2Primitives vp.params) where
@@ -457,10 +463,12 @@ theorem sha2EncodedTargetLedgerConditions (vp : ValidatedParams)
     fun a ha => sha2Domain_of_addressFacts hb
       (addressFacts_xmssNodeAddresses vp hb.toCanonicalAddressBounds a ha)
 
-/-- Every reachable target ledger keeps distinct tweaks under the SHAKE instantiation.  Only the
-canonical widths are needed, so this covers parameter sets whose hypertree is too tall for SHA-2's
-compressed eight-byte tree field.  Being too deep for its one-byte layer field is not possible:
-`CanonicalAddressBounds.d_le_256` rules that out. -/
+/-- Every reachable target ledger keeps distinct tweaks under the SHAKE instantiation.  The UD
+field covers total cap completions, and `EncodedTargetLedgerConditions.wotsFUd_partial` derives
+the source-shaped partial selections.  Only the canonical widths are needed, so this covers
+parameter sets whose hypertree is too tall for SHA-2's compressed eight-byte tree field.  Being
+too deep for its one-byte layer field is not possible: `CanonicalAddressBounds.d_le_256` rules
+that out. -/
 theorem shakeEncodedTargetLedgerConditions (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     EncodedTargetLedgerConditions vp (shakePrimitives vp.params) where

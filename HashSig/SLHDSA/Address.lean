@@ -27,7 +27,7 @@ representability, recognized types, and type-specific canonical padding at exter
 
 ## References
 
-- NIST FIPS 205, §4.2 (ADRS), Table 1 (member functions), §11.2.1 (ADRSc compression)
+- NIST FIPS 205, §4.2 (ADRS), Table 1 (member functions), §11.2 (ADRSc compression)
 -/
 
 @[expose] public section
@@ -214,7 +214,7 @@ def toBytes (a : Adrs) : List Byte :=
   toBytesBE a.layer 4 ++ toBytesBE a.tree 12 ++ toBytesBE a.type 4 ++
     toBytesBE a.word1 4 ++ toBytesBE a.word2 4 ++ toBytesBE a.word3 4
 
-/-- The 22-byte SHA-2 compressed address `ADRSc` (FIPS 205 §11.2.1): the low layer byte, low
+/-- The 22-byte SHA-2 compressed address `ADRSc` (FIPS 205 §11.2): the low layer byte, low
 eight tree bytes, low type byte, then the three four-byte type-dependent words. -/
 def compressSha2 (a : Adrs) : List Byte :=
   toBytesBE a.layer 1 ++ toBytesBE a.tree 8 ++ toBytesBE a.type 1 ++

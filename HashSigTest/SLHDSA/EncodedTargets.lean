@@ -13,6 +13,8 @@ public import HashSig.SLHDSA.Security.EncodedTargets
 Executable checks that the concrete address encoders keep the reachable target ledgers
 duplicate-free, run at the values rather than through the theorems: `Sha2Address.ofAdrs` is applied
 to every ledger entry and the encoded key lists are compared for duplicates at both key widths.
+The checks distinguish the total UD cap completion from a source-shaped partial UD selection and
+also cover an independent optional PRE selection.
 
 Two further groups pin the negative direction, because the ledgers of a small profile keep every
 field far below its encoded width and so exercise no boundary on their own.  `checkFieldBoundaries`
@@ -66,11 +68,11 @@ example : oneLayerParams.len = 2 := by decide
 example : oneLayerParams.w = 256 := by decide
 example : oneLayerParams.t = 2 := by decide
 
-example : ApprovedAddressBounds twoLayerParams :=
+theorem twoLayerApprovedAddressBounds : ApprovedAddressBounds twoLayerParams :=
   ⟨⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩,
     by decide, by decide⟩
 
-example : ApprovedAddressBounds oneLayerParams :=
+theorem oneLayerApprovedAddressBounds : ApprovedAddressBounds oneLayerParams :=
   ⟨⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩,
     by decide, by decide⟩
 
@@ -140,9 +142,20 @@ theorem deep_sha2_conditions_false :
   rw [htree₁, htree₂] at hcontra
   omega
 
-/-- The eight target-role ledgers of a profile, including the two whose ledger depends on a
-reduction's own selection.  The WOTS+ instance base addresses are not a role ledger and are left
-out. -/
+/-- A synthetic source-shaped UD selection at hybrid index zero: assigning each chain the digit
+`chain mod 4` omits digit-zero and digit-one chains, while the remaining chains select the first
+executable step. -/
+def partialUdSelection (vp : ValidatedParams) :
+    WotsChainCoord vp → Option (Fin (vp.params.w - 1)) := fun coord =>
+  if coord.2.val % 4 ≤ 1 then none else some (firstWotsStep vp)
+
+/-- A nontrivial optional selection used for the PRE role. -/
+def optionalPreSelection (vp : ValidatedParams) :
+    WotsChainCoord vp → Option (Fin (vp.params.w - 1)) := fun coord =>
+  if coord.2.val = 0 then none else some (firstWotsStep vp)
+
+/-- The eight condition ledgers of a profile, plus the partial UD ledger derived from its total cap
+completion.  The WOTS+ instance base addresses are not a role ledger and are left out. -/
 def ledgers (vp : ValidatedParams) : List (String × List Adrs) :=
   [("FORS leaves", forsLeafAddresses vp),
    ("FORS internal nodes", forsTreeAddresses vp),
@@ -150,10 +163,9 @@ def ledgers (vp : ValidatedParams) : List (String × List Adrs) :=
    ("XMSS internal nodes", xmssNodeAddresses vp),
    ("WOTS+ steps", wotsStepAddresses vp),
    ("WOTS+ public keys", wotsPkAddresses vp),
-   ("WOTS+ selected steps", selectedWotsAddresses vp fun _ => firstWotsStep vp),
-   ("WOTS+ optional steps",
-     optionalWotsAddresses vp fun coord =>
-       if coord.2.val = 0 then none else some (firstWotsStep vp))]
+   ("WOTS+ total UD cap completion", selectedWotsAddresses vp fun _ => firstWotsStep vp),
+   ("WOTS+ partial UD steps", optionalWotsAddresses vp (partialUdSelection vp)),
+   ("WOTS+ optional PRE steps", optionalWotsAddresses vp (optionalPreSelection vp))]
 
 /-! ## The two encoders at their concrete key widths -/
 
@@ -167,6 +179,19 @@ example (p : Params) (addresses : List Adrs) :
 
 example (p : Params) (addresses : List Adrs) :
     encodeTargets (shakePrimitives p) addresses = shakeKeys addresses := rfl
+
+/-- The assembled SHA-2 condition discharges the source-shaped partial UD ledger through the
+total-cap completion bridge. -/
+example :
+    (encodeTargets (sha2Primitives twoLayerParams)
+      (optionalWotsAddresses twoLayer (partialUdSelection twoLayer))).Nodup :=
+  (sha2EncodedTargetLedgerConditions twoLayer twoLayerApprovedAddressBounds).wotsFUd_partial _
+
+/-- The same partial-UD consumer composes with the weaker SHAKE bounds. -/
+example :
+    (encodeTargets (shakePrimitives deepParams)
+      (optionalWotsAddresses deep (partialUdSelection deep))).Nodup :=
+  (shakeEncodedTargetLedgerConditions deep deepCanonicalBounds).wotsFUd_partial _
 
 /-! ## Ledger checks -/
 
@@ -267,8 +292,8 @@ def main : IO Unit := do
   checkFieldBoundaries
   checkFallbackAliasing
   IO.println "SLH-DSA encoded target-ledger tests: PASS \
-    (two profiles, eight ledgers each; SHA-2 and SHAKE distinctness; five field boundaries; \
-    both encoders' out-of-domain aliasing)"
+    (two profiles, eight condition ledgers plus partial UD; SHA-2 and SHAKE distinctness; \
+    five field boundaries; both encoders' out-of-domain aliasing)"
 
 end SLHDSA.EncodedTargetsTest
 
