@@ -396,7 +396,8 @@ script test (args) do
     #["exe", "slhdsa_target_ledger_tests"],
     #["exe", "slhdsa_encoded_ledger_tests"],
     #["exe", "slhdsa_trace_target_tests"],
-    #["exe", "slhdsa_component_trace_tests"]]
+    #["exe", "slhdsa_component_trace_tests"],
+    #["exe", "slhdsa_canonical_game_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -474,6 +475,11 @@ log under both approved primitive bundles lands in the encoded ledger, and the F
 hypertree programs and key generation hit exactly the tweak set the FIPS 205 algorithm visits. -/
 lean_exe slhdsa_component_trace_tests where
   root := `HashSigTest.SLHDSA.ComponentTraces
+
+/-- Canonical component games: the target caps of every instantiated game on a small profile and
+the FIPS sets, and the `H_msg` ITSR index map and keyed hash. -/
+lean_exe slhdsa_canonical_game_tests where
+  root := `HashSigTest.SLHDSA.CanonicalGames
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
