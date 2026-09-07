@@ -124,3 +124,4 @@ jobs:
           HashSigTest.SLHDSA.Hypertree HashSigTest.SLHDSA.HypertreeGeneral
           HashSigTest.SLHDSA.Scheme HashSigTest.SLHDSA.GeneralScheme
           HashSigTest.SLHDSA.Sha2KAT HashSigTest.SLHDSA.C13KAT
+          HashSigTest.SLHDSA.ReachableTargets
