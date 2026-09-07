@@ -42,10 +42,6 @@ open WotsEncoding
 
 variable {p : Params}
 
-/-- `0 < w = 2^lgw`. -/
-theorem Params.w_pos (p : Params) : 0 < p.w := by
-  unfold Params.w; positivity
-
 /-! ### The hash chain (FIPS 205 Algorithm 5) -/
 
 /-- Low-level callback-parametric implementation of the WOTS+ chain. -/

@@ -19,7 +19,11 @@ checksum to decrease, and equal checksums together with pointwise `≤` force eq
 
 This module is a standard-model statement over `List ℕ` / `ℕ`, independent of the oracle/hash
 layer; a WOTS+ one-wayness reduction consumes
-`wots_fullDigits_incomparable` as its purely combinatorial ingredient.
+`wots_fullDigits_incomparable` as its purely combinatorial ingredient. It says nothing about
+how message digits arise from messages; the companion fact that the FIPS 205 message digits
+determine the message (`WotsEncoding.base2b_msg_injective`) is what lets
+`HashSig.SLHDSA.WotsInjectivity` restate incomparability for distinct *messages*
+(`chainStepsCore_two_encodings`).
 
 See FIPS 205 §5 for the WOTS+ specification this validates.
 -/
@@ -107,6 +111,19 @@ theorem Forall₂.append_inv {R : α → α → Prop} {xs₁ xs₂ ys₁ ys₂ :
   have hdrop := h.drop xs₁.length
   rw [drop1, hlen, drop2] at hdrop
   exact ⟨htake, hdrop⟩
+
+/-- Equal-length lists whose entries are related at every index (read through `getD`) are
+related by `Forall₂`. -/
+theorem Forall₂.of_getD {R : α → α → Prop} (d : α) :
+    ∀ {xs ys : List α}, xs.length = ys.length →
+      (∀ i, i < xs.length → R (xs.getD i d) (ys.getD i d)) → Forall₂ R xs ys
+  | [], [], _, _ => .nil
+  | x :: xs, y :: ys, hlen, h =>
+      .cons (by simpa using h 0 (Nat.succ_pos _))
+        (Forall₂.of_getD d (by simpa using hlen) fun i hi => by
+          simpa using h (i + 1) (by simpa using hi))
+  | [], _ :: _, hlen, _ => by simp at hlen
+  | _ :: _, [], hlen, _ => by simp at hlen
 
 /-! ## Base-w digit arithmetic -/
 
@@ -311,6 +328,13 @@ def wotsFullDigits (dig : List ℕ) (w _l1 l2 : ℕ) : List ℕ :=
 theorem wotsFullDigits_length (dig : List ℕ) (w l1 l2 : ℕ)
     (hLen : dig.length = l1) : (wotsFullDigits dig w l1 l2).length = l1 + l2 := by
   simp [wotsFullDigits, hLen, digitsOfBaseW_length]
+
+/-- The full digit vector determines the message digits: the checksum suffix has the fixed
+width `l2`, so equal full vectors have equal message prefixes. -/
+theorem wotsFullDigits_inj {dig1 dig2 : List ℕ} {w l1 l2 : ℕ}
+    (h : wotsFullDigits dig1 w l1 l2 = wotsFullDigits dig2 w l1 l2) : dig1 = dig2 := by
+  unfold wotsFullDigits at h
+  exact List.append_inj_left' h (by simp [digitsOfBaseW_length])
 
 /-! ## Checksum algebra -/
 
