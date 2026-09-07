@@ -475,14 +475,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Batteries' environment linters over the seven proof libraries (the `lintDriver` in
       # `lakefile.lean`) import one whole environment per library; run inside `Build Project`
       # they pushed the hosted runner into a shutdown, so they get a fresh runner and the
       # oleans that job saved. `fail-on-cache-miss` keeps a missing cache from turning into a
       # second full build.
       - name: Restore Lake cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .lake
           key: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}-${{ github.sha }}
