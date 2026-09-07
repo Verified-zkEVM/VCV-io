@@ -20,7 +20,6 @@ are phrased by running that implementation through the writer-cost instrumentati
 @[expose] public section
 
 open OracleSpec
-open scoped BigOperators
 
 namespace HasQuery
 
@@ -353,9 +352,6 @@ lemma le_expectedQueryCost_of_usesCostAtLeast
     (AddWriterT.le_expectedCost_of_pathwiseCostAtLeast
       (oa := HasQuery.Program.withAddCost oa runtime costFn) (w := w) (val := val) h hval)
 
-@[deprecated (since := "2026-06-25")]
-alias expectedQueryCost_ge_of_usesCostAtLeast := le_expectedQueryCost_of_usesCostAtLeast
-
 lemma expectedQueryCost_eq_of_usesCostExactly
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryImpl spec m}
@@ -376,9 +372,6 @@ lemma le_expectedQueries_of_usesAtLeastQueries [LawfulMonad m]
     (AddWriterT.le_expectedCost_of_pathwiseCostAtLeast
       (oa := HasQuery.Program.withUnitCost oa runtime) (w := n) (val := fun k ↦ (k : ENNReal)) h
       Nat.mono_cast)
-
-@[deprecated (since := "2026-06-25")]
-alias expectedQueries_ge_of_usesAtLeastQueries := le_expectedQueries_of_usesAtLeastQueries
 
 lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     [LawfulMonad m]

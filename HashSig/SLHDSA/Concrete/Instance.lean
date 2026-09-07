@@ -22,7 +22,8 @@ the FIPS 205 §11.2.1 SHA-2 (category-1) instantiation:
 
 where `ADRSc` is the 22-byte compressed address (`Adrs.compressSha2`). A fixed-width signature
 decoder (`decodeSignature`) parses the 3856-byte FIPS wire format
-(`R ‖ SIG_FORS ‖ SIG_HT`) so reference signatures can be verified.
+(`R ‖ SIG_FORS ‖ SIG_HT`) so reference signatures can be verified; it is proved to agree with
+the strict structured codec on every canonical wire in `HashSig.SLHDSA.Concrete.Codec`.
 
 `keygen`/`sign` are intentionally not executed here (they build the full `2^22`-leaf XMSS and
 FORS trees — ~`10^9` hashes); `verify` is ~`400` hashes and is the executable validation path.
@@ -130,7 +131,17 @@ theorem shaParams_d_eq_one : slhdsaSha2_128_24.d = 1 := rfl
 /-! ### Fixed-width signature decoding (FIPS 205 Fig 17 wire format) -/
 
 /-- Decode the 3856-byte signature `R ‖ SIG_FORS ‖ SIG_HT` (FORS: `k` trees of
-`sk(16) ‖ auth(a×16)`; HT: WOTS `len×16` then XMSS auth `h'×16`). -/
+`sk(16) ‖ auth(a×16)`; HT: WOTS `len×16` then XMSS auth `h'×16`).
+
+This fixed-offset reader predates the strict structured codec (`HashSig.SLHDSA.Codec`) and
+performs no width check of its own; KAT inputs are exact-width by construction. It is proved
+to agree with the strict codec on every canonical wire:
+`SLHDSA.Concrete.decodeSignature_encodeSignature` shows that decoding a strict
+`encodeSignature` wire recovers exactly the encoded signature, and
+`SLHDSA.Concrete.decodeSignature_eq_of_strict_ok` shows that whenever the strict checked
+decoder accepts an input, this decoder produces the same structured value
+(`HashSig.SLHDSA.Concrete.Codec`). New FIPS-facing byte surfaces should use the strict
+codec, which rejects non-exact widths before any semantic value is built. -/
 def decodeSignature (ba : ByteArray) : SignatureCore slhdsaSha2_128_24 shaPrimitives.core :=
   let R : Bytes 16 := baSliceToB16 ba 0
   let fors : ForsSigCore slhdsaSha2_128_24 shaPrimitives.core :=

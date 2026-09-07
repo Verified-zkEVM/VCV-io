@@ -378,6 +378,34 @@ lean_exe slhdsa_kat where
 lean_exe slhdsa_c13_kat where
   root := `HashSigTest.SLHDSA.C13KAT
 
+/-- Exact parameter-width and structured key/signature wire-codec regression suite. -/
+lean_exe slhdsa_data_codec_tests where
+  root := `HashSigTest.SLHDSA.DataCodecTests
+
+/-- SHA2/SHAKE vectors, address rejection, and all-profile primitive grammars. -/
+lean_exe slhdsa_primitive_tests where
+  root := `HashSigTest.SLHDSA.PrimitiveTests
+
+/-- WOTS+ checksum/construction exercise across all approved SHA2/SHAKE profiles. -/
+lean_exe slhdsa_wots_tests where
+  root := `HashSigTest.SLHDSA.WotsConstructionTests
+
+/-- Bounded XMSS construction, address-domain, and selected concrete-profile exercise. -/
+lean_exe slhdsa_xmss_tests where
+  root := `HashSigTest.SLHDSA.XmssConstructionTests
+
+/-- S07 FORS extraction, address-domain, tiny exhaustion, and selected concrete-profile exercise. -/
+lean_exe slhdsa_fors_tests where
+  root := `HashSigTest.SLHDSA.ForsConstructionTests
+
+/-- General-hypertree trajectories, checked addresses, and selected concrete construction. -/
+lean_exe slhdsa_hypertree_tests where
+  root := `HashSigTest.SLHDSA.HypertreeConformanceTests
+
+/-- Algorithms 21--25 message boundary and all twelve ACVP pre-hash digest/OID canaries. -/
+lean_exe slhdsa_external_tests where
+  root := `HashSigTest.SLHDSA.External
+
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
 TCB-isolation gate: that gate bounds imports, this one accounts for the axioms every

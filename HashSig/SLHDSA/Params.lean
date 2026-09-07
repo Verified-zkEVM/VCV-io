@@ -28,7 +28,6 @@ The Winternitz and FORS lengths are derived from the primary parameters exactly 
 
 @[expose] public section
 
-
 namespace SLHDSA
 
 /-- Byte values used by the SLH-DSA encodings and address layout. -/
@@ -323,26 +322,10 @@ def validatedParams (ps : LimitedParameterSet) : ValidatedParams :=
 
 end LimitedParameterSet
 
-/-- Compatibility name for the former reduced-profile-only parameter enumeration. -/
-@[deprecated LimitedParameterSet (since := "2026-08-30")]
-abbrev ParameterSet := LimitedParameterSet
-
-namespace ParameterSet
-
-/-- Compatibility interpretation of a reduced-profile parameter name. -/
-@[deprecated LimitedParameterSet.params (since := "2026-08-30")]
-abbrev params : ParameterSet → Params := LimitedParameterSet.params
-
-end ParameterSet
-
 /-- The SLH-DSA-SHA2-128-24 parameter record (NIST SP 800-230 reduced set). -/
 def slhdsaSha2_128_24 : Params := LimitedParameterSet.params .SLHDSA_SHA2_128_24
 
 /-- Recognize the named limited-use parameter profiles. -/
 def Params.IsLimited (p : Params) : Prop := p = slhdsaSha2_128_24
-
-/-- Compatibility spelling for the previously supported reduced profile. -/
-@[deprecated Params.IsLimited (since := "2026-08-30")]
-abbrev Params.isApproved (p : Params) : Prop := p.IsLimited
 
 end SLHDSA

@@ -625,9 +625,6 @@ lemma IND_CPA_hybridLR_counted_run_eq_of_le
       (fun n mm => if n < k + 1 then mm.1 else mm.2) mm st
       (by simp [show ¬(st.2 < k) from by omega, show ¬(st.2 < k + 1) from by omega])
 
-@[deprecated (since := "2026-06-25")]
-alias IND_CPA_hybridLR_counted_run_eq_of_ge := IND_CPA_hybridLR_counted_run_eq_of_le
-
 /-- Counter monotonicity for the hybrid LR counted oracle: the counter never decreases. -/
 lemma IND_CPA_hybridLR_counted_counter_le
     (pk : PK) (k : ℕ)

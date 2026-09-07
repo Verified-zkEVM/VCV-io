@@ -37,9 +37,6 @@ open OracleSpec OracleComp
 
 open scoped OracleSpec.PrimitiveQuery
 
--- `QueryLog spec` is the list presentation of the corresponding PolyFun trace.
-attribute [local implicit_reducible] PFunctor.Idx
-
 variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
 
 namespace QueryImpl

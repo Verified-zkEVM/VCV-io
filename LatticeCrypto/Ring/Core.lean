@@ -28,7 +28,6 @@ the canonical vector-backed instantiation lives in `LatticeCrypto.Ring.VectorBac
 @[expose] public section
 
 
-open scoped BigOperators
 
 universe u v
 

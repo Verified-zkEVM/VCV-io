@@ -5,8 +5,8 @@ Authors: Quang Dao
 -/
 
 module
-public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTOpenPRE
-public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPR
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTOpenPREFinalValidity
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTDSPRFinalValidity
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTTCRFinalValidity
 
 /-!
