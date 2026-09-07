@@ -123,6 +123,35 @@ example (f : Bool → ProbComp (Fin 3)) (i : Bool) :
     (𝒟[Fintype.mPi f]).map (Function.eval i) = 𝒟[f i] := by
   simp [evalDist_mPi, Measure.pi_map_eval]
 
+/-- The empty product carries unit mass. -/
+def emptyFamily : Fin 0 → ProbComp Bool := fun i => i.elim0
+
+example : 𝒟[Fin.mOfFn 0 emptyFamily] Set.univ = 1 := by
+  simp [evalDist_mOfFn]
+
+/-- A product family with one successful coordinate and one failing coordinate. -/
+def familyWithFailure : Bool → OptionT ProbComp Bool
+  | false => pure false
+  | true => failure
+
+example : 𝒟[Fintype.mPi familyWithFailure] Set.univ = 0 := by
+  have hfail : 𝒟[familyWithFailure true] Set.univ = 0 := by
+    rw [evalDist_apply_univ]
+    simp [familyWithFailure]
+  rw [evalDist_mPi, Measure.pi_univ, Fintype.prod_bool, hfail, zero_mul]
+
+example : (𝒟[Fintype.mPi familyWithFailure]).map (Function.eval false) = 0 := by
+  have hfail : 𝒟[familyWithFailure true] Set.univ = 0 := by
+    rw [evalDist_apply_univ]
+    simp [familyWithFailure]
+  have hmem : true ∈ (Finset.univ.erase false : Finset Bool) := by simp
+  have hprod : ∏ j ∈ Finset.univ.erase false, 𝒟[familyWithFailure j] Set.univ = 0 :=
+    Finset.prod_eq_zero hmem hfail
+  rw [evalDist_mPi, Measure.pi_map_eval, hprod, zero_smul]
+
+example : 𝒟[familyWithFailure false] ≠ 0 := by
+  simp [familyWithFailure]
+
 /-! ## A unit-test program
 
 A coin and a die drawn independently, closed on the measure side by the same calls as the

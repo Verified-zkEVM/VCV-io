@@ -3,6 +3,7 @@ Copyright (c) 2026 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
+
 module
 
 public import VCVio.EvalDist.IndepProduct
@@ -25,7 +26,7 @@ the other factors carry full mass, which is the `Pr[⊥ | _] = 0` hypothesis of 
 `probEvent_coord_mPi`, read through `evalDist_apply_univ`.
 -/
 
-@[expose] public section
+public section
 
 open MeasureTheory
 
