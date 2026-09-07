@@ -15,7 +15,7 @@ two valid signatures for each message, while honest signing returns only one of 
 the distinction between message freshness and exact returned-pair freshness observable.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec
 

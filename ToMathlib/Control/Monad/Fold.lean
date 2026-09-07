@@ -3,12 +3,13 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-module
 
+module
 public import Mathlib.Control.Monad.Basic
 public import Mathlib.Data.Fin.Basic
 public import Mathlib.Data.Fin.Tuple.Basic
 public import Mathlib.Control.Basic
+
 /-!
 # `Fin`-indexed monadic sequencing
 
@@ -31,16 +32,3 @@ def Fin.mOfFn {m : Type u → Type v} [Monad m] {α : Type u} :
     let a ← f 0
     let rest ← Fin.mOfFn n (fun i => f i.succ)
     return Fin.cons a rest
-
-/-! ### `forIn` / `foldlM` bridge for imperative-style loops
-
-Lean's `for`/`let mut` syntax desugars to `List.forIn` with `MProd` state and
-`ForInStep.yield` continuations, while functional-style code uses `List.foldlM`
-with `Prod` state. The lemmas below bridge these two representations.
-
-For a single mutable variable (no `MProd` wrapper), use Mathlib's
-`List.forIn_yield_eq_foldlM` directly. -/
-
-section CrossTypeBind
-
-end CrossTypeBind

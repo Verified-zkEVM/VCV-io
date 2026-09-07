@@ -15,7 +15,7 @@ These examples cover the two observable contracts of the `d = 1` hypertree layer
 transparent XMSS composition, and verification recovers a root before its final comparison.
 -/
 
-@[expose] public section
+public section
 
 namespace SLHDSA.HypertreeTest
 

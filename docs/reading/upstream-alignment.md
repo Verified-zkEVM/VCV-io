@@ -25,9 +25,12 @@ little else as it can get away with.**
 
 ## Method, and how to repeat it
 
-Every claim below was checked against source on disk, not recalled. A name is a
-hypothesis; the declaration in the pinned tree is the evidence. An *absence* claim names the
-search that came back empty.
+The original survey recorded source checks at the revisions below. File/line citations,
+usage counts, and the area surveys describe that snapshot; they are not current inventories.
+The status table at the end records subsequent integration. Current agent guides take
+precedence for implementation policy. A name is a hypothesis; inspect the declaration and
+compile a client before adopting it. A negative keyword search records what was searched,
+not a proof that no equivalent API exists.
 
 | Tree | Revision surveyed | How |
 |---|---|---|
@@ -40,8 +43,8 @@ search that came back empty.
 | loom2 | `2f65f311` (2026-07-15) | checkout; upstream last commit 2026-04-19 |
 
 Traps recorded by PolyFun and confirmed here: the newest local toolchain directory is not
-necessarily newer than the pin (check `bin/lean --version`); anything found on `master` but
-absent from the `v4.34.0-rc2` tag ships in v4.35, so a v4.34 bump buys none of it; and an
+necessarily newer than the pin (check `bin/lean --version`); an API found on `master` but
+absent from a release tag must not be assigned to a future release without checking that tag; and an
 instance-providing module can be load-bearing with zero textual references, so "unused"
 needs an instance-synthesis check, not a grep.
 
@@ -60,7 +63,7 @@ needs an instance-synthesis check, not a grep.
 | `ToMathlib/Control/Monad/Commutative.lean:35` `Monad.Commutative`, `CommutativeAt` :26, `Set.monadComm` :196, the `Id`/`Option`/`Except`/`ReaderT` instances | `CommApplicative`, `Mathlib/Control/Basic.lean:206`; `instance : CommApplicative Set`, `Mathlib/Data/Set/Functor.lean:88` | yes | **done** (this PR) — 0 consumers outside the file; for a `LawfulMonad`, `bind_comm` follows from `CommApplicative.commutative_prod` via `seq_eq_bind_map`, and the converse constructs `CommApplicative` (both compiled during the survey). Mathlib has **no** `CommApplicative Option`/`Id`/`Except`/`ReaderT` instances at the pin (`grep instance.*CommApplicative` → `Finset`, `Set`, `Applicative.lean:74`, `FreeAbelianGroup`, `Filter`), so those four become *upstream* rows |
 | `ToMathlib/Control/WriterT.lean:130` `run_seqLeft'` | local `run_seqLeft` :83 | — | **done** (this PR) — verbatim duplicate inside the same file, 0 consumers |
 | `ToMathlib/Control/Monad/Ordered.lean:39,46` `pointwiseRelation`, `Proper` | `Pi.le_def`; `Relator.LiftFun`, `Mathlib/Logic/Relator.lean` | yes | **done** (this PR) — 0 uses, even inside the file |
-| `HashSig/SLHDSA/WotsChecksum.lean:38` `Forall₂` (+ `length_eq` :43, `sum_le` :49, `take`, `drop`) | `List.Forall₂`, `Batteries/Data/List/Basic.lean:383`; `List.Forall₂.length_eq`, `Mathlib/Data/List/Forall2.lean:133`; `forall₂_take`/`forall₂_drop`, `:180,185`; `List.Forall₂.sum_le_sum`, `Mathlib/Algebra/Order/BigOperators/Group/List.lean:27` (`to_additive` of `prod_le_prod'`) | yes | **done** (this PR) — `sum_le_sum` needs `Mathlib.Algebra.Order.Ring.Nat` for `AddLeftMono ℕ`; `append_inv` is re-proved from `forall₂_take_append`/`forall₂_drop_append` (`:190,196`); `eq_of_sum_eq` :57 is new content and stays |
+| `HashSig/SLHDSA/WotsChecksum.lean:38` `Forall₂` (+ `length_eq` :43, `sum_le` :49, `take`, `drop`) | `List.Forall₂`, `Batteries/Data/List/Basic.lean:383`; `List.Forall₂.length_eq`, `Mathlib/Data/List/Forall2.lean:133`; `forall₂_take`/`forall₂_drop`, `:180,185`; `List.Forall₂.sum_le_sum`, `Mathlib/Algebra/Order/BigOperators/Group/List.lean:27` (`to_additive` of `prod_le_prod'`) | yes | **done** (this PR) — `sum_le_sum` needs `Mathlib.Algebra.Order.Group.Nat` for `AddLeftMono ℕ`; `append_inv` is re-proved from `forall₂_take_append`/`forall₂_drop_append` (`:190,196`); `eq_of_sum_eq` :57 is new content and stays |
 | `VCVio/OracleComp/SimSemantics/StateT/PreservesInv.lean:54` `QueryImpl.PreservesInv` | local `StateT.PreservesInv` :143 | — | **open (internal)** — the first unfolds to `∀ t, StateT.PreservesInv (impl t) Inv`; redefine it that way, `preservesInv_iff := Iff.rfl` |
 | `Examples/ProgramLogic/RelationalDerived.lean:10` `public import Cslib.Foundations.Data.PFunctor.Free` | — | — | **keep** — corrected while landing this PR: no identifier from the module is used, but removing the import breaks the file (`PFunctor.FreeM.instPure` is otherwise reachable only through `public meta import`, so the non-`meta` import is what makes the `pure` instance usable in definitions). A name search cannot see module-visibility dependencies; the row was wrong |
 | `LibSodium/SHA2.lean` | — | — | **done** (this PR) — 0-byte file |
@@ -97,9 +100,9 @@ needs an instance-synthesis check, not a grep.
 | `ToMathlib/General.lean:400` `Finset.sum_boole'` | `Finset.sum_boole` (`Mathlib/Algebra/BigOperators/Ring/Finset.lean:44`) is the `r = 1` case only; searched `sum_boole_nsmul`, `sum_ite_const`, `sum_boole_mul` — none is the `#filter • r` form. Re-prove via `sum_ite`, `sum_const_zero`, `sum_const`. |
 | `ToMathlib/Control/WriterT.lean:107–135` `run_monadLift'`, `liftM_def'`, `run_pure'`, `run_bind'`, `run_map'` | Mathlib's `WriterT.run_pure/run_map/run_bind/run_liftM` (`Mathlib/Control/Monad/Writer.lean:93–121`) are generic in `empty append` under `letI := monad empty append`; the primed forms are their instance-specialised simp shapes (`Prod.map f id` vs `fun (a, w) ↦ (f a, w)`), with 25 call sites in `CryptoFoundations/FiatShamir/Sigma/Fork.lean` and `MacFromPRF.lean` that chain `support_bind`/`Set.image_singleton` after them. Keep the statements; prove them by the upstream lemmas. The "7 sorries" once attributed to this file are comment text (`scripts/axiom_baseline.json` has no WriterT entry). |
 | `ToMathlib/Data/Set/Functor.lean:36–45` `SetM.run_pure/run_bind/run_map` | Upstream `Mathlib/Data/Set/Functor.lean` ends at `SetM.run` (line 190 of 190) with no `run_*` equations; the local lemmas are wrapper-boundary statements whose proofs already are `Set.pure_def`/`bind_def`/`fmap_eq_image`. Consumers in `VCVio/OracleComp/EvalDist.lean`. Upstream candidate. |
-| `ToMathlib/Data/ENNReal/AbsDiff.lean:40` `ENNReal.absDiff` | `absDiff a b = edist a b` is provable (15 lines, compiled during the survey), but `ℝ≥0∞` is only a `WeakEMetricSpace` at the pin (`Mathlib/Topology/EMetricSpace/Weak.lean:247`; `PseudoEMetricSpace ℝ≥0∞` does not synthesize), so none of the local API is derivable from `edist`. Add `absDiff_eq_edist` as the bridge. |
+| `ToMathlib/Data/ENNReal/AbsDiff.lean:40` `ENNReal.absDiff` | `absDiff a b = edist a b` is provable (15 lines, compiled during the survey), but `ℝ≥0∞` is only a `WeakEMetricSpace` at the pin (`Mathlib/Topology/EMetricSpace/Weak.lean:247`; `PseudoEMetricSpace ℝ≥0∞` does not synthesize), so full metric-space APIs cannot be assumed. Add `absDiff_eq_edist` as the bridge and check which individual weak-metric lemmas apply. |
 | `ToMathlib/Data/ENNReal/SumSquares.lean` `sq_sum_le_card_mul_sum_sq` | Name-collides with `Mathlib/Algebra/Order/Chebyshev.lean:136`, whose hypotheses are ordered-ring; `ℝ≥0∞` is not. Keep under the `ENNReal` namespace with a docstring cross-reference. |
-| `List.Vector` in 30 files (`MerkleTree/{Inductive,Addressed,MultiExtractability}/**`, `EvalDist/List.lean`, `Examples/PRGfromPRF.lean`, `ToMathlib/General.lean`) | Mathlib's `Mathlib/Data/Vector/Defs.lean` docstring steers verification code to core `Vector`, but core `Vector` has no `cons`, `head` needs `[NeZero n]`, `tail : Vector α (n-1)` (`Init/Data/Vector/Basic.lean:138,416`), and no `inductionOn`; no `List.Vector ↔ Vector` conversion exists in core, Batteries, or Mathlib (grep `toListVector\|List.Vector.toVector\|ofListVector` empty). The Merkle proofs are cons/nil inductions along depth. Keep. The one migration that is free: a core-`Vector` `SampleableType` instance beside the `List.Vector` one in `VCVio/OracleComp/Constructions/SampleableType.lean`. |
+| `List.Vector` in 30 files (`MerkleTree/{Inductive,Addressed,MultiExtractability}/**`, `EvalDist/List.lean`, `Examples/PRGfromPRF.lean`, `ToMathlib/General.lean`) | Mathlib's `Mathlib/Data/Vector/Defs.lean` docstring steers verification code to core `Vector`, but core `Vector` has no `cons`, `head` needs `[NeZero n]`, `tail : Vector α (n-1)` (`Init/Data/Vector/Basic.lean:138,416`), and no `inductionOn`; no `List.Vector ↔ Vector` conversion exists in core, Batteries, or Mathlib (grep `toListVector\|List.Vector.toVector\|ofListVector` empty). The Merkle proofs are cons/nil inductions along depth. Keep. Both core-`Vector` and `List.Vector` already have `SampleableType` instances in `VCVio/OracleComp/Constructions/SampleableType.lean`; keep their coverage when changing either representation. |
 | `@[reducible]` on `OracleComp`, `OracleSpec.toPFunctor`, `ofFn`, `unifSpec`, `ProbComp`, `QueryImpl` | Type-level constructors; instance discrimination-tree keys depend on them (`docs/agents/gotchas.md` §7). |
 | `scripts/AxiomSweep.lean` | `leanprover-community/axiom-audit` (reachable through `lean-action`'s `axiom-audit` input) is allowlist-only with **no committed baseline**, so it cannot express the shrink-only `sorryAx` ratchet (40 entries on `main`) or the `._native.` zero-debt rule (now with an empty grandfathered list: no `native_decide` remains in the proof libraries). |
 | Sub-probability, TV/Rényi/KL divergences, couplings, `NegativeHypergeometric`, `MeasurableSpace (Option/Except)`, the `ToMathlib/Control` monad-theory files, `OrderEnrichedCategory`, `FinRatPMF`, the `LatticeCrypto/Ring` backend, the concrete SHA-2/Keccak/FPR implementations | Verified absent from the pinned trees by keyword grep (`IsSubprobability`, `Coupling` (only Gromov–Hausdorff hits), `hypergeometric`, `MeasurableSpace (Option`, `DijkstraMonad\|GradedMonad\|IndexedMonad\|RelativeMonad\|OrderedMonad\|MonadTransformer`, `MonoidalCategory Preord`, `NTT\|negacyclic`). |
@@ -119,37 +122,22 @@ needs an instance-synthesis check, not a grep.
 
 ### Track — heading into core, or blocked on a design decision
 
-**Program logic: core is absorbing Loom's design.** Core ships two complete WP stacks at the
-pin: the public `Std/Do/` (`SPred`/`PostShape`-indexed; conjunctivity is a *field* of
-`PredTrans`, `Std/Do/PredTrans.lean:63–70`) and `Std/Internal/Do/` (lattice-generic over
-`Lean.Order.CompleteLattice`, `Std/Internal/Do/Order/Basic.lean:15–20`). On `master` the
-latter becomes public `Std.WP` with `LawfulWPMonadAttach`, and `mvcgen` is deprecated for
-`vcgen`; none of it is in `v4.34.0-rc2`, so all of it is **v4.35**. VCVio's
-`VCVio/ProgramLogic/{Unary,Relational}/Loom/*` and `ToMathlib/Control/Monad/RelWP.lean` sit on
-loom2's `Std.Do'` three-parameter `WP m Pred EPred` — the design being upstreamed. Loom may be
-imported only by those five files (`VCVio/ProgramLogic/Tactics/Unary/Internals.lean`,
-`Unary/Loom/{Qualitative,Probabilistic,Quantitative}.lean`, `ToMathlib/Control/Monad/RelWP.lean`).
-The obstacle is total: pinned Mathlib has **zero** `Lean.Order` occurrences, VCVio's `ℝ≥0∞`/`Prob`
-lattice instances come from loom2 (`Loom/LatticeExt.lean:18–22`), and `NotationCore.lean` bakes
-`Lean.Order.bot` into notation; 19 files touch `Lean.Order`. First step at 4.35: a
-`ToMathlib/Order/LeanOrderBridge.lean` giving `Lean.Order.CompleteLattice` from Mathlib's for
-`ℝ≥0∞`, then drop `Loom.WP.Basic`.
+**Program logic: migrate against the pinned APIs.** Lean v4.33.1 already publicly exposes
+`Std.Do.WP`; `VCVio/ProgramLogic/Unary/StdDoBridge.lean` uses it. Core's `mvcgen` and Sym-based
+`vcgen` coexist at this pin, and neither is deprecated. Loom's quantitative and relational
+clients use a different carrier-indexed interface, so replacing them requires a `PostShape`
+adapter and suitable order instances, not merely a future toolchain version.
 
-**Do not retarget `mvcgen` before 4.35.** Real invocations live in
-`VCVio/ProgramLogic/Unary/{HandlerSpecs,StdDoExamples}.lean` and call core `Std.Do`
-(`Std/Tactic/Do/Syntax.lean:436`), which is *not* deprecated at the pin; every other
-occurrence is docstring prose. VCVio's own `syntax (name := vcgenBasic) "vcgen" : tactic`
-(`VCVio/ProgramLogic/Tactics/Unary.lean:321`) shares its token with core `vcgen` (`:464`);
-both parse into a `choice` node, and `evalChoiceAux` only falls through on `unsupportedSyntax`.
-No file imports both today. Decide the rename with the retarget.
-
-**`docs/agents/program-logic.md:679`** described the 4.29 state ("Lean v4.29.0 ships
-`mvcgen`…"); the Sym-based `vcgen` is in core at 4.33 under `Lean.Elab.Tactic.Do.Internal`.
-Refreshed in #653, which also adds the name-collision canary `VCVioTest/VCGenAmbiguity.lean`
-and records the Loom import allowlist in `docs/agents/module-system.md`.
+Core's `vcgen` and VCVio's `vcgen` are both in scope through the root `VCVio` import.
+`VCVioTest/VCGenAmbiguity.lean` checks that a framework `wp` goal still closes in that setting.
+The pinned `Sym.Simp.Theorems.rewrite`, `Sym.Simp.SimpM.run`, and `SymM.run` are public; the
+remaining work is adapting VCVio's registries and goals to their interfaces. See the
+[program-logic guide](../agents/program-logic.md#future-vcgen-bridge-deferred) and the
+[module-system guide](../agents/module-system.md) for the verified boundary from #653.
+Do not infer a release schedule or an API's absence from the original survey's searches.
 
 **Transparency.** `attribute [implicit_reducible] OracleSpec` (`VCVio/OracleComp/OracleSpec.lean:44`)
-is documented as making the wrapper unfold during instance synthesis, but at the pin
+was documented in the survey snapshot as helping instance synthesis, but at the pin
 `[implicit_reducible]` unfolds at `.implicit` only (`Lean/ReducibilityAttrs.lean:214–216`),
 instance synthesis runs at `.instances` (`Lean/Meta/SynthInstance.lean:963`), and `.instances`
 "does *not* unfold `[implicit_reducible]`" (`Init/MetaTypes.lean:123–125`). The `HAdd`
@@ -222,7 +210,8 @@ Batteries, `Cs:` cslib, `V:` VCVio `main`. Design constraints already accepted
 **Correspondence.** `𝒟[mx]` is a `Measure`; the local `IsSubprobabilityMeasure`
 (`V:ToMathlib/MeasureTheory/Measure/Subprobability.lean:37`) has no upstream twin
 (`grep -rni 'subprobability\|SubMarkov'` → 0; `IsZeroOrProbabilityMeasure` is incomparable).
-`evalSPMF` is `OptionT PMF`; `probOutput` is `μ {x}`; `probEvent` is `μ {x | p x}` and
+`evalSPMF` takes values in `OptionT PMF`; on the discrete compatibility interpretation,
+`probOutput` is `μ {x}` and `probEvent` is `μ {x | p x}`. Also,
 `PMF.toOuterMeasure` (`M:Probability/ProbabilityMassFunction/Basic.lean:137`) is already the
 `OuterMeasure.sum` of weighted diracs, so the integration doc's proposed form is `rfl`;
 `expectedValue` is `∫⁻` (`M:MeasureTheory/Integral/Lebesgue/Basic.lean:56`); `Fintype.mPi` is
@@ -251,7 +240,9 @@ favour of the measures `Ber(x,y,p)` / `Bin(n,p)` (`M:Probability/Distributions/{
   analogue of `UnfoldEvalDist`.
 - *Orientation.* Mathlib unfolds `Kernel.comp_apply`/`Measure.bind_apply` toward `lintegral`; VCVio's
   `Pr` set unfolds toward `tsum`; `ENNReal.tsum_mul_left/right` is used in both directions (65×/91×).
-- *`ae` vs support quantifiers.* `∀ x ∈ support mx, p x` is `∀ᵐ x ∂𝒟[mx], p x`; the measure
+- *`ae` vs support quantifiers.* A bridge from `∀ x ∈ support mx, p x` to `∀ᵐ x ∂𝒟[mx], p x` needs
+  assumptions relating syntactic support to positive mass, such as the uniform discrete path;
+  it is not an unconditional equivalence for arbitrary oracle distributions. The measure
   statements (`ae_iff_prob_eq_one` `M:…/Typeclasses/Probability.lean:172`, `Measure.ae_ae_of_ae_bind`
   `M:…/GiryMonad.lean:244`, `Kernel.ae_comp_iff`) are single filter atoms, which sidesteps the
   `grind` saturation cycle `docs/agents/probability.md` documents. `∀ᵐ` has 2 uses in `V:VCVio/`.
@@ -364,7 +355,7 @@ at `.pure` shape only, `V:VCVio/ProgramLogic/Unary/StdDoBridge.lean:70–76`); t
    priority so core's `Prop` instance stays first) replaces the four hand instances
    (`V:VCVio/ProgramLogic/Unary/Loom/Quantitative.lean:121,132`, `Probabilistic.lean:106,134`); `Prob`'s
    lattice comes free from `Set.Iic 1` (`M:Order/CompleteLatticeIntervals.lean:227`). This is also the
-   first step of the v4.35 `Std.WP` migration.
+   an order-adapter step for a possible Loom migration.
 4. `LawfulAppend` (`V:ToMathlib/Control/WriterT.lean:30`) is `Std.Associative (·++·)` +
    `Std.LawfulIdentity (·++·) ∅` (`C:Init/Core.lean:2478,2542`; `List` instances
    `C:Init/Data/List/Basic.lean:627,647`, re-proved locally at `WriterT.lean:51`). 49 uses.
@@ -390,7 +381,7 @@ at `.pure` shape only, `V:VCVio/ProgramLogic/Unary/StdDoBridge.lean:70–76`); t
    `PMF.bind_comm` (the commented-out `sorry` block at `Commutative.lean:201–208` is exactly this).
 10. Dead `ToMathlib/Control` files (0 reverse deps): `Lawful/{MonadFunctor,MonadControl,MonadReader,
     MonadState}` (two are stubs), `AlternativeMonad`, `Monad/{Dijkstra,Graded,Relative,Commutative}`.
-    Prune, `deprecated_module`, or move the sorry-free ones to PolyFun, where the category-theory
+    Prune unused modules or move the sorry-free ones to PolyFun, where the category-theory
     imports they pull already live.
 11. Low priority: `ULiftable` (`M:Control/ULiftable.lean:53`) for the 17 `ULift Bool` scheduler
     signatures in `V:VCVio/Interaction/UC/*`; `Relator.LiftFun` (`M:Logic/Relator.lean:34`) for
@@ -447,7 +438,7 @@ unverified ticks (cross-reference only). PolyFun's `CodeRetract (List Γ) A` is 
 
 **Dependency note.** VCVio's core datatype is definitionally cslib's `PFunctor.FreeM` through
 PolyFun's re-export (`PolyFun/PFunctor/Free/Basic.lean:11`); the single direct cslib import in VCVio is
-dead (see Adopt). The manifest on `main` pins cslib `98e395a7` (v4.33.1), inherited through PolyFun.
+load-bearing for non-`meta` instance visibility and is retained (see Adopt). The manifest on `main` pins cslib `98e395a7` (v4.33.1), inherited through PolyFun.
 
 ### `ℝ≥0∞`, infinite sums, and asymptotics
 
@@ -513,9 +504,9 @@ and the generic `negligible_natMul_of_poly_bound` / `negligible_ofReal_natDiv_of
 5. `sq_sum_div_card_le_sum_sq` (17 lines, `SumSquares.lean:63–80`) is two lines by
    `ENNReal.div_le_of_le_mul`; `add_div_two_mul_nat` (18 lines, `Gauss.lean:283–300`) is four by
    `ENNReal.mul_div_mul_left` + `div_add_div_same`.
-6. `ENNReal.absDiff = edist` (weak metric on `ℝ≥0∞`) derives the four metric axioms; the rest of the
-   `absDiff` API stays local because Mathlib's own TODO (`M:Topology/EMetricSpace/Weak.lean:267`) says the
-   `edist`-on-`ℝ≥0∞` API is empty.
+6. `ENNReal.absDiff = edist` (weak metric on `ℝ≥0∞`) is a candidate bridge to weak-metric lemmas; check their typeclass hypotheses before replacing
+   local proofs. Mathlib's own TODO (`M:Topology/EMetricSpace/Weak.lean:267`) requests more
+   `edist` lemmas on `ℝ≥0∞`, so it should not be read as a complete replacement API.
 
 **Gaps confirmed** (`M:` grep): `∑' a - ∑' b ≤ ∑' (a - b)` (only the ℕ-indexed equality `ENNReal.tsum_sub`);
 `edist`/`absDiff` API on `ℝ≥0∞`; `two_mul_le_add_sq`, Cauchy–Schwarz and Chebyshev on `ℝ≥0∞` (Mathlib's
@@ -540,7 +531,7 @@ random-oracle range that `BitVec.toNat` would serve equally. `ZMod` for coeffici
 `Vector UInt8 n` at the FIPS wire layer, `[Countable α]` for discrete measure semantics: all match
 Mathlib's idiom. Finset notation: `#s` and `#{x ∈ s | p x}` have 0 code uses against 728 `.card` and
 79 `univ.filter`; Mathlib now states lemmas in the new notation (`Finset.sum_boole`,
-`Fin.card_filter_val_lt` `M:Data/Fintype/Fin.lean:47`), so `rw` increasingly needs it to line up.
+`Fin.card_filter_val_lt` `M:Data/Fintype/Fin.lean:47`), but both notations elaborate to the same terms, so this does not affect `rw`.
 `Finite` (219) / `Fintype` (403) / `FinEnum` (243) follow Mathlib's "computable `Fintype`, otherwise
 `Finite`" rule; `SampleableType` is correctly built on `FinEnum`.
 
@@ -599,8 +590,10 @@ by `rfl`; nothing in `LatticeCrypto/` imports `AdjoinRoot` (0 hits). `PolyBacken
 with `ofBackend` is `((AdjoinRoot.powerBasis' hm).basis.reindex _).equivFun`
 (`M:RingTheory/AdjoinRoot.lean:633`, typechecks); `ofBackend_injective` (36 lines, `Core.lean:241–276`)
 is `AdjoinRoot.modByMonicHom_mk` (`:579`) + `Polynomial.modByMonic_eq_self_iff`. `centeredRepr`
-(`V:LatticeCrypto/Ring/Norms.lean:74`) is `ZMod.valMinAbs` character for character
-(`M:Data/ZMod/ValMinAbs.lean:23–29`); the file proves `centeredRepr_eq_valMinAbs` (`:139`) and then
+(`V:LatticeCrypto/Ring/Norms.lean:74`) agrees with `ZMod.valMinAbs` for nonzero moduli
+(`M:Data/ZMod/ValMinAbs.lean:23–29`). At modulus zero the original definition took absolute
+value, while `valMinAbs` preserves the signed integer; #634 explicitly documents and tests that
+change. The survey snapshot proves `centeredRepr_eq_valMinAbs` (`:139`) and then
 restates six `valMinAbs` lemmas on `centeredRepr` (`:78–136` ↔ `natAbs_valMinAbs_le`,
 `natAbs_valMinAbs_neg`, `coe_valMinAbs`, `valMinAbs_mem_Ioc`, `valMinAbs_spec`). FIPS rounding ties
 `(−α/2, α/2]` are `valMinAbs` on `ZMod α`, **not** `Int.bmod` (which ties the other way for even moduli;
@@ -760,12 +753,12 @@ toolchain bump; none adds CI gating.
 | 1 | `gcongr` tagging + `expectedValue_mono_of_support` + `finiteness` rule-set tags, with `VCVioTest/Tactic/` | tactics, `ℝ≥0∞` | ≈200 hand-written monotonicity steps, ≈100 `≠ ⊤` obligations; one idiom for every bind bound |
 | 2 | `negligible` ↔ `SuperpolynomialDecay` `toReal`/`ofReal` bridge; `negligible_of_le` via `trans_eventuallyLE`; move the two `_of_poly_bound` lemmas; `tsum_probOutput_mul_le_of_le` | asymptotics | every `ℝ → ℝ≥0∞` crossing by hand; Mathlib's O/o vocabulary on the `toReal` side |
 | 3 | `evalDist_mPi = Measure.pi`; `evalDist_bind_const`/`map_const`; `lintegral_countable'_comm` + the discrete measure-bridge simp bundle; measure-side twins of `expectedValue_*` and the Markov bound | probability | the `mul_comm` tail on every bridge; `probOutput_mOfFn`-style proofs; opens `IndepFun`/`HasLaw`/`cond` |
-| 4 | Delete the verified duplicates (Adopt table): `FinPairs`, the `General.lean` rows, `Commutative` → `CommApplicative`, `Forall₂`, `LawfulAppend`, `Indexed.lean` copy, `SetM` duplicate normal form, `tsub_le_tsub_add_tsub`, `mod_pow_succ_extract`, `sum_update_*`, `count_toList`, `vector_eq_nil`, `foldlM_range`, `QueryCount.single := Pi.single`, dead cslib import, 0-byte file | constructions (landed with this ledger) | ≈400 lines and one live `Fintype (BitVec n)` instance diamond |
+| 4 | Delete the verified duplicates (Adopt table): `FinPairs`, the `General.lean` rows, `Commutative` → `CommApplicative`, `Forall₂`, `Indexed.lean` copy, `SetM` duplicate normal form, `tsub_le_tsub_add_tsub`, `mod_pow_succ_extract`, `sum_update_*`, `count_toList`, `vector_eq_nil`, `foldlM_range`, `QueryCount.single := Pi.single`, 0-byte file (retain the cslib import and defer `LawfulAppend`) | constructions (landed with this ledger) | ≈400 lines and one live `Fintype (BitVec n)` instance diamond |
 | 5 | `centeredRepr := ZMod.valMinAbs`; `reduce_mod_char` for the twiddle powers; `IsPrimitiveRoot` facts for the three moduli; `polyCoeffFinsetSum`, `ofBackend_injective`, `Function.Injective.commRing`; fix the two stale `native_decide` docstrings | lattice | ≈250 lines; Falcon's root gets a proof; the twiddle half of the NTT trust surface |
-| 6 | Generic `[CompleteLattice α] → Lean.Order.CompleteLattice α` bridge; `Prob` lattice via `Set.Iic 1`; `MonadAttach (OracleComp spec)` with `CanReturn := (· ∈ support ·)`; `simulateQ_traverse` via `LawfulTraversable` | control | four hand instances; the first step of the v4.35 `Std.WP` migration; the `mapM`/`forM`/`forIn` lemma trio |
+| 6 | Generic `[CompleteLattice α] → Lean.Order.CompleteLattice α` bridge; `Prob` lattice via `Set.Iic 1`; `MonadAttach (OracleComp spec)` with `CanReturn := (· ∈ support ·)`; `simulateQ_traverse` via `LawfulTraversable` | control | four hand instances; the an order-adapter step for a possible Loom migration; the `mapM`/`forM`/`forIn` lemma trio |
 | 7 | HashSig base-w `reverse` bridges to `Nat.digitsAppend`/`ofDigits`; `sum_le_card_nsmul`; `Forall₂` | data idioms | ≈150 lines of re-derived digit arithmetic |
 | 8 | cslib-inspired: dependent pairing lemma, finiteness-free `perfectSecrecy ↔ ciphertextRowsEqual`, Shannon `Nat.card K ≥ Nat.card M`; optionally a `SecretSharing` port reusing cslib's Lagrange lemma | crypto foundations | two missing textbook theorems and one missing generic lemma |
-| 9 | Prune or `deprecated_module` the 0-reverse-dep `ToMathlib/Control` files; `Examples/{Regev,FrankingProtocol}.lean`; the 30 deprecated aliases; the 23 `BigOperators` opens | hygiene | dead surface |
+| 9 | Prune the 0-reverse-dep `ToMathlib/Control` files; `Examples/{Regev,FrankingProtocol}.lean`; the 30 deprecated aliases; the 23 `BigOperators` opens | hygiene | dead surface |
 | 10 | Track items needing design: `QueryCount` monoid leak; cost-layer unification; NTT multiplication laws (twiddle + CRT halves from Mathlib, bit-reversal lemma by hand); Poisson summation for the discrete Gaussian; matrix conventions; selective-expose pilot; `implicit_reducible` canary | design | issues, not sweep PRs |
 
 The tooling table below is deliberately last: nothing in it is urgent, and the maintainer's
@@ -802,20 +795,26 @@ audit before deletion (see Method).
 | `Examples/Regev.lean`, `Examples/FrankingProtocol.lean` | delete (fully commented out) |
 | `Examples/OneTimePad/Basic.lean:12` `public import Mathlib.Data.Vector.Zip` | no `Vector` use in the file; delete |
 | 23 `open (scoped) BigOperators` | the namespace still exists (`Mathlib/Algebra/BigOperators/Group/Finset/Defs.lean`) but the notation is root-level; no-ops |
+| Twenty-one declarations of the former `ToMathlib/General.lean` with no in-repo consumer by name (after the split in #657): `list_prod_natCast_ne_top`, `Prod.fst/snd_comp_map`, `fst_map_prod_map_eq_map`, `PMF.apply_eq_one_sub_tsum_ite`, the four `abs`-against-a-sign lemmas, `Fintype.sum_inv_card`, `List.Vector.toList_eq_ofFn_get`, `Function.injective2_swap_iff`, `List.card_filter_getElem_eq`, `Vector.cases₂`/`induction₂`, `PMF.bind_eq_zero`, `PMF.heq_iff`, `Option.cast_eq_some_iff`, `PMF.uniformOfFintype_cast`, `tsum_cast`, `list_mapM_loop_eq`, `List.forIn_mprod_yield_eq_foldlM`, `bind_eq_of_map_eq` | delete one build at a time; the `@[simp]`-tagged ones (`fst/snd_map_prod_map`, `Vector.getElem_eq_get`, `Fintype.card_bitVec`, `BitVec.xor_self_xor`, `heq_of_toArray_eq_of_size_eq`, `PMF.some_map_apply_some`) may fire implicitly and are not in this list |
 
-## Where the queue stands (2026-09-03)
+## Integration status (reviewed 2026-09-07)
 
 | queue item | PR | note |
 |---|---|---|
 | 1 `gcongr`/`finiteness` | #636, then #642 | #642 is the smell test: the four `Monad/Disagreement.lean` hop lemmas and four prefix-event bounds re-proved through `expectedValue` + `gcongr`, 22–30 proof lines each down to 6–18 |
-| 2 `negligible` bridge | #635 | |
+| 2 `negligible` bridge | #635 | merged; the bridges, eventual-domination lemmas, and moved polynomial-bound helpers are available |
 | 3 measure bridge | #637 (reworked), #644, #646 | the `lintegral_countable'_comm` twin was rejected on review and replaced by the one-class `DiscreteEvalDistCompatible` bridge (mass-left by construction, zero `mul_comm`); #644 is the failure measure, #646 `evalDist_mPi = Measure.pi` via `Measure.pi_eq` on boxes |
 | 4 duplicates | this PR (#632) | |
-| 5 lattice | #634 | |
-| 9 hygiene | #647 (C1), #648 (C2) | |
-| 10 design track | #650 (transparency policy + expose ratchet), #651 (selective-expose pilot), #653 (program-logic) | the `QueryCount` monoid leak, cost-layer unification, NTT laws, Poisson summation, and matrix conventions remain open |
+| 5 lattice | #634 | reviewed and queued; includes the explicit modulus-zero behavior change |
+| 9 hygiene | #647 (C1), #648 (C2) | merged; #648 retains the necessary ML-DSA/ML-KEM equality instances and adds an `Option.elim` measurability lemma |
+| 10 design track | #650 (transparency policy + expose ratchet), #651 (selective-expose pilot), #653 (program-logic) | all merged; the `QueryCount` monoid leak, cost-layer unification, NTT laws, Poisson summation, and matrix conventions remain open |
 | tooling | #649 (SHA pins, dependabot, templates), Track A PR (drivers, `check-imports.sh`, dead scripts, options) | `CODEOWNERS` was dropped on review: routing files are boilerplate for a small team |
-| gates | #641 | the one-call tactic contract, machine-checked gaps, the `VCVioTest` warning step |
+| gates | #641 | merged; tactic contract and test warnings are checked, with detailed policy in `docs/agents/probability.md` |
+
+The area surveys above preserve candidate lists from the original snapshot. In particular,
+the asymptotic bridges listed as missing are supplied by #635, and the lattice candidates
+are partly implemented by #634; consult those PRs before repeating the work. The initial
+source line numbers remain search aids, not stable links into the current tree.
 
 Items 6 (`Lean.Order` bridge, `MonadAttach`, `simulateQ_traverse`), 7 (HashSig digit bridges)
 and 8 (cslib-inspired lemmas) are not started.
@@ -835,6 +834,6 @@ form).
 ## Maintenance
 
 Re-run this survey when the toolchain pin moves. Check, in order: `Init/Control/`, `Std/Do/`
-and (from 4.35) `Std/WP/`, `Mathlib/Probability/`, `Mathlib/MeasureTheory/Measure/`,
+and any WP modules present in the actual target release, `Mathlib/Probability/`, `Mathlib/MeasureTheory/Measure/`,
 `Mathlib/Control/`, `Mathlib/Data/FinEnum.lean`, `Cslib/Foundations/`, PolyFun's own ledger.
 Re-verify every row; do not diff against this file.

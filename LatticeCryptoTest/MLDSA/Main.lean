@@ -24,7 +24,7 @@ lake build mldsa_test
 ```
 -/
 
-@[expose] public section
+public section
 
 open MLDSA MLDSA.Concrete MLDSA.Test
 

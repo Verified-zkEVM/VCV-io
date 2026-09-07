@@ -16,7 +16,7 @@ is byte aligned and therefore exercises the outer modulus in the padding formula
 shift-by-eight interpretation truncates to a different digit vector.
 -/
 
-@[expose] public section
+public section
 
 
 namespace SLHDSA.WotsEncodingTest
@@ -27,6 +27,7 @@ def limited : Params := slhdsaSha2_128_24
 def zeroDigits : List ℕ := List.replicate limited.len1 0
 
 /-- Minimal byte-backed context used to exercise the operational WOTS digit path. -/
+@[expose]
 def limitedCore : CorePrimitives limited where
   PkSeed := Unit
   SkSeed := Unit
