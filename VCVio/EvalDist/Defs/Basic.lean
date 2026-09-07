@@ -97,13 +97,11 @@ lemma evalSPMF_def [MonadLiftT m SPMF] {α : Type u} (mx : m α) :
 lemma evalSPMF_id (p : SPMF α) : 𝒮[p] = p :=
   monadLift_self p
 
-/-- The sole deprecated whole-denotation bridge from the finite evaluator to the primary measure
-semantics.
+/-- The whole-denotation unfolding of the compatibility adapter.
 
-The theorem deliberately has only the legacy `MonadLiftT m SPMF` assumption. Consequently the
-measure on the left is the canonical adapter instance defined in `Defs.Measure`; a measure-native
-semantics should be reasoned about directly instead of being converted back to an `SPMF`. -/
-@[deprecated evalDist (since := "2026-08-25")]
+The theorem has only the legacy `MonadLiftT m SPMF` assumption, so the measure on the left is
+the adapter instance defined in `Defs.Measure`; a measure-native semantics is reasoned about
+through the `DiscreteEvalDistCompatible` bridges instead of being converted back to an `SPMF`. -/
 theorem evalDist_eq_evalSPMF_toMeasure [MonadLiftT m SPMF]
     [MeasurableSpace α] (mx : m α) :
     𝒟[mx] = (𝒮[mx]).toMeasure := rfl
@@ -112,8 +110,8 @@ section probability_notation
 
 /-- Probability that a computation `mx` returns the value `x`.
 
-This remains definitionally the point mass of the executable `SPMF` semantics. The
-`probOutput_eq_evalSPMF_toMeasure` theorem exposes the equivalent measure-level reading. -/
+This remains definitionally the point mass of the executable `SPMF` semantics;
+`evalDist_apply_singleton` is the equivalent measure-level reading. -/
 def probOutput [MonadLiftT m SPMF] (mx : m α) (x : α) : ℝ≥0∞ :=
   evalSPMF mx x
 
@@ -121,7 +119,7 @@ def probOutput [MonadLiftT m SPMF] (mx : m α) (x : α) : ℝ≥0∞ :=
 
 The traditional notation remains the executable `SPMF` event API and is therefore usable for
 arbitrary predicates. General measure developments should apply `𝒟[mx]` to a measurable event;
-`probEvent_eq_evalSPMF_toMeasure` bridges the two on discrete spaces. -/
+`evalDist_apply_setOf` bridges the two on discrete spaces. -/
 noncomputable def probEvent [MonadLiftT m SPMF] (mx : m α) (p : α → Prop) : ℝ≥0∞ :=
   (evalSPMF mx).run.toOuterMeasure (some '' {x | p x})
 
@@ -147,12 +145,6 @@ variable [MonadLiftT m SPMF]
 @[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma probOutput_def (mx : m α) (x : α) : Pr[= x | mx] = evalSPMF mx x := rfl
 
-/-- A point probability is the singleton mass of the explicit compatibility measure. -/
-lemma probOutput_eq_evalSPMF_toMeasure [MeasurableSpace α] [DiscreteMeasurableSpace α]
-    (mx : m α) (x : α) : Pr[= x | mx] = (evalSPMF mx).toMeasure {x} := by
-  rw [probOutput_def]
-  exact (SPMF.toMeasure_apply_singleton (evalSPMF mx) x).symm
-
 variable [MonadLiftT m SetM] [EvalDistCompatible m]
 
 @[grind =]
@@ -160,15 +152,6 @@ lemma mem_support_iff (mx : m α) (x : α) :
     x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by
   rw [support_def, support_eq_SPMF_support, SPMF.mem_support_iff,
     probOutput_def, evalSPMF_def]
-
-/-- The legacy support interpretation agrees with positive singleton mass in the canonical
-`SPMF.toMeasure` adapter. This is the explicit dictionary-specific coherence theorem; it does not
-claim that an unrelated measure-native semantics instance has the same support. -/
-lemma mem_support_iff_evalSPMF_toMeasure_singleton_ne_zero
-    [MeasurableSpace α] [DiscreteMeasurableSpace α] (mx : m α) (x : α) :
-    x ∈ support mx ↔ (evalSPMF mx).toMeasure {x} ≠ 0 := by
-  rw [SPMF.toMeasure_apply_singleton]
-  exact mem_support_iff mx x
 
 lemma mem_support_iff_evalSPMF_apply_ne_zero (mx : m α) (x : α) :
     x ∈ support mx ↔ 𝒮[mx] x ≠ 0 := by grind
@@ -238,13 +221,6 @@ section probEvent
 @[aesop norm (rule_sets := [UnfoldEvalDist])]
 lemma probEvent_def [MonadLiftT m SPMF] (mx : m α) (p : α → Prop) :
     Pr[ p | mx] = (𝒮[mx]).run.toOuterMeasure (some '' {x | p x}) := rfl
-
-/-- A discrete event probability is the mass of that event in the compatibility measure. -/
-lemma probEvent_eq_evalSPMF_toMeasure [MeasurableSpace α] [DiscreteMeasurableSpace α]
-    (mx : m α) (p : α → Prop) [MonadLiftT m SPMF] :
-    Pr[p | mx] = (evalSPMF mx).toMeasure {x | p x} := by
-  rw [probEvent_def]
-  exact (SPMF.toMeasure_apply (evalSPMF mx) {x | p x}).symm
 
 @[grind =]
 lemma probEvent_eq_tsum_indicator [MonadLiftT m SPMF] (mx : m α) (p : α → Prop) :
@@ -419,13 +395,6 @@ lemma probEvent_evalSPMF [MonadLiftT m SPMF] (mx : m α) (p : α → Prop) :
 lemma probFailure_evalSPMF [MonadLiftT m SPMF] (mx : m α) :
     Pr[⊥ | 𝒮[mx]] = Pr[⊥ | mx] := by
   rw [probFailure_def, probFailure_def, evalSPMF_id]
-
-/-- Failure probability is the mass missing from the compatibility measure. -/
-lemma probFailure_eq_evalSPMF_toMeasure [MeasurableSpace α] [DiscreteMeasurableSpace α]
-    [MonadLiftT m SPMF] (mx : m α) :
-    Pr[⊥ | mx] = 1 - (evalSPMF mx).toMeasure Set.univ := by
-  rw [probFailure_def, SPMF.toMeasure_apply_univ]
-  exact SPMF.toPMF_none_eq_one_sub_tsum (evalSPMF mx)
 
 end probFailure
 
@@ -1025,3 +994,76 @@ lemma indicator_objective_eq_probEvent (mx : m (α × β)) (R : α → β → Pr
   by_cases hR : R z.1 z.2 <;> simp [hR]
 
 end probEvent_mono_compl
+
+/-! ## The measure-to-façade bridge
+
+`DiscreteEvalDistCompatible` is the one fact that connects the primary measure semantics to the
+discrete façade: integrating a measurable functional against `𝒟[mx]` is the mass-weighted sum
+`∑' x, Pr[= x | mx] * g x`. Every singleton, event and mass bridge below derives from it, so the
+measure side reduces *into* the façade, where the `simp`/`grind` contract takes over, instead of
+carrying a second family of sum lemmas. The compatibility adapter satisfies it definitionally;
+the free-monad fold satisfies it whenever its measure specification agrees with the probability
+specification (`PFunctor.IsMeasureSpec.Compatible`).
+
+The `SPMF` layer behind the façade is transitional. This class and the lemmas derived from it are
+the surface that survives the switch to measure-native definitions: once `Pr[…]` is defined from
+`𝒟[…]` they become definitional, while the `SPMF.` glue that proves the adapter instance is what
+that switch deletes. -/
+
+section measure_bridge
+
+variable [MonadLiftT m SPMF]
+
+/-- The primary measure semantics agrees with the discrete façade: integrating a measurable
+functional against `𝒟[mx]` is the façade expectation `∑' x, Pr[= x | mx] * g x`. -/
+class DiscreteEvalDistCompatible (m : Type u → Type v) [MonadLiftT m SPMF]
+    [EvalDistSemantics m] : Prop where
+  /-- Integrals against the denoted measure are mass-weighted sums over the façade. -/
+  lintegral_evalDist {α : Type u} [MeasurableSpace α] (mx : m α) {g : α → ℝ≥0∞}
+      (hg : Measurable g) : ∫⁻ x, g x ∂𝒟[mx] = ∑' x, Pr[= x | mx] * g x
+
+/-- The compatibility adapter denotes `(𝒮[mx]).toMeasure`, so the bridge is
+`SPMF.lintegral_toMeasure`. Stated with only the lift in scope, so the semantics instance is
+the adapter itself. -/
+instance : DiscreteEvalDistCompatible m := ⟨fun mx _ hg => SPMF.lintegral_toMeasure 𝒮[mx] hg⟩
+
+variable [EvalDistSemantics m] [DiscreteEvalDistCompatible m] [MeasurableSpace α]
+
+/-- The measure of a measurable event is the façade probability of membership. -/
+theorem evalDist_apply (mx : m α) {s : Set α} (hs : MeasurableSet s) :
+    𝒟[mx] s = Pr[(· ∈ s) | mx] := by
+  rw [← lintegral_indicator_one hs,
+    DiscreteEvalDistCompatible.lintegral_evalDist mx (measurable_one.indicator hs),
+    probEvent_eq_tsum_indicator]
+  exact tsum_congr fun x => by by_cases hx : x ∈ s <;> simp [hx]
+
+/-- Singleton mass is the point probability. -/
+@[simp]
+theorem evalDist_apply_singleton [MeasurableSingletonClass α] (mx : m α) (x : α) :
+    𝒟[mx] {x} = Pr[= x | mx] := by
+  rw [evalDist_apply mx (measurableSet_singleton x)]
+  simp only [Set.mem_singleton_iff]
+  exact probEvent_eq_eq_probOutput mx x
+
+/-- On a discrete space the measure of a predicate's event is its façade probability. -/
+@[simp]
+theorem evalDist_apply_setOf [DiscreteMeasurableSpace α] (mx : m α) (p : α → Prop) :
+    𝒟[mx] {x | p x} = Pr[p | mx] :=
+  evalDist_apply mx MeasurableSet.of_discrete
+
+/-- Success mass is one minus the failure probability. -/
+@[simp]
+theorem evalDist_apply_univ (mx : m α) : 𝒟[mx] Set.univ = 1 - Pr[⊥ | mx] := by
+  rw [evalDist_apply mx MeasurableSet.univ]
+  simp
+
+/-- Reachable outputs are exactly the positive-mass singletons. General measures can have
+support points of mass zero, so the statement is deliberately restricted to singleton-measurable
+spaces. -/
+theorem mem_support_iff_evalDist_singleton_ne_zero [MonadLiftT m SetM] [EvalDistCompatible m]
+    [MeasurableSingletonClass α] (mx : m α) (x : α) :
+    x ∈ support mx ↔ 𝒟[mx] {x} ≠ 0 := by
+  rw [evalDist_apply_singleton]
+  exact mem_support_iff mx x
+
+end measure_bridge

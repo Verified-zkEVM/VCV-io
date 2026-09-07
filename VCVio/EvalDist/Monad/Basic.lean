@@ -419,6 +419,19 @@ end support
 variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
   [MonadLiftT m SetM] [EvalDistCompatible m]
 
+omit [MonadLiftT m SetM] [EvalDistCompatible m] in
+/-- The compatibility adapter satisfies the Giry `pure`/`bind` laws for every lawful `SPMF`
+lift, so the `𝒟`-level laws (`evalDist_pure`, `evalDist_bind`, `evalDist_map`, …) hold with no
+measure specification in scope. -/
+instance instLawfulEvalDistSemanticsOfMonadLiftTSPMF : LawfulEvalDistSemantics m where
+  denote_pure x := by
+    change (𝒮[(pure x : m _)]).toMeasure = _
+    simp
+  denote_bind mx f hf := by
+    change (𝒮[mx >>= f]).toMeasure = _
+    rw [evalSPMF_bind]
+    exact (𝒮[mx]).toMeasure_bind' _ hf
+
 lemma probOutput_bind_of_const (mx : m α)
     {my : α → m β} {y : β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[= y | my x] = r) :
     Pr[= y | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by

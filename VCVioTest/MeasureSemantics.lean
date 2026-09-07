@@ -153,6 +153,9 @@ noncomputable instance : coinSpec.IsMeasureSpec where
   toMeasure _ := (PMF.uniformOfFintype Bool).toMeasure
   isProbabilityMeasure _ := PMF.toMeasure.isProbabilityMeasure _
 
+/-- The coin's measure specification is its probability specification read as a measure. -/
+instance : PFunctor.IsMeasureSpec.Compatible coinSpec := ⟨fun _ => rfl⟩
+
 /-- A nonzero, branch-sensitive lower bound rules out a vacuous quantitative semantics. -/
 example : (1 : ℝ≥0∞) ≤
     MeasureProgramLogic.eRelWP (pure true : FreeM coinSpec Bool)
@@ -166,13 +169,13 @@ example : (1 : ℝ≥0∞) ≤
 theorem denote_eq_toMeasure_coin {α : Type} [MeasurableSpace α]
     (program : FreeM coinSpec α) :
     FreeM.denote program = (program.liftM IsProbabilitySpec.toPMF).toMeasure :=
-  FreeM.denote_eq_toMeasure (fun _ => rfl) program
+  FreeM.denote_eq_toMeasure program
 
 /-- Predicate notation transports to arbitrary measurable events, not just singletons. -/
 theorem denote_event_coin {α : Type} [MeasurableSpace α] [DiscreteMeasurableSpace α]
     (program : FreeM coinSpec α) (event : α → Prop) :
     FreeM.denote program {x | event x} = Pr[event | program] :=
-  FreeM.denote_apply_setOf (fun _ => rfl) program event MeasurableSet.of_discrete
+  evalDist_apply_setOf program event
 
 /-- The reverse discrete adapter preserves both successful branches and missing mass. -/
 example (p : SPMF Bool) :
@@ -192,12 +195,12 @@ example (program : FreeM coinSpec Bool) : 𝒟[program] = FreeM.denote program :
 /-- Point notation is an explicit adapter to singleton mass in the primary measure. -/
 example (program : FreeM coinSpec Bool) (x : Bool) :
     Pr[= x | program] = 𝒟[program] {x} :=
-  (FreeM.evalDist_apply_singleton (fun _ => rfl) program x).symm
+  (evalDist_apply_singleton program x).symm
 
 /-- Predicate notation is likewise an adapter to a measurable event. -/
 example (program : FreeM coinSpec Bool) (event : Bool → Prop) :
     Pr[event | program] = 𝒟[program] {x | event x} :=
-  (FreeM.evalDist_apply_setOf (fun _ => rfl) program event MeasurableSet.of_discrete).symm
+  (evalDist_apply_setOf program event).symm
 
 /-- Crossing the compatibility boundary preserves perfect indistinguishability exactly. -/
 example (p q : SPMF Bool) :
@@ -315,7 +318,7 @@ noncomputable instance : unifSpec.toPFunctor.IsMeasureSpec :=
 theorem denote_probComp_apply_singleton {α : Type} [MeasurableSpace α]
     [MeasurableSingletonClass α] (program : ProbComp α) (x : α) :
     FreeM.denote program {x} = Pr[= x | program] :=
-  FreeM.denote_apply_singleton (fun _ => rfl) program x
+  evalDist_apply_singleton program x
 
 /-- The one-time-pad ciphertext is uniform, read off the measure denotation.
 
@@ -375,7 +378,7 @@ example (n : ℕ) (mx : ProbComp (BitVec n)) (g : BitVec n → ℝ≥0∞) :
 open OracleComp.EvalDist in
 /-- ...and is an integral against the denoted measure. -/
 example (n : ℕ) (mx : ProbComp (BitVec n)) (g : BitVec n → ℝ≥0∞) :
-    expectedValue mx g = ∫⁻ x, g x ∂(toMeasure mx) := expectedValue_eq_lintegral mx g
+    ∫⁻ x, g x ∂𝒟[mx] = expectedValue mx g := lintegral_evalDist mx g
 
 open OracleComp.EvalDist in
 /-- **Monotone convergence** for a VCVio expectation, from `lintegral_iSup`. -/
