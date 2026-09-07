@@ -390,11 +390,13 @@ normal form.
   unfold; its untagged `expectedValue_def` equation can be supplied explicitly to `rw` or `grind`.
 - The measure side uses `𝒟[…]`, with `evalDist_pure` and `evalDist_bind` under
   `LawfulEvalDistSemantics`; bind also requires a measurable continuation. For `FreeM`,
-  `FreeM.evalDist_apply_singleton` and `FreeM.evalDist_apply_setOf` connect observations to
-  `Pr[...]` under their countability, measurability, and query-specification agreement hypotheses.
-  `OracleComp.EvalDist.expectedValue_eq_lintegral` identifies expectations with integrals against
-  the compatibility measure `OracleComp.EvalDist.toMeasure` on countable discrete result spaces.
-  These are explicit coherence boundaries; measure-native proofs keep their measure denotation.
+  `PFunctor.IsMeasureSpec.Compatible` records agreement between the measure and probability
+  query specifications. Under `DiscreteEvalDistCompatible`, the generic `evalDist_apply` connects
+  measurable events to `Pr[...]`; `evalDist_apply_singleton` and `evalDist_apply_setOf` are its
+  singleton-measurable and discrete-space specializations. On a discrete result space,
+  `OracleComp.EvalDist.lintegral_evalDist` rewrites an integral against `𝒟[mx]` to
+  `expectedValue mx g`, with no separate countability hypothesis. These are explicit coherence
+  boundaries; measure-native proofs without discrete compatibility keep their measure denotation.
 
 **What the gates enforce.** The gate files (`VCVioTest/ProbabilityTactics.lean`,
 `MonadProbability.lean`, `GrindFailFast.lean`, `Tactic/*.lean`, `EvalDist/*.lean`) state
