@@ -1044,8 +1044,7 @@ lemma probEvent_countAll_bad_le_wp_countPred
     OracleComp.ProgramLogic.wp
       ((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0))
       (fun z : Bool × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - 1 : ℝ≥0∞)) := by
-  rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd, OracleComp.ProgramLogic.wp_eq_expectedValue,
-    OracleComp.ProgramLogic.wp_eq_expectedValue]
+  rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd]
   gcongr with z hz
   simp only [OracleComp.ProgramLogic.propInd_eq_ite]
   exact bad_indicator_le_count_pred_of_mem_support_run_hidingImplCountAll
