@@ -65,7 +65,7 @@ below the trivial budget needs its pointwise-mass theory; neither exists in this
 Nothing here is a security claim about any Falcon parameter set.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec Falcon LatticeCrypto ENNReal
 

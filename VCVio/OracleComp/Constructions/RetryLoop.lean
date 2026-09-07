@@ -33,7 +33,7 @@ approximation error and the exhaustion probability — instead of charging the w
 rate to the approximation term.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ENNReal
 
@@ -45,7 +45,7 @@ variable {α : Type}
 
 /-- Run `attempt` up to `n` times, returning the first acceptance, or `none` if the budget is
 exhausted. -/
-def firstSome (attempt : ProbComp (Option α)) : ℕ → ProbComp (Option α)
+@[expose] def firstSome (attempt : ProbComp (Option α)) : ℕ → ProbComp (Option α)
   | 0 => pure none
   | n + 1 => attempt >>= fun r =>
       match r with

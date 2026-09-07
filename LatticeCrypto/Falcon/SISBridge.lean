@@ -37,7 +37,7 @@ from the coefficientwise bound `(a − b)² ≤ 2·a² + 2·b²` on centered rep
   restated the same way.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp OracleSpec ENNReal
 
