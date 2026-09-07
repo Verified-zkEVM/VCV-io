@@ -193,7 +193,7 @@ uniform on the `η`-bounded box — and form `t = ExpandA(ρ) · s₁ + s₂`. T
 the honestly-sampled key distribution of the idealized proof-level ML-DSA
 model; the deterministic seed-expanded `keygen0` is related to it by a separate
 XOF-replacement assumption. -/
-noncomputable def keygenShort : ProbComp (PublicKey p prims × SecretKey p) := do
+@[expose] noncomputable def keygenShort : ProbComp (PublicKey p prims × SecretKey p) := do
   let key ← $ᵗ (Bytes 32)
   let rho ← $ᵗ (Bytes 32)
   let s1 ← sampleShortVec p.l p.eta

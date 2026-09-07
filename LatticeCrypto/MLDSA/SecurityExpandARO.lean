@@ -122,7 +122,7 @@ section KeyGenWith
 the `η`-bounded box — and form `t = expandA(ρ) · s₁ + s₂`. `keygenShort` is this generator at
 `prims.expandA` (`keygenShort_eq_keygenShortWith`); the `ExpandA` random-oracle generator
 `keygenShortRO` obtains the matrix by an oracle query instead. -/
-noncomputable def keygenShortWith (expandA : Bytes 32 → TqMatrix p.k p.l) :
+@[expose] noncomputable def keygenShortWith (expandA : Bytes 32 → TqMatrix p.k p.l) :
     ProbComp (PublicKey p prims × SecretKey p) := do
   let key ← $ᵗ (Bytes 32)
   let rho ← $ᵗ (Bytes 32)
