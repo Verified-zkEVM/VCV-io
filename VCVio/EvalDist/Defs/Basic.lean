@@ -266,19 +266,19 @@ lemma probEvent_eq_zero_iff :
   rw [probEvent_eq_tsum_indicator]; aesop
 alias ⟨_, probEvent_eq_zero⟩ := probEvent_eq_zero_iff
 
--- Named finite-support rewrite; omitted from the default automation because this
--- support-quantifier characterization saturates `grind`.
+-- Named finite-support rewrite; not registered for `grind`, which saturates on this
+-- support-quantifier characterization.
 lemma probEvent_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] = 0 ↔ ∀ x ∈ finSupport mx, ¬ p x := by grind [probEvent_eq_zero_iff]
 alias ⟨_, probEvent_eq_zero'⟩ := probEvent_eq_zero_iff'
 
--- Named rewrite; omitted from the default automation because this support-quantifier
--- characterization saturates `grind`.
+-- Named rewrite; not registered for `grind`, which saturates on this support-quantifier
+-- characterization.
 lemma probEvent_ne_zero_iff : Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ support mx, p x := by
   grind [probEvent_eq_zero_iff]
 alias ⟨_, probEvent_ne_zero⟩ := probEvent_ne_zero_iff
 
--- Named finite-support rewrite; omitted from the default automation for the same reason.
+-- Named finite-support rewrite; no `grind` registration for the same reason.
 lemma probEvent_ne_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ finSupport mx, p x := by aesop
 alias ⟨_, probEvent_ne_zero'⟩ := probEvent_ne_zero_iff'
