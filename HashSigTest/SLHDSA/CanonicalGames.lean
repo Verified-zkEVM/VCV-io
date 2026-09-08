@@ -15,12 +15,18 @@ Checks that the canonical component games carry the target caps, sampling distri
 attacked members they are meant to, on the SHA-2 primitive bundle at a small validated profile and
 on the twelve FIPS 205 parameter sets.
 
-The `example`s pin, across the module boundary, the definitional facts a reduction relies on: each
-problem's `numTargets` is the role's `targetCount`, the two `F` games sample uniformly, and the
-standalone FORS-`F` DSPR and TCR problems are the ones the OpenPRE reduction attacks.  The
+The `example`s pin, across the module boundary, the facts a reduction relies on: each problem's
+`numTargets` is the role's `targetCount`, the two `F` games sample uniformly, and the standalone
+FORS-`F` DSPR and TCR problems are the ones the OpenPRE reduction attacks.  The `example`s about the
+seven collection problems (the `rfl` and `decide` cap pins, the two UD sampling pins, and the
+`thColl`/`th` pins) also pin exposure: they close only because those records are `@[expose]`d.  The
+`example`s about the standalone FORS-`F` problems and the `H_msg` ITSR problem go through the
+exported equations (`by simp`, `forsFOpenPreProblem_hasUniformInputs`, `forsFDsprProblem_eq_toDSPR`,
+`forsFTcrProblem_eq_toTCR`, `mem_hmsgIndices`), so they hold with those records opaque.  The
 executable checks, at run time, the target caps of the small profile against hand-computed
-constants, the FIPS-set caps against the closed forms, and the `H_msg` ITSR index map on a fixed
-digest against its hand-decoded leaves.
+constants, the FIPS-set caps against reference values from FIPS 205 Table 2 and closed forms that do
+not restate `targetCount`'s defining equations, and the `H_msg` ITSR index map on a fixed digest
+against its hand-decoded leaves.
 -/
 
 public section
@@ -49,11 +55,34 @@ instance : SampleableType prims.Y := inferInstanceAs (SampleableType (Bytes 1))
 def twoLayerDigest : Bytes twoLayerParams.m :=
   Vector.ofFn fun i => ([0xa5, 0x02, 0x01] : List Byte).getD i.val 0
 
-/-! ## Definitional pins -/
+/-! ## Pins through the exported equations (opaque records) -/
 
-example : (forsFOpenPreProblem prims).numTargets = targetCount twoLayerParams .forsF := rfl
-example : (forsFDsprProblem prims).numTargets = targetCount twoLayerParams .forsF := rfl
-example : (forsFTcrProblem prims).numTargets = targetCount twoLayerParams .forsF := rfl
+example : (forsFOpenPreProblem prims).numTargets = targetCount twoLayerParams .forsF := by simp
+example : (forsFDsprProblem prims).numTargets = targetCount twoLayerParams .forsF := by simp
+example : (forsFTcrProblem prims).numTargets = targetCount twoLayerParams .forsF := by simp
+
+example : (forsFOpenPreProblem prims).HasUniformInputs :=
+  forsFOpenPreProblem_hasUniformInputs prims
+
+example : forsFDsprProblem prims = (forsFOpenPreProblem prims).toDSPR :=
+  forsFDsprProblem_eq_toDSPR prims
+example : forsFTcrProblem prims = (forsFOpenPreProblem prims).toTCR :=
+  forsFTcrProblem_eq_toTCR prims
+
+example : (forsFTcrProblem prims).th = prims.fHash := by simp
+example : (forsFOpenPreProblem prims).thColl =
+    TweakableHashCollection.empty prims.PkSeed prims.AdrsKey prims.Y := by simp
+
+example (digest : Bytes twoLayerParams.m) (idx : HmsgIndex twoLayerParams) :
+    idx ∈ (hmsgItsrProblem prims).indices digest ↔
+      idx.idxTree = (splitDigest twoLayerParams digest).idxTree ∧
+        idx.idxLeaf = (splitDigest twoLayerParams digest).idxLeaf ∧
+        idx.leaf.val =
+          forsIdx twoLayerParams (splitDigest twoLayerParams digest).md.toList idx.tree.val := by
+  simp [mem_hmsgIndices]
+
+/-! ## Definitional pins (exposed collection records) -/
+
 example : (forsHTcrCProblem prims).numTargets = targetCount twoLayerParams .forsH := rfl
 example : (forsTlTcrCProblem prims).numTargets = targetCount twoLayerParams .forsTl := rfl
 example : (wotsFUdCProblem prims).numTargets = targetCount twoLayerParams .wotsFUd := rfl
@@ -65,12 +94,8 @@ example : (xmssHTcrCProblem prims).numTargets = targetCount twoLayerParams .xmss
 example : (forsHTcrCProblem prims).numTargets = 96 := by decide
 example : (wotsFTcrCProblem prims).numTargets = 1280 := by decide
 
-example : (forsFOpenPreProblem prims).HasUniformInputs := rfl
 example : (wotsFUdCProblem prims).HasUniformInputs := rfl
 example : (wotsFUdCProblem prims).HasUniformOutputs := rfl
-
-example : forsFDsprProblem prims = (forsFOpenPreProblem prims).toDSPR := rfl
-example : forsFTcrProblem prims = (forsFOpenPreProblem prims).toTCR := rfl
 
 example : (forsHTcrCProblem prims).thColl = prims.thashCollection := rfl
 example : (wotsFUdCProblem prims).th = prims.fHash := rfl
@@ -106,28 +131,50 @@ def fipsSets : List FipsParameterSet :=
     .SLHDSA_SHA2_256s, .SLHDSA_SHA2_256f, .SLHDSA_SHAKE_128s, .SLHDSA_SHAKE_128f,
     .SLHDSA_SHAKE_192s, .SLHDSA_SHAKE_192f, .SLHDSA_SHAKE_256s, .SLHDSA_SHAKE_256f]
 
-/-- On every FIPS set the three FORS caps are the closed forms in `h`, `k`, and `a`, the XMSS cap
-is the hypertree's internal-node count `2 ^ h - 1`, and the WOTS+ caps are `2 ^ h` instances times
-`len` (times `w` for the target-collision role) plus the upper layers. -/
+/-- Reference FORS caps `(forsTl, forsF, forsH)` per FIPS 205 Table 2 row, computed by hand as
+`2 ^ h`, `2 ^ h * k * 2 ^ a`, and `2 ^ h * k * (2 ^ a - 1)` from the table's `h`, `k`, and `a`
+rather than from `Params` or `targetCount`. -/
+def fipsForsCaps : FipsParameterSet → ℕ × ℕ × ℕ
+  | .SLHDSA_SHA2_128s | .SLHDSA_SHAKE_128s =>
+      (9223372036854775808, 528905046081400263933952, 528775918872884297072640)
+  | .SLHDSA_SHA2_128f | .SLHDSA_SHAKE_128f =>
+      (73786976294838206464, 155838093934698292051968, 153403123716968631238656)
+  | .SLHDSA_SHA2_192s | .SLHDSA_SHAKE_192s =>
+      (9223372036854775808, 2568967366681086996250624, 2568810569356460465061888)
+  | .SLHDSA_SHA2_192f | .SLHDSA_SHAKE_192f =>
+      (73786976294838206464, 623352375738793168207872, 620917405521063507394560)
+  | .SLHDSA_SHA2_256s | .SLHDSA_SHAKE_256s =>
+      (18446744073709551616, 6649092007880460460883968, 6648686179510838850748416)
+  | .SLHDSA_SHA2_256f | .SLHDSA_SHAKE_256f =>
+      (295147905179352825856, 5289050460814002639339520, 5278720284132725290434560)
+
+/-- On every FIPS set the three FORS caps equal the Table 2 reference values, the XMSS cap is the
+hypertree's internal-node count `2 ^ h - 1`, the WOTS+ instance count is the closed geometric form
+`(2 ^ (h + hp) - 2 ^ hp) / (2 ^ hp - 1)` and exceeds the bottom layer's `2 ^ h`, and the WOTS+ `F`
+caps are that count times `len = 2n + 3` (times `w = 16` for the target-collision role), using the
+`lg_w = 4` constants FIPS 205 fixes rather than `Params.len` and `Params.w`.  None of these checks
+restates a defining equation of `targetCount`. -/
 def checkFipsCaps : IO Unit := do
   for set in fipsSets do
     let p := set.params
     let name := repr set
     let leaves := 2 ^ p.h
-    ensure s!"{name}: forsF = 2^h * k * 2^a" (targetCount p .forsF == leaves * p.k * 2 ^ p.a)
-    ensure s!"{name}: forsH = 2^h * k * (2^a - 1)"
-      (targetCount p .forsH == leaves * p.k * (2 ^ p.a - 1))
-    ensure s!"{name}: forsTl = 2^h" (targetCount p .forsTl == leaves)
+    let (forsTl, forsF, forsH) := fipsForsCaps set
+    ensure s!"{name}: forsTl = Table 2 reference 2^h" (targetCount p .forsTl == forsTl)
+    ensure s!"{name}: forsF = Table 2 reference 2^h * k * 2^a" (targetCount p .forsF == forsF)
+    ensure s!"{name}: forsH = Table 2 reference 2^h * k * (2^a - 1)"
+      (targetCount p .forsH == forsH)
     ensure s!"{name}: xmssH = 2^h - 1" (targetCount p .xmssH == leaves - 1)
+    let wotsTl := (2 ^ (p.h + p.hp) - 2 ^ p.hp) / (2 ^ p.hp - 1)
+    ensure s!"{name}: wotsTl = (2^(h + hp) - 2^hp) / (2^hp - 1)" (targetCount p .wotsTl == wotsTl)
     ensure s!"{name}: wotsTl exceeds the bottom-layer instance count"
       (targetCount p .wotsTl > leaves)
-    ensure s!"{name}: wotsFUd = wotsTl * len"
-      (targetCount p .wotsFUd == targetCount p .wotsTl * p.len)
-    ensure s!"{name}: wotsFPre = wotsFUd" (targetCount p .wotsFPre == targetCount p .wotsFUd)
-    ensure s!"{name}: wotsFTcr = wotsFUd * w"
-      (targetCount p .wotsFTcr == targetCount p .wotsFUd * p.w)
-  ensure "SHA2-128s: forsTl = 2^63" (targetCount FipsParameterSet.SLHDSA_SHA2_128s.params .forsTl
-    == 9223372036854775808)
+    ensure s!"{name}: wotsFUd = wotsTl * (2n + 3)"
+      (targetCount p .wotsFUd == wotsTl * (2 * p.n + 3))
+    ensure s!"{name}: wotsFPre = wotsTl * (2n + 3)"
+      (targetCount p .wotsFPre == wotsTl * (2 * p.n + 3))
+    ensure s!"{name}: wotsFTcr = wotsTl * (2n + 3) * 16"
+      (targetCount p .wotsFTcr == wotsTl * (2 * p.n + 3) * 16)
   ensure "SHA2-128s: wotsTl = sum of seven layers"
     (targetCount FipsParameterSet.SLHDSA_SHA2_128s.params .wotsTl ==
       (List.range 7).foldl (fun acc i => acc + 2 ^ (9 * (i + 1))) 0)
