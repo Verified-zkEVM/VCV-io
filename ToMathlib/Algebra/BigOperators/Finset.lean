@@ -10,10 +10,10 @@ public import Mathlib.Data.Fintype.Card
 public import Mathlib.Topology.Instances.ENNReal.Lemmas
 
 /-!
-# Finite sums over `Function.update`, indicator sums, and the inverse-cardinality sum
+# Finite sums over `Function.update` and scaled indicators
 
-Rewriting `∑ i, Function.update f j v i` in terms of `∑ i, f i`, the filtered variants,
-`Finset.sum_boole'` for a scaled indicator, and `∑ _ : α, (Fintype.card α)⁻¹ = 1` in `ℝ≥0∞`.
+Rewriting `∑ i, Function.update f j v i` in terms of `∑ i, f i`, the filtered variants, and
+`Finset.sum_boole'` for a scaled indicator.
 -/
 
 public section
@@ -60,11 +60,6 @@ lemma sum_filter_update_of_not_pred {ι : Type*} [Fintype ι] [DecidableEq ι]
   rw [Function.update_of_ne hit]
 
 open ENNReal
-
-lemma Fintype.sum_inv_card (α : Type*) [Fintype α] [Nonempty α] :
-  Finset.sum Finset.univ (fun _ ↦ (Fintype.card α)⁻¹ : α → ℝ≥0∞) = 1 := by
-  rw [Finset.sum_eq_card_nsmul (fun _ _ ↦ rfl), Finset.card_univ,
-    nsmul_eq_mul, ENNReal.mul_inv_cancel] <;> simp
 
 @[simp] lemma Finset.sum_boole' {ι β : Type*} [AddCommMonoid β] (r : β)
     (p) [DecidablePred p] (s : Finset ι) :
