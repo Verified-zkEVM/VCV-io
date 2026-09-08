@@ -7,6 +7,7 @@ Authors: Alexander Hicks
 module
 public import HashSig.SLHDSA.Concrete.FIPS
 public import HashSig.SLHDSA.Security.ReachableTargets
+import HashSig.SLHDSA.ForsConformance
 
 /-!
 # Encoded distinctness of the SLH-DSA reachable target ledgers
@@ -31,6 +32,12 @@ The two encoders need different amounts of the parameter set:
 `AddressFacts` is what the per-ledger lemmas actually establish, and it is stated once for both
 routes: an address is canonical and its layer and tree lie in the hypertree's own ranges.  The
 SHA-2 domain follows from it under the narrower widths, so no ledger lemma has to be proved twice.
+Canonicality is derived through the construction's own address helpers: once
+`layerPosition_toAdrs_isCanonical` shows the base address of a reachable position canonical under
+`CanonicalAddressBounds`, the existing `XmssConformance.wotsLeafAdrs_isCanonical`,
+`wotsChainHashAdrs_isCanonical`, `wotsPkAdrs_isCanonical`,
+`ForsConformance.forsNodeAdrs_isCanonical`, `ForsConformance.forsPkAdrs_isCanonical`, and
+`XmssConformance.xmssNodeAdrs_isCanonical` lemmas carry it to every derived target address.
 
 The UD field of `EncodedTargetLedgerConditions` is stated for a total one-step-per-chain cap
 completion.  A later reduction may omit chains; any such partial selector inherits encoded
@@ -176,10 +183,12 @@ theorem sha2Domain_of_addressFacts {vp : ValidatedParams} (hb : ApprovedAddressB
 
 /-! ## Coordinate bounds -/
 
+/-- Every hypertree layer fits a four-byte word under the canonical bounds. -/
 theorem layer_lt_canonical {vp : ValidatedParams} (hb : CanonicalAddressBounds vp.params)
     (layer : Fin vp.params.d) : layer.val < 2 ^ 32 :=
   lt_of_lt_of_le layer.isLt hb.d_le
 
+/-- Every tree index at any layer is below the layer-zero tree count `2 ^ ((d - 1) * hp)`. -/
 theorem tree_lt_hypertree {vp : ValidatedParams} (layer : ℕ)
     (tree : Fin (2 ^ layerTreeHeight vp layer)) :
     tree.val < 2 ^ ((vp.params.d - 1) * vp.params.hp) := by
@@ -187,122 +196,136 @@ theorem tree_lt_hypertree {vp : ValidatedParams} (layer : ℕ)
   unfold layerTreeHeight
   exact Nat.mul_le_mul_right _ (by omega)
 
+/-- Every tree index fits the twelve-byte tree word under the canonical bounds. -/
 theorem tree_lt_canonical {vp : ValidatedParams} (hb : CanonicalAddressBounds vp.params)
     (layer : ℕ) (tree : Fin (2 ^ layerTreeHeight vp layer)) : tree.val < 2 ^ 96 :=
   lt_of_lt_of_le (tree_lt_hypertree layer tree)
     (Nat.pow_le_pow_right (by norm_num) hb.treeBits_canonical)
 
+/-- Every XMSS leaf index fits a four-byte word under the canonical bounds. -/
 theorem leaf_lt_canonical {vp : ValidatedParams} (hb : CanonicalAddressBounds vp.params)
     (leaf : Fin (2 ^ vp.params.hp)) : leaf.val < 2 ^ 32 :=
   lt_of_lt_of_le leaf.isLt (Nat.pow_le_pow_right (by norm_num) hb.hp_le)
 
+/-- A value below `2 ^ 32` passes the four-byte field check. -/
+private theorem fits_four_of_lt {x : ℕ} (h : x < 2 ^ 32) : Adrs.Fits 4 x = true :=
+  Adrs.fits_iff.2 (lt_of_lt_of_le h (by norm_num))
+
+/-! ## Base-address canonicality
+
+The reachable base addresses are `LayerPosition.toAdrs` and `LayerTreeCoord.toAdrs`, both a layer
+and a tree written into the zero address.  Every derived target address is then obtained by the
+construction's own address helpers, whose canonicality lemmas
+(`XmssConformance.wotsLeafAdrs_isCanonical`, `wotsChainHashAdrs_isCanonical`,
+`wotsPkAdrs_isCanonical`, `ForsConformance.forsNodeAdrs_isCanonical`,
+`ForsConformance.forsPkAdrs_isCanonical`, `XmssConformance.xmssNodeAdrs_isCanonical`) need only a
+canonical base and four-byte
+bounds on the words they set.  The per-address facts below reuse them rather than recomputing the
+six fields of each address. -/
+
+/-- A layer/tree base address is canonical when both coordinates fit their words. -/
+private theorem baseAdrs_isCanonical {layer tree : ℕ} (hlayer : layer < 2 ^ 32)
+    (htree : tree < 2 ^ 96) :
+    ((Adrs.zero.setLayerAddress layer).setTreeAddress tree).isCanonical = true := by
+  rw [Adrs.isCanonical]
+  simp only [Adrs.setLayerAddress, Adrs.setTreeAddress, Adrs.zero]
+  rw [fits_four_of_lt hlayer, Adrs.fits_iff.2 (lt_of_lt_of_le htree (by norm_num))]
+  norm_num [Adrs.Fits, AddrType.ofCode]
+
+/-- The base address of every reachable layer position is canonical under the canonical bounds.
+`Concrete.fips_layerPosition_toAdrs_isCanonical` is the per-parameter-set instance of this. -/
+theorem layerPosition_toAdrs_isCanonical {vp : ValidatedParams}
+    (hb : CanonicalAddressBounds vp.params) (pos : LayerPosition vp) :
+    pos.toAdrs.isCanonical = true :=
+  baseAdrs_isCanonical (layer_lt_canonical hb pos.layer) (tree_lt_canonical hb _ pos.tree)
+
+/-- The base address of every reachable XMSS tree is canonical under the canonical bounds. -/
+theorem layerTreeCoord_toAdrs_isCanonical {vp : ValidatedParams}
+    (hb : CanonicalAddressBounds vp.params) (coord : LayerTreeCoord vp) :
+    coord.toAdrs.isCanonical = true :=
+  baseAdrs_isCanonical (layer_lt_canonical hb coord.layer) (tree_lt_canonical hb _ coord.tree)
+
+/-- Every reachable WOTS+ instance base address is canonical under the canonical bounds. -/
+theorem wotsInstanceAdrs_isCanonical {vp : ValidatedParams}
+    (hb : CanonicalAddressBounds vp.params) (pos : LayerPosition vp) :
+    (wotsInstanceAdrs pos).isCanonical = true :=
+  XmssConformance.wotsLeafAdrs_isCanonical pos.toAdrs pos.leaf.val
+    (layerPosition_toAdrs_isCanonical hb pos)
+    (fits_four_of_lt (leaf_lt_canonical hb pos.leaf))
+
+/-- The FORS analogue of `wotsLeafAdrs_isCanonical`: setting the `FORS_TREE` type and a four-byte
+key pair on a canonical base keeps the address canonical. -/
+private theorem setTypeAndClear_forsTree_setKeyPairAddress_isCanonical (adrs : Adrs) (t : ℕ)
+    (hbase : adrs.isCanonical = true) (ht : Adrs.Fits 4 t = true) :
+    ((adrs.setTypeAndClear .forsTree).setKeyPairAddress t).isCanonical = true := by
+  rcases Adrs.fits_of_isCanonical adrs hbase with ⟨hlayer, htree, -, -, -, -⟩
+  simp [Adrs.setTypeAndClear, Adrs.setKeyPairAddress, Adrs.isCanonical, hlayer, htree, ht]
+  norm_num [Adrs.Fits, AddrType.toCode]
+
+/-- Every reachable FORS base address is canonical under the canonical bounds. -/
+theorem BottomPosition.forsAdrs_isCanonical {vp : ValidatedParams}
+    (hb : CanonicalAddressBounds vp.params) (pos : BottomPosition vp) :
+    pos.forsAdrs.isCanonical = true :=
+  setTypeAndClear_forsTree_setKeyPairAddress_isCanonical pos.toLayerPosition.toAdrs pos.leaf.val
+    (layerPosition_toAdrs_isCanonical hb pos.toLayerPosition)
+    (fits_four_of_lt (leaf_lt_canonical hb pos.leaf))
+
 /-! ## Per-address facts -/
 
-theorem addressFacts_wotsInstanceAdrs {vp : ValidatedParams}
-    (hb : CanonicalAddressBounds vp.params) (pos : LayerPosition vp) :
-    AddressFacts vp (wotsInstanceAdrs pos) := by
-  have hlayerEq : (wotsInstanceAdrs pos).layer = pos.layer.val := rfl
-  have htreeEq : (wotsInstanceAdrs pos).tree = pos.tree.val := rfl
-  have hword1 : (wotsInstanceAdrs pos).word1 = pos.leaf.val := rfl
-  have hword2 : (wotsInstanceAdrs pos).word2 = 0 := rfl
-  have hword3 : (wotsInstanceAdrs pos).word3 = 0 := rfl
-  exact ⟨Adrs.isCanonical_of_fields_free (Or.inl rfl)
-      (by rw [hlayerEq]; exact layer_lt_canonical hb pos.layer)
-      (by rw [htreeEq]; exact tree_lt_canonical hb _ pos.tree) rfl
-      (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf)
-      (by rw [hword2]; norm_num) (by rw [hword3]; norm_num),
-    by rw [hlayerEq]; exact pos.layer.isLt,
-    by rw [htreeEq]; exact tree_lt_hypertree _ pos.tree⟩
-
+/-- Every WOTS+ chain-step address carries the address facts. -/
 theorem addressFacts_wotsStepAdrs {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) (coord : WotsChainCoord vp)
     (step : Fin (vp.params.w - 1)) :
-    AddressFacts vp (wotsStepAdrs coord step) := by
-  have hlayerEq : (wotsStepAdrs coord step).layer = coord.1.layer.val := rfl
-  have htreeEq : (wotsStepAdrs coord step).tree = coord.1.tree.val := rfl
-  have hword1 : (wotsStepAdrs coord step).word1 = coord.1.leaf.val := rfl
-  have hword2 : (wotsStepAdrs coord step).word2 = coord.2.val := rfl
-  have hword3 : (wotsStepAdrs coord step).word3 = step.val := rfl
-  have hstep : step.val < 2 ^ 32 := by have := step.isLt; have := hb.w_le; omega
-  have hchain : coord.2.val < 2 ^ 32 := by have := coord.2.isLt; have := hb.len_le; omega
-  exact ⟨Adrs.isCanonical_of_fields_free (Or.inl rfl)
-      (by rw [hlayerEq]; exact layer_lt_canonical hb coord.1.layer)
-      (by rw [htreeEq]; exact tree_lt_canonical hb _ coord.1.tree) rfl
-      (by rw [hword1]; exact leaf_lt_canonical hb coord.1.leaf)
-      (by rw [hword2]; exact hchain) (by rw [hword3]; exact hstep),
-    by rw [hlayerEq]; exact coord.1.layer.isLt,
-    by rw [htreeEq]; exact tree_lt_hypertree _ coord.1.tree⟩
+    AddressFacts vp (wotsStepAdrs coord step) where
+  canonical :=
+    wotsChainHashAdrs_isCanonical (wotsInstanceAdrs coord.1) coord.2.val step.val
+      (wotsInstanceAdrs_isCanonical hb coord.1)
+      (fits_four_of_lt (by have := coord.2.isLt; have := hb.len_le; omega))
+      (fits_four_of_lt (by have := step.isLt; have := hb.w_le; omega))
+  layer_lt := coord.1.layer.isLt
+  tree_lt := tree_lt_hypertree _ coord.1.tree
 
+/-- Every WOTS+ public-key compression address carries the address facts. -/
 theorem addressFacts_wotsPkAdrs {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) (pos : LayerPosition vp) :
-    AddressFacts vp (wotsPkAdrs (wotsInstanceAdrs pos)) := by
-  have hlayerEq : (wotsPkAdrs (wotsInstanceAdrs pos)).layer = pos.layer.val := rfl
-  have htreeEq : (wotsPkAdrs (wotsInstanceAdrs pos)).tree = pos.tree.val := rfl
-  have hword1 : (wotsPkAdrs (wotsInstanceAdrs pos)).word1 = pos.leaf.val := rfl
-  exact ⟨Adrs.isCanonical_of_fields_compress (Or.inl rfl)
-      (by rw [hlayerEq]; exact layer_lt_canonical hb pos.layer)
-      (by rw [htreeEq]; exact tree_lt_canonical hb _ pos.tree) rfl
-      (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf) rfl rfl,
-    by rw [hlayerEq]; exact pos.layer.isLt,
-    by rw [htreeEq]; exact tree_lt_hypertree _ pos.tree⟩
+    AddressFacts vp (wotsPkAdrs (wotsInstanceAdrs pos)) where
+  canonical := wotsPkAdrs_isCanonical _ (wotsInstanceAdrs_isCanonical hb pos)
+  layer_lt := pos.layer.isLt
+  tree_lt := tree_lt_hypertree _ pos.tree
 
+/-- Every FORS node address with four-byte height and index carries the address facts. -/
 theorem addressFacts_forsNodeAdrs {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) (pos : BottomPosition vp) {z t : ℕ}
     (hz : z < 2 ^ 32) (ht : t < 2 ^ 32) :
-    AddressFacts vp (forsNodeAdrs pos.forsAdrs z t) := by
-  have hlayerEq : (forsNodeAdrs pos.forsAdrs z t).layer = 0 := rfl
-  have htreeEq : (forsNodeAdrs pos.forsAdrs z t).tree = pos.tree.val := rfl
-  have hword1 : (forsNodeAdrs pos.forsAdrs z t).word1 = pos.leaf.val := rfl
-  have hword2 : (forsNodeAdrs pos.forsAdrs z t).word2 = z := rfl
-  have hword3 : (forsNodeAdrs pos.forsAdrs z t).word3 = t := rfl
-  exact ⟨Adrs.isCanonical_of_fields_free (Or.inr rfl) (by rw [hlayerEq]; norm_num)
-      (by rw [htreeEq]; exact tree_lt_canonical hb 0 pos.tree) rfl
-      (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf)
-      (by rw [hword2]; exact hz) (by rw [hword3]; exact ht),
-    by rw [hlayerEq]; exact vp.valid.d_pos,
-    by rw [htreeEq]; exact tree_lt_hypertree 0 pos.tree⟩
+    AddressFacts vp (forsNodeAdrs pos.forsAdrs z t) where
+  canonical :=
+    ForsConformance.forsNodeAdrs_isCanonical _ z t (BottomPosition.forsAdrs_isCanonical hb pos)
+      (fits_four_of_lt hz) (fits_four_of_lt ht)
+  layer_lt := vp.valid.d_pos
+  tree_lt := tree_lt_hypertree 0 pos.tree
 
+/-- Every FORS root compression address carries the address facts. -/
 theorem addressFacts_forsPkAdrs {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) (pos : BottomPosition vp) :
-    AddressFacts vp (forsPkAdrs pos.forsAdrs) := by
-  have hlayerEq : (forsPkAdrs pos.forsAdrs).layer = 0 := rfl
-  have htreeEq : (forsPkAdrs pos.forsAdrs).tree = pos.tree.val := rfl
-  have hword1 : (forsPkAdrs pos.forsAdrs).word1 = pos.leaf.val := rfl
-  exact ⟨Adrs.isCanonical_of_fields_compress (Or.inr rfl) (by rw [hlayerEq]; norm_num)
-      (by rw [htreeEq]; exact tree_lt_canonical hb 0 pos.tree) rfl
-      (by rw [hword1]; exact leaf_lt_canonical hb pos.leaf) rfl rfl,
-    by rw [hlayerEq]; exact vp.valid.d_pos,
-    by rw [htreeEq]; exact tree_lt_hypertree 0 pos.tree⟩
+    AddressFacts vp (forsPkAdrs pos.forsAdrs) where
+  canonical := ForsConformance.forsPkAdrs_isCanonical _ (BottomPosition.forsAdrs_isCanonical hb pos)
+  layer_lt := vp.valid.d_pos
+  tree_lt := tree_lt_hypertree 0 pos.tree
 
+/-- Every XMSS node address with four-byte height and index carries the address facts. -/
 theorem addressFacts_xmssNodeAdrs {vp : ValidatedParams}
     (hb : CanonicalAddressBounds vp.params) (coord : LayerTreeCoord vp) {z t : ℕ}
     (hz : z < 2 ^ 32) (ht : t < 2 ^ 32) :
-    AddressFacts vp (xmssNodeAdrs coord.toAdrs z t) := by
-  have hlayerEq : (xmssNodeAdrs coord.toAdrs z t).layer = coord.layer.val := rfl
-  have htreeEq : (xmssNodeAdrs coord.toAdrs z t).tree = coord.tree.val := rfl
-  have hword1 : (xmssNodeAdrs coord.toAdrs z t).word1 = 0 := rfl
-  have hword2 : (xmssNodeAdrs coord.toAdrs z t).word2 = z := rfl
-  have hword3 : (xmssNodeAdrs coord.toAdrs z t).word3 = t := rfl
-  exact ⟨Adrs.isCanonical_of_fields_tree
-      (by rw [hlayerEq]; exact layer_lt_canonical hb coord.layer)
-      (by rw [htreeEq]; exact tree_lt_canonical hb _ coord.tree) rfl hword1
-      (by rw [hword2]; exact hz) (by rw [hword3]; exact ht),
-    by rw [hlayerEq]; exact coord.layer.isLt,
-    by rw [htreeEq]; exact tree_lt_hypertree _ coord.tree⟩
+    AddressFacts vp (xmssNodeAdrs coord.toAdrs z t) where
+  canonical :=
+    XmssConformance.xmssNodeAdrs_isCanonical _ z t (layerTreeCoord_toAdrs_isCanonical hb coord)
+      (fits_four_of_lt hz) (fits_four_of_lt ht)
+  layer_lt := coord.layer.isLt
+  tree_lt := tree_lt_hypertree _ coord.tree
 
 /-! ## Per-ledger facts -/
 
-/-- The WOTS+ instance base addresses are not a target role of their own, being the identifier a
-reduction indexes an instance by rather than a hashed target, but a reduction that carries them
-needs the same facts. -/
-theorem addressFacts_wotsInstanceAddresses (vp : ValidatedParams)
-    (hb : CanonicalAddressBounds vp.params) :
-    ∀ a ∈ wotsInstanceAddresses vp, AddressFacts vp a := by
-  intro a ha
-  simp only [wotsInstanceAddresses, List.mem_map] at ha
-  obtain ⟨pos, -, rfl⟩ := ha
-  exact addressFacts_wotsInstanceAdrs hb pos
-
+/-- Every FORS leaf target carries the address facts; the global leaf index is below `k * 2^a`. -/
 theorem addressFacts_forsLeafAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     ∀ a ∈ forsLeafAddresses vp, AddressFacts vp a := by
@@ -321,6 +344,8 @@ theorem addressFacts_forsLeafAddresses (vp : ValidatedParams)
     omega
   simpa [Params.t] using lt_of_lt_of_le (by simpa [Params.t] using hstep) hbound
 
+/-- Every FORS internal-node target carries the address facts; the height is at most `a` and the
+global node index is below `k * 2^a`. -/
 theorem addressFacts_forsTreeAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     ∀ a ∈ forsTreeAddresses vp, AddressFacts vp a := by
@@ -349,6 +374,7 @@ theorem addressFacts_forsTreeAddresses (vp : ValidatedParams)
     Nat.mul_le_mul_left _ hpow
   omega
 
+/-- Every FORS root compression target carries the address facts. -/
 theorem addressFacts_forsRootAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     ∀ a ∈ forsRootAddresses vp, AddressFacts vp a := by
@@ -357,6 +383,8 @@ theorem addressFacts_forsRootAddresses (vp : ValidatedParams)
   obtain ⟨pos, -, rfl⟩ := ha
   exact addressFacts_forsPkAdrs hb pos
 
+/-- Every XMSS internal-node target carries the address facts; the height is at most `hp` and the
+index is below `2^hp`. -/
 theorem addressFacts_xmssNodeAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     ∀ a ∈ xmssNodeAddresses vp, AddressFacts vp a := by
@@ -371,6 +399,7 @@ theorem addressFacts_xmssNodeAddresses (vp : ValidatedParams)
     Nat.pow_le_pow_right (by norm_num) (by have := hb.hp_le; omega)
   exact addressFacts_xmssNodeAdrs hb _ (by have := hb.hp_le; omega) (by omega)
 
+/-- Every executed WOTS+ chain-step target carries the address facts. -/
 theorem addressFacts_wotsStepAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     ∀ a ∈ wotsStepAddresses vp, AddressFacts vp a := by
@@ -379,6 +408,7 @@ theorem addressFacts_wotsStepAddresses (vp : ValidatedParams)
   obtain ⟨coord, -, rfl⟩ := ha
   exact addressFacts_wotsStepAdrs hb coord.1 coord.2
 
+/-- Every selected WOTS+ step target carries the address facts, whatever the selection. -/
 theorem addressFacts_selectedWotsAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params)
     (select : WotsChainCoord vp → Fin (vp.params.w - 1)) :
@@ -388,6 +418,8 @@ theorem addressFacts_selectedWotsAddresses (vp : ValidatedParams)
   obtain ⟨coord, -, rfl⟩ := ha
   exact addressFacts_wotsStepAdrs hb coord (select coord)
 
+/-- Every optionally selected WOTS+ step target carries the address facts, whatever the
+selection. -/
 theorem addressFacts_optionalWotsAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params)
     (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1))) :
@@ -398,6 +430,7 @@ theorem addressFacts_optionalWotsAddresses (vp : ValidatedParams)
   obtain ⟨step, -, rfl⟩ := Option.map_eq_some_iff.mp hmap
   exact addressFacts_wotsStepAdrs hb coord step
 
+/-- Every WOTS+ public-key compression target carries the address facts. -/
 theorem addressFacts_wotsPkAddresses (vp : ValidatedParams)
     (hb : CanonicalAddressBounds vp.params) :
     ∀ a ∈ wotsPkAddresses vp, AddressFacts vp a := by
@@ -420,8 +453,9 @@ theorem encodeTargets_sha2_nodup {p : Params} {addresses : List Adrs}
   exact sha2AdrsKey_injective_of_domain haCanonical haLayer haTree hbCanonical hbLayer hbTree hkey
 
 /-- On a duplicate-free ledger of canonical addresses, the full thirty-two byte tweaks of
-`shakePrimitives` stay duplicate-free.  Canonicality is needed: the serialization truncates each
-field to its width, so two addresses that differ only above a field's width share a tweak. -/
+`shakePrimitives` stay duplicate-free.  Field-width bounds are needed, and canonicality supplies
+them: the serialization truncates each field to its width, so two addresses that differ only above
+a field's width share a tweak. -/
 theorem encodeTargets_shake_nodup {p : Params} {addresses : List Adrs}
     (hnodup : addresses.Nodup) (hcanonical : ∀ a ∈ addresses, a.isCanonical = true) :
     (encodeTargets (shakePrimitives p) addresses).Nodup := by

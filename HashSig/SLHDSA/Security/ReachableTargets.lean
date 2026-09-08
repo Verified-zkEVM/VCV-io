@@ -87,21 +87,6 @@ def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord 
 
 end LayerTreeCoord
 
-/-- The product representation of a reachable layer position.  This equivalence is the explicit
-owner bridge used to enumerate the existing dependent structure. -/
-def layerPositionEquiv (vp : ValidatedParams) :
-    LayerPosition vp ≃
-      (Σ layer : Fin vp.params.d,
-        Fin (2 ^ layerTreeHeight vp layer.val) × Fin (2 ^ vp.params.hp)) where
-  toFun pos := ⟨pos.layer, pos.tree, pos.leaf⟩
-  invFun coord := ⟨coord.1, coord.2.1, coord.2.2⟩
-  left_inv pos := by cases pos; rfl
-  right_inv coord := by cases coord; rfl
-
-/-- Reachable layer positions form a finite type because all three FIPS coordinates are bounded. -/
-instance (vp : ValidatedParams) : Fintype (LayerPosition vp) :=
-  Fintype.ofEquiv _ (layerPositionEquiv vp).symm
-
 /-- The target-count exponent agrees with the canonical `LayerPosition` exponent. -/
 theorem treesAtLayer_eq_layerTreeHeight (vp : ValidatedParams) (layer : Fin vp.params.d) :
     treesAtLayer vp.params layer = 2 ^ layerTreeHeight vp layer.val := by

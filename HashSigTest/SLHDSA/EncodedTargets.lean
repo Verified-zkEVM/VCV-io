@@ -105,7 +105,7 @@ example : EncodedTargetLedgerConditions deep (shakePrimitives deepParams) :=
 
 /-- The SHA-2 conditions are not merely unavailable for it, they are false.  Two distinct
 layer-zero trees whose indices exceed the compressed eight-byte field are both listed XMSS
-internal-node targets, and both compress to the all-zero key. -/
+internal-node targets, and the total SHA-2 key projection maps both to the all-zero key. -/
 theorem deep_sha2_conditions_false :
     ¬ EncodedTargetLedgerConditions deep (sha2Primitives deep.params) := by
   intro hconditions
