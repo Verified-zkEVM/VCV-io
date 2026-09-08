@@ -61,12 +61,12 @@ depth-one programs being the `slh*InternalM` family.
   programs), §8 (Algorithms 14--17, the FORS programs), and §9 (Algorithms 18--20, the internal
   scheme programs)
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
-  Formally Verified".  Its EasyCrypt development imposes an analogous address-validity discipline
-  as oracle preconditions: `valid_xadrs`, split by `valid_xadrs_xadrschpkcotrh` into chain,
+  Formally Verified".  Its EasyCrypt development carries an analogous address-validity
+  discipline, the predicates `valid_xadrs`, split by `valid_xadrs_xadrschpkcotrh` into chain,
   public-key-compression, and tree-hash addresses (`proofs/FL_SL_XMSS_MT_ES.ec`), and
-  `valid_fadrs` (`proofs/FORS_ES.ec`).  `mem_constructionAddresses_iff` is the analogue of that
-  split here, six-way because the FORS and WOTS+ roles are separate ledgers; no correspondence
-  between the two developments is claimed.
+  `valid_fadrs` (`proofs/FORS_ES.ec`), under which its address lemmas are stated.
+  `mem_constructionAddresses_iff` is the analogue of that split here, six-way because the FORS
+  and WOTS+ roles are separate ledgers; no correspondence between the two developments is claimed.
 -/
 
 public section
