@@ -23,6 +23,19 @@ namespace VCVioTest.Runtime
 
 open OracleSpec OracleComp
 
+variable {ι κ : Type} {Import : OracleSpec ι} {Surface : OracleSpec κ}
+    {Γ : OracleRuntime Import Surface} {α : Type}
+
+/-- Ordinary imports can introduce the runtime's provenance predicate from support membership. -/
+example (program : OracleComp Surface α) (result : RunResult Γ α)
+    (h : result ∈ support (Γ.run program)) : Γ.GeneratedBy program result :=
+  (OracleRuntime.generatedBy_iff_mem_support Γ program result).2 h
+
+/-- Ordinary imports can eliminate the runtime's provenance predicate to support membership. -/
+example (program : OracleComp Surface α) (result : RunResult Γ α)
+    (h : Γ.GeneratedBy program result) : result ∈ support (Γ.run program) :=
+  (OracleRuntime.generatedBy_iff_mem_support Γ program result).1 h
+
 abbrev counter : OracleRuntime (fun _ : Empty => PUnit) (fun _ : Nat => Nat) where
   State := Nat
   setup := pure 7

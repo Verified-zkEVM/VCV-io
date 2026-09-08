@@ -69,6 +69,12 @@ def resume (previous : RunResult Γ α) (next : α → OracleComp Surface β) :
 def GeneratedBy (program : OracleComp Surface α) (result : RunResult Γ α) : Prop :=
   result ∈ support (Γ.run program)
 
+/-- Public introduction and elimination rule for the otherwise opaque provenance predicate. -/
+theorem generatedBy_iff_mem_support (program : OracleComp Surface α)
+    (result : RunResult Γ α) :
+    Γ.GeneratedBy program result ↔ result ∈ support (Γ.run program) :=
+  Iff.rfl
+
 /-- Initialization is performed before the first phase. -/
 theorem run_eq (program : OracleComp Surface α) :
     Γ.run program = Γ.setup >>= fun s => Γ.runFrom s program := by
