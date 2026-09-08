@@ -183,6 +183,47 @@ lemma isQueryBound_seq {og : OracleComp spec (α → β)} {oa : OracleComp spec 
     IsQueryBound (og <*> oa) (combine b₁ b₂) canQuery cost :=
   PFunctor.FreeM.isRollBound_seq combine h_can h_cost h₁ h₂
 
+/-! ### Predicate-only bounds
+
+With the unit budget `()`, the validity check `fun t _ => P t`, and the trivial cost,
+`IsQueryBound` says that every query on every response path satisfies `P`, without counting
+queries.  The lemmas below restate the structural laws for that instance so a client does not
+have to discharge the `combine` side conditions of `isQueryBound_bind` each time. -/
+
+lemma isQueryBound_unit_pure (x : α) (P : ι → Prop) :
+    IsQueryBound (pure x : OracleComp spec α) () (fun t _ => P t) (fun _ _ => ()) := trivial
+
+lemma isQueryBound_unit_query_iff (t : ι) (P : ι → Prop) :
+    IsQueryBound (liftM (spec.query t) : OracleComp spec _) () (fun t _ => P t) (fun _ _ => ()) ↔
+      P t :=
+  isQueryBound_query_iff t () _ _
+
+lemma isQueryBound_unit_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
+    (P : ι → Prop) :
+    IsQueryBound (liftM (spec.query t) >>= mx) () (fun t _ => P t) (fun _ _ => ()) ↔
+      P t ∧ ∀ u, IsQueryBound (mx u) () (fun t _ => P t) (fun _ _ => ()) :=
+  Iff.rfl
+
+lemma isQueryBound_unit_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {P : ι → Prop}
+    (h₁ : IsQueryBound oa () (fun t _ => P t) (fun _ _ => ()))
+    (h₂ : ∀ x, IsQueryBound (ob x) () (fun t _ => P t) (fun _ _ => ())) :
+    IsQueryBound (oa >>= ob) () (fun t _ => P t) (fun _ _ => ()) :=
+  isQueryBound_bind (fun _ _ => ()) (fun _ _ _ _ h => ⟨h, h⟩) (fun _ _ _ _ _ => ⟨rfl, rfl⟩) h₁ h₂
+
+/-- A predicate-only bound passes through `Vector.ofFnM` when every component has it. -/
+lemma isQueryBound_unit_ofFnM {n : ℕ} (f : Fin n → OracleComp spec α) {P : ι → Prop}
+    (h : ∀ i, IsQueryBound (f i) () (fun t _ => P t) (fun _ _ => ())) :
+    IsQueryBound (Vector.ofFnM f) () (fun t _ => P t) (fun _ _ => ()) := by
+  induction n with
+  | zero =>
+      rw [Vector.ofFnM_zero]
+      exact isQueryBound_unit_pure _ _
+  | succ n ih =>
+      rw [Vector.ofFnM_succ]
+      exact isQueryBound_unit_bind (ih (fun i => f i.castSucc) (fun i => h i.castSucc))
+        fun _ => isQueryBound_unit_bind (h (Fin.last n)) fun _ => isQueryBound_unit_pure _ _
+
 /-- Transfer a structural query bound through `simulateQ` into a stateful target semantics,
 provided each simulated source query has a target-side step bound and the target-side bind
 rule composes those step budgets with the recursive continuation budget. -/

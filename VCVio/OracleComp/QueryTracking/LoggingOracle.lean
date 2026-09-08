@@ -159,6 +159,30 @@ lemma run_withLogging_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
         (pure (u, [⟨t, u⟩]) : m₀ (loggedSpec.Range t × QueryLog loggedSpec))) := by
   simp
 
+/-- Under a deterministic handler, every entry of the `withLogging` log of a program all of whose
+queries satisfy `P` (a predicate-only `IsQueryBound`, see `isQueryBound_unit_bind`) satisfies `P`
+at its input.  The premise is independent of the handler; the conclusion is about one concrete
+execution.  A probabilistic handler needs a `support`-based statement, which this lemma does not
+give. -/
+theorem mem_run_withLogging_of_isQueryBound {α' : Type} {P : κ → Prop}
+    (so : QueryImpl loggedSpec Id) {oa : OracleComp loggedSpec α'}
+    (h : oa.IsQueryBound () (fun t _ => P t) (fun _ _ => ())) :
+    ∀ e ∈ (simulateQ so.withLogging oa).run.run.2, P e.1 := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      change ∀ e ∈ ([] : QueryLog loggedSpec), P e.1
+      simp
+  | query_bind t mx ih =>
+      rw [isQueryBound_query_bind_iff] at h
+      rw [simulateQ_query_bind]
+      simp only [OracleQuery.input_query, monadLift_self, WriterT.run_bind',
+        run_withLogging_apply, Id.run_bind, Id.run_map, Prod.map_snd, List.mem_append,
+        Id.run_pure, List.mem_singleton]
+      intro e he
+      rcases he with rfl | he
+      · exact h.1
+      · exact ih (so t).run (h.2 _) e he
+
 /-- Every entry emitted while simulating one primitive query records that query's input.
 This response-independent provenance fact is stable even when the query was transported from
 a component of a dependent sum specification. -/
