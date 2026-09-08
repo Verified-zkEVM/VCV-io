@@ -66,20 +66,11 @@ def encodeExact {n : ℕ} (bytes : Bytes n) : List Byte := bytes.toList
 theorem decodeExact_eq_ok_iff {n : ℕ} {raw : List Byte} {bytes : Bytes n} :
     decodeExact n raw = .ok bytes ↔ raw = bytes.toList := by
   simp only [decodeExact]
-  split
-  · constructor
-    · intro h
-      injection h with hbytes
-      subst bytes
-      simp
-    · intro h
-      subst raw
-      congr 1
-  · constructor
-    · simp
-    · intro h
-      subst raw
-      simp_all
+  split <;> simp_all only [Except.ok.injEq, ← Vector.toArray_inj, ← Array.toList_inj,
+    Vector.toList, reduceCtorEq, false_iff]
+  intro h
+  have := congrArg List.length h
+  simp_all
 
 /-- Inputs of any other length are rejected before structured parsing begins. -/
 theorem decodeExact_eq_error_of_length_ne (n : ℕ) (raw : List Byte)
