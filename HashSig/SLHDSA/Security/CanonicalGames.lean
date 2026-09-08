@@ -342,6 +342,13 @@ theorem wotsFUdCProblem_eval_adrsToKey [SampleableType prims.PkSeed] [Sampleable
     (wotsFUdCProblem prims).th.eval pkSeed (prims.adrsToKey address) input =
       prims.F pkSeed address input := rfl
 
+/-- The WOTS+-`F` target-collision game attacks the construction's own `F` evaluation. -/
+@[simp]
+theorem wotsFTcrCProblem_eval_adrsToKey [SampleableType prims.PkSeed]
+    (pkSeed : prims.PkSeed) (address : Adrs) (input : prims.Y) :
+    (wotsFTcrCProblem prims).th.eval pkSeed (prims.adrsToKey address) input =
+      prims.F pkSeed address input := rfl
+
 /-- The FORS-`F` open-preimage game attacks the construction's own `F` evaluation. -/
 theorem forsFOpenPreProblem_eval_adrsToKey [SampleableType prims.PkSeed] [SampleableType prims.Y]
     (pkSeed : prims.PkSeed) (address : Adrs) (input : prims.Y) :
