@@ -2,20 +2,33 @@ import Lake
 open Lake DSL
 
 package VCVio where
+  description := "Machine-checked cryptographic proofs in Lean, built on Mathlib: oracle \
+computations, probability semantics, program logic, and lattice- and hash-based schemes."
+  license := "Apache-2.0"
   -- Settings applied to both builds and interactive editing
   leanOptions := #[
     ⟨`pp.unicode.fun, true⟩, -- pretty-prints `fun a ↦ b`
     ⟨`pp.proofs.withType, false⟩,
     ⟨`autoImplicit, false⟩,
     ⟨`relaxedAutoImplicit, false⟩,
+    -- Mathlib's standard linter set (it already includes `linter.style.whitespace`).
     ⟨`weak.linter.mathlibStandardSet, true⟩,
     ⟨`weak.linter.modulesUpperCamelCase, true⟩,
-    ⟨`weak.linter.style.whitespace, true⟩,
+    -- Flag `public`/`private` modifiers that repeat the enclosing section's visibility.
+    ⟨`weak.linter.redundantVisibility, true⟩,
+    -- Mathlib's file-length linter at its default; a file above 1500 lines carries its own
+    -- trailing `set_option linter.style.longFile <ceiling>`, which only ratchets down.
+    ⟨`weak.linter.style.longFile, .ofNat 1500⟩,
     -- Disable the unicode allowlist linter: VCVio docstrings legitimately use
     -- FIPS-204 math notation (combining tilde `c̃`) and cited author names with
     -- diacritics (e.g. `Cătălin Hriţcu`).
     ⟨`weak.linter.unicodeLinter, false⟩
   ]
+  -- `lake test` runs the `@[test_driver]` script below; `lake lint` runs Batteries' environment
+  -- linters over the proof libraries (oleans only, so no native backend is linked).
+  lintDriver := "batteries/runLinter"
+  lintDriverArgs := #["ToMathlib", "VCVio", "LatticeCrypto", "Extern", "HashSig", "Examples",
+    "VCVioWidgets"]
 
 /-
 Interop backends are intentionally disabled for the Lean 4.33 baseline. Their
@@ -74,22 +87,22 @@ Falcon) and every module whose transitive imports reach them. Isolated here so
 `VCVio`/`LatticeCrypto` stay link-safe when the `third_party/` native backends
 are not checked out. May import `VCVio`/`LatticeCrypto`/`ToMathlib`; nothing in
 those libraries may import `Extern`. -/
-lean_lib Extern
+@[default_target] lean_lib Extern
 
 /-- Lattice-based cryptography: ring arithmetic, hardness assumptions, and scheme definitions. -/
-lean_lib LatticeCrypto
+@[default_target] lean_lib LatticeCrypto
 
 /-- Hash-based signatures: SLH-DSA (SPHINCS+, FIPS 205) proof-level specs and security.
 Peer of `LatticeCrypto`; may depend on `VCVio`/`ToMathlib` (and Mathlib), but nothing in
 `VCVio`/`ToMathlib`/`Extern`/`Interop` may import it. -/
-lean_lib HashSig
+@[default_target] lean_lib HashSig
 
 /-- Example constructions of cryptographic primitives. -/
-lean_lib Examples
+@[default_target] lean_lib Examples
 /-- Optional proof widget experiments and visualizations. -/
-lean_lib VCVioWidgets
-/-- Seperate section of the project for things that should be ported. -/
-lean_lib ToMathlib
+@[default_target] lean_lib VCVioWidgets
+/-- Separate section of the project for things that should be ported. -/
+@[default_target] lean_lib ToMathlib
 
 /-- Dormant Interop bridges to Rust verification frontends (hax, aeneas).
 Strict TCB isolation: no other `lean_lib` may import from `Interop`. See
@@ -357,6 +370,40 @@ lean_lib HashSigTest where
 /-- Smoke test: imports VCVio and prints OK. -/
 lean_exe smoke_test where
   root := `VCVioTest.Smoke
+
+/-- `lake test`: build the three test libraries, then run the smoke test and the SLH-DSA test
+executables. `lake test -- --ffi` additionally builds and runs the native-backed ML-KEM / ML-DSA /
+Falcon executables, which compile the vendored C backends under `third_party/`; that path is what
+the nightly FFI workflow runs and is never part of the per-PR CI. -/
+@[test_driver]
+script test (args) do
+  let step (cmdArgs : Array String) : ScriptM UInt32 := do
+    IO.println s!"# lake {" ".intercalate cmdArgs.toList}"
+    let child ← IO.Process.spawn { cmd := "lake", args := cmdArgs }
+    child.wait
+  let mut steps : Array (Array String) := #[
+    #["build", "VCVioTest", "LatticeCryptoTest", "HashSigTest"],
+    #["exe", "smoke_test"],
+    #["exe", "slhdsa_kat"],
+    #["exe", "slhdsa_c13_kat"],
+    #["exe", "slhdsa_data_codec_tests"],
+    #["exe", "slhdsa_primitive_tests"],
+    #["exe", "slhdsa_wots_tests"],
+    #["exe", "slhdsa_xmss_tests"],
+    #["exe", "slhdsa_fors_tests"],
+    #["exe", "slhdsa_hypertree_tests"],
+    #["exe", "slhdsa_external_tests"],
+    #["exe", "slhdsa_target_ledger_tests"],
+    #["exe", "slhdsa_encoded_ledger_tests"],
+    #["exe", "slhdsa_trace_target_tests"]]
+  if args.contains "--ffi" then
+    steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
+  for cmdArgs in steps do
+    let rc ← step cmdArgs
+    if rc != 0 then
+      IO.eprintln s!"lake test: `lake {" ".intercalate cmdArgs.toList}` exited with code {rc}"
+      return rc
+  return 0
 
 /-- ML-KEM test executable (links against mlkem-native FFI). -/
 lean_exe mlkem_test where

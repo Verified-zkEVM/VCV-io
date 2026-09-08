@@ -117,6 +117,21 @@ Do **not** use ASCII banners such as:
 
 ASCII banners are visually loud, do not appear in the generated documentation, and make the file feel partitioned in a way that the type system does not enforce. Prefer the `/-!` form, which both reads as natural prose and surfaces in `doc-gen4` output. If a section is large enough to warrant its own banner, it is usually large enough to warrant its own `namespace` or its own file.
 
+## Toolchain And Dependency Bumps
+
+The toolchain and Mathlib move together, and the other pins follow them. The order that keeps
+`lake update` idempotent (see the comment above the PolyFun `require` in `lakefile.lean`):
+
+1. `lean-toolchain`, then the Mathlib tag in `lakefile.lean`.
+2. The `cslib`, `PolyFun`, and `loom2` revisions, each to a commit built against that Mathlib.
+3. `lake update --keep-toolchain`, then `lake exe cache get`.
+4. `./scripts/validate.sh --lint --test --axioms`; fix what the new toolchain flags rather than
+   silencing it (`docs/agents/gotchas.md` §23), and update `scripts/axiom_baseline.json` only for
+   an intentional change in `sorry` debt.
+5. Re-verify the upstream-alignment ledger (`docs/reading/upstream-alignment.md`): every row is
+   checked against the newly pinned trees, never diffed against the previous ledger.
+6. Update the version mentions in `AGENTS.md` (*Building*) and `docs/agents/gotchas.md` §26.
+
 ## Style Notes
 
 - Keep imports at the top of the file.

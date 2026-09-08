@@ -2185,3 +2185,5 @@ until the signing-simulation reduction is formalized. -/
 end security
 
 end Fischlin
+
+set_option linter.style.longFile 2300

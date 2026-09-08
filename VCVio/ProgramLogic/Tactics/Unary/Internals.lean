@@ -1970,3 +1970,5 @@ def runVCGenPass : TacticM Bool := do
 end Unary
 end TacticInternals
 end OracleComp.ProgramLogic
+
+set_option linter.style.longFile 2100
