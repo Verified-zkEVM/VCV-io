@@ -18,7 +18,7 @@ quantified over the query index, for a `QueryImpl spec (StateT σ ProbComp)`. Th
 `∀ t, StateT.PreservesInv (impl t) Inv`, so `QueryImpl.preservesInv_iff` is `Iff.rfl` and the
 `StateT` lemmas (`preservesInv_bind`, `preservesInv_of_statePreserving`, …) apply to each query
 implementation directly. The consumers (`ProgrammingOracle`, `CachingOracle`, the
-`PRFTagReader` example) are unchanged because the unfolding is definitional.
+`PRFTagReader` example) retain their statements; the example proofs use the structural rules.
 
 ## Layered, not duplicated
 
@@ -43,19 +43,20 @@ where the two presentations need care.
 **Cost-instrumentation layers.** `CostModel`, `CountingOracle`, `WriterCost`, and `QueryCost`
 are four presentations of "run the computation and accumulate a cost". `AddWriterT`
 (`VCVio/OracleComp/QueryTracking/WriterCost.lean`) is canonical: `CostModel.expectedCost`
-already delegates to `AddWriterT.expectedCost`. The odd one out is `CountingOracle.withCost`,
-which writes into the *multiplicative* `QueryCount` writer (`Structures.lean` gives
+already delegates to `AddWriterT.expectedCost`. `QueryImpl.withCost`, defined in
+`CountingOracle.lean`, supports arbitrary monoid-valued costs. Its `withCounting` specialization
+writes into the *multiplicative* `QueryCount` writer (`Structures.lean` gives
 `QueryCount ι := ι → ℕ` a `Monoid` whose `mul` is `+`). Folding it onto `AddWriterT` is blocked
 by the `QueryCount` design item in the ledger: the definition is `@[reducible]`, so that
 `Monoid` instance leaks onto every `ι → ℕ` (`#synth Monoid (ℕ → ℕ)` finds it), and the fold has
 to change the carrier (the repo already uses `κ →₀ ℕ` in `ResourceProfile.lean`) before it can
 change the writer.
 
-**`QueryImpl`/`ProbHandler` versus PolyFun's `Sampler`/`Decoration`.** A `QueryImpl spec m` is a
-per-query interpretation into `m`; PolyFun's `Spec.Sampler m spec` is `Decoration (fun X => m X)
-spec`, the same data in the interaction layer's vocabulary (`VCVio/Interaction/UC/Runtime.lean`
-already threads samplers through processes). `ProbHandler` (`VCVio/OracleComp/Coinductive/
-DynSystem.lean`) is a third spelling for the coinductive runtime. These stay two vocabularies for
-one concept until the Kleisli–Mealy wiring that PolyFun's own ledger tracks lands; at that point
-`QueryImpl` should become the `OracleSpec`-indexed alias of the PolyFun notion, the way the
-`OracleSpec` operations already are.
+**Oracle handlers and interaction samplers.** `QueryImpl spec m` already specializes PolyFun's
+`PFunctor.Handler m spec.toPFunctor` through `QueryImpl.eq_handler`; `ProbHandler` in
+`VCVio/OracleComp/Coinductive/DynSystem.lean` specializes that handler to the discrete probability
+backend. `TypeTree.Sampler m tree` decorates every interaction-tree node with a computation of
+its answer type. These have different indexing structures: an oracle signature versus a tree
+of possible interaction nodes. `VCVio/Interaction/UC/Runtime.lean` consumes the latter through
+`TypeTree.samplePath`. A further unification needs an explicit bridge between the index
+structures and execution laws, rather than another alias of the existing handler.
