@@ -206,11 +206,6 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 
 ## Program Logic Tactics
 
-For theorem registration and proof-simplification reviews, follow
-[`docs/reviews/tactics.md`](docs/reviews/tactics.md). Repo members can request the focused
-review with `/review tactics`, optionally followed by focus text. Pair tactic registrations
-with compiled examples in existing consumers and ordinary-import regression tests.
-
 For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
 `VCVio.ProgramLogic.Notation` keeps notation plus compatibility macros, but
 `Tactics.lean` is the canonical interactive proof mode.

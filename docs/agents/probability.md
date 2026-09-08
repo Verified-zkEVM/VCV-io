@@ -1,10 +1,5 @@
 # Probability Reasoning (EvalDist and ProbComp)
 
-For theorem attributes and proof-simplification reviews, use the
-[tactic usability review procedure](../reviews/tactics.md). `/review tactics` requests the
-same focused review on a PR; it covers function properties, normalization, and proof-mode
-registrations as well as probability inequalities.
-
 For the cross-project survey of SPMF, Mathlib measures and kernels, PolyFun
 coalgebraic limits, ArkLib, Bluebell/Iris, and possible long-term migration paths, see
 [`Probability Semantics for Computations: Landscape and Design Options`](../reading/probability-semantics-landscape.md).
