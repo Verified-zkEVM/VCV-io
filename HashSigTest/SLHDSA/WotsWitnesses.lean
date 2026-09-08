@@ -57,8 +57,6 @@ readily. -/
 
 theorem toyValid : toyParams.Valid := by decide
 
-def toy : ValidatedParams := ⟨toyParams, toyValid⟩
-
 example : toyParams.w = 4 := by decide
 example : toyParams.len1 = 4 := by decide
 example : toyParams.len2 = 2 := by decide
@@ -177,8 +175,8 @@ def extract (sig : WotsSig toyParams toyPrimitives.core) (msg : toyPrimitives.Y)
 /-! ## Positive canaries -/
 
 /-- Chain zero: the honest secret is `2`, so advancing the forged chain to the honest digit `1`
-gives `0` where the honest signature reveals `1`; the two collide one step later, at hash address
-one. -/
+gives `0` where the honest signature reveals `1`.  The two are distinct and share their `F` image
+at hash address one, which is the collision the extractor returns. -/
 def checkChainCollision : IO Unit := do
   let witness := findWotsChainWitness toyPrimitives chainForgery forgedMsg honestSig honestMsg ()
     baseAdrs ⟨0, by decide⟩
@@ -315,6 +313,14 @@ example (sig : WotsSig toyParams toyPrimitives.core) (msg msg' : toyPrimitives.Y
     (hne : msg ≠ msg') :
     (findWotsWitness toyPrimitives sig msg honestSig msg' () baseAdrs).isSome :=
   findWotsWitness_isSome toyValid toyPrimitives toyByteLaws sig msg honestSig msg' () baseAdrs hne
+
+/-- The same at the exact data the run-time checks use, so that the extractor's success on the
+chain forgery is a theorem and not only an observation. -/
+example :
+    (findWotsWitness toyPrimitives chainForgery forgedMsg honestSig honestMsg ()
+      baseAdrs).isSome :=
+  findWotsWitness_isSome toyValid toyPrimitives toyByteLaws chainForgery forgedMsg honestSig
+    honestMsg () baseAdrs forgedMsg_ne_honestMsg
 
 example (sig sig' : WotsSig toyParams toyPrimitives.core) (msg msg' : toyPrimitives.Y)
     (hpk : wotsPkFromSig toyPrimitives sig msg () baseAdrs =
