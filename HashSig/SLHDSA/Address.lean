@@ -22,7 +22,7 @@ Two type-dependent words alias by name exactly as in FIPS 205:
 `setChainAddress = setTreeHeight` (word 2) and `setHashAddress = setTreeIndex` (word 3).
 
 `toBytes` / `compressSha2` give the 32-byte serialization and the 22-byte SHA-2 `ADRSc`
-compression (§11.2.1) as byte lists. `encodeChecked`, `compressSha2Checked`, and `decode` enforce
+compression (§11.2) as byte lists. `encodeChecked`, `compressSha2Checked`, and `decode` enforce
 representability, recognized types, and type-specific canonical padding at external boundaries.
 
 ## References

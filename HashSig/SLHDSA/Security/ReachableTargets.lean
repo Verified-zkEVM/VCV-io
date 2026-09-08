@@ -1177,8 +1177,8 @@ theorem disjoint_wotsPkAddresses_xmssNodeAddresses (vp : ValidatedParams) :
     (fun _ => type_of_mem_xmssNodeAddresses vp)
 
 /-- The six structural ledgers, concatenated in the order of the table above with the two
-selection-dependent ledgers left out, are duplicate-free.  `TraceTargets.constructionAddresses`
-names this concatenation as the union ledger. -/
+selection-dependent ledgers left out, are duplicate-free.  `HashSig.SLHDSA.Security.TraceTargets`
+names this concatenation as the union ledger `constructionAddresses`. -/
 theorem nodup_structuralLedgers_append (vp : ValidatedParams) :
     (forsLeafAddresses vp ++ forsTreeAddresses vp ++ forsRootAddresses vp ++
       wotsStepAddresses vp ++ wotsPkAddresses vp ++ xmssNodeAddresses vp).Nodup := by

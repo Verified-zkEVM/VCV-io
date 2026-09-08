@@ -75,8 +75,8 @@ smaller than the second's. This is the combinatorial ingredient a WOTS+ unforgea
 reduction consumes, instantiated with the forgery target as `msg` and the honestly signed
 message as `msg'`: at the witnessing index the target's step count is strictly below the
 signed one, so a forger who only advances the honest signer's chains cannot reach the target's
-encoding. The EasyCrypt SPHINCS+ proof applies its axiom in exactly this swapped form
-(`two_encodings m' m` in `nhchwcoll_hchwpre`, `WOTS_TW_ES.ec`). The statement is the
+encoding. The EasyCrypt SPHINCS+ proof's forgery-side use of its axiom is exactly this swapped
+form (`two_encodings m' m` in `nhchwcoll_hchwpre`, `WOTS_TW_ES.ec`). The statement is the
 index-wise reading of the second conjunct of `chainLengthsCore_incomparable`, and the Lean
 counterpart of the EasyCrypt `two_encodings` axiom. -/
 theorem chainStepsCore_two_encodings (valid : p.Valid) (laws : core.ByteLaws)
