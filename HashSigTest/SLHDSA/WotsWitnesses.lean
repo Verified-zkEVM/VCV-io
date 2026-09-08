@@ -65,9 +65,16 @@ example : toyParams.len1 = 4 := by decide
 example : toyParams.len2 = 2 := by decide
 example : toyParams.len = 6 := by decide
 
-/-- The per-chain secret values the toy `PRF` hands out, indexed by the chain address. -/
+/-- The per-chain secret values the toy `PRF` hands out, indexed by the chain address.
+
+Only chains `0` and `5` are secret-sensitive: chains `1`-`4` take the "no witness" branch, which is
+decided by the two messages alone, and under `F x = x >>> 1` the only observables of chain `i`'s
+secret `s` are `s >>> b` and `s >>> (w - 1)`, so `4`-`7` are interchangeable here at chain `0` and
+`40`-`47` at chain `5`.  Chain `0`'s `4` is chosen so that the collision the extractor finds lies
+strictly above the honest digit; at `2` it lay exactly at it, where the chain advance is the
+identity and the canaries could not see it. -/
 def toySecret : ℕ → UInt8
-  | 0 => 2
+  | 0 => 4
   | 1 => 7
   | 2 => 19
   | 3 => 33
@@ -191,14 +198,21 @@ def extract (sig : WotsSig toyParams toyPrimitives.core) (msg : toyPrimitives.Y)
 
 /-! ## Positive canaries -/
 
-/-- Chain zero: the honest secret is `2`, so advancing the forged chain to the honest digit `1`
-gives `0` where the honest signature reveals `1`.  The two are distinct and share their `F` image
-at hash address one, which is the collision the extractor returns. -/
+/-- Chain zero: the honest secret is `4`, so the honest signature reveals `2` at the honest digit
+`1`, while advancing the forged chain to that digit gives `0`.  Those two do not yet share an `F`
+image, so the extractor climbs one further step and returns the collision at hash address two,
+between `0` and the honest chain value `1` there.
+
+The collision therefore sits strictly *above* the honest digit, which is what gives the canaries
+below any power to tell `WotsWitness.Valid`'s `fCollision` partner — the honest revealed element
+advanced by `step - b` — apart from the naive `honestSig[0]`.  The last two checks guard that:
+were the collision to move back onto the honest digit, the advance would be the identity and both
+identifications would agree at every value this fixture produces. -/
 def checkChainCollision : IO Unit := do
   let witness := findWotsChainWitness toyPrimitives chainForgery forgedMsg honestSig honestMsg ()
     baseAdrs ⟨0, by decide⟩
-  ensure "chain 0 yields an F-collision at hash address 1"
-    (witnessTag witness == "fCollision 0 1")
+  ensure "chain 0 yields an F-collision at hash address 2"
+    (witnessTag witness == "fCollision 0 2")
   match witness with
   | none => ensure "chain 0 yields a witness" false
   | some w =>
@@ -207,6 +221,12 @@ def checkChainCollision : IO Unit := do
       | .fCollision i step value =>
           ensure "the chain-0 collision is between the expected values"
             ((byteOf value == 0) && (byteOf (honestChainValue i step) == 1))
+          ensure "the chain-0 collision sits strictly above the honest digit"
+            (decide (chainStepsCore toyPrimitives.core honestMsg i.val < step))
+          ensure "the naive partner honestSig[0] does not satisfy the collision equation"
+            (toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step) value !=
+              toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step)
+                honestSig[i.val])
       | _ => ensure "the chain-0 witness is a collision" false
 
 /-- Chain five: the honest digit is `3 = w - 1`, so the forged chain advanced to it lands exactly
@@ -245,7 +265,7 @@ def checkInstanceCollision : IO Unit := do
     (wotsPkFromSigTops toyPrimitives chainForgery forgedMsg () baseAdrs == honestTops)
   let witness := extract chainForgery forgedMsg
   ensure "the instance extractor returns chain 0's collision"
-    (witnessTag witness == "fCollision 0 1")
+    (witnessTag witness == "fCollision 0 2")
   match witness with
   | none => ensure "the instance extractor returns a witness" false
   | some w => ensure "the instance collision satisfies its equation" (witnessHolds w)
@@ -304,17 +324,17 @@ moved off the address the honest signer hashed are all rejected.  The last two f
 identifications alone: every other conjunct holds for them. -/
 def checkFabricatedWitnesses : IO Unit := do
   ensure "a fabricated collision with a different F image is rejected"
-    (!witnessHolds (.fCollision ⟨0, by decide⟩ 1 (node 3)))
+    (!witnessHolds (.fCollision ⟨0, by decide⟩ 2 (node 3)))
   ensure "a fabricated preimage of the wrong value is rejected"
     (!witnessHolds (.fPreimage ⟨5, by decide⟩ 2 (node 0)))
   ensure "a collision at hash address w - 1 is rejected"
     (!witnessHolds (.fCollision ⟨0, by decide⟩ (toyParams.w - 1) (node 0)))
   ensure "a collision below the honest digit is rejected"
-    (!witnessHolds (.fCollision ⟨0, by decide⟩ 0 (node 0)))
+    (!witnessHolds (.fCollision ⟨0, by decide⟩ 0 (node 3)))
   ensure "a preimage at an address the honest signer did not hash is rejected"
     (!witnessHolds (.fPreimage ⟨5, by decide⟩ 1 (node 10)))
   ensure "the genuine chain-zero collision is still accepted"
-    (witnessHolds (.fCollision ⟨0, by decide⟩ 1 (node 0)))
+    (witnessHolds (.fCollision ⟨0, by decide⟩ 2 (node 0)))
   ensure "the genuine chain-five preimage is still accepted"
     (witnessHolds (.fPreimage ⟨5, by decide⟩ 2 (node 10)))
 
