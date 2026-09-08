@@ -233,9 +233,7 @@ theorem wp_ne_top_of_finite [Finite α] (oa : OracleComp spec α) {post : α →
 @[game_rule] theorem wp_map (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
     wp (f <$> oa) post =
       wp oa (post ∘ f) := by
-  rw [map_eq_bind_pure_comp]
-  rw [wp_bind]
-  simp [Function.comp_def]
+  simp [wp_eq_expectedValue, Function.comp_def]
 
 /-- General unfolding: `wp` as weighted sum over output probabilities. -/
 theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :

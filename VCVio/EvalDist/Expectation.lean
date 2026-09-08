@@ -51,7 +51,7 @@ theorem expectedValue_bind (mx : m α) (my : α → m β) (g : β → ℝ≥0∞
     ← ENNReal.tsum_mul_left, mul_assoc]
   exact ENNReal.tsum_comm
 
-theorem expectedValue_map [LawfulMonad m] (mx : m α) (f : α → β)
+@[simp] theorem expectedValue_map [LawfulMonad m] (mx : m α) (f : α → β)
     (g : β → ℝ≥0∞) : expectedValue (f <$> mx) g = expectedValue mx fun x => g (f x) := by
   simp only [map_eq_bind_pure_comp, expectedValue_bind, Function.comp_apply, expectedValue_pure]
 

@@ -94,9 +94,7 @@ open OracleComp.EvalDist in
 theorem expectedValue_length_cons_map (y : S) (mc : ProbComp (List S)) :
     expectedValue ((y :: ·) <$> mc) (fun d => (d.length : ℝ≥0∞))
       = expectedValue mc (fun d => (d.length : ℝ≥0∞)) + 1 := by
-  rw [expectedValue_map]
-  simp only [List.length_cons, Nat.cast_add, Nat.cast_one]
-  rw [expectedValue_add, expectedValue_const (probFailure_of_liftM_PMF mc)]
+  simp [expectedValue_add, expectedValue_const (probFailure_of_liftM_PMF mc)]
 
 /-! ## The loop -/
 
