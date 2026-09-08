@@ -39,7 +39,9 @@ public import VCVioTest.SMDTUDFinalValidity
 public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
 public import VCVioTest.Tactic.Finiteness
+public import VCVioTest.Tactic.FunProp
 public import VCVioTest.Tactic.GCongr
+public import VCVioTest.Tactic.Positivity
 public import VCVioTest.ToMathlib.AbsDiff
 public import VCVioTest.UniformOn
 public import VCVioTest.UniversePolymorphism

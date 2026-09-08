@@ -166,6 +166,7 @@ public import VCVio.EvalDist.Prod
 public import VCVio.EvalDist.RenyiDivergence
 public import VCVio.EvalDist.ResumptionMeasure
 public import VCVio.EvalDist.TVDist
+public import VCVio.EvalDist.TVDist.Positivity
 public import VCVio.Interaction.UC.AsyncRuntime
 public import VCVio.Interaction.UC.AsyncSecurity
 public import VCVio.Interaction.UC.Computational
