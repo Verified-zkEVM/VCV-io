@@ -34,10 +34,10 @@ routes: an address is canonical and its layer and tree lie in the hypertree's ow
 SHA-2 domain follows from it under the narrower widths, so no ledger lemma has to be proved twice.
 Canonicality is derived through the construction's own address helpers: once
 `layerPosition_toAdrs_isCanonical` shows the base address of a reachable position canonical under
-`CanonicalAddressBounds`, the existing `XmssConformance.wotsLeafAdrs_isCanonical`,
-`wotsChainHashAdrs_isCanonical`, `wotsPkAdrs_isCanonical`,
-`ForsConformance.forsNodeAdrs_isCanonical`, `ForsConformance.forsPkAdrs_isCanonical`, and
-`XmssConformance.xmssNodeAdrs_isCanonical` lemmas carry it to every derived target address.
+`CanonicalAddressBounds`, the existing `wotsChainHashAdrs_isCanonical`, `wotsPkAdrs_isCanonical`,
+`XmssConformance.wotsLeafAdrs_isCanonical`, `XmssConformance.xmssNodeAdrs_isCanonical`,
+`ForsConformance.forsNodeAdrs_isCanonical`, and `ForsConformance.forsPkAdrs_isCanonical` lemmas
+carry it to every derived target address.
 
 The UD field of `EncodedTargetLedgerConditions` is stated for a total one-step-per-chain cap
 completion.  A later reduction may omit chains; any such partial selector inherits encoded
@@ -216,12 +216,11 @@ private theorem fits_four_of_lt {x : ℕ} (h : x < 2 ^ 32) : Adrs.Fits 4 x = tru
 The reachable base addresses are `LayerPosition.toAdrs` and `LayerTreeCoord.toAdrs`, both a layer
 and a tree written into the zero address.  Every derived target address is then obtained by the
 construction's own address helpers, whose canonicality lemmas
-(`XmssConformance.wotsLeafAdrs_isCanonical`, `wotsChainHashAdrs_isCanonical`,
-`wotsPkAdrs_isCanonical`, `ForsConformance.forsNodeAdrs_isCanonical`,
-`ForsConformance.forsPkAdrs_isCanonical`, `XmssConformance.xmssNodeAdrs_isCanonical`) need only a
-canonical base and four-byte
-bounds on the words they set.  The per-address facts below reuse them rather than recomputing the
-six fields of each address. -/
+(`wotsChainHashAdrs_isCanonical`, `wotsPkAdrs_isCanonical`,
+`XmssConformance.wotsLeafAdrs_isCanonical`, `XmssConformance.xmssNodeAdrs_isCanonical`,
+`ForsConformance.forsNodeAdrs_isCanonical`, `ForsConformance.forsPkAdrs_isCanonical`) need only a
+canonical base and four-byte bounds on the words they set.  The per-address facts below reuse them
+rather than recomputing the six fields of each address. -/
 
 /-- A layer/tree base address is canonical when both coordinates fit their words. -/
 private theorem baseAdrs_isCanonical {layer tree : ℕ} (hlayer : layer < 2 ^ 32)
