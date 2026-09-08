@@ -17,7 +17,5 @@ jobs:
           python-version: '3.12'
       - name: Validate doc references
         run: python scripts/check-agent-docs.py
-      - name: Test review command routing
-        run: python scripts/test-prepare-review.py
       - name: Check auto-generated doc fragments
         run: python scripts/extract-doc-fragments.py --check

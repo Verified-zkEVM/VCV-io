@@ -1,8 +1,5 @@
 # Program Logic Tactics and Relational Reasoning
 
-The [tactic usability review procedure](../reviews/tactics.md) covers theorem registration,
-proof simplification, and replayable suggestions. Request it on a PR with `/review tactics`.
-
 ## Current Module Boundary
 
 - Import `VCVio.ProgramLogic.Tactics` for normal proof work. This is the canonical user-facing proof mode.
