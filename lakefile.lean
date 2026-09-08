@@ -394,7 +394,8 @@ script test (args) do
     #["exe", "slhdsa_hypertree_tests"],
     #["exe", "slhdsa_external_tests"],
     #["exe", "slhdsa_target_ledger_tests"],
-    #["exe", "slhdsa_encoded_ledger_tests"]]
+    #["exe", "slhdsa_encoded_ledger_tests"],
+    #["exe", "slhdsa_trace_target_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -461,6 +462,11 @@ lean_exe slhdsa_target_ledger_tests where
 encoder field boundaries and the out-of-domain aliasing that makes the obligation real. -/
 lean_exe slhdsa_encoded_ledger_tests where
   root := `HashSigTest.SLHDSA.EncodedTargets
+
+/-- WOTS+ trace provenance: the union ledger's size and distinctness, and every public-hash query
+logged by the WOTS+ programs under both approved primitive bundles lands in the encoded ledger. -/
+lean_exe slhdsa_trace_target_tests where
+  root := `HashSigTest.SLHDSA.TraceTargets
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop

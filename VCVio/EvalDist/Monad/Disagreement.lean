@@ -29,7 +29,7 @@ specialisation is `m = ProbComp`.
 
 universe u v
 
-open ENNReal
+open ENNReal OracleComp.EvalDist
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
   [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [MonadLiftT m SetM] [EvalDistCompatible m]
@@ -44,27 +44,20 @@ lemma probEvent_bind_le_add_of_disagree {mx : m α}
     (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + ε₂) :
     Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + ε₁ + ε₂ := by
   classical
-  have := Classical.decPred q
-  rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
-  calc ∑' x, Pr[= x | mx] * Pr[q | my x]
-      ≤ ∑' x, (Pr[= x | mx] * Pr[q | oc x]
-            + (if D x then Pr[= x | mx] else 0) + Pr[= x | mx] * ε₂) := by
-        refine ENNReal.tsum_le_tsum fun x => ?_
-        by_cases hx : x ∈ support mx
-        · by_cases hDx : D x
-          · simp only [if_pos hDx]
-            exact (mul_le_of_le_one_right' probEvent_le_one).trans
-              (le_add_right (le_add_left le_rfl))
-          · simp only [if_neg hDx, add_zero]
-            exact (mul_le_mul' le_rfl (h x hx hDx)).trans_eq (left_distrib ..)
-        · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x])
-          + (∑' x, if D x then Pr[= x | mx] else 0) + (∑' x, Pr[= x | mx] * ε₂) := by
-        rw [ENNReal.tsum_add, ENNReal.tsum_add]
-    _ ≤ (∑' x, Pr[= x | mx] * Pr[q | oc x]) + ε₁ + ε₂ := by
+  rw [probEvent_bind_eq_expectedValue, probEvent_bind_eq_expectedValue]
+  calc expectedValue mx (fun x => Pr[ q | my x])
+      ≤ expectedValue mx (fun x => Pr[ q | oc x] + (if D x then 1 else 0) + ε₂) := by
+        gcongr with x hx
+        by_cases hDx : D x
+        · simp only [if_pos hDx]
+          exact probEvent_le_one.trans (le_add_right (le_add_left le_rfl))
+        · simp only [if_neg hDx, add_zero]; exact h x hx hDx
+    _ = expectedValue mx (fun x => Pr[ q | oc x]) + Pr[ D | mx]
+          + expectedValue mx (fun _ => ε₂) := by
+        rw [expectedValue_add, expectedValue_add, expectedValue_ite_one]
+    _ ≤ expectedValue mx (fun x => Pr[ q | oc x]) + ε₁ + ε₂ := by
         gcongr
-        · rw [← probEvent_eq_tsum_ite]; exact hD
-        · exact tsum_probOutput_mul_le_of_le mx fun _ => le_rfl
+        exact expectedValue_le_of_le mx fun _ => le_rfl
 
 /-- **Three-way disagreement-aware additive bind bound (hop A).** A coupled three-world variant of
 `probEvent_bind_le_add_of_disagree`: the three worlds share the sampling computation `mx`, and at
@@ -77,28 +70,22 @@ lemma probEvent_bind_le_add_bad_of_disagree {mx : m α}
     (hbad : ∀ x ∈ support mx, D x → Pr[ r | ob x] = 1)
     (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + ε) :
     Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + Pr[ r | mx >>= ob] + ε := by
-  classical
-  have := Classical.decPred q
-  have := Classical.decPred r
-  rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
-  calc ∑' x, Pr[= x | mx] * Pr[q | my x]
-      ≤ ∑' x, (Pr[= x | mx] * Pr[q | oc x]
-            + Pr[= x | mx] * Pr[r | ob x] + Pr[= x | mx] * ε) := by
-        refine ENNReal.tsum_le_tsum fun x => ?_
-        by_cases hx : x ∈ support mx
-        · by_cases hDx : D x
-          · exact ((mul_le_mul' le_rfl probEvent_le_one).trans_eq
-              (by rw [hbad x hx hDx])).trans (le_add_right (le_add_left le_rfl))
-          · exact ((mul_le_mul' le_rfl (h x hx hDx)).trans_eq (left_distrib ..)).trans
-              (add_le_add (le_add_right le_rfl) le_rfl)
-        · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x])
-          + (∑' x, Pr[= x | mx] * Pr[r | ob x]) + (∑' x, Pr[= x | mx] * ε) := by
-        rw [ENNReal.tsum_add, ENNReal.tsum_add]
-    _ ≤ (∑' x, Pr[= x | mx] * Pr[q | oc x])
-          + (∑' x, Pr[= x | mx] * Pr[r | ob x]) + ε := by
+  rw [probEvent_bind_eq_expectedValue, probEvent_bind_eq_expectedValue,
+    probEvent_bind_eq_expectedValue]
+  calc expectedValue mx (fun x => Pr[ q | my x])
+      ≤ expectedValue mx (fun x => Pr[ q | oc x] + Pr[ r | ob x] + ε) := by
+        gcongr with x hx
+        by_cases hDx : D x
+        · rw [hbad x hx hDx]
+          exact probEvent_le_one.trans (le_add_right (le_add_left le_rfl))
+        · exact (h x hx hDx).trans (add_le_add (le_add_right le_rfl) le_rfl)
+    _ = expectedValue mx (fun x => Pr[ q | oc x]) + expectedValue mx (fun x => Pr[ r | ob x])
+          + expectedValue mx (fun _ => ε) := by
+        rw [expectedValue_add, expectedValue_add]
+    _ ≤ expectedValue mx (fun x => Pr[ q | oc x]) + expectedValue mx (fun x => Pr[ r | ob x])
+          + ε := by
         gcongr
-        exact tsum_probOutput_mul_le_of_le mx fun _ => le_rfl
+        exact expectedValue_le_of_le mx fun _ => le_rfl
 
 /-- **Four-way disagreement-aware additive bind bound (hop A).** A strengthening of
 `probEvent_bind_le_add_bad_of_disagree`: the per-step inductive hypothesis itself carries a
@@ -112,27 +99,22 @@ lemma probEvent_bind_le_add_bad_of_disagree' {mx : m α}
     (hbad : ∀ x ∈ support mx, D x → Pr[ r | ob x] = 1)
     (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + Pr[ r | ob x] + ε) :
     Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + Pr[ r | mx >>= ob] + ε := by
-  classical
-  have := Classical.decPred q
-  have := Classical.decPred r
-  rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
-  calc ∑' x, Pr[= x | mx] * Pr[q | my x]
-      ≤ ∑' x, (Pr[= x | mx] * Pr[q | oc x]
-            + Pr[= x | mx] * Pr[r | ob x] + Pr[= x | mx] * ε) := by
-        refine ENNReal.tsum_le_tsum fun x => ?_
-        by_cases hx : x ∈ support mx
-        · by_cases hDx : D x
-          · exact ((mul_le_mul' le_rfl probEvent_le_one).trans_eq
-              (by rw [hbad x hx hDx])).trans (le_add_right (le_add_left le_rfl))
-          · exact (mul_le_mul' le_rfl (h x hx hDx)).trans_eq (by rw [left_distrib, left_distrib])
-        · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x])
-          + (∑' x, Pr[= x | mx] * Pr[r | ob x]) + (∑' x, Pr[= x | mx] * ε) := by
-        rw [ENNReal.tsum_add, ENNReal.tsum_add]
-    _ ≤ (∑' x, Pr[= x | mx] * Pr[q | oc x])
-          + (∑' x, Pr[= x | mx] * Pr[r | ob x]) + ε := by
+  rw [probEvent_bind_eq_expectedValue, probEvent_bind_eq_expectedValue,
+    probEvent_bind_eq_expectedValue]
+  calc expectedValue mx (fun x => Pr[ q | my x])
+      ≤ expectedValue mx (fun x => Pr[ q | oc x] + Pr[ r | ob x] + ε) := by
+        gcongr with x hx
+        by_cases hDx : D x
+        · rw [hbad x hx hDx]
+          exact probEvent_le_one.trans (le_add_right (le_add_left le_rfl))
+        · exact h x hx hDx
+    _ = expectedValue mx (fun x => Pr[ q | oc x]) + expectedValue mx (fun x => Pr[ r | ob x])
+          + expectedValue mx (fun _ => ε) := by
+        rw [expectedValue_add, expectedValue_add]
+    _ ≤ expectedValue mx (fun x => Pr[ q | oc x]) + expectedValue mx (fun x => Pr[ r | ob x])
+          + ε := by
         gcongr
-        exact tsum_probOutput_mul_le_of_le mx fun _ => le_rfl
+        exact expectedValue_le_of_le mx fun _ => le_rfl
 
 /-- **Four-way disagreement+bad additive bind bound.** A merge of
 `probEvent_bind_le_add_of_disagree` with the three-world `probEvent_bind_le_add_bad_of_disagree`:
@@ -146,29 +128,20 @@ lemma probEvent_bind_le_add_bad_disagree {mx : m α}
     (h : ∀ x ∈ support mx, ¬ D x → Pr[ q | my x] ≤ Pr[ q | oc x] + Pr[ r | ob x] + ε₂) :
     Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + Pr[ r | mx >>= ob] + ε₁ + ε₂ := by
   classical
-  have := Classical.decPred q
-  have := Classical.decPred r
-  rw [probEvent_bind_eq_tsum, probEvent_bind_eq_tsum, probEvent_bind_eq_tsum]
-  calc ∑' x, Pr[= x | mx] * Pr[q | my x]
-      ≤ ∑' x, (Pr[= x | mx] * Pr[q | oc x]
-            + Pr[= x | mx] * Pr[r | ob x] + (if D x then Pr[= x | mx] else 0)
-            + Pr[= x | mx] * ε₂) := by
-        refine ENNReal.tsum_le_tsum fun x => ?_
-        by_cases hx : x ∈ support mx
-        · by_cases hDx : D x
-          · simp only [if_pos hDx]
-            exact (mul_le_of_le_one_right' probEvent_le_one).trans
-              (le_add_right (le_add_left le_rfl))
-          · simp only [if_neg hDx, add_zero]
-            exact (mul_le_mul' le_rfl (h x hx hDx)).trans_eq
-              (by rw [left_distrib, left_distrib])
-        · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x])
-          + (∑' x, Pr[= x | mx] * Pr[r | ob x])
-          + (∑' x, if D x then Pr[= x | mx] else 0) + (∑' x, Pr[= x | mx] * ε₂) := by
-        rw [ENNReal.tsum_add, ENNReal.tsum_add, ENNReal.tsum_add]
-    _ ≤ (∑' x, Pr[= x | mx] * Pr[q | oc x])
-          + (∑' x, Pr[= x | mx] * Pr[r | ob x]) + ε₁ + ε₂ := by
+  rw [probEvent_bind_eq_expectedValue, probEvent_bind_eq_expectedValue,
+    probEvent_bind_eq_expectedValue]
+  calc expectedValue mx (fun x => Pr[ q | my x])
+      ≤ expectedValue mx
+          (fun x => Pr[ q | oc x] + Pr[ r | ob x] + (if D x then 1 else 0) + ε₂) := by
+        gcongr with x hx
+        by_cases hDx : D x
+        · simp only [if_pos hDx]
+          exact probEvent_le_one.trans (le_add_right (le_add_left le_rfl))
+        · simp only [if_neg hDx, add_zero]; exact h x hx hDx
+    _ = expectedValue mx (fun x => Pr[ q | oc x]) + expectedValue mx (fun x => Pr[ r | ob x])
+          + Pr[ D | mx] + expectedValue mx (fun _ => ε₂) := by
+        rw [expectedValue_add, expectedValue_add, expectedValue_add, expectedValue_ite_one]
+    _ ≤ expectedValue mx (fun x => Pr[ q | oc x]) + expectedValue mx (fun x => Pr[ r | ob x])
+          + ε₁ + ε₂ := by
         gcongr
-        · rw [← probEvent_eq_tsum_ite]; exact hD
-        · exact tsum_probOutput_mul_le_of_le mx fun _ => le_rfl
+        exact expectedValue_le_of_le mx fun _ => le_rfl

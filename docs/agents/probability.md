@@ -29,6 +29,11 @@ the Giry laws `evalDist_pure`, `evalDist_bind`, `evalDist_map` and the const law
 measure specification in scope; `evalDist_eq_evalSPMF_toMeasure` is its definitional unfolding.
 `evalDist_bind`/`evalDist_map` are deliberately not `@[simp]` on either side: a bind is expanded
 only on request (`gotchas.md` §10), and the measure side has no separate family of sum lemmas.
+Independent products denote product measures: `evalDist_mOfFn` and `evalDist_mPi`
+(`VCVio/EvalDist/IndepProductMeasure.lean`) identify `𝒟[Fintype.mPi f]` with
+`Measure.pi fun i => 𝒟[f i]`, through `Measure.pi_eq` and the coordinatewise event product;
+`evalDist_map_eval_mPi` reads one coordinate back off the product through Mathlib's
+`Measure.pi_map_eval` when the other factors never fail.
 
 Failure on the measure side is missing mass, recorded in `VCVio/EvalDist/FailureMeasure.lean`:
 `Pr[⊥ | mx] = 1 - 𝒟[mx] univ`, `IsProbabilityMeasure 𝒟[mx] ↔ Pr[⊥ | mx] = 0` (an instance under

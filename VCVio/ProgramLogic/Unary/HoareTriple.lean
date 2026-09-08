@@ -91,6 +91,17 @@ theorem wp_eq_mAlgOrdered_wp (oa : OracleComp spec α) (post : α → ℝ≥0∞
     wp oa post =
       MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post := rfl
 
+/-- `wp` is the expectation of the postcondition under the output distribution. This is the
+bridge to the `expectedValue` laws; it is a `rw` target, not a simp lemma, because `wp` stays the
+head the program-logic tactics match on. -/
+theorem wp_eq_expectedValue (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp oa post = OracleComp.EvalDist.expectedValue oa post := by
+  rw [wp_eq_mAlgOrdered_wp]
+  change μ (oa >>= fun a => pure (post a)) = _
+  unfold μ
+  rw [OracleComp.EvalDist.expectedValue_bind]
+  simp only [OracleComp.EvalDist.expectedValue_pure]
+
 /-- Bridge between Loom2's inductive `Std.Do'.Triple` and Mathlib's `≤` on
 `ℝ≥0∞`. Loom2 defines `Std.Do'.Triple.iff` against
 `Lean.Order.PartialOrder.rel`; on `ℝ≥0∞` our `Lean.Order.PartialOrder`
@@ -196,11 +207,13 @@ theorem triple_toLE
         (fun s => wp (xs.foldlM f s) post) := by
   rw [List.foldlM_cons, wp_bind]
 
+/-- `wp` is monotone in the postcondition; `gcongr` descends through it. -/
+@[gcongr]
 theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
     (hpost : ∀ x, post x ≤ post' x) :
     wp oa post ≤ wp oa post' := by
-  simp only [wp_eq_mAlgOrdered_wp]
-  exact MAlgOrdered.wp_mono (m := OracleComp spec) (l := ℝ≥0∞) oa hpost
+  rw [wp_eq_expectedValue, wp_eq_expectedValue]
+  exact OracleComp.EvalDist.expectedValue_mono oa hpost
 
 @[game_rule] theorem wp_map (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
     wp (f <$> oa) post =
@@ -212,31 +225,27 @@ theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
 /-- General unfolding: `wp` as weighted sum over output probabilities. -/
 theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp oa post = ∑' x, Pr[= x | oa] * post x := by
-  rw [wp_eq_mAlgOrdered_wp, MAlgOrdered.wp]
-  change μ (oa >>= fun a => pure (post a)) = _
-  rw [μ_bind_eq_tsum]
-  refine tsum_congr fun x => congrArg (Pr[= x | oa] * ·) ?_
-  have : DecidableEq ℝ≥0∞ := Classical.decEq _
-  simp [μ, probOutput_pure]
+  rw [wp_eq_expectedValue, OracleComp.EvalDist.expectedValue_def]
 
 @[simp] theorem wp_const (oa : OracleComp spec α) (c : ℝ≥0∞) :
     wp oa (fun _ => c) = c := by
-  rw [wp_eq_tsum, ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+  rw [wp_eq_expectedValue]
+  exact OracleComp.EvalDist.expectedValue_const (probFailure_of_liftM_PMF _) c
 
 @[game_rule] theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
     wp oa (fun x => f x + g x) =
       wp oa f + wp oa g := by
-  simp only [wp_eq_tsum, mul_add, ENNReal.tsum_add]
-
-@[game_rule] theorem wp_mul_const (oa : OracleComp spec α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
-    wp oa (fun x => c * f x) =
-      c * wp oa f := by
-  simp only [wp_eq_tsum]; simp_rw [mul_left_comm]; exact ENNReal.tsum_mul_left
+  simp only [wp_eq_expectedValue, OracleComp.EvalDist.expectedValue_add]
 
 theorem wp_const_mul (oa : OracleComp spec α) (f : α → ℝ≥0∞) (c : ℝ≥0∞) :
     wp oa (fun x => f x * c) =
       wp oa f * c := by
-  simp_rw [mul_comm _ c]; rw [wp_mul_const, mul_comm]
+  simp only [wp_eq_expectedValue, OracleComp.EvalDist.expectedValue_mul_const]
+
+@[game_rule] theorem wp_mul_const (oa : OracleComp spec α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
+    wp oa (fun x => c * f x) =
+      c * wp oa f := by
+  simp_rw [mul_comm c]; exact wp_const_mul oa f c
 
 /-! ## `Triple` lemmas (against `Triple _ _ _`)
 
