@@ -232,7 +232,9 @@ theorem isTotalQueryBound_climbM
 The lemmas of this section are stated for an arbitrary predicate `Q` on the programs of a monad
 `m` that holds of every `pure` and is preserved by `bind`.  Each records the leaf indices and the
 `(height, index)` node addresses at which a traversal invokes its callbacks, so that `Q` holds of
-the traversal as soon as it holds of the callbacks at those addresses.  For an `OracleComp`, one
+the traversal as soon as it holds of the callbacks at those addresses.  The lemmas state only that
+sufficiency direction: a traversal visits exactly the recorded addresses, but the counts are the
+business of the `isTotalQueryBound_*` lemmas above.  For an `OracleComp`, one
 such predicate is `fun oa => OracleComp.IsQueryBound oa () (fun t _ => P t) (fun _ _ => ())` for
 a query predicate `P`, by `OracleComp.isQueryBound_pure` and `OracleComp.isQueryBound_bind`; the
 total bounds above are not of this shape because their budget is consumed.
@@ -255,9 +257,11 @@ private theorem div_pow_eq_div_pow_div_pow (i s z : ℕ) (hsz : s ≤ z) :
   rw [Nat.div_div_eq_div_mul, ← pow_add, Nat.add_sub_cancel' hsz]
 
 include hbind in
-/-- `merkleRootM leaf nodeHash z t` invokes `leaf` at the `2 ^ z` leaves of the subtree rooted at
-`(z, t)`, the indices `i` with `i / 2 ^ z = t`, and `nodeHash h i` at its `2 ^ z - 1` internal
-nodes, the addresses with `0 < h ≤ z` and `i / 2 ^ (z - h) = t`, and at nothing else. -/
+/-- `Q` holds of `merkleRootM leaf nodeHash z t` as soon as it holds of `leaf i` at every leaf of
+the subtree rooted at `(z, t)`, the indices with `i / 2 ^ z = t`, and of `nodeHash h i l r` at every
+internal node of that subtree, the addresses with `0 < h ≤ z` and `i / 2 ^ (z - h) = t`.  The
+traversal visits exactly those addresses, but this lemma states only the sufficiency direction;
+`isTotalQueryBound_merkleRootM` counts the visits. -/
 theorem merkleRootM_pred_of_subtree (leaf : ℕ → m Y) (nodeHash : ℕ → ℕ → Y → Y → m Y)
     (z t : ℕ)
     (hleaf : ∀ i, i / 2 ^ z = t → Q (leaf i))
@@ -332,9 +336,10 @@ theorem intrinsicAuthPathM_pred_of_tree (leaf : ℕ → m Y)
       div_pow_eq_div_pow_div_pow idx s z hs.le]
 
 include hpure hbind in
-/-- `climbM nodeHash idx node auth` invokes `nodeHash` at the ancestors of leaf `idx` up to
-height `auth.length`, the nodes `(h, idx / 2 ^ h)` for `0 < h ≤ auth.length`, one per level, and
-at nothing else. -/
+/-- `Q` holds of `climbM nodeHash idx node auth` as soon as it holds of
+`nodeHash h (idx / 2 ^ h) l r` at every ancestor of leaf `idx` up to height `auth.length`, the
+nodes with `0 < h ≤ auth.length`.  The climb visits exactly those ancestors, one per level, but
+this lemma states only the sufficiency direction; `isTotalQueryBound_climbM` counts the visits. -/
 theorem climbM_pred_of_ancestors (nodeHash : ℕ → ℕ → Y → Y → m Y) (idx : ℕ) (node : Y)
     (auth : List Y)
     (hnode : ∀ h, 0 < h → h ≤ auth.length → ∀ l r, Q (nodeHash h (idx / 2 ^ h) l r)) :

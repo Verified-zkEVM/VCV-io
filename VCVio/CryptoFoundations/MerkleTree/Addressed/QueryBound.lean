@@ -83,8 +83,10 @@ variable {m : Type u → Type w} [Monad m]
   (hbind : ∀ {α β : Type u} (oa : m α) (ob : α → m β), Q oa → (∀ x, Q (ob x)) → Q (oa >>= ob))
 
 include hpure hbind in
-/-- Root recomputation issues one node hash per ancestor of the opened leaf and nothing else, so
-a `pure`/`bind`-closed predicate holding of every ancestor's hash holds of the recomputation. -/
+/-- A `pure`/`bind`-closed predicate holds of a root recomputation as soon as it holds of the node
+hash at every ancestor of the opened leaf.  The recomputation issues exactly one node hash per
+ancestor, but this lemma states only the sufficiency direction;
+`isTotalQueryBound_getPutativeRootAddressedM` counts the hashes. -/
 theorem getPutativeRootAddressedM_pred_of_ancestors {s : Skeleton}
     (nodeHash : SkeletonInternalIndex s → Y → Y → m Y)
     (idx : SkeletonLeafIndex s) (node : Y) (proof : List.Vector Y idx.depth)
