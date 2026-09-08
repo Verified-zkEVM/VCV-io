@@ -10,6 +10,10 @@ algorithm definitions, module boundaries, and the trusted computing base.
   support-aware monotonicity, finiteness, and measured simplifications in real consumers.
 - [#642](https://github.com/Verified-zkEVM/VCVio/pull/642): bind bounds through expectation algebra
   and the program-logic `wp` façade.
+- [#659](https://github.com/Verified-zkEVM/VCVio/pull/659): removal of ineffective `simp` tags,
+  checked in concrete import environments rather than assumed globally equivalent.
+- [#672](https://github.com/Verified-zkEVM/VCVio/pull/672): optional-map measurability, finite
+  expectations, support-aware `wp`, and total-variation nonnegativity.
 - `docs/agents/probability.md`, `docs/agents/program-logic.md`, and
   `docs/reading/upstream-alignment.md`: current conventions and the broader registration inventory.
 
@@ -35,6 +39,28 @@ against the current source and pinned dependencies.
    Distinguish source-module compilation, snippet-only checks, and unverified suggestions.
 6. Record failed attempts as reproducible usability gaps, including the residual goal and why the
    obvious tactic did not work. Do not claim that a failed search establishes a missing upstream API.
+
+## Proof-cleanup reviews
+
+Prioritize reductions in existing proof bodies. Record ordinary formatted lines before and after
+for every accepted declaration, and report the net non-test Lean delta including new helpers.
+Count tests and documentation separately. Moving code into a helper, packing commands onto one
+line, or removing mathematical explanations does not establish a simplification.
+
+Start with the existing library interface: expectation linearity, support-aware bounds, handler
+normalization, extensionality, and arithmetic tactics. Control `gcongr` descent with an explicit
+pattern when the next lemma applies to a whole sum. Normalize projections before asking `omega`
+to reason about their values. If broad `grind` search times out, use a small explicit normal form
+or a bounded rule set; do not raise the heartbeat limit to accept the replacement.
+
+Trial a missing registration locally before promoting it. Require a before/after ordinary-import
+probe and at least two shorter production consumers for a new global tag. Preserve weak
+assumptions and test empty/lossy cases where relevant. Recheck older findings against reviewed tag
+removals; an ineffective attribute is not a feature to restore. A cleanup round need not add tags
+when existing tactics already suffice.
+
+The [2026-09-08 cleanup report](tactics-2026-09-08.md) includes a per-declaration line ledger,
+registration probes, API checks, rejected candidates, and complete-module timing comparisons.
 
 ## Registration contracts
 
