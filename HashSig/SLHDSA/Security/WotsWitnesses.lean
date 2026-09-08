@@ -39,8 +39,10 @@ signature data:
   `findChainDivergence_isSome_of_ne`;
 * `chainPair_cases`;
 * `wotsPkFromSigTops_cases`, `wotsPkFromSig_cases`;
-* `WotsWitness`, `WotsWitness.Valid`, `findWotsChainWitness`, `findWotsChainWitness_sound`,
-  `findWotsWitness`, `findWotsWitness_sound`, `findWotsWitness_isSome`;
+* `WotsWitness`, `WotsWitness.Valid` and its three unfolding equations
+  `WotsWitness.valid_tlCollision`, `WotsWitness.valid_fPreimage`, `WotsWitness.valid_fCollision`;
+* `findWotsChainWitness`, `findWotsChainWitness_sound`, `findWotsWitness`,
+  `findWotsWitness_sound`, `findWotsWitness_isSome`;
 * the three game-shape bridges `wotsWitness_valid_fPreimage_eval`,
   `wotsWitness_valid_fCollision_eval`, `wotsWitness_valid_tlCollision_eval`.
 
