@@ -58,7 +58,7 @@ signature data:
 The `T_len` witness address is `wotsPkAdrs (wotsInstanceAdrs pos)`, which `mem_wotsPkAddresses`
 already lists in the `wotsTl` ledger; that lemma is used directly rather than restated.
 
-The two encoded-distinctness lemmas consume `EncodedTargetLedgerConditions` rather than assuming a
+The three encoded-distinctness lemmas consume `EncodedTargetLedgerConditions` rather than assuming a
 fresh injectivity hypothesis, so a concrete profile discharges them through
 `approvedEncodedTargetLedgerConditions`; the SHA-2 zero fallback is therefore never treated as
 unreachable.
@@ -106,7 +106,7 @@ same value, or there is a step `j < n` at which they still differ while their `F
 address `i + j` already agree — a collision of `F` at `adrs.setHashAddress (i + j)`.
 
 *Deterministic inclusion.*  The existence statement is the Lean counterpart of `hchwcoll_hcoll`
-(`WOTS_TW_ES.ec:1178-1197`); `is_coll` (`:611`) and `find_collidx_l` (`:620`) are the search
+(`WOTS_TW_ES.ec:1179-1197`); `is_coll` (`:611`) and `find_collidx_l` (`:620`) are the search
 operators that locate the step, and it is `findChainDivergence` below that plays their role. -/
 theorem chain_diverge (prims : Primitives p) (pkSeed : prims.PkSeed) (adrs : Adrs)
     (u v : prims.Y) (i n : ℕ)
@@ -180,7 +180,7 @@ while their `F` images at hash address `t` agree, exhibiting an `F`-collision th
 *Deterministic inclusion.*  This fuses three EasyCrypt steps at one chain.  `nhchwcoll_hchwpre`
 (`WOTS_TW_ES.ec:1299`) supplies the split, but carries no endpoint hypothesis and its second
 outcome `is_chwcoll` (`:595`) is only the inequality `cf … <> sig[i]`; `hchwcoll_hcoll`
-(`:1178-1197`) and `collision_extraction` (`:1250-1292`) are what turn that inequality into a
+(`:1179-1197`) and `collision_extraction` (`:1249-1291`) are what turn that inequality into a
 collision, and the endpoint equality they need is what `hend` carries here.  The outcomes are
 `is_chwpre` (`:640`) and the extracted collision, with the extractors `extr_pre` (`:656`) and
 `extr_coll_l`/`extr_coll_r` (`:628`, `:633`).  The lemma is exhaustive: the two branches are the
@@ -323,23 +323,27 @@ theorem wotsPkFromSig_cases (valid : p.Valid) (prims : Primitives p)
 /-! ## The extracted witness
 
 `WotsWitness` packages the three outcomes as the data a reduction submits: one value, together
-with the chain index and hash-address step that name the tweak it is submitted against.  Every
-honest object a witness attacks is an argument of `WotsWitness.Valid` and never a constructor
-field — the chain-end vector `honestTops` for the `T_len` branch, and for the two chain branches
-the honest signature `honestSig` together with the message `honestMsg` it signs, from which
-`Valid` *computes* the honest chain value at the named step.
+with — for the two chain branches — the chain index and hash-address step that name the tweak it is
+submitted against.  The `T_len` tweak is named by `adrs` alone, so `tlCollision` carries the value
+and nothing else.  Every honest object a witness attacks is an argument of `WotsWitness.Valid` and
+never a constructor field — the chain-end vector `honestTops` for the `T_len` branch, and for the
+two chain branches the honest signature `honestSig` together with the message `honestMsg` it
+signs, from which `Valid` *computes* the honest chain value at the named step.
 
 That computation is the identification a source-final-validity game needs: its winning condition
 compares the submitted value against the challenge *recorded* at the named target, so a pair of
-arbitrary distinct values with equal images is not a win.  `WotsWitness.Valid` is therefore the
-winning condition of the matching game and nothing more.  It still does not assert that the
-honest object was committed as a game target, which is a program-level obligation of the
-reduction. -/
+arbitrary distinct values with equal images is not a win.  `WotsWitness.Valid` therefore carries
+the hash-value half of that winning condition — the distinctness and the equal images, against a
+partner the predicate names rather than quantifies over — together with the step bounds that place
+the address in a role ledger, and nothing beyond that.  It does not assert that the honest object
+was recorded as a game target, and it says nothing about the rest of a transcript, both of which
+are program-level obligations of the reduction. -/
 
 /-- A witness against one WOTS+ component hash at a fixed base address.
 
-Each constructor carries only the value a reduction submits, together with the chain index and
-hash-address step that name the tweak; every honest object a witness attacks is supplied to
+Each constructor carries only the value a reduction submits, together with, for the two chain
+branches, the chain index and hash-address step that name the tweak; the `T_len` tweak is named by
+`adrs`, so `tlCollision` carries neither.  Every honest object a witness attacks is supplied to
 `WotsWitness.Valid`, which reads the attacked chain value off the honest signature. -/
 inductive WotsWitness (p : Params) (prims : Primitives p) where
   /-- A second preimage of the honest chain-end vector under `T_len` at `wotsPkAdrs adrs`. -/
@@ -371,7 +375,9 @@ signature reveals chain `chainIdx`.  Then:
   motivation rather than a hypothesis — nothing here requires `honestSig` to be honest.
 
 Both chain cases pin the hash-address step below `w - 1`, which is what places their address in
-the `wotsFTcr` role ledger (`mem_wotsStepAddresses_of_lt`).
+the `wotsFTcr` role ledger (`mem_wotsStepAddresses_of_lt`).  In the `fPreimage` case that bound is
+redundant — `step + 1 = b` and `chainStepsCore_le` already give it — and is kept so that a consumer
+rewriting with `valid_fPreimage` reaches the ledger lemma without re-deriving anything.
 
 This is a statement about hash values only.  It does not say that `honestTops`,
 `honestSig[chainIdx]`, or the computed chain value was committed as a game target, nor that any
