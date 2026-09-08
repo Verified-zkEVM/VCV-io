@@ -76,7 +76,6 @@ theorem packComp_pure (n : Nat) (value : β n) :
     packComp (spec := spec) n (pure value) = pure ⟨n, value⟩ :=
   rfl
 
-@[simp]
 theorem packComp_queryBind (n : Nat) (query : (spec n).Domain)
     (next : (spec n).Range query → OracleComp (spec n) (β n)) :
     packComp n (OracleComp.queryBind query next) =

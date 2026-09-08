@@ -152,7 +152,6 @@ lemma appendInputLog_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
     appendInputLog so t = (do modify (· ++ [t]); liftM (so t)) := by
   exact preInsert_apply so (fun t => modify (· ++ [t])) t
 
-@[simp]
 lemma run_withLogging_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
     (t : loggedSpec.Domain) :
     (so.withLogging t).run =
@@ -274,7 +273,6 @@ def OracleSpec.loggingOracle {ι : Type u} {spec : OracleSpec.{u, u} ι} :
 namespace loggingOracle
 
 /-- Specialization of `QueryImpl.probFailure_run_simulateQ_withLogging` to `loggingOracle`. -/
-@[simp]
 lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec]
     (oa : OracleComp spec α) :
@@ -311,7 +309,6 @@ lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
   rw [show (fun z : α × spec.QueryLog => p z.1) = p ∘ Prod.fst from rfl,
     ← probEvent_map, fst_map_run_simulateQ]
 
-@[simp]
 lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec]
     (oa : OracleComp spec α) (x : α) :
@@ -319,13 +316,11 @@ lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
       Pr[= x | oa] := by
   rw [fst_map_run_simulateQ]
 
-@[simp]
 lemma evalSPMF_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec] (oa : OracleComp spec α) :
     𝒮[Prod.fst <$> (simulateQ spec.loggingOracle oa).run] = 𝒮[oa] := by
   rw [fst_map_run_simulateQ]
 
-@[simp]
 lemma support_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec] (oa : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ spec.loggingOracle oa).run) = support oa := by

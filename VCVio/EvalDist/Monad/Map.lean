@@ -40,7 +40,7 @@ lemma finSupport_map [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinse
     (f : α → β) (mx : m α) : finSupport (f <$> mx) = (finSupport mx).image f := by
   grind [map_eq_bind_pure_comp]
 
-@[simp, grind =]
+@[grind =]
 lemma evalSPMF_map [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] [LawfulMonad m]
     (mx : m α) (f : α → β) :
     𝒮[f <$> mx] = f <$> (𝒮[mx]) := by simp [monad_norm]
@@ -170,7 +170,7 @@ lemma support_map_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
   aesop
 
 omit [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] in
-@[simp, grind .]
+@[grind .]
 lemma finSupport_map_const [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
     [DecidableEq α] [DecidableEq β] [HasEvalFinset m]
     (hx : (finSupport mx).Nonempty) : finSupport ((fun _ => y) <$> mx) =
@@ -183,13 +183,13 @@ lemma probOutput_map_const [MonadLiftT m SetM] [EvalDistCompatible m] (y' : β) 
       (1 - Pr[⊥ | mx]) * Pr[= y' | (pure y : m β)] := by
   simp only [monad_norm, Function.comp_def, probOutput_bind_const]
 
-@[simp, aesop safe norm, grind =_]
+@[aesop safe norm, grind =_]
 lemma probEvent_map_const [MonadLiftT m SetM] [EvalDistCompatible m] (p : β → Prop) :
     Pr[ p | (fun _ => y) <$> mx] =
       (1 - Pr[⊥ | mx]) * Pr[ p | (pure y : m β)] := by
   simp only [monad_norm, Function.comp_def, probEvent_bind_const]
 
-@[simp, aesop safe norm]
+@[aesop safe norm]
 lemma probEvent_map_const' [MonadLiftT m SetM] [EvalDistCompatible m] (p : β → Prop)
     [DecidablePred p] :
     Pr[ p | (fun _ => y) <$> mx] =

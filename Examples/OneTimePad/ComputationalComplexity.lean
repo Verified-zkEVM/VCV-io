@@ -69,7 +69,6 @@ def bitVecOfFnLE {n : ℕ} (bits : Fin n → Bool) : BitVec n :=
   (BitVec.ofBoolListLE (List.ofFn bits)).cast List.length_ofFn
 
 /-- Reading a coordinate after little-endian packing recovers that coordinate. -/
-@[simp]
 theorem bitVecOfFnLE_getLsb {n : ℕ} (bits : Fin n → Bool) (index : Fin n) :
     (bitVecOfFnLE bits).getLsb index = bits index := by
   unfold bitVecOfFnLE

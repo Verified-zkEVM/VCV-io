@@ -153,7 +153,7 @@ lemma bind_of_forall [MonadLiftT m SetM] [EvalDistCompatible m]
 /--
 Mapping a value through a total function preserves `NeverFail`.
 -/
-@[simp, grind .]
+@[grind .]
 instance instMap [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
     {mx : m α} [h : NeverFail mx] (f : α → β) :
     NeverFail (f <$> mx) := by

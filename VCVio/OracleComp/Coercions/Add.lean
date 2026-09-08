@@ -231,7 +231,7 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
     | ⟨.inr (.inr t), f⟩ => ⟨.inr t, f⟩ := by
   rcases q with ⟨t | t | t, f⟩ <;> rfl
 
-@[simp] lemma liftM_add_assoc_query (t : (spec₁ + (spec₂ + spec₃)).Domain) :
+lemma liftM_add_assoc_query (t : (spec₁ + (spec₂ + spec₃)).Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂ + spec₃) ((spec₁ + (spec₂ + spec₃)).Range t)) =
       match t with
         | .inl t => query (Sum.inl (Sum.inl t))

@@ -76,7 +76,7 @@ noncomputable local instance instIsUniformSpec : IsUniformSpec spec :=
     support (simulateQ (finRatImpl (spec := spec)) oa) = support oa :=
   Set.ext fun x => mem_support_iff_of_evalSPMF_eq (evalSPMF_simulateQ (spec := spec) oa) x
 
-@[simp] lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
+lemma finSupport_simulateQ {α : Type v} [DecidableEq α]
     (oa : OracleComp spec α) :
     finSupport (simulateQ (finRatImpl (spec := spec)) oa) = finSupport oa := by
   apply Finset.coe_injective

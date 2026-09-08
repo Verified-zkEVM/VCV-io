@@ -61,7 +61,7 @@ lemma mem_finSupport_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [Has
 lemma mem_finSupport_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
     [DecidableEq α] (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
-@[simp, grind =, game_rule]
+@[grind =, game_rule]
 lemma evalSPMF_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α : Type u} (x : α) :
     𝒮[(pure x : m α)] = pure x := by simp [evalSPMF]
 
@@ -177,7 +177,7 @@ lemma mem_finSupport_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [Has
     [DecidableEq α] [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
 
-@[simp, grind =, game_rule]
+@[grind =, game_rule]
 lemma evalSPMF_bind [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) :
     𝒮[mx >>= my] = 𝒮[mx] >>= fun x => 𝒮[my x] :=
   monadLift_bind mx my
@@ -385,12 +385,10 @@ section support
 
 variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
-@[simp]
 lemma support_bind_const (mx : m α) (my : m β) :
     support (mx >>= fun _ => my) = {y ∈ support my | (support mx).Nonempty} := by
   grind [= Set.Nonempty]
 
-@[simp]
 lemma finSupport_bind_const [HasEvalFinset m]
     [DecidableEq β] [DecidableEq α] (mx : m α) (my : m β) :
     finSupport (mx >>= fun _ => my) = if (finSupport mx).Nonempty then finSupport my else ∅ := by

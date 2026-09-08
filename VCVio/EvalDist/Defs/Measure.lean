@@ -279,7 +279,6 @@ theorem toSPMF_apply [Countable α] [DiscreteMeasurableSpace α]
   rw [toSPMF, SPMF.apply_eq_toPMF_some, SPMF.toPMF_mk, Measure.toPMF_apply,
     Measure.withFailure_apply_some]
 
-@[simp]
 theorem toSPMF_apply_none [Countable α] [DiscreteMeasurableSpace α]
     (μ : Measure α) (hμ : μ Set.univ ≤ 1) :
     (μ.toSPMF hμ).run none = 1 - μ Set.univ := by

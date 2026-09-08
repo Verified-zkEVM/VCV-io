@@ -358,7 +358,6 @@ private lemma evalSPMF_liftComp_generateSeed_bind_simulateQ_run'
         simpa only [probOutput_def] using
           congrFun (congrArg DFunLike.coe (ih u _ js.dedup)) x
 
-@[simp]
 lemma probOutput_generateSeed_bind_simulateQ_bind
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
@@ -381,7 +380,6 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
   simpa only [probOutput_def] using congrFun (congrArg DFunLike.coe
     (evalSPMF_liftComp_generateSeed_bind_simulateQ_run' qc js oa)) x
 
-@[simp]
 lemma probOutput_generateSeed_bind_map_simulateQ
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
@@ -679,7 +677,6 @@ lemma evalSPMF_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
         exact probOutput_prependValues_takeAtIndex_tsum_eq_query_mul qc js t i₀ k
           (mx u) u x hcount (ih u _ js.dedup k)
 
-@[simp]
 lemma probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]

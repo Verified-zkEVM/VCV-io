@@ -15,7 +15,6 @@ public import Mathlib.Algebra.BigOperators.Group.List.Basic
 
 public section
 
-@[simp]
 lemma List.prod_map_const {α M : Type*} [CommMonoid M] (xs : List α) (c : M) :
     (xs.map (fun _ => c)).prod = c ^ xs.length := by
   induction xs with

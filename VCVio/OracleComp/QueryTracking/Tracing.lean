@@ -84,7 +84,7 @@ abbrev withTraceBefore (so : QueryImpl spec m) (traceFn : spec.Domain → ω) :
     QueryImpl spec (WriterT ω m) :=
   PFunctor.Handler.withTraceBefore (P := spec.toPFunctor) so traceFn
 
-@[simp, grind =]
+@[grind =]
 lemma withTraceBefore_apply (so : QueryImpl spec m) (traceFn : spec.Domain → ω) (t : spec.Domain) :
     so.withTraceBefore traceFn t = (do tell (traceFn t); so t) := by
   exact PFunctor.Handler.withTraceBefore_apply (P := spec.toPFunctor) so traceFn t
@@ -162,7 +162,7 @@ abbrev withTrace (so : QueryImpl spec m)
     QueryImpl spec (WriterT ω m) :=
   PFunctor.Handler.withTrace (P := spec.toPFunctor) so traceFn
 
-@[simp, grind =]
+@[grind =]
 lemma withTrace_apply (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (t : spec.Domain) :
     so.withTrace traceFn t = (do let u ← so t; tell (traceFn t u); return u) := by
@@ -250,7 +250,7 @@ abbrev withTraceAppendBefore (so : QueryImpl spec m) (traceFn : spec.Domain → 
     QueryImpl spec (WriterT ω m) :=
   PFunctor.Handler.withTraceAppendBefore (P := spec.toPFunctor) so traceFn
 
-@[simp, grind =]
+@[grind =]
 lemma withTraceAppendBefore_apply (so : QueryImpl spec m) (traceFn : spec.Domain → ω)
     (t : spec.Domain) :
     so.withTraceAppendBefore traceFn t = (do tell (traceFn t); so t) := by
@@ -322,7 +322,7 @@ abbrev withTraceAppend (so : QueryImpl spec m)
     QueryImpl spec (WriterT ω m) :=
   PFunctor.Handler.withTraceAppend (P := spec.toPFunctor) so traceFn
 
-@[simp, grind =]
+@[grind =]
 lemma withTraceAppend_apply (so : QueryImpl spec m) (traceFn : (t : spec.Domain) → spec.Range t → ω)
     (t : spec.Domain) :
     so.withTraceAppend traceFn t = (do let u ← so t; tell (traceFn t u); return u) := by

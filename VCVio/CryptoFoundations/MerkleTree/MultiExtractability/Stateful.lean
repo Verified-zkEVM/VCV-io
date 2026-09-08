@@ -187,7 +187,6 @@ theorem ExtractorState.record_checkpoints
         [⟨tag, { root, cumulativeLog := state.cumulativeLog ++ phaseLog }⟩] := rfl
 
 /-- Recording one commitment adds exactly one checkpoint. -/
-@[simp]
 theorem ExtractorState.record_checkpoints_length
     {config : Configuration Cfg Address}
     (state : ExtractorState Cfg Query Address Y config) (tag : Cfg)
