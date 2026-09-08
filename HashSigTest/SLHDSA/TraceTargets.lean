@@ -171,7 +171,6 @@ def checkRejectedChainStep (vp : ValidatedParams) (label : String)
 def fixedBytes (n salt : ℕ) : Bytes n :=
   Vector.ofFn fun i => UInt8.ofNat (salt + 17 * i.val)
 
-
 /-- Run the three WOTS+ programs at `pos` under `prims` and compare their logs with the tweaks the
 WOTS+ address helpers name for that instance: the `len * (w - 1)` executed steps and the
 public-key compression for generation, the `sum chainSteps` steps for signing, and the

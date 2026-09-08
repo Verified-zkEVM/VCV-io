@@ -44,8 +44,10 @@ restate the same formula.  The rest apply the same address term their ledger doe
 is that the coordinate enumeration behind it is exhaustive.  `mem_perfectInternalCoords`
 characterizes the node coordinates `mem_forsTreeAddresses` and `mem_xmssNodeAddresses` quantify
 over.  Whether the construction's free programs query only listed addresses is a separate,
-trace-level statement left to the next slice; the only mechanical evidence for it today is the
-runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean`, which checks, for one fixed digest per
+trace-level statement: `HashSig.SLHDSA.Security.TraceTargets` names the union of the six
+structural ledgers (`constructionAddresses`) and proves it (`QueriesWithinConstructionTargets`)
+for the WOTS+ programs; the FORS, XMSS, hypertree, and scheme programs remain open there.  The
+runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean` checks, for one fixed digest per
 profile, addresses assembled from the construction's address helpers against the ledgers rather
 than running its signing or verification programs.
 
@@ -1190,8 +1192,8 @@ theorem disjoint_wotsPkAddresses_xmssNodeAddresses (vp : ValidatedParams) :
     (fun _ => type_of_mem_xmssNodeAddresses vp)
 
 /-- The six structural ledgers, concatenated in the order of the table above with the two
-selection-dependent ledgers left out, are duplicate-free.  A named union ledger belongs to the
-trace-level slice. -/
+selection-dependent ledgers left out, are duplicate-free.  `TraceTargets.constructionAddresses`
+names this concatenation as the union ledger. -/
 theorem nodup_structuralLedgers_append (vp : ValidatedParams) :
     (forsLeafAddresses vp ++ forsTreeAddresses vp ++ forsRootAddresses vp ++
       wotsStepAddresses vp ++ wotsPkAddresses vp ++ xmssNodeAddresses vp).Nodup := by
