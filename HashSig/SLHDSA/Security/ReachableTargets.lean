@@ -85,6 +85,11 @@ namespace LayerTreeCoord
 def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord vp :=
   ⟨pos.layer, pos.tree⟩
 
+/-- The unique XMSS tree at the final layer `d - 1`, tree zero, whose root Algorithm 18 publishes
+as the public key. -/
+def top (vp : ValidatedParams) : LayerTreeCoord vp :=
+  ⟨⟨vp.params.d - 1, Nat.sub_one_lt (Nat.pos_iff_ne_zero.mp vp.valid.d_pos)⟩, ⟨0, by positivity⟩⟩
+
 end LayerTreeCoord
 
 /-- The target-count exponent agrees with the canonical `LayerPosition` exponent. -/
@@ -206,6 +211,10 @@ theorem toAdrs_tree {vp : ValidatedParams} (coord : LayerTreeCoord vp) :
 @[simp]
 theorem ofPosition_toAdrs {vp : ValidatedParams} (pos : LayerPosition vp) :
     (ofPosition pos).toAdrs = pos.toAdrs := by rfl
+
+/-- The base address of the top tree: layer `d - 1`, tree zero. -/
+theorem top_toAdrs (vp : ValidatedParams) :
+    (top vp).toAdrs = (Adrs.zero.setLayerAddress (vp.params.d - 1)).setTreeAddress 0 := by rfl
 
 end LayerTreeCoord
 

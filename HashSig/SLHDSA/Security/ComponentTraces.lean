@@ -315,9 +315,8 @@ theorem xmssNodeAdrs_mem_constructionAddresses (coord : LayerTreeCoord vp) {h i 
 theorem xmssNodeAdrs_mem_constructionAddresses_of_position (pos : LayerPosition vp) {h i : ℕ}
     (hh : 0 < h) (hhp : h ≤ vp.params.hp) (hi : i < 2 ^ (vp.params.hp - h)) :
     xmssNodeAdrs pos.toAdrs h i ∈ constructionAddresses vp := by
-  rw [mem_constructionAddresses_iff]
-  exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
-    (mem_xmssNodeAddresses_of_position vp pos hh hhp hi)))))
+  rw [← LayerTreeCoord.ofPosition_toAdrs pos]
+  exact xmssNodeAdrs_mem_constructionAddresses _ hh hhp hi
 
 /-- A leaf index of a subtree at `(z, t)` inside a height-`hp` tree is below `2 ^ hp`. -/
 private theorem lt_pow_of_div_pow_lt {i z t hp : ℕ} (hz : z ≤ hp) (hi : i / 2 ^ z = t)
@@ -375,14 +374,6 @@ theorem xmssRootM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSee
     QueriesWithinConstructionTargets core
       (xmssRootM core skSeed pkSeed coord.toAdrs : OracleComp (publicHashSpec core) core.Y) :=
   xmssNodeM_queriesWithinConstructionTargets core skSeed pkSeed coord le_rfl (by positivity)
-
-/-- The root of the XMSS tree containing a reachable position queries only union-ledger tweaks. -/
-theorem xmssRootM_queriesWithinConstructionTargets_of_position (skSeed : core.SkSeed)
-    (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
-    QueriesWithinConstructionTargets core
-      (xmssRootM core skSeed pkSeed pos.toAdrs : OracleComp (publicHashSpec core) core.Y) := by
-  rw [← LayerTreeCoord.ofPosition_toAdrs pos]
-  exact xmssRootM_queriesWithinConstructionTargets core skSeed pkSeed _
 
 /-- XMSS signing at a reachable position queries only union-ledger tweaks: the sibling subtrees
 of the authentication path lie inside the position's tree, and the WOTS+ signature is issued at
@@ -493,15 +484,10 @@ theorem xmssPkFromSigM_traceContract (sig : XmssSig vp.params core) (msg : core.
 
 /-! ## The top-layer tree -/
 
-/-- The unique XMSS tree at the final layer `d - 1`, tree zero, whose root Algorithm 18 publishes
-as the public key. -/
-def LayerTreeCoord.top (vp : ValidatedParams) : LayerTreeCoord vp :=
-  ⟨⟨vp.params.d - 1, Nat.sub_one_lt (Nat.pos_iff_ne_zero.mp vp.valid.d_pos)⟩, ⟨0, by positivity⟩⟩
-
 /-- The top tree's base address is the one `GeneralHypertree.rootM` computes its root at. -/
-theorem LayerTreeCoord.top_toAdrs (vp : ValidatedParams) :
-    (LayerTreeCoord.top vp).toAdrs = GeneralHypertree.layerAdrs (vp.params.d - 1) 0 := by
-  simp [LayerTreeCoord.top, LayerTreeCoord.toAdrs, GeneralHypertree.layerAdrs]
+theorem LayerTreeCoord.top_toAdrs_layerAdrs (vp : ValidatedParams) :
+    (LayerTreeCoord.top vp).toAdrs = GeneralHypertree.layerAdrs (vp.params.d - 1) 0 :=
+  LayerTreeCoord.top_toAdrs vp
 
 /-! ## Hypertree programs -/
 
@@ -606,8 +592,10 @@ theorem hypertreeVerifyM_queriesWithinConstructionTargets [DecidableEq core.Y] (
 theorem hypertreeRootM_queriesWithinConstructionTargets (skSeed : core.SkSeed)
     (pkSeed : core.PkSeed) :
     QueriesWithinConstructionTargets core
-      (GeneralHypertree.rootM vp core skSeed pkSeed : OracleComp (publicHashSpec core) core.Y) :=
-  xmssRootM_queriesWithinConstructionTargets core skSeed pkSeed (LayerTreeCoord.top vp)
+      (GeneralHypertree.rootM vp core skSeed pkSeed : OracleComp (publicHashSpec core) core.Y) := by
+  have h := xmssRootM_queriesWithinConstructionTargets core skSeed pkSeed (LayerTreeCoord.top vp)
+  rw [LayerTreeCoord.top_toAdrs_layerAdrs] at h
+  exact h
 
 /-! ## Internal scheme programs -/
 
