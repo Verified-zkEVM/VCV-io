@@ -7,6 +7,7 @@ Authors: Alexander Hicks
 module
 public import HashSig.SLHDSA.Security.EncodedTargets
 public import HashSig.SLHDSA.Security.WotsWitnesses
+public import HashSigTest.SLHDSA.EncoderFixtures
 
 /-!
 # SLH-DSA WOTS+ witness canaries
@@ -21,7 +22,9 @@ The witness lemmas are stated for an arbitrary `Primitives` bundle, so this is i
 falsifiability fixture, not a claim about any approved profile.  Over that bundle the checks build
 an honest WOTS+ signature, three forgeries that all recover the honest public key, and confirm
 that the extractor returns the `F`-collision, the `F`-preimage, and the `T_len` second preimage
-respectively, each satisfying its equation by evaluation.  Two negative canaries close the other
+respectively, each satisfying its equation by evaluation — including the two identifications the
+games need, that the collision partner is the honest chain value at the address named and that the
+preimage is taken at the address the honest signer hashed.  Two negative canaries close the other
 direction: signing the same message twice yields no witness at all, and a forgery whose recovered
 public key differs yields a `T_len` witness that fails its own validity check — which is exactly
 why `findWotsWitness_sound` carries the public-key hypothesis.
@@ -37,7 +40,7 @@ public section
 
 namespace SLHDSA.WotsWitnessesTest
 
-open Security Concrete
+open Security Concrete EncoderFixtures
 
 def ensure (label : String) (condition : Bool) : IO Unit :=
   unless condition do
@@ -50,8 +53,8 @@ right by one bit, so `F x = x >>> 1`, `chain x i s = x >>> s`, and both `F` and 
 readily. -/
 
 -- Exposed: the toy fixture's arithmetic has to reduce inside the exposed bundle below and inside
--- the `decide` pins, so the parameter record, the secret table, and the bundle are exposed as a
--- group.  Nothing outside this executable consumes them.
+-- the `decide` pins, so the parameter record and the bundle it configures are exposed.  The
+-- secret table needs no exposure of its own.  Nothing outside this executable consumes them.
 @[expose] def toyParams : Params :=
   { n := 1, h := 1, d := 1, hp := 1, a := 1, k := 1, lgw := 2 }
 
@@ -63,7 +66,7 @@ example : toyParams.len2 = 2 := by decide
 example : toyParams.len = 6 := by decide
 
 /-- The per-chain secret values the toy `PRF` hands out, indexed by the chain address. -/
-@[expose] def toySecret : ℕ → UInt8
+def toySecret : ℕ → UInt8
   | 0 => 2
   | 1 => 7
   | 2 => 19
@@ -144,8 +147,18 @@ def badForgery : WotsSig toyParams toyPrimitives.core := forgery 2
 
 /-! ## Witness validity, evaluated
 
-`witnessHolds` re-evaluates the equation each constructor asserts.  It is deliberately a separate
-computation from `WotsWitness.Valid`: the checks below run it on the extractor's actual output. -/
+`witnessHolds` re-evaluates the condition each constructor asserts, including the two
+identifications: the `fCollision` partner is the honest chain value at the address named, and the
+`fPreimage` address is the one the honest signer hashed to reach the revealed value.  It is
+deliberately a separate computation from `WotsWitness.Valid`: the checks below run it on the
+extractor's actual output. -/
+
+/-- The honest chain value at hash-address `step` of chain `i`, advanced from the value the honest
+signature reveals.  This is the value `WotsWitness.Valid` names as the `fCollision` partner. -/
+def honestChainValue (i : Fin toyParams.len) (step : ℕ) : toyPrimitives.Y :=
+  chain toyPrimitives () (wotsChainAdrs baseAdrs i.val) honestSig[i.val]
+    (chainStepsCore toyPrimitives.core honestMsg i.val)
+    (step - chainStepsCore toyPrimitives.core honestMsg i.val)
 
 def witnessHolds : WotsWitness toyParams toyPrimitives → Bool
   | .tlCollision recovered =>
@@ -154,19 +167,23 @@ def witnessHolds : WotsWitness toyParams toyPrimitives → Bool
           toyPrimitives.Tl () (wotsPkAdrs baseAdrs) honestTops.toList)
   | .fPreimage i step value =>
       decide (step < toyParams.w - 1) &&
+        decide (step + 1 = chainStepsCore toyPrimitives.core honestMsg i.val) &&
         (toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step) value ==
           honestSig[i.val])
-  | .fCollision i step value target =>
-      decide (step < toyParams.w - 1) && (value != target) &&
+  | .fCollision i step value =>
+      decide (step < toyParams.w - 1) &&
+        decide (chainStepsCore toyPrimitives.core honestMsg i.val ≤ step) &&
+        (value != honestChainValue i step) &&
         (toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step) value ==
-          toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step) target)
+          toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step)
+            (honestChainValue i step))
 
 /-- A tag naming which constructor the extractor returned, so a canary can pin the branch. -/
 def witnessTag : Option (WotsWitness toyParams toyPrimitives) → String
   | none => "none"
   | some (.tlCollision _) => "tlCollision"
   | some (.fPreimage i step _) => s!"fPreimage {i.val} {step}"
-  | some (.fCollision i step _ _) => s!"fCollision {i.val} {step}"
+  | some (.fCollision i step _) => s!"fCollision {i.val} {step}"
 
 def extract (sig : WotsSig toyParams toyPrimitives.core) (msg : toyPrimitives.Y) :
     Option (WotsWitness toyParams toyPrimitives) :=
@@ -187,9 +204,9 @@ def checkChainCollision : IO Unit := do
   | some w =>
       ensure "the chain-0 collision satisfies its equation" (witnessHolds w)
       match w with
-      | .fCollision _ _ value target =>
+      | .fCollision i step value =>
           ensure "the chain-0 collision is between the expected values"
-            ((byteOf value == 0) && (byteOf target == 1))
+            ((byteOf value == 0) && (byteOf (honestChainValue i step) == 1))
       | _ => ensure "the chain-0 witness is a collision" false
 
 /-- Chain five: the honest digit is `3 = w - 1`, so the forged chain advanced to it lands exactly
@@ -279,18 +296,27 @@ def checkMalformedTlForgery : IO Unit := do
   | some w =>
       ensure "the malformed T_len witness fails its own equation" (!witnessHolds w)
 
-/-- `witnessHolds` itself has to be able to fail.  A fabricated collision whose two values have
-different `F` images, a fabricated preimage of the wrong value, and a genuine collision moved to a
-hash address at or above `w - 1` are all rejected. -/
+/-- `witnessHolds` itself has to be able to fail.  A submitted value whose `F` image differs from
+the honest chain value's, a preimage of the wrong value, a genuine collision moved to a hash
+address at or above `w - 1`, a collision below the honest digit — where the value the revealed
+element advances to is no longer the honest chain value at that address — and a genuine preimage
+moved off the address the honest signer hashed are all rejected.  The last two fail on the
+identifications alone: every other conjunct holds for them. -/
 def checkFabricatedWitnesses : IO Unit := do
-  ensure "a fabricated collision with different F images is rejected"
-    (!witnessHolds (.fCollision ⟨0, by decide⟩ 1 (node 0) (node 3)))
+  ensure "a fabricated collision with a different F image is rejected"
+    (!witnessHolds (.fCollision ⟨0, by decide⟩ 1 (node 3)))
   ensure "a fabricated preimage of the wrong value is rejected"
     (!witnessHolds (.fPreimage ⟨5, by decide⟩ 2 (node 0)))
   ensure "a collision at hash address w - 1 is rejected"
-    (!witnessHolds (.fCollision ⟨0, by decide⟩ (toyParams.w - 1) (node 0) (node 1)))
+    (!witnessHolds (.fCollision ⟨0, by decide⟩ (toyParams.w - 1) (node 0)))
+  ensure "a collision below the honest digit is rejected"
+    (!witnessHolds (.fCollision ⟨0, by decide⟩ 0 (node 0)))
+  ensure "a preimage at an address the honest signer did not hash is rejected"
+    (!witnessHolds (.fPreimage ⟨5, by decide⟩ 1 (node 10)))
   ensure "the genuine chain-zero collision is still accepted"
-    (witnessHolds (.fCollision ⟨0, by decide⟩ 1 (node 0) (node 1)))
+    (witnessHolds (.fCollision ⟨0, by decide⟩ 1 (node 0)))
+  ensure "the genuine chain-five preimage is still accepted"
+    (witnessHolds (.fPreimage ⟨5, by decide⟩ 2 (node 10)))
 
 /-! ## Statement pins at the toy bundle -/
 
@@ -327,8 +353,25 @@ example (sig sig' : WotsSig toyParams toyPrimitives.core) (msg msg' : toyPrimiti
       wotsPkFromSig toyPrimitives sig' msg' () baseAdrs)
     (w : WotsWitness toyParams toyPrimitives)
     (hw : findWotsWitness toyPrimitives sig msg sig' msg' () baseAdrs = some w) :
-    w.Valid () baseAdrs (wotsPkFromSigTops toyPrimitives sig' msg' () baseAdrs) sig' :=
+    w.Valid () baseAdrs (wotsPkFromSigTops toyPrimitives sig' msg' () baseAdrs) sig' msg' :=
   findWotsWitness_sound toyPrimitives sig msg sig' msg' () baseAdrs hpk hw
+
+/-- The identification a source-final-validity game needs, read off the chain extractor's
+soundness lemma alone: a returned `fCollision` collides with the honest chain value at the address
+it names, not with an unconstrained second value.  The proof is the intended downstream path — the
+extractor bodies are not exposed, so the unfolding equation is what a consumer rewrites with. -/
+example (sig sig' : WotsSig toyParams toyPrimitives.core) (msg msg' : toyPrimitives.Y)
+    (i : Fin toyParams.len) (step : ℕ) (value : toyPrimitives.Y)
+    (hw : findWotsChainWitness toyPrimitives sig msg sig' msg' () baseAdrs i =
+      some (.fCollision i step value)) :
+    toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step) value =
+      toyPrimitives.F () ((wotsChainAdrs baseAdrs i.val).setHashAddress step)
+        (chain toyPrimitives () (wotsChainAdrs baseAdrs i.val) sig'[i.val]
+          (chainStepsCore toyPrimitives.core msg' i.val)
+          (step - chainStepsCore toyPrimitives.core msg' i.val)) := by
+  have h := findWotsChainWitness_sound toyPrimitives sig msg sig' msg' () baseAdrs i hw
+  rw [WotsWitness.valid_fCollision] at h
+  exact h.2.2.2
 
 /-! ## Ledger pins on approved profiles -/
 
@@ -375,39 +418,14 @@ layer-zero tree indices overflow the compressed eight-byte tree field, two disti
 chain-step targets therefore share a tweak, and `wotsStepAdrsKey_injective` is false without its
 `EncodedTargetLedgerConditions` argument. -/
 
--- Exposed: the aliasing pin below evaluates the SHA-2 key map at concrete addresses of this
--- profile, so its arithmetic has to reduce.
-@[expose] def deepParams : Params :=
-  { n := 16, h := 99, d := 11, hp := 9, a := 12, k := 14, lgw := 4 }
-
-@[expose] def deep : ValidatedParams := ⟨deepParams, by decide⟩
-
-/-- The SHA-2 bundle's tweak map is the compressed `ADRSc` key map. -/
-theorem adrsToKey_sha2 (p : Params) (a : Adrs) :
-    (sha2Primitives p).adrsToKey a = sha2AdrsKey a := rfl
-
 example : layerTreeHeight deep 0 = 90 := by decide
 example : deep.params.len = 35 := by decide
 example : deep.params.w - 1 = 15 := by decide
 
-/-- Past the checked domain the SHA-2 key map returns the all-zero key. -/
-theorem sha2AdrsKey_eq_zero_of_tree_overflow (a : Adrs) (ha : Adrs.Fits 8 a.tree = false) :
-    sha2AdrsKey a = zeroBytes 22 := by
-  unfold sha2AdrsKey Adrs.compressSha2Checked
-  by_cases h1 : a.isCanonical = false
-  · simp [h1]
-  · by_cases h2 : Adrs.Fits 1 a.layer = false
-    · simp [h1, h2]
-    · simp [h1, h2, ha]
-
-theorem deep_tree_bound (t : ℕ) (ht : t < 2 ^ 64 + 2) : t < 2 ^ layerTreeHeight deep 0 := by
-  have hle : (2 : ℕ) ^ 64 + 2 ≤ 2 ^ layerTreeHeight deep 0 := by
-    rw [show layerTreeHeight deep 0 = 90 from by decide]
-    norm_num
-  omega
-
 /-- A layer-zero position of the `deep` profile at a tree index the compressed field cannot
-hold. -/
+hold.  The profile itself, its tree-index bound, and the SHA-2 out-of-domain fallback come from
+`HashSigTest.SLHDSA.EncoderFixtures`, which shares them with the encoded-target canaries. -/
+-- Exposed: `deepCoord_tree` closes by `rfl`, which needs both of these to reduce.
 @[expose] def deepPos (t : ℕ) (ht : t < 2 ^ 64 + 2) : LayerPosition deep :=
   ⟨⟨0, by decide⟩, ⟨t, deep_tree_bound t ht⟩, ⟨0, Nat.two_pow_pos _⟩⟩
 

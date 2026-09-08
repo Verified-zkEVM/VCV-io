@@ -21,11 +21,15 @@ development (`WOTS_TW_ES.ec`), with the axiom `two_encodings` replaced by the me
 
 ## What is proved, and what is not
 
-Every statement here is about signature data alone: a primitive bundle, a public seed, a
-structural address, two messages, and two signatures.  Nothing here constructs an adversary,
-states an advantage, performs a game hop, or claims that any honest execution queried the honest
-value a witness attacks.  In particular a witness lemma is **not** a reduction: that the game's
-target was committed before the forgery was seen is a simulation-fidelity obligation of the later
+Every *deterministic-inclusion* statement below is about signature data: a primitive bundle, a
+public seed, a structural address, two messages, and two signatures.  One of them,
+`wotsPkFromSig_cases`, additionally names the honest secret seed, because the honest public key
+it starts from is the one `wotsPkGen` produces.  The *transcript-transport* statements are about
+a role ledger over a `ValidatedParams`; they mention no signature at all.  Nothing here
+constructs an adversary, states an advantage, performs a game hop, or claims that any honest
+execution queried the honest value a witness attacks.  In particular a witness lemma is **not** a
+reduction: that the game's target was committed before the forgery was seen is a
+simulation-fidelity obligation of the later
 program-level slice, not a fact established here.  The undetectability role has no witness content
 at all and is deliberately absent — undetectability pays for a distributional hybrid, not for an
 extraction.
@@ -41,15 +45,16 @@ signature data:
 * `wotsPkFromSigTops_cases`, `wotsPkFromSig_cases`;
 * `WotsWitness`, `WotsWitness.Valid` and its three unfolding equations
   `WotsWitness.valid_tlCollision`, `WotsWitness.valid_fPreimage`, `WotsWitness.valid_fCollision`;
-* `findWotsChainWitness`, `findWotsChainWitness_sound`, `findWotsWitness`,
-  `findWotsWitness_sound`, `findWotsWitness_isSome`;
+* `findWotsChainWitness`, `findWotsChainWitness_sound`, `findWotsChainWitness_isSome_of_lt`,
+  `findWotsWitness`, `findWotsWitness_sound`, `findWotsWitness_isSome`;
 * the three game-shape bridges `wotsWitness_valid_fPreimage_eval`,
   `wotsWitness_valid_fCollision_eval`, `wotsWitness_valid_tlCollision_eval`.
 
 *Transcript transport* — a statement about a role ledger of `HashSig.SLHDSA.Security`:
 
-* `mem_wotsStepAddresses_of_lt`, `wotsPreimageAdrs_mem_wotsStepAddresses`;
-* `wotsStepAdrsKey_injective`, `wotsPkAdrsKey_injective`.
+* `mem_wotsStepAddresses_of_lt`, `wotsPreimageAdrs_mem_wotsStepAddresses`,
+  `wotsPreimageAdrs_mem_optionalWotsAddresses`;
+* `wotsStepAdrsKey_injective`, `wotsOptionalStepAdrsKey_injective`, `wotsPkAdrsKey_injective`.
 
 The `T_len` witness address is `wotsPkAdrs (wotsInstanceAdrs pos)`, which `mem_wotsPkAddresses`
 already lists in the `wotsTl` ledger; that lemma is used directly rather than restated.
@@ -67,9 +72,11 @@ step counts of chain `i`.  `chainStepsCore_two_encodings` supplies an index with
 the swapped use `two_encodings m' m` the EasyCrypt proof makes in `nhchwcoll_hchwpre`
 (`WOTS_TW_ES.ec:1299`).  At such an index the forged chain must climb from `a` to the honest
 digit `b` and beyond; advancing it to `b` either lands on the honest revealed value `sig'[i]` — an
-`F`-preimage of a value the signer never revealed a preimage of, matching `extr_pre`
-(`WOTS_TW_ES.ec:656`) — or it does not, and the two chains, which share the endpoint at step
-`w - 1`, must first collide at some step `t` with `b ≤ t < w - 1`, matching `extr_coll_l` /
+`F`-preimage at hash address `b - 1`, matching `extr_pre` (`WOTS_TW_ES.ec:656`); under an honest
+signer the preimage of `sig'[i]` is the step-`(b - 1)` chain value, which the signature does not
+reveal, but that is motivation and is not proved here — or it does not, and the two chains, which
+share the endpoint at step `w - 1`, must first collide at some step `t` with `b ≤ t < w - 1`,
+matching `extr_coll_l` /
 `extr_coll_r` (`:628`, `:633`).  One level up, a signature that recovers the honest public key
 either recovers different chain ends, giving a `T_len` second preimage at `wotsPkAdrs adrs`
 (the `valid_TCRPKCO` branch of `FL_SL_XMSS_MT_ES.ec:3270`), or recovers exactly the honest chain
@@ -99,8 +106,9 @@ after `n` steps are either equal or first differ at a step whose `F` images alre
 same value, or there is a step `j < n` at which they still differ while their `F` images at hash
 address `i + j` already agree — a collision of `F` at `adrs.setHashAddress (i + j)`.
 
-*Deterministic inclusion.*  This is the Lean counterpart of `is_coll` / `find_collidx_l`
-(`WOTS_TW_ES.ec:611`, `:620`). -/
+*Deterministic inclusion.*  The existence statement is the Lean counterpart of `hchwcoll_hcoll`
+(`WOTS_TW_ES.ec:1178-1197`); `is_coll` (`:611`) and `find_collidx_l` (`:620`) are the search
+operators that locate the step, and it is `findChainDivergence` below that plays their role. -/
 theorem chain_diverge (prims : Primitives p) (pkSeed : prims.PkSeed) (adrs : Adrs)
     (u v : prims.Y) (i n : ℕ)
     (hend : chain prims pkSeed adrs u i n = chain prims pkSeed adrs v i n) :
@@ -170,10 +178,14 @@ forged value to digit `b` lands exactly on the honest value — exhibiting an `F
 `honest` at hash address `b - 1` — or the two chains differ at some step `t` with `b ≤ t < w - 1`
 while their `F` images at hash address `t` agree, exhibiting an `F`-collision there.
 
-*Deterministic inclusion.*  This is `nhchwcoll_hchwpre` (`WOTS_TW_ES.ec:1299`) at one chain, with
-the two outcomes `is_chwpre` (`:640`) and `is_chwcoll` (`:595`) and the extractors `extr_pre`
-(`:656`), `extr_coll_l`/`extr_coll_r` (`:628`, `:633`).  The lemma is exhaustive: the two branches
-are the two sides of a decision on whether the advanced forged value equals the honest one. -/
+*Deterministic inclusion.*  This fuses three EasyCrypt steps at one chain.  `nhchwcoll_hchwpre`
+(`WOTS_TW_ES.ec:1299`) supplies the split, but carries no endpoint hypothesis and its second
+outcome `is_chwcoll` (`:595`) is only the inequality `cf … <> sig[i]`; `hchwcoll_hcoll`
+(`:1178-1197`) and `collision_extraction` (`:1250-1292`) are what turn that inequality into a
+collision, and the endpoint equality they need is what `hend` carries here.  The outcomes are
+`is_chwpre` (`:640`) and the extracted collision, with the extractors `extr_pre` (`:656`) and
+`extr_coll_l`/`extr_coll_r` (`:628`, `:633`).  The lemma is exhaustive: the two branches are the
+two sides of a decision on whether the advanced forged value equals the honest one. -/
 theorem chainPair_cases (prims : Primitives p) (pkSeed : prims.PkSeed) (adrs : Adrs)
     (forged honest : prims.Y) (a b : ℕ) (hab : a < b) (hb : b ≤ p.w - 1)
     (hend : chain prims pkSeed adrs forged a (p.w - 1 - a) =
@@ -311,57 +323,86 @@ theorem wotsPkFromSig_cases (valid : p.Valid) (prims : Primitives p)
 
 /-! ## The extracted witness
 
-`WotsWitness` packages the three outcomes as the data a reduction submits, and `findWotsWitness`
-computes one.  `WotsWitness.Valid` is the winning condition of the matching game and nothing more:
-it says the submitted value collides with, or is a preimage of, the honest object named as its
-argument.  It does not assert that the honest object was committed as a game target, which is a
-program-level obligation of the reduction. -/
+`WotsWitness` packages the three outcomes as the data a reduction submits: one value, together
+with the chain index and hash-address step that name the tweak it is submitted against.  Every
+honest object a witness attacks is an argument of `WotsWitness.Valid` and never a constructor
+field — the chain-end vector `honestTops` for the `T_len` branch, and for the two chain branches
+the honest signature `honestSig` together with the message `honestMsg` it signs, from which
+`Valid` *computes* the honest chain value at the named step.
+
+That computation is the identification a source-final-validity game needs: its winning condition
+compares the submitted value against the challenge *recorded* at the named target, so a pair of
+arbitrary distinct values with equal images is not a win.  `WotsWitness.Valid` is therefore the
+winning condition of the matching game and nothing more.  It still does not assert that the
+honest object was committed as a game target, which is a program-level obligation of the
+reduction. -/
 
 /-- A witness against one WOTS+ component hash at a fixed base address.
 
 Each constructor carries only the value a reduction submits, together with the chain index and
-hash-address step that name the tweak; the honest object each witness attacks is supplied to
-`WotsWitness.Valid`. -/
+hash-address step that name the tweak; every honest object a witness attacks is supplied to
+`WotsWitness.Valid`, which reads the attacked chain value off the honest signature. -/
 inductive WotsWitness (p : Params) (prims : Primitives p) where
   /-- A second preimage of the honest chain-end vector under `T_len` at `wotsPkAdrs adrs`. -/
   | tlCollision (recovered : Vector prims.Y p.len)
   /-- An `F`-preimage of the honest revealed value of chain `chainIdx`, at hash-address `step`. -/
   | fPreimage (chainIdx : Fin p.len) (step : ℕ) (value : prims.Y)
-  /-- An `F`-collision at hash-address `step` of chain `chainIdx`, between the forged chain value
-  `value` and the honest chain value `target`. -/
-  | fCollision (chainIdx : Fin p.len) (step : ℕ) (value target : prims.Y)
+  /-- An `F`-collision at hash-address `step` of chain `chainIdx`.  `value` is the submitted
+  colliding value; the honest chain value it collides with is not carried here but computed by
+  `WotsWitness.Valid` from the honest signature and message. -/
+  | fCollision (chainIdx : Fin p.len) (step : ℕ) (value : prims.Y)
 
-/-- The winning condition each witness asserts, against the honest chain ends `honestTops` and the
-honest signature `honestSig` at base address `adrs`.
+/-- The winning condition each witness asserts, against the honest chain ends `honestTops`, the
+honest signature `honestSig`, and the message `honestMsg` that `honestSig` signs, at base address
+`adrs`.
 
-For `tlCollision` this is a `T_len` second preimage of `honestTops`; for `fPreimage` it is an
-`F`-preimage of the honest revealed chain value `honestSig[chainIdx]`; for `fCollision` it is an
-`F`-collision between two distinct values.  The two chain cases additionally pin the hash-address
-step below `w - 1`, which is what places their address in the `wotsFTcr` role ledger
-(`mem_wotsStepAddresses_of_lt`).
+Write `b` for `chainStepsCore prims.core honestMsg chainIdx`, the hash index at which the honest
+signature reveals chain `chainIdx`.  Then:
 
-This is a statement about hash values only.  It does not say that `honestTops` or `honestSig` was
-committed as a game target, nor that any execution queried them. -/
+* `tlCollision recovered` asserts a `T_len` second preimage of `honestTops` at `wotsPkAdrs adrs`;
+* `fPreimage chainIdx step value` asserts an `F`-preimage of the honest revealed value
+  `honestSig[chainIdx]` at hash-address `step`, and pins `step + 1 = b` — the one address at
+  which an honest signer applied `F` to reach `honestSig[chainIdx]`;
+* `fCollision chainIdx step value` asserts an `F`-collision at a hash-address `step` in
+  `[b, w - 2]` between `value` and
+  `chain prims pk (wotsChainAdrs adrs chainIdx) honestSig[chainIdx] b (step - b)`, the honest
+  chain value at that step.  Advancing the revealed element is how the honest value at a step at
+  or above `b` is named without the secret seed: when `honestSig` is an honest signature on
+  `honestMsg`, `chain_compose` identifies it with the value the signer hashed at `step`, which is
+  motivation rather than a hypothesis — nothing here requires `honestSig` to be honest.
+
+Both chain cases pin the hash-address step below `w - 1`, which is what places their address in
+the `wotsFTcr` role ledger (`mem_wotsStepAddresses_of_lt`).
+
+This is a statement about hash values only.  It does not say that `honestTops`,
+`honestSig[chainIdx]`, or the computed chain value was committed as a game target, nor that any
+execution queried them. -/
 def WotsWitness.Valid {p : Params} {prims : Primitives p} (pk : prims.PkSeed) (adrs : Adrs)
-    (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core) :
+    (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core) (honestMsg : prims.Y) :
     WotsWitness p prims → Prop
   | .tlCollision recovered =>
       recovered ≠ honestTops ∧
         prims.Tl pk (wotsPkAdrs adrs) recovered.toList =
           prims.Tl pk (wotsPkAdrs adrs) honestTops.toList
   | .fPreimage i step value =>
-      step < p.w - 1 ∧
+      step < p.w - 1 ∧ step + 1 = chainStepsCore prims.core honestMsg i.val ∧
         prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step) value = honestSig[i.val]
-  | .fCollision i step value target =>
-      step < p.w - 1 ∧ value ≠ target ∧
+  | .fCollision i step value =>
+      step < p.w - 1 ∧ chainStepsCore prims.core honestMsg i.val ≤ step ∧
+        value ≠ chain prims pk (wotsChainAdrs adrs i.val) honestSig[i.val]
+            (chainStepsCore prims.core honestMsg i.val)
+            (step - chainStepsCore prims.core honestMsg i.val) ∧
         prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step) value =
-          prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step) target
+          prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step)
+            (chain prims pk (wotsChainAdrs adrs i.val) honestSig[i.val]
+              (chainStepsCore prims.core honestMsg i.val)
+              (step - chainStepsCore prims.core honestMsg i.val))
 
 /-- Unfolding equation for the `T_len` branch of `WotsWitness.Valid`. -/
 @[simp] theorem WotsWitness.valid_tlCollision {prims : Primitives p} (pk : prims.PkSeed)
     (adrs : Adrs) (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core)
-    (recovered : Vector prims.Y p.len) :
-    (WotsWitness.tlCollision recovered).Valid pk adrs honestTops honestSig ↔
+    (honestMsg : prims.Y) (recovered : Vector prims.Y p.len) :
+    (WotsWitness.tlCollision recovered).Valid pk adrs honestTops honestSig honestMsg ↔
       recovered ≠ honestTops ∧
         prims.Tl pk (wotsPkAdrs adrs) recovered.toList =
           prims.Tl pk (wotsPkAdrs adrs) honestTops.toList := Iff.rfl
@@ -369,20 +410,27 @@ def WotsWitness.Valid {p : Params} {prims : Primitives p} (pk : prims.PkSeed) (a
 /-- Unfolding equation for the `F`-preimage branch of `WotsWitness.Valid`. -/
 @[simp] theorem WotsWitness.valid_fPreimage {prims : Primitives p} (pk : prims.PkSeed)
     (adrs : Adrs) (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core)
-    (i : Fin p.len) (step : ℕ) (value : prims.Y) :
-    (WotsWitness.fPreimage i step value).Valid pk adrs honestTops honestSig ↔
-      step < p.w - 1 ∧
+    (honestMsg : prims.Y) (i : Fin p.len) (step : ℕ) (value : prims.Y) :
+    (WotsWitness.fPreimage i step value).Valid pk adrs honestTops honestSig honestMsg ↔
+      step < p.w - 1 ∧ step + 1 = chainStepsCore prims.core honestMsg i.val ∧
         prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step) value =
           honestSig[i.val] := Iff.rfl
 
-/-- Unfolding equation for the `F`-collision branch of `WotsWitness.Valid`. -/
+/-- Unfolding equation for the `F`-collision branch of `WotsWitness.Valid`.  The second value is
+the honest chain value at `step`, read off `honestSig` rather than supplied by the witness. -/
 @[simp] theorem WotsWitness.valid_fCollision {prims : Primitives p} (pk : prims.PkSeed)
     (adrs : Adrs) (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core)
-    (i : Fin p.len) (step : ℕ) (value target : prims.Y) :
-    (WotsWitness.fCollision i step value target).Valid pk adrs honestTops honestSig ↔
-      step < p.w - 1 ∧ value ≠ target ∧
+    (honestMsg : prims.Y) (i : Fin p.len) (step : ℕ) (value : prims.Y) :
+    (WotsWitness.fCollision i step value).Valid pk adrs honestTops honestSig honestMsg ↔
+      step < p.w - 1 ∧ chainStepsCore prims.core honestMsg i.val ≤ step ∧
+        value ≠ chain prims pk (wotsChainAdrs adrs i.val) honestSig[i.val]
+            (chainStepsCore prims.core honestMsg i.val)
+            (step - chainStepsCore prims.core honestMsg i.val) ∧
         prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step) value =
-          prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step) target := Iff.rfl
+          prims.F pk ((wotsChainAdrs adrs i.val).setHashAddress step)
+            (chain prims pk (wotsChainAdrs adrs i.val) honestSig[i.val]
+              (chainStepsCore prims.core honestMsg i.val)
+              (step - chainStepsCore prims.core honestMsg i.val)) := Iff.rfl
 
 /-- Search one WOTS+ chain for a witness: nothing unless the forged step count `a` is strictly
 below the honest step count `b`, then the `F`-preimage if advancing the forged value to digit `b`
@@ -400,13 +448,20 @@ def findWotsChainWitness (prims : Primitives p) [DecidableEq prims.Y] (sig : Wot
     else
       (findChainDivergence prims pk chAdrs advanced sig'[i.val] b (p.w - 1 - b)).map fun j =>
         .fCollision i (b + j) (chain prims pk chAdrs advanced b j)
-          (chain prims pk chAdrs sig'[i.val] b j)
   else none
 
 /-- Compute a WOTS+ witness from a forged signature on `msg` and an honest signature on `msg'` at
 the same base address: the recovered chain-end vector when it differs from the honest one — a
 `T_len` second preimage exactly when the two recovered public keys agree — and otherwise the first
-chain that yields an `F`-preimage or an `F`-collision. -/
+chain that yields an `F`-preimage or an `F`-collision.
+
+The branch is decided by the chain ends alone, not by the two public keys.  On a forgery whose
+recovered public key differs this therefore still returns a `tlCollision`, and that witness is
+*not* valid; ruling it out is exactly what `findWotsWitness_sound`'s public-key hypothesis does,
+and the malformed-forgery canary of `HashSigTest.SLHDSA.WotsWitnesses` exercises the gap.  The
+split is deliberate: a caller reaching this point has already checked that the forgery verifies,
+and testing the compression again here would move that hypothesis onto
+`findWotsWitness_isSome`, which is otherwise free of it. -/
 def findWotsWitness (prims : Primitives p) [DecidableEq prims.Y] (sig : WotsSig p prims.core)
     (msg : prims.Y) (sig' : WotsSig p prims.core) (msg' : prims.Y) (pk : prims.PkSeed)
     (adrs : Adrs) : Option (WotsWitness p prims) :=
@@ -415,16 +470,19 @@ def findWotsWitness (prims : Primitives p) [DecidableEq prims.Y] (sig : WotsSig 
   else
     some (.tlCollision (wotsPkFromSigTops prims sig msg pk adrs))
 
-/-- Whatever `findWotsChainWitness` returns satisfies `WotsWitness.Valid` against the second
-signature `sig'`.  This search never returns the `T_len` constructor, so it needs no public-key
-hypothesis; the `honestTops` argument of `Valid` is therefore inert here.
+/-- Whatever `findWotsChainWitness` returns satisfies `WotsWitness.Valid` against the honest
+signature `sig'` and the message `msg'` it signs.  This search never returns the `T_len`
+constructor, so it needs no public-key hypothesis, and the `honestTops` argument of `Valid` is
+inert here — but `honestSig` and `honestMsg` are not: the `fPreimage` step and the `fCollision`
+partner are both fixed by them, which is what makes the returned witness an attack on a named
+honest value rather than on an arbitrary one.
 
 *Deterministic inclusion.* -/
 theorem findWotsChainWitness_sound (prims : Primitives p) [DecidableEq prims.Y]
     (sig : WotsSig p prims.core) (msg : prims.Y) (sig' : WotsSig p prims.core) (msg' : prims.Y)
     (pk : prims.PkSeed) (adrs : Adrs) (i : Fin p.len) {w : WotsWitness p prims}
     (hw : findWotsChainWitness prims sig msg sig' msg' pk adrs i = some w) :
-    w.Valid pk adrs (wotsPkFromSigTops prims sig' msg' pk adrs) sig' := by
+    w.Valid pk adrs (wotsPkFromSigTops prims sig' msg' pk adrs) sig' msg' := by
   set a := chainStepsCore prims.core msg i.val with ha
   set b := chainStepsCore prims.core msg' i.val with hb
   set chAdrs := wotsChainAdrs adrs i.val with hchAdrs
@@ -437,7 +495,7 @@ theorem findWotsChainWitness_sound (prims : Primitives p) [DecidableEq prims.Y]
     · rename_i hadv
       rw [Option.some.injEq] at hw
       subst hw
-      refine ⟨by omega, ?_⟩
+      refine ⟨by omega, by omega, ?_⟩
       have hstep : chain prims pk chAdrs sig[i.val] a (b - a) =
           prims.F pk (chAdrs.setHashAddress (b - 1))
             (chain prims pk chAdrs sig[i.val] a (b - 1 - a)) := by
@@ -449,11 +507,63 @@ theorem findWotsChainWitness_sound (prims : Primitives p) [DecidableEq prims.Y]
       rw [Option.map_eq_some_iff] at hw
       obtain ⟨j, hj, rfl⟩ := hw
       obtain ⟨hjlt, hjne, hjcoll⟩ := findChainDivergence_sound prims pk chAdrs _ _ b _ j hj
-      exact ⟨by omega, hjne, hjcoll⟩
+      have hsub : b + j - b = j := by omega
+      exact ⟨by omega, Nat.le_add_right b j,
+        by simpa only [← hb, ← hchAdrs, hsub] using hjne,
+        by simpa only [← hb, ← hchAdrs, hsub] using hjcoll⟩
   · exact absurd hw (by simp)
 
+/-- The chain search succeeds at every chain whose forged step count is strictly below the honest
+one and whose two chains reach the same step-`(w - 1)` endpoint: the preimage test decides the
+branch, and on its negative side `findChainDivergence_isSome_of_ne` supplies the collision.
+
+*Deterministic inclusion.* -/
+theorem findWotsChainWitness_isSome_of_lt (prims : Primitives p) [DecidableEq prims.Y]
+    (sig : WotsSig p prims.core) (msg : prims.Y) (sig' : WotsSig p prims.core) (msg' : prims.Y)
+    (pk : prims.PkSeed) (adrs : Adrs) (i : Fin p.len)
+    (hlt : chainStepsCore prims.core msg i.val < chainStepsCore prims.core msg' i.val)
+    (hend : chain prims pk (wotsChainAdrs adrs i.val) sig[i.val]
+          (chainStepsCore prims.core msg i.val)
+          (p.w - 1 - chainStepsCore prims.core msg i.val) =
+        chain prims pk (wotsChainAdrs adrs i.val) sig'[i.val]
+          (chainStepsCore prims.core msg' i.val)
+          (p.w - 1 - chainStepsCore prims.core msg' i.val)) :
+    (findWotsChainWitness prims sig msg sig' msg' pk adrs i).isSome := by
+  rw [findWotsChainWitness]
+  simp only [hlt, if_true]
+  split
+  · simp
+  · rename_i hadv
+    have hcomp : chain prims pk (wotsChainAdrs adrs i.val)
+          (chain prims pk (wotsChainAdrs adrs i.val) sig[i.val]
+            (chainStepsCore prims.core msg i.val)
+            (chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val))
+          (chainStepsCore prims.core msg' i.val)
+          (p.w - 1 - chainStepsCore prims.core msg' i.val) =
+        chain prims pk (wotsChainAdrs adrs i.val) sig'[i.val]
+          (chainStepsCore prims.core msg' i.val)
+          (p.w - 1 - chainStepsCore prims.core msg' i.val) := by
+      have h := chain_compose prims pk (wotsChainAdrs adrs i.val) sig[i.val]
+        (chainStepsCore prims.core msg i.val)
+        (chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val)
+        (p.w - 1 - chainStepsCore prims.core msg' i.val)
+      rw [show chainStepsCore prims.core msg i.val +
+          (chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val) =
+        chainStepsCore prims.core msg' i.val by omega,
+        show chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val +
+          (p.w - 1 - chainStepsCore prims.core msg' i.val) =
+        p.w - 1 - chainStepsCore prims.core msg i.val by
+          have := chainStepsCore_le prims.core msg' i.val; omega] at h
+      rw [h, hend]
+    have := findChainDivergence_isSome_of_ne prims pk (wotsChainAdrs adrs i.val) _ _
+      (chainStepsCore prims.core msg' i.val)
+      (p.w - 1 - chainStepsCore prims.core msg' i.val) hadv hcomp
+    rw [Option.isSome_map]
+    exact this
+
 /-- **Extractor soundness.**  A witness returned by `findWotsWitness` satisfies
-`WotsWitness.Valid` against the chain ends `sig'` recovers on `msg'` and against `sig'` itself.
+`WotsWitness.Valid` against the chain ends `sig'` recovers on `msg'`, the honest signature `sig'`,
+and the message `msg'` it signs.
 
 The public-key hypothesis is used only by the `T_len` branch, where it supplies the equality of the
 two compressions; `findWotsChainWitness_sound` is the hypothesis-free statement for the two chain
@@ -467,7 +577,7 @@ theorem findWotsWitness_sound (prims : Primitives p) [DecidableEq prims.Y]
     (hpk : wotsPkFromSig prims sig msg pk adrs = wotsPkFromSig prims sig' msg' pk adrs)
     {w : WotsWitness p prims}
     (hw : findWotsWitness prims sig msg sig' msg' pk adrs = some w) :
-    w.Valid pk adrs (wotsPkFromSigTops prims sig' msg' pk adrs) sig' := by
+    w.Valid pk adrs (wotsPkFromSigTops prims sig' msg' pk adrs) sig' msg' := by
   rw [findWotsWitness] at hw
   split at hw
   · obtain ⟨i, _, hi⟩ := List.exists_of_findSome?_eq_some hw
@@ -484,7 +594,8 @@ either the two signatures recover different chain ends, and the `T_len` branch f
 recover the same chain ends and `wotsPkFromSigTops_cases` supplies a chain that yields one.
 
 No public-key hypothesis is needed to make the search *succeed*.  It is `findWotsWitness_sound`
-that needs the two recovered public keys to agree, and only for the `T_len` branch.
+that needs the two recovered public keys to agree, and only for the `T_len` branch.  The
+chain-level half of the argument is `findWotsChainWitness_isSome_of_lt`.
 
 *Deterministic inclusion.* -/
 theorem findWotsWitness_isSome (valid : p.Valid) (prims : Primitives p) [DecidableEq prims.Y]
@@ -495,48 +606,18 @@ theorem findWotsWitness_isSome (valid : p.Valid) (prims : Primitives p) [Decidab
   rw [findWotsWitness]
   split
   · rename_i htops
-    obtain ⟨i, hlt, hcase⟩ :=
+    obtain ⟨i, hlt, -⟩ :=
       wotsPkFromSigTops_cases valid prims laws sig sig' msg msg' pk adrs hne htops
-    have hchain : (findWotsChainWitness prims sig msg sig' msg' pk adrs i).isSome := by
-      have hend : chain prims pk (wotsChainAdrs adrs i.val) sig[i.val]
-            (chainStepsCore prims.core msg i.val)
-            (p.w - 1 - chainStepsCore prims.core msg i.val) =
-          chain prims pk (wotsChainAdrs adrs i.val) sig'[i.val]
-            (chainStepsCore prims.core msg' i.val)
-            (p.w - 1 - chainStepsCore prims.core msg' i.val) := by
-        have := congrArg (fun v : Vector prims.Y p.len => v[i.val]) htops
-        simpa only [wotsPkFromSigTops_eq_ofFn, Vector.getElem_ofFn] using this
-      rw [findWotsChainWitness]
-      simp only [hlt, if_true]
-      split
-      · simp
-      · rename_i hadv
-        have hcomp : chain prims pk (wotsChainAdrs adrs i.val)
-              (chain prims pk (wotsChainAdrs adrs i.val) sig[i.val]
-                (chainStepsCore prims.core msg i.val)
-                (chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val))
-              (chainStepsCore prims.core msg' i.val)
-              (p.w - 1 - chainStepsCore prims.core msg' i.val) =
-            chain prims pk (wotsChainAdrs adrs i.val) sig'[i.val]
-              (chainStepsCore prims.core msg' i.val)
-              (p.w - 1 - chainStepsCore prims.core msg' i.val) := by
-          have h := chain_compose prims pk (wotsChainAdrs adrs i.val) sig[i.val]
-            (chainStepsCore prims.core msg i.val)
-            (chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val)
-            (p.w - 1 - chainStepsCore prims.core msg' i.val)
-          rw [show chainStepsCore prims.core msg i.val +
-              (chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val) =
-            chainStepsCore prims.core msg' i.val by omega,
-            show chainStepsCore prims.core msg' i.val - chainStepsCore prims.core msg i.val +
-              (p.w - 1 - chainStepsCore prims.core msg' i.val) =
-            p.w - 1 - chainStepsCore prims.core msg i.val by
-              have := chainStepsCore_le prims.core msg' i.val; omega] at h
-          rw [h, hend]
-        have := findChainDivergence_isSome_of_ne prims pk (wotsChainAdrs adrs i.val) _ _
+    have hend : chain prims pk (wotsChainAdrs adrs i.val) sig[i.val]
+          (chainStepsCore prims.core msg i.val)
+          (p.w - 1 - chainStepsCore prims.core msg i.val) =
+        chain prims pk (wotsChainAdrs adrs i.val) sig'[i.val]
           (chainStepsCore prims.core msg' i.val)
-          (p.w - 1 - chainStepsCore prims.core msg' i.val) hadv hcomp
-        rw [Option.isSome_map]
-        exact this
+          (p.w - 1 - chainStepsCore prims.core msg' i.val) := by
+      have := congrArg (fun v : Vector prims.Y p.len => v[i.val]) htops
+      simpa only [wotsPkFromSigTops_eq_ofFn, Vector.getElem_ofFn] using this
+    have hchain : (findWotsChainWitness prims sig msg sig' msg' pk adrs i).isSome :=
+      findWotsChainWitness_isSome_of_lt prims sig msg sig' msg' pk adrs i hlt hend
     obtain ⟨w, hwv⟩ := Option.isSome_iff_exists.mp hchain
     have : ((List.finRange p.len).findSome?
         (findWotsChainWitness prims sig msg sig' msg' pk adrs)) ≠ none := by
@@ -549,11 +630,24 @@ theorem findWotsWitness_isSome (valid : p.Valid) (prims : Primitives p) [Decidab
 /-! ## Ledger membership and encoded distinctness
 
 *Transcript transport.*  Every address a witness names at a reachable WOTS+ instance is a member
-of the slice-1 role ledger for its role, and — under `EncodedTargetLedgerConditions` — distinct
-witness addresses carry distinct encoded tweaks.  The `T_len` witness address is listed by
-`mem_wotsPkAddresses` as it stands, so only the chain-step addresses need restating here.  These
-are statements about the ledgers, not about any execution: nothing here says a logged query carried
-the witness values. -/
+of the slice-1 role ledger it is submitted against, and — under `EncodedTargetLedgerConditions` —
+distinct addresses of one ledger carry distinct encoded tweaks.  The three roles are reached
+separately, because they have three different ledgers:
+
+* the `fCollision` witness attacks `wotsFTcr`, whose ledger is `wotsStepAddresses`
+  (`mem_wotsStepAddresses_of_lt`, `wotsStepAdrsKey_injective`);
+* the `fPreimage` witness attacks `wotsFPre`, whose ledger is the one-step-per-chain
+  `optionalWotsAddresses` of the selection the reduction makes
+  (`wotsPreimageAdrs_mem_optionalWotsAddresses`, `wotsOptionalStepAdrsKey_injective`); its address
+  is also a `wotsStepAddresses` member (`wotsPreimageAdrs_mem_wotsStepAddresses`), which is a
+  weaker statement about a different role's ledger and not what a PRE reduction consumes;
+* the `tlCollision` witness attacks `wotsTl`, whose ledger is `wotsPkAddresses`; its address is
+  literally `wotsPkAdrs (wotsInstanceAdrs pos)`, which `mem_wotsPkAddresses` already lists, so
+  that lemma is used directly rather than restated.
+
+These are statements about the ledgers, not about any execution: nothing here says a logged query
+carried the witness values, and which chain a PRE reduction selects is its own choice, carried
+here as the `select` argument. -/
 
 variable {vp : ValidatedParams}
 
@@ -567,15 +661,30 @@ theorem mem_wotsStepAddresses_of_lt (pos : LayerPosition vp) (i : Fin vp.params.
 
 /-- The `F`-preimage branch of `chainPair_cases` names the address one step below the honest
 digit; on a reachable instance it is a listed `wotsFTcr` target, because the honest digit is a
-genuine base-`w` digit and is strictly above the forged one. -/
-theorem wotsPreimageAdrs_mem_wotsStepAddresses (prims : Primitives vp.params)
-    (pos : LayerPosition vp) (i : Fin vp.params.len) (msg msg' : prims.Y)
-    (hlt : chainStepsCore prims.core msg i.val < chainStepsCore prims.core msg' i.val) :
+genuine base-`w` digit.  The caller's `chainStepsCore … msg i < chainStepsCore … msg' i` supplies
+the positivity hypothesis; taking it in this weaker form drops the forged message from the
+statement. -/
+theorem wotsPreimageAdrs_mem_wotsStepAddresses {prims : Primitives vp.params}
+    (pos : LayerPosition vp) (i : Fin vp.params.len) (msg' : prims.Y)
+    (hpos : 0 < chainStepsCore prims.core msg' i.val) :
     (wotsChainAdrs (wotsInstanceAdrs pos) i.val).setHashAddress
         (chainStepsCore prims.core msg' i.val - 1) ∈ wotsStepAddresses vp := by
   refine mem_wotsStepAddresses_of_lt pos i ?_
   have := chainStepsCore_lt prims.core msg' i.val
   omega
+
+/-- The `F`-preimage witness's own role ledger.  A PRE reduction picks at most one hash step per
+chain, and at a chain whose selected step is the one below the honest digit the witness address is
+a listed `wotsFPre` target of that selection. -/
+theorem wotsPreimageAdrs_mem_optionalWotsAddresses {prims : Primitives vp.params}
+    (pos : LayerPosition vp) (i : Fin vp.params.len) (msg' : prims.Y)
+    (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1)))
+    {step : Fin (vp.params.w - 1)} (hsel : select (pos, i) = some step)
+    (hstep : step.val = chainStepsCore prims.core msg' i.val - 1) :
+    (wotsChainAdrs (wotsInstanceAdrs pos) i.val).setHashAddress
+        (chainStepsCore prims.core msg' i.val - 1) ∈ optionalWotsAddresses vp select := by
+  have hmem := mem_optionalWotsAddresses vp select (pos, i) hsel
+  rwa [wotsStepAdrs, hstep] at hmem
 
 /-- Under the encoded-ledger conditions, distinct WOTS+ chain-step coordinates carry distinct
 encoded tweaks: two witnesses naming different `(instance, chain, step)` triples attack different
@@ -592,6 +701,23 @@ theorem wotsStepAdrsKey_injective {prims : Primitives vp.params}
     (wotsStepAddresses_nodup vp)).1 conditions.wotsFTcr
   exact wotsStepAdrs_injective vp
     (hinj _ (mem_wotsStepAddresses vp c.1 c.2) _ (mem_wotsStepAddresses vp d.1 d.2) hcd)
+
+/-- Under the encoded-ledger conditions, two chains a PRE selection retains carry distinct encoded
+tweaks: two `fPreimage` witnesses at different chains of one selection attack different tweaks of
+`wotsFPreCProblem`.  The selection is the reduction's own, and the conditions are consumed at it
+rather than assumed afresh. -/
+theorem wotsOptionalStepAdrsKey_injective {prims : Primitives vp.params}
+    (conditions : EncodedTargetLedgerConditions vp prims)
+    (select : WotsChainCoord vp → Option (Fin (vp.params.w - 1)))
+    {c d : WotsChainCoord vp} {sc sd : Fin (vp.params.w - 1)}
+    (hc : select c = some sc) (hd : select d = some sd)
+    (hkey : prims.adrsToKey (wotsStepAdrs c sc) = prims.adrsToKey (wotsStepAdrs d sd)) :
+    c = d := by
+  have hinj := (encodeTargets_nodup_iff_injOn prims (optionalWotsAddresses vp select)
+    (optionalWotsAddresses_nodup vp select)).1 (conditions.wotsFPre select)
+  exact congrArg Prod.fst (wotsStepAdrs_injective vp (a₁ := (c, sc)) (a₂ := (d, sd))
+    (hinj _ (mem_optionalWotsAddresses vp select c hc) _
+      (mem_optionalWotsAddresses vp select d hd) hkey))
 
 /-- Under the encoded-ledger conditions, distinct WOTS+ instances carry distinct encoded
 compression tweaks: two `T_len` witnesses at different instances attack different tweaks of
@@ -613,43 +739,53 @@ theorem wotsPkAdrsKey_injective {prims : Primitives vp.params}
 `WotsWitness.Valid` is stated in the construction's own vocabulary (`prims.F`, `prims.Tl` at a
 structural `Adrs`).  These three bridges rewrite it into the canonical games' `eval` vocabulary at
 the encoded tweak, using the attacked-member equations of `HashSig.SLHDSA.Security.CanonicalGames`.
-They change presentation only: no game is played and no advantage is stated. -/
+Each takes explicitly only the honest objects its own branch mentions; the others are implicit and
+read off the hypothesis.  They change presentation only: no game is played and no advantage is
+stated. -/
 
 variable (prims : Primitives p)
 
 /-- The `F`-preimage branch, read in `wotsFPreCProblem`'s vocabulary: the submitted value evaluates
-to the honest revealed chain value at the encoded chain-step tweak. -/
+to the honest revealed chain value at the encoded chain-step tweak, at the step the honest signer
+hashed to reach it. -/
 theorem wotsWitness_valid_fPreimage_eval [SampleableType prims.PkSeed] (pk : prims.PkSeed)
-    (adrs : Adrs) (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core)
-    (i : Fin p.len) (step : ℕ) (value : prims.Y)
-    (h : (WotsWitness.fPreimage i step value).Valid pk adrs honestTops honestSig) :
-    step < p.w - 1 ∧
+    (adrs : Adrs) {honestTops : Vector prims.Y p.len} (honestSig : WotsSig p prims.core)
+    (honestMsg : prims.Y) (i : Fin p.len) (step : ℕ) (value : prims.Y)
+    (h : (WotsWitness.fPreimage i step value).Valid pk adrs honestTops honestSig honestMsg) :
+    step < p.w - 1 ∧ step + 1 = chainStepsCore prims.core honestMsg i.val ∧
       (wotsFPreCProblem prims).th.eval pk
           (prims.adrsToKey ((wotsChainAdrs adrs i.val).setHashAddress step)) value =
         honestSig[i.val] :=
-  ⟨h.1, by rw [wotsFPreCProblem_eval_adrsToKey]; exact h.2⟩
+  ⟨h.1, h.2.1, by rw [wotsFPreCProblem_eval_adrsToKey]; exact h.2.2⟩
 
-/-- The `F`-collision branch, read in `wotsFTcrCProblem`'s vocabulary: two distinct values with the
-same evaluation at the encoded chain-step tweak. -/
+/-- The `F`-collision branch, read in `wotsFTcrCProblem`'s vocabulary: the submitted value and the
+honest chain value at the named step are distinct and evaluate equally at the encoded chain-step
+tweak. -/
 theorem wotsWitness_valid_fCollision_eval [SampleableType prims.PkSeed] (pk : prims.PkSeed)
-    (adrs : Adrs) (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core)
-    (i : Fin p.len) (step : ℕ) (value target : prims.Y)
-    (h : (WotsWitness.fCollision i step value target).Valid pk adrs honestTops honestSig) :
-    step < p.w - 1 ∧ value ≠ target ∧
+    (adrs : Adrs) {honestTops : Vector prims.Y p.len} (honestSig : WotsSig p prims.core)
+    (honestMsg : prims.Y) (i : Fin p.len) (step : ℕ) (value : prims.Y)
+    (h : (WotsWitness.fCollision i step value).Valid pk adrs honestTops honestSig honestMsg) :
+    step < p.w - 1 ∧ chainStepsCore prims.core honestMsg i.val ≤ step ∧
+      value ≠ chain prims pk (wotsChainAdrs adrs i.val) honestSig[i.val]
+          (chainStepsCore prims.core honestMsg i.val)
+          (step - chainStepsCore prims.core honestMsg i.val) ∧
       (wotsFTcrCProblem prims).th.eval pk
           (prims.adrsToKey ((wotsChainAdrs adrs i.val).setHashAddress step)) value =
         (wotsFTcrCProblem prims).th.eval pk
-          (prims.adrsToKey ((wotsChainAdrs adrs i.val).setHashAddress step)) target :=
-  ⟨h.1, h.2.1, by
+          (prims.adrsToKey ((wotsChainAdrs adrs i.val).setHashAddress step))
+          (chain prims pk (wotsChainAdrs adrs i.val) honestSig[i.val]
+            (chainStepsCore prims.core honestMsg i.val)
+            (step - chainStepsCore prims.core honestMsg i.val)) :=
+  ⟨h.1, h.2.1, h.2.2.1, by
     rw [wotsFTcrCProblem_eval_adrsToKey, wotsFTcrCProblem_eval_adrsToKey]
-    exact h.2.2⟩
+    exact h.2.2.2⟩
 
 /-- The `T_len` branch, read in `wotsTlTcrCProblem`'s vocabulary: two distinct chain-end vectors
 with the same evaluation at the encoded compression tweak. -/
 theorem wotsWitness_valid_tlCollision_eval [SampleableType prims.PkSeed] (pk : prims.PkSeed)
-    (adrs : Adrs) (honestTops : Vector prims.Y p.len) (honestSig : WotsSig p prims.core)
-    (recovered : Vector prims.Y p.len)
-    (h : (WotsWitness.tlCollision recovered).Valid pk adrs honestTops honestSig) :
+    (adrs : Adrs) (honestTops : Vector prims.Y p.len) {honestSig : WotsSig p prims.core}
+    {honestMsg : prims.Y} (recovered : Vector prims.Y p.len)
+    (h : (WotsWitness.tlCollision recovered).Valid pk adrs honestTops honestSig honestMsg) :
     recovered ≠ honestTops ∧
       (wotsTlTcrCProblem prims).th.eval pk (prims.adrsToKey (wotsPkAdrs adrs)) recovered =
         (wotsTlTcrCProblem prims).th.eval pk (prims.adrsToKey (wotsPkAdrs adrs)) honestTops :=
