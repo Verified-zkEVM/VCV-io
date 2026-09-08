@@ -23,7 +23,7 @@ universe u v
 variable {m : Type u → Type v} [EvalDistSemantics m]
     {α : Type u} [MeasurableSpace α]
 
-/-- Evaluate a distribution with failure to return recorded as `none` and returned values as `some`. -/
+/-- Evaluate a distribution with `none` for failure to return and `some` for returned values. -/
 noncomputable def evalDistWithFailure (program : m α) : Measure (Option α) :=
   (evalDist program).withFailure
 

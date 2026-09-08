@@ -110,4 +110,26 @@ theorem run_bind (program : OracleComp Surface α)
       Γ.run program >>= fun a => Γ.resume a next := by
   simp only [run, runFrom_bind, bind_assoc]
 
+/-- A generated result's output and surface log belong to the original logged program's
+structural support. Stateful interpretation may restrict possible answers, but cannot invent a
+surface execution. No probability-spec assumption is required. -/
+theorem mem_support_logged_of_generatedBy (program : OracleComp Surface α)
+    (result : RunResult Γ α) (generated : Γ.GeneratedBy program result) :
+    (result.output, result.trace) ∈ support program.withQueryLog := by
+  rw [GeneratedBy, run_eq, mem_support_bind_iff] at generated
+  obtain ⟨s, _, reached⟩ := generated
+  have observed : (result.output, result.state, result.trace) ∈ support
+      ((fun a : RunResult Γ α => (a.output, a.state, a.trace)) <$> Γ.runFrom s program) := by
+    rw [support_map]
+    exact Set.mem_image_of_mem _ reached
+  rw [runFrom_observe, support_map] at observed
+  obtain ⟨⟨⟨out, trace⟩, finalState⟩, hrun, heq⟩ := observed
+  have hlogged : (out, trace) ∈ support program.withQueryLog := by
+    apply OracleComp.support_simulateQ_run'_subset Γ.handler program.withQueryLog s
+    rw [StateT.run'_eq, support_map]
+    exact Set.mem_image_of_mem Prod.fst hrun
+  have same : (out, trace) = (result.output, result.trace) := by
+    simpa only [Prod.mk.injEq] using congrArg (fun p => (p.1, p.2.2)) heq
+  exact same ▸ hlogged
+
 end OracleRuntime
