@@ -232,16 +232,10 @@ theorem base2b_msg_eq_digitsOfBaseW {p : Params} (valid : p.Valid) (x : List Byt
     rw [hx, valid.len1_mul_lgw]
   rw [base2b_bigEndian x p.lgw p.len1 hbits, digitsOfBaseW_eq_range]
   apply List.map_congr_left
-  intro i hi
-  have hi' : i < p.len1 := List.mem_range.mp hi
-  have hsplit : p.len1 = (p.len1 - 1 - i) + (i + 1) := by omega
-  have hmul : p.lgw * p.len1 = p.lgw * (p.len1 - 1 - i) + p.lgw * (i + 1) := by
-    calc
-      p.lgw * p.len1 = p.lgw * ((p.len1 - 1 - i) + (i + 1)) := congrArg (p.lgw * ·) hsplit
-      _ = p.lgw * (p.len1 - 1 - i) + p.lgw * (i + 1) := Nat.mul_add _ _ _
+  intro i _
   have hexp : 8 * x.length - p.lgw * (i + 1) = p.lgw * (p.len1 - 1 - i) := by
-    rw [hx, ← valid.len1_mul_lgw, Nat.mul_comm p.len1 p.lgw]
-    omega
+    rw [hx, ← valid.len1_mul_lgw, Nat.mul_comm p.len1 p.lgw, ← Nat.mul_sub, Nat.sub_sub,
+      Nat.add_comm]
   rw [hexp, Params.w, ← pow_mul]
 
 /-- The base-`w` value of the message digits is the message's integer value. -/
@@ -255,16 +249,16 @@ theorem fromBaseW_base2b_msg {p : Params} (valid : p.Valid) (x : List Byte)
 
 /-- Full-width message-digit injectivity: two `n`-byte messages with the same `len1` base-`w`
 digits are equal. -/
-theorem base2b_msg_inj {p : Params} (valid : p.Valid) {x y : List Byte}
+theorem eq_of_base2b_msg_eq {p : Params} (valid : p.Valid) {x y : List Byte}
     (hx : x.length = p.n) (hy : y.length = p.n)
     (h : base2b x p.lgw p.len1 = base2b y p.lgw p.len1) : x = y := by
-  apply toInt_inj_of_length_eq (hx.trans hy.symm)
+  apply eq_of_length_eq_of_toInt_eq (hx.trans hy.symm)
   rw [← fromBaseW_base2b_msg valid x hx, ← fromBaseW_base2b_msg valid y hy, h]
 
 /-- Full-width message-digit injectivity on the fixed-width byte type. -/
 theorem base2b_msg_injective {p : Params} (valid : p.Valid) :
     Function.Injective (fun bytes : Bytes p.n => base2b bytes.toList p.lgw p.len1) := by
   intro x y h
-  exact Vector.toList_inj.mp (base2b_msg_inj valid (by simp) (by simp) h)
+  exact Vector.toList_inj.mp (eq_of_base2b_msg_eq valid (by simp) (by simp) h)
 
 end SLHDSA.WotsEncoding

@@ -230,7 +230,8 @@ def oneNode : limitedCore.Y := Vector.replicate limited.n 1
 theorem zeroNode_ne_oneNode : zeroNode ≠ oneNode := fun h =>
   absurd (congrArg (fun v : Bytes limited.n => v.toList) h) (by decide)
 
-/-- The two nodes are distinct, so `chainStepsCore_two_encodings` applies to them. -/
+/-- The two nodes are distinct, so `chainStepsCore_two_encodings` applies to them (a type
+check of the instantiated statement, not a computational canary). -/
 example : ∃ i, i < limited.len ∧
     chainStepsCore limitedCore zeroNode i < chainStepsCore limitedCore oneNode i :=
   chainStepsCore_two_encodings limited_valid limitedCore_byteLaws zeroNode_ne_oneNode
@@ -238,6 +239,11 @@ example : ∃ i, i < limited.len ∧
 /-- Concretely, digit `3` (the low two bits of the first byte) witnesses the strict increase. -/
 example :
     chainStepsCore limitedCore zeroNode 3 = 0 ∧ chainStepsCore limitedCore oneNode 3 = 1 := by
+  decide
+
+/-- The checksum digit at index `len1 = 64` witnesses the reverse inequality (`2 < 3`), so
+neither node's chain-length vector is pointwise `≤` the other. -/
+example : chainStepsCore limitedCore oneNode 64 < chainStepsCore limitedCore zeroNode 64 := by
   decide
 
 /-- Distinct nodes give distinct message-digit vectors. -/

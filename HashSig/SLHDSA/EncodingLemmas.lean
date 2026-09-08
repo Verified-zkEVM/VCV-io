@@ -100,7 +100,7 @@ theorem toByte_toInt (x : List Byte) : toByte (toInt x) x.length = x := by
         show (toInt xs * 256 + b.toNat) % 256 = b.toNat by omega, ih, UInt8.ofNat_toNat]
 
 /-- Algorithm 2 is injective on byte strings of a common width. -/
-theorem toInt_inj_of_length_eq {x y : List Byte} (hlen : x.length = y.length)
+theorem eq_of_length_eq_of_toInt_eq {x y : List Byte} (hlen : x.length = y.length)
     (h : toInt x = toInt y) : x = y := by
   rw [← toByte_toInt x, ← toByte_toInt y, hlen, h]
 
