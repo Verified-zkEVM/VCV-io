@@ -19,7 +19,7 @@ SHA-3 / SHAKE primitives to produce fully executable `NTTRingOps`, `Encoding`, a
 instances for ML-KEM.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLKEM.Concrete
@@ -120,13 +120,13 @@ def concretePrimitives (params : Params) (encoding : Encoding params)
 /-! ## Assembled ML-KEM-768 bundle -/
 
 /-- Concrete encoding for ML-KEM-768. -/
-def mlkem768Encoding : Encoding mlkem768 := concreteEncoding mlkem768
+abbrev mlkem768Encoding : Encoding mlkem768 := concreteEncoding mlkem768
 
 /-- Concrete encoding for ML-KEM-512. -/
-def mlkem512Encoding : Encoding mlkem512 := concreteEncoding mlkem512
+abbrev mlkem512Encoding : Encoding mlkem512 := concreteEncoding mlkem512
 
 /-- Concrete encoding for ML-KEM-1024. -/
-def mlkem1024Encoding : Encoding mlkem1024 := concreteEncoding mlkem1024
+abbrev mlkem1024Encoding : Encoding mlkem1024 := concreteEncoding mlkem1024
 
 /-- Encoding roundtrip laws for ML-KEM-512. -/
 theorem mlkem512EncodingLaws : mlkem512Encoding.Laws :=

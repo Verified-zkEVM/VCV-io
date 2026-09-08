@@ -959,12 +959,24 @@ private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
     (outer := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal))
     (inner := implW) (oa := adv.main pk), hmap]
   let : DecidableEq (Commit × Resp) := Classical.decEq _
-  conv_lhs =>
-    simp [implS, baseS, fsBaseImpl, cmaRealFixedSign, SourceSigAlg, FiatShamir,
-      randomOracle, QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
-  conv_rhs =>
-    simp [implS, baseS, fsBaseImpl, cmaRealFixedSign, SourceSigAlg, FiatShamir,
-      randomOracle, QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
+  simp only [implS, StateT.run_map, map_bind]
+  rw [bind_map_left]
+  simp only [baseS]
+  refine bind_congr (m := ProbComp) fun a => ?_
+  rcases a with ⟨⟨⟨msg, ⟨c, resp⟩⟩, log⟩, cache⟩
+  simp only [SourceSigAlg, FiatShamir, HasQuery.instOfMonadLift_query,
+    bind_pure_comp, simulateQ_map, StateT.run_map]
+  simp only [fsBaseImpl, QueryImpl.simulateQ_add_liftM_query_right]
+  simp only [simulateQ_pure, StateT.run_pure]
+  simp only [map_pure, QueryLog.wasQueried_eq_decide_mem_map_fst]
+  change _ = do
+    let result ← (fun p : Chal × RoCache M Commit Chal =>
+      (σ.verify pk c p.1 resp, p.2)) <$>
+      ((randomOracle : QueryImpl (roSpec M Commit Chal) _) (msg, c)).run cache
+    pure (!decide (msg ∈ log.map (fun e :
+      (t : (signSpec M Commit Resp).Domain) × (signSpec M Commit Resp).Range t => e.fst)) &&
+      result.1)
+  rfl
 
 private theorem runtime_evalSPMF_postKeygenFreshWriterComp_eq
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) (pk : Stmt) (sk : Wit) :

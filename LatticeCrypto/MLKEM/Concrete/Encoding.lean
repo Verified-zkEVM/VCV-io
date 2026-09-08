@@ -25,10 +25,6 @@ namespace MLKEM.Concrete
 
 open MLKEM
 
-local instance : NeZero modulus := by
-  unfold modulus
-  exact ⟨by decide⟩
-
 /-! ## Bit-level helpers -/
 
 /-- Extract the `j`-th bit (LSB = 0) of a byte. -/
@@ -39,12 +35,32 @@ private def bitOf (b : UInt8) (j : Nat) : Nat :=
 private def packByte (bits : Fin 8 → Nat) : UInt8 :=
   (Nat.ofDigits 2 (List.ofFn bits)).toUInt8
 
--- These finite bit-twiddling identities are auxiliary byte-level facts.
-set_option maxRecDepth 1200 in
 private theorem bitOf_packByte_fin :
     ∀ bits : Fin 8 → Fin 2, ∀ j : Fin 8,
       bitOf (packByte fun i => (bits i).val) j.val = (bits j).val := by
-  intro bits j; fin_cases j <;> revert bits <;> decide
+  intro bits j
+  let digits := List.ofFn fun i => (bits i).val
+  have hdigits : ∀ x ∈ digits, x < 2 := by
+    intro x hx
+    obtain ⟨i, rfl⟩ := List.mem_ofFn.mp hx
+    exact (bits i).isLt
+  have hvalue : Nat.ofDigits 2 digits < 2 ^ 8 := by
+    simpa [digits] using Nat.ofDigits_lt_base_pow_length (by decide) hdigits
+  have hj : j.val.toUInt8.toNat = j.val := by
+    rw [UInt8.toNat_ofNat']
+    exact Nat.mod_eq_of_lt (Nat.lt_trans j.isLt (by decide))
+  have hhead : (digits.drop j.val).head! = (bits j).val := by
+    rw [List.head!_eq_getElem!, List.getElem!_eq_getElem?_getD, List.getElem?_drop]
+    simp only [Nat.add_zero]
+    rw [List.getElem?_eq_getElem (by simp [digits, j.isLt])]
+    exact List.getElem_ofFn (by simp [j.isLt])
+  unfold bitOf packByte
+  simp only [UInt8.toNat_and, UInt8.toNat_shiftRight]
+  rw [UInt8.toNat_ofNat', Nat.mod_eq_of_lt hvalue, hj,
+    Nat.mod_eq_of_lt j.isLt, show (1 : UInt8).toNat = 1 from rfl,
+    Nat.and_one_is_mod, Nat.shiftRight_eq_div_pow,
+    Nat.ofDigits_div_pow_eq_ofDigits_drop j.val (by decide) digits hdigits,
+    Nat.ofDigits_mod_eq_head!, hhead, Nat.mod_eq_of_lt (bits j).isLt]
 
 private theorem bitOf_lt_two (b : UInt8) (j : Nat) : bitOf b j < 2 := by
   unfold bitOf
@@ -231,9 +247,9 @@ private theorem digitsAppend_two_one_getD_zero_mod (n : Nat) :
     (Nat.digitsAppend 2 1 (n % 2 ^ 1)).getD 0 0 = n % 2 := by
   simpa [Nat.pow_one] using digitsAppend_two_one_getD_zero ⟨n % 2, Nat.mod_lt _ (by decide)⟩
 
-/-! ## ByteEncode / ByteDecode (Algorithms 4–5) -/
+/-! ## ByteEncode / ByteDecode (Algorithms 5–6) -/
 
-/-- FIPS 203 Algorithm 4: encode 256 `d`-bit coefficients into `32d` bytes. -/
+/-- FIPS 203 Algorithm 5: encode 256 `d`-bit coefficients into `32d` bytes. -/
 def byteEncode (d : Nat) (f : Rq) : ByteArray :=
   let bits : Array Nat := Array.ofFn fun idx : Fin (ringDegree * d) =>
     let coeff := idx.val / d
@@ -252,14 +268,15 @@ def byteEncode (d : Nat) (f : Rq) : ByteArray :=
     coeffBits.getD bit 0
   bitsToBytes bits
 
-/-- FIPS 203 Algorithm 5: decode `32d` bytes into 256 coefficients. -/
+/-- FIPS 203 Algorithm 6: decode `32d` bytes into 256 coefficients. -/
 def byteDecode (d : Nat) (bytes : ByteArray) : Rq :=
   let bits := bytesToBits bytes
   Vector.ofFn fun idx =>
     let coeffBits := List.ofFn fun j : Fin d => bits.getD (idx.val * d + j.val) 0
     ((Nat.ofDigits 2 coeffBits : Nat) : Coeff)
 
-private theorem byteEncode_size (d : Nat) (f : Rq) :
+/-- `byteEncode d` always produces exactly `32 * d` bytes (FIPS 203 Algorithm 5). -/
+theorem byteEncode_size (d : Nat) (f : Rq) :
     (byteEncode d f).size = 32 * d := by
   let bits : Array Nat := Array.ofFn fun idx : Fin (ringDegree * d) =>
     let coeff := idx.val / d
@@ -492,11 +509,11 @@ private def byteDecode12VecPoly {k : Nat} (bytes : ByteArray) (poly : Fin k) : T
 
 private theorem decode12Pair_fst {a b : Nat} (ha : a < 4096) :
     a % 256 + 256 * ((a / 256 + 16 * (b % 16)) % 16) = a := by
-  grind
+  omega
 
 private theorem decode12Pair_snd {a b : Nat} (ha : a < 4096) :
     (a / 256 + 16 * (b % 16)) / 16 + 16 * (b / 16) = b := by
-  grind
+  omega
 
 private theorem getByteD_eq_getElem {bytes : ByteArray} {i : Nat} (hi : i < bytes.size) :
     getByteD bytes i = bytes[i] := by
@@ -519,6 +536,11 @@ private theorem tq_getElem_eq_coeffs (f : Tq) {i : Nat} (hi : i < ringDegree) :
 /-- Encode a vector of `k` polynomials with 12-bit coefficients. -/
 def byteEncode12Vec {k : Nat} (v : TqVec k) : ByteArray :=
   ByteArray.mk <| Array.ofFn (byteEncode12VecByte v)
+
+/-- The 12-bit packing of `k` NTT-domain polynomials occupies exactly `384 * k` bytes. -/
+theorem byteEncode12Vec_size {k : Nat} (v : TqVec k) :
+    (byteEncode12Vec v).size = 384 * k := by
+  simp [byteEncode12Vec, ByteArray.size]
 
 private theorem getByteD_byteEncode12Vec {k : Nat} (v : TqVec k) {poly j : Nat}
     (hpoly : poly < k) (hj : j < 384) :
@@ -756,6 +778,11 @@ def byteEncodeVec (d : Nat) {k : Nat} (v : RqVec k) : ByteArray :=
         Nat.div_lt_of_lt_mul idx.isLt
       have hbyte : byte < chunkSize := Nat.mod_lt _ hchunk
       getByteD (byteEncode d (v[poly]'hpoly)) byte
+
+/-- Encoding `k` polynomials with `d`-bit coefficients occupies exactly `32 * d * k` bytes. -/
+theorem byteEncodeVec_size (d : Nat) {k : Nat} (v : RqVec k) :
+    (byteEncodeVec d v).size = 32 * d * k := by
+  simp [byteEncodeVec, ByteArray.size]
 
 /-- Decode a byte array into a vector of `k` polynomials with `d`-bit coefficients. -/
 def byteDecodeVec (d k : Nat) (bytes : ByteArray) : RqVec k :=
@@ -1041,6 +1068,65 @@ private theorem byteDecode1Msg_byteEncode1Msg_of_bound (f : Rq)
   byteEncode1 := byteEncode1Msg
   byteDecode1 := byteDecode1Msg
 
+/-! ### Decidable equality on the concrete encoded types
+
+Every generic KEM entry point (`encapsulationKeyCheck`, `encaps`, `decaps`, `asKEMScheme`)
+requires `DecidableEq` on the encoded component types. The concrete carriers are all
+`ByteArray`, but instance search only unfolds reducible constants, so it cannot see through
+`concreteEncoding` on its own. Stating the instances on the projections themselves lets them
+be found by unification, without any unfolding. -/
+
+instance instDecidableEqConcreteEncodingEncodedTHat (params : Params) :
+    DecidableEq (concreteEncoding params).EncodedTHat :=
+  inferInstanceAs (DecidableEq ByteArray)
+
+instance instDecidableEqConcreteEncodingEncodedU (params : Params) :
+    DecidableEq (concreteEncoding params).EncodedU :=
+  inferInstanceAs (DecidableEq ByteArray)
+
+instance instDecidableEqConcreteEncodingEncodedV (params : Params) :
+    DecidableEq (concreteEncoding params).EncodedV :=
+  inferInstanceAs (DecidableEq ByteArray)
+
+/-! ### Encoder output sizes
+
+The concrete encoders produce byte strings of fixed length, and those lengths are exactly the
+constants recorded in `Params.publicKeyBytes` and `Params.ciphertextBytes`. These laws let a
+consumer reason about the wire format of the concrete scheme without unfolding the encoders. -/
+
+/-- The concrete public-key vector encoder produces `384 * k` bytes. -/
+theorem concreteEncoding_byteEncode12Vec_size (params : Params) (t : TqVec params.k) :
+    ((concreteEncoding params).byteEncode12Vec t : ByteArray).size = 384 * params.k :=
+  byteEncode12Vec_size t
+
+/-- The concrete `u`-component encoder produces `32 * du * k` bytes. -/
+theorem concreteEncoding_byteEncodeDUVec_size (params : Params) (u : RqVec params.k) :
+    ((concreteEncoding params).byteEncodeDUVec u : ByteArray).size =
+      32 * params.du * params.k :=
+  byteEncodeVec_size params.du u
+
+/-- The concrete `v`-component encoder produces `32 * dv` bytes. -/
+theorem concreteEncoding_byteEncodeDV_size (params : Params) (v : Rq) :
+    ((concreteEncoding params).byteEncodeDV v : ByteArray).size = 32 * params.dv :=
+  byteEncode_size params.dv v
+
+/-- The encoded `u` and `v` components together fill exactly `Params.ciphertextBytes`. -/
+theorem concreteEncoding_byteEncodeDUVec_size_add_byteEncodeDV_size (params : Params)
+    (u : RqVec params.k) (v : Rq) :
+    ((concreteEncoding params).byteEncodeDUVec u : ByteArray).size +
+        ((concreteEncoding params).byteEncodeDV v : ByteArray).size =
+      params.ciphertextBytes := by
+  rw [concreteEncoding_byteEncodeDUVec_size, concreteEncoding_byteEncodeDV_size,
+    Params.ciphertextBytes]
+  ring
+
+/-- The encoded public-key vector plus the 32-byte seed `ρ` fill exactly
+`Params.publicKeyBytes`. -/
+theorem concreteEncoding_byteEncode12Vec_size_add_32 (params : Params) (t : TqVec params.k) :
+    ((concreteEncoding params).byteEncode12Vec t : ByteArray).size + 32 =
+      params.publicKeyBytes := by
+  rw [concreteEncoding_byteEncode12Vec_size, Params.publicKeyBytes]
+
 /-- Coefficients produced by the concrete ML-KEM message decoder `byteDecode1` are bit coefficients,
     represented by values below `2`. -/
 theorem byteDecode1_get_val_lt_two
@@ -1077,5 +1163,17 @@ theorem concreteEncodingLaws (params : Params)
     simpa [concreteEncoding] using
       byteDecode1Msg_byteEncode1Msg_of_bound (f := compressPoly 1 v)
         (hbound := compressPoly_bound (d := 1) hpow1 v)
+
+/-! ## Instance-resolution canaries
+
+The generic `DecidableEq` instances above must be found on the concrete encoding's projections
+directly. These compile-only checks fail at build time if the resolution path regresses. -/
+
+example : DecidableEq (concreteEncoding mlkem768).EncodedTHat := inferInstance
+example : DecidableEq (concreteEncoding mlkem768).EncodedU := inferInstance
+example : DecidableEq (concreteEncoding mlkem768).EncodedV := inferInstance
+example (v : Rq) : ((concreteEncoding mlkem768).byteEncodeDV v : ByteArray).size = 128 := by
+  rw [concreteEncoding_byteEncodeDV_size]
+  rfl
 
 end MLKEM.Concrete

@@ -66,9 +66,12 @@ When in doubt, prefer:
 All active Lean libraries and tests use the module system. Put ordinary declarations in a
 `public section` and tactic/elaborator declarations in a `public meta section`. Existing source
 files generally use `@[expose] public section` to preserve pre-migration definitional equality;
-new definitions can instead be exposed individually with `@[expose]` when unfolding is part of
-their intended public API. Executable and runtime implementation modules should use opaque
-`public section` when callers do not need to unfold their definitions.
+new files use plain `public section` and expose individual definitions with `@[expose]` when
+unfolding is part of their intended public API. CI limits broad exposure per library; see the
+[module-system guide](docs/agents/module-system.md#validation-and-coordinated-rollout) for the
+exposure check and baseline workflow.
+Executable and runtime implementation modules should use opaque `public section` when callers do
+not need to unfold their definitions.
 
 Use `public import` for a dependency that downstream importers should receive transitively,
 `public meta import` for exported compile-time dependencies, and plain `import` for a private
@@ -114,6 +117,21 @@ Do **not** use ASCII banners such as:
 
 ASCII banners are visually loud, do not appear in the generated documentation, and make the file feel partitioned in a way that the type system does not enforce. Prefer the `/-!` form, which both reads as natural prose and surfaces in `doc-gen4` output. If a section is large enough to warrant its own banner, it is usually large enough to warrant its own `namespace` or its own file.
 
+## Toolchain And Dependency Bumps
+
+The toolchain and Mathlib move together, and the other pins follow them. The order that keeps
+`lake update` idempotent (see the comment above the PolyFun `require` in `lakefile.lean`):
+
+1. `lean-toolchain`, then the Mathlib tag in `lakefile.lean`.
+2. The `cslib`, `PolyFun`, and `loom2` revisions, each to a commit built against that Mathlib.
+3. `lake update --keep-toolchain`, then `lake exe cache get`.
+4. `./scripts/validate.sh --lint --test --axioms`; fix what the new toolchain flags rather than
+   silencing it (`docs/agents/gotchas.md` §23), and update `scripts/axiom_baseline.json` only for
+   an intentional change in `sorry` debt.
+5. Re-verify the upstream-alignment ledger (`docs/reading/upstream-alignment.md`): every row is
+   checked against the newly pinned trees, never diffed against the previous ledger.
+6. Update the version mentions in `AGENTS.md` (*Building*) and `docs/agents/gotchas.md` §26.
+
 ## Style Notes
 
 - Keep imports at the top of the file.
@@ -124,6 +142,9 @@ ASCII banners are visually loud, do not appear in the generated documentation, a
   - All other terms of `Type`s (basically anything else) are in `lowerCamelCase`.
 - Respect the module layering documented in [`AGENTS.md`](AGENTS.md).
 - Use `/-! ## Title -/` doc-headers, not ASCII banners, for inline section breaks (see *Documentation Expectations* above).
+
+For probability tactic tests, follow the
+[tactic-test conventions](docs/agents/probability.md#normal-forms-and-the-tactic-contract).
 
 ## Licensing
 

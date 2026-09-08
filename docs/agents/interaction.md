@@ -33,9 +33,17 @@ Generic interaction modules should not be reintroduced under `VCVio/Interaction`
 
 ## Runtime Semantics
 
-`OpenProcess m Party Δ` comes from PolyFun and carries its per-step `Spec.Sampler m` intrinsically.
-VCVio's runtime layer interprets a closed process by running those samplers and then observing the resulting state in a probabilistic semantics.
-Use PolyFun's `OpenStep.boundaryTrace` when you need to read the emitted output packets from a completed open-step transcript; routing and probabilistic interpretation remain VCVio runtime concerns.
+PolyFun separates the shape of an interaction from the effects that choose its moves:
+
+- `TypeTree` describes the dependent tree of move types;
+- `TypeTree.Path tree` records one complete play through that tree;
+- `TypeTree.Sampler m tree` decorates every node with an `m`-computation that chooses its move.
+
+`OpenProcess m Party Δ` comes from PolyFun and carries its per-step
+`TypeTree.Sampler m` intrinsically. VCVio's runtime layer interprets a closed process by running
+those samplers and then observing the resulting state in a probabilistic semantics. Use PolyFun's
+`OpenStep.boundaryTrace` when you need to read the emitted output packets from a completed open-step
+path; routing and probabilistic interpretation remain VCVio runtime concerns.
 
 Use the synchronous entry points in `VCVio/Interaction/UC/Runtime.lean`:
 
@@ -95,8 +103,10 @@ Choose the smallest import matching the task:
 
 ```lean
 -- Generic interaction APIs from PolyFun
-import PolyFun.Interaction.Basic.Spec
+import PolyFun.Interaction.Basic.TypeTree
 import PolyFun.Interaction.Basic.Strategy
+import PolyFun.Interaction.Basic.Sampler           -- nodewise monadic choices
+import PolyFun.Interaction.Basic.TypeTreeFintype   -- finite/nonempty branching ornaments
 import PolyFun.Interaction.Concurrent.Process
 import PolyFun.Interaction.UC.OpenProcess
 import PolyFun.Interaction.UC.OpenProcessModel

@@ -21,12 +21,12 @@ jobs:
     name: Build + run FFI test executables
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
       - name: Set up Lean environment
-        uses: leanprover/lean-action@v1
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1
         with:
           auto-config: false
           build: false
@@ -38,14 +38,6 @@ jobs:
       - name: Fetch Mathlib cache
         run: lake exe cache get
 
-      - name: Build FFI test executables
-        run: lake build mlkem_test mldsa_test falcon_test
-
-      - name: Run ML-KEM FFI tests
-        run: .lake/build/bin/mlkem_test
-
-      - name: Run ML-DSA FFI tests
-        run: .lake/build/bin/mldsa_test
-
-      - name: Run Falcon FFI tests
-        run: .lake/build/bin/falcon_test
+      # The same driver as the per-PR `lake test`, with the native-backed executables added.
+      - name: Run the test driver with the native executables
+        run: lake test -- --ffi

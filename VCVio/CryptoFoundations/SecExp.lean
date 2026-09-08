@@ -353,7 +353,18 @@ lemma advantage_eq_zero_iff (exp : SecExp m) :
 @[simp]
 lemma advantage_eq_one_iff (exp : SecExp m) :
     exp.advantage = 1 ↔ Pr[⊥ | exp.toSPMFSemantics.evalSPMF exp.main] = 0 := by
-  grind [advantage, probEvent_eq_one_iff]
+  rw [advantage]
+  let p := Pr[⊥ | exp.toSPMFSemantics.evalSPMF exp.main]
+  change 1 - p = 1 ↔ p = 0
+  constructor
+  · intro h
+    by_contra hp
+    have hp' : 0 < p := bot_lt_iff_ne_bot.mpr hp
+    have hlt : 1 - p < (1 : ℝ≥0∞) :=
+      (ENNReal.sub_lt_self_iff one_ne_top).2 ⟨zero_lt_one, hp'⟩
+    exact hlt.ne h
+  · intro h
+    simp only [h, tsub_zero]
 
 end advantage
 

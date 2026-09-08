@@ -42,22 +42,18 @@ The `Primitives.Laws` fields that mention the assembled bundle `MLDSA.Concrete.c
 are proven in `Extern/MLDSA/Laws.lean`, on top of the lemmas banked here.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLDSA.Concrete
 
 open MLDSA LatticeCrypto
 
-set_option maxRecDepth 4000
-
 /-- The ML-DSA centered infinity norm `polyNorm` agrees with the backend-generic
 `LatticeCrypto.cInfNorm` on the canonical vector backend. This is the bridge that lets the
 `polyNorm`-stated `Primitives.Laws` fields consume the `cInfNorm`-stated rounding lemmas. -/
 theorem polyNorm_eq_cInfNorm (f : Rq) : polyNorm f = LatticeCrypto.cInfNorm f := by
-  unfold polyNorm normOps LatticeCrypto.cInfNorm LatticeCrypto.zmodPolyNormOps
-    LatticeCrypto.normOpsOfCenteredView
-  rfl
+  exact LatticeCrypto.zmodPolyNormOps_cInfNorm f
 
 variable (p : Params)
 

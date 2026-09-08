@@ -275,8 +275,9 @@ lemma useHintVec_makeHintVec_eq_highBitsVec
     simp only [Vector.get_eq_getElem, Vector.getElem_sub]
   · exact Nat.le_of_lt h_ct0_lt
   · simpa [Primitives.lowBitsVec, r_j] using h_r0_lt
-  · set_option maxRecDepth 1000 in
-      change LatticeCrypto.cInfNorm (cs2.get jj) ≤ p.beta
+  · have hnorm : polyNorm (cs2.get jj) = LatticeCrypto.cInfNorm (cs2.get jj) :=
+      LatticeCrypto.zmodPolyNormOps_cInfNorm (cs2.get jj)
+    rw [show cs2[j] = cs2.get jj by rfl, hnorm]
     exact h_cs2_bound jj
 
 /-- Correctness of FIPS ML-DSA, conditional on the algebraic key identity (`h_wApprox_eq`)

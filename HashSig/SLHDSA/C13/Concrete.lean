@@ -102,7 +102,15 @@ def keccakPrimitives : Primitives where
 /-! ### Fixed-width signature decoding (3688-byte C13 wire format) -/
 
 /-- Decode the 3688-byte C13 signature `R ‖ FORS+C ‖ HT` (FORS+C: `k` leaf secrets then `k−1`
-auth paths; HT: per layer `WOTS(l·n) ‖ counter(4) ‖ auth(h'·n)`). -/
+auth paths; HT: per layer `WOTS(l·n) ‖ counter(4) ‖ auth(h'·n)`).
+
+This is **not** a FIPS 205 wire boundary: the C13 layout is a deliberately different scheme
+shape — `k` leaf secrets followed by only `k − 1` authentication paths, a 4-byte WOTS+C
+counter inside each hypertree layer, and list-valued paths — so it is not expressible by the
+strict `CoreWireCodec` of `HashSig.SLHDSA.Codec`, which owns the FIPS `R ‖ SIG_FORS ‖ SIG_HT`
+format. This fixed-offset reader exists solely to check the embedded C13 reference vector
+against the on-chain verifier; every FIPS-facing byte surface is superseded by the strict
+codec (`HashSig.SLHDSA.Concrete.Codec`). -/
 def decodeSignature (ba : ByteArray) : Signature keccakPrimitives :=
   let R : Bytes 16 := baSliceToB16 ba 0
   let fors : Vector (Bytes 16 × List (Bytes 16)) 7 :=

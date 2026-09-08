@@ -7,7 +7,6 @@ Authors: Devon Tuma, Quang Dao
 module
 public import VCVio.OracleComp.EvalDist
 public import VCVio.OracleComp.SimSemantics.SimulateQ
-public import ToMathlib.General
 public import PolyFun.PFunctor.Lens.Cartesian
 
 /-!
@@ -47,7 +46,7 @@ predicate.
 
 @[expose] public section
 
-open OracleSpec OracleComp BigOperators ENNReal
+open OracleSpec OracleComp ENNReal
 
 universe u u' v v' w w'
 

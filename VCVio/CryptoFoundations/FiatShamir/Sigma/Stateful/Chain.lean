@@ -31,10 +31,6 @@ universe u
 
 open ENNReal OracleSpec OracleComp ProbComp OracleComp.ProgramLogic.Relational
 
-/- The stateful hops compare routed sum-spec response families through their
-`PFunctor.Obj` presentation. Keep that reduction local to this proof module. -/
-attribute [local implicit_reducible] PFunctor.Obj
-
 namespace FiatShamir.Stateful
 
 /-! Tag the CMA-to-NMA simulator handler family from `Sigma/CmaToNma.lean`
@@ -379,22 +375,20 @@ private lemma simulatedNmaUnifSim_fsUniform_run
         monadLift_self, bind_pure_comp, simulateQ_map, bind_map_left, map_bind]
       exact bind_congr (m := ProbComp) fun u ↦ ih u cache
 
-omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal] [Finite Chal] in
-private def cmaSimLoggedLeftOrnament
+omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] [Inhabited Chal] in
+private lemma cmaSimLoggedLeft_preserves_inv
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
-    (pk : Stmt) (sk : Wit) :
-    QueryImpl.StateOrnament
-      (cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
+    (pk : Stmt) (sk : Wit) : ∀ t s,
+    cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
+      (Stmt := Stmt) (Wit := Wit) pk sk s →
+    ∀ z ∈ support (m := ProbComp)
+      ((cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
         (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-        hr simT)
-      (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) simT pk) where
-  inv := cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
-    (Stmt := Stmt) (Wit := Wit) pk sk
-  proj := cmaSimLoggedProj (M := M) (Commit := Commit)
-    (Chal := Chal) (Stmt := Stmt) (Wit := Wit)
-  preserves_inv := fun t s hs => by
+        hr simT t).run s),
+      cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
+        (Stmt := Stmt) (Wit := Wit) pk sk z.2 := by
+    intro t s hs
     rcases s with ⟨signed, ⟨⟨log, cache, keypair⟩, bad⟩⟩
     simp only [cmaSimFixedKeyInv] at hs ⊢
     rcases t with ((n | mc) | m)
@@ -421,13 +415,17 @@ private def cmaSimLoggedLeftOrnament
     · subst keypair
       intro z hz
       have hz' := by
-        simpa [fs_simp, cmaOracleSpec, QueryImpl.flattenStateT,
-          QueryImpl.mapStateTBase, QueryImpl.Stateful.Frame.linkReshape,
-          QueryImpl.Stateful.linkWith, StateT.run_bind, StateT.run_mk,
-          StateT.run_map, StateT.run_monadLift, monadLift_self, simulateQ_bind,
-          simulateQ_map, simulateQ_query, OracleQuery.input_query,
-          OracleQuery.cont_query, id_map, bind_assoc, bind_pure_comp, pure_bind,
-          map_bind, Functor.map_map, Prod.map_apply, id_eq] using hz
+        simpa only [cmaOracleSpec, add_apply_inr, cmaSimLoggedLeftImpl, cmaSimLoggedImpl,
+          QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaSim, cmaFrame, cmaOuterLens,
+          Prod.mk.eta, cmaNmaLens, cmaSignLogImpl, bind_pure_comp, StateT.run_bind,
+          StateT.run_get, StateT.run_monadLift, monadLift_self, StateT.run_map, StateT.run_set,
+          map_pure, Functor.map_map, pure_bind, simulateQ_map, simulateQ_query,
+          OracleQuery.input_query, OracleQuery.cont_query, QueryImpl.Stateful.linkWith,
+          cmaToNma, cmaSignSim, liftComp_eq_liftM, PFunctor.Lens.State.mk_get, StateT.run_mk,
+          simulateQ_bind, nma, nmaPublic, id_map, nmaProgram, map_bind,
+          QueryImpl.Stateful.Frame.linkReshape, PFunctor.Lens.State.mk_put, support_bind,
+          support_map, Set.mem_iUnion, Set.mem_image, Prod.exists, Bool.exists_bool, exists_prop]
+          using hz
       rcases hz' with ⟨xCommit, xChal, xResp, xCache, xKeypair, hx⟩
       have state_eq (xBad : Bool)
           (hxmem : ((xCommit, xChal, xResp), xCache, xKeypair, xBad) ∈
@@ -443,20 +441,44 @@ private def cmaSimLoggedLeftOrnament
         exact congrArg Prod.snd hx'.symm
       rcases hx with ⟨hxmem, hnext⟩ | ⟨hxmem, hnext⟩
       · have hxinner := state_eq false hxmem
+        have hxkey : xKeypair = some (pk, sk) :=
+          congrArg (fun state => state.2.1) hxinner
         rcases hnext with ⟨u, nextCache, nextKeypair, hnext⟩
         rcases hnext with ⟨hu, rfl⟩ | ⟨hu, rfl⟩
         all_goals
           cases htarget : xCache (m, xCommit)
-          all_goals simp [htarget] at hu
-          all_goals simp_all
+          all_goals
+            simp only [htarget, support_pure, Set.mem_singleton_iff, Prod.mk.injEq,
+              Bool.false_eq_true, Bool.true_eq_false, and_false, and_true, true_and] at hu
+          all_goals exact hu.2.trans hxkey
       · have hxinner := state_eq true hxmem
+        have hxkey : xKeypair = some (pk, sk) :=
+          congrArg (fun state => state.2.1) hxinner
         rcases hnext with ⟨u, nextCache, nextKeypair, hnext⟩
         rcases hnext with ⟨hu, rfl⟩ | ⟨hu, rfl⟩
         all_goals
           cases htarget : xCache (m, xCommit)
-          all_goals simp [htarget] at hu
-          all_goals simp_all
-  project_step := fun t s hs => by
+          all_goals
+            simp only [htarget, support_pure, Set.mem_singleton_iff, Prod.mk.injEq,
+              Bool.false_eq_true, and_false, and_true, true_and] at hu
+          all_goals exact hu.2.trans hxkey
+omit [SampleableType Stmt] [SampleableType Wit] [Inhabited Chal] in
+private lemma cmaSimLoggedLeft_project_step
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (pk : Stmt) (sk : Wit) : ∀ t s,
+    cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
+      (Stmt := Stmt) (Wit := Wit) pk sk s →
+    Prod.map id (cmaSimLoggedProj (M := M) (Commit := Commit)
+        (Chal := Chal) (Stmt := Stmt) (Wit := Wit)) <$>
+      (cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
+        hr simT t).run s =
+      (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) simT pk t).run
+        (cmaSimLoggedProj (M := M) (Commit := Commit)
+          (Chal := Chal) (Stmt := Stmt) (Wit := Wit) s) := by
+    intro t s hs
     rcases s with ⟨signed, ⟨⟨log, cache, keypair⟩, bad⟩⟩
     simp only [cmaSimFixedKeyInv] at hs
     rcases t with ((n | mc) | m)
@@ -483,14 +505,17 @@ private def cmaSimLoggedLeftOrnament
               QueryImpl.id'_apply, uniformSampleImpl, hcache]
     · subst keypair
       conv_lhs =>
-        simp [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-          QueryImpl.mapStateTBase, QueryImpl.Stateful.Frame.linkReshape,
-          QueryImpl.Stateful.linkWith,
-          StateT.run_bind, StateT.run_mk, StateT.run_map, StateT.run_monadLift,
-          monadLift_self, simulateQ_bind, simulateQ_map, simulateQ_query,
-          OracleQuery.input_query, OracleQuery.cont_query, id_map,
-          bind_pure_comp, pure_bind, map_bind, Functor.map_map, Prod.map_apply,
-          id_eq]
+        simp only [add_apply_inr, cmaSimLoggedLeftImpl, cmaSimLoggedImpl,
+          QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaSim, cmaFrame,
+          cmaOuterLens, Prod.mk.eta, cmaNmaLens, cmaSignLogImpl, bind_pure_comp,
+          StateT.run_bind, StateT.run_get, StateT.run_monadLift, monadLift_self,
+          StateT.run_map, StateT.run_set, map_pure, Functor.map_map, pure_bind,
+          simulateQ_map, simulateQ_query, OracleQuery.input_query,
+          OracleQuery.cont_query, QueryImpl.Stateful.linkWith, cmaToNma,
+          cmaSignSim, liftComp_eq_liftM, PFunctor.Lens.State.mk_get,
+          StateT.run_mk, simulateQ_bind, nma, nmaPublic, id_map, nmaProgram,
+          map_bind, QueryImpl.Stateful.Frame.linkReshape,
+          PFunctor.Lens.State.mk_put, Prod.map_apply, id_eq, cmaSimLoggedProj]
       conv_rhs =>
         simp [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
           QueryImpl.mapStateTBase, QueryImpl.Stateful.Frame.linkReshape,
@@ -525,6 +550,26 @@ private def cmaSimLoggedLeftOrnament
           simp [advCache, htarget]
       | none =>
           simp [advCache, htarget]
+
+omit [SampleableType Stmt] [SampleableType Wit] [Inhabited Chal] in
+private def cmaSimLoggedLeftOrnament
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (pk : Stmt) (sk : Wit) :
+    QueryImpl.StateOrnament
+      (cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
+        hr simT)
+      (simulatedNmaLoggedProbImpl (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) simT pk) where
+  inv := cmaSimFixedKeyInv (M := M) (Commit := Commit) (Chal := Chal)
+    (Stmt := Stmt) (Wit := Wit) pk sk
+  proj := cmaSimLoggedProj (M := M) (Commit := Commit)
+    (Chal := Chal) (Stmt := Stmt) (Wit := Wit)
+  preserves_inv := cmaSimLoggedLeft_preserves_inv (M := M) (Commit := Commit)
+    (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit) hr simT pk sk
+  project_step := cmaSimLoggedLeft_project_step (M := M) (Commit := Commit)
+    (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit) hr simT pk sk
 
 omit [DecidableEq M] [DecidableEq Commit] [SampleableType Stmt] [SampleableType Wit]
   [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
@@ -708,6 +753,42 @@ private lemma simulatedNmaUnifFork_nested_preserves_state
   subst st
   simp
 
+omit [SampleableType Stmt] [Inhabited Chal] in
+private lemma forkLoggedImpl_sign_support
+    (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) (m : M)
+    (advCache : (fsRoSpec M Commit Chal).QueryCache)
+    (liveCache : (M × Commit →ₒ Chal).QueryCache)
+    (queryLog : List (M × Commit)) (signed : List M)
+    {z : (Commit × Resp) × (ForkBaseState M Commit Chal × List M)}
+    (hz : z ∈ support ((forkLoggedImpl (M := M) (Commit := Commit)
+      (Chal := Chal) (Resp := Resp) simT pk (.inr m)).run
+        ((advCache, liveCache, queryLog), signed))) :
+    ∃ xCommit xChal xResp xAdvCache xLiveCache xQueryLog,
+      ((((xCommit, xChal, xResp), xAdvCache), (xLiveCache, xQueryLog)) ∈ support
+        ((simulateQ (Fork.unifForward M Commit Chal + Fork.roImpl M Commit Chal)
+          ((simulateQ (simulatedNmaUnifSim (M := M) (Commit := Commit)
+            (Chal := Chal)) (simT pk)).run advCache)).run (liveCache, queryLog))) ∧
+      ((match xAdvCache (.inr (m, xCommit)) with
+        | some _ => ((xCommit, xResp), xAdvCache)
+        | none => ((xCommit, xResp),
+            xAdvCache.cacheQuery (.inr (m, xCommit)) xChal)).1,
+        ((match xAdvCache (.inr (m, xCommit)) with
+          | some _ => ((xCommit, xResp), xAdvCache)
+          | none => ((xCommit, xResp),
+              xAdvCache.cacheQuery (.inr (m, xCommit)) xChal)).2,
+          xLiveCache, xQueryLog),
+        signed ++ [m]) = z := by
+  have hz' := by
+    simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
+      QueryImpl.mapStateTBase] using hz
+  rcases hz' with ⟨xCommit, xChal, xResp, xAdvCache, xLiveCache,
+    xQueryLog, hxmem, hout⟩
+  refine ⟨xCommit, xChal, xResp, xAdvCache, xLiveCache, xQueryLog, hxmem, ?_⟩
+  convert hout using 1
+  congr 4
+  all_goals
+    cases xAdvCache (.inr (m, xCommit)) <;> rfl
+
 omit [SampleableType Stmt] in
 private lemma forkLoggedImpl_preserves_inv_step
     (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) :
@@ -834,8 +915,8 @@ private lemma forkLoggedImpl_preserves_inv_step
         · intro mc' ch' hcache'
           exact hlogInv mc' ch' hcache'
   · have hz' := by
-      simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-        QueryImpl.mapStateTBase] using hz
+      exact forkLoggedImpl_sign_support (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) simT pk m advCache liveCache queryLog signed hz
     rcases hz' with ⟨xCommit, xChal, xResp, xAdvCache, xLiveCache,
       xQueryLog, hxmem, rfl⟩
     let x := (((xCommit, xChal, xResp), xAdvCache), (xLiveCache, xQueryLog))
@@ -991,8 +1072,8 @@ private lemma forkLoggedImpl_preserves_live_adv_inv_step
                 (t' := Sum.inr mc') v hne
               exact hne_cache.trans hadv_old
   · have hz' := by
-      simpa [fs_simp, QueryImpl.extendState, QueryImpl.flattenStateT,
-        QueryImpl.mapStateTBase] using hz
+      exact forkLoggedImpl_sign_support (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp) simT pk m advCache liveCache queryLog signed hz
     rcases hz' with ⟨xCommit, xChal, xResp, xAdvCache, xLiveCache,
       xQueryLog, hxmem, rfl⟩
     let x := (((xCommit, xChal, xResp), xAdvCache), (xLiveCache, xQueryLog))
@@ -2384,3 +2465,5 @@ theorem cma_advantage_le_fork_bound_of_h1h2
       (Stmt := Stmt) (Wit := Wit) adv simT qS qH hQ)
 
 end FiatShamir.Stateful
+
+set_option linter.style.longFile 2600

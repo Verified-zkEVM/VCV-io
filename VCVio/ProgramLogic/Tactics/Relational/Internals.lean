@@ -1901,3 +1901,5 @@ def runRVCGenFinish : TacticM Unit :=
 end Relational
 end TacticInternals
 end OracleComp.ProgramLogic
+
+set_option linter.style.longFile 2100

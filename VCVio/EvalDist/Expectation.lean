@@ -14,8 +14,12 @@ public import VCVio.EvalDist.Monad.Map
 Failing runs contribute nothing, so on a computation that can fail this is the expectation of the
 conditional-on-success value scaled by the success probability, not a conditional expectation.
 
-The laws below are the ones a recursion consumes: `pure` and `bind` (`expectedValue_bind` is the
-tower property), monotonicity, and linearity over a `Finset` sum. `OracleComp.EvalDist.acceptRatio`
+`expectedValue` itself, its unfolding equation, monotonicity (`expectedValue_mono`,
+`expectedValue_mono_of_support`, both `@[gcongr]`), the constant bounds, and additivity live in
+`VCVio.EvalDist.Defs.Basic`, next to `probOutput`, so that the bind equations of
+`VCVio.EvalDist.Monad.Basic` can be stated through it. The laws below are the ones a recursion
+consumes: `pure` and `bind` (`expectedValue_bind` is the tower property) and linearity over a
+`Finset` sum. `OracleComp.EvalDist.acceptRatio`
 and the coordinate-wise fork's `forkSuccOf` are expectations in this sense, and are left written
 out; this definition is for the places where the functional itself recurses.
 -/
@@ -30,14 +34,11 @@ namespace OracleComp.EvalDist
 
 variable {α β : Type u} {m : Type u → Type v} [Monad m] [MonadLiftT m SPMF]
 
-/-- The expected value of `g` on the output of `mx`. -/
-noncomputable def expectedValue (mx : m α) (g : α → ℝ≥0∞) : ℝ≥0∞ := ∑' x, Pr[= x | mx] * g x
+section lawful
 
-omit [Monad m] in
-theorem expectedValue_def (mx : m α) (g : α → ℝ≥0∞) :
-    expectedValue mx g = ∑' x, Pr[= x | mx] * g x := rfl
+variable [LawfulMonadLiftT m SPMF]
 
-@[simp] theorem expectedValue_pure [LawfulMonadLiftT m SPMF] (x : α) (g : α → ℝ≥0∞) :
+@[simp] theorem expectedValue_pure (x : α) (g : α → ℝ≥0∞) :
     expectedValue (pure x : m α) g = g x := by
   classical
   rw [expectedValue]
@@ -46,7 +47,7 @@ theorem expectedValue_def (mx : m α) (g : α → ℝ≥0∞) :
   · rw [probOutput_pure_self, one_mul]
 
 /-- The tower property: averaging a bind is averaging the inner averages. -/
-theorem expectedValue_bind [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) (g : β → ℝ≥0∞) :
+theorem expectedValue_bind (mx : m α) (my : α → m β) (g : β → ℝ≥0∞) :
     expectedValue (mx >>= my) g = expectedValue mx fun x => expectedValue (my x) g := by
   simp only [expectedValue, probOutput_bind_eq_tsum]
   calc ∑' y : β, (∑' x : α, Pr[= x | mx] * Pr[= y | my x]) * g y
@@ -58,27 +59,24 @@ theorem expectedValue_bind [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m 
     _ = ∑' x : α, Pr[= x | mx] * ∑' y : β, Pr[= y | my x] * g y :=
         tsum_congr fun _ => ENNReal.tsum_mul_left
 
-theorem expectedValue_map [LawfulMonad m] [LawfulMonadLiftT m SPMF] (mx : m α) (f : α → β)
+theorem expectedValue_map [LawfulMonad m] (mx : m α) (f : α → β)
     (g : β → ℝ≥0∞) : expectedValue (f <$> mx) g = expectedValue mx fun x => g (f x) := by
   rw [map_eq_bind_pure_comp, expectedValue_bind]
   exact tsum_congr fun x => by simp only [Function.comp_apply, expectedValue_pure]
 
-omit [Monad m] in
-theorem expectedValue_mono (mx : m α) {g h : α → ℝ≥0∞} (hgh : ∀ x, g x ≤ h x) :
-    expectedValue mx g ≤ expectedValue mx h :=
-  tsum_probOutput_mul_mono mx hgh
+/-- A bound that holds for every inner average bounds the bind. -/
+theorem expectedValue_bind_le_of_le {mx : m α} {my : α → m β}
+    {g : β → ℝ≥0∞} {c : ℝ≥0∞} (h : ∀ x, expectedValue (my x) g ≤ c) :
+    expectedValue (mx >>= my) g ≤ c := by
+  rw [expectedValue_bind]; exact expectedValue_le_of_le mx h
+
+end lawful
 
 omit [Monad m] in
 /-- A constant functional averages to itself, provided no mass is lost to failure. -/
 theorem expectedValue_const {mx : m α} (hmass : Pr[⊥ | mx] = 0) (c : ℝ≥0∞) :
     expectedValue mx (fun _ => c) = c := by
   rw [expectedValue, ENNReal.tsum_mul_right, tsum_probOutput_eq_one' hmass, one_mul]
-
-omit [Monad m] in
-theorem expectedValue_add (mx : m α) (g h : α → ℝ≥0∞) :
-    expectedValue mx (fun x => g x + h x) = expectedValue mx g + expectedValue mx h := by
-  simp only [expectedValue, mul_add]
-  exact ENNReal.tsum_add
 
 omit [Monad m] in
 /-- Linearity over a finite sum of functionals. -/

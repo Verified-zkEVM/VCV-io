@@ -78,6 +78,27 @@ def toArray (fHat : TransformPoly ring) : Array Coeff :=
 instance : Coe (TransformPoly ring) ring.Poly :=
   ⟨TransformPoly.toPoly⟩
 
+/-- The transform-domain tag is a bijection with the underlying coefficient-domain carrier. -/
+def equivPoly (ring : NegacyclicRing Coeff) : TransformPoly ring ≃ ring.Poly where
+  toFun := coeffs
+  invFun := mk
+  left_inv _ := rfl
+  right_inv _ := rfl
+
+/-- `equivPoly` forgets the transform-domain tag. -/
+@[simp] theorem equivPoly_apply (fHat : TransformPoly ring) :
+    equivPoly ring fHat = fHat.coeffs :=
+  rfl
+
+/-- The inverse of `equivPoly` attaches the transform-domain tag. -/
+@[simp] theorem equivPoly_symm_apply (f : ring.Poly) :
+    (equivPoly ring).symm f = ⟨f⟩ :=
+  rfl
+
+/-- The transform-domain carrier is finite whenever the coefficient type is, via `equivPoly`. -/
+instance [Fintype Coeff] : Fintype (TransformPoly ring) :=
+  Fintype.ofEquiv ring.Poly (equivPoly ring).symm
+
 instance : Zero (TransformPoly ring) :=
   ⟨⟨ring.zero⟩⟩
 

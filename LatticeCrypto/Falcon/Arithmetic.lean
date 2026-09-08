@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 module
 public import LatticeCrypto.Falcon.Params
+public import LatticeCrypto.Ring.Sampling
 public import LatticeCrypto.Ring.SchoolbookCert
 public import LatticeCrypto.Ring.Transform
 public import LatticeCrypto.Ring.Norms
@@ -83,14 +84,8 @@ instance {n : ℕ} : DecidableEq (Rq n) := by
   change DecidableEq (LatticeCrypto.Poly Coeff n)
   infer_instance
 
-instance {n : ℕ} : Fintype (Rq n) :=
-  inferInstanceAs (Fintype (Vector Coeff n))
-
 instance {n : ℕ} : Inhabited (Rq n) :=
   inferInstanceAs (Inhabited (Vector Coeff n))
-
-instance {n : ℕ} : SampleableType (Rq n) :=
-  inferInstanceAs (SampleableType (Vector Coeff n))
 
 instance {n : ℕ} : DecidableEq (Tq n) := by
   change DecidableEq (LatticeCrypto.TransformPoly (coeffRing n))

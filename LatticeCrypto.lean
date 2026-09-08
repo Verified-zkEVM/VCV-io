@@ -49,6 +49,7 @@ public import LatticeCrypto.Ring.Kernel
 public import LatticeCrypto.Ring.NTTCert
 public import LatticeCrypto.Ring.Norms
 public import LatticeCrypto.Ring.Rounding
+public import LatticeCrypto.Ring.Sampling
 public import LatticeCrypto.Ring.SchoolbookCert
 public import LatticeCrypto.Ring.Smoke
 public import LatticeCrypto.Ring.Transform

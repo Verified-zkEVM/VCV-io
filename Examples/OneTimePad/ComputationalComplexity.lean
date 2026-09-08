@@ -8,7 +8,6 @@ module
 
 public import ToMathlib.MeasureTheory.DiscreteInstances
 public import ToMathlib.Probability.UniformOn
-public import ToMathlib.General
 public import Examples.OneTimePad.Basic
 public import VCVio.CryptoFoundations.Asymptotics.PathSemantics
 public import VCVio.CryptoFoundations.SymmEncAlg.Measure
@@ -260,6 +259,21 @@ theorem denote_coinBitVec_eq_uniform (n : ℕ) :
     denote_coinVector_eq_uniform]
   exact map_uniformOn_univ_of_bijective Measurable.of_discrete
     (bitVecOfFnLE_bijective n)
+
+/-- The primary measure semantics of the explicit key generator is the uniform measure: the
+`𝒟[…]` reading of `denote_coinBitVec_eq_uniform`. -/
+theorem evalDist_coinBitVec (n : ℕ) :
+    𝒟[coinBitVec n] = uniformOn (Set.univ : Set (BitVec n)) :=
+  denote_coinBitVec_eq_uniform n
+
+/-- Every key is drawn with probability `(2 ^ n)⁻¹`. -/
+theorem evalDist_coinBitVec_apply_singleton (n : ℕ) (key : BitVec n) :
+    𝒟[coinBitVec n] {key} = (2 ^ n : ℝ≥0∞)⁻¹ := by
+  simp [evalDist_coinBitVec]
+
+/-- The explicit key generator never fails: its denotation carries total mass one. -/
+theorem evalDist_coinBitVec_apply_univ (n : ℕ) : 𝒟[coinBitVec n] Set.univ = 1 := by
+  simp [evalDist_coinBitVec]
 
 /-! ## A measure-level one-time pad -/
 

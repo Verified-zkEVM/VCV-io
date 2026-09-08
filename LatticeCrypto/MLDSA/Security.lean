@@ -60,8 +60,7 @@ variable (p : Params) (prims : Primitives p) [nttOps : NTTRingOps]
 
 section Properties
 
-variable [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [IsUniformSpec unifSpec]
+variable [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec]
 
 -- The algebraic core of completeness: whenever `respond` produces `some (z, h)`, the
 -- `verify` function accepts. This follows from the key generation relationship
@@ -109,14 +108,14 @@ theorem idsWithAbort_complete' :
 
 omit hRespondVerify
 
-omit nttOps [DecidableEq prims.High] [SampleableType (RqVec p.l)]
-  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+omit nttOps [DecidableEq prims.High] [SampleableType (CommitHashBytes p)]
+  [IsUniformSpec unifSpec] in
 private lemma neg_rq_get (f : Rq) (i : Fin ringDegree) : (-f).get i = -(f.get i) := by
   change (coeffRing.neg f).get i = _
   simp
 
-omit nttOps [DecidableEq prims.High] [SampleableType (RqVec p.l)]
-  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+omit nttOps [DecidableEq prims.High] [SampleableType (CommitHashBytes p)]
+  [IsUniformSpec unifSpec] in
 private lemma polyNorm_neg (f : Rq) : polyNorm (-f) = polyNorm f := by
   unfold polyNorm normOps
   simp only [LatticeCrypto.zmodPolyNormOps, LatticeCrypto.normOpsOfCenteredView]
@@ -126,8 +125,7 @@ private lemma polyNorm_neg (f : Rq) : polyNorm (-f) = polyNorm f := by
   simp only [LatticeCrypto.zmodCenteredCoeffView, coeffRing.coeff_neg]
   exact LatticeCrypto.centeredRepr_natAbs_neg _
 
-omit [DecidableEq prims.High] [SampleableType (RqVec p.l)]
-  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+omit [DecidableEq prims.High] [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
 /-- Vector form of `useHint_makeHint`: `UseHint(MakeHint(z, r), r) = HighBits(r + z)`
 componentwise, when each component of `z` is bounded by `γ₂`. -/
 theorem useHintVec_makeHintVec (h_laws : Primitives.Laws prims nttOps) {k : ℕ}
@@ -140,8 +138,7 @@ theorem useHintVec_makeHintVec (h_laws : Primitives.Laws prims nttOps) {k : ℕ}
   rw [Vector.get_eq_getElem] at hzi
   exact h_laws.useHint_makeHint z[i] r[i] hzi
 
-omit [DecidableEq prims.High] [SampleableType (RqVec p.l)]
-  [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
+omit [DecidableEq prims.High] [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec] in
 /-- Vector form of `hide_low`: a small additive perturbation does not change the high bits. -/
 theorem hide_lowVec (h_laws : Primitives.Laws prims nttOps) {k : ℕ}
     (r s : RqVec k) (b : ℕ)
@@ -292,9 +289,7 @@ end CMAtoNMA
 
 section MainTheorem
 
-variable {M : Type}
-  [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
-  [IsUniformSpec unifSpec]
+variable {M : Type} [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec]
 
 open scoped Classical in
 /-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**

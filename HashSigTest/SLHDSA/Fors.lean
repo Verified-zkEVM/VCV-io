@@ -39,10 +39,10 @@ example (md : List Byte) (sk : prims.SkSeed) (pk : prims.PkSeed) (adrs : Adrs) :
     forsSignM prims.core md sk pk adrs =
       (Vector.ofFnM fun i : Fin p.k => do
         let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-        let path ← PerfectMerkleTree.authPathM
+        let path ← PerfectMerkleTree.intrinsicAuthPathM
           (forsLeafWith prims.core (PublicHash.f prims.core pk) sk pk adrs)
           (forsNodeHashWith (PublicHash.h prims.core pk) adrs) idx p.a
-        return (forsSkGenCore prims.core sk pk adrs idx, path) :
+        return ForsTreeSigCore.mk (forsSkGenCore prims.core sk pk adrs idx) path :
         OracleComp (publicHashSpec prims.core) (ForsSigCore p prims.core)) := rfl
 
 /-- Recovery performs one `F`, then a leaf-to-root climb, per tree in increasing order, followed
@@ -51,10 +51,16 @@ example (sig : ForsSigCore p prims.core) (md : List Byte) (pk : prims.PkSeed) (a
     forsPkFromSigM prims.core sig md pk adrs = (do
       let roots ← Vector.ofFnM fun i : Fin p.k => do
         let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-        let leaf ← PublicHash.f prims.core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).1
+        let leaf ← PublicHash.f prims.core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk
         PerfectMerkleTree.climbM
-          (forsNodeHashWith (PublicHash.h prims.core pk) adrs) idx leaf (sig[i.val]).2
+          (forsNodeHashWith (PublicHash.h prims.core pk) adrs) idx leaf (sig[i.val]).auth.toList
       PublicHash.tl prims.core pk (forsPkAdrs adrs) roots.toList :
       OracleComp (publicHashSpec prims.core) prims.Y) := rfl
+
+/-- The forest and every tree path have their FIPS lengths in the type, so replacing either
+vector by a differently sized path is rejected before recovery can run. -/
+example (sig : ForsSigCore p prims.core) :
+    sig.toList.length = p.k ∧ ∀ i : Fin p.k, (sig[i.val]).auth.toList.length = p.a := by
+  simp
 
 end SLHDSA.ForsTest

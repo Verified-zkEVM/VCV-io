@@ -21,7 +21,7 @@ collect `r` successes and instead drains the pool, and the closed form is then s
 why the coordinate-wise extractor can use one bound for both cases.
 -/
 
-@[expose] public section
+public section
 
 open ProbComp NegHypergeom OracleComp.EvalDist
 
@@ -57,7 +57,7 @@ theorem expectedValue_length_drawUntil_pool3 :
 
 /-- The exhausting experiment stops after draining its one-element pool. -/
 theorem expectedDraws_one_one_two : expectedDraws 1 1 2 = 1 := by
-  show expectedDraws (0 + 1) 1 (1 + 1) = 1
+  change expectedDraws (0 + 1) 1 (1 + 1) = 1
   rw [expectedDraws_succ]
   simp
 

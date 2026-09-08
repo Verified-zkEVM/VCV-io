@@ -131,7 +131,7 @@ theorem verify_sign_correct (pk : PublicKey p) (sk : SecretKey p)
 This is the lattice problem underlying Falcon's security. It is an instance of
 the generic SIS problem where the matrix is the single-row matrix `[I | h]`
 over the cyclotomic ring `R_q = ℤ_q[x]/(x^n + 1)`. -/
-noncomputable def ntruSISProblem [SampleableType (Rq p.n)] :
+noncomputable def ntruSISProblem :
     SIS.Problem (Rq p.n) (Rq p.n × Rq p.n) where
   sampleChallenge := $ᵗ (Rq p.n)
   isValid h x :=
@@ -293,7 +293,7 @@ With exact arithmetic (infinite precision), `r_p = 1` and the sampler loss vanis
 4. Account for finite-precision via the sampler quality hypothesis. -/
 theorem euf_cma_security
     (Salt : Type) [DecidableEq Salt] [SampleableType Salt] [Fintype Salt]
-    [SampleableType (Rq p.n)] [DecidableEq (Rq p.n)]
+    [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
     (qSign qHash : ℕ)
@@ -330,7 +330,7 @@ theorem euf_cma_security
 The collision term specializes to `qSign² / (2 · 2^320)`. For the Falcon-specified
 maximum of `qSign = 2^64` signing queries, this is `≤ 2^{-193}`. -/
 theorem euf_cma_security_bytes40
-    [SampleableType (Rq p.n)] [DecidableEq (Rq p.n)]
+    [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
     (qSign qHash : ℕ)

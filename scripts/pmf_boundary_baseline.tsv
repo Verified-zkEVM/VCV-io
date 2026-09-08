@@ -9,7 +9,7 @@ Examples/Schnorr/SigmaProtocol.lean	1
 LatticeCrypto/DiscreteGaussian.lean	1
 LatticeCrypto/MLDSA/Security.lean	1
 LatticeCrypto/MLDSA/SecurityNMA.lean	4
-ToMathlib/General.lean	28
+ToMathlib/Probability/ProbabilityMassFunction/Lemmas.lean	28
 ToMathlib/Probability/Divergence/RenyiDiscrete.lean	56
 ToMathlib/Probability/ProbabilityMassFunction/Measure.lean	6
 ToMathlib/Probability/ProbabilityMassFunction/RadonNikodym.lean	19
@@ -44,7 +44,7 @@ VCVio/CryptoFoundations/SymmEncAlg.lean	13
 VCVio/CryptoFoundations/SymmEncAlg/MeasureCompatibility.lean	4
 VCVio/EvalDist/BitVec.lean	2
 VCVio/EvalDist/Bool.lean	4
-VCVio/EvalDist/Defs/AlternativeMonad.lean	6
+VCVio/EvalDist/Defs/AlternativeMonad.lean	10
 VCVio/EvalDist/Defs/Basic.lean	138
 VCVio/EvalDist/Defs/Instances.lean	29
 VCVio/EvalDist/Defs/Measure.lean	33
@@ -53,8 +53,10 @@ VCVio/EvalDist/Defs/Semantics.lean	12
 VCVio/EvalDist/Defs/Support.lean	1
 VCVio/EvalDist/Expectation.lean	4
 VCVio/EvalDist/ExpectationMeasure.lean	1
+VCVio/EvalDist/FailureMeasure.lean	8
 VCVio/EvalDist/Fintype.lean	6
 VCVio/EvalDist/IndepProduct.lean	6
+VCVio/EvalDist/IndepProductMeasure.lean	4
 VCVio/EvalDist/Inequalities.lean	1
 VCVio/EvalDist/Instances/ErrorT.lean	37
 VCVio/EvalDist/Instances/FinRatPMF.lean	24

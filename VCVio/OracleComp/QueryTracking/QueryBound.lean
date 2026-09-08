@@ -7,7 +7,6 @@ Authors: Devon Tuma
 module
 public import Mathlib.Algebra.Polynomial.Eval.Defs
 public import PolyFun.PFunctor.Bound
-public import ToMathlib.General
 public import VCVio.OracleComp.EvalDist
 public import VCVio.OracleComp.QueryTracking.CountingOracle
 public import VCVio.OracleComp.SimSemantics.Append
@@ -697,6 +696,30 @@ lemma isTotalQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp s
     IsTotalQueryBound (oa >>= ob) (n₁ + n₂) := by
   refine isQueryBound_bind (combine := fun a b => a + b) ?_ ?_ h1 h2 <;> grind
 
+/-- Support-aware bind rule. Under uniform oracle semantics every syntactically reachable
+continuation value lies in `support oa`, so it suffices to bound the continuation on that support
+rather than on every value of its result type. -/
+theorem isTotalQueryBound_bind_of_mem_support
+    [IsUniformSpec spec]
+    {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {prefixBound suffixBound : ℕ}
+    (hprefix : IsTotalQueryBound oa prefixBound)
+    (hsuffix : ∀ x ∈ support oa, IsTotalQueryBound (ob x) suffixBound) :
+    IsTotalQueryBound (oa >>= ob) (prefixBound + suffixBound) := by
+  induction oa using OracleComp.inductionOn generalizing prefixBound with
+  | pure x =>
+      simpa using (hsuffix x (by simp)).mono (by omega : suffixBound ≤ prefixBound + suffixBound)
+  | query_bind t next ih =>
+      rw [isTotalQueryBound_query_bind_iff] at hprefix
+      rw [bind_assoc, isTotalQueryBound_query_bind_iff]
+      refine ⟨by omega, fun response => ?_⟩
+      apply (ih response (prefixBound := prefixBound - 1) (hprefix.2 response) ?_).mono
+      · omega
+      · intro x hx
+        apply hsuffix x
+        rw [mem_support_bind_iff]
+        exact ⟨response, by simp, hx⟩
+
 /-- If `oa >>= ob` has a total query bound `n`, then `oa` alone has total query bound `n`
 (the continuation can only add queries, not remove them). -/
 lemma IsTotalQueryBound.of_bind_left
@@ -938,8 +961,7 @@ example {ι : Type u} {spec : OracleSpec ι} [IsUniformSpec spec] {α β : Type 
 support lemmas that peel off one `QueryCount.single t` per query step. -/
 private lemma sum_single_eq_one [DecidableEq ι] [Fintype ι] (t : ι) :
     ∑ i, QueryCount.single t i = 1 := by
-  rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_univ t)]
-  simp
+  simp [QueryCount.single]
 
 namespace countingOracle
 
@@ -955,7 +977,7 @@ lemma add_single_mem_support_simulate_queryBind [DecidableEq ι]
   refine ⟨by simp [QueryCount.single], ⟨u, ?_⟩⟩
   convert hz using 2
   funext j
-  by_cases hj : j = t <;> simp [Function.update, hj, QueryCount.single]
+  by_cases hj : j = t <;> simp [hj, QueryCount.single]
 
 section CostSupport
 
@@ -1150,15 +1172,14 @@ variable {p : ι → Prop} [DecidablePred p]
 by the counting-oracle characterizations that peel off one `QueryCount.single t` per step. -/
 private lemma sum_single_filter_eq_one [DecidableEq ι] [Fintype ι] {t : ι} (hpt : p t) :
     ∑ i ∈ Finset.univ.filter p, QueryCount.single t i = 1 := by
-  rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)]
-  simp
+  simp [QueryCount.single, hpt]
 
 /-- The `p`-filtered total of a single-query `QueryCount` is zero when `t` fails `p`. -/
 private lemma sum_single_filter_eq_zero [DecidableEq ι] [Fintype ι] {t : ι} (hpt : ¬ p t) :
     ∑ i ∈ Finset.univ.filter p, QueryCount.single t i = 0 :=
   Finset.sum_eq_zero fun j hj =>
     have hjt : j ≠ t := fun he => hpt (he ▸ (Finset.mem_filter.mp hj).2)
-    by simp [QueryCount.single, Function.update_of_ne hjt]
+    by simp [QueryCount.single, hjt]
 
 /-- A total query bound implies a predicate-targeted bound for every predicate `p`. -/
 theorem IsTotalQueryBound.isQueryBoundP {oa : OracleComp spec α} {n : ℕ}
@@ -1854,3 +1875,5 @@ structure PolyQueries {ι : Type} [DecidableEq ι] {spec : ℕ → OracleSpec ι
     IsPerIndexQueryBound (oa n x) (fun i => (qb i).eval n)
 
 end OracleComp
+
+set_option linter.style.longFile 2000

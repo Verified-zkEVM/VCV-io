@@ -5,7 +5,21 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 module
-public import ToMathlib.General
+public import ToMathlib.Data.ENNReal.Basic
+public import ToMathlib.Algebra.BigOperators.Finset
+public import ToMathlib.Control.Functor.Prod
+public import ToMathlib.Algebra.BigOperators.List
+public import ToMathlib.Data.Fin.Basic
+public import ToMathlib.Probability.ProbabilityMassFunction.Lemmas
+public import ToMathlib.Algebra.Order.Ring.Abs
+public import ToMathlib.Data.Vector.ListVector
+public import ToMathlib.Logic.Basic
+public import ToMathlib.Data.List.Count
+public import ToMathlib.Data.Vector.Count
+public import ToMathlib.Data.BitVec
+public import ToMathlib.Data.Vector.Induction
+public import ToMathlib.Topology.Algebra.InfiniteSum.Option
+public import ToMathlib.Control.Monad.Fold
 
 /-!
 # VCVio Prelude

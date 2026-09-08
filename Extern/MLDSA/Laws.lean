@@ -80,14 +80,12 @@ The abstract `Primitives.Laws` statement is **not** modified by this file; the b
 theorems make explicit which concrete obligations are discharged and which remain.
 -/
 
-@[expose] public section
+public section
 
 
 namespace MLDSA.Concrete
 
 open MLDSA LatticeCrypto
-
-set_option maxRecDepth 4000
 
 variable (p : Params)
 
@@ -148,6 +146,7 @@ The concrete `expandMask` decodes each coefficient through `polyZUnpack p`. The 
 after generalizing the byte argument; the two side conditions on the `z`-range bit width come from
 `approved_gamma1_width`. -/
 
+set_option maxRecDepth 1200 in
 /-- `Primitives.Laws.expandMask_bound` (bound `γ₁`) for the concrete instance, at any
 approved parameter set. -/
 theorem concrete_expandMask_bound (hp : p.isApproved) (rhoDoublePrime : Bytes 64) (kappa : ℕ) :
@@ -234,8 +233,9 @@ theorem concrete_sampleInBall_smul_bound
 /-! ## `Primitives.Laws` status for `concretePrimitives` (no full witness — by design)
 
 Thirteen `Primitives.Laws` fields are proven for the concrete instance at any approved parameter
-set. The transform field inherits the repository's disclosed `native_decide` certificate for
-the concrete NTT matrix inversion; the remaining proofs introduce no additional project-specific
+set. The transform field is proved from the structural butterfly stages of
+`LatticeCrypto/Ring/NTTCert.lean` (no `native_decide`; the runtime loop kernels remain an
+`implemented_by` refinement boundary); the remaining proofs introduce no additional project-specific
 trust assumptions. These fields are: the eight algebraic fields (`concrete_transform`,
 `concrete_high_low_decomp`, `concrete_lowBits_bound`, `concrete_hide_low`,
 `concrete_highBitsShift_injective`, `concrete_useHint_makeHint`, `concrete_power2Round_decomp`,

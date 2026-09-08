@@ -19,8 +19,9 @@ Mathlib measure denotation of the same oracle programs.
 
 These are compatibility corollaries rather than new forking arguments. The
 measure semantics is the canonical one induced by the existing per-query
-probability interpretation, and `PFunctor.FreeM.denote_apply_setOf` identifies its
-measurable success event with the probability used by the original theorem.
+probability interpretation, stated on the primary measure `𝒟[…]`, and
+`evalDist_apply` identifies its measurable success event with the probability
+used by the original theorem.
 -/
 
 @[expose] public section
@@ -48,7 +49,7 @@ variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
 
 /-- The canonical Bellare--Neven seeded-fork bound, stated as the Mathlib
 measure of the successful-result event. -/
-theorem le_denote_isSome_seededFork_sq
+theorem le_evalDist_isSome_seededFork_sq
     (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
     [∀ j, SampleableType (spec.Range j)] [spec.DecidableEq]
@@ -56,11 +57,8 @@ theorem le_denote_isSome_seededFork_sq
     ((∑ s, Pr[= some s | cf <$> main]) ^ 2 / ((qb i + 1 : ℕ) : ℝ≥0∞)
         - (∑ s, Pr[= some s | cf <$> main]) /
             ((Fintype.card (spec.Range i) : ℕ) : ℝ≥0∞)) ≤
-      PFunctor.FreeM.denote (seededFork main qb js i cf)
-        {result | result.isSome} := by
-  rw [PFunctor.FreeM.denote_apply_setOf (fun _ => rfl)
-    (seededFork main qb js i cf) (fun result => result.isSome)
-    Option.measurableSet_isSome]
+      𝒟[seededFork main qb js i cf] {result | result.isSome} := by
+  rw [evalDist_apply _ Option.measurableSet_isSome]
   exact le_probEvent_isSome_seededFork_sq main qb js i cf
 
 end seeded
@@ -74,7 +72,7 @@ variable {ι : Type} {spec : OracleSpec ι} [IsUniformSpec spec] {α : Type}
 
 /-- The replay/context forking bound, stated as the Mathlib measure of the
 successful-result event. -/
-theorem le_denote_isSome_contextFork
+theorem le_evalDist_isSome_contextFork
     [spec.DecidableEq] (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
     (hreach : PathCfReachable main qb i cf) :
@@ -82,11 +80,8 @@ theorem le_denote_isSome_contextFork
      let h : ℝ≥0∞ := Fintype.card (spec.Range i)
      let q := qb i + 1
      acc * (acc / q - h⁻¹)) ≤
-      PFunctor.FreeM.denote (contextFork main qb i cf)
-        {result | result.isSome} := by
-  rw [PFunctor.FreeM.denote_apply_setOf (fun _ => rfl)
-    (contextFork main qb i cf) (fun result => result.isSome)
-    Option.measurableSet_isSome]
+      𝒟[contextFork main qb i cf] {result | result.isSome} := by
+  rw [evalDist_apply _ Option.measurableSet_isSome]
   exact le_probEvent_isSome_contextFork main qb i cf hreach
 
 end replay

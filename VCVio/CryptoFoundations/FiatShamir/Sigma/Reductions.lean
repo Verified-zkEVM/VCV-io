@@ -297,7 +297,8 @@ private theorem perPk_extraction_bound
 end nmaToExtraction
 
 /-- The challenge-space reciprocal `(Fintype.card Chal)⁻¹` is finite. -/
-private lemma challengeSpaceInv_ne_top : challengeSpaceInv Chal ≠ ⊤ :=
+@[aesop (rule_sets := [finiteness]) safe apply]
+lemma challengeSpaceInv_ne_top : challengeSpaceInv Chal ≠ ⊤ :=
   ne_top_of_le_ne_top ENNReal.one_ne_top <|
     ENNReal.inv_le_one.2 (by exact_mod_cast Fintype.card_pos)
 
@@ -360,6 +361,6 @@ theorem nma_to_hard_relation_bound
     (B := fun pkw => Pr[ fun w : Wit => rel pkw.1 w = true |
       nmaReduction σ hr M nmaAdv qH pkw.1])
     (q := (qH : ENNReal) + 1) (hinv := challengeSpaceInv Chal)
-    challengeSpaceInv_ne_top (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
+    (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
 
 end FiatShamir

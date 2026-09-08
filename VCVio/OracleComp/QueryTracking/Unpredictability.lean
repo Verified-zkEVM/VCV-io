@@ -350,6 +350,51 @@ theorem probEvent_cache_hits_targets_le_of_noCollision {α : Type u}
     fun _ _ t₀ t₁ v₁ v₂ hcache₀ hcache₁ hheq₀ hheq₁ => not_not.1 fun hne =>
       hno ⟨t₀, t₁, v₁, v₂, hne, hcache₀, hcache₁, hheq₀.trans hheq₁.symm⟩
 
+/-- Homogeneous finite-target fresh-hit bound without an artificial inhabited-domain
+assumption.  If the query domain is empty, the event is impossible; otherwise this is the
+homogeneous specialization of `probEvent_cache_hits_targets_le_of_noCollision`. -/
+theorem probEvent_cache_hits_targets_le_of_noCollision_homogeneous
+    {ι Y α : Type u} [DecidableEq ι]
+    [Finite Y] [Inhabited Y] [IsUniformSpec (ι →ₒ Y)]
+    (oa : OracleComp (ι →ₒ Y) α)
+    (n : ℕ) (hbound : IsTotalQueryBound oa n)
+    (targets : Finset Y)
+    (cache₀ : (ι →ₒ Y).QueryCache)
+    (hno : ¬ CacheHasCollision cache₀) :
+    Pr[fun z => ∃ target ∈ targets, ∃ input : ι, ∃ value : Y,
+        z.2 input = some value ∧ cache₀ input = none ∧ value = target |
+      (simulateQ (ι →ₒ Y).cachingOracle oa).run cache₀] ≤
+      ((targets.card * n : ℕ) : ℝ≥0∞) * (Nat.card Y : ℝ≥0∞)⁻¹ := by
+  classical
+  cases isEmpty_or_nonempty ι with
+  | inl hempty =>
+      let _ : IsEmpty ι := hempty
+      refine le_of_eq_of_le (probEvent_eq_zero fun z _ hhit => ?_) zero_le
+      obtain ⟨_, _, input, _⟩ := hhit
+      exact isEmptyElim input
+  | inr hnonempty =>
+      let _ : Nonempty ι := hnonempty
+      let _ : Inhabited ι := Classical.inhabited_of_nonempty inferInstance
+      have hbase := probEvent_cache_hits_targets_le_of_noCollision
+        (spec := ι →ₒ Y) oa n hbound (fun input => by
+          apply Nat.le_of_eq
+          exact @Fintype.card_congr
+            ((ι →ₒ Y).Range default) ((ι →ₒ Y).Range input)
+            (OracleSpec.instFintypeRangeOfFintype default)
+            (OracleSpec.instFintypeRangeOfFintype input) (Equiv.refl Y))
+        targets cache₀ hno
+      have hcard :
+          @Fintype.card ((ι →ₒ Y).Range default)
+            (OracleSpec.instFintypeRangeOfFintype default) = Nat.card Y := by
+        calc
+          @Fintype.card ((ι →ₒ Y).Range default)
+              (OracleSpec.instFintypeRangeOfFintype default) =
+              Nat.card ((ι →ₒ Y).Range default) :=
+                (@Nat.card_eq_fintype_card ((ι →ₒ Y).Range default)
+                  (OracleSpec.instFintypeRangeOfFintype default)).symm
+          _ = Nat.card Y := Nat.card_congr (Equiv.refl Y)
+      simpa only [hcard, heq_eq_eq] using hbase
+
 end Unpredictability
 
 /-! ## Collision-Based Win Bound -/

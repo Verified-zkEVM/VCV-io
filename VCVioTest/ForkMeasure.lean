@@ -44,9 +44,8 @@ example (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
     ((∑ s, Pr[= some s | cf <$> main]) ^ 2 / ((qb i + 1 : ℕ) : ℝ≥0∞)
         - (∑ s, Pr[= some s | cf <$> main]) /
             ((Fintype.card (spec.Range i) : ℕ) : ℝ≥0∞)) ≤
-      PFunctor.FreeM.denote (OracleComp.seededFork main qb js i cf)
-        {result | result.isSome} :=
-  OracleComp.le_denote_isSome_seededFork_sq main qb js i cf
+      𝒟[OracleComp.seededFork main qb js i cf] {result | result.isSome} :=
+  OracleComp.le_evalDist_isSome_seededFork_sq main qb js i cf
 
 end seeded
 
@@ -65,9 +64,8 @@ example [spec.DecidableEq] (main : OracleComp spec α) (qb : ι → ℕ) (i : ι
      let h : ℝ≥0∞ := Fintype.card (spec.Range i)
      let q := qb i + 1
      acc * (acc / q - h⁻¹)) ≤
-      PFunctor.FreeM.denote (OracleComp.contextFork main qb i cf)
-        {result | result.isSome} :=
-  OracleComp.le_denote_isSome_contextFork main qb i cf hreach
+      𝒟[OracleComp.contextFork main qb i cf] {result | result.isSome} :=
+  OracleComp.le_evalDist_isSome_contextFork main qb i cf hreach
 
 end replay
 

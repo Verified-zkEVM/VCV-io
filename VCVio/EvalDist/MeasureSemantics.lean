@@ -145,18 +145,3 @@ instance isMarkovKernel_stateTKernel [MeasurableSpace σ] [MeasurableSpace α]
     semantics.isProbabilityMeasure (computation state)
 
 end ProbabilitySemantics
-
-/-- Deprecated name for the total refinement of `EvalDistSemantics`. -/
-@[deprecated ProbabilitySemantics (since := "2026-08-26")]
-abbrev MeasureSemantics := ProbabilitySemantics
-
-namespace MeasureSemantics
-
-/-- Deprecated constructor for the total free-monad semantics. -/
-@[deprecated ProbabilitySemantics.freeM (since := "2026-08-26")]
-noncomputable abbrev freeM {P : PFunctor.{uA, u}} [∀ a, MeasurableSpace (P.B a)]
-    [P.IsMeasureSpec] [∀ a, DiscreteMeasurableSpace (P.B a)] :
-    MeasureSemantics (PFunctor.FreeM P) :=
-  ProbabilitySemantics.freeM
-
-end MeasureSemantics

@@ -110,13 +110,7 @@ theorem expectedQueryCount_le_of_isTotalRollBound (program : FreeM P α) {bound 
     exact isProbabilityMeasure_denote _
   rw [expectedQueryCount, ← map_length_pathMeasure,
     MeasureTheory.lintegral_map Measurable.of_discrete Measurable.of_discrete]
-  calc
-    (∫⁻ path, (Path.length program path : ℝ≥0∞) ∂pathMeasure program) ≤
-        ∫⁻ _path, (bound : ℝ≥0∞) ∂pathMeasure program := by
-      apply lintegral_mono
-      intro path
-      exact ENNReal.coe_le_coe.2 (Nat.cast_le.2
-        (Path.length_le_of_isTotalRollBound program hbound path))
-    _ = (bound : ℝ≥0∞) := by simp [MeasureTheory.lintegral_const]
+  refine (lintegral_mono (g := fun _ => (bound : ℝ≥0∞)) fun path => ?_).trans_eq (by simp)
+  exact Nat.cast_le.2 (Path.length_le_of_isTotalRollBound program hbound path)
 
 end PFunctor.FreeM

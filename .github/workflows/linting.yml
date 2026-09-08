@@ -6,6 +6,10 @@ on:
     paths:
       - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
+      - "VCVioTest.lean"
+      - "VCVioTest/**/*.lean"
+      - "LatticeCryptoTest.lean"
+      - "LatticeCryptoTest/**/*.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -18,11 +22,19 @@ on:
       - "lakefile.lean"
       - "scripts/nolints-style.txt"
       - ".github/workflows/linting.yml"
+  # Merge-queue refs must run independently of PR path filters: the group can
+  # contain changes from several pull requests.
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
     paths:
       - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
+      - "VCVioTest.lean"
+      - "VCVioTest/**/*.lean"
+      - "LatticeCryptoTest.lean"
+      - "LatticeCryptoTest/**/*.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -46,8 +58,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Repo-wide hygiene checks that the old `scripts/lint-style.sh` enforced.
       - name: Check for executable Lean files
         run: |
@@ -68,7 +79,7 @@ jobs:
           fi
 
       - name: Set up Lean environment
-        uses: leanprover/lean-action@v1
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1
         with:
           auto-config: false
           build: false
@@ -82,6 +93,13 @@ jobs:
 
       # `lake exe lint-style` resolves to Mathlib's text-based style linter (the
       # project deliberately defines no `lint-style` exe, so it does not link the
-      # FFI backends). Pass the libraries explicitly for full coverage.
+      # FFI backends). Libraries are passed by name; the test modules are expanded
+      # from git because `HashSigTest` has no umbrella and `LatticeCryptoTest.lean`
+      # is curated.
       - name: Run text-based style linters
-        run: lake exe lint-style ToMathlib VCVio Extern LatticeCrypto HashSig Examples VCVioWidgets Interop HashSigTest.SLHDSA.Oracle HashSigTest.SLHDSA.Wots HashSigTest.SLHDSA.Xmss HashSigTest.SLHDSA.Fors HashSigTest.SLHDSA.Hypertree HashSigTest.SLHDSA.Scheme HashSigTest.SLHDSA.Sha2KAT HashSigTest.SLHDSA.C13KAT
+        run: |
+          test_modules=$(git ls-files 'VCVioTest/*.lean' 'LatticeCryptoTest/*.lean' \
+            'HashSigTest/*.lean' | sed -e 's/\.lean$//' -e 's#/#.#g')
+          # shellcheck disable=SC2086
+          lake exe lint-style ToMathlib VCVio Extern LatticeCrypto HashSig Examples VCVioWidgets \
+            Interop $test_modules

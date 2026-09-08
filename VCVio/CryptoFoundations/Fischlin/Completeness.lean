@@ -85,6 +85,16 @@ private def minGt (k : ℕ) {b : ℕ} : Option (Fin (2 ^ b)) → Prop
   | none   => True
   | some m => k < m.val
 
+/-- Updating a running minimum preserves exactly the thresholds satisfied by both the new
+sample and the old minimum. This avoids unfolding the comparison into unrelated cases. -/
+private lemma minChoice_gt_iff (k : ℕ) {b : ℕ} (i best : Fin (2 ^ b)) :
+    k < (if i.val < best.val then i else best).val ↔ k < i.val ∧ k < best.val := by
+  by_cases h : i.val < best.val
+  · simp only [h, if_true]
+    exact ⟨fun hi => ⟨hi, hi.trans h⟩, And.left⟩
+  · simp only [h, if_false]
+    exact ⟨fun hbest => ⟨hbest.trans_le (Nat.le_of_not_gt h), hbest⟩, And.right⟩
+
 /-- Tail bound for the min-tracking search from an arbitrary starting `best`: the running
 minimum exceeds `k` with probability `q^t` (scaled by whether the seed `best` already exceeds
 `k`), where `q = (2^b - (k+1)) / 2^b`. Proved by induction on the sample count `t`. -/
@@ -137,8 +147,10 @@ private lemma minUnifAux_probEvent_gt (b k t : ℕ) (best : Option (Fin (2 ^ b))
         · rw [if_pos hb, one_mul, hq, ← probEvent_val_gt_uniformSample b k,
             probEvent_eq_tsum_ite]
           refine tsum_congr fun i => ?_
-          by_cases hi : (i : ℕ) = 0 <;> by_cases hk : k < (i : ℕ) <;>
-            by_cases hib : (i : ℕ) < (b0 : ℕ) <;> simp [hi, hk, hib] <;> omega
+          by_cases hi : (i : ℕ) = 0
+          · simp [hi]
+          · simp only [hi, if_false, minChoice_gt_iff, hb, and_true]
+            simp
         · rw [if_neg hb, zero_mul]
           rw [show (∑' (i : Fin (2 ^ b)), Pr[= i | $ᵗ Fin (2 ^ b)] *
               if (i : ℕ) = 0 then (0 : ℝ≥0∞)
@@ -146,8 +158,10 @@ private lemma minUnifAux_probEvent_gt (b k t : ℕ) (best : Option (Fin (2 ^ b))
               = ∑' (_ : Fin (2 ^ b)), (0 : ℝ≥0∞) from ?_]
           · simp
           · refine tsum_congr fun i => ?_
-            by_cases hi : (i : ℕ) = 0 <;> by_cases hib : (i : ℕ) < (b0 : ℕ) <;>
-              simp [hi, hib] <;> omega
+            by_cases hi : (i : ℕ) = 0
+            · simp [hi]
+            · simp only [hi, if_false, minChoice_gt_iff, hb, and_false]
+              simp
 
 /-- Tail bound for the min-tracking search started fresh (`best = none`): the running minimum
 exceeds `k` with probability exactly `q^t`. This is the per-repetition factor in the Fischlin
@@ -270,22 +284,6 @@ private lemma runtime_evalSPMF_eq
   unfold runtime ProbCompRuntime.evalSPMF SPMFSemantics.evalSPMF SemanticsVia.denote
   simp only [SPMFSemantics.withStateOracle]
   rfl
-
-omit [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal] in
-/-- The Fischlin runtime commutes with binding a lifted `ProbComp` prefix. -/
-private lemma runtime_evalSPMF_bind_liftComp
-    {α β : Type} (oa : ProbComp α)
-    (rest : α → OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M) β) :
-    (runtime ρ b M).evalSPMF (liftM oa >>= rest) =
-      𝒮[oa] >>= fun x => (runtime ρ b M).evalSPMF (rest x) := by
-  classical
-  rw [runtime_evalSPMF_eq]
-  simp_rw [runtime_evalSPMF_eq]
-  rw [simulateQ_bind,
-    roSim.run'_liftM_bind
-      (ro := randomOracle (spec := fischlinROSpec Stmt Commit Chal Resp ρ b M)) (oa := oa)
-      (rest := fun x => simulateQ (fischlinImpl ρ b M) (rest x)) (s := ∅)]
-  rw [evalSPMF_bind]
 
 /-- The pure-probability model game `G` for Fischlin completeness.
 

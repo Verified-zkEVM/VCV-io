@@ -6,6 +6,7 @@ Authors: Quang Dao
 module
 
 public import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
+public import Mathlib.Topology.EMetricSpace.Weak
 
 /-!
 # Symmetric Absolute Difference and Supporting Lemmas for `ℝ≥0∞`
@@ -20,6 +21,7 @@ interactions. These are the building blocks for total variation distance on `PMF
 
 ## Main results
 
+- `ENNReal.absDiff_eq_edist` — `absDiff` is Mathlib's `edist` on `ℝ≥0∞` (the weak extended metric)
 - `ENNReal.absDiff_toReal` — connection to real-valued absolute difference
 - `ENNReal.absDiff_triangle` — triangle inequality
 - `ENNReal.absDiff_tsum_le` — subadditivity of `absDiff` over infinite sums
@@ -48,19 +50,28 @@ lemma absDiff_comm (a b : ℝ≥0∞) : ENNReal.absDiff a b = ENNReal.absDiff b 
 lemma absDiff_le_add (a b : ℝ≥0∞) : ENNReal.absDiff a b ≤ a + b :=
   add_le_add tsub_le_self tsub_le_self
 
-private lemma tsub_le_tsub_add_tsub (a b c : ℝ≥0∞) : a - c ≤ (a - b) + (b - c) := by
-  rw [tsub_le_iff_right]
-  calc a ≤ (a - b) + b := le_tsub_add
-    _ ≤ (a - b) + ((b - c) + c) := by gcongr; exact le_tsub_add
-    _ = ((a - b) + (b - c)) + c := (add_assoc _ _ _).symm
+/-- `absDiff` is the extended distance Mathlib puts on `ℝ≥0∞` (through `WithTop ℝ≥0`, a weak
+extended metric: `⊤` is at distance `⊤` from every finite point and `0` from itself). Mathlib has
+no closed form for that `edist` yet, so this is the bridge from the truncated-subtraction spelling
+to `edist` and its `WeakPseudoEMetricSpace` lemmas. -/
+lemma absDiff_eq_edist (a b : ℝ≥0∞) : ENNReal.absDiff a b = edist a b := by
+  induction a with
+  | top => induction b with
+    | top => simp [ENNReal.absDiff]; rfl
+    | coe b => simp [ENNReal.absDiff]; rfl
+  | coe a => induction b with
+    | top => simp [ENNReal.absDiff]; rfl
+    | coe b =>
+      change _ = ((edist a b : ℝ≥0∞))
+      rw [edist_nndist, ENNReal.absDiff, ← ENNReal.coe_sub, ← ENNReal.coe_sub, ← ENNReal.coe_add,
+        NNReal.nndist_eq]
+      congr 1
+      rcases le_total a b with h | h <;> simp [tsub_eq_zero_of_le h]
 
 lemma absDiff_triangle (a b c : ℝ≥0∞) :
     ENNReal.absDiff a c ≤ ENNReal.absDiff a b + ENNReal.absDiff b c := by
-  unfold ENNReal.absDiff
-  calc (a - c) + (c - a)
-      ≤ ((a - b) + (b - c)) + ((c - b) + (b - a)) :=
-        add_le_add (tsub_le_tsub_add_tsub a b c) (tsub_le_tsub_add_tsub c b a)
-    _ = ((a - b) + (b - a)) + ((b - c) + (c - b)) := by ring
+  simp only [absDiff_eq_edist]
+  exact WeakPseudoEMetricSpace.edist_triangle a b c
 
 /-- `|a - b| + 2·min a b = a + b`, the truncated-subtraction form of the identity that splits a
 total mass into its overlap and its discrepancy. -/
@@ -102,12 +113,8 @@ lemma absDiff_tsub_tsub {a b c : ℝ≥0∞} (ha : a ≤ c) (hb : b ≤ c) (hc :
     exact ENNReal.add_sub_cancel_left hca_ne
 
 @[simp] lemma absDiff_eq_zero {a b : ℝ≥0∞} : ENNReal.absDiff a b = 0 ↔ a = b := by
-  constructor
-  · intro h
-    have h1 : a - b = 0 := by exact_mod_cast (add_eq_zero.mp h).1
-    have h2 : b - a = 0 := by exact_mod_cast (add_eq_zero.mp h).2
-    exact le_antisymm (tsub_eq_zero_iff_le.mp h1) (tsub_eq_zero_iff_le.mp h2)
-  · rintro rfl; exact absDiff_self _
+  rw [absDiff_eq_edist]
+  exact ⟨WeakEMetricSpace.eq_of_edist_eq_zero, fun h => h ▸ WeakPseudoEMetricSpace.edist_self a⟩
 
 /-! ### Tsum inequalities -/
 

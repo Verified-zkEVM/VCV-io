@@ -24,9 +24,7 @@ lake build mlkem_test
 ```
 -/
 
-@[expose] public section
-
-set_option maxRecDepth 2048
+public section
 
 open MLKEM MLKEM.Concrete MLKEM.Test
 

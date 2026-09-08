@@ -7,7 +7,7 @@ Authors: Quang Dao
 module
 
 public import VCVio.CryptoFoundations.MerkleTree.Addressed.NatIndexed.Monadic
-public import VCVio.OracleComp.QueryTracking.QueryBound
+public import VCVio.CryptoFoundations.MerkleTree.Addressed.QueryBound
 
 /-!
 # Query bounds for effectful natural-number-indexed Merkle trees
@@ -140,6 +140,30 @@ theorem isTotalQueryBound_authPathM
       rw [← auth_query_budget_succ]
       omega
 
+/-- The intrinsically shaped authentication-path program has the same callback budget as the
+list-valued traversal. -/
+theorem isTotalQueryBound_intrinsicAuthPathM
+    (leaf : ℕ → OracleComp spec Y)
+    (nodeHash : ℕ → ℕ → Y → Y → OracleComp spec Y)
+    (leafBudget nodeBudget idx z : ℕ)
+    (hleaf : ∀ i, IsTotalQueryBound (leaf i) leafBudget)
+    (hnode : ∀ h i l r, IsTotalQueryBound (nodeHash h i l r) nodeBudget) :
+    IsTotalQueryBound (intrinsicAuthPathM leaf nodeHash idx z)
+      ((2 ^ z - 1) * leafBudget + (2 ^ z - z - 1) * nodeBudget) := by
+  induction z with
+  | zero => exact trivial
+  | succ z ih =>
+      simp only [intrinsicAuthPathM]
+      have hsibling := isTotalQueryBound_merkleRootM leaf nodeHash
+        leafBudget nodeBudget z (sibling (idx / 2 ^ z)) hleaf hnode
+      have hboth := isTotalQueryBound_bind ih fun path =>
+        isTotalQueryBound_bind hsibling fun siblingRoot =>
+          show IsTotalQueryBound
+            (pure (path.push siblingRoot) : OracleComp spec _) 0 from trivial
+      refine hboth.mono ?_
+      rw [← auth_query_budget_succ]
+      omega
+
 /-- Compose an authentication-path traversal with a continuation whose bound applies to every
 well-formed result.  The path-length premise retains the structural fact that `authPathM` returns
 exactly one sibling per level; ordinary `isTotalQueryBound_bind` cannot express this refinement
@@ -186,32 +210,6 @@ theorem isTotalQueryBound_authPathM_bind
       rw [← hbudget]
       simpa [Nat.add_assoc] using hbound
 
-private theorem isTotalQueryBound_getPutativeRootAddressedM
-    {s : Skeleton}
-    (nodeHash : SkeletonInternalIndex s → Y → Y → OracleComp spec Y)
-    (nodeBudget : ℕ) (idx : SkeletonLeafIndex s) (node : Y)
-    (proof : List.Vector Y idx.depth)
-    (hnode : ∀ a l r, IsTotalQueryBound (nodeHash a l r) nodeBudget) :
-    IsTotalQueryBound
-      (AddressedMerkleTree.getPutativeRootAddressedM nodeHash idx node proof)
-      (idx.depth * nodeBudget) := by
-  induction idx generalizing node with
-  | ofLeaf => exact trivial
-  | ofLeft idx ih =>
-      simp only [AddressedMerkleTree.getPutativeRootAddressedM]
-      have hchild := ih (nodeHash := fun a => nodeHash (.ofLeft a))
-        (node := node) (proof := proof.tail) (fun a => hnode (.ofLeft a))
-      have hroot := hnode .ofInternal
-      simpa [SkeletonLeafIndex.depth, Nat.add_mul] using
-        isTotalQueryBound_bind hchild fun child => hroot child proof.head
-  | ofRight idx ih =>
-      simp only [AddressedMerkleTree.getPutativeRootAddressedM]
-      have hchild := ih (nodeHash := fun a => nodeHash (.ofRight a))
-        (node := node) (proof := proof.tail) (fun a => hnode (.ofRight a))
-      have hroot := hnode .ofInternal
-      simpa [SkeletonLeafIndex.depth, Nat.add_mul] using
-        isTotalQueryBound_bind hchild fun child => hroot proof.head child
-
 /-- Root recovery invokes the internal-node callback once per authentication-path entry. -/
 theorem isTotalQueryBound_climbM
     (nodeHash : ℕ → ℕ → Y → Y → OracleComp spec Y)
@@ -219,7 +217,7 @@ theorem isTotalQueryBound_climbM
     (hnode : ∀ h i l r, IsTotalQueryBound (nodeHash h i l r) nodeBudget) :
     IsTotalQueryBound (climbM nodeHash idx node auth) (auth.length * nodeBudget) := by
   unfold climbM
-  simpa using isTotalQueryBound_getPutativeRootAddressedM
+  simpa using AddressedMerkleTree.isTotalQueryBound_getPutativeRootAddressedM
     (fun a => nodeHash (a.natAddr (idx / 2 ^ auth.length)).height
       (a.natAddr (idx / 2 ^ auth.length)).index)
     nodeBudget (SkeletonLeafIndex.ofNat auth.length idx) node ⟨auth.reverse, by simp⟩

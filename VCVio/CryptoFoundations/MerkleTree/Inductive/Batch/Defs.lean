@@ -98,7 +98,7 @@ stores nothing (the verifier is given the claimed leaf value separately, via
 The hypotheses on the pruning constructors make the proof shape canonical for its selector:
 for every selector that selects at least one leaf exactly one constructor applies at each
 node. Conversely the family is *uninhabited* whenever `sel.anySelected = false` (see
-`BatchProof.anySelected_of_batchProof` in `Batch.Uniqueness`): there is no such thing as a
+`BatchProof.anySelected_of_batchProof` below): there is no such thing as a
 batch proof that opens nothing.
 -/
 inductive BatchProof (α : Type u) : {s : Skeleton} → LeafData Bool s → Type u
@@ -115,6 +115,16 @@ inductive BatchProof (α : Type u) : {s : Skeleton} → LeafData Bool s → Type
   | pruneLeft {sₗ sᵣ : Skeleton} {l : LeafData Bool sₗ} {r : LeafData Bool sᵣ}
       (hl : l.anySelected = false) (leftRoot : α) (pr : BatchProof α r) :
       BatchProof α (.internal l r)
+
+/-- A batch proof exists only for selectors that select at least one leaf. This structural
+inhabitation invariant is part of the proof representation's basic API. -/
+theorem BatchProof.anySelected_of_batchProof {s : Skeleton} {sel : LeafData Bool s}
+    (proof : BatchProof α sel) : sel.anySelected = true := by
+  induction proof with
+  | leaf => rfl
+  | internalBoth pl pr ihl ihr => simp [LeafData.anySelected, ihl, ihr]
+  | pruneRight hr rightRoot pl ih => simp [LeafData.anySelected, ih]
+  | pruneLeft hl leftRoot pr ih => simp [LeafData.anySelected, ih]
 
 /-- The tuple of claimed values for the leaves selected by `sel`: one `α` per selected
 leaf, `PUnit` at unselected leaves, products at internal nodes.

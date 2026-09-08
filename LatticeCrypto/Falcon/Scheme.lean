@@ -260,7 +260,6 @@ The Falcon specification uses `Salt = Bytes 40` (40 random bytes = 320 bits),
 chosen as `λ + log₂(Q_s)` for `λ = 256` and `Q_s = 2^64` (Section 2.2.2). -/
 noncomputable def falconSignatureAlg
     (Salt : Type) [DecidableEq Salt] [SampleableType Salt]
-    [SampleableType (Rq p.n)]
     [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p)) :

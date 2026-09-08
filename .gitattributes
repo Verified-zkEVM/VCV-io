@@ -1,0 +1,21 @@
+# Line endings: sources and scripts are LF everywhere so that Lean, Lake, and the shell scripts
+# behave the same on every platform.
+* text=auto
+*.lean text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.tsv text eol=lf
+lean-toolchain text eol=lf
+
+# Binary content.
+*.pdf binary
+
+# Generated or vendored content, kept out of language statistics and collapsed in diffs.
+lake-manifest.json linguist-generated
+scripts/axiom_baseline.json linguist-generated
+scripts/*_baseline.tsv linguist-generated
+third_party/** linguist-vendored

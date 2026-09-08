@@ -16,7 +16,7 @@ changes so that it no longer fires), the build fails and the regression surfaces
 without needing a runtime check.
 -/
 
-@[expose] public section
+public section
 
 open OracleComp ProbComp ENNReal
 
@@ -26,6 +26,12 @@ example : SampleableType Bool := inferInstance
 example : SampleableType (Fin 3) := inferInstance
 example : SampleableType (List.Vector Bool 3) := inferInstance
 example : SampleableType (Vector Bool 3) := inferInstance
+
+-- BitVec sampling and finite enumeration share Mathlib's canonical FinEnum-derived Fintype.
+example (n : ℕ) : (inferInstance : Fintype (BitVec n)) = FinEnum.instFintype := rfl
+
+example (n : ℕ) (x : BitVec n) : Pr[= x | $ᵗ (BitVec n)] = (2 ^ n : ℝ≥0∞)⁻¹ := by
+  simp
 
 /-- The `Fin n → α` base instance is still present after the generalization. -/
 example : SampleableType (Fin 3 → Bool) := inferInstance
@@ -68,9 +74,15 @@ example : SampleableType (Fin 3 ↪ Fin 3) :=
 /-- The underlying `FinEnum` enumerations are computable and have the expected cardinalities:
 `Sym (Fin 2) 2` has `multichoose 2 2 = 3` multisets, `Equiv.Perm (Fin 3)` has `3! = 6`
 permutations, and `Fin 2 ↪ Fin 3` has `3 · 2 = 6` injections. -/
-example : (Sym.finEnum (α := Fin 2) 2).card = 3 := by native_decide
-example : (Equiv.Perm.finEnum (α := Fin 3)).card = 6 := by native_decide
-example : (Function.Embedding.finEnum (β := Fin 2) (α := Fin 3)).card = 6 := by native_decide
+example : (Sym.finEnum (α := Fin 2) 2).card = 3 := by
+  rw [@FinEnum.card_eq_fintypeCard _ (Sym.finEnum 2) _]
+  norm_num [Sym.card_sym_eq_multichoose]
+example : (Equiv.Perm.finEnum (α := Fin 3)).card = 6 := by
+  rw [@FinEnum.card_eq_fintypeCard _ Equiv.Perm.finEnum _]
+  norm_num [Fintype.card_perm]
+example : (Function.Embedding.finEnum (β := Fin 2) (α := Fin 3)).card = 6 := by
+  rw [@FinEnum.card_eq_fintypeCard _ Function.Embedding.finEnum _]
+  norm_num [Fintype.card_embedding_eq]
 
 end SampleableType
 

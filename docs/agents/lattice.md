@@ -20,10 +20,12 @@ Use `VCVio/` when you are changing framework abstractions such as `SignatureAlg`
 - `LatticeCrypto/Ring/Kernel.lean`: `PolyKernel`, `NegacyclicRing`, `NegacyclicRingSemantics`, schoolbook multiplication.
 - `LatticeCrypto/Ring/VectorBackend.lean`: canonical vector-backed instantiation.
 - `LatticeCrypto/Ring/Transform.lean`: `TransformPoly`, `TransformOps`, and transform laws.
+- `LatticeCrypto/Ring/Sampling.lean`: `SampleableType` instances for `backend.Poly` and `TransformPoly`, so `$ᵗ Rq` / `$ᵗ Tq` (and the `RqVec` / `TqMatrix` vectors) work for any scheme whose coefficient type is sampleable.
 - `LatticeCrypto/Ring/Norms.lean`: centered representatives, `NormOps`, and generic norm infrastructure.
 - `LatticeCrypto/Ring/Rounding.lean`: abstract `RoundingOps` and `Power2RoundOps` used by ML-DSA.
 - `LatticeCrypto/Ring/IntegralLift.lean`: `IntegralLift` for Falcon integer-polynomial arithmetic.
-- `LatticeCrypto/Ring/NTTCert.lean`: shared matrix certification scaffolding for concrete NTTs.
+- `LatticeCrypto/Ring/NTTCert.lean`: shared matrix scaffolding plus structural butterfly layouts,
+  stage composition, normalization, and coefficient-backend lifts for concrete NTT certificates.
 - `LatticeCrypto/DiscreteGaussian.lean`: generic discrete Gaussian support used by Falcon.
 
 ### Hardness assumptions
@@ -55,8 +57,16 @@ Use `VCVio/` when you are changing framework abstractions such as `SignatureAlg`
 - `LatticeCrypto/MLKEM/Internal.lean`: deterministic internal algorithms following the FIPS decomposition.
 - `LatticeCrypto/MLKEM/KEM.lean`: top-level checked KEM interface.
 - `LatticeCrypto/MLKEM/Security.lean`: IND-CPA and IND-CCA theorem surfaces.
-- `LatticeCrypto/MLKEM/Concrete/`: executable CBD, encoding, and NTT.
-- `Extern/MLKEM/`: FFI bindings and the FFI-backed instance wiring.
+- `LatticeCrypto/MLKEM/Concrete/`: executable CBD, encoding, and NTT. `concreteEncoding` uses
+  `ByteArray` for every encoded component; the `DecidableEq` instances the generic KEM entry
+  points require are stated on its projections (`(concreteEncoding params).EncodedTHat` /
+  `EncodedU` / `EncodedV`), so no local instances are needed downstream. Encoder output sizes
+  are named laws (`concreteEncoding_byteEncode12Vec_size`, `concreteEncoding_byteEncodeDUVec_size`,
+  `concreteEncoding_byteEncodeDV_size`) tied to `Params.publicKeyBytes` / `Params.ciphertextBytes`.
+- `Extern/MLKEM/`: FFI bindings and the FFI-backed instance wiring. The per-parameter aliases
+  `mlkem512Encoding` / `mlkem768Encoding` / `mlkem1024Encoding` are `abbrev`s so the generic
+  `concreteEncoding` instances resolve through them; `LatticeCryptoTest/MLKEM/Helpers.lean`
+  carries build-time canaries for that path.
 
 ### Falcon
 

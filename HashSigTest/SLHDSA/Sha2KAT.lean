@@ -40,6 +40,19 @@ example (pkSeed pkRoot : Bytes 16) (msg : List Byte) (sigBytes : ByteArray) :
     verifyBytes pkSeed pkRoot msg sigBytes =
       verifyInternalBytes pkSeed pkRoot (emptyContextMessage msg) sigBytes := rfl
 
+/-- The fixed-width decoder directly produces the intrinsic FORS, XMSS, and hypertree shapes.
+This rejects a decoder mutation that restores unconstrained list-valued authentication paths or
+silently drops the one hypertree layer. -/
+example (sigBytes : ByteArray) :
+    let sig := decodeSignature sigBytes
+    sig.fors.toList.length = 6 ∧
+      (∀ i : Fin 6, (sig.fors[i.val]).auth.toList.length = 24) ∧
+      sig.hypertree.toList.length = 1 ∧
+      (HtSigCore.getSingleLayer shaParams_d_eq_one sig.hypertree).wots.toList.length = 68 ∧
+      (HtSigCore.getSingleLayer shaParams_d_eq_one sig.hypertree).auth.toList.length = 22 := by
+  simp only [Vector.length_toList, forall_const]
+  decide
+
 /-- Reference vector `pk_seed(16) ‖ pk_root(16) ‖ sig(3856)` (hex). -/
 def vectorHex : String :=
   "00000000000000000000000000000000c3e6fbd47a5ef8978dc5bd9be0a3076c5dbe24f3fe0e24549613d7baba\

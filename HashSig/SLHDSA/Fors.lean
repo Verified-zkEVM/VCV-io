@@ -94,9 +94,18 @@ def forsRootWith (core : CorePrimitives p) {m : Type → Type*} [Monad m]
 def forsPkAdrs (adrs : Adrs) : Adrs :=
   (adrs.setTypeAndClear .forsRoots).setKeyPairAddress adrs.getKeyPairAddress
 
-/-- A FORS signature over an implementation-independent context. -/
+/-- One intrinsically shaped FORS tree signature: a revealed secret value and exactly `a`
+authentication nodes. -/
+structure ForsTreeSigCore (p : Params) (core : CorePrimitives p) where
+  /-- Secret value selected by the message digest. -/
+  sk : core.Y
+  /-- The `a` sibling nodes, from the leaf level upward. -/
+  auth : Vector core.Y p.a
+
+/-- A FORS signature contains exactly one intrinsically shaped tree signature for each of the
+`k` trees. -/
 abbrev ForsSigCore (p : Params) (core : CorePrimitives p) :=
-  Vector (core.Y × List core.Y) p.k
+  Vector (ForsTreeSigCore p core) p.k
 
 /-- Low-level callback-parametric FORS public-key generation. Roots are computed in increasing
 tree order and compressed only after every root is available. -/
@@ -109,9 +118,9 @@ def forsPkGenWith (core : CorePrimitives p) {m : Type → Type*} [Monad m]
     forsRootWith core hash nodeHash sk pk adrs i.val
   compress (forsPkAdrs adrs) roots.toList
 
-/-- Low-level callback-parametric FORS signing. `authPathM` evaluates only sibling subtrees, so
-the selected leaf is revealed but never hashed by signing. Trees are processed in increasing
-order. -/
+/-- Low-level callback-parametric FORS signing. `intrinsicAuthPathM` evaluates only sibling
+subtrees, so the selected leaf is revealed but never hashed by signing. Trees are processed in
+increasing order. -/
 def forsSignWith (core : CorePrimitives p) {m : Type → Type*} [Monad m]
     (hash : Adrs → core.Y → m core.Y)
     (nodeHash : Adrs → core.Y → core.Y → m core.Y)
@@ -119,9 +128,9 @@ def forsSignWith (core : CorePrimitives p) {m : Type → Type*} [Monad m]
     (adrs : Adrs) : m (ForsSigCore p core) :=
   Vector.ofFnM fun i : Fin p.k => do
     let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-    let path ← PerfectMerkleTree.authPathM (forsLeafWith core hash sk pk adrs)
+    let path ← PerfectMerkleTree.intrinsicAuthPathM (forsLeafWith core hash sk pk adrs)
       (forsNodeHashWith nodeHash adrs) idx p.a
-    return (forsSkGenCore core sk pk adrs idx, path)
+    return ⟨forsSkGenCore core sk pk adrs idx, path⟩
 
 /-- Low-level callback-parametric FORS recovery. Each tree first hashes the revealed secret,
 then climbs its authentication path; recovered roots are compressed in increasing tree order. -/
@@ -132,8 +141,8 @@ def forsPkFromSigWith (core : CorePrimitives p) {m : Type → Type*} [Monad m]
     (sig : ForsSigCore p core) (md : List Byte) (adrs : Adrs) : m core.Y := do
   let roots ← Vector.ofFnM fun i : Fin p.k => do
     let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-    let leaf ← hash (forsNodeAdrs adrs 0 idx) (sig[i.val]).1
-    PerfectMerkleTree.climbM (forsNodeHashWith nodeHash adrs) idx leaf (sig[i.val]).2
+    let leaf ← hash (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk
+    PerfectMerkleTree.climbM (forsNodeHashWith nodeHash adrs) idx leaf (sig[i.val]).auth.toList
   compress (forsPkAdrs adrs) roots.toList
 
 /-! ### Canonical oracle programs -/
@@ -302,7 +311,7 @@ theorem forsSignWith_natural {m n : Type → Type*} [Monad m] [LawfulMonad m]
       forsSignWith core hashn nodeHashn md sk pk adrs := by
   apply monadHom_ofFnM F
   intro i
-  simp [PerfectMerkleTree.authPathM_natural F _ _ _ _
+  simp [PerfectMerkleTree.intrinsicAuthPathM_natural F _ _ _ _
     (fun t => forsLeafWith_natural F core hashm hashn hhash sk pk adrs t)
     (fun z t l r => forsNodeHashWith_natural F nodeHashm nodeHashn hnode adrs z t l r)]
 
@@ -323,12 +332,14 @@ theorem forsPkFromSigWith_natural {m n : Type → Type*} [Monad m] [LawfulMonad 
       forsPkFromSigWith core hashn nodeHashn compressn sig md adrs := by
   have hroots : F (Vector.ofFnM fun i : Fin p.k => do
       let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-      let leaf ← hashm (forsNodeAdrs adrs 0 idx) (sig[i.val]).1
-      PerfectMerkleTree.climbM (forsNodeHashWith nodeHashm adrs) idx leaf (sig[i.val]).2) =
+      let leaf ← hashm (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk
+      PerfectMerkleTree.climbM (forsNodeHashWith nodeHashm adrs) idx leaf
+        (sig[i.val]).auth.toList) =
       (Vector.ofFnM fun i : Fin p.k => do
         let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-        let leaf ← hashn (forsNodeAdrs adrs 0 idx) (sig[i.val]).1
-        PerfectMerkleTree.climbM (forsNodeHashWith nodeHashn adrs) idx leaf (sig[i.val]).2) := by
+        let leaf ← hashn (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk
+        PerfectMerkleTree.climbM (forsNodeHashWith nodeHashn adrs) idx leaf
+          (sig[i.val]).auth.toList) := by
     apply monadHom_ofFnM F
     intro i
     rw [F.mmap_bind, hhash]
@@ -454,37 +465,6 @@ private theorem isTotalQueryBound_ofFnM {ι α : Type} {spec : OracleSpec ι} {k
       simpa using isTotalQueryBound_bind (n₂ := 0) (h (Fin.last k))
         (fun a => show IsTotalQueryBound (pure (xs.push a) : OracleComp spec _) 0 from trivial)
 
-/-- Compose `Vector.ofFnM` with a continuation whose bound depends on an invariant satisfied by
-every generated entry.  The entry hypothesis is deliberately a refined bind rule rather than a
-plain query bound: it lets structured producers such as `authPathM` carry their path-length fact
-into the final continuation without claiming that arbitrary oracle outputs satisfy it. -/
-private theorem isTotalQueryBound_ofFnM_bind_of_forall
-    {ι α β : Type} {spec : OracleSpec ι} {k : ℕ}
-    (g : Fin k → OracleComp spec α) (P : α → Prop) (budget : Fin k → ℕ)
-    (hentry : ∀ i (rest : α → OracleComp spec β) (restBudget : ℕ),
-      (∀ x, P x → IsTotalQueryBound (rest x) restBudget) →
-      IsTotalQueryBound (g i >>= rest) (budget i + restBudget))
-    (rest : Vector α k → OracleComp spec β) (restBudget : ℕ)
-    (hrest : ∀ xs, (∀ i : Fin k, P xs[i.val]) → IsTotalQueryBound (rest xs) restBudget) :
-    IsTotalQueryBound (Vector.ofFnM g >>= rest) ((∑ i, budget i) + restBudget) := by
-  induction k generalizing restBudget with
-  | zero =>
-      rw [Vector.ofFnM_zero]
-      simpa using hrest #v[] (fun i => Fin.elim0 i)
-  | succ k ih =>
-      rw [Vector.ofFnM_succ, bind_assoc, Fin.sum_univ_castSucc]
-      have hprefix := ih
-        (g := fun i => g i.castSucc) (budget := fun i => budget i.castSucc)
-        (rest := fun xs => g (Fin.last k) >>= fun x => rest (xs.push x))
-        (restBudget := budget (Fin.last k) + restBudget)
-        (fun i rest' restBudget' h => hentry i.castSucc rest' restBudget' h)
-        (fun xs hxs => hentry (Fin.last k) (fun x => rest (xs.push x)) restBudget
-          (fun x hx => hrest (xs.push x) (fun i => by
-            refine Fin.lastCases ?_ (fun j => ?_) i
-            · simpa using hx
-            · simpa using hxs j)))
-      simpa [Nat.add_assoc] using hprefix
-
 private theorem publicHash_f_isTotalQueryBound_one (core : CorePrimitives p)
     (pk : core.PkSeed) (adrs : Adrs) (x : core.Y) :
     IsTotalQueryBound
@@ -558,21 +538,21 @@ theorem forsSignM_isTotalQueryBound (core : CorePrimitives p) (md : List Byte)
     (fun i : Fin p.k =>
       (do
         let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-        let path ← PerfectMerkleTree.authPathM
+        let path ← PerfectMerkleTree.intrinsicAuthPathM
           (forsLeafWith core (PublicHash.f core pk) sk pk adrs)
           (forsNodeHashWith (PublicHash.h core pk) adrs) idx p.a
-        return (forsSkGenCore core sk pk adrs idx, path) :
-          OracleComp (publicHashSpec core) (core.Y × List core.Y)))
+        return ForsTreeSigCore.mk (forsSkGenCore core sk pk adrs idx) path :
+          OracleComp (publicHashSpec core) (ForsTreeSigCore p core)))
     (fun _ => (2 ^ p.a - 1) + (2 ^ p.a - p.a - 1))
     (fun i => by
       have hpath : IsTotalQueryBound
-          (PerfectMerkleTree.authPathM
+          (PerfectMerkleTree.intrinsicAuthPathM
             (forsLeafWith core (PublicHash.f core pk) sk pk adrs)
             (forsNodeHashWith (PublicHash.h core pk) adrs)
             (i.val * 2 ^ p.a + forsIdx p md i.val) p.a :
-            OracleComp (publicHashSpec core) (List core.Y))
+            OracleComp (publicHashSpec core) (Vector core.Y p.a))
           ((2 ^ p.a - 1) + (2 ^ p.a - p.a - 1)) := by
-        simpa using PerfectMerkleTree.isTotalQueryBound_authPathM
+        simpa using PerfectMerkleTree.isTotalQueryBound_intrinsicAuthPathM
           (forsLeafWith core (PublicHash.f core pk) sk pk adrs)
           (forsNodeHashWith (PublicHash.h core pk) adrs) 1 1
           (i.val * 2 ^ p.a + forsIdx p md i.val) p.a
@@ -580,8 +560,8 @@ theorem forsSignM_isTotalQueryBound (core : CorePrimitives p) (md : List Byte)
           (fun z t l r => publicHash_h_isTotalQueryBound_one core pk _ l r)
       exact isTotalQueryBound_bind (n₂ := 0) hpath
         (fun path => show IsTotalQueryBound
-          (pure (forsSkGenCore core sk pk adrs
-            (i.val * 2 ^ p.a + forsIdx p md i.val), path) :
+          (pure (ForsTreeSigCore.mk (forsSkGenCore core sk pk adrs
+            (i.val * 2 ^ p.a + forsIdx p md i.val)) path) :
             OracleComp (publicHashSpec core) _) 0 from trivial))
   simpa [forsSignM, forsSignWith] using hpaths
 
@@ -591,47 +571,34 @@ theorem forsPkFromSigM_isTotalQueryBound (core : CorePrimitives p)
     (sig : ForsSigCore p core) (md : List Byte) (pk : core.PkSeed) (adrs : Adrs) :
     IsTotalQueryBound
       (forsPkFromSigM core sig md pk adrs : OracleComp (publicHashSpec core) core.Y)
-      ((∑ i : Fin p.k, (fun j : Fin p.k => 1 + (sig[j.val]).2.length) i) + 1) := by
+      (p.k * (p.a + 1) + 1) := by
+  change IsTotalQueryBound (do
+    let roots ← Vector.ofFnM fun i : Fin p.k => do
+      let idx := i.val * 2 ^ p.a + forsIdx p md i.val
+      let leaf ← PublicHash.f core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk
+      PerfectMerkleTree.climbM (forsNodeHashWith (PublicHash.h core pk) adrs)
+        idx leaf (sig[i.val]).auth.toList
+    PublicHash.tl core pk (forsPkAdrs adrs) roots.toList) _
   have hroots := isTotalQueryBound_ofFnM
     (fun i : Fin p.k =>
       (do
         let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-        let leaf ← PublicHash.f core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).1
+        let leaf ← PublicHash.f core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk
         PerfectMerkleTree.climbM (forsNodeHashWith (PublicHash.h core pk) adrs)
-          idx leaf (sig[i.val]).2 : OracleComp (publicHashSpec core) core.Y))
-    (fun i => 1 + (sig[i.val]).2.length)
-    (fun i => isTotalQueryBound_bind
-      (publicHash_f_isTotalQueryBound_one core pk _ _)
-      (fun leaf => by
-        simpa using PerfectMerkleTree.isTotalQueryBound_climbM
-          (forsNodeHashWith (PublicHash.h core pk) adrs) 1
-          (i.val * 2 ^ p.a + forsIdx p md i.val) leaf (sig[i.val]).2
-          (fun z t l r => publicHash_h_isTotalQueryBound_one core pk _ l r)))
-  exact isTotalQueryBound_bind hroots fun roots =>
+          idx leaf (sig[i.val]).auth.toList : OracleComp (publicHashSpec core) core.Y))
+    (fun _ => p.a + 1)
+    (fun i => by
+      let idx := i.val * 2 ^ p.a + forsIdx p md i.val
+      have hbound := isTotalQueryBound_bind
+        (publicHash_f_isTotalQueryBound_one core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk)
+        (fun leaf => by
+          simpa using PerfectMerkleTree.isTotalQueryBound_climbM
+            (forsNodeHashWith (PublicHash.h core pk) adrs) 1
+            idx leaf (sig[i.val]).auth.toList
+            (fun z t l r => publicHash_h_isTotalQueryBound_one core pk _ l r))
+      simpa [idx, Nat.add_comm] using hbound)
+  simpa using isTotalQueryBound_bind hroots fun roots =>
     publicHash_tl_isTotalQueryBound_one core pk (forsPkAdrs adrs) roots.toList
-
-/-- For a FIPS-shaped signature with `a` authentication nodes per tree, recovery has structural
-upper bound `k * (a + 1) + 1`: one `F` and `a` `H` calls per tree, then `T_k`. The constant is
-the exact callback count; `IsTotalQueryBound` exposes it through the library's upper-bound API. -/
-theorem forsPkFromSigM_isTotalQueryBound_fips (core : CorePrimitives p)
-    (sig : ForsSigCore p core) (md : List Byte) (pk : core.PkSeed) (adrs : Adrs)
-    (hlen : ∀ i : Fin p.k, (sig[i.val]).2.length = p.a) :
-    IsTotalQueryBound
-      (forsPkFromSigM core sig md pk adrs : OracleComp (publicHashSpec core) core.Y)
-      (p.k * (p.a + 1) + 1) := by
-  have h := forsPkFromSigM_isTotalQueryBound core sig md pk adrs
-  have hsum : (∑ i : Fin p.k, (fun j : Fin p.k => 1 + (sig[j.val]).2.length) i) =
-      p.k * (p.a + 1) := by
-    calc
-      (∑ i : Fin p.k, (fun j : Fin p.k => 1 + (sig[j.val]).2.length) i) =
-          ∑ _ : Fin p.k, (p.a + 1) := by
-        apply Finset.sum_congr rfl
-        intro i _
-        change 1 + (sig[i.val]).2.length = p.a + 1
-        rw [hlen i]
-        omega
-      _ = p.k * (p.a + 1) := by simp
-  simpa [hsum] using h
 
 /-- Honest FORS signing followed by recovery stays within the full signing-and-recovery
 schedule.  Signing computes only sibling subtrees; every generated authentication path has
@@ -650,43 +617,13 @@ theorem forsSignM_then_forsPkFromSigM_isTotalQueryBound (core : CorePrimitives p
         OracleComp (publicHashSpec core) (ForsSigCore p core × core.Y))
       (p.k * ((2 ^ p.a - 1) + (2 ^ p.a - p.a - 1)) +
         (p.k * (p.a + 1) + 1)) := by
-  let entryBudget := (2 ^ p.a - 1) + (2 ^ p.a - p.a - 1)
-  let recoveryBudget := p.k * (p.a + 1) + 1
-  let entries : Fin p.k → OracleComp (publicHashSpec core) (core.Y × List core.Y) :=
-    fun i => do
-      let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-      let path ← PerfectMerkleTree.authPathM
-        (forsLeafWith core (PublicHash.f core pk) sk pk adrs)
-        (forsNodeHashWith (PublicHash.h core pk) adrs) idx p.a
-      return (forsSkGenCore core sk pk adrs idx, path)
-  have hentries : ∀ i (rest : core.Y × List core.Y →
-      OracleComp (publicHashSpec core) (ForsSigCore p core × core.Y)) (restBudget : ℕ),
-      (∀ x, x.2.length = p.a → IsTotalQueryBound (rest x) restBudget) →
-      IsTotalQueryBound (entries i >>= rest) (entryBudget + restBudget) := by
-    intro i rest restBudget hrest
-    simp only [entries, bind_assoc, pure_bind]
-    simpa [entryBudget] using
-      (PerfectMerkleTree.isTotalQueryBound_authPathM_bind
-        (forsLeafWith core (PublicHash.f core pk) sk pk adrs)
-        (forsNodeHashWith (PublicHash.h core pk) adrs) 1 1
-        (i.val * 2 ^ p.a + forsIdx p md i.val) p.a restBudget
-        (fun t => publicHash_f_isTotalQueryBound_one core pk _ _)
-        (fun z t l r => publicHash_h_isTotalQueryBound_one core pk _ l r)
-        (fun path => rest (forsSkGenCore core sk pk adrs
-          (i.val * 2 ^ p.a + forsIdx p md i.val), path))
-        (fun path hlength => hrest _ hlength))
-  have hbound := isTotalQueryBound_ofFnM_bind_of_forall entries
-    (fun x => x.2.length = p.a) (fun _ => entryBudget) hentries
-    (fun sig => do
-      let forsPk ← forsPkFromSigM core sig md pk adrs
-      return (sig, forsPk)) recoveryBudget
-    (fun sig hlength => by
-      simpa using isTotalQueryBound_bind (n₂ := 0)
-        (forsPkFromSigM_isTotalQueryBound_fips core sig md pk adrs hlength)
+  exact isTotalQueryBound_bind
+    (forsSignM_isTotalQueryBound core md sk pk adrs) fun sig =>
+      isTotalQueryBound_bind (n₂ := 0)
+        (forsPkFromSigM_isTotalQueryBound core sig md pk adrs)
         (fun forsPk => show IsTotalQueryBound
           (pure (sig, forsPk) :
-            OracleComp (publicHashSpec core) (ForsSigCore p core × core.Y)) 0 from trivial))
-  simpa [forsSignM, forsSignWith, entries, entryBudget, recoveryBudget] using hbound
+            OracleComp (publicHashSpec core) (ForsSigCore p core × core.Y)) 0 from trivial)
 
 /-! ### Pure API equations -/
 
@@ -733,23 +670,23 @@ private theorem simulateQ_ofFnM {ι α : Type} {spec : OracleSpec ι} {k : ℕ}
     (sk : prims.SkSeed) (pk : prims.PkSeed) (adrs : Adrs) :
     forsSign prims md sk pk adrs = Vector.ofFn fun i : Fin p.k =>
       let idx := i.val * 2 ^ p.a + forsIdx p md i.val
-      (forsSkGenCore prims.core sk pk adrs idx,
-        PerfectMerkleTree.authPath (forsLeaf prims sk pk adrs)
+      ForsTreeSigCore.mk (forsSkGenCore prims.core sk pk adrs idx)
+        (PerfectMerkleTree.intrinsicAuthPath (forsLeaf prims sk pk adrs)
           (forsNodeHash prims pk adrs) idx p.a) := by
   unfold forsSign forsSignM forsSignWith
   rw [simulateQ_ofFnM]
   apply Vector.ext
   intro i hi
   simp only [Vector.getElem_ofFn, simulateQ_bind, simulateQ_pure,
-    PerfectMerkleTree.simulateQ_authPathM]
+    PerfectMerkleTree.simulateQ_intrinsicAuthPathM]
   rfl
 
 /-- Every authentication path produced by honest FORS signing has the FIPS-prescribed length
 `a`. -/
 @[simp] theorem forsSign_authPath_length (prims : Primitives p) (md : List Byte)
     (sk : prims.SkSeed) (pk : prims.PkSeed) (adrs : Adrs) (i : Fin p.k) :
-    ((forsSign prims md sk pk adrs)[i.val]).2.length = p.a := by
-  simp [forsSign_eq_ofFn, PerfectMerkleTree.authPath_length]
+    ((forsSign prims md sk pk adrs)[i.val]).auth.toList.length = p.a := by
+  simp
 
 @[simp] theorem forsPkFromSig_eq_tl (prims : Primitives p) (sig : ForsSigCore p prims.core)
     (md : List Byte) (pk : prims.PkSeed) (adrs : Adrs) :
@@ -757,7 +694,8 @@ private theorem simulateQ_ofFnM {ι α : Type} {spec : OracleSpec ι} {k : ℕ}
       (Vector.ofFn (fun i : Fin p.k =>
         let idx := i.val * 2 ^ p.a + forsIdx p md i.val
         PerfectMerkleTree.climb (forsNodeHash prims pk adrs) idx
-          (prims.F pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).1) (sig[i.val]).2)).toList := by
+          (prims.F pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk)
+          (sig[i.val]).auth.toList)).toList := by
   simp only [forsPkFromSig, forsPkFromSigM, forsPkFromSigWith, simulateQ_bind,
     simulateQ_ofFnM, PublicHash.tl, PublicHash.f, simulateQ_HasQuery_query,
     PublicHash.impl]
@@ -882,6 +820,7 @@ theorem forsPkFromSig_forsSign (prims : Primitives p) (md : List Byte) (sk : pri
   have key := PerfectMerkleTree.climb_authPath (forsLeaf prims sk pk adrs)
     (forsNodeHash prims pk adrs) (i * 2 ^ p.a + forsIdx p md i) p.a
   rw [ht] at key
+  rw [PerfectMerkleTree.intrinsicAuthPath_toList]
   simpa only [forsLeaf_eq_f, forsRoot_eq_merkleRoot] using key
 
 /-- Extensional FORS completeness for every fixed total public-hash answer table.

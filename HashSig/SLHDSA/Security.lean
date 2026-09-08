@@ -6,8 +6,9 @@ Authors: Nicolas Consigny
 
 module
 public import HashSig.SLHDSA.Scheme
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTPRE
+public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.SMDTTCR
 public import VCVio.CryptoFoundations.PRF
-public import VCVio.CryptoFoundations.TweakableHash
 
 /-!
 # SLH-DSA Cryptographic Primitive Families
@@ -16,19 +17,24 @@ This module packages the hash and pseudorandom-function primitives used by `slhd
 generic `TweakableHash` and `PRFScheme` interfaces:
 
 - `Primitives.fHash` and `Primitives.hHash` expose `F` and `H` as tweakable hash families with
-  `Adrs` as the tweak;
+  the instantiation's canonical encoded `AdrsKey` as the tweak;
+- `Primitives.thashCollection` packages every fixed input arity of `Thash` under one public seed
+  and encoded-address space;
 - `Primitives.msgPrfScheme` exposes the message randomizer `PRF_msg`; and
 - `Primitives.skPrfScheme` exposes the secret-value derivation function `PRF` at a public seed.
 
 These packages identify the primitive families to which an SLH-DSA security reduction applies.
-An aggregate EUF-CMA theorem additionally needs seed-aware SM-TCR and SM-DSPR games, an `H_msg`
+An aggregate EUF-CMA theorem additionally needs the seed-aware collection games under
+`HardnessAssumptions.TweakableHash`, SM-DT-DSPR and SM-DT-OpenPRE/UD variants, an `H_msg`
 interleaved-target-subset-resilience game, explicit reductions from the forger, and checked query
 bounds. Primitive packaging alone does not supply those ingredients.
 
 ## References
 
 - Bernstein, Hülsing, Kölbl, Niederhagen, Rijneveld, Schwabe, "The SPHINCS+ Signature Framework"
-- Hülsing, Rijneveld, Song, Schwabe, "Mitigating Multi-Target Attacks in Hash-Based Signatures"
+- Hülsing, Rijneveld, and Song, "Mitigating Multi-Target Attacks in Hash-Based Signatures"
+- Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
+  Formally Verified"
 - NIST FIPS 205, §10 (security)
 -/
 
@@ -43,18 +49,58 @@ variable {p : Params} (prims : Primitives p)
 
 /-! ### The SLH-DSA hashes as tweakable hash families / PRFs -/
 
-/-- The chain-step / FORS-leaf hash `F` as a tweakable hash family (tweak = `Adrs`). -/
+/-- The chain-step / FORS-leaf hash `F` as a tweakable hash family.  Its tweak is the exact
+encoded address hashed by the concrete instantiation. -/
 def Primitives.fHash [SampleableType prims.PkSeed] :
-    TweakableHash prims.PkSeed Adrs prims.Y prims.Y where
+    TweakableHash prims.PkSeed prims.AdrsKey prims.Y prims.Y where
   seedGen := $ᵗ prims.PkSeed
-  eval := prims.F
+  eval := fun pkSeed adrsKey x => prims.Thash pkSeed adrsKey [x]
 
-/-- The Merkle / FORS-tree node hash `H` as a tweakable hash family (tweak = `Adrs`, message =
-the ordered sibling pair `(left, right)`). -/
+/-- The Merkle / FORS-tree node hash `H` as a tweakable hash family over encoded addresses and
+ordered sibling pairs. -/
 def Primitives.hHash [SampleableType prims.PkSeed] :
-    TweakableHash prims.PkSeed Adrs (prims.Y × prims.Y) prims.Y where
+    TweakableHash prims.PkSeed prims.AdrsKey (prims.Y × prims.Y) prims.Y where
   seedGen := $ᵗ prims.PkSeed
-  eval := fun pkSeed adrs m => prims.H pkSeed adrs m.1 m.2
+  eval := fun pkSeed adrsKey m => prims.Thash pkSeed adrsKey [m.1, m.2]
+
+/-- The fixed-arity members of SLH-DSA's public `Thash` collection.  Member `arity` accepts
+exactly `arity` ordered nodes, while all members share the sampled public seed, canonical encoded
+address space, and output type. -/
+def Primitives.thashCollection :
+    TweakableHashCollection ℕ prims.PkSeed prims.AdrsKey prims.Y where
+  Msg arity := Vector prims.Y arity
+  eval := fun _ pkSeed adrsKey xs => prims.Thash pkSeed adrsKey xs.toList
+
+/-- The fixed-arity member of SLH-DSA's public `Thash` collection. -/
+def Primitives.thashMember [SampleableType prims.PkSeed] (arity : ℕ) :
+    TweakableHash prims.PkSeed prims.AdrsKey (Vector prims.Y arity) prims.Y where
+  seedGen := $ᵗ prims.PkSeed
+  eval := fun pkSeed adrsKey xs => prims.Thash pkSeed adrsKey xs.toList
+
+/-- Evaluating the collection at `arity` is definitionally the same operation as evaluating the
+corresponding fixed-arity member. -/
+@[simp] theorem Primitives.thashCollection_eval [SampleableType prims.PkSeed] (arity : ℕ) :
+    prims.thashCollection.eval arity = (prims.thashMember arity).eval := rfl
+
+/-- The SM-DT-TCR problem for the `arity`-input member of `Thash`, with the whole `Thash`
+collection available during target selection. -/
+def Primitives.thashTcrProblem [SampleableType prims.PkSeed] (arity numTargets : ℕ) :
+    TweakableHash.SM_DT_TCR_Problem ℕ prims.PkSeed prims.AdrsKey
+      (Vector prims.Y arity) prims.Y where
+  th := prims.thashMember arity
+  thColl := prims.thashCollection
+  numTargets := numTargets
+
+/-- The unrestricted-subspace SM-DT-PRE problem for the `arity`-input member of `Thash`, with the
+whole `Thash` collection available during target selection. -/
+def Primitives.thashPreProblem [SampleableType prims.PkSeed] (arity numTargets : ℕ) :
+    TweakableHash.SM_DT_PRE_Problem ℕ prims.PkSeed prims.AdrsKey
+      (Vector prims.Y arity) (Vector prims.Y arity) prims.Y where
+  th := prims.thashMember arity
+  emb := id
+  emb_injective := Function.injective_id
+  thColl := prims.thashCollection
+  numTargets := numTargets
 
 /-- The message randomizer `PRF_msg` as a `PRFScheme` keyed by `SK.prf`; `eval` is
 `prims.PRFmsg`. -/
