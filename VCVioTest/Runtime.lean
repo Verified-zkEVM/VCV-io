@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 module
 public import VCVio.OracleComp.Runtime
-public import VCVio.EvalDist.MaterializeMissingMass
+public import VCVio.EvalDist.WithFailure
 
 /-! # Stateful runtime producer regressions
 
@@ -16,8 +16,8 @@ Two distinct queries distinguish state reset, reversed logs, and incorrect outpu
 
 public section
 
--- Ordinary imports must not expose a split-projection artifact constructor.
-#check_failure RuntimeArtifact.mk
+-- Ordinary imports must not expose a split-projection run-result constructor.
+#check_failure RunResult.mk
 
 namespace VCVioTest.Runtime
 
@@ -35,9 +35,9 @@ abbrev counter : OracleRuntime (fun _ : Empty => PUnit) (fun _ : Nat => Nat) whe
 
 /-- The observations must come from the same stateful run in query order. -/
 theorem counter_observations :
-    (fun a => (a.output, a.state, a.trace)) <$> counter.runArtifact program =
+    (fun a => (a.output, a.state, a.trace)) <$> counter.run program =
     pure ((9, 12), 12, [⟨2, 9⟩, ⟨3, 12⟩]) := by
-  rw [OracleRuntime.runArtifact_eq]
+  rw [OracleRuntime.run_eq]
   simp only [counter, pure_bind]
   rw [OracleRuntime.runFrom_observe]
   simp [program,

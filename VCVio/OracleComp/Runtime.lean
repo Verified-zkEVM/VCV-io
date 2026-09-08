@@ -11,7 +11,7 @@ public import VCVio.OracleComp.QueryTracking.LoggingOracle
 /-! # Persistent oracle runtimes
 
 A runtime initializes its state once, then interprets surface computations sequentially.
-Artifacts keep each output together with its final state and ordered surface query log.
+Run results keep each output together with its final state and ordered surface query log.
 The carrier does not certify provenance: `OracleRuntime.GeneratedBy` records membership in
 an actual runner's support. Import queries made by setup or handlers are not surface queries.
 This interface uses small types, as do the sequential query-logging laws.
@@ -27,17 +27,17 @@ structure OracleRuntime {ι κ : Type} (Import : OracleSpec ι) (Surface : Oracl
 
 /-- Paired runner output. Construction is controlled by the runtime API; sampling provenance
 is a separate support-membership obligation. -/
-structure RuntimeArtifact {ι κ : Type} {Import : OracleSpec ι} {Surface : OracleSpec κ}
+structure RunResult {ι κ : Type} {Import : OracleSpec ι} {Surface : OracleSpec κ}
     (Γ : OracleRuntime Import Surface) (α : Type) where
   private mk ::
   output : α
   state : Γ.State
   trace : OracleSpec.QueryLog Surface
 
-/-- Artifacts agree when all three paired observations agree. -/
-@[ext] theorem RuntimeArtifact.ext {ι κ : Type} {Import : OracleSpec ι}
+/-- Run results agree when all three paired observations agree. -/
+@[ext] theorem RunResult.ext {ι κ : Type} {Import : OracleSpec ι}
     {Surface : OracleSpec κ} {Γ : OracleRuntime Import Surface} {α : Type}
-    {a b : RuntimeArtifact Γ α} (output : a.output = b.output)
+    {a b : RunResult Γ α} (output : a.output = b.output)
     (state : a.state = b.state) (trace : a.trace = b.trace) : a = b := by
   cases a
   cases b
@@ -50,29 +50,29 @@ variable {ι κ : Type} {Import : OracleSpec ι} {Surface : OracleSpec κ}
 
 /-- Run from a supplied state, recording only the surface query/answer sequence. -/
 def runFrom (s : Γ.State) (program : OracleComp Surface α) :
-    OracleComp Import (RuntimeArtifact Γ α) :=
-  (fun p => RuntimeArtifact.mk p.1.1 p.2 p.1.2) <$>
+    OracleComp Import (RunResult Γ α) :=
+  (fun p => RunResult.mk p.1.1 p.2 p.1.2) <$>
     Γ.handler.runState s program.withQueryLog
 
 /-- Initialize once and retain the paired output, final state, and surface log. -/
-def runArtifact (program : OracleComp Surface α) :
-    OracleComp Import (RuntimeArtifact Γ α) :=
+def run (program : OracleComp Surface α) :
+    OracleComp Import (RunResult Γ α) :=
   Γ.setup >>= fun s => Γ.runFrom s program
 
 /-- Continue a completed phase from its final state, retaining the ordered accumulated log. -/
-def resume (previous : RuntimeArtifact Γ α) (next : α → OracleComp Surface β) :
-    OracleComp Import (RuntimeArtifact Γ β) :=
-  (fun result => RuntimeArtifact.mk result.output result.state
+def resume (previous : RunResult Γ α) (next : α → OracleComp Surface β) :
+    OracleComp Import (RunResult Γ β) :=
+  (fun result => RunResult.mk result.output result.state
     (previous.trace ++ result.trace)) <$> Γ.runFrom previous.state (next previous.output)
 
 /-- Membership in structural runner support, not positive probability for arbitrary specs. -/
-def GeneratedBy (program : OracleComp Surface α) (result : RuntimeArtifact Γ α) : Prop :=
-  result ∈ support (Γ.runArtifact program)
+def GeneratedBy (program : OracleComp Surface α) (result : RunResult Γ α) : Prop :=
+  result ∈ support (Γ.run program)
 
 /-- Initialization is performed before the first phase. -/
-theorem runArtifact_eq (program : OracleComp Surface α) :
-    Γ.runArtifact program = Γ.setup >>= fun s => Γ.runFrom s program := by
-  simp [runArtifact]
+theorem run_eq (program : OracleComp Surface α) :
+    Γ.run program = Γ.setup >>= fun s => Γ.runFrom s program := by
+  simp [run]
 
 /-- All observations are extracted together from one logged stateful execution. -/
 theorem runFrom_observe (s : Γ.State) (program : OracleComp Surface α) :
@@ -104,10 +104,10 @@ theorem runFrom_bind (s : Γ.State) (program : OracleComp Surface α)
     monad_norm]
 
 /-- Resumption does not repeat setup. -/
-theorem runArtifact_bind (program : OracleComp Surface α)
+theorem run_bind (program : OracleComp Surface α)
     (next : α → OracleComp Surface β) :
-    Γ.runArtifact (program >>= next) =
-      Γ.runArtifact program >>= fun a => Γ.resume a next := by
-  simp only [runArtifact, runFrom_bind, bind_assoc]
+    Γ.run (program >>= next) =
+      Γ.run program >>= fun a => Γ.resume a next := by
+  simp only [run, runFrom_bind, bind_assoc]
 
 end OracleRuntime
