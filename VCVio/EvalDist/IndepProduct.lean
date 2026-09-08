@@ -5,7 +5,6 @@ Authors: Devon Tuma
 -/
 module
 
-public import ToMathlib.General
 public import VCVio.EvalDist.Expectation
 
 /-!

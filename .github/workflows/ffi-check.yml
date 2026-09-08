@@ -38,14 +38,6 @@ jobs:
       - name: Fetch Mathlib cache
         run: lake exe cache get
 
-      - name: Build FFI test executables
-        run: lake build mlkem_test mldsa_test falcon_test
-
-      - name: Run ML-KEM FFI tests
-        run: .lake/build/bin/mlkem_test
-
-      - name: Run ML-DSA FFI tests
-        run: .lake/build/bin/mldsa_test
-
-      - name: Run Falcon FFI tests
-        run: .lake/build/bin/falcon_test
+      # The same driver as the per-PR `lake test`, with the native-backed executables added.
+      - name: Run the test driver with the native executables
+        run: lake test -- --ffi

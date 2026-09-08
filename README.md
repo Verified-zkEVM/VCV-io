@@ -24,6 +24,11 @@ Assuming Lean and Lake are already installed, the project can be built by just r
 lake exe cache get && lake build
 ```
 
+`lake build` covers the seven proof libraries. `./scripts/validate.sh` runs the fast per-PR
+checks locally; add `--lint`, `--test`, or `--axioms` for those CI passes. `lake test` builds the
+test libraries and runs the test executables, and `lake lint` runs the environment linters
+(see `AGENTS.md`, *Building*).
+
 CI's timed build covers the non-test Lean libraries `ToMathlib`, `VCVio`,
 `LatticeCrypto`, `Extern`, `HashSig`, `Examples`, and `VCVioWidgets`.
 The build timing report parses per-file timings for that same set.
@@ -37,8 +42,8 @@ for dependencies, so the corresponding `extern_lib` targets fall back to empty
 stub archives when those sources are absent. Downstream executables still link
 unless they call VCVio's native FFI symbols; to enable the real backends, run
 `git submodule update --init --recursive` inside `.lake/packages/VCVio` and
-rebuild. (In this repository itself the same command at the repo root — or
-`scripts/build-project.sh --ffi` — enables the native test executables.)
+rebuild. (In this repository itself the same command at the repo root enables the
+native test executables, which `lake test -- --ffi` then builds and runs.)
 
 Mathematical foundations such as probability theory, computational complexity, and algebraic structures are based on or written to the Mathlib project (see [MATHLIB4](REFERENCES.md#mathlib4)), making all of that library usable in constructions and proofs.
 

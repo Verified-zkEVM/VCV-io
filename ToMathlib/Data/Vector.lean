@@ -5,7 +5,10 @@ Authors: Alexander Hicks
 -/
 module
 
-public import ToMathlib.General
+public import ToMathlib.Data.Vector.Induction
+public import ToMathlib.Data.Vector.ListVector
+public import ToMathlib.Logic.Basic
+public import Mathlib.Control.Monad.Basic
 
 /-!
 # Lemmas about monadic operations on `Vector`

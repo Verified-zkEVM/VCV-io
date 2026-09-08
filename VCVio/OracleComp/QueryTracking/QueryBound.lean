@@ -7,7 +7,6 @@ Authors: Devon Tuma
 module
 public import Mathlib.Algebra.Polynomial.Eval.Defs
 public import PolyFun.PFunctor.Bound
-public import ToMathlib.General
 public import VCVio.OracleComp.EvalDist
 public import VCVio.OracleComp.QueryTracking.CountingOracle
 public import VCVio.OracleComp.SimSemantics.Append
@@ -1876,3 +1875,5 @@ structure PolyQueries {ι : Type} [DecidableEq ι] {spec : ℕ → OracleSpec ι
     IsPerIndexQueryBound (oa n x) (fun i => (qb i).eval n)
 
 end OracleComp
+
+set_option linter.style.longFile 2000

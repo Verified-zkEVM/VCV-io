@@ -2465,3 +2465,5 @@ theorem cma_advantage_le_fork_bound_of_h1h2
       (Stmt := Stmt) (Wit := Wit) adv simT qS qH hQ)
 
 end FiatShamir.Stateful
+
+set_option linter.style.longFile 2600

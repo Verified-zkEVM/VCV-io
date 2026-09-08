@@ -6,15 +6,10 @@ on:
     paths:
       - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
-      - "VCVioTest/SMDTPREFinalValidity.lean"
-      - "VCVioTest/SMDTTCRFinalValidity.lean"
-      - "VCVioTest/ITSR.lean"
-      - "VCVioTest/SMDTDSPRFinalValidity.lean"
-      - "VCVioTest/SMDTOpenPREFinalValidity.lean"
-      - "VCVioTest/SMDTUDFinalValidity.lean"
-      - "VCVioTest/CryptoFoundations/SignatureAlg.lean"
-      - "VCVioTest/SMDTTCR.lean"
-      - "VCVioTest/SMDTPRE.lean"
+      - "VCVioTest.lean"
+      - "VCVioTest/**/*.lean"
+      - "LatticeCryptoTest.lean"
+      - "LatticeCryptoTest/**/*.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -36,15 +31,10 @@ on:
     paths:
       - "ToMathlib/**/*.lean"
       - "VCVio/**/*.lean"
-      - "VCVioTest/SMDTPREFinalValidity.lean"
-      - "VCVioTest/SMDTTCRFinalValidity.lean"
-      - "VCVioTest/ITSR.lean"
-      - "VCVioTest/SMDTDSPRFinalValidity.lean"
-      - "VCVioTest/SMDTOpenPREFinalValidity.lean"
-      - "VCVioTest/SMDTUDFinalValidity.lean"
-      - "VCVioTest/CryptoFoundations/SignatureAlg.lean"
-      - "VCVioTest/SMDTTCR.lean"
-      - "VCVioTest/SMDTPRE.lean"
+      - "VCVioTest.lean"
+      - "VCVioTest/**/*.lean"
+      - "LatticeCryptoTest.lean"
+      - "LatticeCryptoTest/**/*.lean"
       - "Extern/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "HashSig.lean"
@@ -103,26 +93,13 @@ jobs:
 
       # `lake exe lint-style` resolves to Mathlib's text-based style linter (the
       # project deliberately defines no `lint-style` exe, so it does not link the
-      # FFI backends). Pass the libraries explicitly for full coverage.
+      # FFI backends). Libraries are passed by name; the test modules are expanded
+      # from git because `HashSigTest` has no umbrella and `LatticeCryptoTest.lean`
+      # is curated.
       - name: Run text-based style linters
-        run: >-
-          lake exe lint-style ToMathlib VCVio Extern LatticeCrypto HashSig Examples VCVioWidgets
-          Interop VCVioTest.SMDTTCR VCVioTest.SMDTPRE
-          VCVioTest.SMDTPREFinalValidity VCVioTest.SMDTTCRFinalValidity
-          VCVioTest.ITSR VCVioTest.SMDTDSPRFinalValidity VCVioTest.SMDTOpenPREFinalValidity
-          VCVioTest.SMDTUDFinalValidity
-          VCVioTest.CryptoFoundations.SignatureAlg
-          HashSigTest.SLHDSA.Params HashSigTest.SLHDSA.Position HashSigTest.SLHDSA.Oracle
-          HashSigTest.SLHDSA.DataCodecTests
-          HashSigTest.SLHDSA.External
-          HashSig.SLHDSA.Concrete.Prehash
-          HashSigTest.SLHDSA.PrimitiveTests HashSigTest.SLHDSA.WotsEncoding
-          HashSigTest.SLHDSA.WotsConstructionTests HashSigTest.SLHDSA.XmssConstructionTests
-          HashSigTest.SLHDSA.ForsConstructionTests
-          HashSigTest.SLHDSA.HypertreeConformanceTests
-          HashSigTest.SLHDSA.Wots HashSigTest.SLHDSA.Xmss HashSigTest.SLHDSA.Fors
-          HashSigTest.SLHDSA.Hypertree HashSigTest.SLHDSA.HypertreeGeneral
-          HashSigTest.SLHDSA.Scheme HashSigTest.SLHDSA.GeneralScheme
-          HashSigTest.SLHDSA.Sha2KAT HashSigTest.SLHDSA.C13KAT
-          HashSigTest.SLHDSA.ReachableTargets
-          HashSigTest.SLHDSA.EncodedTargets
+        run: |
+          test_modules=$(git ls-files 'VCVioTest/*.lean' 'LatticeCryptoTest/*.lean' \
+            'HashSigTest/*.lean' | sed -e 's/\.lean$//' -e 's#/#.#g')
+          # shellcheck disable=SC2086
+          lake exe lint-style ToMathlib VCVio Extern LatticeCrypto HashSig Examples VCVioWidgets \
+            Interop $test_modules
