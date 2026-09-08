@@ -16,8 +16,7 @@ public import Mathlib.Data.Nat.Cast.Basic
 /-!
 # Counting predicates over lists, `Fin`, and arrays
 
-`List.countP` as a sum over indices, cardinalities of filtered index sets, and the
-`Array` corollary.
+`List.countP` as a sum over indices, the `Fin` form, and the `Array` corollary.
 -/
 
 public section
@@ -35,13 +34,6 @@ lemma List.countP_eq_sum_fin_ite {α : Type*} (xs : List α) (p : α → Bool) :
     refine (Fin.sum_univ_succ _).trans ((add_comm _ _).trans ?_)
     congr 1
   }
-
-lemma List.card_filter_getElem_eq {α : Type*} [DecidableEq α]
-    (xs : List α) (x : α) :
-    (Finset.filter (fun i : Fin (xs.length) ↦ xs[i] = x) Finset.univ).card =
-      xs.count x := by
-  rw [List.count, ← List.countP_eq_sum_fin_ite]
-  simp only [Fin.getElem_fin, beq_iff_eq, Finset.sum_boole, Nat.cast_id]
 
 lemma List.countP_finRange_getElem {α : Type} (l : List α) (p : α → Bool) :
     (List.finRange l.length).countP (fun i => p l[↑i]) = l.countP p := by
