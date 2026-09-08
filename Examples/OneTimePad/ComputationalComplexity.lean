@@ -8,7 +8,6 @@ module
 
 public import ToMathlib.MeasureTheory.DiscreteInstances
 public import ToMathlib.Probability.UniformOn
-public import ToMathlib.General
 public import Examples.OneTimePad.Basic
 public import VCVio.CryptoFoundations.Asymptotics.PathSemantics
 public import VCVio.CryptoFoundations.SymmEncAlg.Measure

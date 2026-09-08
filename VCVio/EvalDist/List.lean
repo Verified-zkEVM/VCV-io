@@ -5,7 +5,6 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 module
-public import ToMathlib.General
 public import VCVio.EvalDist.Defs.NeverFails
 
 /-!

@@ -21,6 +21,7 @@ public import VCVioTest.MerkleTreeExtractability
 public import VCVioTest.MerkleTreeMonadic
 public import VCVioTest.MerkleTreeMultiExtractability
 public import VCVioTest.MonadProbability
+public import VCVioTest.OracleComp.PreservesInv
 public import VCVioTest.OracleComp.SecurityFamily
 public import VCVioTest.PFunctorFacade
 public import VCVioTest.PerfectMerkleTree
@@ -39,6 +40,7 @@ public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
 public import VCVioTest.Tactic.Finiteness
 public import VCVioTest.Tactic.GCongr
+public import VCVioTest.ToMathlib.AbsDiff
 public import VCVioTest.UniformOn
 public import VCVioTest.UniversePolymorphism
 public import VCVioTest.Unpredictability
