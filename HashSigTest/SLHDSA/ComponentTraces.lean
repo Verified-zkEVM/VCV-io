@@ -24,7 +24,10 @@ subtrees and the signing chain steps for signing, and the revealed leaf, its anc
 recovery chain steps for recovery), and to have the length the total query bounds predict: exactly
 for the FORS programs and XMSS root generation, and jointly for XMSS signing and recovery, whose
 individual lengths depend on the message.  Recovered roots are compared with generated ones so the
-logged programs are the real ones.  The internal scheme programs are run end to end: key generation
+logged programs are the real ones.  The hypertree signing and recovery programs are run from the
+digest-derived position and checked to log exactly the XMSS signing and recovery tweak sets
+concatenated along the trajectory, the message at each layer being the previous tree's root, and to
+stay within their query bounds.  The internal scheme programs are run end to end: key generation
 logs exactly the top-layer tree, signing and verification log one `H_msg` query and otherwise only
 ledger tweaks within their query bounds, and verification accepts.
 -/
@@ -204,7 +207,36 @@ def xmssPkFromSigKeys {p : Params} (prims : Primitives p) (msg : prims.Y) (adrs 
     (List.range p.hp).map fun h' =>
       prims.adrsToKey (xmssNodeAdrs adrs (h' + 1) (idx / 2 ^ (h' + 1)))
 
-/-! ## FORS, XMSS, and scheme executions -/
+/-- The positions of a hypertree trajectory, each with its base address, leaf, and the message
+signed there: the given message at the first position, then the root of each position's tree at
+the next, as Algorithms 12 and 13 thread it. -/
+def trajectoryLayers (vp : ValidatedParams) (prims : Primitives vp.params) (skSeed : prims.SkSeed)
+    (pkSeed : prims.PkSeed) : prims.Y → List (LayerPosition vp) → List (prims.Y × Adrs × ℕ)
+  | _, [] => []
+  | msg, pos :: rest =>
+      let root := (loggedRun prims
+        (xmssRootM prims.core skSeed pkSeed pos.toAdrs :
+          OracleComp (publicHashSpec prims.core) prims.Y)).1
+      (msg, pos.toAdrs, pos.leaf.val) :: trajectoryLayers vp prims skSeed pkSeed root rest
+
+/-- The tweaks of hypertree signing along a trajectory: XMSS signing at every layer, and XMSS root
+recovery at every layer but the last, where it happens only when `recoverFinal` (`d = 1`). -/
+def hypertreeSignKeys {p : Params} (prims : Primitives p) (recoverFinal : Bool) :
+    List (prims.Y × Adrs × ℕ) → List prims.AdrsKey
+  | [] => []
+  | [(msg, adrs, idx)] =>
+      xmssSignKeys prims msg adrs idx ++
+        if recoverFinal then xmssPkFromSigKeys prims msg adrs idx else []
+  | (msg, adrs, idx) :: rest =>
+      xmssSignKeys prims msg adrs idx ++ xmssPkFromSigKeys prims msg adrs idx ++
+        hypertreeSignKeys prims recoverFinal rest
+
+/-- The tweaks of hypertree root recovery along a trajectory: XMSS root recovery at every layer. -/
+def hypertreePkFromSigKeys {p : Params} (prims : Primitives p)
+    (layers : List (prims.Y × Adrs × ℕ)) : List prims.AdrsKey :=
+  layers.flatMap fun ⟨msg, adrs, idx⟩ => xmssPkFromSigKeys prims msg adrs idx
+
+/-! ## FORS, XMSS, hypertree, and scheme executions -/
 
 /-- Run the three FORS programs at the digest-derived address and compare their logs with the
 tweak sets above and their lengths with the FORS total query bounds. -/
@@ -267,6 +299,38 @@ def exerciseXmss (vp : ValidatedParams) (label : String) (prims : Primitives vp.
   ensure s!"{label}: xmssSignM -> xmssPkFromSigM = xmssRootM"
     (prims.core.yToBytes recovered == prims.core.yToBytes root)
 
+/-- Run hypertree signing and recovery from the digest-derived position and compare their logs with
+the XMSS tweak sets concatenated along `positions`, the trajectory `LayerPosition.initial`, its
+`next`, and so on through the final layer. -/
+def exerciseHypertree (vp : ValidatedParams) (label : String) (prims : Primitives vp.params)
+    (keyEq : prims.AdrsKey → prims.AdrsKey → Bool) (skSeed : prims.SkSeed)
+    (pkSeed : prims.PkSeed) (msg : prims.Y) (parts : DigestParts vp.params)
+    (positions : List (LayerPosition vp)) : IO Unit := do
+  let p := vp.params
+  let encoded := encodeTargets prims (constructionAddresses vp)
+  ensure s!"{label} hypertree: the trajectory has one position per layer"
+    (positions.length == p.d)
+  let layers := trajectoryLayers vp prims skSeed pkSeed msg positions
+  let (signature, signLog) := loggedRun prims
+    (GeneralHypertree.signM vp prims.core msg skSeed pkSeed parts :
+      OracleComp (publicHashSpec prims.core) (GeneralHypertree.Signature vp prims.core))
+  checkLog prims keyEq s!"{label} GeneralHypertree.signM" signLog encoded
+    (hypertreeSignKeys prims (p.d == 1) layers)
+  ensure s!"{label} GeneralHypertree.signM: the log is within signQueryBound"
+    (signLog.length ≤ GeneralHypertree.signQueryBound p)
+  let (recovered, recoverLog) := loggedRun prims
+    (GeneralHypertree.pkFromSigM vp prims.core msg signature pkSeed parts :
+      OracleComp (publicHashSpec prims.core) prims.Y)
+  checkLog prims keyEq s!"{label} GeneralHypertree.pkFromSigM" recoverLog encoded
+    (hypertreePkFromSigKeys prims layers)
+  ensure s!"{label} GeneralHypertree.pkFromSigM: the log is within recoverQueryBound"
+    (recoverLog.length ≤ GeneralHypertree.recoverQueryBound p)
+  let (root, _) := loggedRun prims
+    (GeneralHypertree.rootM vp prims.core skSeed pkSeed :
+      OracleComp (publicHashSpec prims.core) prims.Y)
+  ensure s!"{label}: GeneralHypertree.signM -> pkFromSigM = rootM"
+    (prims.core.yToBytes recovered == prims.core.yToBytes root)
+
 /-- Run internal key generation, signing, and verification: key generation logs exactly the
 top-layer tree, the other two log one `H_msg` and ledger tweaks within their bounds, and the
 signature verifies. -/
@@ -311,7 +375,7 @@ instance (p : Params) : DecidableEq (shakePrimitives p).Y :=
   inferInstanceAs (DecidableEq (Bytes p.n))
 
 /-- Every check of one profile under one bundle: FORS at the digest address, XMSS at each listed
-position, and the scheme end to end. -/
+position, the hypertree loops along those positions, and the scheme end to end. -/
 def exerciseBundle (vp : ValidatedParams) (label : String) (prims : Primitives vp.params)
     [DecidableEq prims.Y] (keyEq : prims.AdrsKey → prims.AdrsKey → Bool)
     (skSeed : prims.SkSeed) (skPrf : prims.SkPrf) (pkSeed : prims.PkSeed) (msg addrnd : prims.Y)
@@ -319,6 +383,8 @@ def exerciseBundle (vp : ValidatedParams) (label : String) (prims : Primitives v
   exerciseFors vp label prims keyEq skSeed pkSeed (splitDigest vp.params digest)
   for (posLabel, pos) in positions do
     exerciseXmss vp s!"{label}, {posLabel}" prims keyEq skSeed pkSeed msg pos
+  exerciseHypertree vp label prims keyEq skSeed pkSeed msg (splitDigest vp.params digest)
+    (positions.map Prod.snd)
   exerciseScheme vp label prims keyEq skSeed skPrf pkSeed addrnd [0x01, 0x02, 0x03]
 
 def checkTwoLayer : IO Unit := do
@@ -343,8 +409,8 @@ def main : IO Unit := do
   checkTwoLayer
   checkOneLayer
   IO.println "SLH-DSA component trace-target tests: PASS \
-    (two small profiles; logged FORS, XMSS, and internal scheme executions under SHA-2 and \
-    SHAKE handlers against the encoded union ledger and the expected tweak sets)"
+    (two small profiles; logged FORS, XMSS, hypertree, and internal scheme executions under \
+    SHA-2 and SHAKE handlers against the encoded union ledger and the expected tweak sets)"
 
 end SLHDSA.ComponentTracesTest
 
