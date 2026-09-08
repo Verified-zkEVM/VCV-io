@@ -46,10 +46,11 @@ characterizes the node coordinates `mem_forsTreeAddresses` and `mem_xmssNodeAddr
 over.  Whether the construction's free programs query only listed addresses is a separate,
 trace-level statement: `HashSig.SLHDSA.Security.TraceTargets` names the union of the six
 structural ledgers (`constructionAddresses`) and proves it (`QueriesWithinConstructionTargets`)
-for the WOTS+ programs; the FORS, XMSS, hypertree, and scheme programs remain open there.  The
-runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean` checks, for one fixed digest per
-profile, addresses assembled from the construction's address helpers against the ledgers rather
-than running its signing or verification programs.
+for the WOTS+ programs, and `HashSig.SLHDSA.Security.ComponentTraces` proves it for the FORS,
+XMSS, hypertree, and scheme programs.  The runtime canary in
+`HashSigTest/SLHDSA/ReachableTargets.lean` checks, for one fixed digest per profile, addresses
+assembled from the construction's address helpers against the ledgers rather than running its
+signing or verification programs.
 
 The address lists remain structural `Adrs` values.  A concrete primitive maps them to its
 `AdrsKey` only after proving injectivity on the listed reachable family; no global injectivity of

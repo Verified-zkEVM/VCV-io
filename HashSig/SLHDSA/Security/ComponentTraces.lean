@@ -107,7 +107,7 @@ theorem QueriesWithinConstructionTargets.intrinsicAuthPathM {Y : Type}
     QueriesWithinConstructionTargets core
       (PerfectMerkleTree.intrinsicAuthPathM leaf nodeHash idx z) :=
   PerfectMerkleTree.intrinsicAuthPathM_pred_of_tree (QueriesWithinConstructionTargets core)
-    (fun x => queriesWithinConstructionTargets_pure core x)
+    (fun x => QueriesWithinConstructionTargets.pure core x)
     (fun _ _ hprogram hcontinuation =>
       QueriesWithinConstructionTargets.bind hprogram hcontinuation)
     leaf nodeHash idx z hleaf hnode
@@ -121,7 +121,7 @@ theorem QueriesWithinConstructionTargets.climbM {Y : Type}
       QueriesWithinConstructionTargets core (nodeHash h (idx / 2 ^ h) l r)) :
     QueriesWithinConstructionTargets core (PerfectMerkleTree.climbM nodeHash idx node auth) :=
   PerfectMerkleTree.climbM_pred_of_ancestors (QueriesWithinConstructionTargets core)
-    (fun x => queriesWithinConstructionTargets_pure core x)
+    (fun x => QueriesWithinConstructionTargets.pure core x)
     (fun _ _ hprogram hcontinuation =>
       QueriesWithinConstructionTargets.bind hprogram hcontinuation)
     nodeHash idx node auth hnode
@@ -221,7 +221,7 @@ theorem forsSignM_queriesWithinConstructionTargets (md : List Byte) (skSeed : co
       exact publicHash_h_queriesWithinConstructionTargets_of_mem core pkSeed _ l r
         (forsTreeAdrs_mem_constructionAddresses pos tree hh hha hi)
   · intro path
-    exact queriesWithinConstructionTargets_pure core _
+    exact QueriesWithinConstructionTargets.pure core _
 
 /-- FORS public-key recovery at a reachable bottom position queries only union-ledger tweaks:
 for each tree, the revealed leaf and the ancestors climbed lie inside that tree. -/
@@ -423,7 +423,7 @@ theorem xmssSignM_queriesWithinConstructionTargets (msg : core.Y) (skSeed : core
     apply QueriesWithinConstructionTargets.bind
       (wotsSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos)
     intro sig
-    exact queriesWithinConstructionTargets_pure core _
+    exact QueriesWithinConstructionTargets.pure core _
 
 /-- XMSS root recovery at a reachable position queries only union-ledger tweaks: the WOTS+ key is
 recovered at the position's own instance, and the climbed ancestors lie inside its tree. -/
@@ -527,7 +527,7 @@ theorem signFromPositionM_queriesWithinConstructionTargets (skSeed : core.SkSeed
       | false =>
           have h := QueriesWithinConstructionTargets.bind
             (xmssSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos)
-            (fun sig => queriesWithinConstructionTargets_pure core
+            (fun sig => QueriesWithinConstructionTargets.pure core
               (#v[sig] : Vector (XmssSig vp.params core) 1))
           simpa [GeneralHypertree.signFromPositionM, GeneralHypertree.signFromPositionWith,
             xmssSignM] using h
@@ -536,7 +536,7 @@ theorem signFromPositionM_queriesWithinConstructionTargets (skSeed : core.SkSeed
             (xmssSignM_queriesWithinConstructionTargets core msg skSeed pkSeed pos)
             (fun sig => QueriesWithinConstructionTargets.bind
               (xmssPkFromSigM_queriesWithinConstructionTargets core sig msg pkSeed pos)
-              (fun _ => queriesWithinConstructionTargets_pure core
+              (fun _ => QueriesWithinConstructionTargets.pure core
                 (#v[sig] : Vector (XmssSig vp.params core) 1)))
           simpa [GeneralHypertree.signFromPositionM, GeneralHypertree.signFromPositionWith,
             xmssSignM, xmssPkFromSigM] using h
@@ -549,7 +549,7 @@ theorem signFromPositionM_queriesWithinConstructionTargets (skSeed : core.SkSeed
           (fun root => QueriesWithinConstructionTargets.bind
             (ih (recoverFinal := false) (pos := next) (hremaining := by simp [next]; omega)
               (msg := root))
-            (fun rest => queriesWithinConstructionTargets_pure core (rest.insertIdx 0 sig))))
+            (fun rest => QueriesWithinConstructionTargets.pure core (rest.insertIdx 0 sig))))
       simpa [GeneralHypertree.signFromPositionM, GeneralHypertree.signFromPositionWith,
         xmssSignM, xmssPkFromSigM, next, bind_assoc] using h
 
@@ -606,7 +606,7 @@ theorem hypertreeVerifyM_queriesWithinConstructionTargets [DecidableEq core.Y] (
         OracleComp (publicHashSpec core) Bool) :=
   QueriesWithinConstructionTargets.bind
     (hypertreePkFromSigM_queriesWithinConstructionTargets core msg sig pkSeed parts)
-    (fun recovered => queriesWithinConstructionTargets_pure core (decide (recovered = pkRoot)))
+    (fun recovered => QueriesWithinConstructionTargets.pure core (decide (recovered = pkRoot)))
 
 /-- The top-layer root computation of Algorithm 18 queries only union-ledger tweaks: it is
 `xmssRootM` at the reachable tree `LayerTreeCoord.top`. -/
@@ -628,7 +628,7 @@ theorem keygenInternalM_queriesWithinConstructionTargets (skSeed : core.SkSeed)
         OracleComp (publicHashSpec core) (PublicKeyCore core × SecretKeyCore core)) :=
   QueriesWithinConstructionTargets.bind
     (hypertreeRootM_queriesWithinConstructionTargets core skSeed pkSeed)
-    (fun pkRoot => queriesWithinConstructionTargets_pure core
+    (fun pkRoot => QueriesWithinConstructionTargets.pure core
       (PublicKeyCore.mk pkSeed pkRoot, SecretKeyCore.mk skSeed skPrf pkSeed pkRoot))
 
 /-- Algorithm 19 queries only union-ledger tweaks: `H_msg` carries no address, and the FORS and
@@ -653,7 +653,7 @@ theorem signInternalM_queriesWithinConstructionTargets (msg : List Byte)
     (hypertreeSignM_queriesWithinConstructionTargets core forsPk sk.skSeed sk.pkSeed
       (splitDigest vp.params digest))
   intro htSig
-  exact queriesWithinConstructionTargets_pure core _
+  exact QueriesWithinConstructionTargets.pure core _
 
 /-- Algorithm 20 queries only union-ledger tweaks: `H_msg`, then FORS and hypertree recovery at
 the addresses derived from its digest. -/
