@@ -410,6 +410,30 @@ example : Function.Injective fun pos : LayerPosition twoLayer =>
   wotsPkAdrsKey_injective (shakeEncodedTargetLedgerConditions twoLayer
     twoLayerApprovedAddressBounds.toCanonicalAddressBounds)
 
+/-- The `F`-preimage witness's own role ledger: a PRE reduction's one-step-per-chain selection
+lists the address the witness names, at a chain whose selected step is the one below the honest
+digit. -/
+example (pos : LayerPosition twoLayer) (i : Fin twoLayerParams.len)
+    (msg' : (sha2Primitives twoLayerParams).Y)
+    (select : WotsChainCoord twoLayer → Option (Fin (twoLayerParams.w - 1)))
+    {step : Fin (twoLayerParams.w - 1)} (hsel : select (pos, i) = some step)
+    (hstep : step.val = chainStepsCore (sha2Primitives twoLayerParams).core msg' i.val - 1) :
+    (wotsChainAdrs (wotsInstanceAdrs pos) i.val).setHashAddress
+        (chainStepsCore (sha2Primitives twoLayerParams).core msg' i.val - 1) ∈
+      optionalWotsAddresses twoLayer select :=
+  wotsPreimageAdrs_mem_optionalWotsAddresses pos i msg' select hsel hstep
+
+/-- And distinct chains retained by one such selection carry distinct encoded tweaks under the
+SHA-2 encoder. -/
+example (select : WotsChainCoord twoLayer → Option (Fin (twoLayerParams.w - 1)))
+    {c d : WotsChainCoord twoLayer} {sc sd : Fin (twoLayerParams.w - 1)}
+    (hc : select c = some sc) (hd : select d = some sd)
+    (hkey : (sha2Primitives twoLayerParams).adrsToKey (wotsStepAdrs c sc) =
+      (sha2Primitives twoLayerParams).adrsToKey (wotsStepAdrs d sd)) :
+    c = d :=
+  wotsOptionalStepAdrsKey_injective
+    (sha2EncodedTargetLedgerConditions twoLayer twoLayerApprovedAddressBounds) select hc hd hkey
+
 /-! ## The encoded-distinctness hypothesis is load-bearing
 
 `Concrete.sha2AdrsKey` sends every address outside its checked domain to the all-zero key, which is
