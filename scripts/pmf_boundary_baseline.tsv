@@ -56,6 +56,7 @@ VCVio/EvalDist/ExpectationMeasure.lean	1
 VCVio/EvalDist/FailureMeasure.lean	8
 VCVio/EvalDist/Fintype.lean	6
 VCVio/EvalDist/IndepProduct.lean	6
+VCVio/EvalDist/IndepProductMeasure.lean	4
 VCVio/EvalDist/Inequalities.lean	1
 VCVio/EvalDist/Instances/ErrorT.lean	37
 VCVio/EvalDist/Instances/FinRatPMF.lean	24

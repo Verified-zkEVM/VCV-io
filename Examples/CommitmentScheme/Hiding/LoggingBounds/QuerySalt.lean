@@ -315,11 +315,7 @@ lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_su
             ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 cm)).run qch.2)
             (fun z : Bool × HidingCountState M S C =>
               (z.2.2 s - qch.2.2 s : ℝ≥0∞))) := by
-    refine Finset.sum_le_sum ?_
-    intro s hs
-    refine OracleComp.ProgramLogic.wp_mono
-      ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 cm)).run qch.2) ?_
-    intro z
+    gcongr with s hs z
     by_cases hslt : qch.2.2 s < z.2.2 s
     · simp [OracleComp.ProgramLogic.propInd, hslt]
       have hsub : 1 ≤ (z.2.2 s - qch.2.2 s : ℕ) := by

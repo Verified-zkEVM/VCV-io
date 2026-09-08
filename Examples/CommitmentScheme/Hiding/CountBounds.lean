@@ -1044,17 +1044,12 @@ lemma probEvent_countAll_bad_le_wp_countPred
     OracleComp.ProgramLogic.wp
       ((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0))
       (fun z : Bool × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - 1 : ℝ≥0∞)) := by
-  rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd,
-    OracleComp.ProgramLogic.wp_eq_tsum, OracleComp.ProgramLogic.wp_eq_tsum]
-  refine ENNReal.tsum_le_tsum fun z => ?_
-  by_cases hz : z ∈ support ((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0))
-  · simp only [OracleComp.ProgramLogic.propInd_eq_ite]
-    exact mul_le_mul'
-      le_rfl
-      (bad_indicator_le_count_pred_of_mem_support_run_hidingImplCountAll
-        (M := M) (S := S) (C := C) A s hz)
-  · rw [probOutput_eq_zero_of_not_mem_support hz]
-    simp [OracleComp.ProgramLogic.propInd_eq_ite]
+  rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd, OracleComp.ProgramLogic.wp_eq_expectedValue,
+    OracleComp.ProgramLogic.wp_eq_expectedValue]
+  gcongr with z hz
+  simp only [OracleComp.ProgramLogic.propInd_eq_ite]
+  exact bad_indicator_le_count_pred_of_mem_support_run_hidingImplCountAll
+    (M := M) (S := S) (C := C) A s hz
 
 /- Fixed-salt expectation bound for the counted excess at the challenge salt. -/
 lemma wp_countPred_le_queryBound_of_run_hidingImplCountAll

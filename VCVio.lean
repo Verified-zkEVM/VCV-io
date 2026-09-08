@@ -143,6 +143,7 @@ public import VCVio.EvalDist.ExpectationMeasure
 public import VCVio.EvalDist.FailureMeasure
 public import VCVio.EvalDist.Fintype
 public import VCVio.EvalDist.IndepProduct
+public import VCVio.EvalDist.IndepProductMeasure
 public import VCVio.EvalDist.Inequalities
 public import VCVio.EvalDist.Instances.ErrorT
 public import VCVio.EvalDist.Instances.FinRatPMF
