@@ -47,11 +47,13 @@ clones.  This module constructs no reductions and states no inequality.
 ## Exposure
 
 The seven collection problems are `@[expose]`d because a downstream adversary's collection query
-carries a `Vector prims.Y arity` at type `(problem).thColl.Msg arity`, which only type-checks when
-the record body is available.  The three standalone problems, the `H_msg` keyed family, the ITSR
-problem, and `hmsgIndices` are opaque and are consumed through exported equations such as
-`*_th`, `*_thColl`, `*_inputGen`, `*_numTargets`, `*_eq_toDSPR`/`*_eq_toTCR`, `hmsgKeyedHash_*`,
-`hmsgItsrProblem_*`, `hmsgIndices_length`, and `mem_hmsgIndices`.
+carries a `Vector prims.Y arity` at type `(problem).thColl.Msg arity`, which type-checks directly
+only when the record body is available (an opaque record would force a `cast` along a `thColl.Msg`
+projection equation into every collection query and every reduction's oracle simulation).  The
+three standalone problems, the `H_msg` keyed family, the ITSR problem, and `hmsgIndices` are opaque
+and are consumed through exported equations such as `*_th`, `*_thColl`, `*_inputGen`,
+`*_numTargets`, `*_eq_toDSPR`/`*_eq_toTCR`, `hmsgKeyedHash_*`, `hmsgItsrProblem_*`,
+`hmsgIndices_length`, and `mem_hmsgIndices`.
 
 ## Follow-ups
 
@@ -341,7 +343,6 @@ theorem wotsFUdCProblem_eval_adrsToKey [SampleableType prims.PkSeed] [Sampleable
       prims.F pkSeed address input := rfl
 
 /-- The FORS-`F` open-preimage game attacks the construction's own `F` evaluation. -/
-@[simp]
 theorem forsFOpenPreProblem_eval_adrsToKey [SampleableType prims.PkSeed] [SampleableType prims.Y]
     (pkSeed : prims.PkSeed) (address : Adrs) (input : prims.Y) :
     (forsFOpenPreProblem prims).th.eval pkSeed (prims.adrsToKey address) input =
@@ -475,14 +476,12 @@ theorem hmsgItsrProblem_khf [SampleableType prims.Y] :
     (hmsgItsrProblem prims).khf = hmsgKeyedHash prims := by rfl
 
 /-- The ITSR problem hashes with the bundle's own `H_msg`. -/
-@[simp]
 theorem hmsgItsrProblem_hash [SampleableType prims.Y] (randomizer : prims.Y)
     (input : HmsgITSRInput prims.PkSeed prims.Y) :
     (hmsgItsrProblem prims).khf.hash randomizer input =
       prims.Hmsg randomizer input.pkSeed input.pkRoot input.request := by rfl
 
 /-- The ITSR problem samples the randomizer uniformly for every target query. -/
-@[simp]
 theorem hmsgItsrProblem_keygen [SampleableType prims.Y] :
     (hmsgItsrProblem prims).khf.keygen = $ᵗ prims.Y := by rfl
 

@@ -131,9 +131,9 @@ def fipsSets : List FipsParameterSet :=
     .SLHDSA_SHA2_256s, .SLHDSA_SHA2_256f, .SLHDSA_SHAKE_128s, .SLHDSA_SHAKE_128f,
     .SLHDSA_SHAKE_192s, .SLHDSA_SHAKE_192f, .SLHDSA_SHAKE_256s, .SLHDSA_SHAKE_256f]
 
-/-- Reference FORS caps `(forsTl, forsF, forsH)` per FIPS 205 Table 2 row, computed by hand as
-`2 ^ h`, `2 ^ h * k * 2 ^ a`, and `2 ^ h * k * (2 ^ a - 1)` from the table's `h`, `k`, and `a`
-rather than from `Params` or `targetCount`. -/
+/-- Reference FORS caps `(forsTl, forsF, forsH)` per FIPS 205 Table 2 row, computed independently
+of `Params` and `targetCount` as `2 ^ h`, `2 ^ h * k * 2 ^ a`, and `2 ^ h * k * (2 ^ a - 1)` from
+the table's `h`, `k`, and `a`. -/
 def fipsForsCaps : FipsParameterSet → ℕ × ℕ × ℕ
   | .SLHDSA_SHA2_128s | .SLHDSA_SHAKE_128s =>
       (9223372036854775808, 528905046081400263933952, 528775918872884297072640)
@@ -148,12 +148,12 @@ def fipsForsCaps : FipsParameterSet → ℕ × ℕ × ℕ
   | .SLHDSA_SHA2_256f | .SLHDSA_SHAKE_256f =>
       (295147905179352825856, 5289050460814002639339520, 5278720284132725290434560)
 
-/-- On every FIPS set the three FORS caps equal the Table 2 reference values, the XMSS cap is the
-hypertree's internal-node count `2 ^ h - 1`, the WOTS+ instance count is the closed geometric form
-`(2 ^ (h + hp) - 2 ^ hp) / (2 ^ hp - 1)` and exceeds the bottom layer's `2 ^ h`, and the WOTS+ `F`
-caps are that count times `len = 2n + 3` (times `w = 16` for the target-collision role), using the
-`lg_w = 4` constants FIPS 205 fixes rather than `Params.len` and `Params.w`.  None of these checks
-restates a defining equation of `targetCount`. -/
+/-- On every FIPS set the three FORS caps equal reference values derived from the FIPS 205 Table 2
+rows, the XMSS cap is the hypertree's internal-node count `2 ^ h - 1`, the WOTS+ instance count is
+the closed geometric form `(2 ^ (h + hp) - 2 ^ hp) / (2 ^ hp - 1)` and exceeds the bottom layer's
+`2 ^ h`, and the WOTS+ `F` caps are that count times `len = 2n + 3` (times `w = 16` for the
+target-collision role), using the `lg_w = 4` constants FIPS 205 fixes rather than `Params.len` and
+`Params.w`.  None of these checks restates a defining equation of `targetCount`. -/
 def checkFipsCaps : IO Unit := do
   for set in fipsSets do
     let p := set.params
