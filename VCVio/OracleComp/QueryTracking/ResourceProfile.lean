@@ -295,7 +295,7 @@ profile, is the same as substituting the composite implementation
 
 /-- Evaluating a purely intrinsic profile after instantiation leaves the intrinsic cost
 unchanged. -/
-@[simp] lemma eval_instantiate_ofIntrinsic [AddCommMonoid ω]
+lemma eval_instantiate_ofIntrinsic [AddCommMonoid ω]
     (w : ω) (impl : κ → ResourceProfile ω κ') (weights : κ' → ω) :
     ((ofIntrinsic (κ := κ) w).instantiate impl).eval weights =
       (ofIntrinsic (κ := κ) w).eval (fun k => (impl k).eval weights) := by
@@ -303,7 +303,7 @@ unchanged. -/
 
 /-- Evaluating a purely symbolic usage profile after instantiation amounts to evaluating each
 capability implementation and summing the resulting scalar costs. -/
-@[simp] lemma eval_instantiate_ofUsage [AddCommMonoid ω]
+lemma eval_instantiate_ofUsage [AddCommMonoid ω]
     (u : κ →₀ ℕ) (impl : κ → ResourceProfile ω κ') (weights : κ' → ω) :
     ((ofUsage (ω := ω) u).instantiate impl).eval weights =
       (ofUsage (ω := ω) u).eval (fun k => (impl k).eval weights) := by

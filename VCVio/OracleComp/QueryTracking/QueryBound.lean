@@ -462,7 +462,6 @@ theorem isPerIndexQueryBound_iff_isRollBound (oa : OracleComp spec α) (qb : ι 
         (fun t qb => Function.update qb t (qb t - 1)) :=
   Iff.rfl
 
-@[simp]
 lemma isPerIndexQueryBound_pure (x : α) (qb : ι → ℕ) :
     IsPerIndexQueryBound (pure x : OracleComp spec α) qb := trivial
 
@@ -472,7 +471,6 @@ lemma isPerIndexQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp s
       0 < qb t ∧ ∀ u, IsPerIndexQueryBound (mx u) (Function.update qb t (qb t - 1)) :=
   Iff.rfl
 
-@[simp]
 lemma isPerIndexQueryBound_query_iff (t : ι) (qb : ι → ℕ) :
     IsPerIndexQueryBound (liftM (spec.query t) : OracleComp spec _) qb ↔
     0 < qb t := by
@@ -537,7 +535,6 @@ lemma isPerIndexQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleCom
     IsPerIndexQueryBound (oa >>= ob) (qb₁ + qb₂) :=
   isPerIndexQueryBound_bind_aux oa ob qb₂ h2 h1
 
-@[simp]
 lemma isPerIndexQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb : ι → ℕ) :
     IsPerIndexQueryBound (f <$> oa) qb ↔ IsPerIndexQueryBound oa qb :=
   isQueryBound_map_aux oa f _ _

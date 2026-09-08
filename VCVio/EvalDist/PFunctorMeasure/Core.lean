@@ -84,7 +84,6 @@ noncomputable def denote [MeasurableSpace α] : FreeM P α → Measure α
 theorem denote_pure [MeasurableSpace α] (x : α) :
     denote (pure x : FreeM P α) = Measure.dirac x := rfl
 
-@[simp]
 theorem denote_liftBind [MeasurableSpace α] (a : P.A) (cont : P.B a → FreeM P α) :
     denote (FreeM.liftBind a cont)
       = Measure.bind (IsMeasureSpec.toMeasure a) fun b => denote (cont b) := rfl

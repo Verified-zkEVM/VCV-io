@@ -71,7 +71,6 @@ def singleHash {m : Type _ → Type _} [Monad m] [hq : HasQuery (spec α) m]
   return out
 
 /-- Interpreting one Merkle hash query applies the supplied hash implementation. -/
-@[simp]
 lemma simulateQ_singleHash (f : QueryImpl (spec α) Id) (left right : α) :
     simulateQ f
         (singleHash (m := OracleComp (spec α)) left right) =

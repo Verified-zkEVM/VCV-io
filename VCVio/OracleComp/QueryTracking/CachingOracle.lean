@@ -335,7 +335,6 @@ lemma run_none {t : spec.Domain} {cache : spec.QueryCache} (h : cache t = none) 
 /-- Trivially true via `probFailure_eq_zero` since both sides are `OracleComp` computations.
 A generic `withCaching` version for arbitrary base monads would require a separate argument
 because caching changes the oracle semantics (cache hits skip the underlying oracle call). -/
-@[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [IsUniformSpec spec₀] {α : Type}
     (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
@@ -350,7 +349,6 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
     NeverFail ((simulateQ spec₀.cachingOracle oa).run cache) ↔ NeverFail oa := by
   rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff, probFailure_run_simulateQ]
 
-@[simp]
 lemma simulateQ_query (t : spec.Domain) :
     simulateQ cachingOracle (liftM (query t)) = cachingOracle t := by
   simp [_root_.simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query]

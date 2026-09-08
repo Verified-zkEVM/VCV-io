@@ -108,7 +108,7 @@ def globalLeafIndex (p : Params) (tree : TreeIndex p) (leaf : LeafIndex p) :
   simp [globalLeafIndex, Params.t]
 
 /-- The exact global coordinate used by canonical signing and recovery is the decoded coordinate. -/
-@[simp] theorem globalLeafIndex_decode_val (p : Params) (md : ForsDigest p)
+theorem globalLeafIndex_decode_val (p : Params) (md : ForsDigest p)
     (tree : TreeIndex p) :
     (globalLeafIndex p tree (decodeIndices p md)[tree.val]).val =
       tree.val * 2 ^ p.a + forsIdx p md.toList tree.val := by
@@ -127,7 +127,7 @@ def decodeDigestParts {p : Params} (parts : DigestParts p) :
 /-- Algorithm 16's authentication entry is the exact sibling subtree of the digest-selected
 global leaf.  The statement specializes the canonical intrinsic path; no alternate path engine is
 introduced. -/
-@[simp] theorem intrinsicAuthPath_decode_get {Y : Type} (p : Params)
+theorem intrinsicAuthPath_decode_get {Y : Type} (p : Params)
     (leaf : ℕ → Y) (nodeHash : ℕ → ℕ → Y → Y → Y)
     (md : ForsDigest p) (tree : TreeIndex p) (j : Fin p.a) :
     (PerfectMerkleTree.intrinsicAuthPath leaf nodeHash
@@ -155,7 +155,7 @@ introduced. -/
 
 /-- Honest signing consumes the typed decoder's exact global coordinate; the signature remains the
 canonical intrinsic `ForsTreeSigCore` with no adapter or competing representation. -/
-@[simp] theorem forsSign_get_eq_decoded {p : Params} (prims : Primitives p)
+theorem forsSign_get_eq_decoded {p : Params} (prims : Primitives p)
     (md : ForsDigest p) (sk : prims.SkSeed) (pk : prims.PkSeed) (adrs : Adrs)
     (tree : TreeIndex p) :
     (forsSign prims md.toList sk pk adrs)[tree.val] =

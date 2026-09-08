@@ -105,7 +105,6 @@ lemma somePathSatisfies_pure (x : α) :
   cases sp
   exact hc
 
-@[simp]
 lemma allPathsSatisfy_query_bind (q : spec.Domain)
     (oa : spec.Range q → OracleComp spec α) :
     allPathsSatisfy queryPred outputPred possibleOutputs
@@ -131,7 +130,6 @@ lemma allPathsSatisfy_query_bind (q : spec.Domain)
           PFunctor.FreeM.Cursor.trace_down, TraceList.directionsWithin_cons] at hw ⊢
         exact h answer hw.1 ⟨res, tail⟩ hw.2
 
-@[simp]
 lemma somePathSatisfies_query_bind (q : spec.Domain)
     (oa : spec.Range q → OracleComp spec α) :
     somePathSatisfies queryPred outputPred possibleOutputs
