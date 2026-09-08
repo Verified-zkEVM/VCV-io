@@ -9,7 +9,7 @@ Examples/Schnorr/SigmaProtocol.lean	1
 LatticeCrypto/DiscreteGaussian.lean	1
 LatticeCrypto/MLDSA/Security.lean	1
 LatticeCrypto/MLDSA/SecurityNMA.lean	4
-ToMathlib/General.lean	28
+ToMathlib/Probability/ProbabilityMassFunction/Lemmas.lean	28
 ToMathlib/Probability/Divergence/RenyiDiscrete.lean	56
 ToMathlib/Probability/ProbabilityMassFunction/Measure.lean	6
 ToMathlib/Probability/ProbabilityMassFunction/RadonNikodym.lean	19

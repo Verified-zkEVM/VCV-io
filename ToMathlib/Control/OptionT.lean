@@ -9,7 +9,7 @@ module
 public import Batteries.Control.AlternativeMonad
 public import Batteries.Control.OptionT
 public import PolyFun.Control.Monad.Hom
-public import ToMathlib.General
+public import ToMathlib.Control.Monad.Fold
 
 /-!
 # Lemmas about `OptionT`

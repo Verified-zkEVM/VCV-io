@@ -11,7 +11,6 @@ public import VCVio.OracleComp.QueryTracking.CountingOracle
 public import VCVio.OracleComp.ProbComp
 public import VCVio.EvalDist.Monad.Map
 public import ToMathlib.Control.WriterT
-public import ToMathlib.General
 public import ToMathlib.Probability.ProbabilityMassFunction.TailSums
 public import Mathlib.Algebra.Order.Monoid.Defs
 public import Mathlib.Topology.Algebra.InfiniteSum.ENNReal

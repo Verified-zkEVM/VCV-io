@@ -8,7 +8,8 @@ module
 public import Mathlib.Probability.ProbabilityMassFunction.Monad
 public import Batteries.Control.AlternativeMonad
 public import PolyFun.Control.Monad.Hom
-public import ToMathlib.General
+public import ToMathlib.Probability.ProbabilityMassFunction.Lemmas
+public import ToMathlib.Topology.Algebra.InfiniteSum.Option
 
 /-!
 # Sub-Probability Distributions
