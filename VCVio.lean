@@ -111,6 +111,7 @@ public import VCVio.EvalDist.Instances.OptionT
 public import VCVio.EvalDist.Instances.ReaderT
 public import VCVio.EvalDist.Kernel
 public import VCVio.EvalDist.List
+public import VCVio.EvalDist.MaterializeMissingMass
 public import VCVio.EvalDist.MeasureSemantics
 public import VCVio.EvalDist.MeasureTVDist
 public import VCVio.EvalDist.Monad.Basic
@@ -185,6 +186,7 @@ public import VCVio.OracleComp.QueryTracking.Tracing
 public import VCVio.OracleComp.QueryTracking.Unpredictability
 public import VCVio.OracleComp.QueryTracking.WriterCost
 public import VCVio.OracleComp.RunIO
+public import VCVio.OracleComp.Runtime
 public import VCVio.OracleComp.SimSemantics.Append
 public import VCVio.OracleComp.SimSemantics.OptionT.Basic
 public import VCVio.OracleComp.SimSemantics.QueryImpl.Basic

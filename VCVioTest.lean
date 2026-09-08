@@ -22,6 +22,7 @@ public import VCVioTest.PerfectMerkleTree
 public import VCVioTest.ProbabilityTactics
 public import VCVioTest.QueryHom
 public import VCVioTest.RoundByRound.OneRound
+public import VCVioTest.Runtime
 public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
 public import VCVioTest.UniformOn
