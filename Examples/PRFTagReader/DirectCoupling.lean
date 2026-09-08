@@ -227,7 +227,7 @@ end ReaderCoupling
 
 /-- `slotZeroSubTable` agrees with `projectTable` pointwise. Useful for rewriting this module's
 direct-coupling statements into the established sibling phrasing in `Table.lean`. -/
-@[simp] lemma slotZeroSubTable_eq_projectTable_apply
+lemma slotZeroSubTable_eq_projectTable_apply
     (gS : (TagId × Fin sessionsPerTag) × Nonce → Digest) (p : TagId × Nonce) :
     slotZeroSubTable (sessionsPerTag := sessionsPerTag) gS p =
       projectTable (TagId := TagId) (Nonce := Nonce) (Digest := Digest)

@@ -387,7 +387,7 @@ noncomputable def drawList (oa : ProbComp R) : ℕ → ProbComp (List R)
 omit [DecidableEq R] in
 /-- The front-block draw never fails: it only ever draws from `oa` (which is failure-free) and
 returns, so `drawList oa n` has zero failure mass. -/
-@[simp] lemma probFailure_drawList (oa : ProbComp R) (n : ℕ) :
+lemma probFailure_drawList (oa : ProbComp R) (n : ℕ) :
     Pr[⊥ | drawList oa n] = 0 := by
   induction n with
   | zero => simp [drawList]

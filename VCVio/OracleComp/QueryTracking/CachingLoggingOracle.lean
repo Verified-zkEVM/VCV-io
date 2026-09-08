@@ -206,7 +206,6 @@ theorem fst_map_run_simulateQ {α : Type u}
     (QueryImpl.ofLift spec (OracleComp spec)) (fun t u => [⟨t, u⟩]) oa s
 
 /-- Output-only projection corollary of `fst_map_run_simulateQ`. -/
-@[simp]
 theorem run'_simulateQ_eq {α : Type u}
     (oa : OracleComp spec α) (s : QueryCache spec × QueryLog spec) :
     (simulateQ cachingLoggingOracle oa).run' s =

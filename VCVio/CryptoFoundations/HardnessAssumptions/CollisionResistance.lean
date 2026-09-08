@@ -185,7 +185,6 @@ pre-spec query through `ROMHashSpec.cachingOracle` is the generic
 `cachingOracle` action at the post-cache spec. The two specs are
 definitionally equal as `OracleSpec X`, so this is `cachingOracle.simulateQ_query`
 at the post-cache spec. -/
-@[simp]
 lemma ROMHashSpec.simulateQ_cachingOracle_query {X Y : Type} [DecidableEq X] (x : X) :
     simulateQ ROMHashSpec.cachingOracle (liftM ((ROMHashSpec X Y).query x)) =
       OracleSpec.cachingOracle (spec := ROMHashSpec.cached X Y) x :=

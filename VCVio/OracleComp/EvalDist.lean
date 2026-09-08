@@ -279,7 +279,6 @@ lemma support_eq_evalSPMF_support :
   EvalDistCompatible.support_eq_SPMF_support oa
 
 /-- An output has non-zero probability in `evalSPMF` iff it is in computation support. -/
-@[simp]
 lemma mem_support_evalSPMF_iff :
     some x ∈ (𝒮[oa]).run.support ↔ x ∈ support oa := by
   rw [support_eq_evalSPMF_support, PMF.mem_support_iff, SPMF.mem_support_iff,
@@ -288,7 +287,6 @@ lemma mem_support_evalSPMF_iff :
 alias ⟨mem_support_of_mem_support_evalSPMF, mem_support_evalSPMF⟩ := mem_support_evalSPMF_iff
 
 /-- Finite-support variant of `mem_support_evalSPMF_iff`. -/
-@[simp]
 lemma mem_support_evalSPMF_iff' [DecidableEq α] :
     some x ∈ (𝒮[oa]).run.support ↔ x ∈ finSupport oa := by
   rw [mem_support_evalSPMF_iff (oa := oa) (x := x), mem_finSupport_iff_mem_support]
@@ -301,11 +299,9 @@ section NeverFail
 
 variable [IsProbabilitySpec spec]
 
-@[simp]
 lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : probFailure oa = 0 ↔ NeverFail oa := by
   simp [neverFail_iff]
 
-@[simp]
 lemma probFailure_pos_iff (oa : OracleComp spec α) : 0 < probFailure oa ↔ ¬ NeverFail oa := by
   simp [neverFail_iff]
 
@@ -363,7 +359,7 @@ section guard
 
 variable [IsProbabilitySpec spec]
 
-@[simp] lemma probOutput_guard {p : Prop} [Decidable p] :
+lemma probOutput_guard {p : Prop} [Decidable p] :
     Pr[= () | (guard p : OptionT (OracleComp spec) Unit)] = if p then 1 else 0 := by
   rw [OracleComp.guard_eq]
   split_ifs with h
@@ -373,7 +369,8 @@ variable [IsProbabilitySpec spec]
     -- post-refactor diamond. Compute directly.
     simp [OptionT.probOutput_eq, OptionT.run_failure, probOutput_pure]
 
-@[simp] lemma probFailure_guard {p : Prop} [Decidable p] :
+@[simp]
+lemma probFailure_guard {p : Prop} [Decidable p] :
     Pr[⊥ | (guard p : OptionT (OracleComp spec) Unit)] = if p then 0 else 1 := by
   rw [OracleComp.guard_eq]
   split_ifs with h
@@ -381,7 +378,7 @@ variable [IsProbabilitySpec spec]
   · -- See note above.
     simp [OptionT.probFailure_eq, OptionT.run_failure]
 
-@[simp] lemma support_guard {p : Prop} [Decidable p] :
+lemma support_guard {p : Prop} [Decidable p] :
     support (guard p : OptionT (OracleComp spec) Unit) = if p then {()} else ∅ := by
   rw [OracleComp.guard_eq]; split_ifs <;> simp
 
@@ -498,7 +495,6 @@ lemma supportWhen_pure (o : QueryImpl spec Set) (x : α) :
   unfold supportWhen
   rw [simulateQ_pure, SetM.run_pure]
 
-@[simp]
 lemma supportWhen_query_bind (o : QueryImpl spec Set) (q : spec.Domain)
     (oa : spec.Range q → OracleComp spec α) :
     supportWhen o ((query q : OracleComp spec _) >>= oa) =

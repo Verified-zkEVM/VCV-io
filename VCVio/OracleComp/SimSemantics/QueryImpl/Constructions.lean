@@ -91,7 +91,7 @@ abbrev preInsert (so : QueryImpl spec m) (nx : spec.Domain → n α) :
     QueryImpl spec n :=
   PFunctor.Handler.preInsert (P := spec.toPFunctor) so nx
 
-@[simp, grind =]
+@[grind =]
 lemma preInsert_apply [LawfulMonad n] (so : QueryImpl spec m) (nx : spec.Domain → n α)
     (t : spec.Domain) :
     so.preInsert nx t = (do let _ ← nx t; liftM (so t)) := by
@@ -261,7 +261,7 @@ abbrev postInsert (so : QueryImpl spec m) {α}
 variable {α β : Type u}
 
 omit [Monad m] in
-@[simp, grind =]
+@[grind =]
 lemma postInsert_apply (so : QueryImpl spec m)
     (nx : (t : spec.Domain) → spec.Range t → n α) (t : spec.Domain) :
     so.postInsert nx t = (do let u ← liftM (so t); let _ ← nx t u; return u) := by

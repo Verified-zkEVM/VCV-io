@@ -233,7 +233,6 @@ theorem wp_StateT_pure {σ : Type} (x : α) (post : α → σ → ℝ≥0∞) :
   exact MAlgOrdered.wp_pure (m := OracleComp spec) (l := ℝ≥0∞) (x, s)
     (fun p : α × σ => post p.1 p.2)
 
-@[simp]
 theorem wp_StateT_get {σ : Type} (post : σ → σ → ℝ≥0∞) :
     Std.Do'.wp (MonadStateOf.get : StateT σ (OracleComp spec) σ) post Lean.Order.bot =
       fun s => post s s := by
@@ -249,7 +248,6 @@ theorem wp_StateT_set {σ : Type} (s' : σ) (post : PUnit → σ → ℝ≥0∞)
   exact MAlgOrdered.wp_pure (m := OracleComp spec) (l := ℝ≥0∞) (PUnit.unit, s')
     (fun p : PUnit × σ => post p.1 p.2)
 
-@[simp]
 theorem wp_StateT_modifyGet {σ : Type} (f : σ → α × σ) (post : α → σ → ℝ≥0∞) :
     Std.Do'.wp (MonadStateOf.modifyGet f : StateT σ (OracleComp spec) α) post
       Lean.Order.bot = fun s => post (f s).1 (f s).2 := by
@@ -271,7 +269,6 @@ theorem wp_StateT_monadLift {σ : Type} (oa : OracleComp spec α)
 
 /-! ## `OptionT (OracleComp spec)` WP normalization -/
 
-@[simp]
 theorem wp_OptionT_bind (x : OptionT (OracleComp spec) α)
     (f : α → OptionT (OracleComp spec) β) (post : β → ℝ≥0∞)
     (epost : EPost.cons ℝ≥0∞ EPost.nil) :
@@ -287,19 +284,16 @@ theorem wp_OptionT_bind (x : OptionT (OracleComp spec) α)
   congr 1 with o
   cases o <;> simp [EPost.cons.pushOption]
 
-@[simp]
 theorem wp_OptionT_pure (x : α) (post : α → ℝ≥0∞)
     (epost : EPost.cons ℝ≥0∞ EPost.nil) :
     Std.Do'.wp (pure x : OptionT (OracleComp spec) α) post epost = post x :=
   MAlgOrdered.wp_pure (m := OracleComp spec) (l := ℝ≥0∞) (some x) (epost.pushOption post)
 
-@[simp]
 theorem wp_OptionT_failure (post : α → ℝ≥0∞)
     (epost : EPost.cons ℝ≥0∞ EPost.nil) :
     Std.Do'.wp (failure : OptionT (OracleComp spec) α) post epost = epost.head :=
   MAlgOrdered.wp_pure (m := OracleComp spec) (l := ℝ≥0∞) none (epost.pushOption post)
 
-@[simp]
 theorem wp_OptionT_monadLift (oa : OracleComp spec α) (post : α → ℝ≥0∞)
     (epost : EPost.cons ℝ≥0∞ EPost.nil) :
     Std.Do'.wp (MonadLift.monadLift oa : OptionT (OracleComp spec) α) post epost =
@@ -309,14 +303,12 @@ theorem wp_OptionT_monadLift (oa : OracleComp spec α) (post : α → ℝ≥0∞
     MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post
   simp only [MAlgOrdered.wp_bind, MAlgOrdered.wp_pure]
 
-@[simp]
 theorem wp_OptionT_lift (oa : OracleComp spec α) (post : α → ℝ≥0∞)
     (epost : EPost.cons ℝ≥0∞ EPost.nil) :
     Std.Do'.wp (OptionT.lift oa : OptionT (OracleComp spec) α) post epost =
       Std.Do'.wp oa post Lean.Order.bot :=
   wp_OptionT_monadLift oa post epost
 
-@[simp]
 theorem wp_OptionT_map (f : α → β) (x : OptionT (OracleComp spec) α)
     (post : β → ℝ≥0∞) (epost : EPost.cons ℝ≥0∞ EPost.nil) :
     Std.Do'.wp (f <$> x) post epost = Std.Do'.wp x (fun a => post (f a)) epost := by
@@ -330,7 +322,6 @@ theorem wp_OptionT_map (f : α → β) (x : OptionT (OracleComp spec) α)
 
 /-! ## `ExceptT (OracleComp spec)` WP normalization -/
 
-@[simp]
 theorem wp_ExceptT_bind {ε : Type} (x : ExceptT ε (OracleComp spec) α)
     (f : α → ExceptT ε (OracleComp spec) β) (post : β → ℝ≥0∞)
     (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
@@ -346,19 +337,16 @@ theorem wp_ExceptT_bind {ε : Type} (x : ExceptT ε (OracleComp spec) α)
   congr 1 with ea
   cases ea <;> simp [EPost.cons.pushExcept, MAlgOrdered.wp_pure]
 
-@[simp]
 theorem wp_ExceptT_pure {ε : Type} (x : α) (post : α → ℝ≥0∞)
     (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
     Std.Do'.wp (pure x : ExceptT ε (OracleComp spec) α) post epost = post x :=
   MAlgOrdered.wp_pure (m := OracleComp spec) (l := ℝ≥0∞) (Except.ok x) (epost.pushExcept post)
 
-@[simp]
 theorem wp_ExceptT_throw {ε : Type} (e : ε) (post : α → ℝ≥0∞)
     (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
     Std.Do'.wp (throw e : ExceptT ε (OracleComp spec) α) post epost = epost.head e :=
   MAlgOrdered.wp_pure (m := OracleComp spec) (l := ℝ≥0∞) (Except.error e) (epost.pushExcept post)
 
-@[simp]
 theorem wp_ExceptT_monadLift {ε : Type} (oa : OracleComp spec α) (post : α → ℝ≥0∞)
     (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
     Std.Do'.wp (MonadLift.monadLift oa : ExceptT ε (OracleComp spec) α) post epost =

@@ -65,14 +65,14 @@ vs `E₁.Range t`, both abstract atoms) the type annotations diverge and
 `id_map` no longer fires under `simp only`. This lemma sidesteps the artifact
 entirely and is the canonical entry point for simplifying `simulateQ` over an
 explicit `spec.query t`. -/
-@[simp, grind =]
+@[grind =]
 lemma simulateQ_spec_query [LawfulMonad r] (t : spec.Domain) :
     simulateQ impl (liftM (spec.query t)) = impl t := by
   simp [simulateQ_query]
 
 /-- A direct-style `HasQuery.query` in `OracleComp` is the canonical primitive query when
 interpreted by `simulateQ`. -/
-@[simp, grind =]
+@[grind =]
 lemma simulateQ_HasQuery_query [LawfulMonad r] (t : spec.Domain) :
     simulateQ impl
         (HasQuery.query (spec := spec) (m := OracleComp spec) t) =
@@ -128,13 +128,11 @@ theorem evalWithAnswerFn_bind {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id
   change simulateQ f (mx >>= my) = simulateQ f (my (simulateQ f mx))
   rw [simulateQ_bind]; rfl
 
-@[simp]
 theorem evalWithAnswerFn_query {ι} {spec : OracleSpec ι} (f : QueryImpl spec Id)
     (t : spec.Domain) :
     evalWithAnswerFn f (query t : OracleComp spec _) = f t := by
   simp [evalWithAnswerFn]
 
-@[simp]
 lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
     (ou : α → OracleComp spec β) : simulateQ impl (liftM q >>= ou) =
       liftM (impl q.input) >>= fun u => simulateQ impl (ou (q.cont u)) := by aesop
@@ -265,7 +263,6 @@ lemma simulateQ_list_mapM (f : α → OracleComp spec β) (xs : List α) :
   | cons x xs ih => simp [List.mapM_cons, simulateQ_bind, ih]
 
 /-- `simulateQ` distributes over `List.forM`. -/
-@[simp]
 lemma simulateQ_list_forM (f : α → OracleComp spec PUnit) (xs : List α) :
     simulateQ impl (xs.forM f) = xs.forM (fun a => simulateQ impl (f a)) := by
   induction xs with

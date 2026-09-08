@@ -49,7 +49,6 @@ lemma withAddCost_apply {ω : Type} [AddMonoid ω]
   simp [withAddCost, AddWriterT.addTell, QueryImpl.withCost]
 
 /-- Cost instrumentation on a left-summand query, with the component response type exposed. -/
-@[simp]
 lemma withAddCost_apply_inl {ι₁ ι₂ : Type} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
     {ω : Type} [AddMonoid ω] (impl : QueryImpl (spec₁ + spec₂) m)
     (costFn : (spec₁ + spec₂).Domain → ω) (t : spec₁.Domain) :
@@ -59,7 +58,6 @@ lemma withAddCost_apply_inl {ι₁ ι₂ : Type} {spec₁ : OracleSpec ι₁} {s
   rw [withAddCost_apply, restrictLeft_apply]
 
 /-- Cost instrumentation on a right-summand query, with the component response type exposed. -/
-@[simp]
 lemma withAddCost_apply_inr {ι₁ ι₂ : Type} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
     {ω : Type} [AddMonoid ω] (impl : QueryImpl (spec₁ + spec₂) m)
     (costFn : (spec₁ + spec₂).Domain → ω) (t : spec₂.Domain) :

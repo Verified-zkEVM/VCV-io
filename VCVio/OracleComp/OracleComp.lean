@@ -92,7 +92,7 @@ lemma liftM_ne_pure (q : OracleQuery spec α) (x : α) :
 lemma pure_ne_liftM (x : α) (q : OracleQuery spec α) :
     pure x ≠ liftM (n := OracleComp spec) q := PFunctor.FreeM.pure_ne_liftObj q x
 
-@[simp, grind =]
+@[grind =]
 protected lemma liftM_map (q : OracleQuery spec α) (f : α → β) :
     liftM (n := OracleComp spec) (f <$> q) = f <$> liftM q := rfl
 
@@ -268,12 +268,12 @@ def isPure {α : Type _} : OracleComp spec α → Bool
 @[simp] lemma isPure_query : isPure (query t : OracleComp spec _) = false := rfl
 @[simp] lemma isPure_query_bind : isPure (liftM (OracleSpec.query t) >>= ou) = false := rfl
 
-@[simp] lemma pure_ne_query :
+lemma pure_ne_query :
     (pure u : OracleComp spec _) ≠ query t := by
   intro h
   have h' := congrArg (isPure (spec := spec)) h
   simp at h'
-@[simp] lemma query_ne_pure :
+lemma query_ne_pure :
     (query t : OracleComp spec _) ≠ pure u := by
   exact Ne.symm (pure_ne_query (spec := spec) t u)
 
@@ -297,7 +297,7 @@ def totalQueries [spec.Fintype] {α : Type v} (oa : OracleComp spec α) : ℕ :=
 section inj
 
 /-- Two `pure` computations are equal iff they return the same value. -/
-@[simp] lemma pure_inj (x y : α) : pure (f := OracleComp spec) x = pure y ↔ x = y :=
+lemma pure_inj (x y : α) : pure (f := OracleComp spec) x = pure y ↔ x = y :=
   PFunctor.FreeM.pure_inj x y
 
 /-- Binding two computations gives a pure operation iff the first computation is pure

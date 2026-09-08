@@ -319,12 +319,10 @@ theorem simulateQ_recoverFromPositionM_withPublicHash (vp : ValidatedParams)
 
 /-! ## Functional correctness -/
 
-@[simp]
 private theorem head_insertIdx_zero {X : Type*} {n : ℕ} (rest : Vector X n) (x : X) :
     (rest.insertIdx 0 x).head = x := by
   simp [Vector.head, Vector.insertIdx_zero]
 
-@[simp]
 private theorem tail_insertIdx_zero {X : Type*} {n : ℕ} (rest : Vector X n) (x : X) :
     (rest.insertIdx 0 x).tail = rest := by
   rw [Vector.insertIdx_zero]
