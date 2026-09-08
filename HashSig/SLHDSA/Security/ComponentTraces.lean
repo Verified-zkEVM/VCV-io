@@ -13,9 +13,10 @@ import VCVio.CryptoFoundations.MerkleTree.Addressed.NatIndexed.QueryBound
 
 This module extends the pathwise predicate `QueriesWithinConstructionTargets` of
 `HashSig.SLHDSA.Security.TraceTargets` from the WOTS+ programs to the FORS, XMSS, hypertree, and
-internal scheme programs.  Each theorem says that every public-hash query a program can issue,
-under any oracle answers, uses an encoded address from the union ledger `constructionAddresses`;
-the `*_traceContract` theorems pair that with the program's total query bound.
+internal scheme programs.  Each theorem says that every `thash` query a program can issue, under
+any oracle answers, uses an encoded address from the union ledger `constructionAddresses`, while
+`H_msg`, which carries no address, is accepted unconditionally; the `*_traceContract` theorems pair
+that with the program's total query bound.
 
 The FORS programs are certified at the FORS address of a reachable `BottomPosition`, and through
 `BottomPosition.ofDigestParts` at the digest-derived address `DigestParts.forsAdrs` that
@@ -40,18 +41,32 @@ The hypertree loops `GeneralHypertree.signFromPositionM` and `recoverFromPositio
 from any reachable `LayerPosition` by induction on the remaining layers, each layer applying the
 XMSS lemmas at the current position before `LayerPosition.next`; `GeneralHypertree.signM`,
 `pkFromSigM`, and `verifyM` are their instances at `LayerPosition.initial`, and
-`GeneralHypertree.rootM` is `xmssRootM` at the top tree `LayerTreeCoord.top`.  The internal scheme
-programs `GeneralScheme.keygenInternalM`, `signInternalM`, and `verifyInternalM` sequence `H_msg`,
-which the predicate accepts unconditionally, with the FORS programs at the digest-derived address
-and the hypertree programs above.  The contracts at these two levels pair the predicate with the
-bounds of `HashSig.SLHDSA.HypertreeGeneral.QueryBound` and `GeneralSchemeQueryBound`, which are
-upper bounds rather than exact counts.
+`GeneralHypertree.rootM` is `xmssRootM` at the top tree `LayerTreeCoord.top`, whose base address
+`LayerTreeCoord.top_toAdrs_layerAdrs` identifies with the one Algorithm 18 uses.  The internal
+scheme programs `GeneralScheme.keygenInternalM`, `signInternalM`, and `verifyInternalM` sequence
+`H_msg` with the FORS programs at the digest-derived address and the hypertree programs above.  The
+contracts at these two levels pair the predicate with the bounds of
+`HashSig.SLHDSA.HypertreeGeneral.QueryBound` and `GeneralSchemeQueryBound`, which are upper bounds
+rather than exact counts.
+
+Theorem names follow the program names, with one convention: the `GeneralHypertree` programs carry
+the `hypertree` prefix (`hypertreeSignM_…` certifies `GeneralHypertree.signM`), which keeps them
+apart from the XMSS programs and from any future `signM`, while the `GeneralScheme` programs keep
+their FIPS names unqualified (`keygenInternalM_…` certifies `GeneralScheme.keygenInternalM`), the
+depth-one programs being the `slh*InternalM` family.
 
 ## References
 
 - NIST FIPS 205, §6 (Algorithms 9--11, the XMSS programs), §7 (Algorithms 12--13, the hypertree
   programs), §8 (Algorithms 14--17, the FORS programs), and §9 (Algorithms 18--20, the internal
   scheme programs)
+- Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
+  Formally Verified".  Its EasyCrypt development imposes an analogous address-validity discipline
+  as oracle preconditions: `valid_xadrs`, split by `valid_xadrs_xadrschpkcotrh` into chain,
+  public-key-compression, and tree-hash addresses (`proofs/FL_SL_XMSS_MT_ES.ec`), and
+  `valid_fadrs` (`proofs/FORS_ES.ec`).  `mem_constructionAddresses_iff` is the analogue of that
+  split here, six-way because the FORS and WOTS+ roles are separate ledgers; no correspondence
+  between the two developments is claimed.
 -/
 
 public section
@@ -150,8 +165,8 @@ theorem forsRootAdrs_mem_constructionAddresses (pos : BottomPosition vp) :
 
 /-! ## FORS programs -/
 
-/-- One FORS tree root at a reachable bottom position issues `F` only at that tree's leaves and
-`H` only at its internal nodes. -/
+/-- One FORS tree root at a reachable bottom position queries only union-ledger tweaks: its `F`
+queries are at that tree's leaves and its `H` queries at its internal nodes. -/
 theorem forsRootM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
     (pos : BottomPosition vp) (tree : Fin vp.params.k) :
     QueriesWithinConstructionTargets core
@@ -328,8 +343,8 @@ private theorem lt_pow_of_div_pow_lt {i z t hp : ℕ} (hz : z ≤ hp) (hi : i / 
 
 /-! ## XMSS programs -/
 
-/-- The XMSS leaf program at leaf `i` of a reachable tree is WOTS+ public-key generation at the
-reachable instance `(coord.layer, coord.tree, i)`. -/
+/-- The XMSS leaf program at leaf `i` of a reachable tree queries only union-ledger tweaks: it is
+WOTS+ public-key generation at the reachable instance `(coord.layer, coord.tree, i)`. -/
 theorem xmssLeafM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
     (coord : LayerTreeCoord vp) {i : ℕ} (hi : i < 2 ^ vp.params.hp) :
     QueriesWithinConstructionTargets core
@@ -347,7 +362,8 @@ theorem xmssLeafM_queriesWithinConstructionTargets_of_position (skSeed : core.Sk
     ⟨pos.layer, pos.tree, ⟨i, hi⟩⟩
 
 /-- An XMSS subtree root at `(z, t)` inside a reachable tree, `z ≤ hp` and `t < 2 ^ (hp - z)`,
-issues WOTS+ leaf generation only at that tree's leaves and `H` only at its internal nodes. -/
+queries only union-ledger tweaks: its WOTS+ leaf generation is at that tree's leaves and its `H`
+queries at its internal nodes. -/
 theorem xmssNodeM_queriesWithinConstructionTargets (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
     (coord : LayerTreeCoord vp) {z t : ℕ} (hz : z ≤ vp.params.hp)
     (ht : t < 2 ^ (vp.params.hp - z)) :
@@ -577,7 +593,8 @@ theorem hypertreePkFromSigM_queriesWithinConstructionTargets (msg : core.Y)
         OracleComp (publicHashSpec core) core.Y) :=
   recoverFromPositionM_queriesWithinConstructionTargets core pkSeed _ _ _ msg sig
 
-/-- Hypertree verification queries exactly what its root recovery queries. -/
+/-- Hypertree verification queries only union-ledger tweaks: it is its root recovery followed by a
+comparison. -/
 theorem hypertreeVerifyM_queriesWithinConstructionTargets [DecidableEq core.Y] (msg : core.Y)
     (sig : GeneralHypertree.Signature vp core) (pkSeed : core.PkSeed)
     (parts : DigestParts vp.params) (pkRoot : core.Y) :
@@ -588,7 +605,8 @@ theorem hypertreeVerifyM_queriesWithinConstructionTargets [DecidableEq core.Y] (
     (hypertreePkFromSigM_queriesWithinConstructionTargets core msg sig pkSeed parts)
     (fun recovered => queriesWithinConstructionTargets_pure core (decide (recovered = pkRoot)))
 
-/-- The top-layer root is the root of the reachable tree `LayerTreeCoord.top`. -/
+/-- The top-layer root computation of Algorithm 18 queries only union-ledger tweaks: it is
+`xmssRootM` at the reachable tree `LayerTreeCoord.top`. -/
 theorem hypertreeRootM_queriesWithinConstructionTargets (skSeed : core.SkSeed)
     (pkSeed : core.PkSeed) :
     QueriesWithinConstructionTargets core

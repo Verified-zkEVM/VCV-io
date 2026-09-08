@@ -469,9 +469,9 @@ logged by the WOTS+ programs under both approved primitive bundles lands in the 
 lean_exe slhdsa_trace_target_tests where
   root := `HashSigTest.SLHDSA.TraceTargets
 
-/-- FORS, XMSS, hypertree, and internal scheme trace provenance: every public-hash query logged by
-those programs under both approved primitive bundles lands in the encoded ledger and hits exactly
-the tweak set the FIPS 205 algorithm visits. -/
+/-- FORS, XMSS, hypertree, and internal scheme trace provenance: every `thash` query those programs
+log under both approved primitive bundles lands in the encoded ledger, and the FORS, XMSS, and
+hypertree programs and key generation hit exactly the tweak set the FIPS 205 algorithm visits. -/
 lean_exe slhdsa_component_trace_tests where
   root := `HashSigTest.SLHDSA.ComponentTraces
 
