@@ -159,30 +159,6 @@ lemma run_withLogging_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
         (pure (u, [⟨t, u⟩]) : m₀ (loggedSpec.Range t × QueryLog loggedSpec))) := by
   simp
 
-/-- Under a deterministic handler, every entry of the `withLogging` log of a program all of whose
-queries satisfy `P` (a predicate-only `IsQueryBound`, see `isQueryBound_unit_bind`) satisfies `P`
-at its input.  The premise is independent of the handler; the conclusion is about one concrete
-execution.  A probabilistic handler needs a `support`-based statement, which this lemma does not
-give. -/
-theorem mem_run_withLogging_of_isQueryBound {α' : Type} {P : κ → Prop}
-    (so : QueryImpl loggedSpec Id) {oa : OracleComp loggedSpec α'}
-    (h : oa.IsQueryBound () (fun t _ => P t) (fun _ _ => ())) :
-    ∀ e ∈ (simulateQ so.withLogging oa).run.run.2, P e.1 := by
-  induction oa using OracleComp.inductionOn with
-  | pure x =>
-      change ∀ e ∈ ([] : QueryLog loggedSpec), P e.1
-      simp
-  | query_bind t mx ih =>
-      rw [isQueryBound_query_bind_iff] at h
-      rw [simulateQ_query_bind]
-      simp only [OracleQuery.input_query, monadLift_self, WriterT.run_bind',
-        run_withLogging_apply, Id.run_bind, Id.run_map, Prod.map_snd, List.mem_append,
-        Id.run_pure, List.mem_singleton]
-      intro e he
-      rcases he with rfl | he
-      · exact h.1
-      · exact ih (so t).run (h.2 _) e he
-
 /-- Every entry emitted while simulating one primitive query records that query's input.
 This response-independent provenance fact is stable even when the query was transported from
 a component of a dependent sum specification. -/
@@ -441,6 +417,60 @@ theorem log_length_le_of_mem_support_run_simulateQ
       have := ih u (hrest u) hz'
       simp only [List.length_cons]
       omega
+
+/-- A predicate-only query bound controls every entry of a deterministic logged execution: if
+every query `oa` can make is to an index satisfying `P`, then under any handler
+`so : QueryImpl spec Id` each entry of the resulting log records a `P`-index at its input.
+The premise quantifies over all response paths, so it is independent of `so`, while the
+conclusion is about the single execution `so` produces.
+`holds_of_mem_log_of_mem_support_run_simulateQ` is the probabilistic analogue. -/
+theorem holds_of_mem_run_simulateQ_withLogging
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type} {P : ι → Prop}
+    (so : QueryImpl spec Id) {oa : OracleComp spec α}
+    (hbound : AllQueriesSatisfy oa P) :
+    ∀ e ∈ (simulateQ so.withLogging oa).run.run.2, P e.1 := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      change ∀ e ∈ ([] : QueryLog spec), P e.1
+      simp
+  | query_bind t mx ih =>
+      rw [allQueriesSatisfy_query_bind_iff] at hbound
+      rw [simulateQ_query_bind]
+      simp only [OracleQuery.input_query, monadLift_self, WriterT.run_bind',
+        QueryImpl.run_withLogging_apply, Id.run_bind, Id.run_map, Prod.map_snd, List.mem_append,
+        Id.run_pure, List.mem_singleton]
+      intro e he
+      rcases he with rfl | he
+      · exact hbound.1
+      · exact ih (so t).run (hbound.2 _) e he
+
+/-- A predicate-only query bound controls every entry of every `loggingOracle` trace in support:
+if every query `oa` can make is to an index satisfying `P`, then each entry of each support
+point's log records a `P`-index at its input.  This is the probabilistic analogue of
+`holds_of_mem_run_simulateQ_withLogging`, in the `support` idiom of
+`log_length_le_of_mem_support_run_simulateQ`. -/
+theorem holds_of_mem_log_of_mem_support_run_simulateQ
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type} {P : ι → Prop}
+    {oa : OracleComp spec α}
+    (hbound : AllQueriesSatisfy oa P)
+    {z : α × QueryLog spec}
+    (hz : z ∈ support ((simulateQ loggingOracle oa).run)) :
+    ∀ e ∈ z.2, P e.1 := by
+  induction oa using OracleComp.inductionOn generalizing z with
+  | pure x =>
+      simp only [simulateQ_pure] at hz
+      subst hz
+      simp
+  | query_bind t mx ih =>
+      rw [allQueriesSatisfy_query_bind_iff] at hbound
+      rw [run_simulateQ_loggingOracle_query_bind, support_bind] at hz
+      simp only [Set.mem_iUnion, support_map] at hz
+      obtain ⟨u, _, z', hz', rfl⟩ := hz
+      intro e he
+      simp only [List.mem_cons] at he
+      rcases he with rfl | he
+      · exact hbound.1
+      · exact ih u (hbound.2 u) hz' e he
 
 end isQueryBound
 

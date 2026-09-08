@@ -34,15 +34,19 @@ hypertree, and scheme programs are not certified by this module.  The logged-exe
 applies to any pathwise-certified program interpreted through `QueryImpl.withLogging` over an
 arbitrary deterministic handler `QueryImpl (publicHashSpec core) Id`, and in particular through the
 canonical `PublicHash.impl` of a primitive bundle.  It is the SLH-DSA instance of
-`QueryImpl.mem_run_withLogging_of_isQueryBound`; a probabilistic handler such as
-`PublicHash.randomOracle` needs a `support`-based bridge, which this module does not provide.
+`OracleComp.holds_of_mem_run_simulateQ_withLogging`, whose `support`-based companion
+`OracleComp.holds_of_mem_log_of_mem_support_run_simulateQ` covers `loggingOracle`; a stateful
+probabilistic handler such as `PublicHash.randomOracle` needs its own bridge, which this module
+does not provide.
 
 The definitions are opaque to importers.  What a downstream slice uses are the public equations:
 `mem_constructionAddresses_iff` and `constructionAddresses_length` for the union ledger,
 `mem_encodedConstructionAddresses_iff` and `encodeTargets_constructionAddresses` for its encoded
 image, `constructionQueryReachable_thash_iff` and `constructionQueryReachable_hmsg` for the query
-predicate, and `queriesWithinConstructionTargets_iff_isQueryBound` to reach the generic
-`IsQueryBound` laws (for example `isQueryBound_map_iff`) from the wrapper.
+predicate, the structural laws `QueriesWithinConstructionTargets.pure`, `.bind`, `.query_iff`,
+and `.ofFnM` for assembling the predicate along a program, and
+`queriesWithinConstructionTargets_iff_isQueryBound` to reach the generic `IsQueryBound` laws (for
+example `isQueryBound_map_iff`) from the wrapper.
 
 The union is a complete structural ledger, not the partial, source-shaped WOTS+ target selection
 used by the undetectability reduction.  These provenance theorems neither execute the ledger's
@@ -64,9 +68,10 @@ namespace SLHDSA.Security
 /-- The union of the six structural address ledgers, in the order FORS leaves, FORS internal nodes,
 FORS roots, WOTS+ hash steps, WOTS+ public-key compressions, XMSS internal nodes.
 
-Two of the eight role ledgers are deliberately absent: the selection-dependent WOTS+ ledgers
-`selectedWotsAddresses` and `optionalWotsAddresses` are sublists of `wotsStepAddresses`
-(`selectedWotsAddresses_subset`, `optionalWotsAddresses_subset`), so nothing is lost.  No secret-key
+Two of the eight role ledgers are deliberately absent: every address the selection-dependent
+WOTS+ ledgers `selectedWotsAddresses` and `optionalWotsAddresses` list is already a
+`wotsStepAddresses` entry (`selectedWotsAddresses_subset`, `optionalWotsAddresses_subset`), so
+nothing is lost.  No secret-key
 derivation address (`wotsSkAdrs`, `forsSkAdrs`, type codes `WOTS_PRF` and `FORS_PRF`) is listed,
 because `CorePrimitives.PRF` and `PRFmsg` are pure fields of the primitives and never
 `publicHashSpec` queries. -/
@@ -151,15 +156,16 @@ theorem constructionQueryReachable_hmsg {vp : ValidatedParams}
   trivial
 
 /-- Every syntactically reachable path through `program` uses only construction-ledger tweaks.
-The unit budget does not count queries; it turns `IsQueryBound` into a pathwise query predicate. -/
+This is the predicate-only query bound `AllQueriesSatisfy`: it counts no queries and constrains
+only which public-hash inputs the program can reach. -/
 def QueriesWithinConstructionTargets {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {α : Type}
     (program : OracleComp (publicHashSpec core) α) : Prop :=
-  program.IsQueryBound () (fun q _ => ConstructionQueryReachable vp core q) (fun _ _ => ())
+  program.AllQueriesSatisfy (ConstructionQueryReachable vp core)
 
 /-- The wrapper is the predicate-only `IsQueryBound`; this is the equation an importer uses to
 reach the generic query-bound laws (`isQueryBound_map_iff`, `isQueryBound_iff_of_map_eq`, and the
-`isQueryBound_unit_*` family). -/
+`allQueriesSatisfy_*` family, which `allQueriesSatisfy_def` connects to this form). -/
 theorem queriesWithinConstructionTargets_iff_isQueryBound {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {α : Type}
     (program : OracleComp (publicHashSpec core) α) :
@@ -172,7 +178,7 @@ theorem QueriesWithinConstructionTargets.pure {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {α : Type} (x : α) :
     QueriesWithinConstructionTargets core
       (pure x : OracleComp (publicHashSpec core) α) :=
-  isQueryBound_unit_pure x _
+  allQueriesSatisfy_pure x _
 
 /-- Pathwise target provenance composes through monadic sequencing. -/
 theorem QueriesWithinConstructionTargets.bind {vp : ValidatedParams}
@@ -182,7 +188,7 @@ theorem QueriesWithinConstructionTargets.bind {vp : ValidatedParams}
     (hprogram : QueriesWithinConstructionTargets core program)
     (hcontinuation : ∀ x, QueriesWithinConstructionTargets core (continuation x)) :
     QueriesWithinConstructionTargets core (program >>= continuation) :=
-  isQueryBound_unit_bind hprogram hcontinuation
+  allQueriesSatisfy_bind hprogram hcontinuation
 
 /-- A single public-hash query is within the construction ledger exactly when its query input is. -/
 @[simp]
@@ -192,7 +198,7 @@ theorem QueriesWithinConstructionTargets.query_iff {vp : ValidatedParams}
         (liftM ((publicHashSpec core).query q) :
           OracleComp (publicHashSpec core) ((publicHashSpec core).Range q)) ↔
       ConstructionQueryReachable vp core q :=
-  isQueryBound_unit_query_iff q _
+  allQueriesSatisfy_query_iff q _
 
 /-- Any structural address in the union ledger has a reachable encoded tweak. -/
 theorem constructionQueryReachable_thash_of_mem {vp : ValidatedParams}
@@ -282,7 +288,7 @@ theorem QueriesWithinConstructionTargets.ofFnM {vp : ValidatedParams}
     (program : Fin k → OracleComp (publicHashSpec core) Y)
     (hprogram : ∀ i, QueriesWithinConstructionTargets core (program i)) :
     QueriesWithinConstructionTargets core (Vector.ofFnM program) :=
-  isQueryBound_unit_ofFnM program hprogram
+  allQueriesSatisfy_ofFnM program hprogram
 
 /-- WOTS+ public-key generation at a reachable position uses only union-ledger tweaks.  Its queries
 are routed through `mem_wotsStepAddresses` and `mem_wotsPkAddresses`; the predicate records only
@@ -403,8 +409,8 @@ theorem publicHash_hmsg_queriesWithinConstructionTargets {vp : ValidatedParams}
 /-- A deterministic logged interpretation of a pathwise-certified program contains only encoded
 tweaks from the construction ledger.  This is the execution-level bridge: the conclusion talks
 about the concrete `QueryLog` returned by `withLogging`, while the premise remains independent of
-the answer function.  It is `QueryImpl.mem_run_withLogging_of_isQueryBound` at the construction
-predicate. -/
+the answer function.  It is `OracleComp.holds_of_mem_run_simulateQ_withLogging` at the
+construction predicate. -/
 theorem constructionQueryReachable_of_mem_run_withLogging {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {α : Type}
     (answer : QueryImpl (publicHashSpec core) Id)
@@ -412,7 +418,7 @@ theorem constructionQueryReachable_of_mem_run_withLogging {vp : ValidatedParams}
     (hprogram : QueriesWithinConstructionTargets core program) :
     ∀ entry ∈ (simulateQ answer.withLogging program).run.run.2,
       ConstructionQueryReachable vp core entry.1 :=
-  QueryImpl.mem_run_withLogging_of_isQueryBound (P := ConstructionQueryReachable vp core) answer
+  holds_of_mem_run_simulateQ_withLogging (P := ConstructionQueryReachable vp core) answer
     hprogram
 
 /-- The logged-execution bridge at the canonical deterministic interpretation of a primitive
