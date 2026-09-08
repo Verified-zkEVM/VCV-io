@@ -213,6 +213,7 @@ theorem ofPosition_toAdrs {vp : ValidatedParams} (pos : LayerPosition vp) :
     (ofPosition pos).toAdrs = pos.toAdrs := by rfl
 
 /-- The base address of the top tree: layer `d - 1`, tree zero. -/
+@[simp]
 theorem top_toAdrs (vp : ValidatedParams) :
     (top vp).toAdrs = (Adrs.zero.setLayerAddress (vp.params.d - 1)).setTreeAddress 0 := by rfl
 

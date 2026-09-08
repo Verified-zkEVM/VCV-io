@@ -67,11 +67,21 @@ def twoLayerDigest : Bytes twoLayerParams.m :=
 def oneLayerDigest : Bytes oneLayerParams.m :=
   Vector.ofFn fun i => ([0x5a, 0x03] : List Byte).getD i.val 0
 
+/-- The two-layer digest's layer-zero position: tree `2`, leaf `1`.  The trajectory is written out
+as literals rather than obtained from `LayerPosition.initial` and `.next`, so that the expected
+tweak sets below share no position arithmetic with the programs under test, which parse the same
+digest themselves. -/
 def twoLayerPosition : LayerPosition twoLayer :=
-  LayerPosition.initial twoLayer (splitDigest twoLayerParams twoLayerDigest)
+  ⟨⟨0, by decide⟩, ⟨2, by decide⟩, ⟨1, by decide⟩⟩
 
+/-- The two-layer digest's layer-one position: tree `2 / 2 ^ hp = 0`, leaf `2 % 2 ^ hp = 2`. -/
+def twoLayerPositionNext : LayerPosition twoLayer :=
+  ⟨⟨1, by decide⟩, ⟨0, by decide⟩, ⟨2, by decide⟩⟩
+
+/-- The one-layer digest's only position: the single tree of layer zero at leaf `3`, again a
+literal. -/
 def oneLayerPosition : LayerPosition oneLayer :=
-  LayerPosition.initial oneLayer (splitDigest oneLayerParams oneLayerDigest)
+  ⟨⟨0, by decide⟩, ⟨0, by decide⟩, ⟨3, by decide⟩⟩
 
 /-! ## Logged executions -/
 
@@ -300,8 +310,8 @@ def exerciseXmss (vp : ValidatedParams) (label : String) (prims : Primitives vp.
     (prims.core.yToBytes recovered == prims.core.yToBytes root)
 
 /-- Run hypertree signing and recovery from the digest-derived position and compare their logs with
-the XMSS tweak sets concatenated along `positions`, the trajectory `LayerPosition.initial`, its
-`next`, and so on through the final layer. -/
+the XMSS tweak sets concatenated along `positions`, the digest's trajectory given independently as
+one literal position per layer. -/
 def exerciseHypertree (vp : ValidatedParams) (label : String) (prims : Primitives vp.params)
     (keyEq : prims.AdrsKey → prims.AdrsKey → Bool) (skSeed : prims.SkSeed)
     (pkSeed : prims.PkSeed) (msg : prims.Y) (parts : DigestParts vp.params)
@@ -388,7 +398,7 @@ def exerciseBundle (vp : ValidatedParams) (label : String) (prims : Primitives v
   exerciseScheme vp label prims keyEq skSeed skPrf pkSeed addrnd [0x01, 0x02, 0x03]
 
 def checkTwoLayer : IO Unit := do
-  let positions := [("layer 0", twoLayerPosition), ("layer 1", twoLayerPosition.next (by decide))]
+  let positions := [("layer 0", twoLayerPosition), ("layer 1", twoLayerPositionNext)]
   exerciseBundle twoLayer "two-layer SHA-2" (sha2Primitives twoLayerParams) (sha2KeyEq _)
     (fixedBytes 1 1) (fixedBytes 1 4) (fixedBytes 1 2) (fixedBytes 1 3) (fixedBytes 1 5)
     twoLayerDigest positions

@@ -42,18 +42,19 @@ from any reachable `LayerPosition` by induction on the remaining layers, each la
 XMSS lemmas at the current position before `LayerPosition.next`; `GeneralHypertree.signM`,
 `pkFromSigM`, and `verifyM` are their instances at `LayerPosition.initial`, and
 `GeneralHypertree.rootM` is `xmssRootM` at the top tree `LayerTreeCoord.top`, whose base address
-`LayerTreeCoord.top_toAdrs_layerAdrs` identifies with the one Algorithm 18 uses.  The internal
-scheme programs `GeneralScheme.keygenInternalM`, `signInternalM`, and `verifyInternalM` sequence
-`H_msg` with the FORS programs at the digest-derived address and the hypertree programs above.  The
-contracts at these two levels pair the predicate with the bounds of
-`HashSig.SLHDSA.HypertreeGeneral.QueryBound` and `GeneralSchemeQueryBound`, which are upper bounds
-rather than exact counts.
+`LayerTreeCoord.top_toAdrs_layerAdrs` identifies with the one Algorithm 18 uses.
+`GeneralScheme.keygenInternalM` is that top-layer root computation and issues nothing else, while
+`signInternalM` and `verifyInternalM` sequence `H_msg` with the FORS programs at the digest-derived
+address and the hypertree programs above.  The contracts at these two levels pair the predicate
+with the bounds of `HashSig.SLHDSA.HypertreeGeneral.QueryBound` and `GeneralSchemeQueryBound`,
+which are upper bounds rather than exact counts.
 
-Theorem names follow the program names, with one convention: the `GeneralHypertree` programs carry
-the `hypertree` prefix (`hypertreeSignM_…` certifies `GeneralHypertree.signM`), which keeps them
-apart from the XMSS programs and from any future `signM`, while the `GeneralScheme` programs keep
-their FIPS names unqualified (`keygenInternalM_…` certifies `GeneralScheme.keygenInternalM`), the
-depth-one programs being the `slh*InternalM` family.
+Theorem names follow the program names, with one convention: the `GeneralHypertree` entry points
+carry the `hypertree` prefix (`hypertreeSignM_…` certifies `GeneralHypertree.signM`), which keeps
+them apart from the XMSS programs and from any future `signM`, while the two typed loop lemmas keep
+the program names (`signFromPositionM_…`, `recoverFromPositionM_…`).  The `GeneralScheme` programs
+keep their FIPS names unqualified (`keygenInternalM_…` certifies `GeneralScheme.keygenInternalM`),
+the depth-one programs being the `slh*InternalM` family.
 
 ## References
 
@@ -65,8 +66,10 @@ depth-one programs being the `slh*InternalM` family.
   discipline, the predicates `valid_xadrs`, split by `valid_xadrs_xadrschpkcotrh` into chain,
   public-key-compression, and tree-hash addresses (`proofs/FL_SL_XMSS_MT_ES.ec`), and
   `valid_fadrs` (`proofs/FORS_ES.ec`), under which its address lemmas are stated.
-  `mem_constructionAddresses_iff` is the analogue of that split here, six-way because the FORS
-  and WOTS+ roles are separate ledgers; no correspondence between the two developments is claimed.
+  `mem_constructionAddresses_iff` is the analogue of that split here, six-way: three XMSS-side
+  roles matching the EasyCrypt split, plus three FORS roles refining its two-way FORS split
+  `valid_fidxvalslp` by keeping the leaf and internal-node ledgers apart; no correspondence
+  between the two developments is claimed.
 -/
 
 public section

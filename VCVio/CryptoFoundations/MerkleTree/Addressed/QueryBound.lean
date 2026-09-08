@@ -86,7 +86,7 @@ include hpure hbind in
 /-- A `pure`/`bind`-closed predicate holds of a root recomputation as soon as it holds of the node
 hash at every ancestor of the opened leaf.  The recomputation issues exactly one node hash per
 ancestor, but this lemma states only the sufficiency direction;
-`isTotalQueryBound_getPutativeRootAddressedM` counts the hashes. -/
+`isTotalQueryBound_getPutativeRootAddressedM` bounds the queries those hashes cost. -/
 theorem getPutativeRootAddressedM_pred_of_ancestors {s : Skeleton}
     (nodeHash : SkeletonInternalIndex s → Y → Y → m Y)
     (idx : SkeletonLeafIndex s) (node : Y) (proof : List.Vector Y idx.depth)
