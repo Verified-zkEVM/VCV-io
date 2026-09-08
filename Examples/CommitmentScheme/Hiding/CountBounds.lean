@@ -1103,13 +1103,88 @@ lemma sum_wp_countIncrementIndicators_le_queryBound_of_run_hidingImplCountAll
         ((simulateQ hidingImplCountAll oa).run st₀)
         (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
           OracleComp.ProgramLogic.propInd (st₀.2 s < z.2.2 s))) ≤ n := by
-  refine le_trans ?_
-    (sum_wp_countIncrements_le_queryBound_of_run_hidingImplCountAll hbound st₀)
-  gcongr with s _ z
-  by_cases hlt : st₀.2 s < z.2.2 s
-  · simp only [OracleComp.ProgramLogic.propInd, if_pos hlt]
-    exact_mod_cast (show 1 ≤ z.2.2 s - st₀.2 s by omega)
-  · simp [OracleComp.ProgramLogic.propInd, hlt]
+  have : Fintype M := Fintype.ofFinite M
+  classical
+  let run := ((simulateQ hidingImplCountAll oa).run st₀)
+  have hsum :
+      (∑ s : S,
+        OracleComp.ProgramLogic.wp run
+          (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
+            OracleComp.ProgramLogic.propInd (st₀.2 s < z.2.2 s))) =
+      OracleComp.ProgramLogic.wp run
+        (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
+          ∑ s : S, OracleComp.ProgramLogic.propInd (st₀.2 s < z.2.2 s)) := by
+    have hsumFin :
+        ∀ ss : Finset S,
+          (ss.sum fun s =>
+            OracleComp.ProgramLogic.wp run
+              (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
+                OracleComp.ProgramLogic.propInd (st₀.2 s < z.2.2 s))) =
+          OracleComp.ProgramLogic.wp run
+            (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
+              ss.sum fun s => OracleComp.ProgramLogic.propInd (st₀.2 s < z.2.2 s)) := by
+      intro ss
+      refine Finset.induction_on ss ?_ ?_
+      · simp [OracleComp.ProgramLogic.wp_const]
+      · intro s ss hs ih
+        simp [hs, ih, OracleComp.ProgramLogic.wp_add]
+    simpa [run] using hsumFin Finset.univ
+  rw [hsum, OracleComp.ProgramLogic.wp_eq_tsum]
+  calc
+    ∑' z, Pr[= z | run] *
+        (∑ s : S, OracleComp.ProgramLogic.propInd (st₀.2 s < z.2.2 s))
+      ≤
+        ∑' z, Pr[= z | run] * (n : ℝ≥0∞) := by
+          refine ENNReal.tsum_le_tsum fun z => ?_
+          by_cases hz : z ∈ support run
+          · rcases
+                exists_counting_support_of_mem_support_run_hidingImplCountAll_coord
+                  (M := M) (S := S) (C := C)
+                  (oa := oa) (st₀ := st₀) (z := z) hz with
+              ⟨qc, hqc, hcoord⟩
+            have hcoordSum :
+                (∑ s : S, OracleComp.ProgramLogic.propInd (st₀.2 s < z.2.2 s) : ℝ≥0∞) ≤
+                  (∑ s : S, ∑ m : M, qc (m, s) : ℝ≥0∞) := by
+              refine Finset.sum_le_sum ?_
+              intro s hs
+              by_cases hslt : st₀.2 s < z.2.2 s
+              · have hsle : z.2.2 s ≤ st₀.2 s + ∑ m : M, qc (m, s) := hcoord s
+                have hnat : 1 ≤ ∑ m : M, qc (m, s) := by
+                  omega
+                simp only [OracleComp.ProgramLogic.propInd, hslt, ↓reduceIte, ge_iff_le]
+                exact_mod_cast hnat
+              · simp [OracleComp.ProgramLogic.propInd, hslt]
+            have htotal :
+                (∑ ms : M × S, qc ms) ≤ n := by
+              exact IsTotalQueryBound.counting_total_le
+                (spec := CMOracle M S C)
+                (ι := M × S)
+                (oa := oa)
+                (n := n)
+                (h := hbound)
+                hqc
+            have hswap :
+                (∑ s : S, ∑ m : M, qc (m, s)) = ∑ ms : M × S, qc ms := by
+              calc
+                (∑ s : S, ∑ m : M, qc (m, s)) = ∑ m : M, ∑ s : S, qc (m, s) := by
+                  simpa using (Finset.sum_comm : (∑ s : S, ∑ m : M, qc (m, s)) =
+                    ∑ m : M, ∑ s : S, qc (m, s))
+                _ = ∑ ms : M × S, qc ms := by
+                  symm
+                  simp [Fintype.sum_prod_type]
+            have hswap' :
+                (∑ s : S, ∑ m : M, qc (m, s) : ℝ≥0∞) =
+                  ∑ ms : M × S, qc ms := by
+              exact_mod_cast hswap
+            have htotal' : (∑ ms : M × S, qc ms : ℝ≥0∞) ≤ n := by
+              exact_mod_cast htotal
+            exact mul_le_mul'
+              le_rfl
+              (le_trans hcoordSum (by simpa [hswap'] using htotal'))
+          · rw [probOutput_eq_zero_of_not_mem_support hz]
+            simp
+    _ = (n : ℝ≥0∞) := by
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
 
 /-- A selected final count decomposes into the initial selected count plus the
 new increments made during the run. -/
