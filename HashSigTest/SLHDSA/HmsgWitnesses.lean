@@ -39,18 +39,26 @@ The one addition is `blindPrimitives`: the same bundle with a single field repla
 that ignores the seed and root it is handed.  Nothing in the scheme-dispatch fixture needed such a
 bundle, and the strictness of the widening cannot be exhibited without one.
 
-## The fixture's five pairs
+## The fixture's six pairs
 
-One forged pair and four signing queries, all at the honest key pair.  The forged message produces
+One forged pair and five signing queries, all at the honest key pair.  The forged message produces
 the digest `[0xBB, 0x27, 0xAB]`, which names layer-zero tree three, leaf three, and selects FORS
-tree zero's local leaf one and FORS tree one's local leaf zero.  The four queries realise all four
-coverage patterns against that pair of indices:
+tree zero's local leaf one and FORS tree one's local leaf zero.  Four of the queries realise all
+four coverage patterns against that pair of indices:
 
 * `qBoth` reproduces the forged digest exactly under a different randomizer *and* a different
   message, so it covers both indices while leaving the pair fresh — the fixture's win;
 * `qFirst` sits at the same FORS instance and covers the first index only;
 * `qSecond` sits at the same FORS instance and covers the second index only;
 * `qOther` sits at a different FORS instance and covers neither.
+
+The fifth, `qHonestOnly`, covers both indices at the honest key pair *without* reproducing the
+digest — coverage is a relation between selected indices, not between digests, and a fixture whose
+only win came from a digest collision would not have shown that.  It is also what makes the fibre
+equivalence's key pair falsifiable: at either of the two moved key pairs it covers neither index, so
+reading the source-shaped side anywhere but at the honest key pair changes the answer.  Without it
+the equivalence canary passed under a mutant that read that side at a different public seed, because
+`qBoth`'s digest collision is an additive one that survives moving the seed and the root.
 
 `qSecond` and `qOther` share a randomizer and differ only in their message, which is asserted: ITSR
 freshness is *pair* freshness, and a fixture in which no two queries shared a key could not show
@@ -285,6 +293,12 @@ def qSecond : toyPrimitives.Y × List Byte := queryOf 0x77 [0x13]
 /-- A query at a different FORS instance altogether, covering neither. -/
 def qOther : toyPrimitives.Y × List Byte := queryOf 0x11 [0x05]
 
+/-- A query that covers both of the forged pair's indices at the honest key pair while producing a
+*different* digest, and covers neither at either of the two moved key pairs.  It is what makes the
+fibre equivalence's key pair falsifiable: reading its source-shaped side anywhere but at the honest
+key pair changes the answer. -/
+def qHonestOnly : toyPrimitives.Y × List Byte := queryOf 0x00 [0x03]
+
 /-- The forged digest. -/
 def digestC : Bytes toyParams.m := digestOf qC.1 qC.2
 
@@ -317,11 +331,18 @@ def widins (queries : List (toyPrimitives.Y × List Byte))
     (candidate : toyPrimitives.Y × HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y) : Bool :=
   decide ((hmsgItsrProblem toyPrimitives).Wins (embed queries) candidate)
 
+/-- Whether the source-shaped game's winning condition holds at a chosen key pair, as a
+boolean. -/
+def narrowWinsAt (ps : toyPrimitives.PkSeed) (pr : toyPrimitives.Y)
+    (queries : List (toyPrimitives.Y × List Byte))
+    (candidate : toyPrimitives.Y × List Byte) : Bool :=
+  decide ((hmsgNarrowItsrProblem toyPrimitives ps pr).Wins queries candidate)
+
 /-- Whether the source-shaped game's winning condition holds at the honest key pair, as a
 boolean. -/
 def narrowWins (queries : List (toyPrimitives.Y × List Byte))
     (candidate : toyPrimitives.Y × List Byte) : Bool :=
-  decide ((hmsgNarrowItsrProblem toyPrimitives pkSeed pkRoot).Wins queries candidate)
+  narrowWinsAt pkSeed pkRoot queries candidate
 
 /-! ## Every `HmsgIndex` of the profile
 
@@ -417,8 +438,11 @@ def checkFixture : IO Unit := do
   ensure "the four target sets realise the four coverage patterns"
     (coversPattern [qBoth] == (true, true) && coversPattern [qFirst] == (true, false) &&
       coversPattern [qSecond] == (false, true) && coversPattern [qOther] == (false, false))
-  ensure "the five queries are pairwise distinct"
-    ([qC, qBoth, qFirst, qSecond, qOther].Pairwise (· != ·))
+  ensure "a fifth query covers both indices without reproducing the digest"
+    (coversPattern [qHonestOnly] == (true, true) &&
+      digestOf qHonestOnly.1 qHonestOnly.2 != digestC)
+  ensure "the six queries are pairwise distinct"
+    ([qC, qBoth, qFirst, qSecond, qOther, qHonestOnly].Pairwise (· != ·))
   ensure "two of them share a randomizer and differ only in their message"
     (qSecond.1 == qOther.1 && qSecond.2 != qOther.2)
   ensure "and the winning query shares neither with the forged pair"
@@ -529,13 +553,17 @@ At the honest key pair the widened winning condition and the source-shaped one a
 of the fixture's candidates and target lists, including the two that fail on freshness and the
 three that fail on coverage.  Neither direction is vacuous: both values `true` and `false` occur. -/
 def checkFibreEquivalence : IO Unit := do
-  let cases := [[qBoth], [qC, qBoth], [qOther], [qFirst], [qSecond], []]
+  let cases := [[qBoth], [qHonestOnly], [qC, qBoth], [qOther], [qFirst], [qSecond], []]
   for queries in cases do
     ensure "the widened and source-shaped winning conditions agree at the honest key pair"
       (widins queries candidateC == narrowWins queries qC)
   ensure "and both values occur among those cases"
     ((cases.any fun queries => widins queries candidateC) &&
       (cases.any fun queries => !widins queries candidateC))
+  ensure "the source-shaped side is read at the honest key pair and nowhere else"
+    (widins [qHonestOnly] candidateC &&
+      !narrowWinsAt otherPkSeed pkRoot [qHonestOnly] qC &&
+      !narrowWinsAt pkSeed otherPkRoot [qHonestOnly] qC)
 
 /-- Which uncovered index comes back, and that it is the first.
 
