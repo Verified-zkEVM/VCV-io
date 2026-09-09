@@ -143,10 +143,12 @@ Two things turn on it, and a third does not.
 ## Address roles
 
 Every address a hypertree witness names is the address the underlying XMSS witness names at the
-position `pos.advance w.layer`, so slice 1's membership lemmas apply through
-`HashSig.SLHDSA.Security.XmssWitnesses` — `mem_xmssNodeAddresses_of_leaf` for the `H` branch and,
-through `wotsLeafAdrs_eq_wotsInstanceAdrs`, `mem_wotsPkAddresses`, `mem_wotsStepAddresses_of_lt`
-and `wotsPreimageAdrs_mem_optionalWotsAddresses` for the three WOTS+ branches.  None of them is
+position `pos.advance w.layer`, so the membership lemmas of the slices below apply unchanged:
+`HashSig.SLHDSA.Security.XmssWitnesses`' `mem_xmssNodeAddresses_of_leaf` for the `H` branch and,
+through that module's `wotsLeafAdrs_eq_wotsInstanceAdrs`,
+`HashSig.SLHDSA.Security.ReachableTargets`' `mem_wotsPkAddresses` together with
+`HashSig.SLHDSA.Security.WotsWitnesses`' `mem_wotsStepAddresses_of_lt` and
+`wotsPreimageAdrs_mem_optionalWotsAddresses` for the three WOTS+ branches.  None of them is
 restated here, and neither is any game-shape bridge: `HypertreeWitness.Valid` reduces to
 `XmssWitness.Valid` at a named position, so `xmssWitness_valid_hCollision_eval` and the three
 WOTS+ bridges apply unchanged.
