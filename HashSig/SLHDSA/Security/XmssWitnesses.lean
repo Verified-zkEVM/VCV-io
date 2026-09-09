@@ -32,12 +32,14 @@ Every *deterministic-inclusion* statement below has its free objects drawn from 
 or a primitive bundle over one, seeds, a structural address, natural-number indices, messages, and
 signature or witness data, together with the structural side conditions their proofs need: the
 `p.Valid` and `prims.core.ByteLaws` arguments of the two statements that invoke the WOTS+
-extractor, the `DecidableEq prims.Y` instance the extractor here and its four lemmas take, and the
-`SampleableType prims.PkSeed` instance on the game-shape bridge.  Not all of them mention all of
-those.  Seven of the fifteen mention an `XmssSigCore` — `xmssPkFromSig_cases`,
-`xmssPkFromSig_forgeryCases`, `findXmssWitness`, its two shape equations and its two lemmas — and
-the other eight do not.  Of those eight only the game-shape bridge names a game at all, and what it
-names is a `Problem` record, never an experiment or an advantage.
+extractor's *completeness* lemma, `xmssPkFromSig_forgeryCases` and `findXmssWitness_isSome` — five
+declarations invoke the extractor itself, but `findWotsWitness_isSome` is what takes those two and
+`findWotsWitness_sound` takes neither — the `DecidableEq prims.Y` instance the extractor here and
+its four lemmas take, and the `SampleableType prims.PkSeed` instance on the game-shape bridge.
+Not all of them mention all of those.  Seven of the fifteen mention an `XmssSigCore` —
+`xmssPkFromSig_cases`, `xmssPkFromSig_forgeryCases`, `findXmssWitness`, its two shape equations and
+its two lemmas — and the other eight do not.  Of those eight only the game-shape bridge names a
+game at all, and what it names is a `Problem` record, never an experiment or an advantage.
 
 The honest secret seed is not confined to one lemma: thirteen of the fifteen take one, the two
 exceptions being `xmssNodeIndex_lt`, which is arithmetic on the leaf index, and the `XmssWitness`
@@ -413,14 +415,22 @@ root mismatch does give `none`: `PerfectMerkleTree.findCollisionAddressed` desce
 recursing only where the two openings' child pairs agree and returning `some` only where they
 first differ under an equal parent, so a `some` already implies the root match.  With the recovered
 leaf the *honest* one — an authentication path that misses the honest tree above a correctly
-recovered leaf — the WOTS+ branch is taken, and it returns a witness that is valid all the same,
+recovered leaf — the WOTS+ branch is taken, and whatever it returns there is valid all the same,
 because its guard is the leaf test and that test is already `findWotsWitness_sound`'s own
-hypothesis.  Over 768 signatures at the toy bundle of `HashSigTest.SLHDSA.XmssWitnesses` (chain
-perturbation by authentication-path level by path perturbation) 608 miss the honest root; the 552
-of those that take the Merkle branch all return `none`, the 56 that take the WOTS+ branch all
-return a witness, and no case in the sweep returns an invalid one.  The malformed-forgery canary
-there pins both halves.  `findXmssWitness_sound` carries the root hypothesis for a different
-reason, recorded on that theorem.
+hypothesis.  That says nothing about whether it returns anything: existence on this branch is
+`findXmssWitness_isSome`'s, and what buys it there is `hne : msg ≠ msg'` together with the
+validated parameters and the byte laws — never the root.  At `msg = msg'` every chain's two step
+counts agree, so the search can run out and give `none` however the climb went.
+
+Over a 768-case sweep at the toy bundle of `HashSigTest.SLHDSA.XmssWitnesses` — sixteen chain-`3`
+perturbations by three authentication-path choices, level `0`, level `1` or none, by sixteen path
+perturbations, all of them on two distinct messages — 608 cases miss the honest root; the 552 of
+those that take the Merkle branch all return `none`, the 56 that take the WOTS+ branch all return
+a witness, and no case in the sweep returns an invalid one.  The 768 are cases, not distinct
+signatures: the path mask is inert at the `none` level and mask `0` reproduces the honest path at
+every level, so they realise 496 signatures.  The malformed-forgery canary there pins both halves.
+`findXmssWitness_sound` carries the root hypothesis for a different reason, recorded on that
+theorem.
 
 The honest WOTS+ signature the second branch compares against is recomputed here from `sk` rather
 than taken as an argument, so a caller cannot substitute a different one. -/

@@ -46,13 +46,16 @@ value itself; and that both chain equations are read at the opened leaf's WOTS+ 
 a neighbouring leaf's.
 
 Two negative canaries close the other direction.  The honest signature on the honest message
-recovers the honest leaf and the honest root and still returns nothing, because at `msg = msg'`
+recovers the honest leaf and the honest root and still returns nothing: the same signature stands on
+both sides, so the `T_len` test passes and the search reaches the chains, where at `msg = msg'`
 every chain's two digits agree and `findWotsChainWitness`'s `a < b` guard fails at every index;
 that is `findXmssWitness_isSome`'s `hne` being necessary, and re-running the same signature at the
 same leaf against a *distinct* second message returns a WOTS+ witness, which is what pins the
 branch.  And on a signature that misses the honest root the outcome is decided by the leaf test,
-not by the root: `none` where the recovered leaf differs and the Merkle branch is taken, a *valid*
-WOTS+ witness where the recovered leaf is honest and only the authentication path is wrong.
+not by the root: `none` where the recovered leaf differs and the Merkle branch is taken, and — on
+two distinct messages — a *valid* WOTS+ witness where the recovered leaf is honest and only the
+authentication path is wrong.  Distinctness is what makes that second half a witness rather than a
+`none`; validity holds of whatever comes back either way.
 
 A third group fabricates eighteen witnesses — four accepted and fourteen rejected — which between
 them falsify all thirteen conjuncts of `witnessHolds`.
@@ -537,11 +540,12 @@ def checkChainCollision : IO Unit := do
 
 /-- The honest signature on the *honest* message, extracted against that same message.  It
 recovers the honest root and the honest leaf, so the extractor takes its WOTS+ branch — and returns
-`none` anyway.  At `msg = msg'` a chain's forged and honest digits are the same number, so
-`findWotsChainWitness`'s `a < b` guard fails at every index and `findSome?` runs out.  What this
-fixture exhibits is therefore `findXmssWitness_isSome`'s `hne : msg ≠ msg'` being necessary: a
-signature can recover the honest root and still yield no witness when the second message is not
-distinct from the first.
+`none` anyway.  The two signatures `findWotsWitness` compares are the same one here, so its `T_len`
+test passes and the search reaches the chains; there, at `msg = msg'`, a chain's forged and honest
+digits are the same number, so `findWotsChainWitness`'s `a < b` guard fails at every index and
+`findSome?` runs out.  What this fixture exhibits is therefore `findXmssWitness_isSome`'s
+`hne : msg ≠ msg'` being necessary: a signature can recover the honest root and still yield no
+witness when the second message is not distinct from the first.
 
 `none` on its own does not say which branch produced it — the Merkle branch returns `none` too — so
 the branch is pinned twice over.  The recovered leaf is checked equal to the honest one, which is
@@ -573,7 +577,7 @@ def checkHonestSignature : IO Unit := do
 is chosen by the recovered *leaf*, so the root mismatch by itself decides nothing, and the two
 halves come out differently.
 
-`badForgery` perturbs chain `3` in bit `2`, which moves the opened leaf far enough that the
+`badForgery` perturbs chain `3` in bit `3`, moving the opened leaf in bit `2` — far enough that the
 height-one node and the tree root both change.  Its recovered leaf differs from the honest one, so
 the Merkle branch is taken; the two openings never meet and it returns `none`.  That is not an
 accident of this fixture: `PerfectMerkleTree.findCollisionAddressed` descends from the root and
@@ -584,13 +588,19 @@ implies the root match.
 authentication-path entry instead.  Its recovered leaf is the honest one, so the *WOTS+* branch is
 taken although the climb misses the root — and the witness it returns is valid, its guard being the
 leaf test, which is `findWotsWitness_sound`'s own hypothesis.  So a missed root does not mean
-`none`: over a 768-signature sweep of chain-`3` perturbation by authentication-path level by path
-perturbation, 608 miss the honest root, the 552 of those that take the Merkle branch return `none`,
-the 56 that take the WOTS+ branch return a witness, and none of the 768 returns an invalid one.
+`none`: over a 768-case sweep — sixteen chain-`3` perturbations by three authentication-path
+choices, level `0`, level `1` or none, by sixteen path perturbations, all of them extracted here
+against a second message distinct from the first — 608 cases miss the honest root, the 552 of those
+that take the Merkle branch return `none`, the 56 that take the WOTS+ branch return a witness, and
+none of the 768 returns an invalid one.  Cases, not distinct signatures: the path mask is inert at
+the `none` level and mask `0` reproduces the honest path at every level, so the 768 realise 496
+signatures.  Distinctness is doing work in the WOTS+ half — re-extract `authForgery` against
+`forgedMsg` itself and it returns `none`, with the same missed root and the same honest leaf.
 
-This is the shape `findXmssWitness_sound`'s root hypothesis guards, and both halves are a *weaker*
-gap than the WOTS+ and FORS extractors have: those return a `T_len` witness that then fails its own
-equation, whereas neither branch here returns an invalid witness. -/
+This is the shape `findXmssWitness_sound`'s root hypothesis is *stated against*, though as the
+paragraph above shows the Merkle branch does not need it.  Both halves are a *weaker* gap than the
+WOTS+ and FORS extractors have: those return a `T_len` witness that then fails its own equation,
+whereas neither branch here returns an invalid witness. -/
 def checkMalformedForgery : IO Unit := do
   ensure "the malformed forgery does not recover the honest XMSS root"
     (xmssPkFromSig toyPrimitives leafIdx badForgery forgedMsg () baseAdrs !=
