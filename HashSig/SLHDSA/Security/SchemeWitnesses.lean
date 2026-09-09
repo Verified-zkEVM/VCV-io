@@ -212,8 +212,13 @@ def schemeParts (vp : ValidatedParams) (prims : Primitives vp.params) (msg : Lis
     DigestParts vp.params :=
   splitDigest vp.params (prims.Hmsg sig.randomness pk.pkSeed pk.pkRoot msg)
 
-/-- Unfolding equation for `schemeParts`. -/
-@[simp] theorem schemeParts_eq (vp : ValidatedParams) (prims : Primitives vp.params)
+/-- Unfolding equation for `schemeParts`.
+
+Deliberately not `@[simp]`, unlike the two arm equations below, whose left-hand sides are
+constructor applications: `schemeParts` exists to name the four-argument `H_msg` call once, and a
+`simp` set that rewrote it away would put that call back into every goal a consumer states.  A
+consumer that wants the digest unfolded names this rewrite, as `verifyInternal_cases` does. -/
+theorem schemeParts_eq (vp : ValidatedParams) (prims : Primitives vp.params)
     (msg : List Byte) (sig : GeneralScheme.SignatureCore vp prims.core)
     (pk : PublicKeyCore prims.core) :
     schemeParts vp prims msg sig pk =
