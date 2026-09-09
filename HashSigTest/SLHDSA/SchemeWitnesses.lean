@@ -84,18 +84,18 @@ extracted from `sigD` therefore *does* satisfy `Witness.Valid` against `sigB`, a
 a property of `findWitness`, not of the predicate.  What the canaries falsify about the predicate
 is the *arguments* each arm is evaluated at — the FORS instance address and FORS message for one
 arm, the position and honest running message for the other — by re-evaluating each witness at the
-other site,
-at the other layer, and at the message the forged signature actually carries there.  That last one
-is the naive identification the fixture is designed to defeat: it is what a reader reaches for who
-takes the honest partner off the signature instead of computing it from the secret seed, and it is
-required to fail.
+other site, at the other layer, and at the message the forged signature actually carries there.
+That last one is the naive identification the fixture is designed to defeat: it is what a reader
+reaches for who takes the honest partner off the signature instead of computing it from the secret
+seed, and it is required to fail.
 
-Two re-evaluations at this fixture are inert, and both are asserted to hold rather than passed over,
-with the reason asserted alongside.  Moving a WOTS+ `F`-preimage witness's honest running message to
-the other layer's does not discriminate, because that branch reads the honest message only through
-the WOTS+ step count at the extracted chain and the two layers' honest messages give the same count
-there; the canary asserts that equality next to it, and asserts that the naive message's count
-differs.  An XMSS `H`-collision witness never reads the honest running message at all.
+Two re-evaluations at this fixture are inert, and both are asserted to hold rather than passed over.
+For one of them the reason is asserted alongside; for the other it is a type-level fact and is only
+stated.  Moving a WOTS+ `F`-preimage witness's honest running message to the other layer's does not
+discriminate, because that branch reads the honest message only through the WOTS+ step count at the
+extracted chain and the two layers' honest messages give the same count there; the canary asserts
+that equality next to it, and asserts that the naive message's count differs.  An XMSS
+`H`-collision witness never reads the honest running message at all.
 
 ## The other canaries
 
@@ -107,14 +107,15 @@ change in how the global index reaches the address is caught there rather than o
 `forsSigLeafIndex`.
 
 `checkSchemeEquations` evaluates the three equations this pull request adds to
-`SLHDSA.GeneralScheme` at every signature the fixture builds, and pins the secret key the first of
-them does not state.  `checkHonestPartner` pins that the honest layer-zero partner depends on the
-digest's *position* and not on its FORS message, which is what makes the hypertree arm's honest
-starting message well defined for a message the signer never signed.  `checkFabricated` is the
-tally: four hand-built witnesses accepted and eleven rejected, the rejected ones covering both
-sites, both layer relabellings, both FORS height bounds, a wrong preimage value, a `T_k` "second
-preimage" of the honest root vector itself, and a root vector that does differ from the honest one
-but does not compress to it.  There is no out-of-range layer fabrication, and there cannot be one:
+`SLHDSA.GeneralScheme` — the key-generation one once, the two verification ones at every signature
+the fixture builds — and pins the secret key the first of them does not state.
+`checkHonestPartner` pins that the honest layer-zero partner depends on the digest's *position* and
+not on its FORS message, which is what makes the hypertree arm's honest starting message well
+defined for a message the signer never signed.  `checkFabricated` is the tally: four hand-built
+witnesses accepted and eleven rejected, the rejected ones covering both sites, both layer
+relabellings, both FORS height bounds, a wrong preimage value, a `T_k` "second preimage" of the
+honest root vector itself, and a root vector that does differ from the honest one but does not
+compress to it.  There is no out-of-range layer fabrication, and there cannot be one:
 `HypertreeWitness.layer` is a `Fin toyParams.d`, so a label at or beyond `d` does not elaborate.
 
 The `example`s pin the library statements at this bundle — the three new `GeneralScheme` equations,
@@ -139,10 +140,15 @@ def ensure (label : String) (condition : Bool) : IO Unit :=
 
 Two hypertree layers of height two, two FORS trees of height one, `w = 16`, `len = 4`. -/
 
--- Exposed: the profile and its validated form have to reduce inside the `decide` pins below and
--- inside the bundle they index.  Neither the secret map, the tweak map, the randomizer, the digest
--- map nor any of the four positions needs exposure of its own.  Nothing outside this executable
--- consumes them.
+-- Exposed, both of them, and what each attribute is for was read off the errors its removal
+-- produces.  Not the `decide` pins below: those stay clean under either removal.  Without
+-- `@[expose]` on `toyParams`, 44 errors, the first inside the bundle at `yToBytes := id`, where
+-- `id` will not take the type `Bytes 1 → Bytes toyParams.n` and the note reads `not unfolded
+-- because their definition is not exposed: toyParams`.  Without it on `toy`, 42 errors, none of
+-- them before the bundle, the first where `toyPrimitives : Primitives toyParams` is offered where
+-- `Primitives toy.params` is expected.  Neither the secret map, the tweak map, the randomizer, the
+-- digest map nor any of the four positions needs exposure of its own.  Nothing outside this
+-- executable consumes them.
 /-- Two layers of height two, two FORS trees of height one. -/
 @[expose] def toyParams : Params :=
   { n := 1, h := 4, d := 2, hp := 2, a := 1, k := 2, lgw := 4 }
@@ -196,11 +202,17 @@ def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
   mixByte (UInt8.ofNat ((r.toNat * (6 * i + 37) + seed.toNat * (10 * i + 53) +
     root.toNat * (14 * i + 89) + (byteFold msg).toNat * (22 * i + 149) + (30 * i + 7)) % 256))
 
--- Exposed and `@[reducible]`, for two different reasons.  Exposed, because the `Fin` bounds of the
--- hand-written positions below are discharged from it.  Reducible, because its carrier types have
--- to unfold to `Bytes 1` for instance resolution to reach them: without it `byteOf`'s `y[0]` finds
--- no `GetElem` instance and no index bound, and the secret-key comparison in `checkSchemeEquations`
--- finds no `BEq` on `toyPrimitives.core.PkSeed`.  Nothing outside this executable consumes it.
+-- Exposed and `@[reducible]`, for two different reasons, each read off the errors that removing
+-- that attribute produces.  Exposed, for code generation: without it, 40 compiled declarations
+-- (the three instances just below, `node`, `byteOf`, the seeds, and on down to `armMsg`) report
+-- `Compilation failed, locally inferred compilation type differs from type that would be inferred
+-- in other modules`, naming `toyPrimitives`, and 31 more fall over behind them as `consider
+-- marking it as 'noncomputable'`.  None of those 74 errors is at the hand-written positions below,
+-- whose `Fin` bounds mention no primitive bundle.  Reducible, because its carrier types have to
+-- unfold to `Bytes 1` for instance resolution to reach them: without it `byteOf`'s `y[0]` finds no
+-- `GetElem` instance and no index bound, and the secret-key comparison in `checkSchemeEquations`
+-- finds no `BEq` on `toyPrimitives.core.PkSeed` — six errors, only those.  Nothing outside this
+-- executable consumes it.
 /-- The toy bundle: one byte per node, a collapsing order- and address-sensitive `Thash`, and an
 `H_msg` that depends on all four of its arguments. -/
 @[expose, reducible] def toyPrimitives : Primitives toyParams where
@@ -996,8 +1008,10 @@ out-of-range layer a build error rather than a rejected run, so no fabrication b
 The two `T_k` fabrications falsify one conjunct each, and they are the two conjuncts that branch
 has: the honest root vector itself compresses to the honest compression but is not distinct from it,
 and the honest vector with its first entry moved by two is distinct but does not compress to it —
-two, because the toy `T_k` discards the low bit of every root it folds, so a move by one would be
-invisible in the compression and would give an *accepted* second preimage instead. -/
+two rather than one because the toy `T_k` discards the low bit of every root it folds and this
+fixture's honest first entry is even, so a move by one changes only the dropped bit: it is distinct
+from the honest vector and still compresses to it, an *accepted* second preimage rather than a
+rejected one.  A move by two carries into a bit the fold keeps. -/
 def checkFabricated : IO Unit := do
   match findWitness skSeed honestPk msgA sigA tree0, findWitness skSeed honestPk msgB sigD tree0,
       findWitness skSeed honestPk msgB sigB tree0, findWitness skSeed honestPk msgB sigC tree0 with
@@ -1255,16 +1269,19 @@ two unfolding equations with the lane's seven `_eval` bridges — one per leaf b
 holding a composite witness reaches each canonical game's `eval` at the encoded tweak in one step.
 No bridge is restated in the library; these pin that none needs to be. -/
 
--- Exposed: the two abbreviations below have to unfold for the hypertree-arm pins, whose hypothesis
--- comes back from `HypertreeWitness.valid_iff` spelled with `advance` and `honestLayerMsg` rather
--- than with these names.  Nothing outside this executable consumes them.
+-- Not exposed, and that was measured: dropping the attribute from both leaves the module clean.
+-- The two abbreviations exist only to keep the four hypertree-arm pins below readable, whose
+-- hypothesis comes back from `HypertreeWitness.valid_iff` spelled with `advance` and
+-- `honestLayerMsg` rather than with these names; all 41 uses of them sit inside those four pins,
+-- and a pin is an `example`, which is not exported and so unfolds an unexposed definition freely
+-- where a `theorem` would be refused.  Nothing outside this executable consumes them.
 /-- The position a hypertree-arm label names on the walk from a digest's layer-zero position. -/
-@[expose] def armPos (parts : DigestParts toy.params) (layer : Fin toy.params.d) :
+def armPos (parts : DigestParts toy.params) (layer : Fin toy.params.d) :
     LayerPosition toy :=
   (LayerPosition.initial toy parts).advance layer.val (by simp)
 
 /-- The honest running message there, under a secret seed and a public seed. -/
-@[expose] def armMsg (sk : toyPrimitives.SkSeed) (pks : toyPrimitives.PkSeed)
+def armMsg (sk : toyPrimitives.SkSeed) (pks : toyPrimitives.PkSeed)
     (parts : DigestParts toy.params) (layer : Fin toy.params.d) : toyPrimitives.Y :=
   honestLayerMsg toy toyPrimitives sk pks (LayerPosition.initial toy parts)
     (forsPkGen toyPrimitives sk pks parts.forsAdrs) layer.val (by simp)
