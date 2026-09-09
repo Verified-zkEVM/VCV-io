@@ -163,6 +163,13 @@ the oracle specification's existing per-query probability interpretation.
 These are transport corollaries; the forking arguments remain in the two
 original modules.
 
+The stateful Fiat–Shamir chain in `FiatShamir/Sigma/Stateful/Chain.lean` classifies each
+logged handler step with the private `ForkStateStep` relation before proving invariants.
+Its cache/log preservation lemmas use no sampling assumptions; both whole-run invariant
+proofs reuse the same support-case normalization. Preserve the distinction between a fresh
+oracle reply and a signing insertion: signing records the message and changes the adversary
+cache, while a fresh oracle reply updates both caches and the live query log.
+
 ## Hardness Assumptions
 
 ### Discrete Log Assumptions (DLog / CDH / DDH)
