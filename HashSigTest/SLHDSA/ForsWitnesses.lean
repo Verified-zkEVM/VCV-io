@@ -33,7 +33,9 @@ opened-leaf first, and that both branches name the *global* FORS leaf index rath
 tree-local one.  Two negative
 canaries close the other direction: an honest signature yields no collision at any tree, and a
 forgery whose recovered public key differs yields a `T_k` witness that fails its own validity
-check — which is exactly why `findForsWitness_sound` carries the public-key hypothesis.
+check — which is exactly why `findForsWitness_sound` carries the public-key hypothesis.  A third
+group fabricates eight witnesses and checks that each is rejected, three of them on the
+identifications alone.
 
 The `example`s pin the theorem statements at that bundle and at approved profiles.  The last group
 is kernel-checked rather than run: on a profile whose layer-zero tree indices overflow SHA-2's
@@ -215,6 +217,19 @@ image now differs from the honest one, so the extractor returns the `H`-collisio
 def collisionForgery : ForsSigCore toyParams toyPrimitives.core :=
   withSecret preimageForgery 1 collidingSecret
 
+/-- A tree-`1` secret whose leaf image differs from the honest one in bit *one*.  `H` shifts its
+left child up by two before dropping a bit, so the height-one node changes while the tree root
+does not: the extractor then finds its collision one level higher, at the tree root node, which is
+the top of the `0 < z ≤ a` range. -/
+def highCollidingSecret : toyPrimitives.Y :=
+  node (2 * ((byteOf (honestLeaf (globalLeaf 1)) ^^^
+    toyTweak (forsNodeAdrs baseAdrs 0 (globalLeaf 1))) ^^^ 2))
+
+/-- Tree `1`'s secret replaced by the one that collides at the tree root rather than at the node
+above the leaf. -/
+def highCollisionForgery : ForsSigCore toyParams toyPrimitives.core :=
+  withSecret honestSig 1 highCollidingSecret
+
 /-- Tree `1`'s top authentication node perturbed in bit one: `H` drops the low bit of each child,
 so the recovered root differs from the honest one in its low bit alone and the `T_k` compression
 is unchanged. -/
@@ -327,6 +342,26 @@ def checkTreeCollision : IO Unit := do
               toyPrimitives.H () (forsNodeAdrs baseAdrs z (forsIdx toyParams digest 1 / 2 ^ z))
                 c.1 c.2)
       | _ => ensure "the tree-1 witness is a collision" false
+
+/-- The same leaf perturbed one bit higher collides at the tree root instead: the height-one node
+changes, so the extractor climbs past it and returns the collision at height `a`.  This is the
+upper end of the `0 < z ≤ a` range, and its node index is tree `1`'s own root index. -/
+def checkTreeRootCollision : IO Unit := do
+  ensure "the high-collision forgery recovers the honest FORS public key"
+    (forsPkFromSig toyPrimitives highCollisionForgery digest () baseAdrs ==
+      forsPkGen toyPrimitives () () baseAdrs)
+  let witness := extractTree highCollisionForgery ⟨1, by decide⟩
+  ensure "tree 1 yields an H-collision at height 2, the tree height"
+    (treeWitnessTag witness == "hCollision 1 2")
+  match witness with
+  | none => ensure "tree 1 yields a witness" false
+  | some w =>
+      ensure "the tree-root collision satisfies its equation" (witnessHolds w)
+      match w with
+      | .hCollision _ z _ =>
+          ensure "the tree-root collision names global node index 1, tree 1's own root"
+            (decide (globalLeaf 1 / 2 ^ z = 1))
+      | _ => ensure "the tree-root witness is a collision" false
 
 /-- Tree `0`'s revealed secret value is a second preimage of the honest leaf image, so no tree
 yields a collision and the extractor falls through to the `F`-preimage branch at whichever tree
@@ -629,6 +664,7 @@ theorem deep_forsLeaf_sha2_not_injective :
 def main : IO Unit := do
   checkToyBundle
   checkTreeCollision
+  checkTreeRootCollision
   checkPreimage
   checkInstanceCollision
   checkInstanceTlCollision
@@ -636,7 +672,7 @@ def main : IO Unit := do
   checkMalformedForgery
   checkFabricatedWitnesses
   IO.println "SLH-DSA FORS witness tests: PASS \
-    (H-collision and F-preimage extraction, T_k second preimage, \
+    (H-collision extraction at both tree heights, F-preimage extraction, T_k second preimage, \
      the honest-signature, malformed-input, and fabricated-witness canaries)"
 
 end SLHDSA.ForsWitnessesTest

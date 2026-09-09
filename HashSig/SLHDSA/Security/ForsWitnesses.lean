@@ -20,17 +20,20 @@ EasyCrypt SPHINCS+ development (`FORS_ES.ec`, theorem `EUFCMA_MFORSTWESNPRF_OPRE
 
 ## What is proved, and what is not
 
-Every *deterministic-inclusion* statement below is about a primitive bundle, a public seed, a
-secret seed, a structural address, a message digest, and a FORS signature.  Unlike the WOTS+
-witnesses, the honest secret seed is not confined to one lemma: the FORS honest partner a witness
-attacks — the honest root vector, the honest child pair at an internal node, the honest leaf image
-— is a function of the honest tree, and the honest tree is what `sk` generates.  The
-*transcript-transport* statements are about a role ledger over a `ValidatedParams`; they mention
-no signature at all.  Nothing here constructs an adversary, states an advantage, performs a game
-hop, or claims that any honest execution queried the honest value a witness attacks.  In
-particular a witness lemma is **not** a reduction: that the game's target was committed before the
-forgery was seen is a simulation-fidelity obligation of the later program-level slice, not a fact
-established here.
+Every *deterministic-inclusion* statement below has its free objects drawn from a primitive
+bundle, a seed, a structural address, a message digest, a natural-number index, and a FORS
+signature; not all of them mention all of those, and four — `forsSigLeafIndex_eq`,
+`forsSigLeafIndex_div_pow_a`, `forsSigLeafIndex_div_lt` and `forsHonestChildren_eq` — mention no
+signature and no game.  Unlike the WOTS+ witnesses, the honest secret seed is not confined to one
+lemma: the FORS honest partner a witness attacks — the honest root vector, the honest child pair
+at an internal node, the honest leaf image — is a function of the honest tree, and the honest tree
+is what `sk` generates.  The *transcript-transport* statements are about a role ledger over a
+`ValidatedParams`, taking a bottom-layer position, a digest and a ledger coordinate; they mention
+no signature and no secret seed at all.  Nothing here constructs an adversary, states an
+advantage, performs a game hop, or claims that any honest execution queried the honest value a
+witness attacks.  In particular a witness lemma is **not** a reduction: that the game's target was
+committed before the forgery was seen is a simulation-fidelity obligation of the later
+program-level slice, not a fact established here.
 
 The FORS translation of `FORS_ES.ec` splits **four** ways, not three.  The fourth branch is
 `valid_ITSR` (`FORS_ES.ec:3213`), which selects the FORS leaf index the honest signer never
@@ -270,9 +273,9 @@ theorem forsTreeBinding (prims : Primitives p) (sig : ForsSigCore p prims.core) 
   · rw [forsHonestChildren_eq]; exact hne
   · rw [forsHonestChildren_eq]; simpa only [forsNodeHash_eq_h] using hcoll
 
-/-- **FORS leaf preimage.**  If tree `i`'s forged leaf image agrees with the honest one, the
-revealed secret value is an `F`-preimage of the honest leaf image at
-`forsNodeAdrs adrs 0 (forsSigLeafIndex p md i)`.
+/-- **FORS leaf preimage.**  At any global FORS leaf index `t`, a value whose `F` image at
+`forsNodeAdrs adrs 0 t` is the honest leaf image there is an `F`-preimage of that image.  The
+caller applies it at `t = forsSigLeafIndex p md i`, with `x` the secret value tree `i` reveals.
 
 This is the `valid_OpenPRE` branch (`FORS_ES.ec:3231`), whose postcondition's hash obligation is
 `f pp tw x = y` (`:4462`).  There is deliberately no `≠`: the source asks only that the value be
@@ -447,10 +450,13 @@ the honest one, and otherwise the collision `PerfectMerkleTree.findCollision` lo
 opened leaf's root path.
 
 The search does not check that tree `i` climbs to the honest root; that check is the caller's, and
-`findForsTreeCollision_sound` carries it as `hroot`.  Without it `findCollision` can still return a
-collision — its kernel tests the hash equality before returning `some` — but the first pair it
-returns need not be the honest one, so the witness need not be valid.  The malformed-input canary
-of `HashSigTest.SLHDSA.ForsWitnesses` exercises exactly that gap. -/
+`findForsTreeCollision_sound` carries it as `hroot`.  What the hypothesis buys is the
+*orientation*: `PerfectMerkleTree.findCollision`'s kernel tests the hash equality before returning
+`some`, so `findCollision_sound` alone already gives a collision of two distinct pairs, but only
+`findCollision_oriented` — which needs the climb to reach the honest root — identifies the first of
+them with the honest child pair at the node named, and it is that identification which
+`ForsWitness.Valid` asserts.  `findForsWitness` supplies the hypothesis from its own root-vector
+guard. -/
 def findForsTreeCollision (prims : Primitives p) [DecidableEq prims.Y]
     (sig : ForsSigCore p prims.core) (md : List Byte) (sk : prims.SkSeed) (pk : prims.PkSeed)
     (adrs : Adrs) (i : Fin p.k) : Option (ForsWitness p prims) :=
