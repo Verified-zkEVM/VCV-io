@@ -458,8 +458,7 @@ theorem wins_of_hmsg_agree {prims : Primitives p} [SampleableType prims.Y]
 `List.find?` returns the first match, which is the source's choice at the corresponding step, and
 `findUncoveredIndex_eq_some_iff` pins that choice: soundness alone would be satisfied by a
 last-match variant. -/
-def findUncoveredIndex (prims : Primitives p) [SampleableType prims.Y] [DecidableEq prims.PkSeed]
-    [DecidableEq prims.Y]
+def findUncoveredIndex (prims : Primitives p) [SampleableType prims.Y]
     (targets : ITSRTranscript prims.Y (HmsgITSRInput prims.PkSeed prims.Y))
     (candidate : prims.Y × HmsgITSRInput prims.PkSeed prims.Y) : Option (HmsgIndex p) :=
   ((hmsgItsrProblem prims).indexSet candidate).find?
@@ -468,7 +467,6 @@ def findUncoveredIndex (prims : Primitives p) [SampleableType prims.Y] [Decidabl
 /-- Unfolding equation for `findUncoveredIndex`.  The body is not exposed, so this is what a
 consumer that needs the `List.find?` shape rewrites with. -/
 theorem findUncoveredIndex_eq_find? (prims : Primitives p) [SampleableType prims.Y]
-    [DecidableEq prims.PkSeed] [DecidableEq prims.Y]
     (targets : ITSRTranscript prims.Y (HmsgITSRInput prims.PkSeed prims.Y))
     (candidate : prims.Y × HmsgITSRInput prims.PkSeed prims.Y) :
     findUncoveredIndex prims targets candidate =
@@ -481,7 +479,6 @@ candidate's own index list, and every index *before* it there is covered.
 The last conjunct is what distinguishes `List.find?` from `List.findLast?`; every other statement
 about `findUncoveredIndex` in this module holds of both. -/
 theorem findUncoveredIndex_eq_some_iff {prims : Primitives p} [SampleableType prims.Y]
-    [DecidableEq prims.PkSeed] [DecidableEq prims.Y]
     (targets : ITSRTranscript prims.Y (HmsgITSRInput prims.PkSeed prims.Y))
     (candidate : prims.Y × HmsgITSRInput prims.PkSeed prims.Y) (idx : HmsgIndex p) :
     findUncoveredIndex prims targets candidate = some idx ↔
@@ -493,7 +490,6 @@ theorem findUncoveredIndex_eq_some_iff {prims : Primitives p} [SampleableType pr
 
 /-- The returned index is one the candidate's own digest selects. -/
 theorem mem_indexSet_of_findUncoveredIndex {prims : Primitives p} [SampleableType prims.Y]
-    [DecidableEq prims.PkSeed] [DecidableEq prims.Y]
     {targets : ITSRTranscript prims.Y (HmsgITSRInput prims.PkSeed prims.Y)}
     {candidate : prims.Y × HmsgITSRInput prims.PkSeed prims.Y} {idx : HmsgIndex p}
     (h : findUncoveredIndex prims targets candidate = some idx) :
@@ -503,7 +499,7 @@ theorem mem_indexSet_of_findUncoveredIndex {prims : Primitives p} [SampleableTyp
 
 /-- The returned index is covered by no target. -/
 theorem notMem_targetIndexSet_of_findUncoveredIndex {prims : Primitives p}
-    [SampleableType prims.Y] [DecidableEq prims.PkSeed] [DecidableEq prims.Y]
+    [SampleableType prims.Y]
     {targets : ITSRTranscript prims.Y (HmsgITSRInput prims.PkSeed prims.Y)}
     {candidate : prims.Y × HmsgITSRInput prims.PkSeed prims.Y} {idx : HmsgIndex p}
     (h : findUncoveredIndex prims targets candidate = some idx) :
