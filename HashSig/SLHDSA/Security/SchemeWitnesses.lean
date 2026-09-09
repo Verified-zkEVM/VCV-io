@@ -15,10 +15,10 @@ public import HashSig.SLHDSA.GeneralScheme
 An SLH-DSA signature that verifies against a public key routes into exactly one of two witness
 families, and which one is decided by a single equality: whether the FORS public key the signature
 recovers at the position its *own* digest names is the honest FORS public key there.  When it is,
-the FORS half of the signature is a FORS forgery at that instance address and
-`HashSig.SLHDSA.Security.ForsWitnesses` translates it.  When it is not, the hypertree half carries a
-message differing from the honest one at that leaf all the way to the published root, and
-`HashSig.SLHDSA.Security.HypertreeWitnesses` translates it.
+that equality is exactly the hypothesis `HashSig.SLHDSA.Security.ForsWitnesses`' extractor takes at
+that instance address, and the FORS half goes there.  When it is not, the hypertree half recovers
+the published root from a layer-zero message differing from the honest one at that leaf, which is
+what the layer walk of `HashSig.SLHDSA.Security.HypertreeWitnesses` takes.
 
 The digest is the one FIPS 205 Algorithm 20 computes from the signature's own randomizer, the
 public seed, the published root and the message; `schemeParts` names it once, so the statements
@@ -40,10 +40,10 @@ therefore wrong, and no declaration here supplies such a tree — computing one 
 
 ## The route
 
-Verification is `GeneralScheme.verifyInternal_eq_decide`: the recovered hypertree root equals the
-published one.  Recovery starts from the FORS public key `forsPkFromSig` rebuilds from the FORS half
-of the signature at `schemeParts …`'s own FORS address.  Comparing that value with
-`forsPkGen prims sk pk.pkSeed`'s at the same address is a decidable equality, so
+Verification is, by `GeneralScheme.verifyInternal_eq_decide`, the decision of whether the recovered
+hypertree root is the published one.  Recovery starts from the FORS public key `forsPkFromSig`
+rebuilds from the FORS half of the signature at `schemeParts …`'s own FORS address.  Comparing that
+value with `forsPkGen prims sk pk.pkSeed`'s at the same address is a decidable equality, so
 `verifyInternal_cases` splits on it and hands the second branch the root match unchanged.
 
 Branch **(A)** — the two FORS public keys agree — is exactly `findForsWitness_sound`'s hypothesis,
@@ -96,8 +96,9 @@ decided by one equality, so they are disjoint and exhaustive; the FORS arm's thr
 exhaustive too, being the three outcomes of one function.  What is *not* preserved is the source's
 assignment of forgeries to cases, so a transcription of its `mu_split` coefficients would be
 unsound here.  What is preserved is that each branch still yields a witness against a different
-component hash, so the shape of the source's summation survives even though the summands' events do
-not match one for one.
+component hash, so the three FORS games a later slice has to reach are the same three; which
+forgeries reach which is what changes.  Whether the source's summand coefficients survive that
+change is not established here and must not be assumed from it.
 
 ## Labels
 
@@ -132,7 +133,7 @@ duplicate them; `HashSigTest.SLHDSA.SchemeWitnesses` pins that they do apply.
 
 The `fors` arm does need one.  Its addresses are rooted at `DigestParts.forsAdrs`, while the three
 FORS ledger lemmas are stated at `BottomPosition.forsAdrs`.  `BottomPosition.ofDigestParts` carries
-no `@[expose]` and has no projection equations of its own, so the identification runs through the
+no `@[expose]`, and no equation projects its two fields, so the identification runs through the
 `@[simp]` equation `BottomPosition.forsAdrs_ofDigestParts` rather than by unfolding.  The three
 membership lemmas below are that rewrite composed with the corresponding `ForsWitnesses` or
 `ReachableTargets` statement; the three encoded-distinctness ones compose it with a `ForsWitnesses`
