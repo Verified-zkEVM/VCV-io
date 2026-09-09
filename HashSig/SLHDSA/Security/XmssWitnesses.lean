@@ -54,11 +54,10 @@ position, a node height and that height's two bounds.  `xmssNodeAdrsKey_injectiv
 primitive bundle, an `EncodedTargetLedgerConditions`, and two coordinate tuples with their own
 range hypotheses; the tuples are implicit arguments rather than bound by a lambda, so they are free
 in the statement.  None of the three mentions a signature or a secret seed.  Nothing here
-constructs an
-adversary, states an advantage, performs a game hop, or claims that any honest execution queried
-the honest value a witness attacks.  In particular a witness lemma is **not** a reduction: that the
-game's target was committed before the forgery was seen is a simulation-fidelity obligation of the
-later program-level slice, not a fact established here.
+constructs an adversary, states an advantage, performs a game hop, or claims that any honest
+execution queried the honest value a witness attacks.  In particular a witness lemma is **not** a
+reduction: that the game's target was committed before the forgery was seen is a
+simulation-fidelity obligation of the later program-level slice, not a fact established here.
 
 The one-layer split proved here is not the whole hypertree translation.  Each of the source's three
 flags is an existential over the `d` layers, and each reduction then picks one layer with a `find`
