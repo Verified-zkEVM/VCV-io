@@ -450,14 +450,16 @@ as the next honest message.  Past the last layer it returns `none`.
 
 Each layer's guard is recomputed here from `sk`, and so is the honest message handed to
 `findXmssWitness` at every layer above the first; the first layer's honest message is the caller's
-`msg'`, which at the top level is the message the honest signer signed.
+`msg'`, the walk's own honest starting message, which this search does not compute.
 
 The guard is the root match at the layer, not at the top, so the search does not need the walk to
 reach the honest top root.  It stops at the first layer whose own recovered root is that layer's
 honest root, wherever that falls, and whatever it returns there is valid all the same —
 `findHypertreeWitness_sound` takes no top-root hypothesis.  There are exactly two ways it returns
-nothing: no layer's recovered root was that layer's honest root, so the walk ran past the last
-layer; or one was, and `findXmssWitness` returned nothing there. -/
+nothing: no layer's recovered root was that layer's honest root, and the search reached the last
+layer and stopped; or one was, and `findXmssWitness` returned nothing there.  The zero-length case
+in the definition is unreachable — the position's own layer bound refutes its walk-length
+hypothesis — and the recursion never enters it, descending only to length one. -/
 def findHypertreeWitness (vp : ValidatedParams) (prims : Primitives vp.params)
     [DecidableEq prims.Y] (sk : prims.SkSeed) (pk : prims.PkSeed) (pos : LayerPosition vp) :
     (layers : ℕ) → pos.layer.val + layers = vp.params.d → prims.Y → prims.Y →
@@ -566,8 +568,8 @@ theorem findHypertreeWitness_sound (vp : ValidatedParams) (prims : Primitives vp
 recovery from `pos` reaches the honest top-layer root, the search always returns a witness.
 
 The layer walk supplies the layer, and at that layer `findXmssWitness_isSome` supplies the
-witness.  The validated parameters come from `vp` itself and the byte laws are the argument
-`findWotsWitness_isSome` needs; the leaf bound is `pos.leaf.isLt` at every position visited.
+witness.  The validated parameters come from `vp` itself, and the byte laws are the argument that
+same lemma takes for its WOTS+ half; the leaf bound is `pos.leaf.isLt` at every position visited.
 
 *Deterministic inclusion.* -/
 theorem findHypertreeWitness_isSome (vp : ValidatedParams) (prims : Primitives vp.params)
