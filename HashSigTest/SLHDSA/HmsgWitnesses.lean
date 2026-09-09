@@ -130,7 +130,7 @@ def ensure (label : String) (condition : Bool) : IO Unit :=
 Two hypertree layers of height two, two FORS trees of height one, `w = 16`, `len = 4`. -/
 
 -- Exposed, and what that attribute is for was read off the errors its removal produces in this
--- file.  Without `@[expose]` on `toyParams`, 40 errors, the first inside the bundle at
+-- file.  Without `@[expose]` on `toyParams`, 41 errors, the first inside the bundle at
 -- `yToBytes := id`, where `id` will not take the type `Bytes 1 → Bytes toyParams.n`.  `toy` below
 -- needs no exposure of its own here, and neither do the secret map, the tweak map, the randomizer
 -- or the digest map.  Nothing outside this executable consumes any of them.
@@ -190,7 +190,7 @@ def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
     root.toNat * (14 * i + 89) + (byteFold msg).toNat * (22 * i + 149) + (30 * i + 7)) % 256))
 
 -- Exposed and `@[reducible]`, for two different reasons, each read off the errors that removing
--- that attribute alone produces in this file.  Exposed, for code generation: without it, 49 errors,
+-- that attribute alone produces in this file.  Exposed, for code generation: without it, 51 errors,
 -- the first at `instance : DecidableEq toyPrimitives.Y` just below, reading `Compilation failed,
 -- locally inferred compilation type differs from type that would be inferred in other modules` and
 -- naming `toyPrimitives ↦ 2`, with the rest following it down the compiled declarations.
