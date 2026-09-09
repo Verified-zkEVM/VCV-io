@@ -57,6 +57,9 @@ canary re-evaluates its witness at the other site and requires that to fail.
 * **D** carries a FORS half whose tree-zero revealed value moves that tree's *leaf image* but not
   the recovered public key — the toy hashes drop the moved bit twice over.  It still takes the FORS
   arm, and the extractor returns the `H`-collision the move creates instead.
+* **T** carries a FORS half whose tree-zero authentication node moves that tree's *recovered root*
+  but not the recovered public key — the toy `T_k` drops the low bit of every root it compresses.
+  It still takes the FORS arm, and the extractor returns the `T_k` second preimage the move creates.
 * **B** carries a FORS half whose recovered public key does move, under an honest hypertree
   signature on that recovered value.  It takes the hypertree arm and diverges at layer zero.
 * **C** carries the same FORS half, a perturbed layer-zero component whose recovered root misses
@@ -102,21 +105,23 @@ leaf addresses are additionally matched against a table of `Adrs` records writte
 change in how the global index reaches the address is caught there rather than only through
 `forsSigLeafIndex`.
 
-`checkSchemeEquations` evaluates the two equations this pull request adds to `SLHDSA.GeneralScheme`
-at every signature the fixture builds.  `checkHonestPartner` pins that the honest layer-zero partner
-depends on the digest's *position* and not on its FORS message, which is what makes the hypertree
-arm's honest starting message well defined for a message the signer never signed.
-`checkFabricated` is the tally: four hand-built witnesses accepted and ten rejected, the rejected
-ones covering both sites, both layer relabellings, both FORS height bounds, a wrong preimage value
-and a `T_k` "second preimage" of the honest root vector itself.  There is no out-of-range layer
+`checkSchemeEquations` evaluates the three equations this pull request adds to
+`SLHDSA.GeneralScheme` at every signature the fixture builds, and pins the secret key the first of
+them does not state.  `checkHonestPartner` pins that the honest layer-zero partner depends on the
+digest's *position* and not on its FORS message, which is what makes the hypertree arm's honest
+starting message well defined for a message the signer never signed.  `checkFabricated` is the
+tally: four hand-built witnesses accepted and eleven rejected, the rejected ones covering both
+sites, both layer relabellings, both FORS height bounds, a wrong preimage value, a `T_k` "second
+preimage" of the honest root vector itself, and a root vector that does differ from the honest one
+but does not compress to it.  There is no out-of-range layer
 fabrication, and there cannot be one: `HypertreeWitness.layer` is a `Fin toyParams.d`, so a label at
 or beyond `d` does not elaborate.
 
 The `example`s pin the library statements at this bundle — the three new `GeneralScheme` equations,
-the dispatch, both shape equations, both unfolding equations, soundness, completeness, the three
-ledger bridges, the two the hypertree arm does not need, three encoded-distinctness bridges under
-the SHA-2 and SHAKE encoders, and all seven of the lane's `_eval` bridges reached through the
-composite predicate.
+the digest split, the dispatch, both shape equations, both unfolding equations, soundness,
+completeness, the three ledger bridges, the three the hypertree arm does not need, three
+encoded-distinctness bridges under the SHA-2 and SHAKE encoders, and all seven of the lane's
+`_eval` bridges reached through the composite predicate.
 -/
 
 public section
@@ -497,9 +502,9 @@ def describe : Witness toy toyPrimitives → String
 
 /-! ## The signatures
 
-Six in all.  Five verify against the honest public key: two route to the FORS arm and three to the
-hypertree arm, and the three hypertree ones split between the two layers.  The sixth verifies
-against nothing and is the case where the extractor returns `none`. -/
+Seven in all.  Six verify against the honest public key: three route to the FORS arm, one to each of
+that arm's three constructors, and three to the hypertree arm, which split between the two layers.
+The seventh verifies against nothing and is the case where the extractor returns `none`. -/
 
 /-- **Forgery A**, the honest signature on `msgA`.  Its recovered FORS public key is the honest one,
 so it routes to the FORS arm; the toy `H_msg` reads the message only through the exclusive-or of its
@@ -522,6 +527,16 @@ this still routes to the FORS arm. -/
 def collapsedFors : ForsSigCore toyParams toyPrimitives.core :=
   honestForsB.set 0 { honestForsB[0] with sk := node (byteOf honestForsB[0].sk + 2) }
 
+/-- A FORS signature whose recovered *root vector* differs from the honest one while its `T_k`
+compression agrees, so the recovered public key does not move: the toy `T_k` folds its children with
+a two-bit shift and drops the low bit of each, so moving tree zero's authentication node by `0x40`
+lands in the bits the fold discards.  A signature carrying this still routes to the FORS arm, where
+the moved vector is the `T_k` second preimage the extractor returns.  A brute-force sweep over all
+one-byte moves of `honestForsB` finds ten such halves; this is one of them. -/
+def collidedFors : ForsSigCore toyParams toyPrimitives.core :=
+  honestForsB.set 0 { honestForsB[0] with
+    auth := honestForsB[0].auth.set 0 (node (byteOf honestForsB[0].auth[0] + 0x40)) }
+
 /-- A FORS signature whose tree-one revealed value does move the recovered public key. -/
 def forgedFors : ForsSigCore toyParams toyPrimitives.core :=
   honestForsB.set 1 { honestForsB[1] with sk := node (byteOf honestForsB[1].sk + 1) }
@@ -535,6 +550,14 @@ key.  It verifies and routes to the FORS arm, where the moved leaf image yields 
 rather than the honest signature's `F`-preimage. -/
 def sigD : GeneralScheme.SignatureCore toy toyPrimitives.core :=
   ⟨rB, collapsedFors,
+    GeneralHypertree.sign toy toyPrimitives honestForsPkB skSeed pkSeed partsB⟩
+
+/-- **Forgery T**: `collidedFors` under the same honest hypertree signature on the honest FORS
+public key.  It verifies and recovers the honest FORS public key, so it routes to the FORS arm; the
+moved root vector is not the honest one, so the extractor takes the `T_k` branch rather than
+searching the trees. -/
+def sigT : GeneralScheme.SignatureCore toy toyPrimitives.core :=
+  ⟨rB, collidedFors,
     GeneralHypertree.sign toy toyPrimitives honestForsPkB skSeed pkSeed partsB⟩
 
 /-- **Forgery B**: `forgedFors` under an honest hypertree signature on the FORS public key it
@@ -564,12 +587,18 @@ def sigC : GeneralScheme.SignatureCore toy toyPrimitives.core :=
     #v[xmss0Perturbed,
       xmssSign toyPrimitives divergedRoot skSeed pkSeed posB1.toAdrs posB1.leaf.val]⟩
 
-/-- **Forgery E**, which is not one: `forgedFors` under the hypertree signature on the *honest*
-FORS public key.  Verification fails and the walk finds no layer whose recovered root is that
-layer's honest root, so the extractor returns nothing. -/
+/-- **Forgery E**: `forgedFors` under the honest hypertree signature on the *honest* FORS public
+key.  It verifies all the same — layer zero misses its honest root, so the walk carries on and stops
+at layer one, where the extractor returns an XMSS `H`-collision rather than a WOTS+ witness. -/
 def sigE : GeneralScheme.SignatureCore toy toyPrimitives.core :=
   ⟨rB, forgedFors,
     GeneralHypertree.sign toy toyPrimitives honestForsPkB skSeed pkSeed partsB⟩
+
+/-- The layer-zero root `sigE`'s own hypertree half recovers, which is neither layer's honest
+running message.  `checkHypertreeCollision` offers it to an XMSS `H`-collision witness as a running
+message; that branch reads none, so the value is arbitrary and this one is at least `sigE`'s own. -/
+def sigERecoveredRoot0 : toyPrimitives.Y :=
+  xmssPkFromSig toyPrimitives posB0.leaf.val sigE.hypertree[0] forgedForsPk pkSeed posB0.toAdrs
 
 /-- The two FORS trees, as extraction targets. -/
 def tree0 : Fin toyParams.k := ⟨0, by decide⟩
@@ -597,13 +626,14 @@ zero, height zero, and the global leaf index in the tree-index word.  Written ou
 by `forsNodeAdrs`, so a change in how the global index reaches the address moves this table. -/
 def forsLeafAdrsTable (j : ℕ) : Adrs := ⟨0, 2, AddrType.forsTree.toCode, 0, 0, j⟩
 
-/-- Fifteen fixture properties.
+/-- Sixteen fixture properties.
 
 The first six are the liveness of the two message-derived maps, which the previous fixture in this
 lane could not exercise: its `H_msg` and `PRF_msg` were both constant and its public seed was a
 unit.  Each of `H_msg`'s four FIPS inputs is moved on its own and the digest is required to move
-with it, and `PRF_msg` is moved in each of its two.  The seventh is the exclusive-or fold's
-collision, which is what makes a routed forgery on an unsigned message exhibitable here.
+with it, and `PRF_msg` is moved in each of its two.  The seventh is that the two sites' randomizers
+differ, and the eighth is the exclusive-or fold's collision, which is what makes a routed forgery on
+an unsigned message exhibitable here.
 
 The next four separate the two forgery sites — different FORS instance address, different FORS
 message, different layer-zero position and different top-layer position — and pin that both FORS
@@ -679,18 +709,28 @@ def checkToyBundle : IO Unit := do
       (honestWotsTops (wotsLeafAdrs posB0.toAdrs posB0.leaf.val) (honestMsgB 0) ==
         wotsPkGenTops toyPrimitives skSeed pkSeed (wotsLeafAdrs posB0.toAdrs posB0.leaf.val)))
 
-/-! ## The two merged-module equations, evaluated -/
+/-! ## The three new `GeneralScheme` equations, evaluated -/
 
-/-- Key generation publishes the seed it was given and the general hypertree's root, and
-verification is the decision of whether the recovered root is the published one.  Both are the
-equations this pull request adds to `SLHDSA.GeneralScheme`, evaluated at each of the six signatures
-the fixture builds rather than restated. -/
+/-- Key generation publishes the seed it was given and the general hypertree's root; verification is
+the general hypertree verifier at the digest; and verification is the decision of whether the
+recovered root is the published one.  Those are the three equations this pull request adds to
+`SLHDSA.GeneralScheme`, evaluated rather than restated — the first once, the other two at every one
+of the seven signatures the fixture builds, with `sigA` taken at both of the messages that share its
+digest.
+
+The key-generation equation states the published component only, so the secret one is pinned here
+beside it: the four fields of `(keygenInternal …).2` are the hand-written `secretKey` that signs
+`sigA`. -/
 def checkSchemeEquations : IO Unit := do
   let generated := (GeneralScheme.keygenInternal toy toyPrimitives skSeed skPrf pkSeed).1
+  let generatedSecret := (GeneralScheme.keygenInternal toy toyPrimitives skSeed skPrf pkSeed).2
   ensure "keygen publishes the seed and the hypertree root"
     (generated.pkSeed == pkSeed && generated.pkRoot == pkRoot)
-  for entry in [(msgA, sigA), (msgA', sigA), (msgB, sigD), (msgB, sigB), (msgB, sigC),
-      (msgB, sigN)] do
+  ensure "keygen retains the two secret seeds, the public seed and the root"
+    (generatedSecret.skSeed == secretKey.skSeed && generatedSecret.skPrf == secretKey.skPrf &&
+      generatedSecret.pkSeed == secretKey.pkSeed && generatedSecret.pkRoot == secretKey.pkRoot)
+  for entry in [(msgA, sigA), (msgA', sigA), (msgB, sigD), (msgB, sigT), (msgB, sigB),
+      (msgB, sigC), (msgB, sigE), (msgB, sigN)] do
     let msg := entry.1
     let sig := entry.2
     let parts := schemeParts toy toyPrimitives msg sig honestPk
@@ -760,6 +800,16 @@ def checkCollapsedForgery : IO Unit := do
     checkForsArm s!"D tree {target.val}" msgB sigD target "fors.hCollision tree=0 height=1"
       holdsB holdsA
 
+/-- A signature whose FORS half moves the recovered *root vector* without moving the recovered
+public key also routes to the FORS arm, and the extractor returns the `T_k` second preimage the move
+creates: the root-vector comparison the extractor makes fails, so it never searches the trees.
+`target` is not honoured on that branch either, which is what asking for the same witness at both
+targets pins.  This is the third of the FORS arm's three constructors, and the one whose witness a
+reader is likeliest to think unreachable at a collapsing toy `T_k`. -/
+def checkCollidedForgery : IO Unit := do
+  for target in [tree0, tree1] do
+    checkForsArm s!"T tree {target.val}" msgB sigT target "fors.tlCollision" holdsB holdsA
+
 /-! ## The hypertree arm -/
 
 /-- One hypertree-arm canary, for the case where the extractor returns a WOTS+ `F`-preimage.
@@ -828,9 +878,14 @@ def checkHypertreeArm (name : String) (sig : GeneralScheme.SignatureCore toy toy
 branch of `XmssWitness.Valid` never reads the honest running message, so the two message
 re-evaluations of `checkHypertreeArm` cannot discriminate and are asserted to hold instead; what
 discriminates is the tree address and, because the two layers' leaves give different node indices
-at the extracted height, the leaf. -/
+at the extracted height, the leaf.
+
+The second of those two is made at `inert`, which the caller supplies.  Any value of the right type
+would do — the branch reads none — so it is taken as an argument rather than borrowed from another
+signature's construction, where it would suggest a connection that does not exist. -/
 def checkHypertreeCollision (name : String)
-    (sig : GeneralScheme.SignatureCore toy toyPrimitives.core) (layer height : ℕ) : IO Unit := do
+    (sig : GeneralScheme.SignatureCore toy toyPrimitives.core) (layer height : ℕ)
+    (inert : toyPrimitives.Y) : IO Unit := do
   let parts := schemeParts toy toyPrimitives msgB sig honestPk
   ensure s!"{name}: verifies" (GeneralScheme.verifyInternal toy toyPrimitives msgB sig honestPk)
   ensure s!"{name}: recovers a FORS public key that is not the honest one"
@@ -859,7 +914,7 @@ def checkHypertreeCollision (name : String)
       ensure s!"{name}: the honest running message is inert, and holds"
         (xmssWitnessHolds (posOfB layer).toAdrs (posOfB layer).leaf.val (honestMsgB other)
             w.witness &&
-          xmssWitnessHolds (posOfB layer).toAdrs (posOfB layer).leaf.val divergedRoot w.witness)
+          xmssWitnessHolds (posOfB layer).toAdrs (posOfB layer).leaf.val inert w.witness)
       ensure s!"{name}: fails at the other layer as a whole"
         (!xmssWitnessHolds (posOfB other).toAdrs (posOfB other).leaf.val (honestMsgB other)
           w.witness)
@@ -930,7 +985,13 @@ def checkHonestPartner : IO Unit := do
 /-! ## Fabricated witnesses -/
 
 /-- A witness the extractor did not return, offered at a site.  A `Fin toyParams.d` label makes an
-out-of-range layer a build error rather than a rejected run, so no fabrication below carries one. -/
+out-of-range layer a build error rather than a rejected run, so no fabrication below carries one.
+
+The two `T_k` fabrications falsify one conjunct each, and they are the two conjuncts that branch
+has: the honest root vector itself compresses to the honest compression but is not distinct from it,
+and the honest vector with its first entry moved by two is distinct but does not compress to it —
+two, because the toy `T_k` discards the low bit of every root it folds, so a move by one would be
+invisible in the compression and would give an *accepted* second preimage instead. -/
 def checkFabricated : IO Unit := do
   match findWitness skSeed honestPk msgA sigA tree0, findWitness skSeed honestPk msgB sigD tree0,
       findWitness skSeed honestPk msgB sigB tree0, findWitness skSeed honestPk msgB sigC tree0 with
@@ -957,13 +1018,16 @@ def checkFabricated : IO Unit := do
             holdsB (.fors (.fPreimage tree0 (node (byteOf (honestForsSecret partsB.forsAdrs
               (globalLeafAt partsB.md.toList 0)) + 2))))),
          ("a T_k second preimage of the honest root vector",
-            holdsB (.fors (.tlCollision (honestForsRoots partsB.forsAdrs))))]
+            holdsB (.fors (.tlCollision (honestForsRoots partsB.forsAdrs)))),
+         ("a root vector that differs from the honest one but does not compress to it",
+            holdsB (.fors (.tlCollision ((honestForsRoots partsB.forsAdrs).set 0
+              (node (byteOf (honestForsRoots partsB.forsAdrs)[0] + 2))))))]
       for entry in accepted do
         ensure s!"fabricated: {entry.1} is accepted" entry.2
       for entry in rejected do
         ensure s!"fabricated: {entry.1} is rejected" (!entry.2)
-      ensure "the tally is four accepted and ten rejected"
-        (accepted.length == 4 && rejected.length == 10)
+      ensure "the tally is four accepted and eleven rejected"
+        (accepted.length == 4 && rejected.length == 11)
   | _, _, _, _ => throw (IO.userError "Scheme witness check failed: fabricated: wrong arms")
 
 /-! ## Statement pins
@@ -1133,6 +1197,18 @@ example (parts : DigestParts toy.params) (j : ℕ)
         ((LayerPosition.initial toy parts).advance j hj).leaf.val) ∈ wotsPkAddresses toy := by
   rw [wotsLeafAdrs_eq_wotsInstanceAdrs]
   exact mem_wotsPkAddresses toy _
+
+/-- And so does the chain-step address the two WOTS+ `F` branches name, through the same rewrite.
+`wotsPreimageAdrs_mem_optionalWotsAddresses` has no pin of its own: its ledger is built from a
+reduction's per-instance `select` function, which the dispatch does not have. -/
+example (parts : DigestParts toy.params) (j : ℕ)
+    (hj : (LayerPosition.initial toy parts).layer.val + j < toy.params.d)
+    (i : Fin toy.params.len) {t : ℕ} (ht : t < toy.params.w - 1) :
+    (wotsChainAdrs (wotsLeafAdrs ((LayerPosition.initial toy parts).advance j hj).toAdrs
+        ((LayerPosition.initial toy parts).advance j hj).leaf.val) i.val).setHashAddress t ∈
+      wotsStepAddresses toy := by
+  rw [wotsLeafAdrs_eq_wotsInstanceAdrs]
+  exact mem_wotsStepAddresses_of_lt ((LayerPosition.initial toy parts).advance j hj) i ht
 
 /-- Under the SHA-2 encoder, two FORS leaf targets named by two digests carry equal encoded tweaks
 only when the two digests agree on both indices and the two FORS coordinates agree. -/
@@ -1380,9 +1456,10 @@ def main : IO Unit := do
   checkSchemeEquations
   checkHonestForgery
   checkCollapsedForgery
+  checkCollidedForgery
   checkHypertreeArm "B" sigB 0 2 0 forgedForsPk
   checkHypertreeArm "C" sigC 1 2 0 divergedRoot
-  checkHypertreeCollision "E" sigE 1 1
+  checkHypertreeCollision "E" sigE 1 1 sigERecoveredRoot0
   checkNoWitness
   checkArmSelection
   checkHonestPartner
