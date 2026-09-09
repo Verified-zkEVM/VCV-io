@@ -514,8 +514,9 @@ leaf and honest running message at every layer, the extractor reports the layer 
 forgery meets the honest hypertree and returns an XMSS witness there.  For the three WOTS+
 extractions each re-evaluation at a neighbouring layer's address, leaf and honest running message
 is required to fail; a fourth extraction returns an `H`-collision, whose branch reads the leaf only
-as a node index that layers zero and one share, so that one re-evaluation is required to hold
-instead.  Plus the no-match, early-match and nine fabricated-witness canaries, three accepted and
+as a node index that layers zero and one share and never reads the honest running message at all,
+so it makes four re-evaluations rather than six — two on the address and two on the leaf, one of
+which is required to hold instead of to fail.  Plus the no-match, early-match and nine fabricated-witness canaries, three accepted and
 six rejected. -/
 lean_exe slhdsa_hypertree_witness_tests where
   root := `HashSigTest.SLHDSA.HypertreeWitnesses

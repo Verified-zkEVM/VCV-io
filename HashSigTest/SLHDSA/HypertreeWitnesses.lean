@@ -45,8 +45,9 @@ sound because the running message arriving one layer up is that tree's honest ro
 signed at the divergence layer is not the honest one there and that that layer's own recovery is
 the honest root; it pins the layer *and the constructor* the extractor reports; evaluates the
 returned witness at that layer's tree address, leaf and honest running message; and then
-re-evaluates the *same* witness three more times per neighbouring layer, changing one of those
-three arguments at a time, requiring each to fail.
+re-evaluates the *same* witness four more times per neighbouring layer: once for each of those
+three arguments, changing one at a time, and once with all three moved together, which is
+`HypertreeWitness.Valid` as a whole.  Each of the four is required to fail.
 
 All three re-evaluations bite only because all three forgeries extract an `fPreimage` witness,
 which is why the constructor is pinned rather than assumed.  `checkLayerH` runs the other case and
@@ -93,7 +94,7 @@ a `Fin toyParams.d`, so a label at or beyond `d` is not a witness at this walk l
 elaborate.  What used to be two run-time rejections is a build error now, exercised by the mutation
 that widens the label's index rather than by an `ensure`.
 
-The `example`s pin the theorem statements at that bundle, including the seven declarations with no
+The `example`s pin the theorem statements at that bundle, including the nine declarations with no
 consumer inside the library, and the ledger and encoded-tweak lemmas at the same profile — which
 is inside the approved address bounds, so no second parameter record is introduced.
 -/
@@ -433,8 +434,9 @@ def checkToyBundle : IO Unit := do
 layer whose own recovered root is that layer's honest root is `layer`.  The check pins the layer
 and the constructor the extractor reports, evaluates the returned witness at that layer's address,
 leaf and honest message, and then re-evaluates the *same* witness against each other layer's
-address, each other layer's leaf, and each other layer's honest message, requiring every one of
-those to fail.
+address, each other layer's leaf and each other layer's honest message, one at a time, and against
+each other layer as a whole, which moves all three together; every one of those four is required to
+fail.
 
 The three positions of this fixture differ in all of layer, tree and leaf — `(0, 6, 3)`, `(1, 1,
 2)` and `(2, 0, 1)` — so a layer read one too high or one too low moves the tree address, the leaf
@@ -647,17 +649,21 @@ def checkFabricatedWitnesses : IO Unit := do
 
 /-! ## Statement pins
 
-The theorems this module ships, elaborated at the toy profile.  Seven declarations have no consumer
-inside the library and nothing else in the tree elaborates them: the two extractor shape equations,
+The theorems this module ships, elaborated at the toy profile.  Nine declarations have no consumer
+inside the library and nothing else in the tree elaborates them — every name declared in
+`HashSig.SLHDSA.Security.HypertreeWitnesses` that occurs exactly once in the code of `HashSig/`,
+which is its own declaration line, nothing there importing that module: the two extractor shape
+equations, the two extractor lemmas `findHypertreeWitness_sound` and `findHypertreeWitness_isSome`,
 the `atLayer` bridge, the top-level walk, the cross-layer encoded-distinctness lemma, the
 honest-signer bridge `signFromPosition_getElem`, and `LayerPosition.advance_ne`.  Each is pinned
 here.  `HypertreeWitness.valid_iff` is not among them — `findHypertreeWitness_sound` rewrites with
 it — and neither is `HypertreeWitness.layer_lt`, which is what `HypertreeWitness.Valid` forms its
 position with; both are pinned all the same, in the form a consumer meets them.  The honest-signer
-bridge is pinned as the layer-`j` component read against `honestLayerMsg`, and the two WOTS+
+bridge is pinned as the layer-`j` component read against `honestLayerMsg`, and all three WOTS+
 cross-layer separations are composed here the way the module docstring says they compose:
-`wotsPkAdrsKey_injective` against `advance_ne` directly, and `wotsStepAdrsKey_injective` through
-the `congrArg (·.1.1)` its pair-valued conclusion needs first. -/
+`wotsPkAdrsKey_injective` against `advance_ne` directly, `wotsOptionalStepAdrsKey_injective`
+through the `congrArg Prod.fst` its `WotsChainCoord` conclusion needs, and
+`wotsStepAdrsKey_injective` through the `congrArg (·.1.1)` its pair-valued conclusion needs. -/
 
 example (pos : LayerPosition toy) (layers : ℕ)
     (hlayers : pos.layer.val + layers = toy.params.d) (msg msg' : toyPrimitives.Y)
@@ -827,8 +833,8 @@ example (pos : LayerPosition toy) {j j' : ℕ}
   LayerPosition.advance_ne pos hj hj' hne
     (wotsPkAdrsKey_injective (sha2EncodedTargetLedgerConditions toy toyApprovedAddressBounds) hkey)
 
-/-- And for the two chain-step branches, whose ledgers are indexed by a `WotsChainCoord` whose
-first component is that same position.  One step again. -/
+/-- And for the `fCollision` branch, whose ledger `wotsStepAddresses` is indexed by a
+`WotsChainCoord` paired with the step, so the position comes out of a pair equality. -/
 example (pos : LayerPosition toy) {j j' : ℕ} (i i' : Fin toy.params.len)
     (s s' : Fin (toy.params.w - 1))
     (hj : pos.layer.val + j < toyParams.d) (hj' : pos.layer.val + j' < toyParams.d) (hne : j ≠ j')
@@ -840,6 +846,21 @@ example (pos : LayerPosition toy) {j j' : ℕ} (i i' : Fin toy.params.len)
     (sha2EncodedTargetLedgerConditions toy toyApprovedAddressBounds)
     (a₁ := (⟨pos.advance j hj, i⟩, s)) (a₂ := (⟨pos.advance j' hj', i'⟩, s')) hkey
   exact congrArg (fun c => c.1.1) h
+
+/-- And for the `fPreimage` branch, whose ledger `optionalWotsAddresses` is indexed by the
+`WotsChainCoord` a selection picks a step of.  `wotsOptionalStepAdrsKey_injective` concludes that
+coordinate equality directly, so one `congrArg Prod.fst` projects the position out. -/
+example (pos : LayerPosition toy) {j j' : ℕ} (i i' : Fin toy.params.len)
+    (select : WotsChainCoord toy → Option (Fin (toy.params.w - 1)))
+    {s s' : Fin (toy.params.w - 1)}
+    (hj : pos.layer.val + j < toyParams.d) (hj' : pos.layer.val + j' < toyParams.d) (hne : j ≠ j')
+    (hc : select (pos.advance j hj, i) = some s) (hd : select (pos.advance j' hj', i') = some s')
+    (hkey : (sha2Primitives toyParams).adrsToKey (wotsStepAdrs (pos.advance j hj, i) s) =
+        (sha2Primitives toyParams).adrsToKey (wotsStepAdrs (pos.advance j' hj', i') s')) :
+    False := by
+  refine LayerPosition.advance_ne pos hj hj' hne ?_
+  exact congrArg Prod.fst (wotsOptionalStepAdrsKey_injective
+    (sha2EncodedTargetLedgerConditions toy toyApprovedAddressBounds) select hc hd hkey)
 
 def main : IO Unit := do
   checkToyBundle

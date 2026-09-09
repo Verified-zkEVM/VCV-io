@@ -268,12 +268,14 @@ theorem advance_succ (pos : LayerPosition vp) (j : ℕ)
 /-- Two different counts of layers advanced from one position land on two different positions,
 because the layer word of `pos.advance j` is `pos.layer.val + j`.
 
-This is what a consumer holding two hypertree witnesses at two layers of one walk needs, whatever
-branch they took: each of slice 1's four witness ledgers is enumerated over every layer, and each
-of their injectivity lemmas concludes equality of a coordinate whose position component this
-refutes.  It is what the three WOTS+ ledgers need and all they need.  The `xmssH` ledger is
-indexed by a `LayerTreeCoord`, which `LayerTreeCoord.ofPosition` builds as `⟨pos.layer, pos.tree⟩`,
-dropping the leaf.  `Params.Valid.hp_pos` gives at least two leaves at every layer and tree, so
+This is what a consumer holding two hypertree witnesses at two layers of one walk needs in three of
+the four branches: each of slice 1's four witness ledgers is enumerated over every layer, and the
+three WOTS+ ones' injectivity lemmas each conclude equality of a coordinate whose position
+component this refutes.  It is what those three need and all they need.  The fourth is the `xmssH`
+ledger, indexed by a `LayerTreeCoord`, which `LayerTreeCoord.ofPosition` builds as
+`⟨pos.layer, pos.tree⟩`, dropping the leaf; `xmssNodeAdrsKey_injective` concludes an equality of
+those, which has no position component to refute, and `layerTreeCoord_advance_ne` is what that
+branch uses instead.  `Params.Valid.hp_pos` gives at least two leaves at every layer and tree, so
 that map is not injective and this statement's conclusion does not transport forward along it.
 
 `layerTreeCoord_advance_ne` is that branch's own reading of `advance_layer_val`, and it is the
@@ -532,9 +534,32 @@ position and the layer already fix it; `HypertreeWitness.Valid` recomputes it.
 
 The layer is a `Fin layers`, indexed by the walk length the witness was extracted from, rather than
 a bare `ℕ` with the bound carried as a side condition.  The bound is the same one every statement
-here needs, and putting it in the type is what makes the label mean the count of layers advanced
-rather than an arbitrary numbering: the base case of `findHypertreeWitness` runs at walk length one,
-where `Fin 1` admits only `0`, so no other base label can be written at all. -/
+here needs, and putting it in the type fixes the label's *range*.  It does not fix the label's
+meaning, and the difference is worth stating exactly.
+
+What the type refuses is the `+ 1` shift: `findHypertreeWitness`'s base case runs at walk length
+one, where the label's type is `Fin 1`, so a base label of `1` carries the obligation `1 < 1`,
+which is refutable rather than merely unproved.  What it still admits is any relabelling that
+agrees with the identity at walk length one.  The reflection `t ↦ layers - 1 - t` — counting the
+layer from the top of the walk instead of from `pos` — is the natural one, and it elaborates:
+leave the length-one base label `⟨0, ·⟩`, label the length-`n + 2` base case `⟨layers + 1, ·⟩`,
+drop the `+ 1` from the recursive step, read `layers - 1 - w.layer.val` in
+`HypertreeWitness.layer_lt`, `Valid` and `valid_iff`, and add two `omega`-derived rewrites to
+`findHypertreeWitness_sound`'s `more` branch.  Under it `w.layer` no longer counts layers advanced
+from `pos` — a divergence at the walk's first layer is labelled `layers - 1` — while `Valid` still
+names the right position, because it decodes the label.  A consumer pairing the raw label with a
+`Fin d` layer would address the wrong tree.
+
+Nothing here refuses that.  Every statement here that mentions the label either writes it — the two
+shape equations — or reads it through `layer_lt` and `Valid`, so the reflection renumbers them along
+with the extractor and they re-prove by the same inductions.  What
+would *not* renumber is a statement tying the label to the walk's own indexing of the signature
+vector — that the reported layer is the one whose component recovers the honest root there — and
+that is the first-match property this module does not prove.  What refuses it instead is
+`HashSigTest.SLHDSA.HypertreeWitnesses`, whose layer pin compares the reported label with the
+literal layer its fixture built the divergence at, and whose `posOf`/`advance` and
+`honestMsgAt`/`honestLayerMsg` agreement checks are what stop those tables being renumbered to
+match. -/
 structure HypertreeWitness (vp : ValidatedParams) (prims : Primitives vp.params) (layers : ℕ) where
   /-- The layer, counted from the walk's starting position, below the walk's length. -/
   layer : Fin layers
@@ -545,8 +570,10 @@ structure HypertreeWitness (vp : ValidatedParams) (prims : Primitives vp.params)
 the witness reports, added to the walk's starting layer, is below `d`.
 
 It is read off the `Fin layers` label and the walk-length hypothesis, with nothing from `Valid`.
-This is the bound a consumer used to destructure out of `Valid`'s existential; `Valid` no longer
-carries one, so this is where the bound comes from. -/
+This is the *derived* form of the bound a consumer used to destructure out of `Valid`'s
+existential.  The existential's own conjunct was `w.layer < layers`, which is now `w.layer.isLt`
+and needs no lemma at all; `Valid` carries neither, so this is where the bound every `advance` site
+here needs comes from. -/
 theorem HypertreeWitness.layer_lt {vp : ValidatedParams} {prims : Primitives vp.params}
     {layers : ℕ} (w : HypertreeWitness vp prims layers) (pos : LayerPosition vp)
     (hlayers : pos.layer.val + layers = vp.params.d) :
