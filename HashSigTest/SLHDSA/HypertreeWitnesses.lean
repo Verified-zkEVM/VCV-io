@@ -355,8 +355,8 @@ The three honest XMSS roots are pairwise distinct, and so are the three honest r
 a witness read at the wrong layer is read against a different honest partner.  The four honest
 leaves of each of the three trees are pairwise distinct, so no two leaves of one tree share one.
 The hand-written `posOf` agrees with `LayerPosition.advance` and the hand-written `honestMsgAt`
-with `honestLayerMsg`, at all three layers — which is what makes an off-by-one in the position
-arithmetic itself visible here rather than only downstream.  The hand-written honest chain ends
+with `honestLayerMsg`, at all three layers, so the layer canaries below check the extractor against
+a table that is written independently of the library's and known to match it.  The hand-written honest chain ends
 agree with `wotsPkGenTops`, which is what `XmssWitness.Valid` names.  And the hand-assembled honest
 hypertree signature is the one `GeneralHypertree.sign` produces. -/
 def checkToyBundle : IO Unit := do
