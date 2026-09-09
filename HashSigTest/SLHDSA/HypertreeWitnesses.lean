@@ -644,10 +644,13 @@ def checkFabricatedWitnesses : IO Unit := do
 
 /-! ## Statement pins
 
-The theorems this module ships, elaborated at the toy profile.  Six declarations have no consumer
+The theorems this module ships, elaborated at the toy profile.  Eight declarations have no consumer
 inside the library and nothing else in the tree elaborates them: the two extractor shape equations,
-the `HypertreeWitness.Valid` unfolding equation, the `atLayer` bridge, the top-level walk, and the
-cross-layer encoded-distinctness lemma.  Each is pinned here. -/
+the `HypertreeWitness.Valid` unfolding equation, the `atLayer` bridge, the top-level walk, the
+cross-layer encoded-distinctness lemma, the honest-signer bridge `signFromPosition_getElem`, and
+`LayerPosition.advance_ne`.  Each is pinned here.  The last two are pinned in the form a consumer
+uses them: the honest signer's layer-`j` component read against `honestLayerMsg`, and the two WOTS+
+cross-layer separations composed in the one step the module docstring says they take. -/
 
 example (pos : LayerPosition toy) (layers : ℕ)
     (hlayers : pos.layer.val + layers = toy.params.d) (msg msg' : toyPrimitives.Y)
@@ -740,6 +743,21 @@ example (sigs : Vector (XmssSig toyParams toyPrimitives) toyParams.d)
   findHypertreeWitness_isSome toy toyPrimitives toyByteLaws () () pos0 toyParams.d (by decide)
     forgedMsg honestMsg forgedMsg_ne_honestMsg sigs hroot
 
+/-- The honest running message is what the honest signer signs there.  This is the bridge the
+module docstring points at wherever it calls `honestLayerMsg` a witness's honest partner; without
+it that identification is a gloss.  `checkToyBundle` evaluates the same content at this fixture,
+since `honestXmssSig i` is `xmssSign` on `honestMsgAt i` at `posOf i` and the assembled signature
+is asserted to be the signer's. -/
+example (msg : toyPrimitives.Y) (j : ℕ) (hj : pos0.layer.val + j < toyParams.d) :
+    (signFromPosition toy toyPrimitives () () false pos0 toyParams.d (by decide) msg)[j]'
+        (by have h0 : pos0.layer.val = 0 := by decide
+            omega) =
+      xmssSign toyPrimitives (honestLayerMsg toy toyPrimitives () () pos0 msg j hj) () ()
+        (pos0.advance j hj).toAdrs (pos0.advance j hj).leaf.val :=
+  signFromPosition_getElem toy toyPrimitives () () false pos0 toyParams.d (by decide) msg j
+    (by have h0 : pos0.layer.val = 0 := by decide
+        omega)
+
 /-! ## Ledger pins
 
 The toy profile is inside the approved address bounds, so it serves the ledger and encoded-tweak
@@ -788,6 +806,33 @@ example (pos : LayerPosition toy) {j j' z z' i i' : ℕ}
   advance_xmssNodeAdrsKey_injective
     (shakeEncodedTargetLedgerConditions toy toyApprovedAddressBounds.toCanonicalAddressBounds) pos
     hj hj' hz hzh hi hz' hzh' hi' hkey
+
+/-- Cross-layer separation for the `tlCollision` branch, whose ledger `wotsPkAddresses` is indexed
+by the `LayerPosition` itself.  No lemma of this module composes it: `wotsPkAdrsKey_injective`
+contradicts `LayerPosition.advance_ne` in one step, which is what the module docstring claims and
+what this pins. -/
+example (pos : LayerPosition toy) {j j' : ℕ}
+    (hj : pos.layer.val + j < toyParams.d) (hj' : pos.layer.val + j' < toyParams.d) (hne : j ≠ j')
+    (hkey : (sha2Primitives toyParams).adrsToKey
+          (wotsPkAdrs (wotsInstanceAdrs (pos.advance j hj))) =
+        (sha2Primitives toyParams).adrsToKey
+          (wotsPkAdrs (wotsInstanceAdrs (pos.advance j' hj')))) : False :=
+  LayerPosition.advance_ne pos hj hj' hne
+    (wotsPkAdrsKey_injective (sha2EncodedTargetLedgerConditions toy toyApprovedAddressBounds) hkey)
+
+/-- And for the two chain-step branches, whose ledgers are indexed by a `WotsChainCoord` whose
+first component is that same position.  One step again. -/
+example (pos : LayerPosition toy) {j j' : ℕ} (i i' : Fin toy.params.len)
+    (s s' : Fin (toy.params.w - 1))
+    (hj : pos.layer.val + j < toyParams.d) (hj' : pos.layer.val + j' < toyParams.d) (hne : j ≠ j')
+    (hkey : (sha2Primitives toyParams).adrsToKey (wotsStepAdrs (pos.advance j hj, i) s) =
+        (sha2Primitives toyParams).adrsToKey (wotsStepAdrs (pos.advance j' hj', i') s')) :
+    False := by
+  refine LayerPosition.advance_ne pos hj hj' hne ?_
+  have h := wotsStepAdrsKey_injective
+    (sha2EncodedTargetLedgerConditions toy toyApprovedAddressBounds)
+    (a₁ := (⟨pos.advance j hj, i⟩, s)) (a₂ := (⟨pos.advance j' hj', i'⟩, s')) hkey
+  exact congrArg (fun c => c.1.1) h
 
 def main : IO Unit := do
   checkToyBundle

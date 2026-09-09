@@ -262,7 +262,10 @@ because the layer word of `pos.advance j` is `pos.layer.val + j`.
 This is what a consumer holding two hypertree witnesses at two layers of one walk needs, whatever
 branch they took: each of slice 1's four witness ledgers is enumerated over every layer, and each
 of their injectivity lemmas concludes equality of a coordinate whose position component this
-refutes.  `layerTreeCoord_advance_ne` is its `LayerTreeCoord` corollary. -/
+refutes.  It is what the three WOTS+ ledgers need and all they need.  The `xmssH` ledger is
+indexed by a `LayerTreeCoord`, which forgets the leaf, so this does not reach it;
+`layerTreeCoord_advance_ne` is that branch's own reading of `advance_layer_val`, a sibling of this
+one rather than a corollary. -/
 theorem advance_ne (pos : LayerPosition vp) {j j' : ℕ}
     (hj : pos.layer.val + j < vp.params.d) (hj' : pos.layer.val + j' < vp.params.d)
     (hne : j ≠ j') :
