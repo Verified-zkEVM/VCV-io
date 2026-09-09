@@ -24,18 +24,18 @@ stated with its two children swapped, or at a neighbouring address, fails by eva
 witness lemmas are stated for an arbitrary `Primitives` bundle, so this is in scope; it is a
 falsifiability fixture, not a claim about any approved profile.
 
-Over that bundle the checks build honest FORS key material at a two-tree profile of height two,
-three forgeries that all recover the honest FORS public key, and confirm that the extractor
-returns the `H`-collision, the `F`-preimage, and the `T_k` second preimage respectively, each
-satisfying its equation by evaluation — including the two identifications the games need, that the
-collision partner is the honest child pair at the node named, taken left to right rather than
-opened-leaf first, and that both branches name the *global* FORS leaf index rather than the
-tree-local one.  Two negative
-canaries close the other direction: an honest signature yields no collision at any tree, and a
-forgery whose recovered public key differs yields a `T_k` witness that fails its own validity
-check — which is exactly why `findForsWitness_sound` carries the public-key hypothesis.  A third
-group fabricates eight witnesses and checks that each is rejected, three of them on the
-identifications alone.
+Over that bundle the checks build honest FORS key material at a two-tree profile of height two and
+four forgeries that all recover the honest FORS public key, and confirm that the extractor returns
+the `H`-collision at height one, the `H`-collision at the tree height `a = 2`, the `F`-preimage,
+and the `T_k` second preimage respectively, each satisfying its equation by evaluation — including
+the three identifications the games need: that the collision partner is the honest child pair at
+the node named, that its two children are taken left to right rather than opened-leaf first, and
+that both the collision and the preimage name the *global* FORS leaf index rather than the
+tree-local one.  Two negative canaries close the other direction: an honest signature yields no
+collision at any tree, and a forgery whose recovered public key differs yields a `T_k` witness that
+fails its own validity check — which is exactly why `findForsWitness_sound` carries the public-key
+hypothesis.  A third group fabricates eight witnesses: the two genuine ones are checked *accepted*
+and the other six rejected, between them falsifying every conjunct of every branch.
 
 The `example`s pin the theorem statements at that bundle and at approved profiles.  The last group
 is kernel-checked rather than run: on a profile whose layer-zero tree indices overflow SHA-2's
@@ -205,7 +205,8 @@ bit only.  `H` drops the low bit of each child, so the parent node at height one
 the recovered root is still honest — the forgery therefore recovers the honest public key while
 colliding `H` at that node. -/
 def collidingSecret : toyPrimitives.Y :=
-  node (2 * ((byteOf (honestLeaf (globalLeaf 1)) ^^^ toyTweak (forsNodeAdrs baseAdrs 0 5)) ^^^ 1))
+  node (2 * ((byteOf (honestLeaf (globalLeaf 1)) ^^^
+    toyTweak (forsNodeAdrs baseAdrs 0 (globalLeaf 1))) ^^^ 1))
 
 /-- Tree `0`'s secret replaced by a second preimage: every leaf image is honest, so the extractor
 finds no collision and falls through to the `F`-preimage branch. -/
@@ -443,12 +444,27 @@ def checkMalformedForgery : IO Unit := do
   ensure "the malformed forgery still produces a T_k witness" (witnessTag w == "tlCollision")
   ensure "the malformed T_k witness fails its own equation" (!witnessHolds w)
 
-/-- `witnessHolds` itself has to be able to fail.  A fabricated collision whose `H` image differs,
-a fabricated preimage of the wrong value, a genuine collision moved to height zero — where the
-address is a FORS *leaf* address and `forsHonestChildren`'s `height - 1` would truncate — a genuine
-collision moved above the tree height, the genuine collision with its two children swapped, and the
-genuine preimage moved to the tree-local leaf index are all rejected.  The last three fail on the
-identifications alone: every other conjunct holds for them. -/
+/-- `witnessHolds` itself has to be able to fail, and has to accept.  Eight witnesses are
+fabricated at tree `1`.  The two genuine ones — the height-one collision and the preimage at the
+honest secret value — are checked *accepted*; the other six are rejected, and between them they
+falsify every conjunct of every branch:
+
+* the hash equation, by a collision whose `H` image differs and by the genuine collision with its
+  two children swapped — the second only because `H` is order sensitive, so it is the left-to-right
+  identification that rejects it;
+* the `F` equation, by a preimage of the wrong value;
+* the `tlCollision` distinctness, by a `T_k` witness at the honest root vector itself, whose `T_k`
+  image is of course equal;
+* the `0 < z` bound, by the genuine collision moved to height zero, where the address is a FORS
+  *leaf* address and `forsHonestChildren`'s `height - 1` would truncate;
+* the `z ≤ a` bound, by the genuine collision moved above the tree height.
+
+The last two miss the hash equation as well, because the honest child pair is recomputed at
+whatever height the witness names; it is the bounds that say what is wrong with them.
+
+The remaining identification, the *global* rather than tree-local index, is checked where the
+genuine witnesses are extracted: at the node index by `checkTreeCollision` and at the leaf index by
+`checkPreimage`. -/
 def checkFabricatedWitnesses : IO Unit := do
   let two : Fin toyParams.k := ⟨1, by decide⟩
   let genuinePair : toyPrimitives.Y × toyPrimitives.Y :=
@@ -475,16 +491,32 @@ def checkFabricatedWitnesses : IO Unit := do
 /-! ## Statement pins at the toy bundle -/
 
 /-- A shape pin for `forsPkFromSig_cases`: at a signature which recovers the honest FORS public
-key, one of the three branches holds, and each is weakened here to the datum it names. -/
+key, one of the three branches holds.  Each branch is restated with its hash equation first — the
+order a source-final-validity game reads it in, winning condition before side condition — so every
+conjunct the theorem supplies is bound and used here.  Deleting the `T_k` equality from the first
+disjunct or the `H` equality from the second, which is the security content of those two branches,
+breaks this pin. -/
 example (sig : ForsSigCore toyParams toyPrimitives.core) (md : List Byte)
     (hpk : forsPkFromSig toyPrimitives sig md () baseAdrs =
       forsPkGen toyPrimitives () () baseAdrs) :
-    forsRecoveredRoots toyPrimitives sig md () baseAdrs ≠
-        forsHonestRoots toyPrimitives () () baseAdrs ∨
+    (toyPrimitives.Tl () (forsPkAdrs baseAdrs)
+            (forsRecoveredRoots toyPrimitives sig md () baseAdrs).toList =
+          toyPrimitives.Tl () (forsPkAdrs baseAdrs)
+            (forsHonestRoots toyPrimitives () () baseAdrs).toList ∧
+        forsRecoveredRoots toyPrimitives sig md () baseAdrs ≠
+          forsHonestRoots toyPrimitives () () baseAdrs) ∨
       (∃ (i : Fin toyParams.k) (z : ℕ) (c : toyPrimitives.Y × toyPrimitives.Y),
-        0 < z ∧ z ≤ toyParams.a ∧
-          forsHonestChildren toyPrimitives () () baseAdrs z
-            (forsSigLeafIndex toyParams md i.val / 2 ^ z) ≠ c) ∨
+        toyPrimitives.H ()
+              (forsNodeAdrs baseAdrs z (forsSigLeafIndex toyParams md i.val / 2 ^ z))
+              (forsHonestChildren toyPrimitives () () baseAdrs z
+                (forsSigLeafIndex toyParams md i.val / 2 ^ z)).1
+              (forsHonestChildren toyPrimitives () () baseAdrs z
+                (forsSigLeafIndex toyParams md i.val / 2 ^ z)).2 =
+            toyPrimitives.H ()
+              (forsNodeAdrs baseAdrs z (forsSigLeafIndex toyParams md i.val / 2 ^ z)) c.1 c.2 ∧
+          0 < z ∧ z ≤ toyParams.a ∧
+            forsHonestChildren toyPrimitives () () baseAdrs z
+              (forsSigLeafIndex toyParams md i.val / 2 ^ z) ≠ c) ∨
       (∀ i : Fin toyParams.k,
         toyPrimitives.F () (forsNodeAdrs baseAdrs 0 (forsSigLeafIndex toyParams md i.val))
             (sig[i.val]).sk =
@@ -492,9 +524,9 @@ example (sig : ForsSigCore toyParams toyPrimitives.core) (md : List Byte)
             (forsSkGenCore toyPrimitives.core () () baseAdrs
               (forsSigLeafIndex toyParams md i.val))) := by
   rcases forsPkFromSig_cases toyPrimitives sig md () () baseAdrs hpk with
-    ⟨hne, -⟩ | ⟨i, z, c, hz, hza, hne, -⟩ | hall
-  · exact Or.inl hne
-  · exact Or.inr (Or.inl ⟨i, z, c, hz, hza, hne⟩)
+    ⟨hne, htl⟩ | ⟨i, z, c, hz, hza, hne, hcoll⟩ | hall
+  · exact Or.inl ⟨htl, hne⟩
+  · exact Or.inr (Or.inl ⟨i, z, c, hcoll, hz, hza, hne⟩)
   · exact Or.inr (Or.inr hall)
 
 /-- The extractor's soundness at the toy bundle, for every signature, digest and target: the only
