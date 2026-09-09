@@ -33,25 +33,32 @@ Unlike the WOTS+ witnesses, the honest secret seed is not confined to one lemma:
 partner a witness attacks — the honest root vector, the honest child pair at an internal node, the
 honest leaf image — is a function of the honest tree, and the honest tree is what `sk` generates.
 
-The *transcript-transport* statements are about a role ledger over a `ValidatedParams`; their free
-objects are a bottom-layer position, the coordinate that ledger indexes by, and — in the two
-membership lemmas only — a digest.  They mention no signature and no secret seed at all.  Nothing
+The *transcript-transport* statements are about a role ledger over a `ValidatedParams`.  The two
+membership lemmas take a bottom-layer position, a digest and a tree index, and
+`mem_forsTreeAddresses_of_digest` a node height as well; the three encoded-distinctness lemmas take
+a primitive bundle and an `EncodedTargetLedgerConditions`, and reach the ledger's coordinates
+either as the argument of a `Function.Injective` (`forsLeafAdrsKey_injective`,
+`forsRootAdrsKey_injective`) or as two coordinate tuples with their own range hypotheses
+(`forsTreeAdrsKey_injective`).  None of the five mentions a signature or a secret seed.  Nothing
 here constructs an adversary, states an advantage, performs a game hop, or claims that any honest
 execution queried the honest value a witness attacks.  In particular a witness lemma is **not** a
 reduction: that the game's target was committed before the forgery was seen is a
 simulation-fidelity obligation of the later program-level slice, not a fact established here.
 
 The FORS translation of `FORS_ES.ec` splits **four** ways, not three.  The fourth branch is
-`valid_ITSR` (`FORS_ES.ec:3213`), which selects the FORS leaf index the honest signer never
-opened; it is a statement about the digest transcript and the signing log, not about one FORS
-signature, and it is deliberately absent here.  Consequently this module never establishes that a
-witness *index* is unopened, which is the second half of the FORS-`F` winning condition
-(`FORS_ES.ec:4461`); only the preimage half (`:4462`) is proved.
+`valid_ITSR` (`FORS_ES.ec:3213`): every FORS leaf index the forged message opens was already
+revealed by a signing query, and the forged pair itself was never queried.  It names no index of
+its own — the FORS leaf index the honest signer never opened is chosen by the `find` at `:3223`,
+which is meaningful exactly when the first of those two conjuncts fails.  `valid_ITSR` is a
+statement about the digest transcript and the signing log, not about one FORS signature, and it is
+deliberately absent here.  Consequently this module never establishes that a witness *index* is
+unopened, which is the second half of the FORS-`F` winning condition (`FORS_ES.ec:4461`); only the
+preimage half (`:4462`) is proved.
 
 ## Labels
 
 *Deterministic inclusion* — a statement whose only free objects are `prims`, seeds, addresses,
-a digest and signature data:
+a digest, natural-number indices, and signature or witness data:
 
 * the four definitions `forsSigLeafIndex`, `forsHonestRoots`, `forsRecoveredRoots`,
   `forsHonestChildren`, with their equations `forsSigLeafIndex_eq`, `forsHonestRoots_getElem`,
@@ -110,18 +117,19 @@ instance-wide and prefers the `H` branch instead: it fires when the two root vec
 *some* tree's forged leaf image differs, and the `F` branch when they agree and *every* tree's
 image agrees.
 
-The comparison with the source runs one way against its *events* and the other way against its
-*cases*, so it is worth stating twice.  Against the events, both branches are strictly contained.
-The `F` branch forces every tree's image to agree, hence `dftidx`'s, hence `valid_OpenPRE`; the
-`H` branch forces every recovered root to be honest, hence `dftidx`'s, hence `valid_TRHTCR`, which
-asks that of the ITSR-selected tree alone.  Both containments are strict: a forgery whose root
-vectors agree and whose `dftidx` image agrees while some other tree's differs satisfies
-`valid_OpenPRE` and is routed here to `H`, and one whose `dftidx` root is honest while some other
-tree's is not satisfies `valid_TRHTCR` and is routed here to `T_k`.  Restricted to forgeries whose
-two root vectors agree — where this module does not take its `T_k` branch, and the source, with
-`valid_TRHTCR` holding, does not take TRCO — the `H` comparison turns around: the source's TRHTCR
-case is then `dftidx`'s image differing, and *some* tree's image differing is strictly wider than
-that, while the `F` branch stays strictly narrower than `valid_OpenPRE`.
+The comparison with the source runs one way against its *events* and, for the `H` branch, the other
+way against its *cases*, so it is worth stating twice.  Against the events, both branches are
+strictly contained.  The `F` branch forces every tree's image to agree, hence `dftidx`'s, hence
+`valid_OpenPRE`; the `H` branch forces every recovered root to be honest, hence `dftidx`'s, hence
+`valid_TRHTCR`, which asks that of the ITSR-selected tree alone.  Both containments are strict: a
+forgery whose root vectors agree and whose `dftidx` image agrees while some other tree's differs
+satisfies `valid_OpenPRE` and is routed here to `H`, and one whose `dftidx` root is honest while
+some other tree's is not satisfies `valid_TRHTCR` and is routed here to `T_k`.  Restricted to
+forgeries whose two root vectors agree — where this module does not take its `T_k` branch, and the
+source, with `valid_TRHTCR` holding, does not take TRCO — the `H` comparison turns around: the
+source's TRHTCR case bound is then `!valid_ITSR` together with `dftidx`'s image differing, and
+*some* tree's image differing is strictly wider than that, while the `F` branch stays strictly
+narrower than `valid_OpenPRE`.
 
 Each branch still yields a witness against a different one of the three FORS component hashes —
 for `F`, the hash half of the winning condition only, the unopened-index half being the ITSR
@@ -278,10 +286,10 @@ theorem forsRootsBinding (prims : Primitives p) (sig : ForsSigCore p prims.core)
 
 /-- The honest child pair of the FORS internal node at height `z`, global index `t`: the two
 honest subtree roots one level below.  Meaningful only at `0 < z`.  Every statement below that
-names it as an honest partner asserts that bound; the one exception is its own unfolding equation,
-which is definitional and holds at every height.  At `z = 0` truncated subtraction would silently
-name the leaf level, and `forsNodeAdrs adrs 0 t` is a `forsF` leaf target rather than a `forsH`
-node target. -/
+names it as an honest partner asserts that bound; the one statement that names it without
+asserting the bound is its own unfolding equation, which is definitional and holds at every
+height.  At `z = 0` truncated subtraction would silently name the leaf level, and
+`forsNodeAdrs adrs 0 t` is a `forsF` leaf target rather than a `forsH` node target. -/
 def forsHonestChildren (prims : Primitives p) (sk : prims.SkSeed) (pk : prims.PkSeed)
     (adrs : Adrs) (z t : ℕ) : prims.Y × prims.Y :=
   PerfectMerkleTree.honestChildren (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) z t
@@ -356,8 +364,9 @@ tree's forged leaf image differs from the honest one.  It is exhaustive by const
 splits are decisions on a proposition and its negation.
 
 These are the three non-ITSR branches of the four-way FORS split of `FORS_ES.ec`
-(`EUFCMA_MFORSTWESNPRF_OPRE`, `:3829`); the fourth, `valid_ITSR` (`:3213`), decides *which* tree's
-preimage the third branch should be submitted at and is not available from one signature.
+(`EUFCMA_MFORSTWESNPRF_OPRE`, `:3829`); the fourth, `valid_ITSR` (`:3213`), is an event about the
+signing log, and it is under its negation that the source's `find` (`:3223`) picks *which* tree's
+preimage the third branch should be submitted at.  That log is not available from one signature.
 
 *Deterministic inclusion.* -/
 theorem forsPkFromSig_cases (prims : Primitives p) (sig : ForsSigCore p prims.core)

@@ -297,8 +297,12 @@ def extract (sig : ForsSigCore toyParams toyPrimitives.core) (target : Fin toyPa
 
 /-! ## The bundle behaves as advertised -/
 
-/-- `F` drops the low bit of its input and adds the address tweak; `H` is order sensitive at the
-node the collision canary uses. -/
+/-- The four bundle properties the canaries below lean on.  `F` drops the low bit of its input and
+adds the address tweak.  The eight honest leaf images are pairwise distinct, so no two leaves share
+an honest partner.  `H` is order sensitive at the node the collision canary names.  And the tweak
+separates that node's address both from the one at the same height with another index and from the
+one at the same index a height up, and separates global leaf `5`'s address from the address a
+tree-local numbering would give that leaf. -/
 def checkToyBundle : IO Unit := do
   ensure "F drops the low bit and adds the address tweak"
     ((List.range 256).all fun x =>
