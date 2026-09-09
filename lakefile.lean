@@ -400,7 +400,8 @@ script test (args) do
     #["exe", "slhdsa_canonical_game_tests"],
     #["exe", "slhdsa_wots_witness_tests"],
     #["exe", "slhdsa_fors_witness_tests"],
-    #["exe", "slhdsa_xmss_witness_tests"]]
+    #["exe", "slhdsa_xmss_witness_tests"],
+    #["exe", "slhdsa_hypertree_witness_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -507,6 +508,14 @@ honest-signature and malformed-input canaries and eighteen fabricated witnesses,
 fourteen rejected. -/
 lean_exe slhdsa_xmss_witness_tests where
   root := `HashSigTest.SLHDSA.XmssWitnesses
+
+/-- Hypertree layer-walk extraction: over a three-layer toy profile whose trajectory changes tree,
+leaf and honest running message at every layer, the extractor reports the layer at which the
+forgery meets the honest hypertree and returns an XMSS witness there, each one re-evaluated at the
+neighbouring layers' addresses, leaves and honest messages and required to fail, plus the
+no-match, early-match and eleven fabricated-witness canaries, three accepted and eight rejected. -/
+lean_exe slhdsa_hypertree_witness_tests where
+  root := `HashSigTest.SLHDSA.HypertreeWitnesses
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
