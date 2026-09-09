@@ -50,7 +50,7 @@ underlying facts in the explicit shape used by the direct coupling argument.
 
 @[expose] public section
 
-open OracleComp OracleSpec ENNReal
+open OracleComp OracleSpec ENNReal MeasureTheory ProbabilityTheory
 
 namespace PRFTagReader
 
@@ -117,16 +117,33 @@ distribution on multiple-session tables.
 This is the foundational marginalization step of the direct M_ideal/S_ideal coupling: the
 reference-slot cells of `gS` are themselves jointly uniform and independent of the off-slot
 cells, so the multiple-session sub-table is uniform whenever the single-session full table is. -/
+lemma evalDist_slotZeroSubTable_uniformSample
+    [Fintype TagId] [DecidableEq TagId]
+    [Fintype Nonce] [DecidableEq Nonce]
+    [Finite Digest] [Nonempty Digest] [SampleableType Digest]
+    [MeasurableSpace Digest] [MeasurableSingletonClass Digest]
+    [EvalDistSemantics ProbComp] [LawfulEvalDistSemantics ProbComp]
+    (hSmall : 𝒟[$ᵗ (TagId × Nonce → Digest)] = uniformOn Set.univ)
+    (hLarge : 𝒟[$ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)] = uniformOn Set.univ) :
+    𝒟[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>=
+        fun gS => pure (slotZeroSubTable (sessionsPerTag := sessionsPerTag) gS)] =
+      𝒟[$ᵗ (TagId × Nonce → Digest)] := by
+  rw [bind_pure_comp]
+  exact evalDist_map_table_comp_injective _ _ hSmall hLarge
+    (slotZeroEmbed_injective (TagId := TagId) (Nonce := Nonce)
+      (sessionsPerTag := sessionsPerTag))
+
+/-- Discrete frontend form of uniform slot-zero restriction. -/
 lemma evalSPMF_slotZeroSubTable_uniformSample
     [Fintype TagId] [DecidableEq TagId]
     [Fintype Nonce] [DecidableEq Nonce]
     [Finite Digest] [Nonempty Digest] [SampleableType Digest] :
     𝒮[($ᵗ ((TagId × Fin sessionsPerTag) × Nonce → Digest)) >>=
         fun gS => pure (slotZeroSubTable (sessionsPerTag := sessionsPerTag) gS)] =
-      𝒮[$ᵗ (TagId × Nonce → Digest)] :=
-  evalSPMF_uniformSample_map_comp_injective (R := Digest)
-    (slotZeroEmbed_injective (TagId := TagId) (Nonce := Nonce)
-      (sessionsPerTag := sessionsPerTag))
+      𝒮[$ᵗ (TagId × Nonce → Digest)] := by
+  let : MeasurableSpace Digest := ⊤
+  apply evalSPMF_eq_of_evalDist_eq
+  exact evalDist_slotZeroSubTable_uniformSample evalDist_uniformSample evalDist_uniformSample
 
 /-! ### Reader-side cell inclusion under the embedding -/
 

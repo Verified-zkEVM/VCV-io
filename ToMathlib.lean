@@ -52,6 +52,7 @@ public import ToMathlib.MeasureTheory.Measure.Monotone
 public import ToMathlib.MeasureTheory.Measure.Option
 public import ToMathlib.MeasureTheory.Measure.Subprobability
 public import ToMathlib.MeasureTheory.Measure.TotalVariation
+public import ToMathlib.MeasureTheory.Measure.UniformTable
 public import ToMathlib.OrderEnrichedCategory
 public import ToMathlib.Probability.Divergence.Renyi
 public import ToMathlib.Probability.Divergence.RenyiDiscrete

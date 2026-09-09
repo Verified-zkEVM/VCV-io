@@ -7,6 +7,8 @@ Authors: Oleksandr Vovkotrub
 module
 public import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 public import VCVio.OracleComp.Constructions.SampleableType
+public import VCVio.OracleComp.Constructions.SampleableType.MeasureCompatibility
+public import VCVio.EvalDist.Monad.UniformTable
 
 /-!
 # Lazy Random Oracle Equals Eager Full-Table Sampling
@@ -72,8 +74,11 @@ same distribution as evaluating `ψ` on a directly drawn uniform table. -/
 lemma evalSPMF_uniformSample_bind_update_map {α : Type} (t : D) (ψ : (D → R) → α) :
     𝒮[do let u ← $ᵗ R; let g ← $ᵗ (D → R); pure (ψ (Function.update g t u))] =
       𝒮[do let g ← $ᵗ (D → R); pure (ψ g)] := by
-  rw [bind_pure_comp, evalSPMF_map, ← evalSPMF_uniformSample_bind_update t]
-  simp [map_bind, bind_pure_comp]
+  let : MeasurableSpace R := ⊤
+  let : MeasurableSpace α := ⊤
+  apply evalSPMF_eq_of_evalDist_eq
+  exact evalDist_bind_bind_update_map ($ᵗ R) ($ᵗ (D → R))
+    evalDist_uniformSample evalDist_uniformSample t ψ
 
 /-- **Two-cell marginalization, post-composed.** For any continuation `ψ : (D → R) → α` and any
 two distinct coordinates `t₁ ≠ t₂`, drawing fresh independent uniforms `u₁, u₂`, then a full
@@ -93,12 +98,11 @@ lemma evalSPMF_uniformSample_bind_update_two_map {α : Type} {t₁ t₂ : D} (hn
     𝒮[do let u₁ ← $ᵗ R; let u₂ ← $ᵗ R; let g ← $ᵗ (D → R);
          pure (ψ (Function.update (Function.update g t₁ u₁) t₂ u₂))] =
       𝒮[do let g ← $ᵗ (D → R); pure (ψ g)] := by
-  simp_rw [Function.update_comm hne]
-  rw [evalSPMF_bind]
-  refine (congrArg _ (funext fun u₁ =>
-    evalSPMF_uniformSample_bind_update_map t₂ fun h => ψ (Function.update h t₁ u₁))).trans ?_
-  rw [← evalSPMF_bind]
-  exact evalSPMF_uniformSample_bind_update_map t₁ ψ
+  let : MeasurableSpace R := ⊤
+  let : MeasurableSpace α := ⊤
+  apply evalSPMF_eq_of_evalDist_eq
+  exact evalDist_bind_bind_bind_update_two_map ($ᵗ R) ($ᵗ (D → R))
+    evalDist_uniformSample evalDist_uniformSample hne ψ
 
 omit [Finite D] [Finite R] [Nonempty R] in
 /-- Pure-case base step for `evalSPMF_simulateQ_randomOracle_run'_eq_tableExtending`: running
