@@ -13,9 +13,9 @@ public import HashSig.SLHDSA.Security.WotsWitnesses
 Deterministic translations of one XMSS root match into a concrete witness against one named
 component hash: an ordered-pair collision of `H` at an exact `TREE` internal-node address, or one
 of the three WOTS+ witnesses of `HashSig.SLHDSA.Security.WotsWitnesses` at the leaf the signature
-opens.  The case analysis is the Lean counterpart of the `valid_TCRTRH`/`valid_TCRPKCO`/
-`valid_WOTSTWES` split of the EasyCrypt SPHINCS+ development, specialised to one XMSS tree
-(`FL_SL_XMSS_MT_ES.ec`, the three case flags at `:3268-3272`).
+opens.  The case analysis is the Lean counterpart of the `valid_WOTSTWES`/`valid_TCRPKCO`/
+`valid_TCRTRH` split of the EasyCrypt SPHINCS+ development, specialised to one XMSS tree
+(`FL_SL_XMSS_MT_ES.ec`, the three case flags at `:3268-3269`, `:3270-3271` and `:3272-3273`).
 
 ## What is proved, and what is not
 
@@ -50,12 +50,12 @@ the honest value a witness attacks.  In particular a witness lemma is **not** a 
 game's target was committed before the forgery was seen is a simulation-fidelity obligation of the
 later program-level slice, not a fact established here.
 
-The one-layer split proved here is not the whole hypertree translation.  `FL_SL_XMSS_MT_ES.ec`
-reaches its three flags after a walk over all `d` layers that picks the first layer at which two
-recovery chains diverge (the `find` at `:2112`, `:2398`, `:2685`, and the exhaustiveness argument
-inlined at `:5332-5337`).  That walk is deliberately absent here: it is a statement about a vector
-of `d` XMSS signatures, not about one, and every statement in this module is about one XMSS
-signature at one named leaf.
+The one-layer split proved here is not the whole hypertree translation.  Each of the source's three
+flags is an existential over the `d` layers, and each reduction then picks one layer with a `find`
+(`:2112`, `:2398`, `:2685`); that the three between them cover every forgery is discharged inline
+at `:5332-5337`.  That walk is deliberately absent here: it is a statement about a vector of `d`
+XMSS signatures, not about one, and every statement in this module is about one XMSS signature at
+one named leaf.
 
 ## Labels
 
@@ -100,25 +100,34 @@ reconstructs the WOTS+ public key of leaf `idx` from `sig.wots` and then climbs 
 generation builds the same tree from the honest leaves.  A root match therefore equates the climb
 of the recovered leaf with the honest root.  Either the recovered leaf differs from the honest one,
 and `PerfectMerkleTree.climb_binding` extracts an `H`-collision at an internal node of height
-`0 < z ≤ h'` on that leaf's root path — the `valid_TCRTRH` branch, whose extractor is the `find`
-inside `R_SMDTTCRCTRH_EUFNAGCMA` (`FL_SL_XMSS_MT_ES.ec:2685-2711`) — or it agrees, and the
-signature recovers the honest WOTS+ public key at `wotsLeafAdrs adrs idx`, which is exactly
-`wotsPkFromSig_cases`' hypothesis and splits three further ways: a `T_len` second preimage at
-`wotsPkAdrs (wotsLeafAdrs adrs idx)` (`valid_TCRPKCO`), and the two chain outcomes
-(`valid_WOTSTWES`).
+`0 < z ≤ h'` on that leaf's root path — or it agrees, and the signature recovers the honest WOTS+
+public key at `wotsLeafAdrs adrs idx`, which is exactly `wotsPkFromSig_cases`' hypothesis and
+splits three further ways: a `T_len` second preimage at `wotsPkAdrs (wotsLeafAdrs adrs idx)`, and
+the two chain outcomes.
 
-The comparison with the source runs one way.  Restricted to one layer, the split here is a
-*refinement* of the source's three flags in one place and identical in the others.  `valid_TCRTRH`
-and this module's `H` branch coincide: both fire exactly when the recovered leaf at the layer in
-question differs from the honest one.  `valid_TCRPKCO` and the `T_len` branch coincide: both fire
-exactly when the leaf agrees while the recovered chain ends do not.  The remaining case — leaf and
-chain ends both honest — is `valid_WOTSTWES` in the source and splits here into the `F`-preimage
-and `F`-collision branches of `WotsWitness`, because `WOTS_TW_ES.ec` resolves that flag into those
-two only later, in `Game3`/`Game4_WOTSTWES` (`:3643`, `:3694`).  The containment is therefore
-one-to-one on the first two flags and two-to-one on the third, and in no direction strict.
+The comparison with the source is branch by branch, and at a fixed layer each of the source's three
+flags is a conjunction this module reproduces exactly.
 
-What the source has and this module does not is the layer walk: its three flags are evaluated after
-choosing *which* of the `d` layers to attack, and nothing here chooses a layer.
+* `valid_TCRTRH` (`:3272-3273`) asks that the layer's recovered root equal the honest one *and*
+  its recovered leaf differ.  The first conjunct is `xmssPkFromSig_cases`' hypothesis `hroot`, the
+  second is the case it splits on, so under that hypothesis the `H` branch fires on exactly the
+  layers `valid_TCRTRH` names.  Its extractor is the `find` at `:2685-2686` inside
+  `R_SMDTTCRCTRH_EUFNAGCMA`'s forge, whose predicate is literally those two conjuncts and whose
+  collision extraction runs to `:2711`.
+* `valid_TCRPKCO` (`:3270-3271`) asks that the layer's recovered leaf equal the honest one *and*
+  its recovered chain-end vector differ.  That is `wotsPkFromSig_cases`' first disjunct verbatim,
+  which is the `T_len` branch, and it needs no hypothesis of this module's.
+* `valid_WOTSTWES` (`:3268-3269`) asks that the layer's recovered chain-end vector equal the
+  honest one *and* the message signed at that layer differ.  Since the leaf is the compression of
+  the chain ends, the first conjunct implies the leaf agrees too, so this is the remaining case
+  here — leaf and chain ends both honest, messages distinct.  It splits two ways rather than one:
+  `WOTS_TW_ES.ec` resolves a WOTS forgery into a chain preimage or a chain collision separately, at
+  `nhchwcoll_hchwpre` (`:1299`), between the predicates `is_chwcoll` (`:595`) and `is_chwpre`
+  (`:640`), and `WotsWitness` carries that resolution in its constructors.
+
+So the correspondence at a fixed layer is one-to-one on the first two flags and two-to-one on the
+third, and strict in neither direction.  What the source has and this module does not is the layer
+walk: each flag is an existential over `0 ≤ i < d`, and nothing here chooses a layer.
 
 `MultiExtractability` is deliberately not imported, for the reason
 `HashSig.SLHDSA.Security.ForsWitnesses` gives: it is a probabilistic shared-ROM game over
@@ -161,10 +170,11 @@ Naming it separates the Merkle argument from the WOTS+ one. -/
 
 /-- The honest child pair of the XMSS internal node at height `z`, index `t`: the two honest
 subtree roots one level below.  Meaningful only at `0 < z`.  Every statement below that names it
-as an honest partner asserts that bound; the one statement that names it without asserting the
-bound is its own unfolding equation, which is definitional and holds at every height.  At `z = 0`
-truncated subtraction would silently name the leaf level twice, and the leaf of an XMSS tree is a
-WOTS+ public key rather than a `TREE` target. -/
+as an honest partner asserts that bound; the one statement below that names it without asserting
+the bound is its own unfolding equation, which is definitional and holds at every height.  At
+`z = 0` truncated subtraction leaves `z - 1 = 0`, so it returns the two leaves `2 * t` and
+`2 * t + 1` — the children of the height-*one* node at `t`, not of any node at height zero — and
+an XMSS leaf is a WOTS+ public key, addressed under `WOTS_PK`, rather than a `TREE` target. -/
 def xmssHonestChildren (prims : Primitives p) (sk : prims.SkSeed) (pk : prims.PkSeed)
     (adrs : Adrs) (z t : ℕ) : prims.Y × prims.Y :=
   PerfectMerkleTree.honestChildren (xmssLeaf prims sk pk adrs) (xmssNodeHash prims pk adrs) z t
@@ -178,8 +188,9 @@ theorem xmssHonestChildren_eq (prims : Primitives p) (sk : prims.SkSeed) (pk : p
   by simp only [xmssHonestChildren, PerfectMerkleTree.honestChildren, xmssNode_eq_merkleRoot]
 
 /-- At any height `z ≤ h'`, the ancestor of leaf `idx` carries the index `idx / 2 ^ z`, and that
-index is below `2 ^ (h' - z)`, which is the coordinate shape `xmssNodeAddresses` lists.  FIPS 205
-Algorithm 10 line 5 uses the same shape for the authentication path. -/
+index is below `2 ^ (h' - z)`, which is the coordinate shape `xmssNodeAddresses` lists through
+`perfectInternalCoords`.  It is also the shape the authentication path of FIPS 205 Algorithm 10 is
+indexed by, whose height-`z` entry is the sibling of that same quotient. -/
 theorem xmssNodeIndex_lt (p : Params) {idx z : ℕ} (hidx : idx < 2 ^ p.hp) (hz : z ≤ p.hp) :
     idx / 2 ^ z < 2 ^ (p.hp - z) := by
   refine Nat.div_lt_of_lt_mul ?_
@@ -199,9 +210,10 @@ construction: the split is a decision on a proposition and its negation, and the
 `xmssPkFromSig_binding` (`Xmss.lean:812`) with `xmssLeaf_eq_wotsPkGen` used to read the honest leaf
 as a WOTS+ public key.
 
-The collision branch is the `valid_TCRTRH` case of `FL_SL_XMSS_MT_ES.ec:3270`, whose extractor is
-the `find` inside `R_SMDTTCRCTRH_EUFNAGCMA.forge` (`:2685-2711`); the other branch is the
-hypothesis of `wotsPkFromSig_cases`, under which the source's remaining two flags are decided.
+Together with its root hypothesis, the collision branch is the `valid_TCRTRH` case of
+`FL_SL_XMSS_MT_ES.ec:3272-3273`, whose extractor is the `find` at `:2685-2686` inside
+`R_SMDTTCRCTRH_EUFNAGCMA`'s forge; the other branch is the hypothesis of `wotsPkFromSig_cases`,
+under which the source's remaining two flags are decided.
 
 *Deterministic inclusion.* -/
 theorem xmssPkFromSig_cases (prims : Primitives p) (idx : ℕ) (hidx : idx < 2 ^ p.hp)
@@ -335,9 +347,9 @@ chain value, and an `F`-collision at a chain step — so the composite is four-w
 stated in two parts rather than four because the three WOTS+ outcomes are `WotsWitnesses`' own and
 restating them here would duplicate them.
 
-The four branches are `valid_TCRTRH`, `valid_TCRPKCO` and the two resolutions of
-`valid_WOTSTWES` (`FL_SL_XMSS_MT_ES.ec:3268-3272`, resolved in `WOTS_TW_ES.ec:3643,3694`),
-specialised to one layer.
+The four branches are `valid_TCRTRH` (`FL_SL_XMSS_MT_ES.ec:3272-3273`), `valid_TCRPKCO`
+(`:3270-3271`) and the two resolutions of `valid_WOTSTWES` (`:3268-3269`, resolved in
+`WOTS_TW_ES.ec` at `nhchwcoll_hchwpre`, `:1299`), each specialised to one layer.
 
 *Deterministic inclusion.* -/
 theorem xmssPkFromSig_forgeryCases (valid : p.Valid) (prims : Primitives p)

@@ -636,8 +636,8 @@ of the two branches holds.  The collision branch is restated with its hash equat
 of the side conditions `xmssPkFromSig_cases` states before it, so it has to be reassembled rather
 than passed through, and every conjunct the theorem supplies is bound and used here.  That is not
 the order the games read: `SM_DT_TCR_SourceFinalValidity`'s experiment tests its side condition
-first and the hash equation last.  Deleting the `H` equality from the second disjunct, which is the
-security content of that branch, breaks this pin. -/
+first and the hash equation last (`SMDTTCRFinalValidity.lean:105`).  Deleting the `H` equality from
+the second disjunct, which is the security content of that branch, breaks this pin. -/
 example (sig : XmssSig toyParams toyPrimitives) (msg : toyPrimitives.Y) (idx : ℕ)
     (hidx : idx < 2 ^ toyParams.hp)
     (hroot : xmssPkFromSig toyPrimitives idx sig msg () baseAdrs =
