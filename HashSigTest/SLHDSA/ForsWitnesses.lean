@@ -34,8 +34,11 @@ that both the collision and the preimage name the *global* FORS leaf index rathe
 tree-local one.  Two negative canaries close the other direction: an honest signature yields no
 collision at any tree, and a forgery whose recovered public key differs yields a `T_k` witness that
 fails its own validity check — which is exactly why `findForsWitness_sound` carries the public-key
-hypothesis.  A third group fabricates eight witnesses: the two genuine ones are checked *accepted*
-and the other six rejected, between them falsifying every conjunct of every branch.
+hypothesis.  A third group fabricates nine witnesses — eight at tree `1`, and one `T_k` witness,
+which carries no tree coordinate: the two genuine ones are checked *accepted* and the other seven
+rejected, between them falsifying six of `witnessHolds`' seven conjuncts.  The seventh, the `T_k`
+hash equality, is falsified by the malformed-forgery canary instead, on the witness the extractor
+itself returns.
 
 The `example`s pin the theorem statements at that bundle and at approved profiles.  The last group
 is kernel-checked rather than run: on a profile whose layer-zero tree indices overflow SHA-2's
@@ -176,9 +179,12 @@ def honestChildPair (z t : ℕ) : toyPrimitives.Y × toyPrimitives.Y :=
 def honestSig : ForsSigCore toyParams toyPrimitives.core :=
   forsSign toyPrimitives digest () () baseAdrs
 
-/-! ## The three forgeries
+/-! ## The four forgeries and the malformed one
 
-Each replaces one field of the honest signature and leaves the rest untouched. -/
+Four of the five recover the honest FORS public key; `badForgery` does not, and is what the
+malformed-input canary uses.  Each replaces one revealed secret value or one authentication node —
+except `collisionForgery`, which is built on top of `preimageForgery` and so differs from the
+honest signature in two fields. -/
 
 /-- Replace tree `i`'s revealed secret value. -/
 def withSecret (sig : ForsSigCore toyParams toyPrimitives.core) (i : ℕ) (value : toyPrimitives.Y) :
@@ -218,10 +224,12 @@ image now differs from the honest one, so the extractor returns the `H`-collisio
 def collisionForgery : ForsSigCore toyParams toyPrimitives.core :=
   withSecret preimageForgery 1 collidingSecret
 
-/-- A tree-`1` secret whose leaf image differs from the honest one in bit *one*.  `H` shifts its
-left child up by two before dropping a bit, so the height-one node changes while the tree root
-does not: the extractor then finds its collision one level higher, at the tree root node, which is
-the top of the `0 < z ≤ a` range. -/
+/-- A tree-`1` secret whose leaf image differs from the honest one in bit *one*.  `H` drops the low
+bit of each child, so that difference reaches the height-one node — where leaf `5` is the right
+child, contributing `r >>> 1` — as a difference in bit *zero*; and the height-one node is in turn
+the root's left child, whose low bit is dropped in the same way, so the tree root is unchanged.
+The extractor therefore finds its collision one level higher, at the tree root node, which is the
+top of the `0 < z ≤ a` range. -/
 def highCollidingSecret : toyPrimitives.Y :=
   node (2 * ((byteOf (honestLeaf (globalLeaf 1)) ^^^
     toyTweak (forsNodeAdrs baseAdrs 0 (globalLeaf 1))) ^^^ 2))
@@ -422,8 +430,8 @@ def checkInstanceTlCollision : IO Unit := do
 /-! ## Negative canaries -/
 
 /-- The honest signature has an honest leaf image at every tree, so no tree yields a collision and
-the fall-through witness is the honest secret value — a valid open-preimage witness, and the one
-place the absence of a distinctness conjunct is visible. -/
+the fall-through witness is the honest secret value — a valid open-preimage witness, which only
+the absence of a distinctness conjunct admits. -/
 def checkHonestSignature : IO Unit := do
   ensure "no tree of the honest signature yields a collision"
     ((treeWitnessTag (extractTree honestSig ⟨0, by decide⟩) == "none") &&
@@ -444,23 +452,34 @@ def checkMalformedForgery : IO Unit := do
   ensure "the malformed forgery still produces a T_k witness" (witnessTag w == "tlCollision")
   ensure "the malformed T_k witness fails its own equation" (!witnessHolds w)
 
-/-- `witnessHolds` itself has to be able to fail, and has to accept.  Eight witnesses are
-fabricated at tree `1`.  The two genuine ones — the height-one collision and the preimage at the
-honest secret value — are checked *accepted*; the other six are rejected, and between them they
-falsify every conjunct of every branch:
+/-- `witnessHolds` itself has to be able to fail, and has to accept.  Nine witnesses are
+fabricated: eight at tree `1`, and one `T_k` witness, which carries no tree coordinate.  The two
+genuine ones — the height-one collision and the preimage at the honest secret value — are checked
+*accepted*; the other seven are rejected.
 
-* the hash equation, by a collision whose `H` image differs and by the genuine collision with its
-  two children swapped — the second only because `H` is order sensitive, so it is the left-to-right
-  identification that rejects it;
-* the `F` equation, by a preimage of the wrong value;
-* the `tlCollision` distinctness, by a `T_k` witness at the honest root vector itself, whose `T_k`
-  image is of course equal;
+`witnessHolds` has seven conjuncts in all: two on the `tlCollision` branch, four on `hCollision`,
+one on `fPreimage`.  The seven rejections falsify six of them —
+
+* the `hCollision` hash equation, by a collision whose `H` image differs and by the genuine
+  collision with its two children swapped — the second only because `H` is order sensitive, so it
+  is the left-to-right identification that rejects it;
+* the `hCollision` distinctness, by a collision submitted at the honest child pair itself; this is
+  the one fabrication rejected on a single conjunct, since both its bounds hold and its hash
+  equation is an identity;
 * the `0 < z` bound, by the genuine collision moved to height zero, where the address is a FORS
   *leaf* address and `forsHonestChildren`'s `height - 1` would truncate;
-* the `z ≤ a` bound, by the genuine collision moved above the tree height.
+* the `z ≤ a` bound, by the genuine collision moved above the tree height;
+* the `fPreimage` equation, by a preimage of the wrong value;
+* the `tlCollision` distinctness, by a `T_k` witness at the honest root vector itself, whose `T_k`
+  image is of course equal.
 
-The last two miss the hash equation as well, because the honest child pair is recomputed at
-whatever height the witness names; it is the bounds that say what is wrong with them.
+The height-zero and above-height fabrications miss the hash equation as well, because the honest
+child pair is recomputed at whatever height the witness names; it is the bounds that say what is
+wrong with them.
+
+The seventh conjunct, the `tlCollision` hash equality, is falsified by `checkMalformedForgery`
+rather than here: the witness the extractor returns from `badForgery` carries a root vector that
+differs from the honest one *and* compresses differently.
 
 The remaining identification, the *global* rather than tree-local index, is checked where the
 genuine witnesses are extracted: at the node index by `checkTreeCollision` and at the leaf index by
@@ -481,6 +500,8 @@ def checkFabricatedWitnesses : IO Unit := do
     (witnessHolds (.hCollision two 1 (genuinePair.2, genuinePair.1)) == false)
   ensure "the honest child pair is not the opened-leaf-first pair"
     (honestChildPair 1 (globalLeaf 1 / 2) != (honestLeaf 5, honestLeaf 4))
+  ensure "a collision submitted at the honest child pair itself is rejected"
+    (witnessHolds (.hCollision two 1 (honestChildPair 1 (globalLeaf 1 / 2))) == false)
   ensure "the genuine tree-1 preimage is accepted"
     (witnessHolds (.fPreimage two (node (toySecret (globalLeaf 1)))))
   ensure "a fabricated preimage of the wrong value is rejected"
@@ -491,9 +512,12 @@ def checkFabricatedWitnesses : IO Unit := do
 /-! ## Statement pins at the toy bundle -/
 
 /-- A shape pin for `forsPkFromSig_cases`: at a signature which recovers the honest FORS public
-key, one of the three branches holds.  Each branch is restated with its hash equation first — the
-order a source-final-validity game reads it in, winning condition before side condition — so every
-conjunct the theorem supplies is bound and used here.  Deleting the `T_k` equality from the first
+key, one of the three branches holds.  The two collision branches are restated with their hash
+equation first, the reverse of the order `forsPkFromSig_cases` states them in, so each has to be
+reassembled rather than passed through and every conjunct the theorem supplies is bound and used
+here.  That is not the order the games read: both source-final-validity experiments test their side
+condition first and the hash equation last (`m ≠ mj ∧ eval = eval`; `j ∉ opened`, then
+`eval = eval`).  Deleting the `T_k` equality from the first
 disjunct or the `H` equality from the second, which is the security content of those two branches,
 breaks this pin. -/
 example (sig : ForsSigCore toyParams toyPrimitives.core) (md : List Byte)
