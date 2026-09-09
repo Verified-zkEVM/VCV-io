@@ -16,30 +16,35 @@ FORS component hash: a `T_k` second preimage of the honest root vector at the `F
 compression address, an ordered-pair collision of `H` at an exact `FORS_TREE` internal-node
 address, or an `F`-preimage of an honest leaf image at an exact `FORS_TREE` leaf address.  The
 case analysis is the Lean counterpart of three of the four branches of the FORS translation in the
-EasyCrypt SPHINCS+ development (`FORS_ES.ec`, theorem `EUFCMA_MFORSTWESNPRF_OPRE` at `:3827`).
+EasyCrypt SPHINCS+ development (`FORS_ES.ec`, theorem `EUFCMA_MFORSTWESNPRF_OPRE` at `:3829`).
 
 ## What is proved, and what is not
 
 Every *deterministic-inclusion* statement below has its free objects drawn from a primitive
 bundle, a seed, a structural address, a message digest, a natural-number index, and a FORS
-signature; not all of them mention all of those, and four — `forsSigLeafIndex_eq`,
-`forsSigLeafIndex_div_pow_a`, `forsSigLeafIndex_div_lt` and `forsHonestChildren_eq` — mention no
-signature and no game.  Unlike the WOTS+ witnesses, the honest secret seed is not confined to one
-lemma: the FORS honest partner a witness attacks — the honest root vector, the honest child pair
-at an internal node, the honest leaf image — is a function of the honest tree, and the honest tree
-is what `sk` generates.  The *transcript-transport* statements are about a role ledger over a
-`ValidatedParams`, taking a bottom-layer position, a digest and a ledger coordinate; they mention
-no signature and no secret seed at all.  Nothing here constructs an adversary, states an
-advantage, performs a game hop, or claims that any honest execution queried the honest value a
-witness attacks.  In particular a witness lemma is **not** a reduction: that the game's target was
-committed before the forgery was seen is a simulation-fidelity obligation of the later
-program-level slice, not a fact established here.
+signature; not all of them mention all of those.  Twelve of the thirty mention a `ForsSigCore` —
+`forsRecoveredRoots` and its equation, `forsPkFromSig_eq_tl_recoveredRoots`, `forsRootsBinding`,
+`forsTreeBinding`, `forsPkFromSig_cases`, the two extractors and the four lemmas about them — and
+the other eighteen do not.  Of those eighteen only the three `_eval` bridges name a game at all,
+and what they name is a `Problem` record, never an experiment or an advantage.
+
+Unlike the WOTS+ witnesses, the honest secret seed is not confined to one lemma: the FORS honest
+partner a witness attacks — the honest root vector, the honest child pair at an internal node, the
+honest leaf image — is a function of the honest tree, and the honest tree is what `sk` generates.
+
+The *transcript-transport* statements are about a role ledger over a `ValidatedParams`, taking a
+bottom-layer position, a digest and a ledger coordinate; they mention no signature and no secret
+seed at all.  Nothing here constructs an adversary, states an advantage, performs a game hop, or
+claims that any honest execution queried the honest value a witness attacks.  In particular a
+witness lemma is **not** a reduction: that the game's target was committed before the forgery was
+seen is a simulation-fidelity obligation of the later program-level slice, not a fact established
+here.
 
 The FORS translation of `FORS_ES.ec` splits **four** ways, not three.  The fourth branch is
 `valid_ITSR` (`FORS_ES.ec:3213`), which selects the FORS leaf index the honest signer never
 opened; it is a statement about the digest transcript and the signing log, not about one FORS
 signature, and it is deliberately absent here.  Consequently this module never establishes that a
-witness address is *unopened*, which is the second half of the FORS-`F` winning condition
+witness *index* is unopened, which is the second half of the FORS-`F` winning condition
 (`FORS_ES.ec:4461`); only the preimage half (`:4462`) is proved.
 
 ## Labels
@@ -88,6 +93,17 @@ forged leaf image differs from the honest one, and `PerfectMerkleTree.climb_bind
 (`FORS_ES.ec:3242`), whose extractor is `extract_collision_bt_ap_trh` (`:729`) over `ecbtapP`
 (`MerkleTrees.ec:152`) — or it agrees, and the revealed secret value is an `F`-preimage of the
 honest leaf image — the `valid_OpenPRE` branch (`:3231`).
+
+This is a *reordering* of the source's split, not a restriction of it.  `FORS_ES.ec` decides all
+three events at the one ITSR-selected tree `dftidx` (`:3223`) and tries OpenPRE before TRHTCR: the
+case bounds are `!valid_ITSR ∧ valid_OpenPRE` (`:4457-4458`) and then
+`!valid_ITSR ∧ !valid_OpenPRE ∧ valid_TRHTCR` (`:5786-5788`).  The split here is instance-wide and
+prefers the `H` branch instead — it fires when *some* tree's forged leaf image differs, and the
+`F` branch only when *every* tree's agrees.  So this module's `H` branch is strictly wider than
+`valid_TRHTCR` and its `F` branch strictly narrower than `valid_OpenPRE`.  Each branch still wins
+its own game, so a union bound over the three is unaffected; but the events are not in
+one-to-one correspondence with the source's, and it is `findForsWitness`'s `target` that lets a
+later assembly submit the `F` witness at the ITSR-selected tree.
 
 The FORS-`F` branch is an **open-preimage** witness, not a target-collision one.  The
 source's postcondition (`FORS_ES.ec:4454-4462`) asks for an index in range, an index the signer
@@ -301,7 +317,7 @@ tree's forged leaf image differs from the honest one.  It is exhaustive by const
 splits are decisions on a proposition and its negation.
 
 These are the three non-ITSR branches of the four-way FORS split of `FORS_ES.ec`
-(`EUFCMA_MFORSTWESNPRF_OPRE`, `:3827`); the fourth, `valid_ITSR` (`:3213`), decides *which* tree's
+(`EUFCMA_MFORSTWESNPRF_OPRE`, `:3829`); the fourth, `valid_ITSR` (`:3213`), decides *which* tree's
 preimage the third branch should be submitted at and is not available from one signature.
 
 *Deterministic inclusion.* -/
@@ -395,6 +411,13 @@ Write `idx = forsSigLeafIndex p md tree` for the global leaf index the digest op
 * `fPreimage tree value` asserts that `value` is an `F`-preimage at `forsNodeAdrs adrs 0 idx` of
   the honest leaf image there.  There is deliberately no distinctness conjunct: the FORS-`F`
   branch is an open-preimage witness, and the honest secret value itself is allowed to win.
+
+The two distinctness conjuncts are oriented differently.  `tlCollision`'s reads submitted-first,
+`recovered ≠ forsHonestRoots …`, which is the order
+`SM_DT_TCR_SourceFinalValidity.Experiment` tests (`m ≠ mj`, the submitted message first); the
+`hCollision` one reads honest-first, inherited from `PerfectMerkleTree.findCollision_sound`, whose
+`c₁ ≠ c₂` names the honest pair first.  Nothing turns on it — a consumer that wants the game's
+order applies `Ne.symm` — but the two branches of this one predicate do not agree.
 
 This is a statement about hash values only.  It does not say that the honest roots, the honest
 child pair, or the honest leaf image was committed as a game target, nor that any execution
