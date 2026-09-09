@@ -401,7 +401,8 @@ script test (args) do
     #["exe", "slhdsa_wots_witness_tests"],
     #["exe", "slhdsa_fors_witness_tests"],
     #["exe", "slhdsa_xmss_witness_tests"],
-    #["exe", "slhdsa_hypertree_witness_tests"]]
+    #["exe", "slhdsa_hypertree_witness_tests"],
+    #["exe", "slhdsa_scheme_witness_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -520,6 +521,14 @@ which is required to hold instead of to fail.  Plus the no-match, early-match an
 fabricated-witness canaries, three accepted and six rejected. -/
 lean_exe slhdsa_hypertree_witness_tests where
   root := `HashSigTest.SLHDSA.HypertreeWitnesses
+
+/-- Scheme-level witness dispatch: over a two-layer toy profile with two FORS trees, a
+message-sensitive `H_msg` and a randomizer-sensitive `PRF_msg`, a verifying signature whose
+recovered FORS public key is the honest one routes to a FORS witness and one whose recovered key
+differs routes to a hypertree witness; each arm's witness is required to fail against the other
+forgery's digest, so the arm selection is checked rather than assumed. -/
+lean_exe slhdsa_scheme_witness_tests where
+  root := `HashSigTest.SLHDSA.SchemeWitnesses
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
