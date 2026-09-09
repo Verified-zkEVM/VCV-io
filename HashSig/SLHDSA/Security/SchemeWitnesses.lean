@@ -127,9 +127,11 @@ bottom position and is used only by the three encoded-distinctness lemmas.
 The `hypertree` arm needs no bridge at all.  `HypertreeWitness.Valid` names its addresses at
 `(LayerPosition.initial vp (schemeParts …)).advance w.layer …`, which is a `LayerPosition`, so
 `XmssWitnesses`' `mem_xmssNodeAddresses_of_leaf` and `wotsLeafAdrs_eq_wotsInstanceAdrs`,
-`ReachableTargets`' `mem_wotsPkAddresses`, and `WotsWitnesses`' `mem_wotsStepAddresses_of_lt` and
-`wotsPreimageAdrs_mem_optionalWotsAddresses` apply to it unchanged.  Restating them here would
-duplicate them; `HashSigTest.SLHDSA.SchemeWitnesses` pins that they do apply.
+`ReachableTargets`' `mem_wotsPkAddresses` and `WotsWitnesses`' `mem_wotsStepAddresses_of_lt` apply
+to it unchanged.  Restating them here would duplicate them; `HashSigTest.SLHDSA.SchemeWitnesses`
+pins those four.  `WotsWitnesses`' `wotsPreimageAdrs_mem_optionalWotsAddresses` is deliberately not
+among them: its ledger is `optionalWotsAddresses vp select`, built from a reduction's per-instance
+`select` function, and the dispatch has no such function to supply.
 
 The `fors` arm does need one.  Its addresses are rooted at `DigestParts.forsAdrs`, while the three
 FORS ledger lemmas are stated at `BottomPosition.forsAdrs`.  `BottomPosition.ofDigestParts` carries
@@ -223,6 +225,10 @@ def schemeParts (vp : ValidatedParams) (prims : Primitives vp.params) (msg : Lis
 address its own digest names, the FORS public key the secret seed generates there, or it does not —
 and then its hypertree half carries the value it *did* recover all the way to the published root.
 
+The recovered-root equation is not special to the second branch — it follows from `hverify` alone,
+through `verifyInternal_eq_decide` — and it is stated there because that is the branch which
+consumes it.  Nothing is hidden by the placement.
+
 Neither `sk` nor `pk` is constrained: the statement holds for any secret seed and any public key the
 verifier accepted, and the honest identification `pk.pkRoot = GeneralHypertree.root vp prims sk
 pk.pkSeed` is not a hypothesis.  A consumer supplies it where the second branch is used, because it
@@ -288,8 +294,13 @@ way `idx` and the forged message are not attacked objects of `XmssWitness.Valid`
 input to the digest.
 
 There are no conjuncts of the composite's own.  Every conjunct a consumer meets belongs to a merged
-predicate, and each merged module's canaries falsify its own; what this predicate adds is the arm
-selection, which `HashSigTest.SLHDSA.SchemeWitnesses` falsifies in both directions.
+predicate, and each merged module's canaries falsify its own; what this predicate adds is the
+*arguments* each arm is evaluated at, which `HashSigTest.SLHDSA.SchemeWitnesses` falsifies by
+re-evaluating every extracted witness at the other forgery site.  The arm selection is a property of
+`findWitness` and not of this predicate — this predicate reads a signature only through the digest,
+so at two signatures sharing a randomizer and a message it cannot separate the arms at all, and that
+fixture exhibits exactly such a pair, taking different arms, with each one's witness valid against
+the other.
 
 This is a statement about hash values and computed honest partners only.  It does not say that any
 honest object it names was committed as a game target, that any execution queried one, that the

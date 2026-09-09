@@ -524,9 +524,10 @@ lean_exe slhdsa_hypertree_witness_tests where
 
 /-- Scheme-level witness dispatch: over a two-layer toy profile with two FORS trees, a
 message-sensitive `H_msg` and a randomizer-sensitive `PRF_msg`, a verifying signature whose
-recovered FORS public key is the honest one routes to a FORS witness and one whose recovered key
-differs routes to a hypertree witness; each arm's witness is required to fail against the other
-forgery's digest, so the arm selection is checked rather than assumed. -/
+recovered FORS public key is the honest one routes to a FORS witness — at all three of that arm's
+constructors — and one whose recovered key differs routes to a hypertree witness; each arm's witness
+is required to fail at the other forgery *site*, and the arm selection is pinned by a pair of
+signatures that share a digest and take different arms. -/
 lean_exe slhdsa_scheme_witness_tests where
   root := `HashSigTest.SLHDSA.SchemeWitnesses
 
