@@ -7,6 +7,7 @@ Authors: Devon Tuma
 module
 public import VCVio.EvalDist.Defs.Measure.Core
 public import ToMathlib.MeasureTheory.Measure.IndependentDraws
+public import ToMathlib.MeasureTheory.Measure.Bounds
 
 /-!
 # Independent draws under measure-valued evaluation
@@ -54,3 +55,12 @@ theorem evalDist_bind_bind_bind_rotate [DiscreteMeasurableSpace α]
       𝒟[mz >>= fun c => mx >>= fun a => my >>= fun b => f a b c] := by
   simp only [evalDist_bind_of_discrete]
   exact Measure.bind_bind_bind_rotate _ _ _ hf
+
+/-- Charge a bad intermediate event separately from uniformly bounded good continuations. -/
+theorem evalDist_bind_apply_le_add_of_bad (mx : m α) (f : α → m β)
+    (hf : Measurable fun a => 𝒟[f a]) {bad : Set α} (hbad : MeasurableSet bad)
+    {event : Set β} (hevent : MeasurableSet event) {ε₁ ε₂ : ENNReal}
+    (hbadBound : 𝒟[mx] bad ≤ ε₁) (hgood : ∀ a, a ∉ bad → 𝒟[f a] event ≤ ε₂) :
+    𝒟[mx >>= f] event ≤ ε₁ + ε₂ := by
+  rw [evalDist_bind mx f hf]
+  exact Measure.bind_apply_le_add_of_bad _ _ hf hbad hevent hbadBound hgood
