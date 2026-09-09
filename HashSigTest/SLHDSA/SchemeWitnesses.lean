@@ -58,8 +58,9 @@ canary re-evaluates its witness at the other site and requires that to fail.
   the recovered public key — the toy hashes drop the moved bit twice over.  It still takes the FORS
   arm, and the extractor returns the `H`-collision the move creates instead.
 * **T** carries a FORS half whose tree-zero authentication node moves that tree's *recovered root*
-  but not the recovered public key — the toy `T_k` drops the low bit of every root it compresses.
-  It still takes the FORS arm, and the extractor returns the `T_k` second preimage the move creates.
+  but not the recovered public key — the toy `T_k` discards two of the first root's bits, and the
+  move lands in one of them.  It still takes the FORS arm, and the extractor returns the `T_k`
+  second preimage the move creates.
 * **B** carries a FORS half whose recovered public key does move, under an honest hypertree
   signature on that recovered value.  It takes the hypertree arm and diverges at layer zero.
 * **C** carries the same FORS half, a perturbed layer-zero component whose recovered root misses
@@ -113,9 +114,8 @@ starting message well defined for a message the signer never signed.  `checkFabr
 tally: four hand-built witnesses accepted and eleven rejected, the rejected ones covering both
 sites, both layer relabellings, both FORS height bounds, a wrong preimage value, a `T_k` "second
 preimage" of the honest root vector itself, and a root vector that does differ from the honest one
-but does not compress to it.  There is no out-of-range layer
-fabrication, and there cannot be one: `HypertreeWitness.layer` is a `Fin toyParams.d`, so a label at
-or beyond `d` does not elaborate.
+but does not compress to it.  There is no out-of-range layer fabrication, and there cannot be one:
+`HypertreeWitness.layer` is a `Fin toyParams.d`, so a label at or beyond `d` does not elaborate.
 
 The `example`s pin the library statements at this bundle — the three new `GeneralScheme` equations,
 the digest split, the dispatch, both shape equations, both unfolding equations, soundness,
@@ -532,10 +532,12 @@ def collapsedFors : ForsSigCore toyParams toyPrimitives.core :=
   honestForsB.set 0 { honestForsB[0] with sk := node (byteOf honestForsB[0].sk + 2) }
 
 /-- A FORS signature whose recovered *root vector* differs from the honest one while its `T_k`
-compression agrees, so the recovered public key does not move: the toy `T_k` folds its children with
-a two-bit shift and drops the low bit of each, so moving tree zero's authentication node by `0x40`
-lands in the bits the fold discards.  A signature carrying this still routes to the FORS arm, where
-the moved vector is the `T_k` second preimage the extractor returns.  A brute-force sweep over all
+compression agrees, so the recovered public key does not move.  The toy `T_k` folds its children as
+`acc ↦ (acc <<< 2) ^^^ (y >>> 1)`, so at `k = 2` the first root reaches the compression through bits
+one to six only: its low bit is dropped by the shift right and its high bit is shifted out again by
+the shift left.  Moving tree zero's authentication node by `0x40` moves tree zero's recovered root
+by `0x80`, which is one of those two.  A signature carrying this still routes to the FORS arm, where
+the moved vector is the `T_k` second preimage the extractor returns.  A brute-force sweep over the
 one-byte moves of `honestForsB` finds ten such halves; this is one of them. -/
 def collidedFors : ForsSigCore toyParams toyPrimitives.core :=
   honestForsB.set 0 { honestForsB[0] with

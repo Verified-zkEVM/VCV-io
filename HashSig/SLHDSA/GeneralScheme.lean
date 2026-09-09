@@ -190,10 +190,10 @@ theorem simulateQ_verifyInternalM (vp : ValidatedParams) (prims : Primitives vp.
 The three equations below are what a consumer of the pure interpretations rewrites with.  None of
 them is available by `rfl` downstream: `keygenInternalM` and `verifyInternalM` are `do` blocks over
 `publicHashSpec`, and their interpretation under `simulateQ (PublicHash.impl prims)` reduces only
-once the `bind` law — and, where an `H_msg` query is made, the handler equation for it — has
-fired.  Each proof names the rewrites its own equation needs and no more: `verifyInternal_eq` names
-both, `keygenInternal_fst` only the `bind` law, because key generation makes no `H_msg` query at
-all, and `verifyInternal_eq_decide` names neither, being the previous equation composed with
+once the `bind` law — and, where an `H_msg` query is made, the handler equation for it — has fired.
+Each proof names the rewrites its own equation needs and no more: `verifyInternal_eq` names both,
+`keygenInternal_fst` only the `bind` law, because key generation makes no `H_msg` query at all, and
+`verifyInternal_eq_decide` names neither, being the previous equation composed with
 `GeneralHypertree.verify_eq_decide`.  Each closes the remainder inside this module, where the pure
 definitions' bodies are available.  Downstream the verification reduction is additionally stopped
 inside the component loops by `Vector.ofFnM`, whose body an importer cannot unfold. -/
