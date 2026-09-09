@@ -26,13 +26,15 @@ checks.  The witness lemmas are stated for an arbitrary `Primitives` bundle, so 
 it is a falsifiability fixture, not a claim about any approved profile.
 
 Over that bundle the checks build honest XMSS key material for a tree of height two — four WOTS+
-leaves, `w = 16`, `len = 4` — and five named signatures at leaf `3` on a forged message, four of
+leaves, `w = 16`, `len = 4` — and six named signatures at leaf `3` on a forged message, four of
 which recover the honest XMSS root.  `nodeForgery` yields the `H`-collision at height one,
 `rootForgery` the `H`-collision at the tree height `h' = 2`, `tlForgery` the `T_len` second
-preimage at the opened leaf, `chainForgery` the `F`-collision at a chain step, and `badForgery`
-nothing at all.  A sixth signature, the honest one on the forged message, is built inside
-`checkPreimage` and yields the `F`-preimage at a chain step.  Each returned witness is checked
-against its equation by evaluation.
+preimage at the opened leaf, `chainForgery` the `F`-collision at a chain step, `badForgery`
+nothing at all, and `authForgery` — the only one that perturbs the authentication path rather than
+the WOTS+ signature — a valid `F`-preimage in spite of missing the honest root.  A seventh
+signature, the honest one on the forged message, is built inside `checkPreimage` and yields the
+`F`-preimage at a chain step.  Each returned witness is checked against its equation by
+evaluation.
 
 Seven identifications are separated along the way: that the `H` partner is the honest child pair at
 the node named; that its two children are taken left to right rather than opened-leaf first; that
@@ -43,9 +45,14 @@ read off the honest signature on the *honest* message rather than on the forged 
 value itself; and that both chain equations are read at the opened leaf's WOTS+ address rather than
 a neighbouring leaf's.
 
-Two negative canaries close the other direction: the honest signature yields no `H`-collision and
-falls through to the WOTS+ branch, and a signature whose recovered leaf differs while its climb
-misses the honest root yields no witness at all.
+Two negative canaries close the other direction.  The honest signature on the honest message
+recovers the honest leaf and the honest root and still returns nothing, because at `msg = msg'`
+every chain's two digits agree and `findWotsChainWitness`'s `a < b` guard fails at every index;
+that is `findXmssWitness_isSome`'s `hne` being necessary, and re-running the same signature at the
+same leaf against a *distinct* second message returns a WOTS+ witness, which is what pins the
+branch.  And on a signature that misses the honest root the outcome is decided by the leaf test,
+not by the root: `none` where the recovered leaf differs and the Merkle branch is taken, a *valid*
+WOTS+ witness where the recovered leaf is honest and only the authentication path is wrong.
 
 A third group fabricates eighteen witnesses — four accepted and fourteen rejected — which between
 them falsify all thirteen conjuncts of `witnessHolds`.
@@ -214,11 +221,12 @@ def forgedMsgSig : WotsSig toyParams toyPrimitives.core :=
 def honestAuth : Vector toyPrimitives.Y toyParams.hp :=
   (xmssSign toyPrimitives forgedMsg () () baseAdrs leafIdx).auth
 
-/-! ## The five signatures
+/-! ## The six signatures
 
-All five sign the forged message at leaf `3` and carry the honest authentication path; four of them
-recover the honest XMSS root and one does not.  Four perturb chain `3` of `forgedMsgSig`, whose
-recovered chain end is the signature value itself, and one perturbs chain `0`.
+All six sign the forged message at leaf `3`; four recover the honest XMSS root and two do not.
+Five carry the honest authentication path — four perturbing chain `3` of `forgedMsgSig`, whose
+recovered chain end is the signature value itself, and one perturbing chain `0` — while the sixth
+leaves `forgedMsgSig` alone and perturbs the authentication path instead.
 
 Chain `3`'s contribution to the `T_len` fold is `y >>> 1` unshifted, so flipping bit `b + 1` of
 that byte flips bit `b` of the recovered WOTS+ public key — the opened leaf.  Bit `0` of a leaf is
@@ -268,6 +276,16 @@ revealed value itself, so the canaries could not tell the computed partner from 
 def chainForgery : XmssSig toyParams toyPrimitives :=
   xmssSigOf (Vector.ofFn fun i : Fin toyParams.len =>
     if i.val = 0 then node 144 else forgedMsgSig[i.val])
+
+/-- The honest WOTS+ signature on the forged message under an authentication path whose height-zero
+entry is perturbed in bit `1`.  The recovered leaf is therefore the honest one while the climb
+misses the honest root — the case a root mismatch alone does not decide, since the extractor
+branches on the leaf.  It is the only signature here whose authentication path is not the honest
+one. -/
+def authForgery : XmssSig toyParams toyPrimitives :=
+  { wots := forgedMsgSig,
+    auth := Vector.ofFn fun j : Fin toyParams.hp =>
+      if j.val = 0 then node (byteOf honestAuth[0] ^^^ 2) else honestAuth[j.val] }
 
 /-! ## Witness validity, evaluated
 
@@ -517,39 +535,82 @@ def checkChainCollision : IO Unit := do
 
 /-! ## Negative canaries -/
 
-/-- The honest signature on the *honest* message recovers the honest leaf, so the extractor takes
-its WOTS+ branch rather than the Merkle one.  Both messages' chain-end vectors are then the honest
-ones, so the chain search still fires at chain `0` and returns an `F`-preimage — of the honest
-revealed value, from the value the honest signer itself hashed.  What the canary pins is the
-*branch*: an honest signature never yields an `H`-collision. -/
+/-- The honest signature on the *honest* message, extracted against that same message.  It
+recovers the honest root and the honest leaf, so the extractor takes its WOTS+ branch — and returns
+`none` anyway.  At `msg = msg'` a chain's forged and honest digits are the same number, so
+`findWotsChainWitness`'s `a < b` guard fails at every index and `findSome?` runs out.  What this
+fixture exhibits is therefore `findXmssWitness_isSome`'s `hne : msg ≠ msg'` being necessary: a
+signature can recover the honest root and still yield no witness when the second message is not
+distinct from the first.
+
+`none` on its own does not say which branch produced it — the Merkle branch returns `none` too — so
+the branch is pinned twice over.  The recovered leaf is checked equal to the honest one, which is
+the test the extractor branches on; and the same signature at the same leaf is re-extracted against
+a *distinct* second message, where the guard does fire.  There the search reaches chain `1`, whose
+digit is `0` under `honestMsg` and `15` under `forgedMsg`, and returns the `F`-preimage at
+hash-address `14` — a WOTS+ witness, never an `H`-collision.  Neither outcome is read off a
+rendered tag: one is `Option.isNone`, the other a constructor pattern. -/
 def checkHonestSignature : IO Unit := do
   let honestSig := xmssSign toyPrimitives honestMsg () () baseAdrs leafIdx
   ensure "the honest signature recovers the honest XMSS root"
     (xmssPkFromSig toyPrimitives leafIdx honestSig honestMsg () baseAdrs ==
       xmssRoot toyPrimitives () () baseAdrs)
-  let witness := findXmssWitness toyPrimitives leafIdx honestSig honestMsg honestMsg () ()
-    baseAdrs
-  ensure "the honest signature yields no H-collision"
-    (witnessTag witness != "hCollision 1" && witnessTag witness != "hCollision 2")
+  ensure "the honest signature's recovered leaf is the honest one, so the WOTS+ branch is taken"
+    (wotsPkFromSig toyPrimitives honestSig.wots honestMsg () leafAdrs == honestLeaf leafIdx)
+  ensure "at a second message equal to the first the extractor returns nothing"
+    (findXmssWitness toyPrimitives leafIdx honestSig honestMsg honestMsg () () baseAdrs).isNone
+  match findXmssWitness toyPrimitives leafIdx honestSig honestMsg forgedMsg () () baseAdrs with
+  | some (.wots (.fPreimage i step value)) =>
+      ensure "a distinct second message fires the guard at chain 1, hash-address 14"
+        ((i.val == 1) && (step == 14))
+      ensure "and that F-preimage holds against the honest signature on the distinct message"
+        (toyPrimitives.F () ((wotsChainAdrs leafAdrs i.val).setHashAddress step) value ==
+          forgedMsgSig[i.val])
+  | _ =>
+      ensure "a distinct second message yields a WOTS+ F-preimage, never an H-collision" false
 
-/-- Perturbing chain `3` in bit `2` moves the opened leaf far enough that the height-one node and
-the tree root both change, so the signature does not recover the honest root.  The extractor takes
-its Merkle branch — the recovered leaf differs from the honest one — and the collision search finds
-nothing, because the two openings never meet.  It returns `none`.
+/-- Both halves of what the extractor does on a signature that misses the honest root.  The branch
+is chosen by the recovered *leaf*, so the root mismatch by itself decides nothing, and the two
+halves come out differently.
 
-This is the shape `findXmssWitness_sound`'s root hypothesis guards, and it is a *weaker* gap than
-the WOTS+ and FORS extractors have: those return a `T_len` witness that then fails its own
-equation, whereas here a signature that misses the honest root yields no witness at all.  The
-reason is that the leaf test the extractor performs is what supplies `findWotsWitness_sound`'s own
-hypothesis on the WOTS+ side, so that side needs no root match, and on the Merkle side
-`PerfectMerkleTree.findCollision` verifies the hash equality before returning `some`. -/
+`badForgery` perturbs chain `3` in bit `2`, which moves the opened leaf far enough that the
+height-one node and the tree root both change.  Its recovered leaf differs from the honest one, so
+the Merkle branch is taken; the two openings never meet and it returns `none`.  That is not an
+accident of this fixture: `PerfectMerkleTree.findCollisionAddressed` descends from the root and
+returns `some` only where the two openings first differ under an equal parent, so a `some` already
+implies the root match.
+
+`authForgery` keeps the honest WOTS+ signature on the forged message and perturbs the height-zero
+authentication-path entry instead.  Its recovered leaf is the honest one, so the *WOTS+* branch is
+taken although the climb misses the root — and the witness it returns is valid, its guard being the
+leaf test, which is `findWotsWitness_sound`'s own hypothesis.  So a missed root does not mean
+`none`: over a 768-signature sweep of chain-`3` perturbation by authentication-path level by path
+perturbation, 608 miss the honest root, the 552 of those that take the Merkle branch return `none`,
+the 56 that take the WOTS+ branch return a witness, and none of the 768 returns an invalid one.
+
+This is the shape `findXmssWitness_sound`'s root hypothesis guards, and both halves are a *weaker*
+gap than the WOTS+ and FORS extractors have: those return a `T_len` witness that then fails its own
+equation, whereas neither branch here returns an invalid witness. -/
 def checkMalformedForgery : IO Unit := do
   ensure "the malformed forgery does not recover the honest XMSS root"
     (xmssPkFromSig toyPrimitives leafIdx badForgery forgedMsg () baseAdrs !=
       xmssRoot toyPrimitives () () baseAdrs)
   ensure "the malformed forgery's recovered leaf differs from the honest one"
     (wotsPkFromSig toyPrimitives badForgery.wots forgedMsg () leafAdrs != honestLeaf leafIdx)
-  ensure "the malformed forgery yields no witness" (witnessTag (extract badForgery) == "none")
+  ensure "the malformed forgery yields no witness" (extract badForgery).isNone
+  ensure "the perturbed authentication path does not recover the honest XMSS root either"
+    (xmssPkFromSig toyPrimitives leafIdx authForgery forgedMsg () baseAdrs !=
+      xmssRoot toyPrimitives () () baseAdrs)
+  ensure "the perturbed authentication path leaves the recovered leaf honest"
+    (wotsPkFromSig toyPrimitives authForgery.wots forgedMsg () leafAdrs == honestLeaf leafIdx)
+  match extract authForgery with
+  | some (.wots (.fPreimage i step value)) =>
+      ensure "the perturbed authentication path yields the F-preimage at chain 0, hash-address 2"
+        ((i.val == 0) && (step == 2))
+      ensure "and that witness is valid, in spite of the missed root"
+        (witnessHolds (.wots (.fPreimage i step value)))
+  | _ =>
+      ensure "the perturbed authentication path yields a valid WOTS+ witness, not none" false
 
 /-- `witnessHolds` itself has to be able to fail, and has to accept.  Eighteen witnesses are
 fabricated: six `hCollision`s, three `tlCollision`s, four `fPreimage`s and five `fCollision`s.
@@ -721,6 +782,80 @@ example (sig : XmssSig toyParams toyPrimitives) (msg msg' : toyPrimitives.Y) (id
       (wotsSign toyPrimitives msg' () () (wotsLeafAdrs baseAdrs idx)) msg' := by
   have h := findXmssWitness_sound toyPrimitives idx hidx sig msg msg' () () baseAdrs hroot hw
   rwa [XmssWitness.valid_wots] at h
+
+/-- The one pin for the three declarations nothing else in the tree elaborates: the two extractor
+shape equations and `xmssPkFromSig_forgeryCases`.
+
+The shape equations are used as the dichotomy they encode — every run of the extractor is one of
+the two branches, and which one is decided by the leaf test alone, with no root hypothesis in
+sight.  `xmssPkFromSig_forgeryCases` is unfolded to the literal four-way split, through
+`WotsWitness.Valid`'s three `Iff.rfl` equations; that four-way form is the propositional one a
+later `conseq` post-condition reads, and it is the only place the correspondence with
+`valid_TCRTRH`, `valid_TCRPKCO` and the two resolutions of `valid_WOTSTWES` is a theorem rather
+than prose.  Deleting a conjunct from any of the three would otherwise go unnoticed. -/
+example (sig : XmssSig toyParams toyPrimitives) (msg msg' : toyPrimitives.Y) (idx : ℕ)
+    (hidx : idx < 2 ^ toyParams.hp) (hne : msg ≠ msg')
+    (hroot : xmssPkFromSig toyPrimitives idx sig msg () baseAdrs =
+      xmssRoot toyPrimitives () () baseAdrs) :
+    (findXmssWitness toyPrimitives idx sig msg msg' () () baseAdrs =
+          (findWotsWitness toyPrimitives sig.wots msg
+            (wotsSign toyPrimitives msg' () () (wotsLeafAdrs baseAdrs idx)) msg' ()
+            (wotsLeafAdrs baseAdrs idx)).map .wots ∨
+        findXmssWitness toyPrimitives idx sig msg msg' () () baseAdrs =
+          (PerfectMerkleTree.findCollision (xmssLeaf toyPrimitives () () baseAdrs)
+            (xmssNodeHash toyPrimitives () baseAdrs) idx
+            (wotsPkFromSig toyPrimitives sig.wots msg () (wotsLeafAdrs baseAdrs idx))
+            sig.auth.toList).map fun w => .hCollision w.1 w.2.2) ∧
+      ((∃ (z : ℕ) (c : toyPrimitives.Y × toyPrimitives.Y), 0 < z ∧ z ≤ toyParams.hp ∧
+            xmssHonestChildren toyPrimitives () () baseAdrs z (idx / 2 ^ z) ≠ c ∧
+            toyPrimitives.H () (xmssNodeAdrs baseAdrs z (idx / 2 ^ z))
+                (xmssHonestChildren toyPrimitives () () baseAdrs z (idx / 2 ^ z)).1
+                (xmssHonestChildren toyPrimitives () () baseAdrs z (idx / 2 ^ z)).2 =
+              toyPrimitives.H () (xmssNodeAdrs baseAdrs z (idx / 2 ^ z)) c.1 c.2) ∨
+        (∃ recovered : Vector toyPrimitives.Y toyParams.len,
+            recovered ≠ wotsPkGenTops toyPrimitives () () (wotsLeafAdrs baseAdrs idx) ∧
+            toyPrimitives.Tl () (wotsPkAdrs (wotsLeafAdrs baseAdrs idx)) recovered.toList =
+              toyPrimitives.Tl () (wotsPkAdrs (wotsLeafAdrs baseAdrs idx))
+                (wotsPkGenTops toyPrimitives () () (wotsLeafAdrs baseAdrs idx)).toList) ∨
+        (∃ (i : Fin toyParams.len) (step : ℕ) (value : toyPrimitives.Y),
+            step < toyParams.w - 1 ∧ step + 1 = chainStepsCore toyPrimitives.core msg' i.val ∧
+            toyPrimitives.F ()
+                ((wotsChainAdrs (wotsLeafAdrs baseAdrs idx) i.val).setHashAddress step) value =
+              (wotsSign toyPrimitives msg' () () (wotsLeafAdrs baseAdrs idx))[i.val]) ∨
+        ∃ (i : Fin toyParams.len) (step : ℕ) (value : toyPrimitives.Y),
+          step < toyParams.w - 1 ∧ chainStepsCore toyPrimitives.core msg' i.val ≤ step ∧
+          value ≠ chain toyPrimitives () (wotsChainAdrs (wotsLeafAdrs baseAdrs idx) i.val)
+              (wotsSign toyPrimitives msg' () () (wotsLeafAdrs baseAdrs idx))[i.val]
+              (chainStepsCore toyPrimitives.core msg' i.val)
+              (step - chainStepsCore toyPrimitives.core msg' i.val) ∧
+          toyPrimitives.F ()
+              ((wotsChainAdrs (wotsLeafAdrs baseAdrs idx) i.val).setHashAddress step) value =
+            toyPrimitives.F ()
+              ((wotsChainAdrs (wotsLeafAdrs baseAdrs idx) i.val).setHashAddress step)
+              (chain toyPrimitives () (wotsChainAdrs (wotsLeafAdrs baseAdrs idx) i.val)
+                (wotsSign toyPrimitives msg' () () (wotsLeafAdrs baseAdrs idx))[i.val]
+                (chainStepsCore toyPrimitives.core msg' i.val)
+                (step - chainStepsCore toyPrimitives.core msg' i.val))) := by
+  refine ⟨?_, ?_⟩
+  · by_cases hleaf : xmssLeaf toyPrimitives () () baseAdrs idx =
+        wotsPkFromSig toyPrimitives sig.wots msg () (wotsLeafAdrs baseAdrs idx)
+    · exact Or.inl
+        (findXmssWitness_eq_wots_of_leaf toyPrimitives idx sig msg msg' () () baseAdrs hleaf)
+    · exact Or.inr
+        (findXmssWitness_eq_node_of_leaf_ne toyPrimitives idx sig msg msg' () () baseAdrs hleaf)
+  · rcases xmssPkFromSig_forgeryCases toyValid toyPrimitives toyByteLaws idx hidx sig msg msg'
+      () () baseAdrs hne hroot with hcoll | ⟨w, hw⟩
+    · exact Or.inl hcoll
+    · cases w with
+      | tlCollision recovered =>
+          rw [WotsWitness.valid_tlCollision] at hw
+          exact Or.inr (Or.inl ⟨recovered, hw⟩)
+      | fPreimage i step value =>
+          rw [WotsWitness.valid_fPreimage] at hw
+          exact Or.inr (Or.inr (Or.inl ⟨i, step, value, hw⟩))
+      | fCollision i step value =>
+          rw [WotsWitness.valid_fCollision] at hw
+          exact Or.inr (Or.inr (Or.inr ⟨i, step, value, hw⟩))
 
 /-! ## Ledger pins on approved profiles -/
 

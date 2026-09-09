@@ -24,15 +24,20 @@ proves it, over the intrinsic `XmssSigCore` — whose authentication path is `Ve
 so it carries no path-length hypothesis — and this module consumes it unchanged.  What is added is
 exhaustiveness: `xmssPkFromSig_cases` says that when the binding lemma's leaf hypothesis fails the
 signature recovers the *honest* WOTS+ public key at that leaf, which is the hypothesis
-`wotsPkFromSig_cases` takes, and `xmssPkFromSig_forgeryCases` composes the two.
+`wotsPkFromSig_cases` takes, and `xmssPkFromSig_forgeryCases` composes it with the WOTS+
+extractor pair (`findWotsWitness_isSome`, `findWotsWitness_sound`), whose three outcomes are
+`wotsPkFromSig_cases`' three.
 
 Every *deterministic-inclusion* statement below has its free objects drawn from a parameter record
 or a primitive bundle over one, seeds, a structural address, natural-number indices, messages, and
-signature or witness data; not all of them mention all of those.  Seven of the fifteen mention an
-`XmssSigCore` — `xmssPkFromSig_cases`, `xmssPkFromSig_forgeryCases`, `findXmssWitness`, its two
-shape equations and its two lemmas — and the other eight do not.  Of those eight only the game-shape
-bridge names a game at all, and what it names is a `Problem` record, never an experiment or an
-advantage.
+signature or witness data, together with the structural side conditions their proofs need: the
+`p.Valid` and `prims.core.ByteLaws` arguments of the two statements that invoke the WOTS+
+extractor, the `DecidableEq prims.Y` instance the extractor here and its four lemmas take, and the
+`SampleableType prims.PkSeed` instance on the game-shape bridge.  Not all of them mention all of
+those.  Seven of the fifteen mention an `XmssSigCore` — `xmssPkFromSig_cases`,
+`xmssPkFromSig_forgeryCases`, `findXmssWitness`, its two shape equations and its two lemmas — and
+the other eight do not.  Of those eight only the game-shape bridge names a game at all, and what it
+names is a `Problem` record, never an experiment or an advantage.
 
 The honest secret seed is not confined to one lemma: thirteen of the fifteen take one, the two
 exceptions being `xmssNodeIndex_lt`, which is arithmetic on the leaf index, and the `XmssWitness`
@@ -85,12 +90,14 @@ declaration.
 
 * `wotsLeafAdrs_eq_wotsInstanceAdrs`, `mem_xmssNodeAddresses_of_leaf`, `xmssNodeAdrsKey_injective`.
 
-The `wots` branch's own three ledgers are `WotsWitnesses`': `wotsStepAddresses`,
-`optionalWotsAddresses` and `wotsPkAddresses`, reached by `mem_wotsStepAddresses_of_lt`,
-`wotsPreimageAdrs_mem_optionalWotsAddresses` and `mem_wotsPkAddresses`.  Those lemmas are stated at
-`wotsInstanceAdrs pos`, and an XMSS witness names `wotsLeafAdrs pos.toAdrs pos.leaf.val`; the two
-are the same address, which is what `wotsLeafAdrs_eq_wotsInstanceAdrs` records.  Nothing is
-restated.
+The `wots` branch's own three ledgers are slice-1 objects, defined in
+`HashSig.SLHDSA.Security.ReachableTargets`: `wotsStepAddresses`, `optionalWotsAddresses` and
+`wotsPkAddresses`.  They are reached by `WotsWitnesses`' `mem_wotsStepAddresses_of_lt` and
+`wotsPreimageAdrs_mem_optionalWotsAddresses`, and by `ReachableTargets`' own `mem_wotsPkAddresses`
+— which `WotsWitnesses` likewise uses directly rather than restating.  All three membership lemmas
+are stated at `wotsInstanceAdrs pos`, and an XMSS witness names
+`wotsLeafAdrs pos.toAdrs pos.leaf.val`; the two are the same address, which is what
+`wotsLeafAdrs_eq_wotsInstanceAdrs` records.  Nothing is restated.
 
 `xmssNodeAdrsKey_injective` consumes `EncodedTargetLedgerConditions` rather than assuming a fresh
 injectivity hypothesis, so a concrete profile discharges it through
@@ -116,9 +123,11 @@ flags is a conjunction this module reproduces exactly.
 * `valid_TCRTRH` (`:3272-3273`) asks that the layer's recovered root equal the honest one *and*
   its recovered leaf differ.  The first conjunct is `xmssPkFromSig_cases`' hypothesis `hroot`, the
   second is the case it splits on, so under that hypothesis the `H` branch fires on exactly the
-  layers `valid_TCRTRH` names.  Its extractor is the `find` at `:2685-2686` inside
-  `R_SMDTTCRCTRH_EUFNAGCMA`'s forge, whose predicate is literally those two conjuncts and whose
-  collision extraction runs to `:2711`.
+  layers `valid_TCRTRH` names.  Its extractor is `R_SMDTTCRCTRH_EUFNAGCMA`'s procedure `find`
+  (`:2597`) — the reduction is an `Adv_SMDTTCRC` and has no `forge` of its own; `forge` belongs to
+  the adversary and is called at `:2646`.  Inside that procedure the layer is selected by the list
+  `find` at `:2685-2686`, whose predicate is literally those two conjuncts, and the collision
+  extraction runs to `:2711`.
 * `valid_TCRPKCO` (`:3270-3271`) asks that the layer's recovered leaf equal the honest one *and*
   its recovered chain-end vector differ.  That is `wotsPkFromSig_cases`' first disjunct, which is
   the `T_len` branch, with the leaf equality written out as the equality of the two `T_len` images
@@ -219,8 +228,9 @@ construction: the split is a decision on a proposition and its negation, and the
 as a WOTS+ public key.
 
 Together with its root hypothesis, the collision branch is the `valid_TCRTRH` case of
-`FL_SL_XMSS_MT_ES.ec:3272-3273`, whose extractor is the `find` at `:2685-2686` inside
-`R_SMDTTCRCTRH_EUFNAGCMA`'s forge; the other branch is the hypothesis of `wotsPkFromSig_cases`,
+`FL_SL_XMSS_MT_ES.ec:3272-3273`, whose extractor is `R_SMDTTCRCTRH_EUFNAGCMA`'s procedure `find`
+(`:2597`) — which calls the adversary's `forge` at `:2646` and selects the layer with the list
+`find` at `:2685-2686`; the other branch is the hypothesis of `wotsPkFromSig_cases`,
 under which the source's remaining two flags are decided.
 
 *Deterministic inclusion.* -/
@@ -289,10 +299,12 @@ the intended use — and the honest message `honestMsg` signed at that leaf.
 
 * `hCollision z c` asserts an `H`-collision at `xmssNodeAdrs adrs z (idx / 2 ^ z)` between `c` and
   `xmssHonestChildren prims sk pk adrs z (idx / 2 ^ z)`, the honest child pair there, and pins
-  `0 < z ≤ h'`.  Both bounds are load-bearing: `z ≤ h'` and `0 < z` together are what place the
-  address in the `xmssH` ledger, and `0 < z` is also the height at which `xmssHonestChildren`'s
-  `z - 1` would truncate.  Neither separates the address from another role's ledger; the `TREE`
-  type code does that on its own.
+  `0 < z ≤ h'`.  Both bounds are load-bearing: `z ≤ h'` and `0 < z`, together with the leaf bound
+  a `LayerPosition` carries, are what place the address in the `xmssH` ledger — `idx` here is an
+  unbounded `ℕ`, so the two height bounds alone do not bound `idx / 2 ^ z` by `2 ^ (h' - z)`; and
+  `0 < z` also excludes `z = 0`, the height at which `xmssHonestChildren`'s `z - 1` truncates.
+  Neither separates the address from another role's ledger; the `TREE` type code does that on its
+  own.
 * `wots w` asserts `w`'s own winning condition at `wotsLeafAdrs adrs idx`, against the honest chain
   ends `wotsPkGenTops prims sk pk (wotsLeafAdrs adrs idx)` and the honest WOTS+ signature
   `wotsSign prims honestMsg sk pk (wotsLeafAdrs adrs idx)` on `honestMsg`.  Those two are computed
@@ -301,8 +313,9 @@ the intended use — and the honest message `honestMsg` signed at that leaf.
 
 The `hCollision` distinctness reads honest-first, `xmssHonestChildren … ≠ c`, inherited from
 `PerfectMerkleTree.findCollision_sound`, whose `c₁ ≠ c₂` names the honest pair first; the
-`tlCollision` case inside `WotsWitness.Valid` reads submitted-first.  Nothing turns on it — a
-consumer that wants a game's order applies `Ne.symm` — but the two do not agree.
+`tlCollision` and `fCollision` cases inside `WotsWitness.Valid` both read submitted-first
+(`recovered ≠ honestTops` and `value ≠ chain …`).  Nothing turns on it — a consumer that wants a
+game's order applies `Ne.symm` — but the two orientations do not agree.
 
 This is a statement about hash values only.  It does not say that the honest child pair, the honest
 chain ends or the honest signature was committed as a game target, nor that any execution queried
@@ -344,10 +357,10 @@ honest message that signature signs. -/
       w.Valid pk (wotsLeafAdrs adrs idx) (wotsPkGenTops prims sk pk (wotsLeafAdrs adrs idx))
         (wotsSign prims honestMsg sk pk (wotsLeafAdrs adrs idx)) honestMsg := Iff.rfl
 
-/-- **XMSS forgery trichotomy-of-trichotomies.**  A signature at leaf `idx < 2 ^ h'` on a forged
-message `msg` that recovers the honest XMSS root yields, for any honest message `msg' ≠ msg`,
-either an `H`-collision at an internal node of the opened leaf's root path, or a `WotsWitness`
-against the honest WOTS+ key material at that leaf.
+/-- **XMSS forgery dichotomy, four-way after unfolding.**  A signature at leaf `idx < 2 ^ h'` on a
+forged message `msg` that recovers the honest XMSS root yields, for any honest message
+`msg' ≠ msg`, either an `H`-collision at an internal node of the opened leaf's root path, or a
+`WotsWitness` against the honest WOTS+ key material at that leaf.
 
 Unfolding the second disjunct through `WotsWitness.Valid` splits it three further ways — a `T_len`
 second preimage at `wotsPkAdrs (wotsLeafAdrs adrs idx)`, an `F`-preimage of the honest revealed
@@ -391,14 +404,24 @@ honest key material at `adrs` and the honest message `msg'`: the `H`-collision o
 root path when the recovered leaf differs from the honest one, and otherwise the WOTS+ witness at
 that leaf.
 
-The branch is decided by the recovered leaf alone, not by the recovered root.  That test is
-stronger than it looks: on the WOTS+ side it is already `findWotsWitness_sound`'s own hypothesis,
-so that branch is sound with no root match at all, and on the Merkle side
-`PerfectMerkleTree.findCollision` verifies the hash equality before returning `some`.  So unlike
-the WOTS+ and FORS extractors, this one does not return a witness that fails its own validity
-check on a signature which misses the honest root; it returns `none`, which is what the
-malformed-forgery canary of `HashSigTest.SLHDSA.XmssWitnesses` pins.  `findXmssWitness_sound`
-carries the root hypothesis for a different reason, recorded on that theorem.
+The branch is decided by the recovered leaf alone, not by the recovered root.  So unlike the WOTS+
+and FORS extractors, this one never returns a witness that fails its own validity check on a
+signature which misses the honest root — but what it returns on such a signature is decided by the
+leaf test, and it is not always `none`.
+
+With the recovered leaf *different* from the honest one the Merkle branch is taken, and there a
+root mismatch does give `none`: `PerfectMerkleTree.findCollisionAddressed` descends from the root,
+recursing only where the two openings' child pairs agree and returning `some` only where they
+first differ under an equal parent, so a `some` already implies the root match.  With the recovered
+leaf the *honest* one — an authentication path that misses the honest tree above a correctly
+recovered leaf — the WOTS+ branch is taken, and it returns a witness that is valid all the same,
+because its guard is the leaf test and that test is already `findWotsWitness_sound`'s own
+hypothesis.  Over 768 signatures at the toy bundle of `HashSigTest.SLHDSA.XmssWitnesses` (chain
+perturbation by authentication-path level by path perturbation) 608 miss the honest root; the 552
+of those that take the Merkle branch all return `none`, the 56 that take the WOTS+ branch all
+return a witness, and no case in the sweep returns an invalid one.  The malformed-forgery canary
+there pins both halves.  `findXmssWitness_sound` carries the root hypothesis for a different
+reason, recorded on that theorem.
 
 The honest WOTS+ signature the second branch compares against is recomputed here from `sk` rather
 than taken as an argument, so a caller cannot substitute a different one. -/
@@ -451,9 +474,10 @@ the honest tree.
 
 `findCollision` looks unconditionally oriented — it reads its first pair off the honest tree, and
 `findCollision_sound` already pins the address to `idx / 2 ^ h` without a root hypothesis — but
-`findCollisionAddressed_oriented` bundles orientation with existence and takes the root
-hypothesis, so there is nothing weaker to appeal to.  The same hypothesis appears for the same
-reason on `HashSig.SLHDSA.Security.findForsTreeCollision_sound`.  It costs nothing here:
+`findCollision_oriented`, which is what this proof calls, bundles orientation with existence and
+takes the root hypothesis, as does the kernel `findCollisionAddressed_oriented` it delegates to, so
+there is nothing weaker to appeal to.  The same hypothesis appears for the same reason on
+`HashSig.SLHDSA.Security.findForsTreeCollision_sound`.  It costs nothing here:
 `findXmssWitness_isSome` needs the root match for existence in any case, so a caller that wants a
 witness at all is already holding it.
 
@@ -539,9 +563,10 @@ member of the slice-1 role ledger it is submitted against, and — under
 
 Only the `hCollision` branch has a ledger of its own here: it attacks `xmssH`, whose ledger is
 `xmssNodeAddresses` (`mem_xmssNodeAddresses_of_leaf`, `xmssNodeAdrsKey_injective`).  The `wots`
-branch's three ledgers belong to `HashSig.SLHDSA.Security.WotsWitnesses` and are reached at the
-address `wotsInstanceAdrs pos`, which `wotsLeafAdrs_eq_wotsInstanceAdrs` identifies with the
-address an XMSS witness names.
+branch's three ledgers are slice-1 objects of `HashSig.SLHDSA.Security.ReachableTargets`, reached
+by `WotsWitnesses`' membership lemmas and by `mem_wotsPkAddresses` directly, at the address
+`wotsInstanceAdrs pos`, which `wotsLeafAdrs_eq_wotsInstanceAdrs` identifies with the address an
+XMSS witness names.
 
 These are statements about the ledgers, not about any execution: nothing here says a logged query
 carried the witness values. -/
@@ -602,12 +627,12 @@ theorem xmssNodeAdrsKey_injective {prims : Primitives vp.params}
 `Adrs`, and `WotsWitness.Valid` for the other branch).  The bridge below rewrites the
 `hCollision` branch into `xmssHTcrCProblem`'s `eval` vocabulary at the encoded tweak, using
 `CanonicalGames.xmssHTcrCProblem_eval_adrsToKey`.  That equation is already on the slice-6 base, so
-this module adds no game bridge of its own; the proof names the rewrite explicitly rather than
-relying on its `@[simp]` attribute, because the sibling bridges of `CanonicalGames` do not all
-carry one.  It rewrites *both* sides of the hash equation,
-so the equation it concludes is stated in the game's vocabulary; the remaining conjuncts are
-carried through unchanged and stay in the construction's — the two height bounds, which are
-ledger-placement conditions no game states, and the distinctness, which names
+this module adds no new `Problem`-`eval` equation of its own; the bridge below is a consumer of
+slice 6's.  The proof names the rewrite explicitly rather than relying on its `@[simp]` attribute,
+because the sibling bridges of `CanonicalGames` do not all carry one.  It rewrites *both* sides of
+the hash equation, so the equation it concludes is stated in the game's vocabulary; the remaining
+conjuncts are carried through unchanged and stay in the construction's — the two height bounds,
+which are ledger-placement conditions no game states, and the distinctness, which names
 `xmssHonestChildren` directly.  It changes presentation only: no game is played and no advantage is
 stated.
 
