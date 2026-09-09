@@ -75,11 +75,12 @@ without renaming them.
 
 Fix a reachable position `pos`, a count `layers` of positions from `pos` through the final layer,
 a forged message `msg`, an honest message `msg' ≠ msg`, and a vector of `layers` XMSS signatures.
-Recovery threads each layer's recovered root into the next position as that layer's message.  The
-honest walk from the same position threads the honest XMSS roots instead, and its layer-`j`
+Recovery threads each layer's recovered root into the next position, as the message signed there.
+The honest walk from the same position threads the honest XMSS roots instead, and its layer-`j`
 message is `honestLayerMsg`: the given honest message at `j = 0`, and the honest XMSS root of the
-layer-`(j-1)` tree afterwards — a function of the honest key material alone, because an honest
-XMSS signature recovers its own tree's root whatever it signs.
+layer-`(j-1)` tree afterwards.  Above layer zero it is therefore a function of the honest key
+material and the position alone, with no honest signature in it, because an honest XMSS signature
+recovers its own tree's root whatever it signs.
 
 If the forged walk ends at the honest top root then at some layer `j` the two walks meet: the
 forged walk's layer-`j` recovery already equals the honest layer-`j` root, while its layer-`j`
@@ -99,10 +100,14 @@ as a proof argument, so rewriting under it needs `next_congr` rather than `rw`.
 ## The layer bound
 
 The bound every statement here carries is `j < layers` against `pos.layer.val + layers = d` —
-equivalently `pos.layer.val + j < d`.  It is the bound the source's recorded addresses are guarded
-by: each of the three case flags is an existential over `0 ≤ i < d`, each reduction picks its `i`
-with a list `find` over that range, and the address it then extracts at is built by `set_ltidx`
-from that `i` and the tree index at that layer.
+equivalently `pos.layer.val + j < d`.  It is the bound the source's recorded targets are guarded
+by: each of the three case flags is an existential over `0 ≤ i < d`, and each reduction picks its
+`i` with a list `find` over that range.  What the layer then indexes differs between the three.
+The `H` reduction builds the address it extracts at with `set_ltidx`, from that `i` and the tree
+index at that layer.  The other two build no address of their own; they turn the same triple into
+an index into the challenge oracle's query list, `bigi predT (fun i => nr_trees i) 0 cidx * l' +
+tidx * l' + kpidx`.  Either way the layer is one of the coordinates separating one recorded target
+from another, and `0 ≤ i < d` is its range.
 
 Two things turn on it, and a third does not.
 
