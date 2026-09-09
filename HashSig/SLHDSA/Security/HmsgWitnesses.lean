@@ -42,10 +42,11 @@ from the embedding's is fresh *for free*, against any transcript, without the ad
 anything; and `wins_of_hmsg_agree` turns that free freshness into a win as soon as the digest at
 the two key pairs agrees.  In particular, for an `H_msg` that ignores its `PK.seed` and `PK.root`
 arguments the wide game falls to one target query — query `⟨s', r', M⟩`, receive the key `R`, and
-return `(R, ⟨s, r, M⟩)` — while the narrow game at every fixed key pair is untouched, since the
-narrow game never sees a second key pair to move to.  So wide-hardness implies narrow-hardness at
-every fixed key pair, and the converse fails: as an assumption, the FIPS-shaped one is strictly
-the stronger.
+return `(R, ⟨s, r, M⟩)`.  Its narrow game is not weakened by the blinding at all: at *every* fixed
+key pair that game is the unblinded bundle's narrow game at the one pair the blinding fixes, so
+narrow hardness is carried across exactly, and the narrow game never sees a second key pair to move
+to.  So wide-hardness implies narrow-hardness at every fixed key pair, and the converse fails: as an
+assumption, the FIPS-shaped one is strictly the stronger.
 
 **What would be lost if a reduction needed the converse.**  A reduction that wanted to discharge a
 Lean SLH-DSA bound from the source's assumption alone — that is, to conclude wide-hardness from
@@ -144,7 +145,7 @@ Those forty-one are the module's whole interface; none is `private` and none car
 
 ## References
 
-- NIST FIPS 205, §4.1, §9 Algorithms 16, 17, 19 and 20, §10.2
+- NIST FIPS 205, §4.1, §9 Algorithms 16, 17, 19 and 20, §10.2, §11
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified" (`FORS_ES.ec`, `KeyedHashFunctions.eca`)
 -/
@@ -160,8 +161,9 @@ variable {p : Params}
 These extend `HmsgIndex`, so they live in its namespace; the transcript statements below are in
 `SLHDSA.Security` with the rest of the lane. -/
 
-/-- The FORS instance address an ITSR index names: layer zero, the digest's tree index, type
-`FORS_TREE`, and the digest's leaf index as the key-pair address.
+/-- The FORS instance address an ITSR index names: layer zero, the index's own tree component, type
+`FORS_TREE`, and its own leaf component as the key-pair address.  No digest is presupposed; when the
+index does belong to a digest, `forsAdrs_of_mem` says the address is that digest's.
 
 This is the body of `DigestParts.forsAdrs`, repeated because an `HmsgIndex` carries no FORS
 message and so cannot produce a `DigestParts` without inventing one.  `forsAdrs_eq_of_indices`

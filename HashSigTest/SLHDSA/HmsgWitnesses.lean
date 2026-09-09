@@ -196,7 +196,7 @@ def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
 -- naming `toyPrimitives ↦ 2`, with the rest following it down the compiled declarations.
 -- Reducible, because its carrier types have to unfold to `Bytes 1` for instance resolution to
 -- reach them: without it, three errors and only these — `byteOf`'s `y[0]` finds no
--- `GetElem toyPrimitives.Y ℕ` instance and cannot prove its index valid, and `widins` finds no
+-- `GetElem toyPrimitives.Y ℕ` instance and cannot prove its index valid, and `wideWins` finds no
 -- `DecidableEq (HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y)`.  Nothing outside this
 -- executable consumes it.
 /-- The toy bundle: one byte per node, a collapsing order- and address-sensitive `Thash`, and an
@@ -327,7 +327,7 @@ def embed (queries : List (toyPrimitives.Y × List Byte)) :
   embedTargets toyPrimitives pkSeed pkRoot queries
 
 /-- Whether the wide game's winning condition holds, as a boolean. -/
-def widins (queries : List (toyPrimitives.Y × List Byte))
+def wideWins (queries : List (toyPrimitives.Y × List Byte))
     (candidate : toyPrimitives.Y × HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y) : Bool :=
   decide ((hmsgItsrProblem toyPrimitives).Wins (embed queries) candidate)
 
@@ -385,9 +385,10 @@ def coversPattern (queries : List (toyPrimitives.Y × List Byte)) : Bool × Bool
 /-- The fixture's bundle with one field changed: an `H_msg` that ignores the `PK.seed` and
 `PK.root` it is handed and hashes at the fixture's own key pair instead.
 
-Every other field, and every carrier type, is the fixture's own, so its source-shaped problem at
-that key pair is the fixture's source-shaped problem — `checkStrictness` asserts that rather than
-assuming it — while its widened game admits the one-query break `wins_of_hmsg_agree` describes. -/
+Every other field, and every carrier type, is the fixture's own, and its source-shaped problem at
+*any* key pair is the fixture's source-shaped problem at the honest one — `checkStrictness` asserts
+that on the fixture's cases rather than assuming it — while its widened game admits the one-query
+break `wins_of_hmsg_agree` describes. -/
 -- Exposed and `@[reducible]`, both measured the way the bundle above was.  Exposed: without it,
 -- nine errors — the three instances just below report `Compilation failed, locally inferred
 -- compilation type differs from type that would be inferred in other modules` naming
@@ -411,7 +412,8 @@ instance : DecidableEq blindPrimitives.PkSeed := inferInstanceAs (DecidableEq (B
 The first six properties are the two message-derived maps: each of `H_msg`'s four FIPS inputs is
 moved on its own and the digest is required to move with it, and `PRF_msg` is moved in each of its
 two.  The rest fix the shape the coverage canaries rely on: the forged digest names two indices,
-they are the hand-written pair, and the four query digests realise all four coverage patterns. -/
+they are the hand-written pair, four queries realise all four coverage patterns against them, a
+fifth covers both without reproducing the digest, and two of the six pairs share a randomizer. -/
 def checkFixture : IO Unit := do
   ensure "H_msg moves with the randomizer"
     (toyPrimitives.Hmsg (node 0x01) pkSeed pkRoot msgC !=
@@ -456,8 +458,7 @@ def checkFixture : IO Unit := do
 a hand-written `Adrs` record; `HmsgIndex.globalLeaf` is required to agree with `forsSigLeafIndex`
 *and* with a hand-written `tree · 2 ^ a + leaf`; and the FORS leaf address the pair produces is
 required to agree with a hand-written table of four `Adrs` records.  The last is what a shift
-applied to
-`globalLeaf` and to its bridge together has to survive, and does not. -/
+applied to `globalLeaf` and to its bridge together has to survive, and does not. -/
 def checkCoordinates : IO Unit := do
   ensure "the forged instance address is the hand-written one"
     (partsC.forsAdrs == forgedForsAdrsTable)
@@ -533,35 +534,36 @@ one query reproduces the forged digest under a different pair.  The off-fibre ca
 coverage while holding on freshness, which is the widening's extra room made falsifiable. -/
 def checkWins : IO Unit := do
   ensure "the candidate wins against a transcript that covers both of its indices"
-    (widins [qBoth] candidateC)
+    (wideWins [qBoth] candidateC)
   ensure "freshness fails when the candidate is one of the targets"
-    (!widins [qC, qBoth] candidateC &&
+    (!wideWins [qC, qBoth] candidateC &&
       decide (candidateC ∈ embed [qC, qBoth]) &&
       (forgedIndexTable.all fun idx =>
         decide (idx ∈ (hmsgItsrProblem toyPrimitives).targetIndexSet (embed [qC, qBoth]))))
   ensure "coverage fails against a transcript at another instance, and freshness holds"
-    (!widins [qOther] candidateC && decide (candidateC ∉ embed [qOther]))
+    (!wideWins [qOther] candidateC && decide (candidateC ∉ embed [qOther]))
   ensure "coverage fails when only one of the two indices is covered"
-    (!widins [qFirst] candidateC && !widins [qSecond] candidateC)
+    (!wideWins [qFirst] candidateC && !wideWins [qSecond] candidateC)
   ensure "an off-fibre candidate is fresh and still does not win"
-    (decide (candidateOffSeed ∉ embed [qC, qBoth]) && !widins [qC, qBoth] candidateOffSeed &&
-      decide (candidateOffRoot ∉ embed [qC, qBoth]) && !widins [qC, qBoth] candidateOffRoot)
+    (decide (candidateOffSeed ∉ embed [qC, qBoth]) && !wideWins [qC, qBoth] candidateOffSeed &&
+      decide (candidateOffRoot ∉ embed [qC, qBoth]) && !wideWins [qC, qBoth] candidateOffRoot)
 
 /-- The fibre equivalence, evaluated in both directions at every fixture transcript.
 
-At the honest key pair the widened winning condition and the source-shaped one agree on every one
-of the fixture's candidates and target lists, including the two that fail on freshness and the
-three that fail on coverage.  Neither direction is vacuous: both values `true` and `false` occur. -/
+At the honest key pair the widened winning condition and the source-shaped one agree on all seven
+of the fixture's target lists: two on which the forged pair wins, one on which freshness fails, and
+four on which coverage fails.  Neither direction is vacuous: both values occur.  The last check is
+what pins the key pair the source-shaped side is read at. -/
 def checkFibreEquivalence : IO Unit := do
   let cases := [[qBoth], [qHonestOnly], [qC, qBoth], [qOther], [qFirst], [qSecond], []]
   for queries in cases do
     ensure "the widened and source-shaped winning conditions agree at the honest key pair"
-      (widins queries candidateC == narrowWins queries qC)
+      (wideWins queries candidateC == narrowWins queries qC)
   ensure "and both values occur among those cases"
-    ((cases.any fun queries => widins queries candidateC) &&
-      (cases.any fun queries => !widins queries candidateC))
+    ((cases.any fun queries => wideWins queries candidateC) &&
+      (cases.any fun queries => !wideWins queries candidateC))
   ensure "the source-shaped side is read at the honest key pair and nowhere else"
-    (widins [qHonestOnly] candidateC &&
+    (wideWins [qHonestOnly] candidateC &&
       !narrowWinsAt otherPkSeed pkRoot [qHonestOnly] qC &&
       !narrowWinsAt pkSeed otherPkRoot [qHonestOnly] qC)
 
@@ -570,7 +572,9 @@ def checkFibreEquivalence : IO Unit := do
 Four target sets: one covering only the candidate's second index, so the first is returned; one
 covering only its first, so the second is returned; one covering neither, where a last-match
 extractor would return the second and this one returns the first; and one covering both, where
-nothing is returned and the pair wins.  The third is the case soundness alone does not decide. -/
+nothing is returned and the pair wins.  The third is the case soundness alone does not decide.  Two
+sweeps over the same four then require whatever comes back to be uncovered, to be an index the
+candidate selects, and to name its own FORS tree. -/
 def checkFindUncovered : IO Unit := do
   ensure "with only the second index covered, the first comes back"
     (findUncoveredIndex toyPrimitives (embed [qSecond]) candidateC == some forgedIndex0)
@@ -582,7 +586,7 @@ def checkFindUncovered : IO Unit := do
       findUncoveredIndex toyPrimitives (embed []) candidateC == some forgedIndex0)
   ensure "with both covered, nothing comes back and the pair wins"
     (findUncoveredIndex toyPrimitives (embed [qBoth]) candidateC == none &&
-      widins [qBoth] candidateC)
+      wideWins [qBoth] candidateC)
   ensure "the returned index is uncovered and is one the candidate selects"
     ([[qSecond], [qFirst], [qOther], []].all fun queries =>
       match findUncoveredIndex toyPrimitives (embed queries) candidateC with
@@ -600,10 +604,11 @@ def checkFindUncovered : IO Unit := do
 
 `blindPrimitives` differs from the fixture's bundle in one field: its `H_msg` ignores the `PK.seed`
 and `PK.root` it is handed and hashes at the fixture's own key pair instead.  Its source-shaped
-problem at that key pair is therefore *the same problem* — the two agree on every randomizer and
-message the fixture uses — while its widened game falls to a single target query, which the
-fixture's own bundle refuses.  That is the separation: narrow hardness does not carry to the
-widened game. -/
+problem at *any* key pair is therefore the fixture's bundle's at the honest one — the two are
+asserted to agree on every randomizer and message the fixture uses, and their winning conditions on
+four of its target lists — while its widened game falls to a single target query, which the
+fixture's own bundle refuses.  That is the separation: source-shaped hardness does not carry to the
+widened game.  The last two checks falsify the two hypotheses the win rests on, one each. -/
 def checkStrictness : IO Unit := do
   ensure "the blind bundle agrees with the fixture's at the honest key pair"
     ([qC, qBoth, qFirst, qSecond, qOther].all fun q =>
@@ -655,8 +660,9 @@ Against a transcript covering the forged pair's first index only, the second is 
 query and FORS tree land on its coordinate.  The two queries in that transcript miss it for
 different reasons — one sits at the forged instance and misses on the leaf, the other sits at
 another instance and misses on the address — so both halves of the conjunction the lemma denies are
-exercised.  The converse is asserted as well: for the index that *is* covered, some query and tree
-do land on its coordinate, so the lemma's hypothesis is not vacuously satisfiable. -/
+exercised.  The other direction is asserted as well: for the index that *is* covered, some query
+and tree do land on its coordinate, so the conjunction the lemma denies is satisfiable at this
+fixture and its denial is not vacuous. -/
 def checkUncoveredCoordinate : IO Unit := do
   let queries := [qFirst, qOther]
   let uncovered := forgedIndex1
