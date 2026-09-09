@@ -516,8 +516,8 @@ extractions each re-evaluation at a neighbouring layer's address, leaf and hones
 is required to fail; a fourth extraction returns an `H`-collision, whose branch reads the leaf only
 as a node index that layers zero and one share and never reads the honest running message at all,
 so it makes four re-evaluations rather than six — two on the address and two on the leaf, one of
-which is required to hold instead of to fail.  Plus the no-match, early-match and nine fabricated-witness canaries, three accepted and
-six rejected. -/
+which is required to hold instead of to fail.  Plus the no-match, early-match and nine
+fabricated-witness canaries, three accepted and six rejected. -/
 lean_exe slhdsa_hypertree_witness_tests where
   root := `HashSigTest.SLHDSA.HypertreeWitnesses
 

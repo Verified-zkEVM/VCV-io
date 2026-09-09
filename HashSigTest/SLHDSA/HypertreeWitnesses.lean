@@ -49,9 +49,9 @@ re-evaluates the *same* witness four more times per neighbouring layer: once for
 three arguments, changing one at a time, and once with all three moved together, which is
 `HypertreeWitness.Valid` as a whole.  Each of the four is required to fail.
 
-All three re-evaluations bite only because all three forgeries extract an `fPreimage` witness,
-which is why the constructor is pinned rather than assumed.  `checkLayerH` runs the other case and
-says what changes there.
+The three single-argument re-evaluations bite only because all three forgeries extract an
+`fPreimage` witness, which is why the constructor is pinned rather than assumed.  `checkLayerH`
+runs the other case and says what changes there.
 
 ## The other canaries
 
