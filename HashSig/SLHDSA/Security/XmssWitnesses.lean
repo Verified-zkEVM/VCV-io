@@ -417,8 +417,9 @@ first differ under an equal parent, so a `some` already implies the root match. 
 leaf the *honest* one — an authentication path that misses the honest tree above a correctly
 recovered leaf — the WOTS+ branch is taken, and whatever it returns there is valid all the same,
 because its guard is the leaf test and that test is already `findWotsWitness_sound`'s own
-hypothesis.  That is `findXmssWitness_sound_of_leaf` below, whose only hypothesis is the leaf test:
-a caller holding a leaf match and no root match cites it rather than reproving it.  It says nothing
+hypothesis.  That is `findXmssWitness_sound_of_leaf` below, which beside the `some w` its
+conclusion is about takes the leaf test and nothing else: a caller holding a leaf match and no root
+match cites it rather than reproving it.  It says nothing
 about whether anything is returned: existence on this branch is `findXmssWitness_isSome`'s, and what
 buys it there is `hne : msg ≠ msg'` together with the validated parameters and the byte laws —
 never the root, as that theorem's proof shows, though no statement here isolates the existence half.
@@ -477,9 +478,9 @@ theorem findXmssWitness_eq_node_of_leaf_ne (prims : Primitives p) [DecidableEq p
 /-- **Extractor soundness on the WOTS+ branch, without the root.**  When the recovered leaf is the
 honest one — the test `findXmssWitness` performs itself — whatever the extractor returns satisfies
 `XmssWitness.Valid` against the honest XMSS tree at `adrs`, the opened leaf `idx` and the honest
-message `msg'`.  The leaf test is the only hypothesis: no root match, no leaf bound `hidx`, no
-message distinctness, no `p.Valid` and no `ByteLaws`.  It is what reaches `findWotsWitness_sound`'s
-public-key hypothesis, through `wotsPkFromSig_wotsSign`.
+message `msg'`.  Beside the `some w` the conclusion is about, the leaf test is the only hypothesis:
+no root match, no leaf bound `hidx`, no message distinctness, no `p.Valid` and no `ByteLaws`.  It is
+what reaches `findWotsWitness_sound`'s public-key hypothesis, through `wotsPkFromSig_wotsSign`.
 
 This is the half of `findXmssWitness_sound` that survives a root mismatch, and that theorem's WOTS+
 branch is this lemma applied.  A caller holding a leaf match and no root match — an authentication
