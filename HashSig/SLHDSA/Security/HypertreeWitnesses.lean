@@ -555,11 +555,15 @@ shape equations — or reads it through `layer_lt` and `Valid`, so the reflectio
 with the extractor and they re-prove by the same inductions.  What
 would *not* renumber is a statement tying the label to the walk's own indexing of the signature
 vector — that the reported layer is the one whose component recovers the honest root there — and
-that is the first-match property this module does not prove.  What refuses it instead is
-`HashSigTest.SLHDSA.HypertreeWitnesses`, whose layer pin compares the reported label with the
-literal layer its fixture built the divergence at, and whose `posOf`/`advance` and
-`honestMsgAt`/`honestLayerMsg` agreement checks are what stop those tables being renumbered to
-match. -/
+that is the first-match property this module does not prove.
+
+`HashSigTest.SLHDSA.HypertreeWitnesses` refuses it twice over, and the first of the two is a build
+error rather than a run-time one.  Its statement pins restate the two shape equations and `Valid`'s
+body with the label read raw, so the reflection applied to this module alone fails to elaborate
+*there*, at five sites in two `example`s, before anything runs.  Renumber those pins with it and the
+executable is what fails: `checkLayer` compares the reported label with the literal layer the
+fixture built the divergence at, and the `posOf`/`advance` and `honestMsgAt`/`honestLayerMsg`
+agreement checks are what stop those tables being renumbered to match. -/
 structure HypertreeWitness (vp : ValidatedParams) (prims : Primitives vp.params) (layers : ℕ) where
   /-- The layer, counted from the walk's starting position, below the walk's length. -/
   layer : Fin layers

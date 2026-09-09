@@ -394,10 +394,17 @@ carry now that the library also carries part of it.  When `HypertreeWitness.laye
 shifting the extractor's label and `HypertreeWitness.Valid`'s reading of it *together* — labelling
 the base case `⟨1, ·⟩` and reading `w.layer - 1` — re-proved `findHypertreeWitness_sound` by the
 same induction, and the executable was the only thing that noticed.  The label is a `Fin layers`
-now, so that shift no longer elaborates.  These checks stay because they are what caught the class,
-because they cost nothing, and because they check the numbering a second way, not through
-`HypertreeWitness.Valid`: `checkLayer`'s `w.layer == layer` pin compares against the label the
-fixture *built* the divergence at, and `hypertreeWitnessHolds` reads `posOf` and `honestMsgAt`.
+now, so that particular shift no longer elaborates — but the class is not closed by the type.  The
+reflection `t ↦ layers - 1 - t`, counting the layer from the top of the walk instead of from the
+walk's start, agrees with the identity at walk length one, which is the only place `Fin layers` pins
+anything, and it re-proves the library.  What stops it is in this module: the statement pins below
+restate the two shape equations and `HypertreeWitness.Valid`'s body with the label read raw, so the
+reflection is a build error *here* at five sites; and renumbering those pins with it leaves
+`checkLayer`'s pin failing at run time with `layer 0: layer index is 0`, the reflected extractor
+reporting layer two for the layer-zero divergence.  These checks stay because they are what caught
+this class, because they cost nothing, and because they check the numbering a second way, not
+through `HypertreeWitness.Valid`: `checkLayer`'s `w.layer == layer` pin compares against the label
+the fixture *built* the divergence at, and `hypertreeWitnessHolds` reads `posOf` and `honestMsgAt`.
 Renumbering those two tables to match some other labelling makes them stop agreeing with `advance`
 and `honestLayerMsg` at the fixed layers `0`, `1` and `2`, and the agreement check fails.  Without
 them the executable would be a restatement of the library at whatever numbering the library
@@ -663,7 +670,13 @@ bridge is pinned as the layer-`j` component read against `honestLayerMsg`, and a
 cross-layer separations are composed here the way the module docstring says they compose:
 `wotsPkAdrsKey_injective` against `advance_ne` directly, `wotsOptionalStepAdrsKey_injective`
 through the `congrArg Prod.fst` its `WotsChainCoord` conclusion needs, and
-`wotsStepAdrsKey_injective` through the `congrArg (·.1.1)` its pair-valued conclusion needs. -/
+`wotsStepAdrsKey_injective` through the `congrArg (·.1.1)` its pair-valued conclusion needs.
+
+Two of these pins carry more than their statements.  The extractor's dichotomy pin writes both
+shape equations' labels out literally and the soundness pin writes `Valid`'s body with
+`w.layer.val` read raw against `HypertreeWitness.layer_lt`, so a relabelling of the extractor that
+the library's own `Fin layers` type admits — the reflection `t ↦ layers - 1 - t` — stops
+elaborating at these five sites, in this module, before the canaries run. -/
 
 example (pos : LayerPosition toy) (layers : ℕ)
     (hlayers : pos.layer.val + layers = toy.params.d) (msg msg' : toyPrimitives.Y)
