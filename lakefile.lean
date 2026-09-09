@@ -399,7 +399,8 @@ script test (args) do
     #["exe", "slhdsa_component_trace_tests"],
     #["exe", "slhdsa_canonical_game_tests"],
     #["exe", "slhdsa_wots_witness_tests"],
-    #["exe", "slhdsa_fors_witness_tests"]]
+    #["exe", "slhdsa_fors_witness_tests"],
+    #["exe", "slhdsa_xmss_witness_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -497,6 +498,15 @@ honest-signature and malformed-input canaries and nine fabricated witnesses, two
 seven rejected. -/
 lean_exe slhdsa_fors_witness_tests where
   root := `HashSigTest.SLHDSA.ForsWitnesses
+
+/-- XMSS forgery-to-witness extraction: over a toy bundle whose `Thash` collapses its input and is
+order and address sensitive, the extractor returns the `H`-collision at the exact `TREE` node
+address — at height one and again at the tree height — and the three WOTS+ witnesses at the exact
+address of the leaf the signature opens, each satisfying its equation by evaluation, plus the
+honest-signature and malformed-input canaries and eighteen fabricated witnesses, four accepted and
+fourteen rejected. -/
+lean_exe slhdsa_xmss_witness_tests where
+  root := `HashSigTest.SLHDSA.XmssWitnesses
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop

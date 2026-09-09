@@ -26,19 +26,20 @@ exhaustiveness: `xmssPkFromSig_cases` says that when the binding lemma's leaf hy
 signature recovers the *honest* WOTS+ public key at that leaf, which is the hypothesis
 `wotsPkFromSig_cases` takes, and `xmssPkFromSig_forgeryCases` composes the two.
 
-Every *deterministic-inclusion* statement below has its free objects drawn from a primitive bundle,
-a seed pair, a structural address, a leaf index, two messages, an XMSS signature, and the value a
-witness submits; not all of them mention all of those.  Eight of the fourteen mention an
-`XmssSigCore` — `xmssPkFromSig_cases`, `xmssPkFromSig_forgeryCases`, `findXmssWitness` and its
-three lemmas, and the two extractor-shape equations `findXmssWitness_eq_wots_of_leaf` and
-`findXmssWitness_eq_node_of_leaf_ne` — and the other six do not.  Of those six only the game-shape
+Every *deterministic-inclusion* statement below has its free objects drawn from a parameter record
+or a primitive bundle over one, seeds, a structural address, natural-number indices, messages, and
+signature or witness data; not all of them mention all of those.  Seven of the fifteen mention an
+`XmssSigCore` — `xmssPkFromSig_cases`, `xmssPkFromSig_forgeryCases`, `findXmssWitness`, its two
+shape equations and its two lemmas — and the other eight do not.  Of those eight only the game-shape
 bridge names a game at all, and what it names is a `Problem` record, never an experiment or an
 advantage.
 
-The honest secret seed is not confined to one lemma: every honest partner an XMSS witness attacks —
-the honest child pair at a `TREE` node, the honest WOTS+ chain ends at the opened leaf, the honest
-WOTS+ signature at that leaf on the honest message — is a function of the honest tree, and the
-honest tree is what `sk` generates.
+The honest secret seed is not confined to one lemma: thirteen of the fifteen take one, the two
+exceptions being `xmssNodeIndex_lt`, which is arithmetic on the leaf index, and the `XmssWitness`
+inductive, which carries no honest object at all.  That is because every honest partner an XMSS
+witness attacks — the honest child pair at a `TREE` node, the honest WOTS+ chain ends at the opened
+leaf, the honest WOTS+ signature at that leaf on the honest message — is a function of the honest
+tree, and the honest tree is what `sk` generates.
 
 The *transcript-transport* statements are about a role ledger over a `ValidatedParams`.  The
 membership lemma takes a layer position and a node height; the encoded-distinctness lemma takes a
@@ -58,8 +59,9 @@ signature at one named leaf.
 
 ## Labels
 
-*Deterministic inclusion* — a statement whose only free objects are `prims`, seeds, addresses, a
-leaf index, messages, and signature or witness data:
+*Deterministic inclusion* — a statement whose only free objects are a parameter record or a
+`prims` over one, seeds, addresses, natural-number indices, messages, and signature or witness
+data:
 
 * the definition `xmssHonestChildren` with its equation `xmssHonestChildren_eq`, and the index
   fact `xmssNodeIndex_lt`;
@@ -70,7 +72,8 @@ leaf index, messages, and signature or witness data:
   `findXmssWitness_sound`, `findXmssWitness_isSome`;
 * the game-shape bridge `xmssWitness_valid_hCollision_eval`.
 
-These fourteen and the three below are the module's whole interface.  There is no private
+These fifteen and the three below are the module's whole interface: eighteen declarations in all,
+of which fourteen are theorems, three are `def`s and one is an inductive.  There is no private
 declaration.
 
 *Transcript transport* — a statement about a role ledger of `HashSig.SLHDSA.Security`:
@@ -368,10 +371,14 @@ honest key material at `adrs` and the honest message `msg'`: the `H`-collision o
 root path when the recovered leaf differs from the honest one, and otherwise the WOTS+ witness at
 that leaf.
 
-The branch is decided by the recovered leaf alone, not by the recovered root.  On a signature whose
-recovered root differs this therefore still runs one of the two searches, and what it returns need
-not be valid; ruling that out is exactly what `findXmssWitness_sound`'s root hypothesis does, and
-the malformed-forgery canary of `HashSigTest.SLHDSA.XmssWitnesses` exercises the gap.
+The branch is decided by the recovered leaf alone, not by the recovered root.  That test is
+stronger than it looks: on the WOTS+ side it is already `findWotsWitness_sound`'s own hypothesis,
+so that branch is sound with no root match at all, and on the Merkle side
+`PerfectMerkleTree.findCollision` verifies the hash equality before returning `some`.  So unlike
+the WOTS+ and FORS extractors, this one does not return a witness that fails its own validity
+check on a signature which misses the honest root; it returns `none`, which is what the
+malformed-forgery canary of `HashSigTest.SLHDSA.XmssWitnesses` pins.  `findXmssWitness_sound`
+carries the root hypothesis for a different reason, recorded on that theorem.
 
 The honest WOTS+ signature the second branch compares against is recomputed here from `sk` rather
 than taken as an argument, so a caller cannot substitute a different one. -/
@@ -415,11 +422,20 @@ theorem findXmssWitness_eq_node_of_leaf_ne (prims : Primitives p) [DecidableEq p
 /-- **Extractor soundness.**  The witness `findXmssWitness` returns satisfies `XmssWitness.Valid`
 against the honest XMSS tree at `adrs`, the opened leaf `idx` and the honest message `msg'`.
 
-The root hypothesis is used only by the Merkle branch, where `PerfectMerkleTree.findCollision_
-oriented` needs it to identify the first pair returned with the honest child pair at the node
-named; the WOTS+ branch is guarded by the leaf test the extractor performs itself, and reaches
-`findWotsWitness_sound`'s public-key hypothesis from that test alone.  The leaf bound `hidx` is
-likewise used only by the Merkle branch, to place the opened leaf inside the honest tree.
+The root hypothesis is used only by the Merkle branch, where
+`PerfectMerkleTree.findCollision_oriented` needs it to identify the first pair returned with the
+honest child pair at the node named; the WOTS+ branch is guarded by the leaf test the extractor
+performs itself, and reaches `findWotsWitness_sound`'s public-key hypothesis from that test alone.
+The leaf bound `hidx` is likewise used only by the Merkle branch, to place the opened leaf inside
+the honest tree.
+
+`findCollision` looks unconditionally oriented — it reads its first pair off the honest tree, and
+`findCollision_sound` already pins the address to `idx / 2 ^ h` without a root hypothesis — but
+`findCollisionAddressed_oriented` bundles orientation with existence and takes the root
+hypothesis, so there is nothing weaker to appeal to.  The same hypothesis appears for the same
+reason on `HashSig.SLHDSA.Security.findForsTreeCollision_sound`.  It costs nothing here:
+`findXmssWitness_isSome` needs the root match for existence in any case, so a caller that wants a
+witness at all is already holding it.
 
 As `XmssWitness.Valid` records, this says nothing about whether those honest objects were committed
 as game targets.
@@ -565,7 +581,10 @@ theorem xmssNodeAdrsKey_injective {prims : Primitives vp.params}
 `XmssWitness.Valid` is stated in the construction's own vocabulary (`prims.H` at a structural
 `Adrs`, and `WotsWitness.Valid` for the other branch).  The bridge below rewrites the
 `hCollision` branch into `xmssHTcrCProblem`'s `eval` vocabulary at the encoded tweak, using
-`CanonicalGames.xmssHTcrCProblem_eval_adrsToKey`.  It rewrites *both* sides of the hash equation,
+`CanonicalGames.xmssHTcrCProblem_eval_adrsToKey`.  That equation is already on the slice-6 base, so
+this module adds no game bridge of its own; the proof names the rewrite explicitly rather than
+relying on its `@[simp]` attribute, because the sibling bridges of `CanonicalGames` do not all
+carry one.  It rewrites *both* sides of the hash equation,
 so the equation it concludes is stated in the game's vocabulary; the remaining conjuncts are
 carried through unchanged and stay in the construction's — the two height bounds, which are
 ledger-placement conditions no game states, and the distinctness, which names
