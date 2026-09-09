@@ -17,23 +17,32 @@ restated from the theorems.
 
 No collision is exhibitable under an approved instantiation, so the extraction canaries run over a
 toy primitive bundle whose `Thash` folds its input with a two-bit shift and drops the low bit of
-every child, then exclusive-ors a per-address tweak.  Three properties of that bundle carry the
-canaries: it collides readily, it is *order sensitive*, so a witness stated with its two children
-swapped fails by evaluation, and it is *address sensitive*, so a witness stated at a neighbouring
-node or at a neighbouring leaf's WOTS address fails too.  The witness lemmas are stated for an
-arbitrary `Primitives` bundle, so this is in scope; it is a falsifiability fixture, not a claim
-about any approved profile.
+every child, then exclusive-ors a per-address tweak.  Four properties of that bundle carry the
+canaries: it collides readily; its four honest leaf images are pairwise distinct, so no two leaves
+share an honest partner; it is *order sensitive*, so a witness stated with its two children swapped
+fails by evaluation; and it is *address sensitive*, so a witness stated at a neighbouring node or
+at a neighbouring leaf's WOTS+ address fails too.  `checkToyBundle` asserts all four, in five
+checks.  The witness lemmas are stated for an arbitrary `Primitives` bundle, so this is in scope;
+it is a falsifiability fixture, not a claim about any approved profile.
 
 Over that bundle the checks build honest XMSS key material for a tree of height two — four WOTS+
-leaves, `w = 16`, `len = 4` — and five signatures at leaf `3` on a forged message, four of which
-recover the honest XMSS root.  They confirm that the extractor returns, respectively, the
-`H`-collision at height one, the `H`-collision at the tree height `h' = 2`, the `T_len` second
-preimage at the opened leaf, the `F`-preimage at a chain step, and the `F`-collision at a chain
-step, each satisfying its equation by evaluation — including the four identifications the games
-need: that the `H` partner is the honest child pair at the node named, that its two children are
-taken left to right rather than opened-leaf first, that the node index is the *ancestor* index
-`idx / 2 ^ z` rather than the leaf index, and that the WOTS+ partners are the honest key material
-at the opened leaf on the *honest* message rather than at a neighbouring leaf or on the forged one.
+leaves, `w = 16`, `len = 4` — and five named signatures at leaf `3` on a forged message, four of
+which recover the honest XMSS root.  `nodeForgery` yields the `H`-collision at height one,
+`rootForgery` the `H`-collision at the tree height `h' = 2`, `tlForgery` the `T_len` second
+preimage at the opened leaf, `chainForgery` the `F`-collision at a chain step, and `badForgery`
+nothing at all.  A sixth signature, the honest one on the forged message, is built inside
+`checkPreimage` and yields the `F`-preimage at a chain step.  Each returned witness is checked
+against its equation by evaluation.
+
+Seven identifications are separated along the way: that the `H` partner is the honest child pair at
+the node named; that its two children are taken left to right rather than opened-leaf first; that
+the node index is the *ancestor* index `idx / 2 ^ z` rather than the leaf index; that the
+`F`-preimage address is one below the honest digit rather than at it; that the WOTS+ partners are
+read off the honest signature on the *honest* message rather than on the forged one; that the
+`F`-collision partner is the honest revealed value *advanced* to the named step rather than that
+value itself; and that both chain equations are read at the opened leaf's WOTS+ address rather than
+a neighbouring leaf's.
+
 Two negative canaries close the other direction: the honest signature yields no `H`-collision and
 falls through to the WOTS+ branch, and a signature whose recovered leaf differs while its climb
 misses the honest root yields no witness at all.
@@ -311,12 +320,12 @@ def extract (sig : XmssSig toyParams toyPrimitives) :
 
 /-! ## The bundle behaves as advertised -/
 
-/-- The five bundle properties the canaries below lean on.  `F` drops the low bit of its input and
-adds the address tweak.  The four honest leaf images are pairwise distinct, so no two leaves share
-an honest partner.  `H` is order sensitive at the node the collision canary names.  The tweak
-separates that node's address from the one at the same height with the leaf index as its index, and
-from the one a height up.  And the tweak separates the opened leaf's WOTS+ chain address from a
-neighbouring leaf's. -/
+/-- The five checks that assert the four bundle properties the canaries below lean on.  `F` drops
+the low bit of its input and adds the address tweak.  The four honest leaf images are pairwise
+distinct, so no two leaves share an honest partner.  `H` is order sensitive at the node the
+collision canary names.  The tweak separates that node's address from the one at the same height
+with the leaf index as its index, and from the one a height up.  And the tweak separates the
+opened leaf's WOTS+ chain address from a neighbouring leaf's. -/
 def checkToyBundle : IO Unit := do
   ensure "F drops the low bit and adds the address tweak"
     ((List.range 256).all fun x =>

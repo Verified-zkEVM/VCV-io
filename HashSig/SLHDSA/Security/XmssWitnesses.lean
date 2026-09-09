@@ -41,10 +41,15 @@ witness attacks — the honest child pair at a `TREE` node, the honest WOTS+ cha
 leaf, the honest WOTS+ signature at that leaf on the honest message — is a function of the honest
 tree, and the honest tree is what `sk` generates.
 
-The *transcript-transport* statements are about a role ledger over a `ValidatedParams`.  The
-membership lemma takes a layer position and a node height; the encoded-distinctness lemma takes a
+The three *transcript-transport* statements are about the role ledgers of a `ValidatedParams`.
+`wotsLeafAdrs_eq_wotsInstanceAdrs` takes a layer position alone and states no membership: it
+identifies the address an XMSS witness names with the one a slice-1 ledger is indexed by, which is
+what lets the WOTS+ ledger lemmas apply unchanged.  `mem_xmssNodeAddresses_of_leaf` takes a layer
+position, a node height and that height's two bounds.  `xmssNodeAdrsKey_injective` takes a
 primitive bundle, an `EncodedTargetLedgerConditions`, and two coordinate tuples with their own
-range hypotheses.  Neither mentions a signature or a secret seed.  Nothing here constructs an
+range hypotheses; the tuples are implicit arguments rather than bound by a lambda, so they are free
+in the statement.  None of the three mentions a signature or a secret seed.  Nothing here
+constructs an
 adversary, states an advantage, performs a game hop, or claims that any honest execution queried
 the honest value a witness attacks.  In particular a witness lemma is **not** a reduction: that the
 game's target was committed before the forgery was seen is a simulation-fidelity obligation of the
@@ -115,8 +120,9 @@ flags is a conjunction this module reproduces exactly.
   `R_SMDTTCRCTRH_EUFNAGCMA`'s forge, whose predicate is literally those two conjuncts and whose
   collision extraction runs to `:2711`.
 * `valid_TCRPKCO` (`:3270-3271`) asks that the layer's recovered leaf equal the honest one *and*
-  its recovered chain-end vector differ.  That is `wotsPkFromSig_cases`' first disjunct verbatim,
-  which is the `T_len` branch, and it needs no hypothesis of this module's.
+  its recovered chain-end vector differ.  That is `wotsPkFromSig_cases`' first disjunct, which is
+  the `T_len` branch, with the leaf equality written out as the equality of the two `T_len` images
+  and the two conjuncts in the other order.  It needs no hypothesis of this module's.
 * `valid_WOTSTWES` (`:3268-3269`) asks that the layer's recovered chain-end vector equal the
   honest one *and* the message signed at that layer differ.  Since the leaf is the compression of
   the chain ends, the first conjunct implies the leaf agrees too, so this is the remaining case
@@ -125,9 +131,10 @@ flags is a conjunction this module reproduces exactly.
   `nhchwcoll_hchwpre` (`:1299`), between the predicates `is_chwcoll` (`:595`) and `is_chwpre`
   (`:640`), and `WotsWitness` carries that resolution in its constructors.
 
-So the correspondence at a fixed layer is one-to-one on the first two flags and two-to-one on the
-third, and strict in neither direction.  What the source has and this module does not is the layer
-walk: each flag is an existential over `0 ≤ i < d`, and nothing here chooses a layer.
+So at a fixed layer, and for `valid_TCRTRH` under the root hypothesis its first conjunct supplies,
+the correspondence is one-to-one on the first two flags and two-to-one on the third, and strict in
+neither direction.  What the source has and this module does not is the layer walk: each flag is an
+existential over `0 ≤ i < d`, and nothing here chooses a layer.
 
 `MultiExtractability` is deliberately not imported, for the reason
 `HashSig.SLHDSA.Security.ForsWitnesses` gives: it is a probabilistic shared-ROM game over
@@ -143,8 +150,9 @@ type code (`type_of_mem_xmssNodeAddresses`), so — unlike the FORS `H` case, wh
 word alone — the `0 < z` bound an `hCollision` witness carries is *not* what keeps it out of
 another role's ledger.  It is load-bearing for two other reasons: `xmssNodeAddresses` lists only
 the coordinates of `perfectInternalCoords h'`, which start at height one, so `0 < z` is what places
-the address in the ledger at all; and `xmssHonestChildren`'s `z - 1` would truncate at zero, naming
-the leaf level twice.  A height-zero `TREE` address is unlisted rather than misattributed: the leaf
+the address in the ledger at all; and `xmssHonestChildren`'s `z - 1` would truncate at zero, so
+that at `z = 0` it would name the children of the height-one node instead of anything at height
+zero.  A height-zero `TREE` address is unlisted rather than misattributed: the leaf
 of an XMSS tree is a WOTS+ public key, addressed by `wotsPkAdrs (wotsLeafAdrs adrs idx)` under the
 `WOTS_PK` type code, and never by `xmssNodeAdrs adrs 0 idx`.
 
