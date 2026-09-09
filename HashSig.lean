@@ -45,6 +45,7 @@ public import HashSig.SLHDSA.Security.CanonicalGames
 public import HashSig.SLHDSA.Security.ComponentTraces
 public import HashSig.SLHDSA.Security.EncodedTargets
 public import HashSig.SLHDSA.Security.ForsWitnesses
+public import HashSig.SLHDSA.Security.HmsgWitnesses
 public import HashSig.SLHDSA.Security.HypertreeWitnesses
 public import HashSig.SLHDSA.Security.ReachableTargets
 public import HashSig.SLHDSA.Security.SchemeWitnesses
