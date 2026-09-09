@@ -28,8 +28,9 @@ Over that bundle the checks build honest FORS key material at a two-tree profile
 three forgeries that all recover the honest FORS public key, and confirm that the extractor
 returns the `H`-collision, the `F`-preimage, and the `T_k` second preimage respectively, each
 satisfying its equation by evaluation — including the two identifications the games need, that the
-collision partner is the honest child pair at the node named, in left-to-right order, and that
-both branches name the *global* FORS leaf index rather than the tree-local one.  Two negative
+collision partner is the honest child pair at the node named, taken left to right rather than
+opened-leaf first, and that both branches name the *global* FORS leaf index rather than the
+tree-local one.  Two negative
 canaries close the other direction: an honest signature yields no collision at any tree, and a
 forgery whose recovered public key differs yields a `T_k` witness that fails its own validity
 check — which is exactly why `findForsWitness_sound` carries the public-key hypothesis.
@@ -128,12 +129,14 @@ def baseAdrs : Adrs :=
 /-! ## The digest
 
 One byte, `0x90`, whose two base-`4` digits are `2` and `1`: tree `0` opens its local leaf `2`,
-global index `2`, and tree `1` opens its local leaf `1`, global index `5`.  Global index `5` is
-odd, so tree `1`'s opened leaf is the **right** child of its parent — which is what gives the
-canaries below any power to tell the honest child pair, in left-to-right order, apart from the
-climb's own `(sibling, recovered)` path order.  It is also the one index at which the tree-local
-and global numberings differ, which is what lets them reject a witness stated at the local
-index. -/
+global index `2`, and tree `1` opens its local leaf `1`, global index `5`.
+
+Two properties of global index `5` give the canaries below their power.  It is **odd**, so the
+opened leaf is the *second* child of its parent and the honest child pair, taken left to right, is
+`(leaf 4, leaf 5)` — not the `(opened leaf, sibling)` pair a partner keyed on the opened leaf
+would name.  At an even index those two coincide and the swap canary would be blind.  And it lies
+in the **second** tree, where the global FORS numbering and tree `1`'s local numbering differ, so
+a witness stated at the local index `1` names a different address and different honest values. -/
 def digest : List Byte := [0x90]
 
 example : forsIdx toyParams digest 0 = 2 := by decide
@@ -294,9 +297,10 @@ drops, so the parent at height one is unchanged and the extractor returns the co
 between the honest child pair `(leaf 4, leaf 5)` and the forged pair `(leaf 4, forged leaf 5)`.
 
 The node is `(height 1, global index 2)`.  Tree `1`'s local numbering would call it
-`(height 1, index 0)`, and the opened leaf is the node's *right* child, so this one fixture
-separates the global index from the local one and the honest left-to-right child order from the
-climb's own `(sibling, recovered)` order.  The last three checks guard exactly that. -/
+`(height 1, index 0)`, and the opened leaf `5` is the node's *right* child, so the honest pair
+taken left to right is `(leaf 4, leaf 5)` rather than the opened-leaf-first `(leaf 5, leaf 4)`.
+This one fixture therefore separates the global node index from the local one and the honest child
+order from the opened-leaf-first one; the last three checks guard exactly that. -/
 def checkTreeCollision : IO Unit := do
   let witness := extractTree collisionForgery ⟨1, by decide⟩
   ensure "tree 1 yields an H-collision at height 1"
@@ -424,6 +428,8 @@ def checkFabricatedWitnesses : IO Unit := do
     (witnessHolds (.hCollision two 3 genuinePair) == false)
   ensure "the genuine collision with its two children swapped is rejected"
     (witnessHolds (.hCollision two 1 (genuinePair.2, genuinePair.1)) == false)
+  ensure "the honest child pair is not the opened-leaf-first pair"
+    (honestChildPair 1 (globalLeaf 1 / 2) != (honestLeaf 5, honestLeaf 4))
   ensure "the genuine tree-1 preimage is accepted"
     (witnessHolds (.fPreimage two (node (toySecret (globalLeaf 1)))))
   ensure "a fabricated preimage of the wrong value is rejected"
