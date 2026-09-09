@@ -31,17 +31,17 @@ extractor pair (`findWotsWitness_isSome`, `findWotsWitness_sound`), whose three 
 Every *deterministic-inclusion* statement below has its free objects drawn from a parameter record
 or a primitive bundle over one, seeds, a structural address, natural-number indices, messages, and
 signature or witness data, together with the structural side conditions their proofs need: the
-`p.Valid` and `prims.core.ByteLaws` arguments of the two statements that invoke the WOTS+
-extractor's *completeness* lemma, `xmssPkFromSig_forgeryCases` and `findXmssWitness_isSome` — five
-declarations invoke the extractor itself, but `findWotsWitness_isSome` is what takes those two and
-`findWotsWitness_sound` takes neither — the `DecidableEq prims.Y` instance the extractor here and
-its four lemmas take, and the `SampleableType prims.PkSeed` instance on the game-shape bridge.
-Not all of them mention all of those.  Seven of the fifteen mention an `XmssSigCore` —
+`p.Valid` and `prims.core.ByteLaws` arguments of the two declarations whose *proofs* invoke the
+WOTS+ extractor's *completeness* lemma, `xmssPkFromSig_forgeryCases` and `findXmssWitness_isSome`
+— five declarations invoke the extractor itself, but `findWotsWitness_isSome` is what takes those
+two and `findWotsWitness_sound` takes neither — the `DecidableEq prims.Y` instance the extractor
+here and its five lemmas take, and the `SampleableType prims.PkSeed` instance on the game-shape
+bridge.  Not all of them mention all of those.  Eight of the sixteen mention an `XmssSigCore` —
 `xmssPkFromSig_cases`, `xmssPkFromSig_forgeryCases`, `findXmssWitness`, its two shape equations and
-its two lemmas — and the other eight do not.  Of those eight only the game-shape bridge names a
+its three lemmas — and the other eight do not.  Of those eight only the game-shape bridge names a
 game at all, and what it names is a `Problem` record, never an experiment or an advantage.
 
-The honest secret seed is not confined to one lemma: thirteen of the fifteen take one, the two
+The honest secret seed is not confined to one lemma: fourteen of the sixteen take one, the two
 exceptions being `xmssNodeIndex_lt`, which is arithmetic on the leaf index, and the `XmssWitness`
 inductive, which carries no honest object at all.  That is because every honest partner an XMSS
 witness attacks — the honest child pair at a `TREE` node, the honest WOTS+ chain ends at the opened
@@ -80,11 +80,11 @@ data:
 * `XmssWitness`, `XmssWitness.Valid` and its two unfolding equations
   `XmssWitness.valid_hCollision`, `XmssWitness.valid_wots`;
 * `findXmssWitness`, `findXmssWitness_eq_wots_of_leaf`, `findXmssWitness_eq_node_of_leaf_ne`,
-  `findXmssWitness_sound`, `findXmssWitness_isSome`;
+  `findXmssWitness_sound_of_leaf`, `findXmssWitness_sound`, `findXmssWitness_isSome`;
 * the game-shape bridge `xmssWitness_valid_hCollision_eval`.
 
-These fifteen and the three below are the module's whole interface: eighteen declarations in all,
-of which fourteen are theorems, three are `def`s and one is an inductive.  There is no private
+These sixteen and the three below are the module's whole interface: nineteen declarations in all,
+of which fifteen are theorems, three are `def`s and one is an inductive.  There is no private
 declaration.
 
 *Transcript transport* — a statement about a role ledger of `HashSig.SLHDSA.Security`:
@@ -417,10 +417,13 @@ first differ under an equal parent, so a `some` already implies the root match. 
 leaf the *honest* one — an authentication path that misses the honest tree above a correctly
 recovered leaf — the WOTS+ branch is taken, and whatever it returns there is valid all the same,
 because its guard is the leaf test and that test is already `findWotsWitness_sound`'s own
-hypothesis.  That says nothing about whether it returns anything: existence on this branch is
-`findXmssWitness_isSome`'s, and what buys it there is `hne : msg ≠ msg'` together with the
-validated parameters and the byte laws — never the root.  At `msg = msg'` every chain's two step
-counts agree, so the search can run out and give `none` however the climb went.
+hypothesis.  That is `findXmssWitness_sound_of_leaf` below, whose only hypothesis is the leaf test:
+a caller holding a leaf match and no root match cites it rather than reproving it.  It says nothing
+about whether anything is returned: existence on this branch is `findXmssWitness_isSome`'s, and what
+buys it there is `hne : msg ≠ msg'` together with the validated parameters and the byte laws —
+never the root, as that theorem's proof shows, though no statement here isolates the existence half.
+At `msg = msg'` every chain's two step counts agree, so the search can run out and give `none`
+however the climb went.
 
 Over a 768-case sweep at the toy bundle of `HashSigTest.SLHDSA.XmssWitnesses` — sixteen chain-`3`
 perturbations by three authentication-path choices, level `0`, level `1` or none, by sixteen path
@@ -471,15 +474,46 @@ theorem findXmssWitness_eq_node_of_leaf_ne (prims : Primitives p) [DecidableEq p
         sig.auth.toList).map fun w => .hCollision w.1 w.2.2 := by
   rw [findXmssWitness]; simp only [hleaf, if_false]
 
+/-- **Extractor soundness on the WOTS+ branch, without the root.**  When the recovered leaf is the
+honest one — the test `findXmssWitness` performs itself — whatever the extractor returns satisfies
+`XmssWitness.Valid` against the honest XMSS tree at `adrs`, the opened leaf `idx` and the honest
+message `msg'`.  The leaf test is the only hypothesis: no root match, no leaf bound `hidx`, no
+message distinctness, no `p.Valid` and no `ByteLaws`.  It is what reaches `findWotsWitness_sound`'s
+public-key hypothesis, through `wotsPkFromSig_wotsSign`.
+
+This is the half of `findXmssWitness_sound` that survives a root mismatch, and that theorem's WOTS+
+branch is this lemma applied.  A caller holding a leaf match and no root match — an authentication
+path that misses the honest tree above a correctly recovered leaf, which is what `authForgery` of
+`HashSigTest.SLHDSA.XmssWitnesses` is — has no root hypothesis to supply and needs none.  Nothing
+here says anything is returned; existence is `findXmssWitness_isSome`'s and needs `hne`.
+
+*Deterministic inclusion.* -/
+theorem findXmssWitness_sound_of_leaf (prims : Primitives p) [DecidableEq prims.Y] (idx : ℕ)
+    (sig : XmssSig p prims) (msg msg' : prims.Y) (sk : prims.SkSeed) (pk : prims.PkSeed)
+    (adrs : Adrs)
+    (hleaf : xmssLeaf prims sk pk adrs idx =
+      wotsPkFromSig prims sig.wots msg pk (wotsLeafAdrs adrs idx))
+    {w : XmssWitness p prims} (hw : findXmssWitness prims idx sig msg msg' sk pk adrs = some w) :
+    w.Valid sk pk adrs idx msg' := by
+  rw [findXmssWitness_eq_wots_of_leaf prims idx sig msg msg' sk pk adrs hleaf,
+    Option.map_eq_some_iff] at hw
+  obtain ⟨u, hu, rfl⟩ := hw
+  rw [xmssLeaf_eq_wotsPkGen] at hleaf
+  have hsound := findWotsWitness_sound prims sig.wots msg
+    (wotsSign prims msg' sk pk (wotsLeafAdrs adrs idx)) msg' pk (wotsLeafAdrs adrs idx)
+    (by rw [← hleaf, wotsPkFromSig_wotsSign]) hu
+  rw [XmssWitness.valid_wots]
+  rwa [wotsPkFromSigTops_wotsSign] at hsound
+
 /-- **Extractor soundness.**  The witness `findXmssWitness` returns satisfies `XmssWitness.Valid`
 against the honest XMSS tree at `adrs`, the opened leaf `idx` and the honest message `msg'`.
 
 The root hypothesis is used only by the Merkle branch, where
 `PerfectMerkleTree.findCollision_oriented` needs it to identify the first pair returned with the
-honest child pair at the node named; the WOTS+ branch is guarded by the leaf test the extractor
-performs itself, and reaches `findWotsWitness_sound`'s public-key hypothesis from that test alone.
-The leaf bound `hidx` is likewise used only by the Merkle branch, to place the opened leaf inside
-the honest tree.
+honest child pair at the node named; the WOTS+ branch is `findXmssWitness_sound_of_leaf`, which
+this proof calls and which takes neither the root hypothesis nor the leaf bound, being guarded by
+the leaf test the extractor performs itself.  The leaf bound `hidx` is likewise used only by the
+Merkle branch, to place the opened leaf inside the honest tree.
 
 `findCollision` looks unconditionally oriented — it reads its first pair off the honest tree, and
 `findCollision_sound` already pins the address to `idx / 2 ^ h` without a root hypothesis — but
@@ -500,19 +534,11 @@ theorem findXmssWitness_sound (prims : Primitives p) [DecidableEq prims.Y] (idx 
     (hroot : xmssPkFromSig prims idx sig msg pk adrs = xmssRoot prims sk pk adrs)
     {w : XmssWitness p prims} (hw : findXmssWitness prims idx sig msg msg' sk pk adrs = some w) :
     w.Valid sk pk adrs idx msg' := by
-  rw [findXmssWitness] at hw
-  split at hw
-  · rename_i hleaf
-    rw [Option.map_eq_some_iff] at hw
-    obtain ⟨u, hu, rfl⟩ := hw
-    rw [xmssLeaf_eq_wotsPkGen] at hleaf
-    have hsound := findWotsWitness_sound prims sig.wots msg
-      (wotsSign prims msg' sk pk (wotsLeafAdrs adrs idx)) msg' pk (wotsLeafAdrs adrs idx)
-      (by rw [← hleaf, wotsPkFromSig_wotsSign]) hu
-    rw [XmssWitness.valid_wots]
-    rwa [wotsPkFromSigTops_wotsSign] at hsound
-  · rename_i hleaf
-    rw [Option.map_eq_some_iff] at hw
+  by_cases hleaf : xmssLeaf prims sk pk adrs idx =
+      wotsPkFromSig prims sig.wots msg pk (wotsLeafAdrs adrs idx)
+  · exact findXmssWitness_sound_of_leaf prims idx sig msg msg' sk pk adrs hleaf hw
+  · rw [findXmssWitness_eq_node_of_leaf_ne prims idx sig msg msg' sk pk adrs hleaf,
+      Option.map_eq_some_iff] at hw
     obtain ⟨u, hu, rfl⟩ := hw
     have hlen : sig.auth.toList.length = p.hp := by simp
     have hclimb : PerfectMerkleTree.climb (xmssNodeHash prims pk adrs) idx
