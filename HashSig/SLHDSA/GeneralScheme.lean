@@ -69,18 +69,6 @@ def verifyInternalM (vp : ValidatedParams) (core : CorePrimitives vp.params)
 
 /-! ## Naturality -/
 
-private theorem queryHom_hmsg {p : Params} (core : CorePrimitives p)
-    {m n : Type → Type*} [Monad m] [Monad n]
-    [HasQuery (publicHashSpec core) m] [HasQuery (publicHashSpec core) n]
-    (F : HasQuery.QueryHom (publicHashSpec core) m n)
-    (r : core.Y) (pkSeed : core.PkSeed) (pkRoot : core.Y) (msg : List Byte) :
-    F.toMonadHom (PublicHash.hmsg core r pkSeed pkRoot msg) =
-      PublicHash.hmsg core r pkSeed pkRoot msg := by
-  change F.toMonadHom
-      (query (spec := publicHashSpec core) (.hmsg r pkSeed pkRoot msg)) =
-    query (spec := publicHashSpec core) (.hmsg r pkSeed pkRoot msg)
-  exact HasQuery.map_query F _
-
 /-- Query-preserving monad morphisms commute with general internal key generation. -/
 theorem keygenInternalM_natural (vp : ValidatedParams) (core : CorePrimitives vp.params)
     {m n : Type → Type*} [Monad m] [LawfulMonad m] [Monad n] [LawfulMonad n]
@@ -99,7 +87,7 @@ theorem signInternalM_natural (vp : ValidatedParams) (core : CorePrimitives vp.p
     (msg : List Byte) (sk : SecretKeyCore core) (addrnd : core.Y) :
     F.toMonadHom (signInternalM vp core msg sk addrnd) =
       signInternalM vp core msg sk addrnd := by
-  simp [signInternalM, queryHom_hmsg core F, forsSignM_natural core F,
+  simp [signInternalM, PublicHash.hmsg_natural core F, forsSignM_natural core F,
     forsPkFromSigM_natural core F, GeneralHypertree.signM_natural vp core F]
 
 /-- Query-preserving monad morphisms commute with general internal verification. -/
@@ -111,7 +99,7 @@ theorem verifyInternalM_natural (vp : ValidatedParams) (core : CorePrimitives vp
     (msg : List Byte) (sig : SignatureCore vp core) (pk : PublicKeyCore core) :
     F.toMonadHom (verifyInternalM vp core msg sig pk) =
       verifyInternalM vp core msg sig pk := by
-  simp [verifyInternalM, queryHom_hmsg core F, forsPkFromSigM_natural core F,
+  simp [verifyInternalM, PublicHash.hmsg_natural core F, forsPkFromSigM_natural core F,
     GeneralHypertree.verifyM_natural vp core F]
 
 /-! ## Fixed-answer completeness -/

@@ -143,19 +143,6 @@ def slhVerifyInternal (prims : Primitives p) [DecidableEq prims.Y] (msg : List B
 
 /-! ### Naturality -/
 
-private theorem queryHom_hmsg (core : CorePrimitives p)
-    {m n : Type → Type*} [Monad m] [LawfulMonad m]
-    [Monad n] [LawfulMonad n] [HasQuery (publicHashSpec core) m]
-    [HasQuery (publicHashSpec core) n]
-    (F : HasQuery.QueryHom (publicHashSpec core) m n)
-    (r : core.Y) (pkSeed : core.PkSeed) (pkRoot : core.Y) (msg : List Byte) :
-    F.toMonadHom (PublicHash.hmsg core r pkSeed pkRoot msg) =
-      PublicHash.hmsg core r pkSeed pkRoot msg := by
-  change F.toMonadHom
-      (query (spec := publicHashSpec core) (.hmsg r pkSeed pkRoot msg)) =
-    query (spec := publicHashSpec core) (.hmsg r pkSeed pkRoot msg)
-  exact HasQuery.map_query F _
-
 /-- Query-preserving monad morphisms commute with depth-one internal key generation. -/
 theorem slhKeygenInternalM_natural (core : CorePrimitives p)
     {m n : Type → Type*} [Monad m] [LawfulMonad m]
@@ -176,7 +163,7 @@ theorem slhSignInternalM_natural (core : CorePrimitives p)
     (msg : List Byte) (sk : SecretKeyCore core) (addrnd : core.Y) :
     F.toMonadHom (slhSignInternalM hd core msg sk addrnd) =
       slhSignInternalM hd core msg sk addrnd := by
-  simp [slhSignInternalM, queryHom_hmsg core F,
+  simp [slhSignInternalM, PublicHash.hmsg_natural core F,
     forsSignM_natural core F, forsPkFromSigM_natural core F, htSignM_natural core hd F]
 
 /-- Query-preserving monad morphisms commute with depth-one internal verification. -/
@@ -188,7 +175,7 @@ theorem slhVerifyInternalM_natural (core : CorePrimitives p)
     (msg : List Byte) (sig : SignatureCore p core) (pk : PublicKeyCore core) :
     F.toMonadHom (slhVerifyInternalM hd core msg sig pk) =
       slhVerifyInternalM hd core msg sig pk := by
-  simp [slhVerifyInternalM, queryHom_hmsg core F,
+  simp [slhVerifyInternalM, PublicHash.hmsg_natural core F,
     forsPkFromSigM_natural core F, htVerifyM_natural core hd F]
 
 /-! ### Structural query bounds -/
@@ -212,13 +199,6 @@ WOTS+ chain budget plus the `h'`-step XMSS authentication path. -/
 def slhVerifyInternalQueryBound (p : Params) : ℕ :=
   1 + (p.k * (p.a + 1) + 1) + (p.len * (p.w - 1) + 1 + p.hp)
 
-private theorem publicHash_hmsg_isTotalQueryBound_one (core : CorePrimitives p)
-    (r : core.Y) (pkSeed : core.PkSeed) (pkRoot : core.Y) (msg : List Byte) :
-    IsTotalQueryBound
-      (PublicHash.hmsg core r pkSeed pkRoot msg :
-        OracleComp (publicHashSpec core) (Bytes p.m)) 1 := by
-  simp [PublicHash.hmsg, IsTotalQueryBound]
-
 /-- Internal key generation inherits the complete hypertree-root budget. -/
 theorem slhKeygenInternalM_isTotalQueryBound (core : CorePrimitives p)
     (skSeed : core.SkSeed) (skPrf : core.SkPrf) (pkSeed : core.PkSeed) :
@@ -241,15 +221,7 @@ private theorem htSignM_isTotalQueryBound_coarse (core : CorePrimitives p)
         OracleComp (publicHashSpec core) (HtSigCore p core))
       (p.len * (p.w - 1) + xmssAuthPathQueryBound p p.hp) := by
   apply (htSignM_isTotalQueryBound core hd msg sk pk adrs idxTree idxLeaf).mono
-  have hsum :
-      (∑ i : Fin p.len, chainStepsCore core msg i.val) ≤ p.len * (p.w - 1) := by
-    calc
-      (∑ i : Fin p.len, chainStepsCore core msg i.val) ≤
-          ∑ _ : Fin p.len, (p.w - 1) := by
-            apply Finset.sum_le_sum
-            intro i hi
-            exact chainStepsCore_le core msg i.val
-      _ = p.len * (p.w - 1) := by simp
+  have hsum := sum_chainStepsCore_le core msg
   omega
 
 /-- Internal signing follows and bounds the whole FIPS 205 Algorithm 19 public-hash schedule:
@@ -264,7 +236,7 @@ theorem slhSignInternalM_isTotalQueryBound (core : CorePrimitives p)
       (slhSignInternalQueryBound p) := by
   let R := core.PRFmsg sk.skPrf addrnd msg
   have hbound := isTotalQueryBound_bind
-    (publicHash_hmsg_isTotalQueryBound_one core R sk.pkSeed sk.pkRoot msg) fun digest =>
+    (PublicHash.hmsg_isTotalQueryBound core R sk.pkSeed sk.pkRoot msg) fun digest =>
       let parts := splitDigest p digest
       isTotalQueryBound_bind
         (forsSignM_then_forsPkFromSigM_isTotalQueryBound
@@ -306,7 +278,7 @@ theorem slhVerifyInternalM_isTotalQueryBound (core : CorePrimitives p) [Decidabl
       (slhVerifyInternalM hd core msg sig pk : OracleComp (publicHashSpec core) Bool)
       (slhVerifyInternalQueryBound p) := by
   have hbound := isTotalQueryBound_bind
-    (publicHash_hmsg_isTotalQueryBound_one core sig.randomness pk.pkSeed pk.pkRoot msg)
+    (PublicHash.hmsg_isTotalQueryBound core sig.randomness pk.pkSeed pk.pkRoot msg)
       fun digest =>
       let parts := splitDigest p digest
       isTotalQueryBound_bind

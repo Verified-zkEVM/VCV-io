@@ -349,45 +349,6 @@ theorem forsPkFromSigWith_natural {m n : Type → Type*} [Monad m] [LawfulMonad 
       (fun z t l r => forsNodeHashWith_natural F nodeHashm nodeHashn hnode adrs z t l r) _ _ _
   simp [forsPkFromSigWith, F.mmap_bind, hroots, hcompress]
 
-private theorem queryHom_f (core : CorePrimitives p) {m n : Type → Type*}
-    [Monad m] [Monad n] [HasQuery (publicHashSpec core) m]
-    [HasQuery (publicHashSpec core) n]
-    (F : HasQuery.QueryHom (publicHashSpec core) m n) (pk : core.PkSeed) :
-    ∀ a y, F.toMonadHom (PublicHash.f core pk a y) = PublicHash.f core pk a y := by
-  intro a y
-  change F.toMonadHom
-      (query (spec := publicHashSpec core)
-        (PublicHashQuery.thash pk (core.adrsToKey a) [y])) =
-    query (spec := publicHashSpec core)
-      (PublicHashQuery.thash pk (core.adrsToKey a) [y])
-  exact HasQuery.map_query F _
-
-private theorem queryHom_h (core : CorePrimitives p) {m n : Type → Type*}
-    [Monad m] [Monad n] [HasQuery (publicHashSpec core) m]
-    [HasQuery (publicHashSpec core) n]
-    (F : HasQuery.QueryHom (publicHashSpec core) m n) (pk : core.PkSeed) :
-    ∀ a l r, F.toMonadHom (PublicHash.h core pk a l r) = PublicHash.h core pk a l r := by
-  intro a l r
-  change F.toMonadHom
-      (query (spec := publicHashSpec core)
-        (PublicHashQuery.thash pk (core.adrsToKey a) [l, r])) =
-    query (spec := publicHashSpec core)
-      (PublicHashQuery.thash pk (core.adrsToKey a) [l, r])
-  exact HasQuery.map_query F _
-
-private theorem queryHom_tl (core : CorePrimitives p) {m n : Type → Type*}
-    [Monad m] [Monad n] [HasQuery (publicHashSpec core) m]
-    [HasQuery (publicHashSpec core) n]
-    (F : HasQuery.QueryHom (publicHashSpec core) m n) (pk : core.PkSeed) :
-    ∀ a ys, F.toMonadHom (PublicHash.tl core pk a ys) = PublicHash.tl core pk a ys := by
-  intro a ys
-  change F.toMonadHom
-      (query (spec := publicHashSpec core)
-        (PublicHashQuery.thash pk (core.adrsToKey a) ys)) =
-    query (spec := publicHashSpec core)
-      (PublicHashQuery.thash pk (core.adrsToKey a) ys)
-  exact HasQuery.map_query F _
-
 /-- Query-preserving monad morphisms commute with canonical FORS leaf computation. -/
 theorem forsLeafM_natural (core : CorePrimitives p) {m n : Type → Type*}
     [Monad m] [LawfulMonad m] [Monad n] [LawfulMonad n]
@@ -395,7 +356,7 @@ theorem forsLeafM_natural (core : CorePrimitives p) {m n : Type → Type*}
     (F : HasQuery.QueryHom (publicHashSpec core) m n)
     (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) (t : ℕ) :
     F.toMonadHom (forsLeafM core sk pk adrs t) = forsLeafM core sk pk adrs t :=
-  forsLeafWith_natural F.toMonadHom core _ _ (queryHom_f core F pk) sk pk adrs t
+  forsLeafWith_natural F.toMonadHom core _ _ (PublicHash.f_natural core F pk) sk pk adrs t
 
 /-- Query-preserving monad morphisms commute with canonical FORS internal-node computation. -/
 theorem forsNodeHashM_natural (core : CorePrimitives p) {m n : Type → Type*}
@@ -405,7 +366,7 @@ theorem forsNodeHashM_natural (core : CorePrimitives p) {m n : Type → Type*}
     (pk : core.PkSeed) (adrs : Adrs) (z t : ℕ) (l r : core.Y) :
     F.toMonadHom (forsNodeHashM core pk adrs z t l r) =
       forsNodeHashM core pk adrs z t l r :=
-  forsNodeHashWith_natural F.toMonadHom _ _ (queryHom_h core F pk) adrs z t l r
+  forsNodeHashWith_natural F.toMonadHom _ _ (PublicHash.h_natural core F pk) adrs z t l r
 
 /-- Query-preserving monad morphisms commute with one canonical FORS root computation. -/
 theorem forsRootM_natural (core : CorePrimitives p) {m n : Type → Type*}
@@ -415,7 +376,7 @@ theorem forsRootM_natural (core : CorePrimitives p) {m n : Type → Type*}
     (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) (i : ℕ) :
     F.toMonadHom (forsRootM core sk pk adrs i) = forsRootM core sk pk adrs i :=
   forsRootWith_natural F.toMonadHom core _ _ _ _
-    (queryHom_f core F pk) (queryHom_h core F pk) sk pk adrs i
+    (PublicHash.f_natural core F pk) (PublicHash.h_natural core F pk) sk pk adrs i
 
 /-- Query-preserving monad morphisms commute with canonical FORS public-key generation. -/
 theorem forsPkGenM_natural (core : CorePrimitives p) {m n : Type → Type*}
@@ -425,7 +386,8 @@ theorem forsPkGenM_natural (core : CorePrimitives p) {m n : Type → Type*}
     (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) :
     F.toMonadHom (forsPkGenM core sk pk adrs) = forsPkGenM core sk pk adrs :=
   forsPkGenWith_natural F.toMonadHom core _ _ _ _ _ _
-    (queryHom_f core F pk) (queryHom_h core F pk) (queryHom_tl core F pk) sk pk adrs
+    (PublicHash.f_natural core F pk) (PublicHash.h_natural core F pk)
+    (PublicHash.tl_natural core F pk) sk pk adrs
 
 /-- Query-preserving monad morphisms commute with canonical FORS signing. -/
 theorem forsSignM_natural (core : CorePrimitives p) {m n : Type → Type*}
@@ -435,7 +397,7 @@ theorem forsSignM_natural (core : CorePrimitives p) {m n : Type → Type*}
     (md : List Byte) (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) :
     F.toMonadHom (forsSignM core md sk pk adrs) = forsSignM core md sk pk adrs :=
   forsSignWith_natural F.toMonadHom core _ _ _ _
-    (queryHom_f core F pk) (queryHom_h core F pk) md sk pk adrs
+    (PublicHash.f_natural core F pk) (PublicHash.h_natural core F pk) md sk pk adrs
 
 /-- Query-preserving monad morphisms commute with canonical FORS recovery. -/
 theorem forsPkFromSigM_natural (core : CorePrimitives p) {m n : Type → Type*}
@@ -445,7 +407,8 @@ theorem forsPkFromSigM_natural (core : CorePrimitives p) {m n : Type → Type*}
     (sig : ForsSigCore p core) (md : List Byte) (pk : core.PkSeed) (adrs : Adrs) :
     F.toMonadHom (forsPkFromSigM core sig md pk adrs) = forsPkFromSigM core sig md pk adrs :=
   forsPkFromSigWith_natural F.toMonadHom core _ _ _ _ _ _
-    (queryHom_f core F pk) (queryHom_h core F pk) (queryHom_tl core F pk) sig md adrs
+    (PublicHash.f_natural core F pk) (PublicHash.h_natural core F pk)
+    (PublicHash.tl_natural core F pk) sig md adrs
 
 /-! ### Structural query bounds -/
 
@@ -465,37 +428,19 @@ private theorem isTotalQueryBound_ofFnM {ι α : Type} {spec : OracleSpec ι} {k
       simpa using isTotalQueryBound_bind (n₂ := 0) (h (Fin.last k))
         (fun a => show IsTotalQueryBound (pure (xs.push a) : OracleComp spec _) 0 from trivial)
 
-private theorem publicHash_f_isTotalQueryBound_one (core : CorePrimitives p)
-    (pk : core.PkSeed) (adrs : Adrs) (x : core.Y) :
-    IsTotalQueryBound
-      (PublicHash.f core pk adrs x : OracleComp (publicHashSpec core) core.Y) 1 := by
-  simp [PublicHash.f, IsTotalQueryBound]
-
-private theorem publicHash_h_isTotalQueryBound_one (core : CorePrimitives p)
-    (pk : core.PkSeed) (adrs : Adrs) (l r : core.Y) :
-    IsTotalQueryBound
-      (PublicHash.h core pk adrs l r : OracleComp (publicHashSpec core) core.Y) 1 := by
-  simp [PublicHash.h, IsTotalQueryBound]
-
-private theorem publicHash_tl_isTotalQueryBound_one (core : CorePrimitives p)
-    (pk : core.PkSeed) (adrs : Adrs) (xs : List core.Y) :
-    IsTotalQueryBound
-      (PublicHash.tl core pk adrs xs : OracleComp (publicHashSpec core) core.Y) 1 := by
-  simp [PublicHash.tl, IsTotalQueryBound]
-
 /-- A FORS leaf is one explicit `F` query. -/
 theorem forsLeafM_isTotalQueryBound (core : CorePrimitives p)
     (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) (t : ℕ) :
     IsTotalQueryBound
       (forsLeafM core sk pk adrs t : OracleComp (publicHashSpec core) core.Y) 1 :=
-  publicHash_f_isTotalQueryBound_one core pk _ _
+  PublicHash.f_isTotalQueryBound core pk _ _
 
 /-- A FORS internal node is one explicit `H` query. -/
 theorem forsNodeHashM_isTotalQueryBound (core : CorePrimitives p)
     (pk : core.PkSeed) (adrs : Adrs) (z t : ℕ) (l r : core.Y) :
     IsTotalQueryBound
       (forsNodeHashM core pk adrs z t l r : OracleComp (publicHashSpec core) core.Y) 1 :=
-  publicHash_h_isTotalQueryBound_one core pk _ _ _
+  PublicHash.h_isTotalQueryBound core pk _ _ _
 
 /-- A height-`a` FORS root evaluates all `2^a` leaves and all `2^a - 1` internal nodes. -/
 theorem forsRootM_isTotalQueryBound (core : CorePrimitives p)
@@ -507,8 +452,8 @@ theorem forsRootM_isTotalQueryBound (core : CorePrimitives p)
     (PerfectMerkleTree.isTotalQueryBound_merkleRootM
       (forsLeafWith core (PublicHash.f core pk) sk pk adrs)
       (forsNodeHashWith (PublicHash.h core pk) adrs) 1 1 p.a i
-      (fun t => publicHash_f_isTotalQueryBound_one core pk _ _)
-      (fun z t l r => publicHash_h_isTotalQueryBound_one core pk _ l r))
+      (fun t => PublicHash.f_isTotalQueryBound core pk _ _)
+      (fun z t l r => PublicHash.h_isTotalQueryBound core pk _ l r))
 
 /-- FORS public-key generation computes `k` complete roots, in order, and then makes one `T_k`
 query. -/
@@ -524,7 +469,7 @@ theorem forsPkGenM_isTotalQueryBound (core : CorePrimitives p)
     (fun i => forsRootM_isTotalQueryBound core sk pk adrs i.val)
   simpa [forsPkGenM, forsPkGenWith, forsRootM] using
     isTotalQueryBound_bind hroots fun roots =>
-      publicHash_tl_isTotalQueryBound_one core pk (forsPkAdrs adrs) roots.toList
+      PublicHash.tl_isTotalQueryBound core pk (forsPkAdrs adrs) roots.toList
 
 /-- FORS signing computes only sibling subtrees. Per tree this is exactly `2^a - 1` leaf
 callbacks and `2^a - a - 1` internal-node callbacks; the selected leaf is not hashed. -/
@@ -556,8 +501,8 @@ theorem forsSignM_isTotalQueryBound (core : CorePrimitives p) (md : List Byte)
           (forsLeafWith core (PublicHash.f core pk) sk pk adrs)
           (forsNodeHashWith (PublicHash.h core pk) adrs) 1 1
           (i.val * 2 ^ p.a + forsIdx p md i.val) p.a
-          (fun t => publicHash_f_isTotalQueryBound_one core pk _ _)
-          (fun z t l r => publicHash_h_isTotalQueryBound_one core pk _ l r)
+          (fun t => PublicHash.f_isTotalQueryBound core pk _ _)
+          (fun z t l r => PublicHash.h_isTotalQueryBound core pk _ l r)
       exact isTotalQueryBound_bind (n₂ := 0) hpath
         (fun path => show IsTotalQueryBound
           (pure (ForsTreeSigCore.mk (forsSkGenCore core sk pk adrs
@@ -590,15 +535,15 @@ theorem forsPkFromSigM_isTotalQueryBound (core : CorePrimitives p)
     (fun i => by
       let idx := i.val * 2 ^ p.a + forsIdx p md i.val
       have hbound := isTotalQueryBound_bind
-        (publicHash_f_isTotalQueryBound_one core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk)
+        (PublicHash.f_isTotalQueryBound core pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk)
         (fun leaf => by
           simpa using PerfectMerkleTree.isTotalQueryBound_climbM
             (forsNodeHashWith (PublicHash.h core pk) adrs) 1
             idx leaf (sig[i.val]).auth.toList
-            (fun z t l r => publicHash_h_isTotalQueryBound_one core pk _ l r))
+            (fun z t l r => PublicHash.h_isTotalQueryBound core pk _ l r))
       simpa [idx, Nat.add_comm] using hbound)
   simpa using isTotalQueryBound_bind hroots fun roots =>
-    publicHash_tl_isTotalQueryBound_one core pk (forsPkAdrs adrs) roots.toList
+    PublicHash.tl_isTotalQueryBound core pk (forsPkAdrs adrs) roots.toList
 
 /-- Honest FORS signing followed by recovery stays within the full signing-and-recovery
 schedule.  Signing computes only sibling subtrees; every generated authentication path has

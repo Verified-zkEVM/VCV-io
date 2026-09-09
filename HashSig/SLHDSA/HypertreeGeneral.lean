@@ -210,24 +210,6 @@ def recoverFromPositionM (vp : ValidatedParams) (core : CorePrimitives vp.params
   recoverFromPositionWith vp core (PublicHash.f core pk) (PublicHash.tl core pk)
     (PublicHash.h core pk) pk pos
 
-@[simp]
-private theorem xmssSignWith_publicHash_eq_xmssSignM
-    {p : Params} (core : CorePrimitives p) {m : Type → Type*} [Monad m]
-    [HasQuery (publicHashSpec core) m] (msg : core.Y) (sk : core.SkSeed)
-    (pk : core.PkSeed) (adrs : Adrs) (idx : ℕ) :
-    xmssSignWith core (PublicHash.f core pk) (PublicHash.tl core pk)
-        (PublicHash.h core pk) msg sk pk adrs idx =
-      (xmssSignM core msg sk pk adrs idx : m (XmssSig p core)) := rfl
-
-@[simp]
-private theorem xmssPkFromSigWith_publicHash_eq_xmssPkFromSigM
-    {p : Params} (core : CorePrimitives p) {m : Type → Type*} [Monad m]
-    [HasQuery (publicHashSpec core) m] (idx : ℕ) (sig : XmssSig p core)
-    (msg : core.Y) (pk : core.PkSeed) (adrs : Adrs) :
-    xmssPkFromSigWith core (PublicHash.f core pk) (PublicHash.tl core pk)
-        (PublicHash.h core pk) idx sig msg adrs =
-      (xmssPkFromSigM core idx sig msg pk adrs : m core.Y) := rfl
-
 /-- Canonical explicit-public-hash hypertree signer for arbitrary `d`. -/
 def signM (vp : ValidatedParams) (core : CorePrimitives vp.params)
     {m : Type → Type*} [Monad m] [HasQuery (publicHashSpec core) m]
@@ -374,11 +356,13 @@ theorem signFromPositionM_natural (vp : ValidatedParams) (core : CorePrimitives 
   | zero => simp [signFromPositionM, signFromPositionWith]
   | one =>
       cases recoverFinal <;>
-        simp [signFromPositionM, signFromPositionWith,
-          xmssSignM_natural core F, xmssPkFromSigM_natural core F]
+        simp [signFromPositionM, signFromPositionWith, xmssSignWith_publicHash_eq_xmssSignM,
+          xmssPkFromSigWith_publicHash_eq_xmssPkFromSigM, xmssSignM_natural core F,
+          xmssPkFromSigM_natural core F]
   | more layers _ ih =>
       simp only [signFromPositionM] at ih
-      simp [signFromPositionM, signFromPositionWith, xmssSignM_natural core F,
+      simp [signFromPositionM, signFromPositionWith, xmssSignWith_publicHash_eq_xmssSignM,
+        xmssPkFromSigWith_publicHash_eq_xmssPkFromSigM, xmssSignM_natural core F,
         xmssPkFromSigM_natural core F, ih]
 
 /-- Query-preserving monad morphisms commute with the typed structural recovery loop. -/
@@ -394,11 +378,11 @@ theorem recoverFromPositionM_natural (vp : ValidatedParams) (core : CorePrimitiv
   induction layers using Nat.twoStepInduction generalizing pos msg with
   | zero => simp [recoverFromPositionM, recoverFromPositionWith]
   | one => simp [recoverFromPositionM, recoverFromPositionWith,
-      xmssPkFromSigM_natural core F]
+      xmssPkFromSigWith_publicHash_eq_xmssPkFromSigM, xmssPkFromSigM_natural core F]
   | more layers _ ih =>
       simp only [recoverFromPositionM] at ih
       simp [recoverFromPositionM, recoverFromPositionWith,
-        xmssPkFromSigM_natural core F, ih]
+        xmssPkFromSigWith_publicHash_eq_xmssPkFromSigM, xmssPkFromSigM_natural core F, ih]
 
 /-- Query-preserving monad morphisms commute with arbitrary-`d` hypertree signing. -/
 theorem signM_natural (vp : ValidatedParams) (core : CorePrimitives vp.params)
