@@ -15,8 +15,8 @@ The layer walk: a hypertree signature that recovers the honest public root from 
 must, at one of its `d` layers, present an XMSS signature that recovers the honest XMSS root of
 that layer's tree from a message differing from `honestLayerMsg` there.  That message is the one
 `GeneralHypertree.signFromPosition` signs at that layer, which is `signFromPosition_getElem`; it is
-a statement about the honest signing algorithm, not about any transcript this module sees.  That
-layer's signature is then one XMSS forgery at one named tree address, which
+a statement about the honest structural signing loop, not about any transcript this module sees.
+That layer's signature is then one XMSS forgery at one named tree address, which
 `HashSig.SLHDSA.Security.XmssWitnesses` translates into a witness against `H`, `T_len` or `F`.
 
 ## What is proved, and what is not
@@ -50,24 +50,25 @@ need: the `DigestParts` the layer-zero position is parsed from, which three of t
 `DecidableEq prims.Y` instance the extractor and its four lemmas take; and the
 `prims.core.ByteLaws` argument `findHypertreeWitness_isSome` alone takes, which is what reaches the
 WOTS+ extractor's completeness lemma.  The honest secret seed is taken by fifteen of the
-twenty-six: the honest running message, its three equations and the honest-signer bridge, the walk
-and its two companions, the validity predicate and its unfolding equation, and the extractor and
-its four lemmas.  The eight position-arithmetic declarations, the witness type and the two ledger
-statements do not take one, because none of them names an honest object.  The `p.Valid` argument
+twenty-seven: the honest running message, its three equations and the honest-signer bridge, the
+walk and its two companions, the validity predicate and its unfolding equation, and the extractor
+and its four lemmas.  The other twelve do not take one, because none of them names an honest
+object: the eight position-arithmetic declarations, the witness type and its bound lemma, and the
+two ledger statements.  The `p.Valid` argument
 its predecessors carry is absent throughout: a `ValidatedParams` supplies it.
 
 The declarations are:
 
-* the position arithmetic `LayerPosition.next_congr`, `LayerPosition.advance` and its five
-  equations `advance_zero`, `advance_next`, `advance_layer_val`, `advance_succ` and `advance_ne`,
-  and the bridge `advance_initial_eq_atLayer`;
+* the position arithmetic `LayerPosition.next_congr`, `LayerPosition.advance` with its four
+  equations `advance_zero`, `advance_next`, `advance_layer_val` and `advance_succ` and the
+  separation lemma `advance_ne`, and the bridge `advance_initial_eq_atLayer`;
 * the honest running message `honestLayerMsg` with `honestLayerMsg_zero`, `honestLayerMsg_succ`
-  and `honestLayerMsg_next`, and `signFromPosition_getElem`, which identifies it with what the
-  honest signing algorithm signs;
+  and `honestLayerMsg_next`, and `signFromPosition_getElem`, which identifies it with what
+  `GeneralHypertree.signFromPosition` signs;
 * the walk `recoverFromPosition_binding`, its top-level hypothesis bridge
   `recoverFromPosition_of_pkFromSig`, and its top-level instance `pkFromSig_binding`;
-* `HypertreeWitness`, `HypertreeWitness.Valid` and its unfolding equation
-  `HypertreeWitness.valid_iff`;
+* `HypertreeWitness`, the bound `HypertreeWitness.layer_lt` its `Fin layers` label carries,
+  `HypertreeWitness.Valid` and its unfolding equation `HypertreeWitness.valid_iff`;
 * `findHypertreeWitness`, its two shape equations `findHypertreeWitness_eq_of_root` and
   `findHypertreeWitness_eq_next_of_ne`, and its two lemmas `findHypertreeWitness_sound` and
   `findHypertreeWitness_isSome`.
@@ -77,9 +78,10 @@ The declarations are:
 
 * `layerTreeCoord_advance_ne` is about `LayerTreeCoord`, a slice-1 coordinate, which is what the
   label covers: it separates the tree coordinates two different layers of one walk carry.  It
-  names no ledger and asserts no membership.  It is a sibling of `advance_ne` rather than a
-  corollary — `ofPosition` forgets the leaf, so neither implies the other — and both are read off
-  `advance_layer_val`;
+  names no ledger and asserts no membership.  It is the stronger of the pair it forms with
+  `advance_ne`: `advance_ne` follows from it by `congrArg LayerTreeCoord.ofPosition`, while the
+  step back would need `ofPosition` injective and it is not.  Both are read off
+  `advance_layer_val`, which is how each is proved here;
 * `advance_xmssNodeAdrsKey_injective` is about the encoded tweaks of the `xmssH` ledger.
 
 Four private `Vector` lemmas carry the head-and-tail bookkeeping the two inductions need, and they
@@ -130,9 +132,11 @@ as a proof argument, so rewriting under it needs `next_congr` rather than `rw`.
 ## The layer bound
 
 The bound every statement here carries is `j < layers` against `pos.layer.val + layers = d` —
-equivalently `pos.layer.val + j < d`.  It is the bound the source's recorded targets are guarded
-by: each of the three case flags is an existential over `0 ≤ i < d`, and each reduction picks its
-`i` with a list `find` over that range.
+equivalently `pos.layer.val + j < d`.  The walk's own statements carry it as a hypothesis on a
+bare `ℕ`; a `HypertreeWitness` carries it in its type, its label being a `Fin layers`, and
+`HypertreeWitness.layer_lt` is the one reading of it the rest of the module uses.  It is the bound
+the source's recorded targets are guarded by: each of the three case flags is an existential over
+`0 ≤ i < d`, and each reduction picks its `i` with a list `find` over that range.
 
 All three reductions use the layer the same way while re-walking the trajectory: each rebuilds that
 layer's chain, compression and tree addresses with `set_ltidx ad i tidx`, and each returns an index
@@ -165,9 +169,14 @@ Two things turn on it, and a third does not.
   `advance_ne` does not reach it and the branch needs its own reading of `advance_layer_val`:
   `layerTreeCoord_advance_ne`, composed with `xmssNodeAdrsKey_injective` by
   `advance_xmssNodeAdrsKey_injective`.  Both are restated here.  For the three WOTS+ branches no
-  restatement is needed — `wotsPkAdrsKey_injective` is injective in the `LayerPosition` itself, and
-  `wotsStepAdrsKey_injective` and `wotsOptionalStepAdrsKey_injective` in a `WotsChainCoord`, whose
-  first component is that position — so each contradicts `advance_ne` in one step at the caller.
+  restatement is needed, because each of their injectivity lemmas already concludes an equality
+  the position can be projected out of: `wotsPkAdrsKey_injective` is injective in the
+  `LayerPosition` itself, so it contradicts `advance_ne` directly;
+  `wotsOptionalStepAdrsKey_injective` concludes an equality of `WotsChainCoord`s, whose first
+  component is the position, so it takes one `congrArg Prod.fst` first; and
+  `wotsStepAdrsKey_injective` is injective in a `WotsChainCoord × Fin (w - 1)`, so its conclusion
+  is a pair equality and it takes `congrArg (·.1.1)`.  Each of the three is a projection and a
+  contradiction at the caller, not a lemma this module has to state.
 * It is *not* what keeps a witness inside its own role's ledger, and it is not a height bound.
   The heights an XMSS witness carries are `XmssWitness.Valid`'s, unchanged here.
 
@@ -263,9 +272,16 @@ This is what a consumer holding two hypertree witnesses at two layers of one wal
 branch they took: each of slice 1's four witness ledgers is enumerated over every layer, and each
 of their injectivity lemmas concludes equality of a coordinate whose position component this
 refutes.  It is what the three WOTS+ ledgers need and all they need.  The `xmssH` ledger is
-indexed by a `LayerTreeCoord`, which forgets the leaf, so this does not reach it;
-`layerTreeCoord_advance_ne` is that branch's own reading of `advance_layer_val`, a sibling of this
-one rather than a corollary. -/
+indexed by a `LayerTreeCoord`, which forgets the leaf, so this statement does not reach it —
+`LayerTreeCoord.ofPosition` is not injective, and distinct positions can share a coordinate.
+
+`layerTreeCoord_advance_ne` is that branch's own reading of `advance_layer_val`, and it is the
+stronger of the two: this one follows from it by `congrArg LayerTreeCoord.ofPosition`, because a
+function applied to equal arguments gives equal results, and no injectivity is needed for that
+direction.  Both are kept, each three lines off `advance_layer_val`, because taking the derivation
+would make this piece of position arithmetic depend on a slice-1 coordinate — a *Deterministic
+inclusion* statement resting on a *Transcript transport* one, which is the boundary the labels
+draw. -/
 theorem advance_ne (pos : LayerPosition vp) {j j' : ℕ}
     (hj : pos.layer.val + j < vp.params.d) (hj' : pos.layer.val + j' < vp.params.d)
     (hne : j ≠ j') :
@@ -314,7 +330,8 @@ private theorem tail_insertIdx_zero {X : Type*} {n : ℕ} (rest : Vector X n) (x
 
 /-! ## The honest running message
 
-The message the honest signer signs at each layer of a walk that starts at `pos`. -/
+The message `GeneralHypertree.signFromPosition` signs at each layer of a walk that starts at
+`pos`. -/
 
 /-- The honest message signed at layer `j` of the walk that starts at `pos` with the honest
 message `msg`: `msg` itself at layer zero, and the honest XMSS root of the layer-`(j-1)` tree
@@ -358,9 +375,9 @@ theorem honestLayerMsg_next (vp : ValidatedParams) (prims : Primitives vp.params
   | zero => rw [honestLayerMsg_succ, honestLayerMsg_zero, LayerPosition.advance_zero]
   | succ i => rw [honestLayerMsg_succ, honestLayerMsg_succ, LayerPosition.advance_next]
 
-/-- **The honest running message is what the honest signer signs.**  The layer-`j` component of
-the honest structural signer's output, run from `pos` on `msg`, is `xmssSign` applied to
-`honestLayerMsg … j` at that layer's tree address and leaf.
+/-- **The honest running message is what the honest structural signer signs.**  The layer-`j`
+component of `GeneralHypertree.signFromPosition`'s output, run from `pos` on `msg`, is `xmssSign`
+applied to `honestLayerMsg … j` at that layer's tree address and leaf.
 
 Everything else here calls `honestLayerMsg` the honest partner of a witness.  This is the lemma
 that earns the name: without it the identification is a gloss, and a consumer that wants to say a
@@ -368,6 +385,12 @@ witness attacks material an honest signing query would have revealed has nothing
 `recoverFromPosition_signFromPosition` is the companion statement about where the honest walk
 *ends*; this one is about what it signs at each step, and slice 8's identification of the honest
 WOTS+ partner at a leaf runs through it.
+
+The subject is the pure structural loop, not `GeneralHypertree.sign`, which is that loop under
+`simulateQ (PublicHash.impl prims)`.  The step between them is one rewrite with
+`GeneralHypertree.sign_eq_signFromPosition`, at `recoverFinal = (d == 1)` and the digest-derived
+layer-zero position; it is not composed here, because every statement in this module is about an
+arbitrary starting position and that equation is only about the initial one.
 
 The induction is the same two-step one, generalising the position, the message, the layer index
 and `recoverFinal` — whose value the signer discards, so both branches agree. -/
@@ -499,50 +522,69 @@ honest object it attacks is computed by `HypertreeWitness.Valid` from the honest
 the position the layer names — the honest tree at `(pos.advance layer).toAdrs`, the honest WOTS+
 key material at the leaf `(pos.advance layer).leaf.val` that layer's signature opens, and the
 honest running message `honestLayerMsg` there, which `signFromPosition_getElem` identifies with
-the message the honest signing algorithm signs at that layer.  None of the three is a field. -/
+the message `GeneralHypertree.signFromPosition` signs at that layer.  None of the three is a
+field. -/
 
 /-- A witness against one component hash at one hypertree layer: the layer, and an `XmssWitness`
 at the position that layer names.  The position itself is not carried, because the walk's starting
-position and the layer already fix it; `HypertreeWitness.Valid` recomputes it. -/
-structure HypertreeWitness (vp : ValidatedParams) (prims : Primitives vp.params) where
-  /-- The layer, counted from the walk's starting position. -/
-  layer : ℕ
+position and the layer already fix it; `HypertreeWitness.Valid` recomputes it.
+
+The layer is a `Fin layers`, indexed by the walk length the witness was extracted from, rather than
+a bare `ℕ` with the bound carried as a side condition.  The bound is the same one every statement
+here needs, and putting it in the type is what makes the label mean the count of layers advanced
+rather than an arbitrary numbering: the base case of `findHypertreeWitness` runs at walk length one,
+where `Fin 1` admits only `0`, so no other base label can be written at all. -/
+structure HypertreeWitness (vp : ValidatedParams) (prims : Primitives vp.params) (layers : ℕ) where
+  /-- The layer, counted from the walk's starting position, below the walk's length. -/
+  layer : Fin layers
   /-- The XMSS witness at that layer's tree and leaf. -/
   witness : XmssWitness vp.params prims
+
+/-- The side condition every position and honest message a witness names is formed with: the layer
+the witness reports, added to the walk's starting layer, is below `d`.
+
+It is read off the `Fin layers` label and the walk-length hypothesis, with nothing from `Valid`.
+This is the bound a consumer used to destructure out of `Valid`'s existential; `Valid` no longer
+carries one, so this is where the bound comes from. -/
+theorem HypertreeWitness.layer_lt {vp : ValidatedParams} {prims : Primitives vp.params}
+    {layers : ℕ} (w : HypertreeWitness vp prims layers) (pos : LayerPosition vp)
+    (hlayers : pos.layer.val + layers = vp.params.d) :
+    pos.layer.val + w.layer.val < vp.params.d := by
+  have := w.layer.isLt; omega
 
 /-- The winning condition a hypertree witness asserts, against the honest hypertree that `sk`
 generates under the public seed `pk`, along the walk of `layers` layers that starts at `pos` with
 the honest message `honestMsg`.
 
-The layer bound `w.layer < layers` is the first conjunct.  It is what makes
-`pos.advance w.layer` a position at all, hence what places every address the witness names in a
-slice-1 ledger; it is also what separates this layer's targets from another layer's inside the one
-`xmssNodeAddresses` ledger.  The remaining content is `XmssWitness.Valid` at that position's tree
-address, that position's leaf, and the honest running message there — all three computed, none
-supplied.
+The whole content is `XmssWitness.Valid` at the tree address of `pos.advance w.layer`, that
+position's leaf, and the honest running message there — all three computed from the layer, none
+supplied.  There is no layer-bound conjunct: the label is a `Fin layers`, so the bound is in the
+witness's type, and `HypertreeWitness.layer_lt` is what forms the position from it.  That bound is
+still what places every address the witness names in a slice-1 ledger, and still what separates
+this layer's targets from another layer's inside the one `xmssNodeAddresses` ledger; it is now
+carried by the data rather than asserted about it.
 
 This is a statement about hash values and ledger placement only.  It does not say that any honest
 object it names was committed as a game target, nor that any execution queried one. -/
 def HypertreeWitness.Valid {vp : ValidatedParams} {prims : Primitives vp.params}
     (sk : prims.SkSeed) (pk : prims.PkSeed) (pos : LayerPosition vp) (honestMsg : prims.Y)
     (layers : ℕ) (hlayers : pos.layer.val + layers = vp.params.d)
-    (w : HypertreeWitness vp prims) : Prop :=
-  ∃ _ : w.layer < layers,
-    w.witness.Valid sk pk (pos.advance w.layer (by omega)).toAdrs
-      (pos.advance w.layer (by omega)).leaf.val
-      (honestLayerMsg vp prims sk pk pos honestMsg w.layer (by omega))
+    (w : HypertreeWitness vp prims layers) : Prop :=
+  w.witness.Valid sk pk (pos.advance w.layer.val (w.layer_lt pos hlayers)).toAdrs
+    (pos.advance w.layer.val (w.layer_lt pos hlayers)).leaf.val
+    (honestLayerMsg vp prims sk pk pos honestMsg w.layer.val (w.layer_lt pos hlayers))
 
 /-- Unfolding equation for `HypertreeWitness.Valid`.  The body is not exposed, so this is what a
-consumer destructures. -/
+consumer rewrites with. -/
 @[simp] theorem HypertreeWitness.valid_iff {vp : ValidatedParams} {prims : Primitives vp.params}
     (sk : prims.SkSeed) (pk : prims.PkSeed) (pos : LayerPosition vp) (honestMsg : prims.Y)
     (layers : ℕ) (hlayers : pos.layer.val + layers = vp.params.d)
-    (w : HypertreeWitness vp prims) :
+    (w : HypertreeWitness vp prims layers) :
     w.Valid sk pk pos honestMsg layers hlayers ↔
-      ∃ _ : w.layer < layers,
-        w.witness.Valid sk pk (pos.advance w.layer (by omega)).toAdrs
-          (pos.advance w.layer (by omega)).leaf.val
-          (honestLayerMsg vp prims sk pk pos honestMsg w.layer (by omega)) := Iff.rfl
+      w.witness.Valid sk pk (pos.advance w.layer.val (w.layer_lt pos hlayers)).toAdrs
+        (pos.advance w.layer.val (w.layer_lt pos hlayers)).leaf.val
+        (honestLayerMsg vp prims sk pk pos honestMsg w.layer.val (w.layer_lt pos hlayers)) :=
+  Iff.rfl
 
 /-- Compute a hypertree witness from a vector of `layers` XMSS signatures, the forged message
 `msg` the walk from `pos` starts with, the honest message `msg'`, and the honest key material.
@@ -569,23 +611,25 @@ hypothesis — and the recursion never enters it, descending only to length one.
 def findHypertreeWitness (vp : ValidatedParams) (prims : Primitives vp.params)
     [DecidableEq prims.Y] (sk : prims.SkSeed) (pk : prims.PkSeed) (pos : LayerPosition vp) :
     (layers : ℕ) → pos.layer.val + layers = vp.params.d → prims.Y → prims.Y →
-      Vector (XmssSig vp.params prims.core) layers → Option (HypertreeWitness vp prims)
+      Vector (XmssSig vp.params prims.core) layers → Option (HypertreeWitness vp prims layers)
   | 0, _, _, _, _ => none
   | 1, _, msg, msg', sigs =>
       if xmssPkFromSig prims pos.leaf.val sigs.head msg pk pos.toAdrs =
           xmssRoot prims sk pk pos.toAdrs then
-        (findXmssWitness prims pos.leaf.val sigs.head msg msg' sk pk pos.toAdrs).map (⟨0, ·⟩)
+        (findXmssWitness prims pos.leaf.val sigs.head msg msg' sk pk pos.toAdrs).map
+          (⟨⟨0, Nat.zero_lt_one⟩, ·⟩)
       else none
   | layers + 2, h, msg, msg', sigs =>
       if xmssPkFromSig prims pos.leaf.val sigs.head msg pk pos.toAdrs =
           xmssRoot prims sk pk pos.toAdrs then
-        (findXmssWitness prims pos.leaf.val sigs.head msg msg' sk pk pos.toAdrs).map (⟨0, ·⟩)
+        (findXmssWitness prims pos.leaf.val sigs.head msg msg' sk pk pos.toAdrs).map
+          (⟨⟨0, Nat.succ_pos _⟩, ·⟩)
       else
         (findHypertreeWitness vp prims sk pk (pos.next (by omega)) (layers + 1)
             (by simp only [LayerPosition.next_layer_val]; omega)
             (xmssPkFromSig prims pos.leaf.val sigs.head msg pk pos.toAdrs)
             (xmssRoot prims sk pk pos.toAdrs) sigs.tail).map
-          fun w => ⟨w.layer + 1, w.witness⟩
+          fun w => ⟨⟨w.layer.val + 1, Nat.succ_lt_succ w.layer.isLt⟩, w.witness⟩
 
 /-- The search stops at the starting layer exactly when that layer's recovered root is the honest
 XMSS root there.  The bodies are not exposed, so this equation is what a consumer rewrites with.
@@ -600,7 +644,8 @@ theorem findHypertreeWitness_eq_of_root (vp : ValidatedParams) (prims : Primitiv
     (hmatch : xmssPkFromSig prims pos.leaf.val sigs.head msg pk pos.toAdrs =
       xmssRoot prims sk pk pos.toAdrs) :
     findHypertreeWitness vp prims sk pk pos (layers + 1) hlayers msg msg' sigs =
-      (findXmssWitness prims pos.leaf.val sigs.head msg msg' sk pk pos.toAdrs).map (⟨0, ·⟩) := by
+      (findXmssWitness prims pos.leaf.val sigs.head msg msg' sk pk pos.toAdrs).map
+        (⟨⟨0, Nat.succ_pos layers⟩, ·⟩) := by
   match layers, hlayers, sigs, hmatch with
   | 0, _, _, hmatch => rw [findHypertreeWitness, if_pos hmatch]
   | _ + 1, _, _, hmatch => rw [findHypertreeWitness, if_pos hmatch]
@@ -618,30 +663,35 @@ theorem findHypertreeWitness_eq_next_of_ne (vp : ValidatedParams) (prims : Primi
           (by simp only [LayerPosition.next_layer_val]; omega)
           (xmssPkFromSig prims pos.leaf.val sigs.head msg pk pos.toAdrs)
           (xmssRoot prims sk pk pos.toAdrs) sigs.tail).map
-        fun w => ⟨w.layer + 1, w.witness⟩ := by
+        fun w => ⟨⟨w.layer.val + 1, Nat.succ_lt_succ w.layer.isLt⟩, w.witness⟩ := by
   rw [findHypertreeWitness, if_neg hmatch]
 
 /-- **Extractor soundness.**  Whatever `findHypertreeWitness` returns satisfies
 `HypertreeWitness.Valid` against the honest hypertree, at the layer it reports and against the
 honest running message there.
 
-What this pins about the reported layer, and what it does not, is worth stating exactly.  It pins
-the layer *relative to* `HypertreeWitness.Valid`: the recursive step rewrites through
-`LayerPosition.advance_next` and `honestLayerMsg_next`, so a shift applied to the extractor's
-label alone — a `+ 2`, or a dropped `+ 1` — does not type-check.  It does not pin the layer
-absolutely.  `HypertreeWitness.layer` is a bare `ℕ` field of a structure declared here, and its
-only meaning is the one the statements here give it, so the substitution that renames the base
-label `⟨0, ·⟩` to `⟨1, ·⟩` and reads `w.layer - 1` wherever `HypertreeWitness.Valid` reads
-`w.layer` re-proves this lemma by the same induction.  No statement written in this module's own
-vocabulary can distinguish that relabelling, because it is applied to all of them at once.
+What this pins about the reported layer is worth stating exactly, because two different things
+pin it and only one of them is this lemma.
 
-What distinguishes it is a check outside this module, against a layer fixed by something other
-than the label: `HashSigTest.SLHDSA.HypertreeWitnesses` compares the reported layer with the one
-its fixture built the divergence at, and evaluates the witness through a hand-written table of
-positions and honest messages rather than through `Valid`.  Its agreement check, which pins that
-table against `advance` and `honestLayerMsg` at fixed layers, is what stops the shift from being
-propagated into the table as well.  That executable is where this class is caught; the proofs here
-are not a second check on it.
+The *relative* placement is this lemma's: the recursive step rewrites through
+`LayerPosition.advance_next` and `honestLayerMsg_next`, so a shift applied to the extractor's
+label alone — a `+ 2`, or a dropped `+ 1` — does not type-check against `HypertreeWitness.Valid`.
+
+The *absolute* placement is the witness type's.  `HypertreeWitness.layer` is a `Fin layers`, so its
+range is fixed by the walk length the witness was extracted from rather than by the statements that
+read it.  A bare `ℕ` label would admit a uniform renumbering — base label `⟨0, ·⟩` to `⟨1, ·⟩`,
+`w.layer` read as `w.layer - 1` in `Valid`, the bound relaxed to `0 < w.layer ∧ w.layer ≤ layers`
+— which is a reparametrisation, not an unsoundness: it leaves `Valid`'s content unchanged, so
+every layer-free consequence survives it, and every statement here could be renumbered with it.
+What refuses it is that the base case runs at walk length one, where the label's type is `Fin 1`
+and the shifted label's obligation is `1 < 1`.  That is refutable, not merely unproved, so the
+renumbering is not writable at all, and the failure is a build error rather than a run-time one.
+
+`HashSigTest.SLHDSA.HypertreeWitnesses` checks the same thing a second way and independently of the
+type: it compares the reported layer with the one its fixture built the divergence at, and
+evaluates the witness through a hand-written table of positions and honest messages rather than
+through `Valid`, with an agreement check pinning that table against `advance` and `honestLayerMsg`
+at fixed layers.  Those checks predate the `Fin` label and are kept.
 
 There is no top-root hypothesis.  Each layer's guard is the root match at that layer, which is
 `findXmssWitness_sound`'s own hypothesis, so the conclusion holds whether or not the walk reaches
@@ -654,18 +704,17 @@ theorem findHypertreeWitness_sound (vp : ValidatedParams) (prims : Primitives vp
     [DecidableEq prims.Y] (sk : prims.SkSeed) (pk : prims.PkSeed) (pos : LayerPosition vp)
     (layers : ℕ) (hlayers : pos.layer.val + layers = vp.params.d) (msg msg' : prims.Y)
     (sigs : Vector (XmssSig vp.params prims.core) layers)
-    {w : HypertreeWitness vp prims}
+    {w : HypertreeWitness vp prims layers}
     (hw : findHypertreeWitness vp prims sk pk pos layers hlayers msg msg' sigs = some w) :
     w.Valid sk pk pos msg' layers hlayers := by
-  induction layers using Nat.twoStepInduction generalizing pos msg msg' w with
+  induction layers using Nat.twoStepInduction generalizing pos msg msg' with
   | zero => simp [findHypertreeWitness] at hw
   | one =>
       rw [findHypertreeWitness] at hw
       split at hw
       · rw [Option.map_eq_some_iff] at hw
         obtain ⟨u, hu, rfl⟩ := hw
-        refine ⟨Nat.zero_lt_succ _, ?_⟩
-        rw [LayerPosition.advance_zero, honestLayerMsg_zero]
+        simp only [HypertreeWitness.valid_iff, LayerPosition.advance_zero, honestLayerMsg_zero]
         exact findXmssWitness_sound prims pos.leaf.val pos.leaf.isLt sigs.head msg msg' sk pk
           pos.toAdrs (by assumption) hu
       · exact absurd hw (by simp)
@@ -674,18 +723,17 @@ theorem findHypertreeWitness_sound (vp : ValidatedParams) (prims : Primitives vp
       split at hw
       · rw [Option.map_eq_some_iff] at hw
         obtain ⟨u, hu, rfl⟩ := hw
-        refine ⟨Nat.zero_lt_succ _, ?_⟩
-        rw [LayerPosition.advance_zero, honestLayerMsg_zero]
+        simp only [HypertreeWitness.valid_iff, LayerPosition.advance_zero, honestLayerMsg_zero]
         exact findXmssWitness_sound prims pos.leaf.val pos.leaf.isLt sigs.head msg msg' sk pk
           pos.toAdrs (by assumption) hu
       · rw [Option.map_eq_some_iff] at hw
         obtain ⟨u, hu, rfl⟩ := hw
-        obtain ⟨huj, huv⟩ :=
+        have huv :=
           ih (pos.next (by omega)) (by simp only [LayerPosition.next_layer_val]; omega)
             _ (xmssRoot prims sk pk pos.toAdrs) sigs.tail hu
-        refine ⟨Nat.succ_lt_succ huj, ?_⟩
+        simp only [HypertreeWitness.valid_iff] at huv ⊢
         rw [LayerPosition.advance_next,
-          honestLayerMsg_next vp prims sk pk pos msg' u.layer (by omega)]
+          honestLayerMsg_next vp prims sk pk pos msg' u.layer.val (by omega)]
         exact huv
 
 /-- **Extractor completeness.**  On two distinct messages, against a vector of signatures whose
@@ -735,12 +783,17 @@ variable {vp : ValidatedParams}
 `pos.advance j` is `pos.layer.val + j`, and both are below `d`, so the coordinates differ as soon
 as the layers do.
 
-This is a sibling of `LayerPosition.advance_ne`, not a corollary of it, and not the other way
-round either: `LayerTreeCoord.ofPosition` keeps the layer and the tree and forgets the leaf, so it
-is not injective, and equal coordinates do not give equal positions.  Both statements are read off
-`advance_layer_val`, and each is what one family of ledgers needs — this one for the `hCollision`
-branch, whose ledger is indexed by a `LayerTreeCoord`, and `advance_ne` for the three WOTS+
-branches, whose ledgers are indexed by the position itself. -/
+This is the stronger of the two statements it forms a pair with.  `LayerPosition.advance_ne`
+follows from it in one step, `fun h => layerTreeCoord_advance_ne pos hj hj' hne (congrArg
+LayerTreeCoord.ofPosition h)`; the step back does not exist, because it would need
+`LayerTreeCoord.ofPosition` injective and that function keeps the layer and the tree and forgets
+the leaf.  Neither is derived from the other here: both are read off `advance_layer_val`, and
+`advance_ne` is *Deterministic inclusion* position arithmetic that would otherwise rest on this
+slice-1 coordinate statement.
+
+Each is what one family of ledgers needs — this one for the `hCollision` branch, whose ledger is
+indexed by a `LayerTreeCoord`, and `advance_ne` for the three WOTS+ branches, whose ledgers are
+indexed by the position or by a coordinate the position projects out of. -/
 theorem layerTreeCoord_advance_ne (pos : LayerPosition vp) {j j' : ℕ}
     (hj : pos.layer.val + j < vp.params.d) (hj' : pos.layer.val + j' < vp.params.d)
     (hne : j ≠ j') :

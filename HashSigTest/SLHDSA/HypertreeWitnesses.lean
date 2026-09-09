@@ -64,8 +64,12 @@ so the honest-message re-evaluation is inert at every layer; and the leaf enters
 `idx / 2 ^ z`, so at the extracted height `z = 1` the leaves `3` and `2` of layers zero and one
 share the node index `1` and the leaf re-evaluation is inert between them, while layer two's leaf
 `1` gives node index `0` and does discriminate.  What discriminates at both neighbours is the tree
-address.  The check asserts the two inert re-evaluations *hold*, so their inertness is pinned
-rather than passed over.
+address.  The leaf inertness is asserted to *hold*, so it is pinned rather than passed over; it
+turns on this fixture's two leaves sharing a node index and fails if the trajectory changes.  The
+honest-message inertness is not asserted, because it is not independent of the base assertion three
+lines above it: `xmssWitnessHolds` takes the honest message as an argument and its `hCollision`
+branch never reads it, so re-evaluating at another layer's honest message re-runs the base
+assertion.  That would pin `xmssWitnessHolds` against `XmssWitness.Valid`, not the extractor.
 
 `checkNoWitness` closes both ways the search can return nothing.  The honest hypertree signature
 extracted against the message it actually signs matches at layer zero and still returns nothing,
@@ -80,16 +84,15 @@ match and stops.
 witness comes back and holds, which is `findHypertreeWitness_sound` carrying no top-root
 hypothesis.
 
-`checkFabricatedWitnesses` is the tally: eleven runs of `hypertreeWitnessHolds`, three accepted and
-eight rejected.  The eight between them falsify both conjuncts of `HypertreeWitness.Valid` — six
-in-range layer shifts falsify the XMSS condition with the bound satisfied, and two out-of-range
-layers falsify the bound.  The layer-three fabrication is the sharpest: `posOf` and `honestMsgAt`
-saturate, so at layer three they return the layer-two position and message and the XMSS condition
-still holds; only the bound rejects it.  The layer-nine one is no sharper — the tables saturate
-there too, so it differs from the layer-three one only in the numeral fed to the bound — but it
-costs nothing and it pins that the bound is not tested by proximity.
+`checkFabricatedWitnesses` is the tally: nine runs of `hypertreeWitnessHolds`, three accepted and
+six rejected.  The six are the in-range layer shifts, and they falsify the one conjunct
+`HypertreeWitness.Valid` has — the XMSS condition at the position and honest message the label
+names.  There is no out-of-range fabrication, and there cannot be one: `HypertreeWitness.layer` is
+a `Fin toyParams.d`, so a label at or beyond `d` is not a witness at this walk length and does not
+elaborate.  What used to be two run-time rejections is a build error now, exercised by the mutation
+that widens the label's index rather than by an `ensure`.
 
-The `example`s pin the theorem statements at that bundle, including the six declarations with no
+The `example`s pin the theorem statements at that bundle, including the seven declarations with no
 consumer inside the library, and the ledger and encoded-tweak lemmas at the same profile — which
 is inside the approved address bounds, so no second parameter record is introduced.
 -/
@@ -185,9 +188,10 @@ example : (pos0.layer.val, pos0.tree.val, pos0.leaf.val) = (0, 6, 3) := by decid
 example : (pos1.layer.val, pos1.tree.val, pos1.leaf.val) = (1, 1, 2) := by decide
 example : (pos2.layer.val, pos2.tree.val, pos2.leaf.val) = (2, 0, 1) := by decide
 
-/-- The three positions by layer, written out rather than iterated, and saturating past the top
-layer.  This is the second computation of what `LayerPosition.advance` computes; `checkToyBundle`
-asserts they agree at all three layers. -/
+/-- The three positions by layer, written out rather than iterated.  This is the second computation
+of what `LayerPosition.advance` computes; `checkToyBundle` asserts they agree at all three layers.
+The catch-all is what makes the function total; nothing calls it above layer two, because every
+caller reads a `Fin toyParams.d` or one of the three literals. -/
 def posOf : ℕ → LayerPosition toy
   | 0 => pos0
   | 1 => pos1
@@ -208,8 +212,9 @@ theorem forgedMsg_ne_honestMsg : forgedMsg ≠ honestMsg := fun h =>
 def honestRoot (i : ℕ) : toyPrimitives.Y :=
   xmssRoot toyPrimitives () () (posOf i).toAdrs
 
-/-- The honest message signed at layer `i`, written out rather than recursed, and saturating past
-the top layer.  This is the second computation of what `honestLayerMsg` computes. -/
+/-- The honest message signed at layer `i`, written out rather than recursed.  This is the second
+computation of what `honestLayerMsg` computes, and its catch-all is totality for the same reason
+`posOf`'s is. -/
 def honestMsgAt : ℕ → toyPrimitives.Y
   | 0 => honestMsg
   | 1 => honestRoot 0
@@ -272,16 +277,20 @@ def forgery2 : Signature toy toyPrimitives.core := #v[bad0, bad1, signAt 2 run2]
 
 /-- The full-depth search from the layer-zero position, on the forged and honest messages. -/
 def extract (s : Signature toy toyPrimitives.core) :
-    Option (HypertreeWitness toy toyPrimitives) :=
+    Option (HypertreeWitness toy toyPrimitives toyParams.d) :=
   findHypertreeWitness toy toyPrimitives () () pos0 toyParams.d (by decide) forgedMsg honestMsg s
 
+/-- The fixture's three layers, as the `Fin toyParams.d` labels a witness carries.  A label outside
+this range is not a `HypertreeWitness` at this walk length and cannot be written down at all. -/
+def allLayers : List (Fin toyParams.d) := [⟨0, by decide⟩, ⟨1, by decide⟩, ⟨2, by decide⟩]
+
 /-- A tag naming the layer and the constructor a search returned. -/
-def tag : Option (HypertreeWitness toy toyPrimitives) -> String
+def tag : Option (HypertreeWitness toy toyPrimitives toyParams.d) -> String
   | none => "none"
-  | some ⟨l, .hCollision z _⟩ => s!"layer {l} hCollision {z}"
-  | some ⟨l, .wots (.tlCollision _)⟩ => s!"layer {l} tlCollision"
-  | some ⟨l, .wots (.fPreimage i st _)⟩ => s!"layer {l} fPreimage {i.val} {st}"
-  | some ⟨l, .wots (.fCollision i st _)⟩ => s!"layer {l} fCollision {i.val} {st}"
+  | some ⟨l, .hCollision z _⟩ => s!"layer {l.val} hCollision {z}"
+  | some ⟨l, .wots (.tlCollision _)⟩ => s!"layer {l.val} tlCollision"
+  | some ⟨l, .wots (.fPreimage i st _)⟩ => s!"layer {l.val} fPreimage {i.val} {st}"
+  | some ⟨l, .wots (.fCollision i st _)⟩ => s!"layer {l.val} fCollision {i.val} {st}"
 
 /-! ## Witness validity, evaluated
 
@@ -292,10 +301,10 @@ arguments is what lets the layer canaries below run the *same* witness at a neig
 address, at a neighbouring layer's leaf, and against a neighbouring layer's honest message, and
 watch each one fail on its own.
 
-`hypertreeWitnessHolds` adds the layer bound and supplies those three from the layer, through
-`posOf` and `honestMsgAt` — which are written out by hand, so they are a second computation of
-what `LayerPosition.advance` and `honestLayerMsg` compute.  `checkToyBundle` asserts the two agree
-at all three layers. -/
+`hypertreeWitnessHolds` supplies those three from the layer, through `posOf` and `honestMsgAt` —
+which are written out by hand, so they are a second computation of what `LayerPosition.advance` and
+`honestLayerMsg` compute.  `checkToyBundle` asserts the two agree at all three layers.  It adds no
+bound of its own: the label is a `Fin toyParams.d` and the bound is in its type. -/
 
 /-- The honest WOTS+ signature at a leaf's base address on an honest message. -/
 def honestWotsSig (la : Adrs) (hmsg : toyPrimitives.Y) : WotsSig toyParams toyPrimitives.core :=
@@ -359,12 +368,13 @@ def xmssWitnessHolds (adrs : Adrs) (idx : ℕ) (hmsg : toyPrimitives.Y) :
           toyPrimitives.H () (xmssNodeAdrs adrs z (idx / 2 ^ z)) c.1 c.2)
   | .wots wt => wotsWitnessHolds (wotsLeafAdrs adrs idx) hmsg wt
 
-/-- The two conjuncts of `HypertreeWitness.Valid` at the full-depth walk from `pos0`: the layer
-bound, and the XMSS condition at the address, leaf and honest message that layer names. -/
-def hypertreeWitnessHolds (w : HypertreeWitness toy toyPrimitives) : Bool :=
-  decide (w.layer < toyParams.d) &&
-    xmssWitnessHolds (posOf w.layer).toAdrs (posOf w.layer).leaf.val (honestMsgAt w.layer)
-      w.witness
+/-- The one conjunct of `HypertreeWitness.Valid` at the full-depth walk from `pos0`: the XMSS
+condition at the address, leaf and honest message that layer names.  The layer bound is not
+evaluated here because it is not a conjunct — the label is a `Fin toyParams.d`, so the bound is in
+the witness's type and an out-of-range label is a build error rather than a rejected run. -/
+def hypertreeWitnessHolds (w : HypertreeWitness toy toyPrimitives toyParams.d) : Bool :=
+  xmssWitnessHolds (posOf w.layer.val).toAdrs (posOf w.layer.val).leaf.val
+    (honestMsgAt w.layer.val) w.witness
 
 /-! ## The bundle behaves as advertised -/
 
@@ -378,23 +388,20 @@ with `honestLayerMsg`, at all three layers, so the layer canaries below check th
 a table that is written independently of the library's and known to match it.
 
 Those two agreement checks are load-bearing, not documentation, and it is worth saying what they
-carry.  A `HypertreeWitness`'s `layer` is a bare `ℕ` whose meaning is fixed only by
-`HypertreeWitness.Valid`, so shifting the extractor's label and `Valid`'s reading of it *together*
-— labelling the base case `⟨1, ·⟩` and reading `w.layer - 1` — re-proves
-`findHypertreeWitness_sound` by the same induction, and no statement written in the library's own
-vocabulary can tell that shift from the original.  What tells it is `checkLayer`'s
-`w.layer == layer` pin, whose `layer` is the literal the fixture *built* the divergence at, and
-`hypertreeWitnessHolds`, which reads `posOf` and `honestMsgAt` rather than `Valid`.
-
-That leaves one move: shift `posOf` and `honestMsgAt` here as well, so the tables agree with the
-shifted label again.  These two checks are what closes it.  They compare the tables with `advance`
-and `honestLayerMsg` at the fixed layers `0`, `1` and `2`, and neither of those two library
-definitions is touched by the shift — the shift is in which index is fed to them — so a table
-renumbered to match a shifted label stops agreeing and the check fails.  Without them the
-executable would be a restatement of the library at whatever numbering the library happened to
-use; with them it is an independent one.  The hand-written
-honest chain ends agree with `wotsPkGenTops`, which is what `XmssWitness.Valid` names.  And the
-hand-assembled honest hypertree signature is the one `GeneralHypertree.sign` produces. -/
+carry now that the library also carries part of it.  When `HypertreeWitness.layer` was a bare `ℕ`,
+shifting the extractor's label and `HypertreeWitness.Valid`'s reading of it *together* — labelling
+the base case `⟨1, ·⟩` and reading `w.layer - 1` — re-proved `findHypertreeWitness_sound` by the
+same induction, and the executable was the only thing that noticed.  The label is a `Fin layers`
+now, so that shift no longer elaborates.  These checks stay because they are what caught the class,
+because they cost nothing, and because they check the numbering a second way, without going through
+the type: `checkLayer`'s `w.layer == layer` pin compares against the literal the fixture *built* the
+divergence at, and `hypertreeWitnessHolds` reads `posOf` and `honestMsgAt` rather than `Valid`.
+Renumbering those two tables to match some other labelling makes them stop agreeing with `advance`
+and `honestLayerMsg` at the fixed layers `0`, `1` and `2`, and the agreement check fails.  Without
+them the executable would be a restatement of the library at whatever numbering the library
+happened to use; with them it is an independent one.  The hand-written honest chain ends agree with
+`wotsPkGenTops`, which is what `XmssWitness.Valid` names.  And the hand-assembled honest hypertree
+signature is the one `GeneralHypertree.sign` produces. -/
 def checkToyBundle : IO Unit := do
   ensure "honest roots distinct"
     (honestRoot 0 != honestRoot 1 && honestRoot 1 != honestRoot 2 &&
@@ -438,54 +445,52 @@ extract an `fPreimage` witness, and for that constructor all three do bite: `Wot
 `fPreimage` branch reads the address through `wotsChainAdrs`, the leaf through `wotsLeafAdrs`, and
 the honest message through both `chainStepsCore` and the honest WOTS+ signature.  For an
 `hCollision` witness they do not, and `checkLayerH` runs that case with its own assertion set. -/
-def checkLayer (name : String) (layer : ℕ) (branch : String) (running : toyPrimitives.Y)
-    (component : XmssSig toyParams toyPrimitives) (sig : Signature toy toyPrimitives.core) :
-    IO Unit := do
+def checkLayer (name : String) (layer : Fin toyParams.d) (branch : String)
+    (running : toyPrimitives.Y) (component : XmssSig toyParams toyPrimitives)
+    (sig : Signature toy toyPrimitives.core) : IO Unit := do
   ensure s!"{name}: recovers the published root"
     (pkFromSig toy toyPrimitives forgedMsg sig () parts ==
       GeneralHypertree.root toy toyPrimitives () ())
   ensure s!"{name}: the message signed there is not the honest one"
-    (running != honestMsgAt layer)
+    (running != honestMsgAt layer.val)
   ensure s!"{name}: and that layer's recovery is the honest root"
-    (recoverAt layer component running == honestRoot layer)
+    (recoverAt layer.val component running == honestRoot layer.val)
   match extract sig with
   | none => throw (IO.userError s!"Hypertree witness check failed: {name}: no witness")
   | some w =>
-      ensure s!"{name}: layer index is {layer}" (w.layer == layer)
+      ensure s!"{name}: layer index is {layer.val}" (w.layer == layer)
       ensure s!"{name}: the branch is {branch}" (tag (some w) == branch)
       ensure s!"{name}: witness holds at its layer" (hypertreeWitnessHolds w)
-      for other in [0, 1, 2] do
+      for other in allLayers do
         unless other == layer do
-          ensure s!"{name}: fails against layer {other}'s honest message"
-            (!xmssWitnessHolds (posOf layer).toAdrs (posOf layer).leaf.val (honestMsgAt other)
-              w.witness)
-          ensure s!"{name}: fails at layer {other}'s tree address"
-            (!xmssWitnessHolds (posOf other).toAdrs (posOf layer).leaf.val (honestMsgAt layer)
-              w.witness)
-          ensure s!"{name}: fails at layer {other}'s leaf"
-            (!xmssWitnessHolds (posOf layer).toAdrs (posOf other).leaf.val (honestMsgAt layer)
-              w.witness)
-          ensure s!"{name}: fails as a whole at layer {other}"
+          ensure s!"{name}: fails against layer {other.val}'s honest message"
+            (!xmssWitnessHolds (posOf layer.val).toAdrs (posOf layer.val).leaf.val
+              (honestMsgAt other.val) w.witness)
+          ensure s!"{name}: fails at layer {other.val}'s tree address"
+            (!xmssWitnessHolds (posOf other.val).toAdrs (posOf layer.val).leaf.val
+              (honestMsgAt layer.val) w.witness)
+          ensure s!"{name}: fails at layer {other.val}'s leaf"
+            (!xmssWitnessHolds (posOf layer.val).toAdrs (posOf other.val).leaf.val
+              (honestMsgAt layer.val) w.witness)
+          ensure s!"{name}: fails as a whole at layer {other.val}"
             (!hypertreeWitnessHolds ⟨other, w.witness⟩)
-      ensure s!"{name}: fails at the first layer past the walk"
-        (!hypertreeWitnessHolds ⟨toyParams.d, w.witness⟩)
-      ensure s!"{name}: fails far past the walk" (!hypertreeWitnessHolds ⟨9, w.witness⟩)
 
 /-- The forged message is signed at layer zero by the honest XMSS signer, so layer zero's recovered
 root is already that layer's honest root and the layers above it are the honest signature's own. -/
 def checkLayer0 : IO Unit :=
-  checkLayer "layer 0" 0 "layer 0 fPreimage 0 2" forgedMsg (signAt 0 forgedMsg) forgery0
+  checkLayer "layer 0" ⟨0, by decide⟩ "layer 0 fPreimage 0 2" forgedMsg (signAt 0 forgedMsg)
+    forgery0
 
 /-- Layer zero's authentication path is perturbed, so its recovered root misses that layer's honest
 root; the running message it hands up is signed at layer one by the honest XMSS signer. -/
 def checkLayer1 : IO Unit :=
-  checkLayer "layer 1" 1 "layer 1 fPreimage 1 13" run1 (signAt 1 run1) forgery1
+  checkLayer "layer 1" ⟨1, by decide⟩ "layer 1 fPreimage 1 13" run1 (signAt 1 run1) forgery1
 
 /-- Both lower layers' authentication paths are perturbed, so the walk reaches the top layer before
 meeting the honest hypertree, and the top layer's tree is the one whose root the public key
 publishes. -/
 def checkLayer2 : IO Unit :=
-  checkLayer "layer 2" 2 "layer 2 fPreimage 1 4" run2 (signAt 2 run2) forgery2
+  checkLayer "layer 2" ⟨2, by decide⟩ "layer 2 fPreimage 1 4" run2 (signAt 2 run2) forgery2
 
 /-- The fabricated layer-zero component that produces an `H`-collision witness: four WOTS+ chain
 values that are not the honest signer's, carried on the honest authentication path for the forged
@@ -513,9 +518,15 @@ shape, and this is the shape they are not discriminating for.  Which of them bit
 * the honest message does not appear in the branch at all, so the honest-message re-evaluation is
   inert at every layer, and no fixture can make it otherwise.
 
-The two inert re-evaluations are asserted to *hold*, so their inertness is pinned rather than
-skipped, and `hypertreeWitnessHolds` at each other layer — which moves all three arguments together
-— is still required to fail. -/
+The leaf inertness is asserted to *hold*, so it is pinned rather than skipped: it turns on the
+fixture's leaves `3` and `2` quotienting to the same node index at `z = 1`, and a different
+trajectory breaks it.  The honest-message inertness is *not* asserted, and the reason is that it
+would not be an independent assertion: `xmssWitnessHolds` takes the honest message as an argument
+and this branch never reads it, so `xmssWitnessHolds adrs idx (honestMsgAt other) w.witness` and
+`xmssWitnessHolds adrs idx (honestMsgAt 0) w.witness` are the same evaluation, and the second is
+asserted three lines above.  A pin on it would fail only if `xmssWitnessHolds` or
+`XmssWitness.Valid` changed, not if the extractor did.  `hypertreeWitnessHolds` at each other layer
+— which moves all three arguments together — is still required to fail. -/
 def checkLayerH : IO Unit := do
   ensure "hCollision: recovers the published root"
     (pkFromSig toy toyPrimitives forgedMsg forgeryH () parts ==
@@ -529,21 +540,17 @@ def checkLayerH : IO Unit := do
   | some w =>
       ensure "hCollision: the branch is hCollision at height one"
         (tag (some w) == "layer 0 hCollision 1")
-      ensure "hCollision: layer index is 0" (w.layer == 0)
+      ensure "hCollision: layer index is 0" (w.layer.val == 0)
       ensure "hCollision: witness holds at its layer" (hypertreeWitnessHolds w)
-      for other in [1, 2] do
-        ensure s!"hCollision: fails at layer {other}'s tree address"
-          (!xmssWitnessHolds (posOf other).toAdrs (posOf 0).leaf.val (honestMsgAt 0) w.witness)
-        ensure s!"hCollision: inert against layer {other}'s honest message"
-          (xmssWitnessHolds (posOf 0).toAdrs (posOf 0).leaf.val (honestMsgAt other) w.witness)
-        ensure s!"hCollision: fails as a whole at layer {other}"
+      for other in [(⟨1, by decide⟩ : Fin toyParams.d), ⟨2, by decide⟩] do
+        ensure s!"hCollision: fails at layer {other.val}'s tree address"
+          (!xmssWitnessHolds (posOf other.val).toAdrs (posOf 0).leaf.val (honestMsgAt 0) w.witness)
+        ensure s!"hCollision: fails as a whole at layer {other.val}"
           (!hypertreeWitnessHolds ⟨other, w.witness⟩)
       ensure "hCollision: inert at layer 1's leaf, which shares its node index"
         (xmssWitnessHolds (posOf 0).toAdrs (posOf 1).leaf.val (honestMsgAt 0) w.witness)
       ensure "hCollision: fails at layer 2's leaf, which does not"
         (!xmssWitnessHolds (posOf 0).toAdrs (posOf 2).leaf.val (honestMsgAt 0) w.witness)
-      ensure "hCollision: fails at the first layer past the walk"
-        (!hypertreeWitnessHolds ⟨toyParams.d, w.witness⟩)
 
 /-! ## What the search does when no layer matches, and when one matches early -/
 
@@ -551,8 +558,9 @@ def checkLayerH : IO Unit := do
 recovered root is that layer's honest root, so the search stops at layer zero — and returns nothing
 all the same, because at `msg = msg'` every chain's two step counts agree and the WOTS+ chain
 search runs out.  That is `findHypertreeWitness_isSome`'s message-distinctness hypothesis being
-necessary: the walk does reach the published root, and it does match at layer zero, so neither of
-the other two ways of returning nothing is available; and re-running the same signature at the same
+necessary: the walk does reach the published root, and it does match at layer zero, so the other
+way of returning nothing — no layer matching at all — is not available either, and nothing coming
+back cannot be blamed on a walk that never got there; and re-running the same signature at the same
 walk against a *distinct* second message returns a witness at layer zero, which is what pins that
 the branch taken was layer zero's rather than a failure to match.
 
@@ -574,7 +582,7 @@ def checkNoWitness : IO Unit := do
       forgedMsg honestHtSig with
   | none => throw (IO.userError "Hypertree witness check failed: honest walk, distinct message")
   | some w =>
-      ensure "honest walk against a distinct message stops at layer zero" (w.layer == 0)
+      ensure "honest walk against a distinct message stops at layer zero" (w.layer.val == 0)
       ensure "and that witness holds against that message"
         (xmssWitnessHolds pos0.toAdrs pos0.leaf.val forgedMsg w.witness)
   ensure "a walk matching at no layer returns nothing"
@@ -600,57 +608,54 @@ def checkEarlyMatch : IO Unit := do
   match extract sig with
   | none => throw (IO.userError "Hypertree witness check failed: early match: no witness")
   | some w =>
-      ensure "early match: stops at layer zero" (w.layer == 0)
+      ensure "early match: stops at layer zero" (w.layer.val == 0)
       ensure "early match: witness holds there" (hypertreeWitnessHolds w)
 
 /-! ## Fabricated witnesses
 
-Eleven witnesses run through `hypertreeWitnessHolds`, three accepted and eight rejected.  The three
-accepted are the extractor's own answers at the three layers.  The eight rejected between them
-falsify both conjuncts of `HypertreeWitness.Valid`: two out-of-range layers falsify the bound while
-leaving the XMSS condition satisfiable, and six in-range layer shifts falsify the XMSS condition
-while leaving the bound satisfied.  The per-argument separation — address, leaf, honest message —
-is `checkLayer`'s.
+Nine witnesses run through `hypertreeWitnessHolds`, three accepted and six rejected.  The three
+accepted are the extractor's own answers at the three layers.  The six rejected are the in-range
+layer shifts, and they falsify the one conjunct `HypertreeWitness.Valid` has: the XMSS condition at
+the position and honest message the label names.  The per-argument separation — address, leaf,
+honest message — is `checkLayer`'s.
 
-`⟨3, w⟩` for the layer-two witness is the sharpest of the eight: `posOf` and `honestMsgAt` are
-saturating, so at layer three they return exactly the layer-two position and message and the XMSS
-condition still holds; only the bound rejects it. -/
-/-- The tally: eleven runs of `hypertreeWitnessHolds`, three accepted and eight rejected. -/
+An out-of-range fabrication is not among them because it is not writable.  `HypertreeWitness.layer`
+is a `Fin toyParams.d`, so `⟨3, w⟩` and `⟨9, w⟩` — which this tally used to carry, as the two
+rejections that isolated the old bound conjunct — are type errors rather than rejected runs, and
+what exercises that bound is the mutation widening the label's index, which fails to build. -/
+/-- The tally: nine runs of `hypertreeWitnessHolds`, three accepted and six rejected. -/
 def checkFabricatedWitnesses : IO Unit := do
   let mut accepted := 0
   let mut rejected := 0
-  for (layer, sig) in [(0, forgery0), (1, forgery1), (2, forgery2)] do
+  for (layer, sig) in
+      [((⟨0, by decide⟩ : Fin toyParams.d), forgery0), (⟨1, by decide⟩, forgery1),
+        (⟨2, by decide⟩, forgery2)] do
     match extract sig with
     | none => throw (IO.userError "Hypertree witness check failed: fabrication base missing")
     | some w =>
-        ensure s!"fabrication base {layer} accepted" (hypertreeWitnessHolds w)
+        ensure s!"fabrication base {layer.val} accepted" (hypertreeWitnessHolds w)
         accepted := accepted + 1
-        for other in [0, 1, 2] do
+        for other in allLayers do
           unless other == layer do
-            ensure s!"fabrication {layer}->{other} rejected"
+            ensure s!"fabrication {layer.val}->{other.val} rejected"
               (!hypertreeWitnessHolds ⟨other, w.witness⟩)
             rejected := rejected + 1
-  match extract forgery2 with
-  | none => throw (IO.userError "Hypertree witness check failed: fabrication base missing")
-  | some w =>
-      ensure "out-of-range layer 3 rejected" (!hypertreeWitnessHolds ⟨toyParams.d, w.witness⟩)
-      ensure "and its XMSS condition still holds at layer 3's saturated position"
-        (xmssWitnessHolds (posOf toyParams.d).toAdrs (posOf toyParams.d).leaf.val
-          (honestMsgAt toyParams.d) w.witness)
-      ensure "out-of-range layer 9 rejected" (!hypertreeWitnessHolds ⟨9, w.witness⟩)
-      rejected := rejected + 2
   ensure "three accepted" (accepted == 3)
-  ensure "eight rejected" (rejected == 8)
+  ensure "six rejected" (rejected == 6)
 
 /-! ## Statement pins
 
-The theorems this module ships, elaborated at the toy profile.  Eight declarations have no consumer
+The theorems this module ships, elaborated at the toy profile.  Seven declarations have no consumer
 inside the library and nothing else in the tree elaborates them: the two extractor shape equations,
-the `HypertreeWitness.Valid` unfolding equation, the `atLayer` bridge, the top-level walk, the
-cross-layer encoded-distinctness lemma, the honest-signer bridge `signFromPosition_getElem`, and
-`LayerPosition.advance_ne`.  Each is pinned here.  The last two are pinned in the form a consumer
-uses them: the honest signer's layer-`j` component read against `honestLayerMsg`, and the two WOTS+
-cross-layer separations composed in the one step the module docstring says they take. -/
+the `atLayer` bridge, the top-level walk, the cross-layer encoded-distinctness lemma, the
+honest-signer bridge `signFromPosition_getElem`, and `LayerPosition.advance_ne`.  Each is pinned
+here.  `HypertreeWitness.valid_iff` is not among them — `findHypertreeWitness_sound` rewrites with
+it — and neither is `HypertreeWitness.layer_lt`, which is what `HypertreeWitness.Valid` forms its
+position with; both are pinned all the same, in the form a consumer meets them.  The honest-signer
+bridge is pinned as the layer-`j` component read against `honestLayerMsg`, and the two WOTS+
+cross-layer separations are composed here the way the module docstring says they compose:
+`wotsPkAdrsKey_injective` against `advance_ne` directly, and `wotsStepAdrsKey_injective` through
+the `congrArg (·.1.1)` its pair-valued conclusion needs first. -/
 
 example (pos : LayerPosition toy) (layers : ℕ)
     (hlayers : pos.layer.val + layers = toy.params.d) (msg msg' : toyPrimitives.Y)
@@ -689,13 +694,13 @@ example (pos : LayerPosition toy) (layers : ℕ)
       if xmssPkFromSig toyPrimitives pos.leaf.val sigs.head msg () pos.toAdrs =
           xmssRoot toyPrimitives () () pos.toAdrs then
         (findXmssWitness toyPrimitives pos.leaf.val sigs.head msg msg' () () pos.toAdrs).map
-          (⟨0, ·⟩)
+          (⟨⟨0, Nat.succ_pos (layers + 1)⟩, ·⟩)
       else
         (findHypertreeWitness toy toyPrimitives () () (pos.next (by omega)) (layers + 1)
             (by simp only [LayerPosition.next_layer_val]; omega)
             (xmssPkFromSig toyPrimitives pos.leaf.val sigs.head msg () pos.toAdrs)
             (xmssRoot toyPrimitives () () pos.toAdrs) sigs.tail).map
-          fun w => ⟨w.layer + 1, w.witness⟩ := by
+          fun w => ⟨⟨w.layer.val + 1, Nat.succ_lt_succ w.layer.isLt⟩, w.witness⟩ := by
   by_cases h : xmssPkFromSig toyPrimitives pos.leaf.val sigs.head msg () pos.toAdrs =
       xmssRoot toyPrimitives () () pos.toAdrs
   · rw [if_pos h]
@@ -705,18 +710,18 @@ example (pos : LayerPosition toy) (layers : ℕ)
     exact findHypertreeWitness_eq_next_of_ne toy toyPrimitives () () pos layers hlayers msg msg'
       sigs h
 
-/-- Extractor soundness, destructured through the unfolding equation: a consumer recovers the layer
-bound and the `XmssWitness` condition at the position and honest message that layer names. -/
+/-- Extractor soundness, destructured through the unfolding equation: a consumer recovers the
+`XmssWitness` condition at the position and honest message the reported layer names, with the
+position formed through `HypertreeWitness.layer_lt` rather than through a bound `Valid` supplies. -/
 example (pos : LayerPosition toy) (layers : ℕ)
     (hlayers : pos.layer.val + layers = toy.params.d) (msg msg' : toyPrimitives.Y)
     (sigs : Vector (XmssSig toyParams toyPrimitives) layers)
-    (w : HypertreeWitness toy toyPrimitives)
+    (w : HypertreeWitness toy toyPrimitives layers)
     (hw : findHypertreeWitness toy toyPrimitives () () pos layers hlayers msg msg' sigs =
       some w) :
-    ∃ _ : w.layer < layers,
-      w.witness.Valid () () (pos.advance w.layer (by omega)).toAdrs
-        (pos.advance w.layer (by omega)).leaf.val
-        (honestLayerMsg toy toyPrimitives () () pos msg' w.layer (by omega)) :=
+    w.witness.Valid () () (pos.advance w.layer.val (w.layer_lt pos hlayers)).toAdrs
+      (pos.advance w.layer.val (w.layer_lt pos hlayers)).leaf.val
+      (honestLayerMsg toy toyPrimitives () () pos msg' w.layer.val (w.layer_lt pos hlayers)) :=
   (HypertreeWitness.valid_iff () () pos msg' layers hlayers w).mp
     (findHypertreeWitness_sound toy toyPrimitives () () pos layers hlayers msg msg' sigs hw)
 
