@@ -66,6 +66,10 @@ a digest and signature data:
 * the three game-shape bridges `forsWitness_valid_tlCollision_eval`,
   `forsWitness_valid_hCollision_eval`, `forsWitness_valid_fPreimage_eval`.
 
+These thirty and the five below are the module's whole interface.  The one further declaration,
+`forsRecoveredRoot_climb`, is `private`: it re-spells the root hypothesis three proofs share and
+concludes nothing they do not.
+
 *Transcript transport* — a statement about a role ledger of `HashSig.SLHDSA.Security`:
 
 * `mem_forsLeafAddresses_of_digest`, `mem_forsTreeAddresses_of_digest`;
@@ -213,6 +217,26 @@ theorem forsPkFromSig_eq_tl_recoveredRoots (prims : Primitives p) (sig : ForsSig
       prims.Tl pk (forsPkAdrs adrs) (forsRecoveredRoots prims sig md pk adrs).toList :=
   forsPkFromSig_eq_tl prims sig md pk adrs
 
+/-- The climb of tree `i`'s forged opening reaches the honest tree-`i` root, spelled as
+`PerfectMerkleTree.merkleRoot` at height `a` and breadth index `idx / 2 ^ a` — the shape
+`PerfectMerkleTree.climb_binding`, `findCollision_oriented` and `findCollision_sound` all take.
+It is `hroot` with `forsRoot` unfolded and `forsSigLeafIndex_div_pow_a` applied.
+
+Private: it is a spelling of the hypothesis its three consumers below already carry, and adds
+nothing to what they conclude. -/
+private theorem forsRecoveredRoot_climb (prims : Primitives p) (sig : ForsSigCore p prims.core)
+    (md : List Byte) (sk : prims.SkSeed) (pk : prims.PkSeed) (adrs : Adrs) (i : Fin p.k)
+    (hroot : (forsRecoveredRoots prims sig md pk adrs)[i.val] =
+      (forsHonestRoots prims sk pk adrs)[i.val]) :
+    PerfectMerkleTree.climb (forsNodeHash prims pk adrs) (forsSigLeafIndex p md i.val)
+        (prims.F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val)) (sig[i.val]).sk)
+        (sig[i.val]).auth.toList =
+      PerfectMerkleTree.merkleRoot (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) p.a
+        (forsSigLeafIndex p md i.val / 2 ^ p.a) := by
+  rw [forsSigLeafIndex_div_pow_a]
+  rw [forsRecoveredRoots_getElem, forsHonestRoots_getElem, forsRoot_eq_merkleRoot] at hroot
+  exact hroot
+
 /-! ## The three branches -/
 
 /-- **FORS root-compression binding.**  A signature that recovers the honest FORS public key
@@ -273,15 +297,7 @@ theorem forsTreeBinding (prims : Primitives p) (sig : ForsSigCore p prims.core) 
           (forsHonestChildren prims sk pk adrs z (forsSigLeafIndex p md i.val / 2 ^ z)).2 =
         prims.H pk (forsNodeAdrs adrs z (forsSigLeafIndex p md i.val / 2 ^ z)) c.1 c.2 := by
   have hlen : (sig[i.val]).auth.toList.length = p.a := by simp
-  have hclimb : PerfectMerkleTree.climb (forsNodeHash prims pk adrs)
-        (forsSigLeafIndex p md i.val)
-        (prims.F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val)) (sig[i.val]).sk)
-        (sig[i.val]).auth.toList =
-      PerfectMerkleTree.merkleRoot (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) p.a
-        (forsSigLeafIndex p md i.val / 2 ^ p.a) := by
-    rw [forsSigLeafIndex_div_pow_a]
-    rw [forsRecoveredRoots_getElem, forsHonestRoots_getElem, forsRoot_eq_merkleRoot] at hroot
-    exact hroot
+  have hclimb := forsRecoveredRoot_climb prims sig md sk pk adrs i hroot
   obtain ⟨z, c, hzpos, hzle, hne, hcoll⟩ :=
     PerfectMerkleTree.climb_binding (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs)
       p.a (forsSigLeafIndex p md i.val) _ _ hlen hclimb hleaf
@@ -537,15 +553,7 @@ theorem findForsTreeCollision_sound (prims : Primitives p) [DecidableEq prims.Y]
     rw [Option.map_eq_some_iff] at hw
     obtain ⟨u, hu, rfl⟩ := hw
     have hlen : (sig[i.val]).auth.toList.length = p.a := by simp
-    have hclimb : PerfectMerkleTree.climb (forsNodeHash prims pk adrs)
-          (forsSigLeafIndex p md i.val)
-          (prims.F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val)) (sig[i.val]).sk)
-          (sig[i.val]).auth.toList =
-        PerfectMerkleTree.merkleRoot (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) p.a
-          (forsSigLeafIndex p md i.val / 2 ^ p.a) := by
-      rw [forsSigLeafIndex_div_pow_a]
-      rw [forsRecoveredRoots_getElem, forsHonestRoots_getElem, forsRoot_eq_merkleRoot] at hroot
-      exact hroot
+    have hclimb := forsRecoveredRoot_climb prims sig md sk pk adrs i hroot
     obtain ⟨z, c, hor⟩ := PerfectMerkleTree.findCollision_oriented
       (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) p.a
       (forsSigLeafIndex p md i.val) _ _ hlen hclimb hleaf
@@ -572,15 +580,7 @@ theorem findForsTreeCollision_isSome_of_ne (prims : Primitives p) [DecidableEq p
       prims.F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val)) (sig[i.val]).sk) :
     (findForsTreeCollision prims sig md sk pk adrs i).isSome := by
   have hlen : (sig[i.val]).auth.toList.length = p.a := by simp
-  have hclimb : PerfectMerkleTree.climb (forsNodeHash prims pk adrs)
-        (forsSigLeafIndex p md i.val)
-        (prims.F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val)) (sig[i.val]).sk)
-        (sig[i.val]).auth.toList =
-      PerfectMerkleTree.merkleRoot (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) p.a
-        (forsSigLeafIndex p md i.val / 2 ^ p.a) := by
-    rw [forsSigLeafIndex_div_pow_a]
-    rw [forsRecoveredRoots_getElem, forsHonestRoots_getElem, forsRoot_eq_merkleRoot] at hroot
-    exact hroot
+  have hclimb := forsRecoveredRoot_climb prims sig md sk pk adrs i hroot
   obtain ⟨z, c, hor⟩ := PerfectMerkleTree.findCollision_oriented
     (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) p.a
     (forsSigLeafIndex p md i.val) _ _ hlen hclimb hleaf
@@ -761,9 +761,11 @@ theorem forsRootAdrsKey_injective {prims : Primitives vp.params}
 `ForsWitness.Valid` is stated in the construction's own vocabulary (`prims.F`, `prims.H`,
 `prims.Tl` at a structural `Adrs`).  These three bridges rewrite it into the canonical games'
 `eval` vocabulary at the encoded tweak, using the attacked-member equations of
-`HashSig.SLHDSA.Security.CanonicalGames`.  Each takes explicitly only the honest objects its own
-branch mentions; the others are implicit and read off the hypothesis.  They change presentation
-only: no game is played and no advantage is stated.
+`HashSig.SLHDSA.Security.CanonicalGames`.  All three take the same explicit prefix — the honest
+seeds, the instance address and the digest — then the branch's own data and the validity
+hypothesis, and all three rewrite *both* sides of their hash equation, so what they conclude is
+stated entirely in the game's vocabulary.  They change presentation only: no game is played and no
+advantage is stated.
 
 The `fPreimage` bridge lands in `forsFOpenPreProblem` and not in `forsFTcrProblem`, for the reason
 the case-analysis section gives.  Slice 6's `forsFTcrProblem_eq_toTCR` and
@@ -775,7 +777,7 @@ variable (prims : Primitives p)
 /-- The `T_k` branch, read in `forsTlTcrCProblem`'s vocabulary: two distinct root vectors with the
 same evaluation at the encoded compression tweak. -/
 theorem forsWitness_valid_tlCollision_eval [SampleableType prims.PkSeed] (sk : prims.SkSeed)
-    (pk : prims.PkSeed) (adrs : Adrs) {md : List Byte} (recovered : Vector prims.Y p.k)
+    (pk : prims.PkSeed) (adrs : Adrs) (md : List Byte) (recovered : Vector prims.Y p.k)
     (h : (ForsWitness.tlCollision recovered).Valid sk pk adrs md) :
     recovered ≠ forsHonestRoots prims sk pk adrs ∧
       (forsTlTcrCProblem prims).th.eval pk (prims.adrsToKey (forsPkAdrs adrs)) recovered =
@@ -803,18 +805,23 @@ theorem forsWitness_valid_hCollision_eval [SampleableType prims.PkSeed] (sk : pr
     rw [forsHTcrCProblem_eval_adrsToKey, forsHTcrCProblem_eval_adrsToKey]
     exact h.2.2.2⟩
 
-/-- The `F`-preimage branch, read in `forsFOpenPreProblem`'s vocabulary: the submitted value
-evaluates to the honest leaf image at the encoded leaf tweak.  This is the hash half of that
-game's winning condition; the other half, that the index was never opened, is not established
-here. -/
+/-- The `F`-preimage branch, read in `forsFOpenPreProblem`'s vocabulary: the submitted value and
+the honest secret value have the same evaluation at the encoded leaf tweak.  That is the shape
+`SM_DT_OpenPRE_SourceFinalValidity.Experiment` tests — `eval pk t m = eval pk t x` at the committed
+target input `x`, here the honest secret value whose image is the honest leaf image.  It is the
+hash half of that game's winning condition; the other half, that the index was never opened, is not
+established here.  `forsFOpenPreProblem_eval_adrsToKey` is not `@[simp]` where its two siblings
+are (`CanonicalGames.lean:353`), a slice-6 asymmetry nothing here depends on: all three proofs name
+their rewrite explicitly. -/
 theorem forsWitness_valid_fPreimage_eval [SampleableType prims.PkSeed] [SampleableType prims.Y]
     (sk : prims.SkSeed) (pk : prims.PkSeed) (adrs : Adrs) (md : List Byte) (i : Fin p.k)
     (value : prims.Y) (h : (ForsWitness.fPreimage i value).Valid sk pk adrs md) :
     (forsFOpenPreProblem prims).th.eval pk
         (prims.adrsToKey (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val))) value =
-      prims.F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val))
+      (forsFOpenPreProblem prims).th.eval pk
+        (prims.adrsToKey (forsNodeAdrs adrs 0 (forsSigLeafIndex p md i.val)))
         (forsSkGenCore prims.core sk pk adrs (forsSigLeafIndex p md i.val)) := by
-  rw [forsFOpenPreProblem_eval_adrsToKey]
+  rw [forsFOpenPreProblem_eval_adrsToKey, forsFOpenPreProblem_eval_adrsToKey]
   exact h
 
 end SLHDSA.Security
