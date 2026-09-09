@@ -71,6 +71,7 @@ public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.ToFinalV
 public import VCVio.CryptoFoundations.HashCommitment
 public import VCVio.CryptoFoundations.IdenSchemeWithAbort
 public import VCVio.CryptoFoundations.KEMDEM
+public import VCVio.CryptoFoundations.KEMDEM.Measure
 public import VCVio.CryptoFoundations.KeyEncapMech
 public import VCVio.CryptoFoundations.MacAlg
 public import VCVio.CryptoFoundations.MacFromPRF
