@@ -616,7 +616,8 @@ computation of it, so the canaries check the extractor against tables written in
 library's and known to match it. -/
 def checkToyBundle : IO Unit := do
   ensure "H_msg moves with the randomizer"
-    (digestOf (rOf addrndA msgB) msgB != digestOf (rOf addrndB msgB) msgB)
+    (splitDigest toyParams (toyPrimitives.Hmsg (node 0x01) pkSeed pkRoot msgB) !=
+      splitDigest toyParams (toyPrimitives.Hmsg (node 0x02) pkSeed pkRoot msgB))
   ensure "H_msg moves with the message"
     (digestOf rB msgA != digestOf rB msgB)
   ensure "H_msg moves with the public seed"
@@ -627,6 +628,7 @@ def checkToyBundle : IO Unit := do
       splitDigest toyParams (toyPrimitives.Hmsg rB pkSeed (node (byteOf pkRoot + 1)) msgB))
   ensure "PRF_msg moves with addrnd" (rOf addrndA msgB != rOf addrndB msgB)
   ensure "PRF_msg moves with the message" (rOf addrndB msgA != rOf addrndB msgB)
+  ensure "and so the two sites' randomizers differ" (rOf addrndA msgA != rB)
   ensure "the two site-A messages differ but share a digest"
     (msgA != msgA' && byteFold msgA == byteFold msgA' &&
       digestOf (rOf addrndA msgA) msgA == digestOf (rOf addrndA msgA') msgA')
