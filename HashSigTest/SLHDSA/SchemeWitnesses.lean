@@ -140,9 +140,8 @@ def ensure (label : String) (condition : Bool) : IO Unit :=
 Two hypertree layers of height two, two FORS trees of height one, `w = 16`, `len = 4`. -/
 
 -- Exposed: the profile and its validated form have to reduce inside the `decide` pins below and
--- inside the bundle they index, and the bundle itself has to reduce for the `Fin` bounds of the
--- hand-written positions.  Neither the secret map, the tweak map, the randomizer, the digest map
--- nor any of the four positions needs exposure of its own.  Nothing outside this executable
+-- inside the bundle they index.  Neither the secret map, the tweak map, the randomizer, the digest
+-- map nor any of the four positions needs exposure of its own.  Nothing outside this executable
 -- consumes them.
 /-- Two layers of height two, two FORS trees of height one. -/
 @[expose] def toyParams : Params :=
@@ -197,6 +196,11 @@ def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
   mixByte (UInt8.ofNat ((r.toNat * (6 * i + 37) + seed.toNat * (10 * i + 53) +
     root.toNat * (14 * i + 89) + (byteFold msg).toNat * (22 * i + 149) + (30 * i + 7)) % 256))
 
+-- Exposed and `@[reducible]`, for two different reasons.  Exposed, because the `Fin` bounds of the
+-- hand-written positions below are discharged from it.  Reducible, because its carrier types have
+-- to unfold to `Bytes 1` for instance resolution to reach them: without it `byteOf`'s `y[0]` finds
+-- no `GetElem` instance and no index bound, and the secret-key comparison in `checkSchemeEquations`
+-- finds no `BEq` on `toyPrimitives.core.PkSeed`.  Nothing outside this executable consumes it.
 /-- The toy bundle: one byte per node, a collapsing order- and address-sensitive `Thash`, and an
 `H_msg` that depends on all four of its arguments. -/
 @[expose, reducible] def toyPrimitives : Primitives toyParams where
