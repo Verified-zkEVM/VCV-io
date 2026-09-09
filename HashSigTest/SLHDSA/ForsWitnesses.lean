@@ -463,9 +463,9 @@ one on `fPreimage`.  The seven rejections falsify six of them —
 * the `hCollision` hash equation, by a collision whose `H` image differs and by the genuine
   collision with its two children swapped — the second only because `H` is order sensitive, so it
   is the left-to-right identification that rejects it;
-* the `hCollision` distinctness, by a collision submitted at the honest child pair itself; this is
-  the one fabrication rejected on a single conjunct, since both its bounds hold and its hash
-  equation is an identity;
+* the `hCollision` distinctness, by a collision submitted at the honest child pair itself: both its
+  bounds hold and its hash equation is an identity, so the distinctness is the only conjunct it
+  fails;
 * the `0 < z` bound, by the genuine collision moved to height zero, where the address is a FORS
   *leaf* address and `forsHonestChildren`'s `height - 1` would truncate;
 * the `z ≤ a` bound, by the genuine collision moved above the tree height;
@@ -513,13 +513,12 @@ def checkFabricatedWitnesses : IO Unit := do
 
 /-- A shape pin for `forsPkFromSig_cases`: at a signature which recovers the honest FORS public
 key, one of the three branches holds.  The two collision branches are restated with their hash
-equation first, the reverse of the order `forsPkFromSig_cases` states them in, so each has to be
-reassembled rather than passed through and every conjunct the theorem supplies is bound and used
-here.  That is not the order the games read: both source-final-validity experiments test their side
-condition first and the hash equation last (`m ≠ mj ∧ eval = eval`; `j ∉ opened`, then
-`eval = eval`).  Deleting the `T_k` equality from the first
-disjunct or the `H` equality from the second, which is the security content of those two branches,
-breaks this pin. -/
+equation moved in front of the side conditions `forsPkFromSig_cases` states before it, so each has
+to be reassembled rather than passed through, and every conjunct the theorem supplies is bound and
+used here.  That is not the order the games read: both source-final-validity experiments test
+their side condition first and the hash equation last (`m ≠ mj ∧ eval = eval`; `j ∉ opened`, then
+`eval = eval`).  Deleting the `T_k` equality from the first disjunct or the `H` equality from the
+second, which is the security content of those two branches, breaks this pin. -/
 example (sig : ForsSigCore toyParams toyPrimitives.core) (md : List Byte)
     (hpk : forsPkFromSig toyPrimitives sig md () baseAdrs =
       forsPkGen toyPrimitives () () baseAdrs) :

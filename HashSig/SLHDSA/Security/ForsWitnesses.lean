@@ -277,11 +277,11 @@ theorem forsRootsBinding (prims : Primitives p) (sig : ForsSigCore p prims.core)
   exact hpk
 
 /-- The honest child pair of the FORS internal node at height `z`, global index `t`: the two
-honest subtree roots one level below.  Meaningful only at `0 < z`, which every statement below
-that names it as an honest partner asserts — all but its own unfolding equation, which is
-definitional and so holds at every height.  At `z = 0` truncated subtraction would silently name
-the leaf level, and `forsNodeAdrs adrs 0 t` is a `forsF` leaf target rather than a `forsH` node
-target. -/
+honest subtree roots one level below.  Meaningful only at `0 < z`.  Every statement below that
+names it as an honest partner asserts that bound; the one exception is its own unfolding equation,
+which is definitional and holds at every height.  At `z = 0` truncated subtraction would silently
+name the leaf level, and `forsNodeAdrs adrs 0 t` is a `forsF` leaf target rather than a `forsH`
+node target. -/
 def forsHonestChildren (prims : Primitives p) (sk : prims.SkSeed) (pk : prims.PkSeed)
     (adrs : Adrs) (z t : ℕ) : prims.Y × prims.Y :=
   PerfectMerkleTree.honestChildren (forsLeaf prims sk pk adrs) (forsNodeHash prims pk adrs) z t
