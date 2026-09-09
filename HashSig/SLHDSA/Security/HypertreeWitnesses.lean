@@ -13,8 +13,8 @@ public import HashSig.SLHDSA.HypertreeGeneral
 
 The layer walk: a hypertree signature that recovers the honest public root from a forged message
 must, at one of its `d` layers, present an XMSS signature that recovers the honest XMSS root of
-that layer's tree from a message the honest signer never signed there.  That layer's signature is
-then one XMSS forgery at one named tree address, which
+that layer's tree from a message differing from the one the honest hypertree signs there.  That
+layer's signature is then one XMSS forgery at one named tree address, which
 `HashSig.SLHDSA.Security.XmssWitnesses` translates into a witness against `H`, `T_len` or `F`.
 
 ## What is proved, and what is not
@@ -42,7 +42,19 @@ exhaustiveness the source discharges inline.
 
 *Deterministic inclusion* — a statement whose only free objects are a validated parameter record
 or a `prims` over one, seeds, positions and addresses, natural-number indices, messages, and
-signature or witness data:
+signature or witness data, together with the structural side conditions their statements or proofs
+need: the `DigestParts` the layer-zero position is parsed from, which three of them take —
+`advance_initial_eq_atLayer`, `recoverFromPosition_of_pkFromSig` and `pkFromSig_binding`; the
+`DecidableEq prims.Y` instance the extractor and its four lemmas take; and the
+`prims.core.ByteLaws` argument `findHypertreeWitness_isSome` alone takes, which is what reaches the
+WOTS+ extractor's completeness lemma.  The honest secret seed is taken by fourteen of the
+twenty-four: the honest running message and its three equations, the walk and its two companions,
+the validity predicate and its unfolding equation, and the extractor and its four lemmas.  The
+seven position-arithmetic declarations, the witness type and the two ledger statements do not take
+one, because none of them names an honest object.  The `p.Valid` argument its predecessors carry is
+absent throughout: a `ValidatedParams` supplies it.
+
+The declarations are:
 
 * the position arithmetic `LayerPosition.next_congr`, `LayerPosition.advance` and its four
   equations `advance_zero`, `advance_next`, `advance_layer_val`, `advance_succ`, and the bridge
@@ -57,9 +69,12 @@ signature or witness data:
   `findHypertreeWitness_eq_next_of_ne`, and its two lemmas `findHypertreeWitness_sound` and
   `findHypertreeWitness_isSome`.
 
-*Transcript transport* — a statement about a role ledger of `HashSig.SLHDSA.Security`:
+*Transcript transport* — a statement about the slice-1 coordinates and ledgers of
+`HashSig.SLHDSA.Security`:
 
-* `layerTreeCoord_advance_ne` and `advance_xmssNodeAdrsKey_injective`.
+* `layerTreeCoord_advance_ne` names no ledger and asserts no membership: it separates the slice-1
+  tree coordinate two different layers of one walk carry, which is what the next one needs;
+* `advance_xmssNodeAdrsKey_injective` is about the encoded tweaks of the `xmssH` ledger.
 
 Two private `Vector` lemmas, `getElem_zero_eq_head` and `getElem_succ_eq_tail`, carry the
 head-and-tail bookkeeping the induction needs; they are the only private declarations, and they
