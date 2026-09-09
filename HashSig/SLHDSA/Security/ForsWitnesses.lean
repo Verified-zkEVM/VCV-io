@@ -339,9 +339,9 @@ theorem forsPkFromSig_cases (prims : Primitives p) (sig : ForsSigCore p prims.co
 vector, an adversarial child pair together with the height that names its tweak, or the revealed
 secret value together with the tree that names its tweak.  Every honest object a witness attacks
 is an argument of `ForsWitness.Valid` and never a constructor field: `Valid` takes the honest
-secret seed, the public seed, the instance address and the *forged* digest, and from them
-*computes* the honest root vector, the honest child pair at the named node, and the honest leaf
-image at the named tree's opened leaf.
+secret seed, the public seed, the instance address and the digest, and from them *computes* the
+honest root vector, the honest child pair at the named node, and the honest leaf image at the
+named tree's opened leaf.
 
 That computation is the identification a source-final-validity game needs: its winning condition
 compares the submitted value against the challenge *recorded* at the named target, so a pair of
@@ -353,16 +353,18 @@ address in a role ledger, and nothing beyond that.  It does not assert that the 
 recorded as a game target, that the preimage branch's index was never opened, or anything about
 the rest of a transcript; those are program-level obligations of the reduction.
 
-Only the forged digest appears.  The honest digest does not, because — unlike the WOTS+ case,
+Only one digest appears, the one the witness is submitted against.  A second, honest digest does
+not, because — unlike the WOTS+ case,
 where the honest partner is read off the honest signature — every FORS honest partner is a
 function of the honest tree, which `sk` generates. -/
 
 /-- A witness against one FORS component hash at a fixed instance address.
 
-Each constructor carries only the value a reduction submits, together with the coordinate that
-names its tweak: the tree height for the `H` branch, the tree number for the `F` branch.  The
-`T_k` tweak is named by `adrs` alone, so `tlCollision` carries no coordinate; and the `H` branch's
-horizontal index is not carried either, because the forged digest already fixes it.  Every honest
+Each constructor carries only the value a reduction submits, together with the coordinates that
+name its tweak: the tree number and the tree height for the `H` branch, the tree number alone for
+the `F` branch.  The `T_k` tweak is named by `adrs` alone, so `tlCollision` carries no coordinate;
+and the `H` branch's horizontal node index is not carried either, because the tree number and the
+digest already fix it.  Every honest
 object a witness attacks is supplied to `ForsWitness.Valid`, which reads it off the honest tree. -/
 inductive ForsWitness (p : Params) (prims : Primitives p) where
   /-- A second preimage of the honest FORS root vector under `T_k` at `forsPkAdrs adrs`. -/
@@ -375,7 +377,8 @@ inductive ForsWitness (p : Params) (prims : Primitives p) where
   | fPreimage (tree : Fin p.k) (value : prims.Y)
 
 /-- The winning condition each witness asserts, against the honest tree that `sk` generates at
-`adrs` under the public seed `pk`, at the forged digest `md`.
+`adrs` under the public seed `pk`, at the digest `md` — the forged one, in the intended use, though
+nothing here requires `md` to be a forgery's.
 
 Write `idx = forsSigLeafIndex p md tree` for the global leaf index the digest opens in tree
 `tree`.  Then:
