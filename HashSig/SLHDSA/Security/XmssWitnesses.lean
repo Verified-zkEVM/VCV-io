@@ -419,12 +419,11 @@ recovered leaf — the WOTS+ branch is taken, and whatever it returns there is v
 because its guard is the leaf test and that test is already `findWotsWitness_sound`'s own
 hypothesis.  That is `findXmssWitness_sound_of_leaf` below, which beside the `some w` its
 conclusion is about takes the leaf test and nothing else: a caller holding a leaf match and no root
-match cites it rather than reproving it.  It says nothing
-about whether anything is returned: existence on this branch is `findXmssWitness_isSome`'s, and what
-buys it there is `hne : msg ≠ msg'` together with the validated parameters and the byte laws —
-never the root, as that theorem's proof shows, though no statement here isolates the existence half.
-At `msg = msg'` every chain's two step counts agree, so the search can run out and give `none`
-however the climb went.
+match cites it rather than reproving it.  It says nothing about whether anything is returned:
+existence on this branch is `findXmssWitness_isSome`'s, and what buys it there is `hne : msg ≠ msg'`
+together with the validated parameters and the byte laws — never the root, as that theorem's proof
+shows, though no statement here isolates the existence half.  At `msg = msg'` every chain's two step
+counts agree, so the search can run out and give `none` however the climb went.
 
 Over a 768-case sweep at the toy bundle of `HashSigTest.SLHDSA.XmssWitnesses` — sixteen chain-`3`
 perturbations by three authentication-path choices, level `0`, level `1` or none, by sixteen path
