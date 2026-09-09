@@ -398,7 +398,8 @@ script test (args) do
     #["exe", "slhdsa_trace_target_tests"],
     #["exe", "slhdsa_component_trace_tests"],
     #["exe", "slhdsa_canonical_game_tests"],
-    #["exe", "slhdsa_wots_witness_tests"]]
+    #["exe", "slhdsa_wots_witness_tests"],
+    #["exe", "slhdsa_fors_witness_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -487,6 +488,13 @@ extractor returns the chain `F`-collision, the chain `F`-preimage, and the `T_le
 each satisfying its equation by evaluation, plus the empty and malformed-input canaries. -/
 lean_exe slhdsa_wots_witness_tests where
   root := `HashSigTest.SLHDSA.WotsWitnesses
+
+/-- FORS forgery-to-witness extraction: over a toy bundle whose `Thash` collapses its input and is
+order and address sensitive, the extractor returns the `H`-collision at the exact FORS node
+address, the `F`-preimage at the exact FORS leaf address, and the `T_k` second preimage, each
+satisfying its equation by evaluation, plus the honest-signature and malformed-input canaries. -/
+lean_exe slhdsa_fors_witness_tests where
+  root := `HashSigTest.SLHDSA.ForsWitnesses
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
