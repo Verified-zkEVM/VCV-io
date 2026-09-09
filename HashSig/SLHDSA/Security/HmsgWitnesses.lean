@@ -130,7 +130,7 @@ address, a digest, an index and naturals:
 * `findUncoveredIndex`, `findUncoveredIndex_eq_find?`, `findUncoveredIndex_eq_some_iff`,
   `mem_indexSet_of_findUncoveredIndex`, `notMem_targetIndexSet_of_findUncoveredIndex`,
   `wins_of_findUncoveredIndex_eq_none`, `itsr_wins_or_uncovered`, `uncoveredTarget`,
-  `uncoveredTarget_globalLeaf`;
+  `uncoveredTarget_eq`, `uncoveredTarget_globalLeaf`;
 * `forsSign_getElem_sk`.
 
 *Transcript transport* — a statement about a query list or an ITSR target transcript:
@@ -140,7 +140,7 @@ address, a digest, an index and naturals:
   `mem_targetIndexSet_embedTargets_iff`, `wins_embedTargets_iff`;
 * `forsSign_reveals_of_mem_hmsgIndices`, `coord_unrevealed_of_notMem`.
 
-Those forty are the module's whole interface; none is `private` and none carries `@[expose]`.
+Those forty-one are the module's whole interface; none is `private` and none carries `@[expose]`.
 
 ## References
 
@@ -551,9 +551,21 @@ with a stated provenance rather than a raw `Fin`, and `uncoveredTarget_globalLea
 the coordinate the same index names. -/
 def uncoveredTarget {p : Params} (idx : HmsgIndex p) : Fin p.k := idx.tree
 
+/-- Unfolding equation for `uncoveredTarget`.  The body is not exposed, so a consumer that wants to
+see the FORS tree behind the name rewrites with this.
+
+Not `@[simp]`, for the reason `HashSig.SLHDSA.Security.SchemeWitnesses` gives for `schemeParts_eq`:
+the definition exists to name a value with a stated provenance, and a `simp` set that rewrote the
+name away would put the bare projection back into every goal a consumer states. -/
+theorem uncoveredTarget_eq {p : Params} (idx : HmsgIndex p) :
+    uncoveredTarget idx = idx.tree := by rfl
+
 /-- The selected tree is what dividing the tree height out of the global leaf gives back, so the
-`target` handed to the FORS extractor and the coordinate the uncovered index names agree. -/
-@[simp] theorem uncoveredTarget_globalLeaf {p : Params} (idx : HmsgIndex p) :
+`target` handed to the FORS extractor and the coordinate the uncovered index names agree.
+
+Not `@[simp]` either, and for a second reason: its right-hand side is the wrapper, so as a rewrite
+rule it would replace a plain projection by a named one. -/
+theorem uncoveredTarget_globalLeaf {p : Params} (idx : HmsgIndex p) :
     idx.globalLeaf / 2 ^ p.a = (uncoveredTarget idx).val :=
   HmsgIndex.globalLeaf_div_pow_a idx
 

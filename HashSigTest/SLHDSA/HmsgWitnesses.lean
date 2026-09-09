@@ -109,7 +109,7 @@ coverage.
 
 ## The pins
 
-Every one of the thirty-four theorems the library module exports appears as an `example` at this
+Every one of the thirty-five theorems the library module exports appears as an `example` at this
 bundle's types, with generic arguments where the statement has them.  Seven further `example`s are
 the profile's own `decide` pins, inherited with the copied block.
 -/
@@ -811,6 +811,8 @@ example (hfresh : candidate ∉ targets) :
         j ∈ (hmsgItsrProblem toyPrimitives).indexSet candidate ∧
         j ∉ (hmsgItsrProblem toyPrimitives).targetIndexSet targets :=
   itsr_wins_or_uncovered targets candidate hfresh
+
+example : uncoveredTarget idx = idx.tree := uncoveredTarget_eq idx
 
 example : idx.globalLeaf / 2 ^ toyParams.a = (uncoveredTarget idx).val :=
   uncoveredTarget_globalLeaf idx
