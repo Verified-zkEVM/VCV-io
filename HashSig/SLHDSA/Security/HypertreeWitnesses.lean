@@ -80,7 +80,7 @@ The declarations are:
   label covers: it separates the tree coordinates two different layers of one walk carry.  It
   names no ledger and asserts no membership.  It is the stronger of the pair it forms with
   `advance_ne`: `advance_ne` follows from it by `congrArg LayerTreeCoord.ofPosition`, while the
-  step back would need `ofPosition` injective and it is not.  Both are read off
+  step back would need `ofPosition` injective, and `ofPosition` drops the leaf.  Both end at
   `advance_layer_val`, which is how each is proved here;
 * `advance_xmssNodeAdrsKey_injective` is about the encoded tweaks of the `xmssH` ledger.
 
@@ -272,16 +272,17 @@ This is what a consumer holding two hypertree witnesses at two layers of one wal
 branch they took: each of slice 1's four witness ledgers is enumerated over every layer, and each
 of their injectivity lemmas concludes equality of a coordinate whose position component this
 refutes.  It is what the three WOTS+ ledgers need and all they need.  The `xmssH` ledger is
-indexed by a `LayerTreeCoord`, which forgets the leaf, so this statement does not reach it —
-`LayerTreeCoord.ofPosition` is not injective, and distinct positions can share a coordinate.
+indexed by a `LayerTreeCoord`, which `LayerTreeCoord.ofPosition` builds as `⟨pos.layer, pos.tree⟩`,
+dropping the leaf.  `Params.Valid.hp_pos` gives at least two leaves at every layer and tree, so
+that map is not injective and this statement's conclusion does not transport forward along it.
 
 `layerTreeCoord_advance_ne` is that branch's own reading of `advance_layer_val`, and it is the
 stronger of the two: this one follows from it by `congrArg LayerTreeCoord.ofPosition`, because a
-function applied to equal arguments gives equal results, and no injectivity is needed for that
-direction.  Both are kept, each three lines off `advance_layer_val`, because taking the derivation
-would make this piece of position arithmetic depend on a slice-1 coordinate — a *Deterministic
-inclusion* statement resting on a *Transcript transport* one, which is the boundary the labels
-draw. -/
+function applied to equal arguments gives equal results and no injectivity is needed in that
+direction.  Neither is derived from the other here, because this one is *Deterministic inclusion*
+position arithmetic and taking that derivation would rest it on a *Transcript transport* statement
+about a slice-1 coordinate.  Each ends at `advance_layer_val` — this one by projecting the layer
+word out of the position, the coordinate one by way of `toAdrs`. -/
 theorem advance_ne (pos : LayerPosition vp) {j j' : ℕ}
     (hj : pos.layer.val + j < vp.params.d) (hj' : pos.layer.val + j' < vp.params.d)
     (hne : j ≠ j') :
@@ -673,25 +674,28 @@ honest running message there.
 What this pins about the reported layer is worth stating exactly, because two different things
 pin it and only one of them is this lemma.
 
-The *relative* placement is this lemma's: the recursive step rewrites through
-`LayerPosition.advance_next` and `honestLayerMsg_next`, so a shift applied to the extractor's
-label alone — a `+ 2`, or a dropped `+ 1` — does not type-check against `HypertreeWitness.Valid`.
+The *relative* placement is this lemma's.  The recursive step rewrites through
+`LayerPosition.advance_next` and `honestLayerMsg_next`, so dropping the `+ 1` from the extractor's
+recursive label breaks this proof at that rewrite.  A `+ 2` there does not even reach it: the
+recursive label's own bound would be `w.layer.val + 2 < layers + 2`, and the recursive answer
+supplies only `w.layer.val < layers + 1`.
 
 The *absolute* placement is the witness type's.  `HypertreeWitness.layer` is a `Fin layers`, so its
 range is fixed by the walk length the witness was extracted from rather than by the statements that
-read it.  A bare `ℕ` label would admit a uniform renumbering — base label `⟨0, ·⟩` to `⟨1, ·⟩`,
-`w.layer` read as `w.layer - 1` in `Valid`, the bound relaxed to `0 < w.layer ∧ w.layer ≤ layers`
-— which is a reparametrisation, not an unsoundness: it leaves `Valid`'s content unchanged, so
-every layer-free consequence survives it, and every statement here could be renumbered with it.
-What refuses it is that the base case runs at walk length one, where the label's type is `Fin 1`
-and the shifted label's obligation is `1 < 1`.  That is refutable, not merely unproved, so the
-renumbering is not writable at all, and the failure is a build error rather than a run-time one.
+read it.  A bare `ℕ` label would instead admit a uniform renumbering — base label `⟨0, ·⟩` to
+`⟨1, ·⟩`, `w.layer` read as `w.layer - 1` in `Valid`, the bound relaxed to
+`0 < w.layer ∧ w.layer ≤ layers` — which is a reparametrisation rather than an unsoundness: it
+leaves `Valid`'s content unchanged, so the statements this module ships are all renumbered with it
+and re-prove by the same induction.  What refuses it here is that the extractor's base case runs at
+walk length one, where the label's type is `Fin 1` and the shifted base label's obligation is
+`1 < 1`.  That obligation is refutable rather than merely unproved, so the renumbering is not
+writable at all and the failure is a build error rather than a run-time one.
 
-`HashSigTest.SLHDSA.HypertreeWitnesses` checks the same thing a second way and independently of the
-type: it compares the reported layer with the one its fixture built the divergence at, and
-evaluates the witness through a hand-written table of positions and honest messages rather than
-through `Valid`, with an agreement check pinning that table against `advance` and `honestLayerMsg`
-at fixed layers.  Those checks predate the `Fin` label and are kept.
+`HashSigTest.SLHDSA.HypertreeWitnesses` checks the reported layer a second way, not through
+`HypertreeWitness.Valid`: it compares the label with the one its fixture built the divergence at,
+and evaluates the witness through a hand-written table of positions and honest messages, with an
+agreement check pinning that table against `advance` and `honestLayerMsg` at fixed layers.  Those
+checks are what caught the renumbering when the label was a bare `ℕ`, and they are kept.
 
 There is no top-root hypothesis.  Each layer's guard is the root match at that layer, which is
 `findXmssWitness_sound`'s own hypothesis, so the conclusion holds whether or not the walk reaches
@@ -785,11 +789,12 @@ as the layers do.
 
 This is the stronger of the two statements it forms a pair with.  `LayerPosition.advance_ne`
 follows from it in one step, `fun h => layerTreeCoord_advance_ne pos hj hj' hne (congrArg
-LayerTreeCoord.ofPosition h)`; the step back does not exist, because it would need
-`LayerTreeCoord.ofPosition` injective and that function keeps the layer and the tree and forgets
-the leaf.  Neither is derived from the other here: both are read off `advance_layer_val`, and
-`advance_ne` is *Deterministic inclusion* position arithmetic that would otherwise rest on this
-slice-1 coordinate statement.
+LayerTreeCoord.ofPosition h)`.  There is no step back: `advance_ne`'s conclusion is a disequality
+of positions, and carrying that forward through `ofPosition` is exactly injectivity of `ofPosition`,
+which builds `⟨pos.layer, pos.tree⟩` and so identifies the at-least-two leaves `Params.Valid.hp_pos`
+gives every tree.  Neither is derived from the other here in any case: `advance_ne` is
+*Deterministic inclusion* position arithmetic and would otherwise rest on this slice-1 coordinate
+statement.
 
 Each is what one family of ledgers needs — this one for the `hCollision` branch, whose ledger is
 indexed by a `LayerTreeCoord`, and `advance_ne` for the three WOTS+ branches, whose ledgers are

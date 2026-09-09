@@ -65,11 +65,12 @@ so the honest-message re-evaluation is inert at every layer; and the leaf enters
 share the node index `1` and the leaf re-evaluation is inert between them, while layer two's leaf
 `1` gives node index `0` and does discriminate.  What discriminates at both neighbours is the tree
 address.  The leaf inertness is asserted to *hold*, so it is pinned rather than passed over; it
-turns on this fixture's two leaves sharing a node index and fails if the trajectory changes.  The
-honest-message inertness is not asserted, because it is not independent of the base assertion three
-lines above it: `xmssWitnessHolds` takes the honest message as an argument and its `hCollision`
-branch never reads it, so re-evaluating at another layer's honest message re-runs the base
-assertion.  That would pin `xmssWitnessHolds` against `XmssWitness.Valid`, not the extractor.
+turns on this fixture's two leaves sharing a node index, and it fails if the trajectory changes.
+The honest-message inertness is not asserted, because it would not be an independent assertion:
+`xmssWitnessHolds` takes the honest message as an argument and its `hCollision` branch never reads
+it, so re-evaluating the same witness at a neighbouring layer's honest message is the same
+computation as the check that the witness holds at its own layer.  A pin on it would test
+`xmssWitnessHolds` against `XmssWitness.Valid`, not the extractor.
 
 `checkNoWitness` closes both ways the search can return nothing.  The honest hypertree signature
 extracted against the message it actually signs matches at layer zero and still returns nothing,
@@ -393,9 +394,9 @@ shifting the extractor's label and `HypertreeWitness.Valid`'s reading of it *tog
 the base case `⟨1, ·⟩` and reading `w.layer - 1` — re-proved `findHypertreeWitness_sound` by the
 same induction, and the executable was the only thing that noticed.  The label is a `Fin layers`
 now, so that shift no longer elaborates.  These checks stay because they are what caught the class,
-because they cost nothing, and because they check the numbering a second way, without going through
-the type: `checkLayer`'s `w.layer == layer` pin compares against the literal the fixture *built* the
-divergence at, and `hypertreeWitnessHolds` reads `posOf` and `honestMsgAt` rather than `Valid`.
+because they cost nothing, and because they check the numbering a second way, not through
+`HypertreeWitness.Valid`: `checkLayer`'s `w.layer == layer` pin compares against the label the
+fixture *built* the divergence at, and `hypertreeWitnessHolds` reads `posOf` and `honestMsgAt`.
 Renumbering those two tables to match some other labelling makes them stop agreeing with `advance`
 and `honestLayerMsg` at the fixed layers `0`, `1` and `2`, and the agreement check fails.  Without
 them the executable would be a restatement of the library at whatever numbering the library
@@ -523,9 +524,10 @@ fixture's leaves `3` and `2` quotienting to the same node index at `z = 1`, and 
 trajectory breaks it.  The honest-message inertness is *not* asserted, and the reason is that it
 would not be an independent assertion: `xmssWitnessHolds` takes the honest message as an argument
 and this branch never reads it, so `xmssWitnessHolds adrs idx (honestMsgAt other) w.witness` and
-`xmssWitnessHolds adrs idx (honestMsgAt 0) w.witness` are the same evaluation, and the second is
-asserted three lines above.  A pin on it would fail only if `xmssWitnessHolds` or
-`XmssWitness.Valid` changed, not if the extractor did.  `hypertreeWitnessHolds` at each other layer
+`xmssWitnessHolds adrs idx (honestMsgAt 0) w.witness` are the same evaluation — and the second is
+what `hypertreeWitnessHolds w` already asserts, the layer having been pinned to zero just before.
+A pin on it would fail only if `xmssWitnessHolds` or `XmssWitness.Valid` changed, not if the
+extractor did.  `hypertreeWitnessHolds` at each other layer
 — which moves all three arguments together — is still required to fail. -/
 def checkLayerH : IO Unit := do
   ensure "hCollision: recovers the published root"
@@ -621,8 +623,8 @@ honest message — is `checkLayer`'s.
 
 An out-of-range fabrication is not among them because it is not writable.  `HypertreeWitness.layer`
 is a `Fin toyParams.d`, so `⟨3, w⟩` and `⟨9, w⟩` — which this tally used to carry, as the two
-rejections that isolated the old bound conjunct — are type errors rather than rejected runs, and
-what exercises that bound is the mutation widening the label's index, which fails to build. -/
+rejections that isolated the old bound conjunct — are type errors rather than rejected runs.  The
+bound is exercised at build time instead, by the mutation that widens the label's index. -/
 /-- The tally: nine runs of `hypertreeWitnessHolds`, three accepted and six rejected. -/
 def checkFabricatedWitnesses : IO Unit := do
   let mut accepted := 0
