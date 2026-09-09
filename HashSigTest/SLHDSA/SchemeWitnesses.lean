@@ -134,10 +134,11 @@ def ensure (label : String) (condition : Bool) : IO Unit :=
 
 Two hypertree layers of height two, two FORS trees of height one, `w = 16`, `len = 4`. -/
 
--- Exposed: the profile, its validated form and the four hand-written positions all have to reduce
--- inside the `decide` pins below and inside the exposed bundle they configure, and each position's
--- `next` bound is discharged by `decide`.  Neither the secret map, the tweak map, the randomizer
--- nor the digest map needs exposure of its own.  Nothing outside this executable consumes them.
+-- Exposed: the profile and its validated form have to reduce inside the `decide` pins below and
+-- inside the bundle they index, and the bundle itself has to reduce for the `Fin` bounds of the
+-- hand-written positions.  Neither the secret map, the tweak map, the randomizer, the digest map
+-- nor any of the four positions needs exposure of its own.  Nothing outside this executable
+-- consumes them.
 /-- Two layers of height two, two FORS trees of height one. -/
 @[expose] def toyParams : Params :=
   { n := 1, h := 4, d := 2, hp := 2, a := 1, k := 2, lgw := 4 }
@@ -288,16 +289,16 @@ def partsA : DigestParts toyParams := digestOf (rOf addrndA msgA) msgA
 def partsB : DigestParts toyParams := digestOf rB msgB
 
 /-- Site A's layer-zero position, written out. -/
-@[expose] def posA0 : LayerPosition toy := ⟨⟨0, by decide⟩, ⟨1, by decide⟩, ⟨3, by decide⟩⟩
+def posA0 : LayerPosition toy := ⟨⟨0, by decide⟩, ⟨1, by decide⟩, ⟨3, by decide⟩⟩
 
 /-- Site A's top-layer position, written out. -/
-@[expose] def posA1 : LayerPosition toy := ⟨⟨1, by decide⟩, ⟨0, by decide⟩, ⟨1, by decide⟩⟩
+def posA1 : LayerPosition toy := ⟨⟨1, by decide⟩, ⟨0, by decide⟩, ⟨1, by decide⟩⟩
 
 /-- Site B's layer-zero position, written out. -/
-@[expose] def posB0 : LayerPosition toy := ⟨⟨0, by decide⟩, ⟨2, by decide⟩, ⟨0, by decide⟩⟩
+def posB0 : LayerPosition toy := ⟨⟨0, by decide⟩, ⟨2, by decide⟩, ⟨0, by decide⟩⟩
 
 /-- Site B's top-layer position, written out. -/
-@[expose] def posB1 : LayerPosition toy := ⟨⟨1, by decide⟩, ⟨0, by decide⟩, ⟨2, by decide⟩⟩
+def posB1 : LayerPosition toy := ⟨⟨1, by decide⟩, ⟨0, by decide⟩, ⟨2, by decide⟩⟩
 
 /-- Site A's positions by layer.  The catch-all makes the function total; every caller reads a
 `Fin toyParams.d` or one of the two literals. -/
