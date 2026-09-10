@@ -568,12 +568,16 @@ and the residual's second branch is reachable; under its deterministic variant, 
 the EasyCrypt development's message-keyed signer has, the same three queries leave one.  The
 deterministic log's transcript is pinned too, and it is the only place in the file where
 `logQueries` meets a log with a repeated entry: on `signingLog` all three pairs are distinct, so a
-`logQueries` that de-duplicated would be invisible there.  Six properties. -/
+`logQueries` that de-duplicated would be invisible there.  The same holds of `loggedRandomizers`,
+whose two deterministic entries at that message are equal, so that list is pinned by value rather
+than only through `eraseDups`.  Seven properties. -/
 def checkVariants : IO Unit := do
   ensure "the deterministic variant's two queries on one message are one signature"
     (loggedSignatures deterministicLog msgP == [detSigP, detSigP])
   ensure "so its log carries one randomizer at that message"
     ((loggedRandomizers deterministicLog msgP).eraseDups.length == 1)
+  ensure "listed once per query, so the list itself carries the repeat"
+    (loggedRandomizers deterministicLog msgP == [detSigP.randomness, detSigP.randomness])
   ensure "while the hedged log carries two"
     ((loggedRandomizers signingLog msgP).eraseDups.length == 2)
   ensure "both logs record the same number of queries at that message"
