@@ -1042,4 +1042,5 @@ theorem sum_probEvent_hidingBad_le [Fintype S] [Inhabited S] [Finite M] {AUX : T
                 · rw [probOutput_eq_zero_of_not_mem_support hqchoose]
                   simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]

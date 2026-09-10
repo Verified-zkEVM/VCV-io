@@ -130,5 +130,5 @@ of baseline additions.
 
 For every batch, use the shared driver to prune the baseline, preserve import façades, and
 run `./scripts/validate.sh --lint --test --axioms` along with
-`bash scripts/check-pmf-boundary.sh --ratchet HEAD`. Baseline reductions are consequences
+`bash scripts/check-pmf-boundary.sh --ratchet origin/main`. Baseline reductions are consequences
 of checked source fixes, not targets achieved by renaming exceptions or weakening lint sets.

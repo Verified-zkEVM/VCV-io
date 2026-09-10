@@ -693,7 +693,8 @@ lemma wp_choose_sumCounts_le_queryBound [Fintype S] [Inhabited S]
             · rw [probOutput_eq_zero_of_not_mem_support hqchoose]
               simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]
 
 omit [Finite C] [Inhabited C] in
 /-- Every support point of `simulateQ hidingImplCountAll` is dominated by some
@@ -1185,7 +1186,8 @@ lemma sum_wp_countIncrementIndicators_le_queryBound_of_run_hidingImplCountAll
           · rw [probOutput_eq_zero_of_not_mem_support hz]
             simp
     _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]
 
 /-- A selected final count decomposes into the initial selected count plus the
 new increments made during the run. -/

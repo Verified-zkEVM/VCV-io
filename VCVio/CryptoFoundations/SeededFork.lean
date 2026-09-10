@@ -617,7 +617,7 @@ theorem probOutput_none_seededFork_le :
   set acc := ∑ s, ps s
   set h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
   have htotal := probOutput_none_add_tsum_some (mx := seededFork main qb js i cf)
-  rw [probFailure_of_liftM_PMF, tsub_zero] at htotal
+  rw [probFailure_eq_zero, tsub_zero] at htotal
   calc Pr[= none | seededFork main qb js i cf]
     _ = 1 - ∑' p, Pr[= some p | seededFork main qb js i cf] :=
         ENNReal.eq_sub_of_add_eq

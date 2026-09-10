@@ -498,6 +498,6 @@ lemma probEvent_coin (p : Bool → Prop) [DecidablePred p] :
 
 @[grind =]
 lemma probFailure_coin : Pr[⊥ | coin] = 0 :=
-  probFailure_of_liftM_PMF coin
+  NeverFail.probFailure_eq_zero
 
 end coinSpec

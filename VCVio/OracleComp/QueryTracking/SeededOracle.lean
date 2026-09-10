@@ -450,7 +450,7 @@ lemma evalSPMF_liftComp_uniformSample_bind_simulateQ_run'_addValue
     apply evalSPMF_ext; intro a
     simp_rw [hrun']
     rw [probOutput_bind_const]
-    simp [probFailure_of_liftM_PMF]
+    simp
   | query_bind t mx ih =>
     intro σ
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
