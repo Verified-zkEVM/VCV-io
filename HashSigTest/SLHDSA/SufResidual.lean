@@ -27,14 +27,16 @@ have linked the imported `main` and run the other fixture.  The lane has no shar
 and adding one would edit merged, reviewed files from inside this pull request.
 
 Diffed against the `H_msg` bridge fixture's copy of the block, from its section heading to `pkRoot`,
-there are four hunks carrying five deliberate differences.  Three attribute comments carry this
-file's own measured error counts and error text — every attribute comment here was written by
-removing the attribute and reading what Lean said, and the counts are 42, 101 and 11, not that
-file's 41, 51 and 3.  `toy` carries `@[expose]` here, where that file leaves it unexposed, because
-the three `DecidableEq` instances below are stated at `toy.params`.  And `otherPkSeed`, which exists
-there to move a candidate off the honest key pair, is dropped: every statement in the library module
-reads its public seed and published root off one `pk`, so there is no second key pair to move to,
-and testing that there is would be re-testing the `H_msg` bridge.
+there are four hunks.  Three attribute comments carry this file's own measured error counts and
+error text — every attribute comment here was written by removing the attribute and reading what
+Lean said.  The counts are 41, 101 and 11 where that file records 41, 51 and 3: the first coincides,
+and its comment still differs, because it quotes the error rather than paraphrasing it.  Two
+docstrings in the copied block name the group in *this* file that asserts what they describe.  `toy`
+carries `@[expose]` here, where that file leaves it unexposed, because the three `DecidableEq`
+instances below are stated at `toy.params`.  And `otherPkSeed`, which exists there to move a
+candidate off the honest key pair, is dropped: every statement in the library module reads its
+public seed and published root off one `pk`, so there is no second key pair to move to, and testing
+that there is would be re-testing the `H_msg` bridge.
 
 ## What this fixture adds
 
@@ -120,7 +122,7 @@ def ensure (label : String) (condition : Bool) : IO Unit :=
 Two hypertree layers of height two, two FORS trees of height one, `w = 16`, `len = 4`. -/
 
 -- Exposed, and what that attribute is for was read off the errors its removal produces in this
--- file.  Without `@[expose]` on `toyParams`, 42 errors, the first inside the bundle at
+-- file.  Without `@[expose]` on `toyParams`, 41 errors, the first inside the bundle at
 -- `yToBytes := id`: `Type mismatch: id has type ?m → ?m but is expected to have type
 -- `Bytes 1 → Bytes toyParams.n`.  The secret map, the tweak map, the randomizer and the digest map
 -- need no exposure of their own here.  Nothing outside this executable consumes any of them.
