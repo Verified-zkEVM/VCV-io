@@ -1,5 +1,12 @@
 # Probability Reasoning (EvalDist and ProbComp)
 
+For sampling-and-event statements, import `VCVio.EvalDist.Notation` and use
+`open scoped ProbabilityTheory`. The notation `Pr_{let x ← mx; let y ← f x}[R x y]` uses Lean's
+ordinary `do` parser and elaborator, with the event in the scope of the sampling prelude.
+It shares the existing scalar probability semantics and does not normalize away failure.
+See the [notation reference](notation.md#probability-notations) for control flow, measure
+correspondence, and coordinated ArkLib adoption.
+
 For the cross-project survey of SPMF, Mathlib measures and kernels, PolyFun
 coalgebraic limits, ArkLib, Bluebell/Iris, and possible long-term migration paths, see
 [`Probability Semantics for Computations: Landscape and Design Options`](../reading/probability-semantics-landscape.md).

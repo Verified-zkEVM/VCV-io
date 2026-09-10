@@ -9,6 +9,7 @@ public import VCVioTest.CryptoFoundations.OracleClosure
 public import VCVioTest.CryptoFoundations.SignatureAlg
 public import VCVioTest.CryptoFoundations.SymmEncAlgMeasure
 public import VCVioTest.EvalDist.MeasureBridge
+public import VCVioTest.EvalDist.Notation
 public import VCVioTest.ForkMeasure
 public import VCVioTest.Forking.WithoutReplacement
 public import VCVioTest.GrindFailFast
