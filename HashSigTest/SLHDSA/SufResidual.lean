@@ -29,14 +29,16 @@ and adding one would edit merged, reviewed files from inside this pull request.
 Diffed against the `H_msg` bridge fixture's copy of the block, from its section heading to `pkRoot`,
 there are four hunks.  Three attribute comments carry this file's own measured error counts and
 error text — every attribute comment here was written by removing the attribute and reading what
-Lean said.  The counts are 41, 101 and 11 where that file records 41, 51 and 3: the first coincides,
-and its comment still differs, because it quotes the error rather than paraphrasing it.  Two
-docstrings in the copied block name the group in *this* file that asserts what they describe.  `toy`
-carries `@[expose]` here, where that file leaves it unexposed, because the three `DecidableEq`
-instances below are stated at `toy.params`.  And `otherPkSeed`, which exists there to move a
-candidate off the honest key pair, is dropped: every statement in the library module reads its
-public seed and published root off one `pk`, so there is no second key pair to move to, and testing
-that there is would be re-testing the `H_msg` bridge.
+Lean said.  The counts are 43, a hundred errors plus the line saying the ceiling was reached, and
+13, where that file records 41, 51 and 3; none of the three matches the figure standing in the same
+place there, and the error text differs as well, because these comments quote the error rather than
+paraphrasing it.  Two docstrings in the copied
+block name the group in *this* file that asserts what they describe.  `toy` carries `@[expose]`
+here, where that file leaves it unexposed, because the three `DecidableEq` instances below are
+stated at `toy.params`.  And `otherPkSeed`, which exists there to move a candidate off the honest
+key pair, is dropped: every statement in the library module reads its public seed and published root
+off one `pk`, so there is no second key pair to move to, and testing that there is would be
+re-testing the `H_msg` bridge.
 
 ## What this fixture adds
 
@@ -49,7 +51,14 @@ three queries, which is the shape the EasyCrypt development's message-keyed sign
 A third log, longer than either, whose only purpose is to be longer: it signs one message three
 times and repeats one of those entries.  Both other logs stop at two signatures per message and at
 three entries, so a reading that reordered or collapsed a list only once it grew past those sizes
-would be invisible to every check written against them.  Two pins on this log are what refuse it.
+would be invisible to every check written against them.  Four pins on this log refuse it, one for
+each list this file reads a log into: the signatures at a message, their randomizers, the pair
+transcript, and that transcript embedded at the honest key pair.  Each of the four is a hand-written
+value that differs from its own reverse *and* carries a repeat, so each refuses reordering,
+collapsing and truncation together, up to the longest list its own reader produces anywhere here —
+three entries for the first two, four for the other two.  No list this file reads a log into is
+longer than that, so a reading that waited for a fourth signature at one message, or for a fifth
+entry in a transcript, would need a longer log again.
 
 Four forgeries, and three `DecidableEq` instances.  The instances are the fixture's own: the library
 module carries `DecidableEq` on the signature type as a hypothesis because no such instance exists
@@ -127,7 +136,7 @@ def ensure (label : String) (condition : Bool) : IO Unit :=
 Two hypertree layers of height two, two FORS trees of height one, `w = 16`, `len = 4`. -/
 
 -- Exposed, and what that attribute is for was read off the errors its removal produces in this
--- file.  Without `@[expose]` on `toyParams`, 41 errors, the first inside the bundle at
+-- file.  Without `@[expose]` on `toyParams`, 43 errors, the first inside the bundle at
 -- `yToBytes := id`: `Type mismatch: id has type ?m → ?m but is expected to have type
 -- `Bytes 1 → Bytes toyParams.n`.  The secret map, the tweak map, the randomizer and the digest map
 -- need no exposure of their own here.  Nothing outside this executable consumes any of them.
@@ -139,7 +148,7 @@ theorem toyValid : toyParams.Valid := by decide
 
 -- Exposed here, where the `H_msg` bridge fixture leaves it unexposed, because this file states
 -- three `DecidableEq` instances whose types are written at `toy.params`: without the attribute,
--- 49 errors, the first at the `ForsTreeSigCore` instance below, `Application type mismatch: the
+-- 58 errors, the first at the `ForsTreeSigCore` instance below, `Application type mismatch: the
 -- argument toyPrimitives.core has type CorePrimitives toyParams but is expected to have type
 -- CorePrimitives toy.params`.
 /-- The validated form of `toyParams`. -/
@@ -200,9 +209,11 @@ def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
 -- toyPrimitives.Y` just below: `Compilation failed, locally inferred compilation type differs from
 -- type that would be inferred in other modules`, naming `toyPrimitives ↦ 2`, with the rest after it
 -- down the compiled declarations.  Reducible, because its carrier types have to unfold to `Bytes 1`
--- for instance resolution to reach them: without it, 11 errors and only these — two at `byteOf`,
+-- for instance resolution to reach them: without it, 13 errors and only these — two at `byteOf`,
 -- whose `y[0]` finds no `GetElem toyPrimitives.Y ℕ` instance and then cannot prove its index valid;
--- four `Decidable (… ∈ embeddedTargets)` membership goals in `checkBranches`; three
+-- two `BEq (ITSRTranscript toyPrimitives.Y (HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y))`,
+-- one for each embedded-transcript value pin in `checkBranches`; four
+-- `Decidable (… ∈ embeddedTargets)` membership goals in the same group; three
 -- `DecidableEq (HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y)`, one in `checkBranches` and
 -- two in the pins; and two `DecidableEq toyPrimitives.PkSeed`, both in the pins.  Nothing outside
 -- this executable consumes it.
@@ -335,11 +346,13 @@ def deterministicLog :
   [⟨msgP, detSigP⟩, ⟨msgQ, detSigQ⟩, ⟨msgP, detSigP⟩]
 
 /-- A longer log, and the only one that signs one message three times.  Its `msgP` entries are the
-deterministic signature twice and then a hedged one, so `loggedSignatures` at that message is a
-three-element list that differs from its own reverse, and `logQueries` is a four-entry transcript
-carrying a repeated pair.  Neither shape occurs in the two logs above: both stop at two signatures
-per message and at three entries.  `checkLoggedSignatures` pins the first list and
-`checkRandomizers` the second, by value. -/
+deterministic signature twice and then a hedged one, so each of the four lists this file reads a log
+into differs from its own reverse and carries a repeat here: `loggedSignatures` and
+`loggedRandomizers` at that message are three long, `logQueries` and its embedding at the honest key
+pair are four-entry transcripts.  Neither shape occurs in the two logs above: both stop at two
+signatures per message and at three entries, and `signingLog`'s three pairs are pairwise distinct.
+All four lists are pinned by value on this log — the first two in `checkLoggedSignatures` and
+`checkRandomizers`, the transcript in `checkRandomizers`, its embedding in `checkBranches`. -/
 def thriceSignedLog :
     QueryLog (List Byte →ₒ GeneralScheme.SignatureCore toy toyPrimitives.core) :=
   [⟨msgP, detSigP⟩, ⟨msgQ, detSigQ⟩, ⟨msgP, detSigP⟩, ⟨msgP, sigP1⟩]
@@ -378,8 +391,9 @@ def forgeryCross : GeneralScheme.SignatureCore toy toyPrimitives.core :=
   { sigP1 with randomness := sigQ.randomness }
 
 /-- The FORS public key `verifyInternal` recovers from a signature, which it then hands to the
-hypertree as its layer-0 WOTS+ message.  Its arguments are the signature's FORS half and the digest
-split, so on two signatures whose splits agree it is a function of the FORS half alone. -/
+hypertree as its layer-0 WOTS+ message.  Its arguments are the signature's FORS half, the digest
+split and the honest public seed, so on two signatures whose splits agree — the seed being a fixture
+constant — it is a function of the FORS half alone. -/
 def recoveredForsPk (sig : GeneralScheme.SignatureCore toy toyPrimitives.core) (msg : List Byte) :
     toyPrimitives.Y :=
   forsPkFromSig toyPrimitives sig.fors (schemeParts toy toyPrimitives msg sig honestPk).md.toList
@@ -447,8 +461,9 @@ def checkFixture : IO Unit := do
 at each of the three messages, in query order, and the two entries at `msgP` are both required to be
 present: a reading that kept only the first, or only the last, fails here and is otherwise sound.
 `mem_loggedSignatures` is exercised in both directions.  The list is pinned once more on
-`thriceSignedLog`, where it is three long: a reading that reversed only past the lengths the other
-two logs reach is invisible everywhere else in this file.  Ten properties. -/
+`thriceSignedLog`, where it is three long, which is the only place in this file where a reading of
+this list that reversed or collapsed only past the lengths the other two logs reach meets an input
+that shows it.  Ten properties. -/
 def checkLoggedSignatures : IO Unit := do
   ensure "the log has three entries on two distinct messages"
     (signingLog.length == 3 && (signingLog.map fun e => e.1).eraseDups.length == 2)
@@ -477,8 +492,10 @@ def checkLoggedSignatures : IO Unit := do
 /-- The two library predicates on a log, at all four combinations of their values.  Three are
 realised by fixture data; the fourth — an unqueried message whose exact pair is nevertheless in the
 log — is asserted unreachable over every entry of the log rather than omitted, because that is what
-makes the library's queried/unqueried split exhaustive.  The two conjuncts of the same-message
-condition are then falsified one at a time.  Eight properties. -/
+makes the library's queried/unqueried split exhaustive.  The replay case names both signatures the
+log holds at that message, one of which is its first entry and the other its last, so a
+`signingLogContains` that read only one end of the log fails here.  The two conjuncts of the
+same-message condition are then falsified one at a time.  Eight properties. -/
 def checkPredicates : IO Unit := do
   ensure "an unqueried message with a fresh pair: an ordinary existential forgery"
     (!signingLog.wasQueried msgU &&
@@ -486,8 +503,9 @@ def checkPredicates : IO Unit := do
   ensure "a queried message with a fresh pair: the residual"
     (signingLog.wasQueried msgP &&
       !SignatureAlg.signingLogContains signingLog msgP forgeryFresh)
-  ensure "a queried message with a logged pair: a replay"
-    (signingLog.wasQueried msgP && SignatureAlg.signingLogContains signingLog msgP sigP1)
+  ensure "a queried message with a logged pair: a replay, at either entry it has there"
+    (signingLog.wasQueried msgP && SignatureAlg.signingLogContains signingLog msgP sigP1 &&
+      SignatureAlg.signingLogContains signingLog msgP sigP2)
   ensure "the fourth combination is unreachable: every logged pair's message is queried"
     (signingLog.all fun e => signingLog.wasQueried e.1)
   ensure "the same-message condition holds exactly at the residual"
@@ -508,10 +526,11 @@ def checkPredicates : IO Unit := do
 
 /-- The randomizers, and the pair transcript.  The transcript is asserted against a hand-written
 list; membership in it is asserted to be per-message, not per-log, by the cross forgery, whose
-randomizer is in the transcript but not paired with the message it is offered at.  The transcript
-is pinned a second time on `thriceSignedLog`, whose four entries carry a repeat: a reading that
-de-duplicated only past the length the other two logs reach is invisible everywhere else in this
-file.  Eleven properties. -/
+randomizer is in the transcript but not paired with the message it is offered at.  Both lists are
+pinned again on `thriceSignedLog`: the randomizers at the thrice-signed message, which are three
+long and carry a repeat, and the transcript, whose four entries carry a repeat.  Those are the
+longest lists either reader produces in this file, so between them they refuse every reordering,
+collapsing or truncation of the two readers that this file's logs can reach.  Twelve properties. -/
 def checkRandomizers : IO Unit := do
   ensure "the twice-signed message carries two distinct randomizers"
     (loggedRandomizers signingLog msgP == [sigP1.randomness, sigP2.randomness] &&
@@ -527,6 +546,9 @@ def checkRandomizers : IO Unit := do
   ensure "the cross forgery's randomizer is recorded, but at the other message"
     (!decide (forgeryCross.randomness ∈ loggedRandomizers signingLog msgP) &&
       decide (forgeryCross.randomness ∈ loggedRandomizers signingLog msgQ))
+  ensure "a message signed three times lists its randomizer twice and then the other, in order"
+    (loggedRandomizers thriceSignedLog msgP ==
+      [detSigP.randomness, detSigP.randomness, sigP1.randomness])
   ensure "the transcript is the hand-written projection of the log"
     (logQueries signingLog ==
       [(sigP1.randomness, msgP), (sigQ.randomness, msgQ), (sigP2.randomness, msgP)])
@@ -544,16 +566,25 @@ def checkRandomizers : IO Unit := do
       [(detSigP.randomness, msgP), (detSigQ.randomness, msgQ), (detSigP.randomness, msgP),
         (sigP1.randomness, msgP)])
 
-/-- What each branch does at the embedded transcript.  On the fresh branch the candidate is absent
-and the bridge's dichotomy is run to see which alternative it takes; on the logged branch the
-candidate is present, the winning condition fails, and — asserted separately, because otherwise
-"the winning condition fails" would not say *which* conjunct failed — the coverage conjunct still
-holds and the first-uncovered-index extractor returns nothing.  The index list the coverage check
-quantifies over is separately asserted to have length two, because `List.all` over `[]` is `true`.
-Ten properties. -/
+/-- What each branch does at the embedded transcript.  The transcript itself is pinned by value
+first, which fixes its length, its order and its multiplicity together; and because embedding
+`signingLog`'s transcript cannot show a collapse — that transcript's three pairs are distinct — the
+embedding of `thriceSignedLog`'s four-entry transcript, which does carry a repeat, is pinned beside
+it.  Then, on the fresh branch the candidate is absent and the bridge's dichotomy is run to see
+which alternative it takes; on the logged branch the candidate is present, the winning condition
+fails, and — asserted separately, because otherwise "the winning condition fails" would not say
+*which* conjunct failed — the coverage conjunct still holds and the first-uncovered-index extractor
+returns nothing.  The index list the coverage check quantifies over is separately asserted to have
+length two, because `List.all` over `[]` is `true`.  Eleven properties. -/
 def checkBranches : IO Unit := do
-  ensure "the embedded transcript has one target per logged query"
-    (embeddedTargets.length == 3)
+  ensure "the embedded transcript is the log's three queries at the honest key pair, in order"
+    (embeddedTargets ==
+      [(sigP1.randomness, ⟨pkSeed, pkRoot, msgP⟩), (sigQ.randomness, ⟨pkSeed, pkRoot, msgQ⟩),
+        (sigP2.randomness, ⟨pkSeed, pkRoot, msgP⟩)])
+  ensure "embedding a four-entry transcript keeps its repeat, in order"
+    (embedTargets toyPrimitives pkSeed pkRoot (logQueries thriceSignedLog) ==
+      [(detSigP.randomness, ⟨pkSeed, pkRoot, msgP⟩), (detSigQ.randomness, ⟨pkSeed, pkRoot, msgQ⟩),
+        (detSigP.randomness, ⟨pkSeed, pkRoot, msgP⟩), (sigP1.randomness, ⟨pkSeed, pkRoot, msgP⟩)])
   ensure "the fresh forgery's candidate is not one of them"
     (!decide (candidateOf forgeryFresh msgP ∈ embeddedTargets))
   ensure "nor is any candidate at the unsigned message"

@@ -555,8 +555,9 @@ it fresh, and two carrying a logged randomizer at that message, for which the pa
 target, the winning condition fails on freshness while coverage is asserted still to hold over an
 index list asserted non-empty, and the first-uncovered-index extractor returns nothing.  The same
 three queries under FIPS 205's deterministic variant are run alongside, and leave one randomizer
-where the hedged default leaves two; a third, longer log pins the signature list and the pair
-transcript at sizes neither of the other two reaches. -/
+where the hedged default leaves two; a third, longer log pins all four lists the fixture reads a log
+into — the signatures at a message, their randomizers, the pair transcript and its embedding at the
+honest key pair — at sizes neither of the other two reaches. -/
 lean_exe slhdsa_suf_residual_tests where
   root := `HashSigTest.SLHDSA.SufResidual
 
