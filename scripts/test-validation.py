@@ -25,7 +25,7 @@ class ValidationTests(unittest.TestCase):
                      "check-complexity-backend-isolation", "check-extern-isolation",
                      "check-interop-isolation", "test-axiomsweep"):
             self.script(scripts / f"{name}.sh", 'exit 0\n')
-        for name in ("test-check-imports.py", "test-validation.py", "check-agent-docs.py",
+        for name in ("test-check-imports.py", "test-validation.py", "test-lint.py", "check-agent-docs.py",
                      "extract-doc-fragments.py"):
             (scripts / name).write_text("pass\n")
         binary = self.root / "bin"
@@ -57,6 +57,14 @@ fi
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("validate: OK.", result.stdout)
         self.assertIn("test", (self.root / "calls").read_text().splitlines())
+
+    def test_lint_selectors_reuse_the_completed_build(self):
+        result = self.validate("--lint")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = (self.root / "calls").read_text().splitlines()
+        self.assertIn("lint -- --style-only", calls)
+        self.assertIn("lint -- --env-only --no-build", calls)
+        self.assertEqual(sum(call.startswith("build ") for call in calls), 1)
 
     def test_each_test_library_warning_fails(self):
         for library in ("VCVioTest", "LatticeCryptoTest", "HashSigTest"):
