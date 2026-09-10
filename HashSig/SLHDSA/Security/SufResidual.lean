@@ -26,10 +26,10 @@ of a list; what does not appear is anything that samples the key pair or bounds 
 ## What the split leaves for SLH-DSA to do, and where it actually sits
 
 The scheme dispatch of `HashSig.SLHDSA.Security.SchemeWitnesses` reads no log: `findWitness_isSome`
-takes the byte laws, a secret seed, a public seed, a message, a signature and a target, and the
-single hypothesis that the signature verifies.  So a forged signature routes into a witness family
-whether or not its message was queried, and the strong-unforgeability split buys the dispatch
-nothing.
+takes `[DecidableEq prims.Y]`, the byte laws, a secret seed, a public seed, a message, a signature
+and a target, and the single hypothesis that the signature verifies.  So a forged signature routes
+into a witness family whether or not its message was queried, and the strong-unforgeability split
+buys the dispatch nothing.
 
 What does read a log is the `H_msg` bridge of `HashSig.SLHDSA.Security.HmsgWitnesses`.  Its
 dichotomy `itsr_wins_or_uncovered` needs the forged *pair* to be absent from the target transcript,
@@ -64,16 +64,31 @@ them.
 
 What a reduction would have to use on that branch is the *pair*: two distinct signatures that split
 to one digest, hence one FORS instance and one set of opened leaves, and differ somewhere in their
-component vectors.  No search in the lane takes a pair in that sense.  Each of the four merged
-families compares one forged object against an honest partner computed from `sk` — `findXmssWitness`
-recovers the honest leaf and the honest WOTS+ signature from `sk` and the honest message, and
-`findForsWitness` the honest FORS material — so what already applies to the forged signature alone
-applies here unchanged, and the second signature enters nowhere.  The one search that does take two
-`(signature, message)` pairs, `findWotsChainWitness`, returns nothing unless the forged chain-step
-count is strictly below the honest one, which fails at every index when the two messages agree; and
-`findXmssWitness_isSome` and `findHypertreeWitness_isSome` carry that message disequality as a
-hypothesis for the same reason.  A same-digest extractor is therefore a further witness module with
-its own witness type, and it is not in this pull request.
+component vectors.  Three of the four merged families cannot be handed that pair at all, because
+they compute their second object from `sk` rather than taking it: `findXmssWitness` recovers the
+honest leaf and the honest WOTS+ signature from `sk` and the honest message, `findForsWitness` the
+honest FORS material, and `findHypertreeWitness` carries `sk` down the layer walk.  For those, what
+already applies to the forged signature alone applies here unchanged and the second signature enters
+nowhere.
+
+The WOTS+ family is not of that shape, and it is the one that has to be argued.  `findWotsWitness`
+and its per-chain helper `findWotsChainWitness` are the lane's only two searches that take two
+`(signature, message)` pairs; the partner is an arbitrary signature, and neither
+`findWotsWitness_sound` nor `findWotsWitness_isSome` mentions `sk`.  The chain helper is inert when
+the two messages agree — it returns nothing at an index unless the two chain-step counts differ
+there — but on this branch the two messages need not agree.  They are the two recovered FORS public
+keys, which `verifyInternal` hands to the hypertree as its layer-0 WOTS+ message, and on this branch
+they are recovered from two *different* FORS halves.  So `findWotsWitness_isSome`'s guard
+`msg ≠ msg'` is satisfiable and the search does return a witness.
+
+What places the family out of scope is therefore not the guard but what a returned witness says.
+`findWotsWitness_sound` concludes `WotsWitness.Valid … sig' msg'` — validity against the *supplied*
+partner — and, as its own docstring records, says nothing about whether that partner was committed
+as a game target.  Here the supplied partner is a second adversarial signature, so the witness is a
+collision between two adversarial objects rather than an attack on honest committed material, which
+is exactly the two-adversarial-signatures argument this lane holds out of scope.  A same-digest
+extractor is therefore a further witness module with its own witness type, and it is not in this
+pull request.
 
 `HashSig.SLHDSA.Security.HypertreeWitnesses`'s review recorded that a two-adversarial-signatures
 argument is out of scope for the existential-unforgeability line; `schemeParts_eq_of_randomizer_eq`
@@ -121,8 +136,10 @@ module calls `loggedRandomizers` would be constant at each message.
 FIPS 205 Algorithm 19 sets `opt_rand ← addrnd` and then `R ← PRF_msg(SK.prf, opt_rand, M)` (lines 2
 and 3), and §9.2 makes that hedged variant the default while offering `opt_rand ← PK.seed` as a
 deterministic alternative under which "signing the same message twice will result in the same
-signature".  `HashSig.SLHDSA.GeneralScheme.signInternalM` takes `addrnd` as an argument and
-`HashSig.SLHDSA.RandomOracle.slhSignM` samples it, so the Lean transcript is the hedged one and
+signature".  `HashSig.SLHDSA.GeneralScheme.signInternalM` takes `addrnd` as an argument, and
+`HashSig.SLHDSA.RandomOracle.slhSignM` samples it and passes it to the depth-one compatibility
+signer `HashSig.SLHDSA.slhSignInternalM`, which derives `R` by the same
+`core.PRFmsg sk.skPrf addrnd msg`.  So the Lean transcript is the hedged one and
 `loggedRandomizers` at one message can hold as many distinct values as there were queries.  The
 residual's second branch is what that costs, and it is empty for the deterministic variant, which is
 the variant the source's shape matches.
@@ -172,7 +189,7 @@ about a pair of signatures rather than about a transcript:
 
 Those twenty-five are the module's whole interface; none is `private` and none carries `@[expose]`.
 
-Fifteen of them carry `[DecidableEq (GeneralScheme.SignatureCore vp prims.core)]`.  That instance is
+Nine of them carry `[DecidableEq (GeneralScheme.SignatureCore vp prims.core)]`.  That instance is
 not derivable on this branch: neither `SLHDSA.SignatureCore` nor `ForsTreeSigCore` nor `XmssSigCore`
 declares or derives one, and `HashSig` contains no instance for any of the three.  It is required by
 the library predicates being bridged, `SignatureAlg.signingLogContains` and `QueryLog.wasQueried`,
@@ -279,7 +296,7 @@ theorem wasQueried_eq_true_iff [DecidableEq (GeneralScheme.SignatureCore vp prim
 This is `SignatureAlg.wasQueried_eq_true_of_signingLogContains_eq_true` in this reading, and it is
 what makes the library's queried/unqueried split exhaustive inside the strong-unforgeability
 success event: the fourth combination, an unqueried message whose exact pair is nevertheless in the
-log, is unreachable.  Through the two bridges above the proof is `List.ne_nil_of_mem`.
+log, is unreachable.  Through `wasQueried_eq_true_iff` the proof is `List.ne_nil_of_mem`.
 
 *Transcript transport.* -/
 theorem wasQueried_eq_true_of_mem_loggedSignatures
