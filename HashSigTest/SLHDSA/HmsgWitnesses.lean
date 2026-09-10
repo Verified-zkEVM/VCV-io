@@ -22,11 +22,14 @@ diffing the two blocks.  It is copied rather than imported because a `lean_exe` 
 imported `main` and run the other fixture.  The lane has no shared fixture module yet, and adding
 one would edit a merged, reviewed file from inside this pull request.
 
-That diff has exactly four entries, all deliberate.  The failure message names this executable.
+That diff has exactly seven entries, all deliberate.  The failure message names this executable.
 `toy` carries no `@[expose]` here, because removing that attribute in this file produces no errors
-at all.  And the two remaining attribute comments carry this file's own measured error counts and
-error text rather than the other fixture's — every attribute comment here was written by removing
-the attribute and reading what Lean said.
+at all.  Two attribute comments carry this file's own measured error counts and error text rather
+than the other fixture's — every attribute comment here was written by removing the attribute and
+reading what Lean said.  And three docstrings in the copied block name the group that asserts what
+they describe, which is `checkFixture` here and `checkToyBundle` there.  Strip the comments, the
+docstrings and that one dropped attribute, and the two blocks differ in a single string: the
+failure message.
 
 ## What the profile already supplies, and the one thing it does not
 
@@ -162,7 +165,7 @@ example : toyParams.leafIdxBytes = 1 := by decide
 example : toyParams.t = 2 := by decide
 
 /-- The exclusive-or fold through which the toy `H_msg` and `PRF_msg` read a message.  Two messages
-with equal folds therefore share a digest; `checkToyBundle` exhibits such a pair and asserts the
+with equal folds therefore share a digest; `checkFixture` exhibits such a pair and asserts the
 digests agree, and separately asserts that messages with different folds do not. -/
 def byteFold (m : List Byte) : UInt8 := m.foldl (fun acc b => acc ^^^ b) 0
 
@@ -185,14 +188,14 @@ def toyTweak (seed : UInt8) (a : Adrs) : UInt8 :=
 
 /-- The toy `PRF_msg`: the message randomizer FIPS 205 Algorithm 19 line 3 derives.  It reads the
 per-signature `addrnd`, so two signings of one message under two different randomness values differ.
-`checkToyBundle` asserts that. -/
+`checkFixture` asserts that. -/
 def toyRandomizer (skPrf addrnd : UInt8) (msg : List Byte) : UInt8 :=
   mixByte (UInt8.ofNat
     ((skPrf.toNat * 13 + addrnd.toNat * 47 + (byteFold msg).toNat * 5 + 1) % 256))
 
 /-- Byte `i` of the toy `H_msg` digest.  All four FIPS inputs enter every byte — the randomizer, the
 public seed, the published root and the message fold — so the FORS message and both hypertree
-indices move when any of them moves.  `checkToyBundle` asserts each of the four separately. -/
+indices move when any of them moves.  `checkFixture` asserts each of the four separately. -/
 def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
   mixByte (UInt8.ofNat ((r.toNat * (6 * i + 37) + seed.toNat * (10 * i + 53) +
     root.toNat * (14 * i + 89) + (byteFold msg).toNat * (22 * i + 149) + (30 * i + 7)) % 256))
@@ -819,7 +822,8 @@ example (input : HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y)
 
 example : (hmsgItsrProblem toyPrimitives).indexSet
       (r, (⟨pkS, pkR, m⟩ : HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y)) =
-    (hmsgNarrowItsrProblem toyPrimitives pkS pkR).indexSet (r, m) := indexSet_embed pkS pkR r m
+    (hmsgNarrowItsrProblem toyPrimitives pkS pkR).indexSet (r, m) :=
+  indexSet_embedTargets_entry pkS pkR r m
 
 example : (hmsgItsrProblem toyPrimitives).targetIndexSet
       (embedTargets toyPrimitives pkS pkR queries) =

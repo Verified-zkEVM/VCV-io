@@ -25,7 +25,7 @@ predicate on a list and a pair; what does not appear is the experiment that samp
 hashed input the whole record `⟨PK.seed, PK.root, M⟩`.  The EasyCrypt development's `MCO` clone
 instantiates the same abstract keyed-hash theory at `in_t <- msg`: the message **alone**.  The two
 games are therefore not the same game, and this module is where the difference is stated, proved
-and bounded.  `hmsgNarrowItsrProblem` transcribes the source's shape — keyed on the randomizer,
+and delimited.  `hmsgNarrowItsrProblem` transcribes the source's shape — keyed on the randomizer,
 over the message alone, at a public seed and root fixed once and for all — so that the difference
 can be written as a relation between two Lean objects rather than as a remark.
 
@@ -48,13 +48,21 @@ narrow hardness is carried across exactly, and the narrow game never sees a seco
 to.  So wide-hardness implies narrow-hardness at every fixed key pair, and the converse fails: as an
 assumption, the FIPS-shaped one is strictly the stronger.
 
+Those last two paragraphs speak of adversaries and hardness, and nothing here proves them at that
+level: they are the informal reading of the deterministic `Iff` below together with the obvious
+query embedding, and the statements that carry a probability, an adversary and an advantage are
+slice 8's.  What this module proves is the deterministic core they rest on.
+
 **What would be lost if a reduction needed the converse.**  A reduction that wanted to discharge a
 Lean SLH-DSA bound from the source's assumption alone — that is, to conclude wide-hardness from
 narrow-hardness — cannot, and no amount of care in stating the bridge would let it.  What such a
 reduction must do instead is stay inside one fibre, and that is a property of how it forms its
 inputs, not of any lemma here.  `embedTargets` and the candidate side of `wins_embedTargets_iff`
 share one `(pkSeed, pkRoot)` argument pair for exactly that reason: a reduction that let the two
-drift apart would be a type error rather than a review question.
+drift apart cannot instantiate that lemma at all, rather than instantiating it at a statement a
+reviewer has to notice is the wrong one.  The drifted terms themselves type-check perfectly well —
+`notMem_embedTargets_of_ne` and `wins_of_hmsg_agree` are *about* such terms — so what the shared
+pair buys is a unification constraint on one lemma, not a type-level guarantee about reductions.
 
 **Direction of the assumption, stated once.**  Assuming the FIPS `H_msg` interleaved-target-subset
 resilient is assuming more than the source assumes of `mco`.  A formalisation may assume more; it
@@ -189,34 +197,36 @@ There is no named source lemma to point at, and this docstring does not invent o
 
 ## Labels
 
-*Deterministic inclusion* — a statement whose free objects are a primitive bundle, seeds, an
-address, a digest, an index and naturals:
+*Deterministic inclusion* — a statement with no list of signing queries in it.  Its free objects
+are a primitive bundle, seeds, an address, a digest, an index, a message, naturals, and any ITSR
+target transcript the statement is handed or builds for itself:
 
 * `HmsgIndex.forsAdrs`, `forsAdrs_layer`, `forsAdrs_tree`, `forsAdrs_type`, `forsAdrs_keyPair`,
   `forsAdrs_eq_of_indices`, `forsAdrs_of_mem`, `forsAdrs_eq_bottom`;
 * `HmsgIndex.globalLeaf`, `globalLeaf_eq`, `globalLeaf_lt`, `globalLeaf_div_pow_a`,
   `globalLeaf_of_mem`, `HmsgIndex.ext_of_coords`;
 * `hmsgNarrowItsrProblem`, `hmsgNarrowItsrProblem_hash`, `hmsgNarrowItsrProblem_keygen`,
-  `hmsgNarrowItsrProblem_indices`, `indexSet_embed`;
+  `hmsgNarrowItsrProblem_indices`, `indexSet_embedTargets_entry`;
 * `wins_of_hmsg_agree`;
 * `findUncoveredIndex`, `findUncoveredIndex_eq_find?`, `findUncoveredIndex_eq_some_iff`,
   `mem_indexSet_of_findUncoveredIndex`, `notMem_targetIndexSet_of_findUncoveredIndex`,
   `wins_of_findUncoveredIndex_eq_none`, `itsr_wins_or_uncovered`, `uncoveredTarget`,
   `uncoveredTarget_eq`, `uncoveredTarget_globalLeaf`;
-* `forsSign_getElem_sk`.
+* `forsSign_getElem_sk`, `forsSign_reveals_of_mem_hmsgIndices`.
 
-*Transcript transport* — a statement about a query list or an ITSR target transcript:
+*Transcript transport* — a statement carrying a free list of signing queries, and so about the
+transcript that list embeds to:
 
 * `embedTargets`, `embedTargets_eq`, `mem_embedTargets_iff`, `notMem_embedTargets_of_notMem`,
   `notMem_embedTargets_of_ne`, `targetIndexSet_embedTargets`,
   `mem_targetIndexSet_embedTargets_iff`, `wins_embedTargets_iff`;
-* `forsSign_reveals_of_mem_hmsgIndices`, `coord_unrevealed_of_notMem`.
+* `coord_unrevealed_of_notMem`.
 
 Those forty-one are the module's whole interface; none is `private` and none carries `@[expose]`.
 
 ## References
 
-- NIST FIPS 205, §4.1, §9 Algorithms 16, 17, 19 and 20, §10.2, §11
+- NIST FIPS 205, §4.1, §8 Algorithms 16 and 17, §9 Algorithms 19 and 20, §10.2, §11
 - Barbosa, Dupressoir, Hülsing, Meijers, and Strub, "A Tight Security Proof for SPHINCS+,
   Formally Verified" (`FORS_ES.ec`, `KeyedHashFunctions.eca`)
 -/
@@ -447,8 +457,8 @@ theorem notMem_embedTargets_of_ne {prims : Primitives p} (pkSeed : prims.PkSeed)
 /-- One embedded pair selects the indices the narrow problem selects from the same pair.  The two
 hashes are the same `H_msg` call at the same four arguments and the two index maps are both
 `hmsgIndices`, so this is the coverage half of the widening in one line. -/
-theorem indexSet_embed {prims : Primitives p} [SampleableType prims.Y] (pkSeed : prims.PkSeed)
-    (pkRoot : prims.Y) (randomizer : prims.Y) (request : List Byte) :
+theorem indexSet_embedTargets_entry {prims : Primitives p} [SampleableType prims.Y]
+    (pkSeed : prims.PkSeed) (pkRoot : prims.Y) (randomizer : prims.Y) (request : List Byte) :
     (hmsgItsrProblem prims).indexSet
         (randomizer, (⟨pkSeed, pkRoot, request⟩ : HmsgITSRInput prims.PkSeed prims.Y)) =
       (hmsgNarrowItsrProblem prims pkSeed pkRoot).indexSet (randomizer, request) := by
@@ -462,7 +472,7 @@ theorem targetIndexSet_embedTargets {prims : Primitives p} [SampleableType prims
     (hmsgItsrProblem prims).targetIndexSet (embedTargets prims pkSeed pkRoot queries) =
       (hmsgNarrowItsrProblem prims pkSeed pkRoot).targetIndexSet queries := by
   rw [ITSRProblem.targetIndexSet, ITSRProblem.targetIndexSet, embedTargets_eq, List.flatMap_map]
-  exact congrArg queries.flatMap (funext fun q => indexSet_embed pkSeed pkRoot q.1 q.2)
+  exact congrArg queries.flatMap (funext fun q => indexSet_embedTargets_entry pkSeed pkRoot q.1 q.2)
 
 /-- Membership in the embedded transcript's index set, in the form a reduction reads: some query's
 digest at that key pair selects the index. -/
@@ -491,7 +501,7 @@ theorem wins_embedTargets_iff {prims : Primitives p} [SampleableType prims.Y]
         (randomizer, ⟨pkSeed, pkRoot, request⟩) ↔
       (hmsgNarrowItsrProblem prims pkSeed pkRoot).Wins queries (randomizer, request) := by
   rw [ITSRProblem.Wins, ITSRProblem.Wins, targetIndexSet_embedTargets,
-    indexSet_embed pkSeed pkRoot randomizer request]
+    indexSet_embedTargets_entry pkSeed pkRoot randomizer request]
   constructor
   · rintro ⟨hfresh, hcov⟩
     exact ⟨fun hmem => hfresh ((mem_embedTargets_iff pkSeed pkRoot queries randomizer
@@ -654,8 +664,9 @@ theorem forsSign_getElem_sk (prims : Primitives p) (md : List Byte) (sk : prims.
 secret value honest signing on that digest reveals at that index's tree is the secret value at that
 coordinate.
 
-*Transcript transport.*  This is the reading that makes an uncovered index mean something: the
-indices a query's digest selects are exactly the coordinates that query's signature opens. -/
+*Deterministic inclusion.*  Its free objects are a digest and an index, not a query list; the
+reading it licenses is what makes an uncovered index mean something, since the indices a query's
+digest selects are exactly the coordinates that query's signature opens. -/
 theorem forsSign_reveals_of_mem_hmsgIndices (prims : Primitives p) (sk : prims.SkSeed)
     (pkSeed : prims.PkSeed) {digest : Bytes p.m} {idx : HmsgIndex p}
     (h : idx ∈ hmsgIndices p digest) :
