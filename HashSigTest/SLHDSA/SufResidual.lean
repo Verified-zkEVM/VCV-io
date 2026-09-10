@@ -134,7 +134,7 @@ theorem toyValid : toyParams.Valid := by decide
 
 -- Exposed here, where the `H_msg` bridge fixture leaves it unexposed, because this file states
 -- three `DecidableEq` instances whose types are written at `toy.params`: without the attribute,
--- 43 errors, the first at the `ForsTreeSigCore` instance below, `Application type mismatch: the
+-- 45 errors, the first at the `ForsTreeSigCore` instance below, `Application type mismatch: the
 -- argument toyPrimitives.core has type CorePrimitives toyParams but is expected to have type
 -- CorePrimitives toy.params`.
 /-- The validated form of `toyParams`. -/
