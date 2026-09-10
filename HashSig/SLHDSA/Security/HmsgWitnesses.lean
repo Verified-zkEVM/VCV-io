@@ -119,10 +119,28 @@ field.  The repetition is not left to inspection: `forsAdrs_eq_of_indices` prove
 whenever the two indices do, and `forsAdrs_of_mem` is that equation at a digest the index belongs
 to.  `globalLeaf` is grounded the same way, against `forsSigLeafIndex`, which
 `HashSig.SLHDSA.Security.ForsWitnesses` derives from FIPS 205 Algorithm 16 line 4 and Algorithm 17
-line 5.  A shift applied to `globalLeaf` and to `globalLeaf_of_mem` together type-checks and proves;
-what refuses it is that the right-hand side is a separately reviewed definition with its own
-citation, and that `HashSigTest.SLHDSA.HmsgWitnesses` evaluates the resulting FORS leaf address
-against a table of `Adrs` records written out by hand.
+line 5.
+
+A shift of `globalLeaf` does not stay at two sites.  Shifting the definition together with
+`globalLeaf_of_mem` and nothing else leaves seven errors; carrying the shift through until the
+library elaborates clean moves nine declarations — the definition, `globalLeaf_eq`,
+`globalLeaf_lt`, `globalLeaf_div_pow_a`, `globalLeaf_of_mem`, `HmsgIndex.ext_of_coords`,
+`uncoveredTarget_globalLeaf`, `forsSign_reveals_of_mem_hmsgIndices` and
+`coord_unrevealed_of_notMem` — and seven of the fixture's statement pins with them.  Those pins
+close the shift at build time.  At run time it is closed by six checks in
+`HashSigTest.SLHDSA.HmsgWitnesses`, each of which reads the shifted leaf against something that
+does not move with it, and each of which was measured on its own with the other five removed:
+`forsSigLeafIndex`, the separately reviewed definition with its own citation; a hand-written
+`tree * 2 ^ a + leaf`; the divide-back to the FORS tree; the `k * 2 ^ a` bound; the secret value
+honest signing reveals at the coordinate; and a hand-written list of the two global leaves the
+forged digest is expected to select, read against the hand-written table of `Adrs` records.
+
+The per-index read of that `Adrs` table is *not* one of the six.  The shifted global leaf stands on
+both sides of its comparison, so with only that check present the fully carried-through shift
+passes: it pins how `forsNodeAdrs` builds an address from a given global leaf, and says nothing
+about which global leaf.  So does the `Nodup` sweep over the sixty-four indices, which a shift
+permutes bijectively.  What pins the leaf is the sixth check, whose left side moves and whose right
+side does not.
 
 ## First, not last
 

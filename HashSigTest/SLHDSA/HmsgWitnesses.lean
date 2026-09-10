@@ -95,11 +95,17 @@ coverage.
 
 ## The naive identifications this fixture is built to reject
 
-* *That `globalLeaf` is the local leaf.*  Rejected by evaluating the FORS leaf address at the
-  extracted coordinate against a table of four `Adrs` records written out by hand — layer zero,
-  layer-zero tree three, `FORS_TREE`, key-pair address three, height zero, global index — rather
-  than against `forsSigLeafIndex`.  A shift applied to `globalLeaf` and to its bridge together
-  type-checks, proves, and fails at that table.
+* *That `globalLeaf` is the local leaf.*  Rejected six times over, each measured on its own with
+  the other five removed: against `forsSigLeafIndex`, which is separately reviewed and carries the
+  FIPS citation; against a hand-written `tree · 2 ^ a + leaf`; against the divide-back to the FORS
+  tree; against the `k · 2 ^ a` bound; against the secret value honest signing reveals at the
+  coordinate; and against a hand-written list of the two global leaves the forged digest is
+  expected to select, read through the hand-written `Adrs` table.  A shift of `globalLeaf` carried
+  through the library until it elaborates clean moves nine declarations, and then fails at each of
+  those six.  The *per-index* read of that `Adrs` table is not one of them: the shifted global leaf
+  stands on both sides of its comparison, so with it alone the shift passes.  It pins how
+  `forsNodeAdrs` builds an address from a given global leaf, not which global leaf — and so does
+  the `Nodup` sweep over the sixty-four indices, which a shift merely permutes.
 * *That `findUncoveredIndex` returns "an" uncovered index.*  Rejected by the empty-transcript case,
   where both are uncovered and the returned one is required to be the earlier.
 * *That the ITSR candidate may carry any `(PK.seed, PK.root)`.*  Rejected by the two off-fibre
