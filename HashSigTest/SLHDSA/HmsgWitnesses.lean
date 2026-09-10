@@ -13,18 +13,20 @@ values, not restated from the theorems.
 
 ## The profile is the scheme-dispatch fixture's, and why it is copied rather than imported
 
-The bundle below is byte for byte the one `HashSigTest.SLHDSA.SchemeWitnesses` builds — the same
-seven parameters, the same six byte maps, the same three seeds, the same published root — so the
-two executables run on one profile and a reviewer can check that by diffing the two blocks.  It is
-copied rather than imported because a `lean_exe` root must own its `main`, and a module that
-imports the other one cannot declare `main` at all: the attempt reports `` `main` has already been
-declared``, and had it not, the executable would silently link the imported `main` and run the other
-fixture.  The lane has no shared fixture module yet, and adding one would edit a merged, reviewed
-file from inside this pull request.
+The bundle below is the one `HashSigTest.SLHDSA.SchemeWitnesses` builds — the same seven
+parameters, the same six byte maps, the same three honest seeds and second public seed, the same
+published root — so the two executables run on one profile, and a reviewer can check that by
+diffing the two blocks.  It is copied rather than imported because a `lean_exe` root must own its
+`main`, and a module that imports the other one cannot declare `main` at all: the attempt reports
+`` `main` has already been declared``, and had it not, the executable would silently link the
+imported `main` and run the other fixture.  The lane has no shared fixture module yet, and adding
+one would edit a merged, reviewed file from inside this pull request.
 
-One line differs from the copied original, deliberately: `toy` carries no `@[expose]` here, because
-removing the attribute in this file produces no errors at all.  The comment beside each remaining
-attribute is the error its removal actually produces here, not the count the other fixture measured.
+That diff has exactly four entries, all deliberate.  The failure message names this executable.
+`toy` carries no `@[expose]` here, because removing that attribute in this file produces no errors
+at all.  And the two remaining attribute comments carry this file's own measured error counts and
+error text rather than the other fixture's — every attribute comment here was written by removing
+the attribute and reading what Lean said.
 
 ## What the profile already supplies, and the one thing it does not
 
