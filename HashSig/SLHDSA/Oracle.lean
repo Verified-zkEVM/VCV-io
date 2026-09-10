@@ -6,6 +6,8 @@ Authors: Quang Dao
 
 module
 public import HashSig.SLHDSA.Primitives
+public import VCVio.OracleComp.HasQuery.Morphism
+public import VCVio.OracleComp.QueryTracking.QueryBound
 public import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 
 /-!
@@ -137,6 +139,74 @@ same public-hash handler. -/
           OracleComp (publicHashSpec prims.core) (Bytes p.m)) =
       prims.Hmsg r pkSeed pkRoot msg := by
   simp only [hmsg, simulateQ_HasQuery_query, impl]
+
+/-! ### Query-preserving morphisms
+
+A `HasQuery.QueryHom` fixes every explicit query, hence each arity-specific public-hash wrapper.
+These equations are the leaves of every `*M_natural` theorem over `publicHashSpec`. -/
+
+/-- Query-preserving monad morphisms fix an explicit `F` query. -/
+theorem f_natural (core : CorePrimitives p) {m n : Type → Type*} [Monad m] [Monad n]
+    [HasQuery (publicHashSpec core) m] [HasQuery (publicHashSpec core) n]
+    (F : HasQuery.QueryHom (publicHashSpec core) m n)
+    (pkSeed : core.PkSeed) (adrs : Adrs) (x : core.Y) :
+    F.toMonadHom (f core pkSeed adrs x) = f core pkSeed adrs x :=
+  HasQuery.map_query F (PublicHashQuery.thash pkSeed (core.adrsToKey adrs) [x])
+
+/-- Query-preserving monad morphisms fix an explicit `H` query. -/
+theorem h_natural (core : CorePrimitives p) {m n : Type → Type*} [Monad m] [Monad n]
+    [HasQuery (publicHashSpec core) m] [HasQuery (publicHashSpec core) n]
+    (F : HasQuery.QueryHom (publicHashSpec core) m n)
+    (pkSeed : core.PkSeed) (adrs : Adrs) (left right : core.Y) :
+    F.toMonadHom (h core pkSeed adrs left right) = h core pkSeed adrs left right :=
+  HasQuery.map_query F (PublicHashQuery.thash pkSeed (core.adrsToKey adrs) [left, right])
+
+/-- Query-preserving monad morphisms fix an explicit `T_l` query. -/
+theorem tl_natural (core : CorePrimitives p) {m n : Type → Type*} [Monad m] [Monad n]
+    [HasQuery (publicHashSpec core) m] [HasQuery (publicHashSpec core) n]
+    (F : HasQuery.QueryHom (publicHashSpec core) m n)
+    (pkSeed : core.PkSeed) (adrs : Adrs) (xs : List core.Y) :
+    F.toMonadHom (tl core pkSeed adrs xs) = tl core pkSeed adrs xs :=
+  HasQuery.map_query F (PublicHashQuery.thash pkSeed (core.adrsToKey adrs) xs)
+
+/-- Query-preserving monad morphisms fix an explicit `H_msg` query. -/
+theorem hmsg_natural (core : CorePrimitives p) {m n : Type → Type*} [Monad m] [Monad n]
+    [HasQuery (publicHashSpec core) m] [HasQuery (publicHashSpec core) n]
+    (F : HasQuery.QueryHom (publicHashSpec core) m n)
+    (r : core.Y) (pkSeed : core.PkSeed) (pkRoot : core.Y) (msg : List Byte) :
+    F.toMonadHom (hmsg core r pkSeed pkRoot msg) = hmsg core r pkSeed pkRoot msg :=
+  HasQuery.map_query F (PublicHashQuery.hmsg r pkSeed pkRoot msg)
+
+/-! ### One-query budgets
+
+Each wrapper is a single explicit query, so it has total query budget `1` in the free
+public-hash program. These are the leaves of every structural `*M_isTotalQueryBound` theorem. -/
+
+/-- An explicit `F` query is one public-hash query. -/
+theorem f_isTotalQueryBound (core : CorePrimitives p) (pkSeed : core.PkSeed) (adrs : Adrs)
+    (x : core.Y) :
+    IsTotalQueryBound (f core pkSeed adrs x : OracleComp (publicHashSpec core) core.Y) 1 := by
+  simp [f, IsTotalQueryBound]
+
+/-- An explicit `H` query is one public-hash query. -/
+theorem h_isTotalQueryBound (core : CorePrimitives p) (pkSeed : core.PkSeed) (adrs : Adrs)
+    (left right : core.Y) :
+    IsTotalQueryBound
+      (h core pkSeed adrs left right : OracleComp (publicHashSpec core) core.Y) 1 := by
+  simp [h, IsTotalQueryBound]
+
+/-- An explicit `T_l` query is one public-hash query. -/
+theorem tl_isTotalQueryBound (core : CorePrimitives p) (pkSeed : core.PkSeed) (adrs : Adrs)
+    (xs : List core.Y) :
+    IsTotalQueryBound (tl core pkSeed adrs xs : OracleComp (publicHashSpec core) core.Y) 1 := by
+  simp [tl, IsTotalQueryBound]
+
+/-- An explicit `H_msg` query is one public-hash query. -/
+theorem hmsg_isTotalQueryBound (core : CorePrimitives p) (r : core.Y) (pkSeed : core.PkSeed)
+    (pkRoot : core.Y) (msg : List Byte) :
+    IsTotalQueryBound
+      (hmsg core r pkSeed pkRoot msg : OracleComp (publicHashSpec core) (Bytes p.m)) 1 := by
+  simp [hmsg, IsTotalQueryBound]
 
 /-- The cache used by the lazy public random oracle. -/
 abbrev Cache (core : CorePrimitives p) := (publicHashSpec core).QueryCache

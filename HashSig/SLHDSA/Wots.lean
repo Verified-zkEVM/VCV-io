@@ -222,6 +222,32 @@ theorem chainStepsCore_le (core : CorePrimitives p) (msg : core.Y) (i : ℕ) :
     chainStepsCore core msg i ≤ p.w - 1 :=
   Nat.le_sub_one_of_lt (chainStepsCore_lt core msg i)
 
+/-- Over all `len` chains, the message-selected signing steps total at most one full pass. -/
+theorem sum_chainStepsCore_le (core : CorePrimitives p) (msg : core.Y) :
+    (∑ i : Fin p.len, chainStepsCore core msg i.val) ≤ p.len * (p.w - 1) :=
+  calc
+    (∑ i : Fin p.len, chainStepsCore core msg i.val) ≤ ∑ _ : Fin p.len, (p.w - 1) :=
+      Finset.sum_le_sum fun i _ => chainStepsCore_le core msg i.val
+    _ = p.len * (p.w - 1) := by simp
+
+/-- Over all `len` chains, the complementary recovery steps total at most one full pass. -/
+theorem sum_complement_chainStepsCore_le (core : CorePrimitives p) (msg : core.Y) :
+    (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) ≤ p.len * (p.w - 1) :=
+  calc
+    (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) ≤
+        ∑ _ : Fin p.len, (p.w - 1) :=
+      Finset.sum_le_sum fun _ _ => Nat.sub_le _ _
+    _ = p.len * (p.w - 1) := by simp
+
+/-- Signing steps and complementary recovery steps partition one full pass over every chain. -/
+theorem sum_chainStepsCore_add_sum_complement (core : CorePrimitives p) (msg : core.Y) :
+    (∑ i : Fin p.len, chainStepsCore core msg i.val) +
+        (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) =
+      p.len * (p.w - 1) := by
+  rw [← Finset.sum_add_distrib]
+  simp_rw [Nat.add_sub_of_le (chainStepsCore_le core msg _)]
+  simp
+
 /-! ### Public-key generation, signing, and recovery -/
 
 /-- A WOTS+ signature: the `len` chain values, length-indexed. -/
@@ -422,32 +448,6 @@ theorem wotsPkFromSigWith_natural {m n : Type → Type*} [Monad m] [LawfulMonad 
   simp [wotsPkFromSigWith, F.mmap_bind,
     wotsPkFromSigTopsWith_natural F core hashm hashn hhash, hcompress]
 
-private theorem queryHom_f (core : CorePrimitives p) {m n : Type → Type*}
-    [Monad m] [Monad n] [HasQuery (publicHashSpec core) m]
-    [HasQuery (publicHashSpec core) n]
-    (F : HasQuery.QueryHom (publicHashSpec core) m n) (pk : core.PkSeed) :
-    ∀ a y, F.toMonadHom (PublicHash.f core pk a y) = PublicHash.f core pk a y := by
-  intro a y
-  change F.toMonadHom
-      (query (spec := publicHashSpec core)
-        (PublicHashQuery.thash pk (core.adrsToKey a) [y])) =
-    query (spec := publicHashSpec core)
-      (PublicHashQuery.thash pk (core.adrsToKey a) [y])
-  exact HasQuery.map_query F _
-
-private theorem queryHom_tl (core : CorePrimitives p) {m n : Type → Type*}
-    [Monad m] [Monad n] [HasQuery (publicHashSpec core) m]
-    [HasQuery (publicHashSpec core) n]
-    (F : HasQuery.QueryHom (publicHashSpec core) m n) (pk : core.PkSeed) :
-    ∀ a ys, F.toMonadHom (PublicHash.tl core pk a ys) = PublicHash.tl core pk a ys := by
-  intro a ys
-  change F.toMonadHom
-      (query (spec := publicHashSpec core)
-        (PublicHashQuery.thash pk (core.adrsToKey a) ys)) =
-    query (spec := publicHashSpec core)
-      (PublicHashQuery.thash pk (core.adrsToKey a) ys)
-  exact HasQuery.map_query F _
-
 /-- Query-preserving monad morphisms commute with explicit WOTS+ public-key chain generation. -/
 theorem wotsPkGenTopsM_natural (core : CorePrimitives p)
     {m n : Type → Type*} [Monad m] [LawfulMonad m]
@@ -456,7 +456,7 @@ theorem wotsPkGenTopsM_natural (core : CorePrimitives p)
     (F : HasQuery.QueryHom (publicHashSpec core) m n)
     (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) :
     F.toMonadHom (wotsPkGenTopsM core sk pk adrs) = wotsPkGenTopsM core sk pk adrs :=
-  wotsPkGenTopsWith_natural F.toMonadHom core _ _ (queryHom_f core F pk) sk pk adrs
+  wotsPkGenTopsWith_natural F.toMonadHom core _ _ (PublicHash.f_natural core F pk) sk pk adrs
 
 /-- Query-preserving monad morphisms commute with explicit WOTS+ public-key generation. -/
 theorem wotsPkGenM_natural (core : CorePrimitives p)
@@ -467,7 +467,7 @@ theorem wotsPkGenM_natural (core : CorePrimitives p)
     (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) :
     F.toMonadHom (wotsPkGenM core sk pk adrs) = wotsPkGenM core sk pk adrs :=
   wotsPkGenWith_natural F.toMonadHom core _ _ _ _
-    (queryHom_f core F pk) (queryHom_tl core F pk) sk pk adrs
+    (PublicHash.f_natural core F pk) (PublicHash.tl_natural core F pk) sk pk adrs
 
 /-- Query-preserving monad morphisms commute with explicit WOTS+ signing. -/
 theorem wotsSignM_natural (core : CorePrimitives p)
@@ -478,7 +478,7 @@ theorem wotsSignM_natural (core : CorePrimitives p)
     (msg : core.Y) (sk : core.SkSeed) (pk : core.PkSeed)
     (adrs : Adrs) :
     F.toMonadHom (wotsSignM core msg sk pk adrs) = wotsSignM core msg sk pk adrs :=
-  wotsSignWith_natural F.toMonadHom core _ _ (queryHom_f core F pk) msg sk pk adrs
+  wotsSignWith_natural F.toMonadHom core _ _ (PublicHash.f_natural core F pk) msg sk pk adrs
 
 /-- Query-preserving monad morphisms commute with explicit WOTS+ recovery-chain generation. -/
 theorem wotsPkFromSigTopsM_natural (core : CorePrimitives p)
@@ -490,7 +490,7 @@ theorem wotsPkFromSigTopsM_natural (core : CorePrimitives p)
     (pk : core.PkSeed) (adrs : Adrs) :
     F.toMonadHom (wotsPkFromSigTopsM core sig msg pk adrs) =
       wotsPkFromSigTopsM core sig msg pk adrs :=
-  wotsPkFromSigTopsWith_natural F.toMonadHom core _ _ (queryHom_f core F pk) sig msg adrs
+  wotsPkFromSigTopsWith_natural F.toMonadHom core _ _ (PublicHash.f_natural core F pk) sig msg adrs
 
 /-- Query-preserving monad morphisms commute with explicit WOTS+ public-key recovery. -/
 theorem wotsPkFromSigM_natural (core : CorePrimitives p)
@@ -503,7 +503,7 @@ theorem wotsPkFromSigM_natural (core : CorePrimitives p)
     F.toMonadHom (wotsPkFromSigM core sig msg pk adrs) =
       wotsPkFromSigM core sig msg pk adrs :=
   wotsPkFromSigWith_natural F.toMonadHom core _ _ _ _
-    (queryHom_f core F pk) (queryHom_tl core F pk) sig msg adrs
+    (PublicHash.f_natural core F pk) (PublicHash.tl_natural core F pk) sig msg adrs
 
 /-! ### Structural query bounds -/
 
@@ -524,18 +524,6 @@ private theorem isTotalQueryBound_ofFnM {ι α : Type} {spec : OracleSpec ι} {k
       simpa using isTotalQueryBound_bind (n₂ := 0) (h (Fin.last k))
         (fun a => show IsTotalQueryBound (pure (xs.push a) : OracleComp spec _) 0 from trivial)
 
-private theorem publicHash_f_isTotalQueryBound_one (core : CorePrimitives p)
-    (pk : core.PkSeed) (adrs : Adrs) (x : core.Y) :
-    IsTotalQueryBound
-      (PublicHash.f core pk adrs x : OracleComp (publicHashSpec core) core.Y) 1 := by
-  simp [PublicHash.f, IsTotalQueryBound]
-
-private theorem publicHash_tl_isTotalQueryBound_one (core : CorePrimitives p)
-    (pk : core.PkSeed) (adrs : Adrs) (xs : List core.Y) :
-    IsTotalQueryBound
-      (PublicHash.tl core pk adrs xs : OracleComp (publicHashSpec core) core.Y) 1 := by
-  simp [PublicHash.tl, IsTotalQueryBound]
-
 /-- An explicit WOTS+ chain of length `s` makes at most `s` public-hash queries. -/
 theorem chainM_isTotalQueryBound (core : CorePrimitives p) (pk : core.PkSeed)
     (adrs : Adrs) (x : core.Y) (i s : ℕ) :
@@ -548,7 +536,7 @@ theorem chainM_isTotalQueryBound (core : CorePrimitives p) (pk : core.PkSeed)
         (chainM core pk adrs x i s >>= fun y =>
           PublicHash.f core pk (adrs.setHashAddress (i + s)) y) (s + 1)
       exact isTotalQueryBound_bind ih fun y =>
-        publicHash_f_isTotalQueryBound_one core pk _ y
+        PublicHash.f_isTotalQueryBound core pk _ y
 
 /-- WOTS+ public-key chain generation makes at most `len * (w - 1)` public-hash queries. -/
 theorem wotsPkGenTopsM_isTotalQueryBound (core : CorePrimitives p)
@@ -573,7 +561,7 @@ theorem wotsPkGenM_isTotalQueryBound (core : CorePrimitives p)
       (wotsPkGenM core sk pk adrs : OracleComp (publicHashSpec core) core.Y)
       (p.len * (p.w - 1) + 1) := by
   exact isTotalQueryBound_bind (wotsPkGenTopsM_isTotalQueryBound core sk pk adrs)
-    fun tops => publicHash_tl_isTotalQueryBound_one core pk (wotsPkAdrs adrs) tops.toList
+    fun tops => PublicHash.tl_isTotalQueryBound core pk (wotsPkAdrs adrs) tops.toList
 
 /-- WOTS+ signing is bounded by one query for every message-selected chain step. -/
 theorem wotsSignM_isTotalQueryBound (core : CorePrimitives p) (msg : core.Y)
@@ -605,7 +593,7 @@ theorem wotsPkFromSigM_isTotalQueryBound (core : CorePrimitives p)
       ((∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) + 1) := by
   exact isTotalQueryBound_bind
     (wotsPkFromSigTopsM_isTotalQueryBound core sig msg pk adrs)
-    fun tops => publicHash_tl_isTotalQueryBound_one core pk (wotsPkAdrs adrs) tops.toList
+    fun tops => PublicHash.tl_isTotalQueryBound core pk (wotsPkAdrs adrs) tops.toList
 
 /-- Signing followed by recovery is bounded by one full pass over every WOTS+ chain plus the
 final `T_l` compression query. -/
@@ -619,14 +607,7 @@ theorem wotsSignM_then_wotsPkFromSigM_isTotalQueryBound (core : CorePrimitives p
   have hbound := isTotalQueryBound_bind
     (wotsSignM_isTotalQueryBound core msg sk pk adrs)
     (fun sig => wotsPkFromSigM_isTotalQueryBound core sig msg pk adrs)
-  have hsum :
-      (∑ i : Fin p.len, chainStepsCore core msg i.val) +
-          (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) =
-        p.len * (p.w - 1) := by
-    rw [← Finset.sum_add_distrib]
-    simp_rw [Nat.add_sub_of_le (chainStepsCore_le core msg _)]
-    simp
-  simpa [← Nat.add_assoc, hsum] using hbound
+  simpa [← Nat.add_assoc, sum_chainStepsCore_add_sum_complement core msg] using hbound
 
 /-! ### Pure interpretations -/
 

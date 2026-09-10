@@ -49,35 +49,6 @@ def signQueryBound (p : Params) : ℕ :=
 def recoverQueryBound (p : Params) : ℕ :=
   p.d * xmssRecoverQueryBound p
 
-private theorem chainSteps_sum_le (core : CorePrimitives p) (msg : core.Y) :
-    (∑ i : Fin p.len, chainStepsCore core msg i.val) ≤ p.len * (p.w - 1) := by
-  calc
-    (∑ i : Fin p.len, chainStepsCore core msg i.val) ≤
-        ∑ _ : Fin p.len, (p.w - 1) := by
-      apply Finset.sum_le_sum
-      intro i _
-      exact chainStepsCore_le core msg i.val
-    _ = p.len * (p.w - 1) := by simp
-
-private theorem complementaryChainSteps_sum_le (core : CorePrimitives p) (msg : core.Y) :
-    (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) ≤
-      p.len * (p.w - 1) := by
-  calc
-    (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) ≤
-        ∑ _ : Fin p.len, (p.w - 1) := by
-      apply Finset.sum_le_sum
-      intro i _
-      omega
-    _ = p.len * (p.w - 1) := by simp
-
-private theorem chainSteps_partition (core : CorePrimitives p) (msg : core.Y) :
-    (∑ i : Fin p.len, chainStepsCore core msg i.val) +
-        (∑ i : Fin p.len, (p.w - 1 - chainStepsCore core msg i.val)) =
-      p.len * (p.w - 1) := by
-  rw [← Finset.sum_add_distrib]
-  simp_rw [Nat.add_sub_of_le (chainStepsCore_le core msg _)]
-  simp
-
 theorem xmssSignM_isTotalQueryBound_coarse (core : CorePrimitives p)
     (msg : core.Y) (sk : core.SkSeed) (pk : core.PkSeed) (adrs : Adrs) (idx : ℕ) :
     IsTotalQueryBound
@@ -86,7 +57,7 @@ theorem xmssSignM_isTotalQueryBound_coarse (core : CorePrimitives p)
       (xmssSignQueryBound p) := by
   apply (xmssSignM_isTotalQueryBound core msg sk pk adrs idx).mono
   unfold xmssSignQueryBound
-  have := chainSteps_sum_le core msg
+  have := sum_chainStepsCore_le core msg
   omega
 
 theorem xmssPkFromSigM_isTotalQueryBound_coarse (core : CorePrimitives p)
@@ -98,7 +69,7 @@ theorem xmssPkFromSigM_isTotalQueryBound_coarse (core : CorePrimitives p)
       (xmssRecoverQueryBound p) := by
   apply (xmssPkFromSigM_isTotalQueryBound core idx sig msg pk adrs).mono
   unfold xmssRecoverQueryBound
-  have := complementaryChainSteps_sum_le core msg
+  have := sum_complement_chainStepsCore_le core msg
   omega
 
 /-- Signing and recovery while retaining both results has the same complete-chain budget as the
@@ -118,7 +89,7 @@ theorem xmssSignRecoverPairM_isTotalQueryBound (core : CorePrimitives p)
           show IsTotalQueryBound
             (pure (sig, root) : OracleComp (publicHashSpec core) _) 0 from trivial
   unfold xmssCycleQueryBound
-  have hpartition := chainSteps_partition core msg
+  have hpartition := sum_chainStepsCore_add_sum_complement core msg
   simpa [← Nat.add_assoc, hpartition, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hbound
 
 theorem signFromPositionM_isTotalQueryBound (vp : ValidatedParams)

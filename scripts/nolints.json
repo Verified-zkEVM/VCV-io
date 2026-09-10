@@ -1591,7 +1591,6 @@
  ["unusedArguments", "_private.Examples.CommitmentScheme.Extractability.0.extractability_someWin_implies_collision"],
  ["unusedArguments", "_private.Extern.MLDSA.Sampling.0.MLDSA.Concrete.getD_push_or"],
  ["unusedArguments", "_private.Extern.MLDSA.Sampling.0.MLDSA.Concrete.getD_set!_or"],
- ["unusedArguments", "_private.HashSig.SLHDSA.Scheme.0.SLHDSA.queryHom_hmsg"],
  ["unusedArguments", "_private.VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain.0.FiatShamir.Stateful.ForkBaseState"],
  ["unusedArguments", "_private.VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain.0.FiatShamir.Stateful.SimLoggedState"],
  ["unusedArguments", "_private.VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain.0.FiatShamir.Stateful.forkWrappedUniformImpl"],

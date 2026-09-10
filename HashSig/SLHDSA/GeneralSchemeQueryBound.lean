@@ -39,13 +39,6 @@ def signInternalQueryBound (p : Params) : ℕ :=
 def verifyInternalQueryBound (p : Params) : ℕ :=
   1 + (p.k * (p.a + 1) + 1) + GeneralHypertree.recoverQueryBound p
 
-private theorem publicHash_hmsg_isTotalQueryBound_one (core : CorePrimitives p)
-    (r : core.Y) (pkSeed : core.PkSeed) (pkRoot : core.Y) (msg : List Byte) :
-    IsTotalQueryBound
-      (PublicHash.hmsg core r pkSeed pkRoot msg :
-        OracleComp (publicHashSpec core) (Bytes p.m)) 1 := by
-  simp [PublicHash.hmsg, IsTotalQueryBound]
-
 theorem keygenInternalM_isTotalQueryBound (vp : ValidatedParams)
     (core : CorePrimitives vp.params) (skSeed : core.SkSeed) (skPrf : core.SkPrf)
     (pkSeed : core.PkSeed) :
@@ -72,7 +65,7 @@ theorem signInternalM_isTotalQueryBound (vp : ValidatedParams)
       (signInternalQueryBound vp.params) := by
   let R := core.PRFmsg sk.skPrf addrnd msg
   have hbound := isTotalQueryBound_bind
-    (publicHash_hmsg_isTotalQueryBound_one core R sk.pkSeed sk.pkRoot msg) fun digest =>
+    (PublicHash.hmsg_isTotalQueryBound core R sk.pkSeed sk.pkRoot msg) fun digest =>
       let parts := splitDigest vp.params digest
       isTotalQueryBound_bind
         (forsSignM_then_forsPkFromSigM_isTotalQueryBound
@@ -92,7 +85,7 @@ theorem verifyInternalM_isTotalQueryBound (vp : ValidatedParams)
       (verifyInternalM vp core msg sig pk : OracleComp (publicHashSpec core) Bool)
       (verifyInternalQueryBound vp.params) := by
   have hbound := isTotalQueryBound_bind
-    (publicHash_hmsg_isTotalQueryBound_one core sig.randomness pk.pkSeed pk.pkRoot msg)
+    (PublicHash.hmsg_isTotalQueryBound core sig.randomness pk.pkSeed pk.pkRoot msg)
     fun digest =>
       let parts := splitDigest vp.params digest
       isTotalQueryBound_bind
