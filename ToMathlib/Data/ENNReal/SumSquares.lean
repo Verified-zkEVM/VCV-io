@@ -20,9 +20,8 @@ open Finset ENNReal
 
 namespace ENNReal
 
-/-- The `ℝ≥0∞` form of Mathlib's root `two_mul_le_add_sq` (which needs an ordered ring with
-`ExistsAddOfLE` and `MulPosStrictMono`, so it does not apply to `ℝ≥0∞`); inside `open ENNReal` the
-unqualified name resolves to this lemma. -/
+/-- The `ℝ≥0∞` form of Mathlib's root `two_mul_le_add_sq`. The root lemma requires strict
+multiplication and additive order reflection, which fail in the presence of `⊤`. -/
 lemma two_mul_le_add_sq (a b : ℝ≥0∞) :
     2 * a * b ≤ a ^ 2 + b ^ 2 := by
   rcases eq_or_ne a ⊤ with rfl | ha
@@ -33,8 +32,7 @@ lemma two_mul_le_add_sq (a b : ℝ≥0∞) :
   exact_mod_cast _root_.two_mul_le_add_sq a.toNNReal b.toNNReal
 
 /-- The `ℝ≥0∞` form of Mathlib's root `sq_sum_le_card_mul_sum_sq`
-(`Mathlib/Algebra/Order/Chebyshev`, stated for linearly ordered rings); inside `open ENNReal` the
-unqualified name resolves to this lemma. -/
+(`Mathlib/Algebra/Order/Chebyshev`), whose strict ordered-semiring assumptions exclude `ℝ≥0∞`. -/
 lemma sq_sum_le_card_mul_sum_sq {ι' : Type*}
     (s : Finset ι') (f : ι' → ℝ≥0∞) :
     (∑ i ∈ s, f i) ^ 2 ≤ s.card * ∑ i ∈ s, f i ^ 2 := by
