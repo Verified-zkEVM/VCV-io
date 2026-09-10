@@ -80,7 +80,7 @@ there — so what decides its reach is whether this branch drives the two messag
 messages are the FORS public keys the two signatures recover, which `verifyInternal` hands to the
 hypertree as its layer-0 WOTS+ message; by `schemeParts_eq_of_randomizer_eq` the pair splits to one
 digest against one public key, which leaves each of the two keys a function of that signature's FORS
-half and of nothing else.
+half and of nothing that differs between them.
 
 The branch does not drive them apart.  What it gives is a disjunction, and where only its hypertree
 disjunct holds the two FORS halves are equal and the two recovered keys are one key; two FORS halves
