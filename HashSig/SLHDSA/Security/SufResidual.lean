@@ -62,13 +62,19 @@ returns nothing (`findUncoveredIndex_eq_none_of_mem_loggedRandomizers`).  Both a
 `itsr_wins_or_uncovered` are therefore closed off, and no amount of care in a reduction reopens
 them.
 
-Extracting from that branch needs a different object: two signatures with one digest, hence one FORS
-instance and one set of opened leaves, differing somewhere in their component vectors.  The lane's
-four witness families cannot be pointed at it.  `findWotsWitness` is guarded by a strict inequality
-between the two chain-step counts, which is false at every index when the two messages agree, and
-`findXmssWitness` and `findHypertreeWitness` inherit that guard; the honest partner in all four
-families is a value computed from `sk`, and here it is the other *signature*.  A same-digest
-extractor is a further witness module with its own witness type, and it is not in this pull request.
+What a reduction would have to use on that branch is the *pair*: two distinct signatures that split
+to one digest, hence one FORS instance and one set of opened leaves, and differ somewhere in their
+component vectors.  No search in the lane takes a pair in that sense.  Each of the four merged
+families compares one forged object against an honest partner computed from `sk` — `findXmssWitness`
+recovers the honest leaf and the honest WOTS+ signature from `sk` and the honest message, and
+`findForsWitness` the honest FORS material — so what already applies to the forged signature alone
+applies here unchanged, and the second signature enters nowhere.  The one search that does take two
+`(signature, message)` pairs, `findWotsChainWitness`, returns nothing unless the forged chain-step
+count is strictly below the honest one, which fails at every index when the two messages agree; and
+`findXmssWitness_isSome` and `findHypertreeWitness_isSome` carry that message disequality as a
+hypothesis for the same reason.  A same-digest extractor is therefore a further witness module with
+its own witness type, and it is not in this pull request.
+
 `HashSig.SLHDSA.Security.HypertreeWitnesses`'s review recorded that a two-adversarial-signatures
 argument is out of scope for the existential-unforgeability line; `schemeParts_eq_of_randomizer_eq`
 and `components_ne_of_ne_of_randomizer_eq` do not reopen it — they say what such an argument would
