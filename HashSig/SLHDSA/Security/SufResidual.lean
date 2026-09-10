@@ -76,10 +76,10 @@ and its per-chain helper `findWotsChainWitness` are the lane's only two searches
 `(signature, message)` pairs; the partner is an arbitrary signature, and neither
 `findWotsWitness_sound` nor `findWotsWitness_isSome` mentions `sk`.  The chain helper is inert when
 the two messages agree — it returns nothing at an index unless the two chain-step counts differ
-there — but on this branch the two messages need not agree.  They are the two recovered FORS public
-keys, which `verifyInternal` hands to the hypertree as its layer-0 WOTS+ message, and on this branch
-they are recovered from two *different* FORS halves.  So `findWotsWitness_isSome`'s guard
-`msg ≠ msg'` is satisfiable and the search does return a witness.
+there — but here the two messages need not agree.  They are the two recovered FORS public keys,
+which `verifyInternal` hands to the hypertree as its layer-0 WOTS+ message, and on this branch they
+are recovered from two *different* FORS halves.  So `findWotsWitness_isSome`'s guard `msg ≠ msg'`
+is satisfiable and the search does return a witness.
 
 What places the family out of scope is therefore not the guard but what a returned witness says.
 `findWotsWitness_sound` concludes `WotsWitness.Valid … sig' msg'` — validity against the *supplied*
