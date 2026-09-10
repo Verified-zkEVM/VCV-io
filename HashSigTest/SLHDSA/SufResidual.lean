@@ -622,9 +622,10 @@ candidate is present, the winning condition fails, and — asserted separately, 
 winning condition fails" would not say *which* conjunct failed — the coverage conjunct still holds
 and the first-uncovered-index extractor returns nothing.  The index list the coverage check
 quantifies over is separately asserted to have length two, because `List.all` over `[]` is `true`.
-Every one of those is written with the FORS-perturbed forgery, and carry to the hypertree-perturbed
-one because the two are asserted to offer the same candidate, which they do because they carry the
-same randomizer: that is what makes this branch reachable twice.  Thirteen properties. -/
+Each of those five is written with the FORS-perturbed forgery, and each carries to the
+hypertree-perturbed one, because the two are asserted to offer the same candidate — which they do
+because they carry the same randomizer, and which is what makes this branch reachable twice.
+Thirteen properties. -/
 def checkBranches : IO Unit := do
   ensure "the embedded transcript is the log's three queries at the honest key pair, in order"
     (embeddedTargets ==
