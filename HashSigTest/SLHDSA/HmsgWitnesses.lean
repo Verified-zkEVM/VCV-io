@@ -367,6 +367,21 @@ def forgedLeafAdrsTable (j : ℕ) : Adrs := ⟨0, 3, AddrType.forsTree.toCode, 3
 /-- The FORS instance address of the forged digest, written out by hand. -/
 def forgedForsAdrsTable : Adrs := ⟨0, 3, AddrType.forsTree.toCode, 3, 0, 0⟩
 
+/-- The two global leaves the forged digest's two indices name, written out by hand: FORS tree
+zero's local leaf one sits at `0 · 2 ^ a + 1`, and FORS tree one's local leaf zero at
+`1 · 2 ^ a + 0`.  Unlike the per-index table read, this list does not move when `globalLeaf`
+does. -/
+def forgedGlobalLeafTable : List ℕ := [1, 2]
+
+/-- An index whose two digest words differ — layer-zero tree one, key pair two — so that the tree
+word and the key-pair word of `HmsgIndex.forsAdrs` can be told apart.  Every index the forged
+digest selects has both words equal to three. -/
+def offDiagonalIndex : HmsgIndex toyParams :=
+  ⟨⟨1, by decide⟩, ⟨2, by decide⟩, ⟨1, by decide⟩, ⟨0, by decide⟩⟩
+
+/-- Its FORS instance address, written out by hand. -/
+def offDiagonalAdrsTable : Adrs := ⟨0, 1, AddrType.forsTree.toCode, 2, 0, 0⟩
+
 /-- The first index the forged digest selects, written out by hand: layer-zero tree three, leaf
 three, FORS tree zero, local leaf one. -/
 def forgedIndex0 : HmsgIndex toyParams :=
@@ -413,9 +428,11 @@ instance : DecidableEq blindPrimitives.PkSeed := inferInstanceAs (DecidableEq (B
 
 The first six properties are the two message-derived maps: each of `H_msg`'s four FIPS inputs is
 moved on its own and the digest is required to move with it, and `PRF_msg` is moved in each of its
-two.  The rest fix the shape the coverage canaries rely on: the forged digest names two indices,
-they are the hand-written pair, four queries realise all four coverage patterns against them, a
-fifth covers both without reproducing the digest, and two of the six pairs share a randomizer. -/
+two.  The seventh is what makes the fold behind them visible: two messages whose folds are equal
+are required to share a digest and two whose folds differ are required not to.  The rest fix the
+shape the coverage canaries rely on: the forged digest names two indices, they are the hand-written
+pair, four queries realise all four coverage patterns against them, a fifth covers both without
+reproducing the digest, and two of the six pairs share a randomizer. -/
 def checkFixture : IO Unit := do
   ensure "H_msg moves with the randomizer"
     (toyPrimitives.Hmsg (node 0x01) pkSeed pkRoot msgC !=
@@ -427,6 +444,9 @@ def checkFixture : IO Unit := do
     (toyPrimitives.Hmsg qC.1 pkSeed pkRoot msgC != toyPrimitives.Hmsg qC.1 pkSeed otherPkRoot msgC)
   ensure "PRF_msg moves with addrnd" (rOf 0x11 msgC != rOf 0x22 msgC)
   ensure "PRF_msg moves with the message" (rOf 0x11 msgC != rOf 0x11 [0x21])
+  ensure "two messages with equal folds share a digest, and two with different folds do not"
+    (byteFold msgC == byteFold [0x01] && digestOf qC.1 msgC == digestOf qC.1 [0x01] &&
+      byteFold msgC != byteFold [0x21] && digestOf qC.1 msgC != digestOf qC.1 [0x21])
   ensure "the forged digest is the hand-written one"
     (digestC.toList == [0xBB, 0x27, 0xAB] && partsC.md.toList == [0xBB] &&
       partsC.idxTree.val == 3 && partsC.idxLeaf.val == 3)
@@ -456,11 +476,17 @@ def checkFixture : IO Unit := do
 
 /-- The two coordinate maps, against tables written out by hand.
 
-`HmsgIndex.forsAdrs` is required to agree with the digest's own `DigestParts.forsAdrs` *and* with
-a hand-written `Adrs` record; `HmsgIndex.globalLeaf` is required to agree with `forsSigLeafIndex`
-*and* with a hand-written `tree · 2 ^ a + leaf`; and the FORS leaf address the pair produces is
-required to agree with a hand-written table of four `Adrs` records.  The last is what a shift
-applied to `globalLeaf` and to its bridge together has to survive, and does not. -/
+`HmsgIndex.forsAdrs` is required to agree with the digest's own `DigestParts.forsAdrs` *and* with a
+hand-written `Adrs` record — at the forged digest, and at one further index whose two digest words
+differ, because the forged digest names layer-zero tree three and key pair three alike and on it
+alone a swap of those two address words is invisible.  `HmsgIndex.globalLeaf` is required to agree
+with `forsSigLeafIndex`, with a hand-written `tree · 2 ^ a + leaf`, with the divide-back to the
+FORS tree, with the `k · 2 ^ a` bound, and with a hand-written pair of global leaves.
+
+The per-index leaf-address check reads the same global leaf on both sides, so what it pins is how
+`forsNodeAdrs` builds an address from a given global leaf, not which global leaf; the pair check
+beside it reads the hand-written table at hand-written leaves, and that is the one a shift of
+`globalLeaf` fails at. -/
 def checkCoordinates : IO Unit := do
   ensure "the forged instance address is the hand-written one"
     (partsC.forsAdrs == forgedForsAdrsTable)
@@ -476,6 +502,15 @@ def checkCoordinates : IO Unit := do
     ensure "dividing the tree height out of the global leaf gives the target back"
       (idx.globalLeaf / 2 ^ toyParams.a == (uncoveredTarget idx).val &&
         (uncoveredTarget idx) == idx.tree)
+  ensure "the two indices' global leaves and leaf addresses are the hand-written pair"
+    (((hmsgIndices toyParams digestC).map fun idx => idx.globalLeaf) == forgedGlobalLeafTable &&
+      ((hmsgIndices toyParams digestC).map fun idx =>
+          forsNodeAdrs idx.forsAdrs 0 idx.globalLeaf) ==
+        forgedGlobalLeafTable.map forgedLeafAdrsTable)
+  ensure "an index whose two digest words differ has the hand-written address"
+    (offDiagonalIndex.forsAdrs == offDiagonalAdrsTable &&
+      offDiagonalIndex.forsAdrs.tree == 1 &&
+      offDiagonalIndex.forsAdrs.getKeyPairAddress == 2)
   ensure "the four global leaves of the instance carry four distinct hand-written addresses"
     (((List.range 4).map forgedLeafAdrsTable).Nodup &&
       ((List.range 4).all fun j => forsNodeAdrs partsC.forsAdrs 0 j == forgedLeafAdrsTable j))
@@ -610,7 +645,9 @@ problem at *any* key pair is therefore the fixture's bundle's at the honest one 
 asserted to agree on every randomizer and message the fixture uses, and their winning conditions on
 four of its target lists — while its widened game falls to a single target query, which the
 fixture's own bundle refuses.  That is the separation: source-shaped hardness does not carry to the
-widened game.  The last two checks falsify the two hypotheses the win rests on, one each. -/
+widened game.  The break is asserted in both of the two directions the bundle is blind in — moving
+the public seed and moving the published root — because the docstring above claims blindness in
+both.  The last two checks falsify the two hypotheses the win rests on, one each. -/
 def checkStrictness : IO Unit := do
   ensure "the blind bundle agrees with the fixture's at the honest key pair"
     ([qC, qBoth, qFirst, qSecond, qOther].all fun q =>
@@ -625,13 +662,23 @@ def checkStrictness : IO Unit := do
   ensure "the fixture's own bundle does not"
     (!decide ((hmsgItsrProblem toyPrimitives).Wins [(qC.1, ⟨otherPkSeed, pkRoot, qC.2⟩)]
       (qC.1, ⟨pkSeed, pkRoot, qC.2⟩)))
+  ensure "and the same holds when the published root moves instead of the public seed"
+    (decide ((hmsgItsrProblem blindPrimitives).Wins [(qC.1, ⟨pkSeed, otherPkRoot, qC.2⟩)]
+        (qC.1, ⟨pkSeed, pkRoot, qC.2⟩)) &&
+      !decide ((hmsgItsrProblem toyPrimitives).Wins [(qC.1, ⟨pkSeed, otherPkRoot, qC.2⟩)]
+        (qC.1, ⟨pkSeed, pkRoot, qC.2⟩)))
   ensure "the win needs the two inputs to differ"
     (!decide ((hmsgItsrProblem blindPrimitives).Wins [(qC.1, ⟨pkSeed, pkRoot, qC.2⟩)]
       (qC.1, ⟨pkSeed, pkRoot, qC.2⟩)))
-  ensure "and it needs the two digests to agree"
+  ensure "and it needs the two digests to agree, in both of the two directions"
     (blindPrimitives.Hmsg qC.1 otherPkSeed pkRoot qC.2 == blindPrimitives.Hmsg qC.1 pkSeed pkRoot
         qC.2 &&
-      toyPrimitives.Hmsg qC.1 otherPkSeed pkRoot qC.2 != toyPrimitives.Hmsg qC.1 pkSeed pkRoot qC.2)
+      blindPrimitives.Hmsg qC.1 pkSeed otherPkRoot qC.2 == blindPrimitives.Hmsg qC.1 pkSeed pkRoot
+        qC.2 &&
+      toyPrimitives.Hmsg qC.1 otherPkSeed pkRoot qC.2 !=
+        toyPrimitives.Hmsg qC.1 pkSeed pkRoot qC.2 &&
+      toyPrimitives.Hmsg qC.1 pkSeed otherPkRoot qC.2 !=
+        toyPrimitives.Hmsg qC.1 pkSeed pkRoot qC.2)
 
 /-- What honest signing reveals at the indices a digest selects.
 
