@@ -49,6 +49,7 @@ public import HashSig.SLHDSA.Security.HmsgWitnesses
 public import HashSig.SLHDSA.Security.HypertreeWitnesses
 public import HashSig.SLHDSA.Security.ReachableTargets
 public import HashSig.SLHDSA.Security.SchemeWitnesses
+public import HashSig.SLHDSA.Security.SufResidual
 public import HashSig.SLHDSA.Security.TargetCounts
 public import HashSig.SLHDSA.Security.TraceTargets
 public import HashSig.SLHDSA.Security.WotsWitnesses
