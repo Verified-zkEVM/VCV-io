@@ -148,14 +148,13 @@ bridge from the finite executable backend to the primary measure API. -/
 noncomputable def toMeasure : Measure α :=
   p.toPMF.toMeasure.dropNone
 
-@[simp]
 theorem toMeasure_apply_univ_le_one : p.toMeasure Set.univ ≤ 1 := by
   have hTotal : p.toPMF.toMeasure Set.univ = 1 := measure_univ
   exact (Measure.dropNone_apply_univ_le p.toPMF.toMeasure).trans_eq hTotal
 
 @[simp]
 theorem toMeasure_pure (x : α) : (pure x : SPMF α).toMeasure = Measure.dirac x := by
-  rw [toMeasure, SPMF.toPMF_pure, PMF.toMeasure_pure, Measure.dropNone_dirac_some]
+  simp [toMeasure, PMF.toMeasure_pure, Measure.dropNone_dirac_some]
 
 /-- Failure carries no successful-output mass. -/
 @[simp]

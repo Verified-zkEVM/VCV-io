@@ -110,14 +110,12 @@ def uniformRange (n m : ℕ) (h : n < m) :
   (fun ⟨x, hx⟩ => ⟨x + n, by omega⟩) <$> $[0..(m - n)]
 
 /-- Tactic to attempt to prove `uniformRange` decreasing bound, similar to array indexing. -/
-syntax "uniform_range_tactic" : tactic
-macro "uniform_range_tactic" : tactic => `(tactic | trivial)
-macro "uniform_range_tactic" : tactic => `(tactic | get_elem_tactic)
+syntax (name := uniformRangeTactic) "uniform_range_tactic" : tactic
+macro_rules | `(tactic| uniform_range_tactic) => `(tactic | trivial)
+macro_rules | `(tactic| uniform_range_tactic) => `(tactic | get_elem_tactic)
 
-/-- Select uniformly from a range of numbers. Attempts to use `get-/
+/-- Select uniformly from `[n, m)`, proving the bound with `uniform_range_tactic`. -/
 notation "$[" n "⋯" m "]" => uniformRange n m (by uniform_range_tactic)
-
-lemma uniformRange_def (n m : ℕ) (h : n < m) : $[n⋯m] = uniformRange n m h := rfl
 
 example {m n : ℕ} (h : m < n) : ProbComp ℕ := do
   let x ← $[314⋯31415]; let y ← $[0⋯10] -- Prove by trivial reduction

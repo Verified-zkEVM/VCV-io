@@ -77,7 +77,6 @@ theorem evalDist_lift (a : P.A) :
 
 /-- An operation followed by a continuation denotes the Giry bind of its answer measure with
 the denotation of the continuation. -/
-@[simp]
 theorem evalDist_liftBind [MeasurableSpace α] (a : P.A) (cont : P.B a → FreeM P α) :
     𝒟[FreeM.liftBind a cont] = Measure.bind (IsMeasureSpec.toMeasure a) fun b => 𝒟[cont b] :=
   rfl
@@ -129,7 +128,7 @@ site; it is `IsMeasureSpec.Compatible` by `rfl`. -/
 noncomputable def _root_.PFunctor.IsProbabilitySpec.toMeasureSpec (P : PFunctor.{uA, u})
     [∀ a, MeasurableSpace (P.B a)] [P.IsProbabilitySpec] : P.IsMeasureSpec where
   toMeasure a := (IsProbabilitySpec.toPMF a).toMeasure
-  isProbabilityMeasure _ := PMF.toMeasure.isProbabilityMeasure _
+  isProbabilityMeasure _ := inferInstance
 
 instance _root_.PFunctor.IsProbabilitySpec.toMeasureSpec_compatible (P : PFunctor.{uA, u})
     [∀ a, MeasurableSpace (P.B a)] [P.IsProbabilitySpec] :

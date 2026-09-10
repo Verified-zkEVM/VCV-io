@@ -120,11 +120,11 @@ lemma probEvent_pure_eq_indicator [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] 
     Pr[ p | (pure x : m α)] = Set.indicator {x | p x} (Function.const α 1) x := by
   aesop (rule_sets := [UnfoldEvalDist])
 
-@[simp, grind =]
+-- Keep the direct pure rule ahead of the generic NeverFails rule, which lives in a later module.
+@[simp 1100, grind =]
 lemma probFailure_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : α) :
     Pr[⊥ | (pure x : m α)] = 0 := by aesop (rule_sets := [UnfoldEvalDist])
 
-@[simp]
 lemma tsum_probOutput_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : α) :
     ∑' y : α, Pr[= y | (pure x : m α)] = 1 := by
   have : DecidableEq α := Classical.decEq α; simp
@@ -134,7 +134,6 @@ lemma tsum_probOutput_pure' [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : �
     ∑' y : α, Pr[= x | (pure y : m α)] = 1 := by
   have : DecidableEq α := Classical.decEq α; simp
 
-@[simp]
 lemma sum_probOutput_pure [Fintype α] [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (x : α) :
     ∑ y : α, Pr[= y | (pure x : m α)] = 1 := by
   have : DecidableEq α := Classical.decEq α; simp
@@ -185,7 +184,11 @@ lemma evalSPMF_bind [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (m
 lemma evalSPMF_bind_of_support_eq_empty [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
     [MonadLiftT m SetM] [EvalDistCompatible m] (mx : m α) (my : α → m β)
     (h : support mx = ∅) : 𝒮[mx >>= my] = failure := by
-  simp [SPMF.ext_iff, ← probOutput_def, h]
+  rw [← evalSPMF_id failure]
+  apply evalSPMF_ext
+  intro y
+  simp only [probOutput_def, evalSPMF_id]
+  simp [← probOutput_def, h]
 
 section bind_tsum
 
