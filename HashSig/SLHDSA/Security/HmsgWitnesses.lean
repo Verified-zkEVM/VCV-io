@@ -70,6 +70,39 @@ security — qualified in its own footnote, which excepts applications needing m
 signatures.  The ITSR assumption is therefore imported from the SPHINCS+ analysis, not read off the
 standard, and this module's correspondence claims are against the EasyCrypt development.
 
+## Correspondence with the EasyCrypt development
+
+The message-compression function is `op mco : mkey -> msg -> msgFORSTW * index`
+(`FORS_ES.ec:412`), and the index map is `op g` (`:421-424`), which produces one triple per FORS
+tree: the flat instance index, the tree number, and the leaf that tree's chunk of the compressed
+message selects.  `MCO` clones the abstract keyed-hash theory at `key_t <- mkey`, `in_t <- msg`,
+`out_t <- msgFORSTW * index`, `f <- mco` (`:426-433`) — the `in_t <- msg` line (`:428`) is the
+deviation this module is about — and `MCO_ITSR` clones its ITSR sub-theory at `g <- g`
+(`:435-441`).
+
+The winning condition is the ITSR game's own return, `KeyedHashFunctions.eca:1567`, with
+`h k x = g (f k x)` at `:1476`.  That is the definition `KeyedHash.ITSRProblem.Wins` mirrors, in the
+same two parts and with the same quantifier: every index the candidate selects occurs among the
+indices the recorded targets select, and the candidate pair is not one of those targets.  Where the
+FORS reduction discharges it is a different place, the `conseq` at `FORS_ES.ec:3897-3900` inside
+`EUFCMA_MFORSTWESNPRF_OPRE`; citing only that would understate, because the shape is the game's and
+not the reduction's.
+
+`valid_ITSR` itself is set at `FORS_ES.ec:3212-3214`, from `lidxs' <- g (mco mk' m')` and
+`! (mk', m') \in zip …mks …qs` — pair freshness against the recorded transcript, which is what
+`embedTargets` and `notMem_embedTargets_of_notMem` transport.  The uncovered index is selected at
+`:3223` by `find (fun i => ! i \in …lidxs) lidxs'`, first match, which is why `findUncoveredIndex`
+is `List.find?`; the selected tree and leaf are then read at the flat leaf address `dftidx * t +
+dflfidx` (`:3229-3230`), which is `globalLeaf`, and FIPS 205 Algorithm 16 line 4 and Algorithm 17
+line 5 index the FORS trees the same way.
+
+Two things about the reduction that bound this module's obligations.  `R_ITSR_EUFCMA`
+(`FORS_ES.ec:2176`) forwards the forgery's message key and message unchanged (`:2237-2239`) and
+neither verifies the forgery nor tests its freshness itself, so nothing here needs a validity
+hypothesis on the ITSR side.  And the source proves no standalone lemma for the step
+`coord_unrevealed_of_notMem` states; it is folded into the OpenPRE `conseq` and closed by SMT over
+the concrete opened-index list.
+
 ## The index-to-coordinate maps
 
 An `HmsgIndex` carries four fields: the two digest indices that name the FORS instance, the FORS
