@@ -181,8 +181,8 @@ The per-index read of that `Adrs` table is *not* one of the six.  The shifted gl
 both sides of its comparison, so with only that check present the fully carried-through shift
 passes: it pins how `forsNodeAdrs` builds an address from a given global leaf, and says nothing
 about which global leaf.  So does the `Nodup` sweep over the sixty-four indices, which a shift
-permutes bijectively.  What pins the leaf is the sixth check, whose left side moves and whose right
-side does not.
+permutes bijectively.  The sixth check is the one that does: its left side moves with the shift
+and its right side does not.
 
 ## First, not last
 
@@ -211,9 +211,12 @@ There is no named source lemma to point at, and this docstring does not invent o
 
 ## Labels
 
-*Deterministic inclusion* — a statement with no list of signing queries in it.  Its free objects
-are a primitive bundle, seeds, an address, a digest, an index, a message, naturals, and any ITSR
-target transcript the statement is handed or builds for itself:
+*Deterministic inclusion* — a statement with no list of signing queries in it.  Reading the free
+data binders off all thirty-two, they are exactly: a parameter set, validated or not; a primitive
+bundle; seeds and node values; an address; a digest or the `DigestParts` it splits into; a semantic
+index; a FORS tree number; a message; a candidate keyed-hash pair, or the `HmsgITSRInput` inside
+one; and an ITSR target transcript over that widened input type, which the statement is handed or
+builds for itself.  No natural number occurs free in any of them:
 
 * `HmsgIndex.forsAdrs`, `forsAdrs_layer`, `forsAdrs_tree`, `forsAdrs_type`, `forsAdrs_keyPair`,
   `forsAdrs_eq_of_indices`, `forsAdrs_of_mem`, `forsAdrs_eq_bottom`;
