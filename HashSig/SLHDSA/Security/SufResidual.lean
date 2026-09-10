@@ -86,9 +86,10 @@ message alone: the twenty assignments to `is_fresh` are `! m' \in qs` (`FORS_ES.
 `SPHINCS_PLUS.ec:1207`, `:1356`), a call to a `fresh` procedure (`FORS_ES.ec:2034`, `:3203`,
 `SPHINCS_PLUS.ec:2126`, `:2149`, `:2175`, `:2235`), or a message disequality in the
 no-adaptivity games (`FL_SL_XMSS_MT_ES.ec:1879`, `:3225`, `:3453`, `SPHINCS_PLUS.ec:2638`,
-`WOTS_TW_ES.ec:2371`, `:2618`, `:3671`, `:3724`, `:3775`, `:3915`); and all three `fresh`
-procedures take a `msg` and return `! m \in qs` (`FORS_ES.ec:1988`, `:2099-2101`,
-`SPHINCS_PLUS.ec:2039-2041`).  No signature is compared anywhere.
+`WOTS_TW_ES.ec:2371`, `:2618`, `:3671`, `:3724`, `:3775`, `:3915`); and all three declarations of
+a `fresh` procedure take a `msg` (`FORS_ES.ec:1988` in an oracle module type, `:2099-2101`,
+`SPHINCS_PLUS.ec:2039-2041`), the two with bodies returning `! m \in qs`.  No signature is compared
+anywhere.
 
 Two consequences, and they are different from each other.
 
