@@ -403,7 +403,8 @@ script test (args) do
     #["exe", "slhdsa_xmss_witness_tests"],
     #["exe", "slhdsa_hypertree_witness_tests"],
     #["exe", "slhdsa_scheme_witness_tests"],
-    #["exe", "slhdsa_hmsg_witness_tests"]]
+    #["exe", "slhdsa_hmsg_witness_tests"],
+    #["exe", "slhdsa_suf_residual_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -543,6 +544,20 @@ directions — equivalent to the source's shape inside one key pair, and broken 
 for a bundle whose `H_msg` ignores the key pair, which the fixture's own bundle refuses. -/
 lean_exe slhdsa_hmsg_witness_tests where
   root := `HashSigTest.SLHDSA.HmsgWitnesses
+
+/-- Deterministic strong-unforgeability residual: over the scheme-dispatch fixture's own two-layer
+profile, a three-entry signing log whose twice-signed message carries two different hedged
+randomizers is read at each of its messages, the two log predicates of the generic SUF surface are
+exhibited at all four of their combinations with the fourth asserted unreachable, and five forgeries
+are sent through the residual's dichotomy: one whose randomizer is new at its message and so leaves
+the recorded pair fresh, one whose randomizer was logged at a *different* message and so also leaves
+it fresh, and two carrying a logged randomizer at that message, for which the pair is a recorded
+target, the winning condition fails on freshness while coverage is asserted still to hold, and the
+first-uncovered-index extractor returns nothing.  The same three queries under FIPS 205's
+deterministic variant are run alongside, and leave one randomizer where the hedged default leaves
+two. -/
+lean_exe slhdsa_suf_residual_tests where
+  root := `HashSigTest.SLHDSA.SufResidual
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
