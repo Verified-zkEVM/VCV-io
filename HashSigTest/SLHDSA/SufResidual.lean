@@ -348,8 +348,9 @@ def deterministicLog :
 deterministic signature twice and then a hedged one, so each of the four lists this file reads a log
 into differs from its own reverse and carries a repeat here: `loggedSignatures` and
 `loggedRandomizers` at that message are three long, `logQueries` and its embedding at the honest key
-pair are four-entry transcripts.  Neither shape occurs in the two logs above: both stop at two
-signatures per message and at three entries, and `signingLog`'s three pairs are pairwise distinct.
+pair are four-entry transcripts.  No list either log above produces has both properties: those two
+stop at two signatures per message and at three entries, their repeats are all palindromic, and
+`signingLog`'s three pairs are pairwise distinct.
 All four lists are pinned by value on this log — the first two in `checkLoggedSignatures` and
 `checkRandomizers`, the transcript in `checkRandomizers`, its embedding in `checkBranches`. -/
 def thriceSignedLog :
@@ -460,9 +461,9 @@ def checkFixture : IO Unit := do
 at each of the three messages, in query order, and the two entries at `msgP` are both required to be
 present: a reading that kept only the first, or only the last, fails here and is otherwise sound.
 `mem_loggedSignatures` is exercised in both directions.  The list is pinned once more on
-`thriceSignedLog`, where it is three long: that is the only reading of this list in the file long
-enough for a reader misbehaving past the lengths the other two logs reach to show itself, and this
-pin and `checkRandomizers`'s pin on the randomizers of the same list both refuse it.  Ten
+`thriceSignedLog`, where it is three long — the only place this file evaluates that list at a
+length the other two logs never reach.  A reader that misbehaves only there is refused by this pin
+and, through the randomizers it maps to, by `checkRandomizers`'s pin on the same log.  Ten
 properties. -/
 def checkLoggedSignatures : IO Unit := do
   ensure "the log has three entries on two distinct messages"
