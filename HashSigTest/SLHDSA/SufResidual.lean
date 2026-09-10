@@ -46,6 +46,11 @@ the twice-signed message's two entries separated by the other message's, so that
 show up.  Alongside it, the log FIPS 205 §9.2's deterministic variant would produce for the same
 three queries, which is the shape the EasyCrypt development's message-keyed signer has.
 
+A third log, longer than either, whose only purpose is to be longer: it signs one message three
+times and repeats one of those entries.  Both other logs stop at two signatures per message and at
+three entries, so a reading that reordered or collapsed a list only once it grew past those sizes
+would be invisible to every check written against them.  Two pins on this log are what refuse it.
+
 Four forgeries, and three `DecidableEq` instances.  The instances are the fixture's own: the library
 module carries `DecidableEq` on the signature type as a hypothesis because no such instance exists
 on this branch, and these build it field by field at this bundle and nowhere else.
@@ -327,13 +332,24 @@ def deterministicLog :
     QueryLog (List Byte →ₒ GeneralScheme.SignatureCore toy toyPrimitives.core) :=
   [⟨msgP, detSigP⟩, ⟨msgQ, detSigQ⟩, ⟨msgP, detSigP⟩]
 
+/-- A longer log, and the only one that signs one message three times.  Its `msgP` entries are the
+deterministic signature twice and then a hedged one, so `loggedSignatures` at that message is a
+three-element list that differs from its own reverse, and `logQueries` is a four-entry transcript
+carrying a repeated pair.  Neither shape occurs in the two logs above: both stop at two signatures
+per message and at three entries.  `checkLoggedSignatures` pins the first list and
+`checkRandomizers` the second, by value. -/
+def thriceSignedLog :
+    QueryLog (List Byte →ₒ GeneralScheme.SignatureCore toy toyPrimitives.core) :=
+  [⟨msgP, detSigP⟩, ⟨msgQ, detSigQ⟩, ⟨msgP, detSigP⟩, ⟨msgP, sigP1⟩]
+
 /-! ## The forgeries
 
 Four, all offered against the honest public key.  None of the library module's statements has a
-verification hypothesis, so a forgery here does not have to verify; one of them does, and
-`checkFixture` asserts it, so that the branch the residual sends it to is not an artefact of
-offering nonsense.  The other three are built by perturbing a logged signature and none is asserted
-to verify. -/
+verification hypothesis, so a forgery here does not have to verify — but which ones do is measured,
+so that the branch the residual sends each to is not an artefact of offering nonsense.  Three
+verify: the one the honest signer produced under fresh randomness, and the two built by perturbing a
+logged signature in one of its two halves.  The fourth, which carries the randomizer the log
+recorded at the other message, does not, and is asserted not to. -/
 
 /-- A strong forgery on the *queried* message `msgP`: the honest signer run again under randomness
 the log does not carry.  It verifies, and its exact pair is not in the log, which is the whole of
@@ -359,6 +375,14 @@ swept the whole log rather than the entries at one message would put it on the o
 def forgeryCross : GeneralScheme.SignatureCore toy toyPrimitives.core :=
   { sigP1 with randomness := sigQ.randomness }
 
+/-- The FORS public key `verifyInternal` recovers from a signature, which it then hands to the
+hypertree as its layer-0 WOTS+ message.  Its arguments are the signature's FORS half and the digest
+split, so on two signatures whose splits agree it is a function of the FORS half alone. -/
+def recoveredForsPk (sig : GeneralScheme.SignatureCore toy toyPrimitives.core) (msg : List Byte) :
+    toyPrimitives.Y :=
+  forsPkFromSig toyPrimitives sig.fors (schemeParts toy toyPrimitives msg sig honestPk).md.toList
+    pkSeed (schemeParts toy toyPrimitives msg sig honestPk).forsAdrs
+
 /-- The forged pair read as an ITSR candidate at the honest key pair. -/
 def candidateOf (sig : GeneralScheme.SignatureCore toy toyPrimitives.core) (msg : List Byte) :
     toyPrimitives.Y × HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y :=
@@ -371,10 +395,11 @@ def embeddedTargets :
 
 /-! ## The checks -/
 
-/-- The fixture's own data: that hedged signing separates the two queries on one message, that the
-verifying forgeries verify, that each fabricated forgery differs from the signature it was built
-from in exactly the intended half, and that the cross forgery's randomizer is the one the log
-recorded at the *other* message.  Sixteen properties. -/
+/-- The fixture's own data: that hedged signing separates the two queries on one message, which of
+the four forgeries verify against the honest public key and that the fourth does not, that each
+fabricated forgery differs from the signature it was built from in exactly the intended half, and
+that the cross forgery's randomizer is the one the log recorded at the *other* message.  Eighteen
+properties. -/
 def checkFixture : IO Unit := do
   ensure "hedged signing gives the two queries on one message different randomizers"
     (sigP1.randomness != sigP2.randomness)
@@ -398,10 +423,15 @@ def checkFixture : IO Unit := do
     (forgeryHt.randomness == sigP1.randomness && forgeryHt.fors == sigP1.fors)
   ensure "and moves the hypertree half"
     (forgeryHt.hypertree != sigP1.hypertree && forgeryHt != sigP1)
+  ensure "both forgeries built from a logged signature verify as well"
+    (GeneralScheme.verifyInternal toy toyPrimitives msgP forgeryFors honestPk &&
+      GeneralScheme.verifyInternal toy toyPrimitives msgP forgeryHt honestPk)
   ensure "the cross forgery carries the randomizer the log recorded at the other message"
     (forgeryCross.randomness == sigQ.randomness)
   ensure "which is neither of the two recorded at this one"
     (forgeryCross.randomness != sigP1.randomness && forgeryCross.randomness != sigP2.randomness)
+  ensure "and the cross forgery is the one that does not verify"
+    (!GeneralScheme.verifyInternal toy toyPrimitives msgP forgeryCross honestPk)
   ensure "the three messages are pairwise distinct"
     (msgP != msgQ && msgP != msgU && msgQ != msgU)
   ensure "the deterministic variant is a different signature from either hedged one"
@@ -414,7 +444,9 @@ def checkFixture : IO Unit := do
 /-- What the log says at each message.  `loggedSignatures` is asserted against a hand-written list
 at each of the three messages, in query order, and the two entries at `msgP` are both required to be
 present: a reading that kept only the first, or only the last, fails here and is otherwise sound.
-`mem_loggedSignatures` is exercised in both directions.  Nine properties. -/
+`mem_loggedSignatures` is exercised in both directions.  The list is pinned once more on
+`thriceSignedLog`, where it is three long: a reading that reversed only past the lengths the other
+two logs reach is invisible everywhere else in this file.  Ten properties. -/
 def checkLoggedSignatures : IO Unit := do
   ensure "the log has three entries on two distinct messages"
     (signingLog.length == 3 && (signingLog.map fun e => e.1).eraseDups.length == 2)
@@ -437,6 +469,8 @@ def checkLoggedSignatures : IO Unit := do
   ensure "listing is exact-entry membership, both ways"
     (decide ((⟨msgP, sigP2⟩ : (_ : List Byte) × _) ∈ signingLog) &&
       !decide ((⟨msgQ, sigP2⟩ : (_ : List Byte) × _) ∈ signingLog))
+  ensure "a message signed three times lists all three, in query order"
+    (loggedSignatures thriceSignedLog msgP == [detSigP, detSigP, sigP1])
 
 /-- The two library predicates on a log, at all four combinations of their values.  Three are
 realised by fixture data; the fourth — an unqueried message whose exact pair is nevertheless in the
@@ -472,8 +506,10 @@ def checkPredicates : IO Unit := do
 
 /-- The randomizers, and the pair transcript.  The transcript is asserted against a hand-written
 list; membership in it is asserted to be per-message, not per-log, by the cross forgery, whose
-randomizer is in the transcript but not paired with the message it is offered at.  Ten
-properties. -/
+randomizer is in the transcript but not paired with the message it is offered at.  The transcript
+is pinned a second time on `thriceSignedLog`, whose four entries carry a repeat: a reading that
+de-duplicated only past the length the other two logs reach is invisible everywhere else in this
+file.  Eleven properties. -/
 def checkRandomizers : IO Unit := do
   ensure "the twice-signed message carries two distinct randomizers"
     (loggedRandomizers signingLog msgP == [sigP1.randomness, sigP2.randomness] &&
@@ -501,6 +537,10 @@ def checkRandomizers : IO Unit := do
   ensure "and the two pairs at the twice-signed message are"
     (decide ((sigP1.randomness, msgP) ∈ logQueries signingLog) &&
       decide ((sigP2.randomness, msgP) ∈ logQueries signingLog))
+  ensure "a four-entry log's transcript keeps every query, repeats included"
+    (logQueries thriceSignedLog ==
+      [(detSigP.randomness, msgP), (detSigQ.randomness, msgQ), (detSigP.randomness, msgP),
+        (sigP1.randomness, msgP)])
 
 /-- What each branch does at the embedded transcript.  On the fresh branch the candidate is absent
 and the bridge's dichotomy is run to see which alternative it takes; on the logged branch the
@@ -537,7 +577,13 @@ def checkBranches : IO Unit := do
 /-- What two signatures with one randomizer share.  The digest split agrees for the two fabricated
 forgeries and disagrees for the fresh one, so the agreement is not an artefact of the profile; the
 list of FORS leaves the digest opens agrees with it; and the component disequality is exhibited on
-each of its two disjuncts by a different forgery.  Eight properties. -/
+each of its two disjuncts by a different forgery.
+
+The last three are about what the pair hands the hypertree.  Neither disjunct of that disequality
+decides the recovered FORS public key: the forgery that moves only the hypertree half recovers the
+logged signature's key, so does the one that moves the FORS half, and a third FORS half — the second
+tree's secret bumped — recovers a different one.  That is the module's reason for saying the WOTS+
+guard is met on some of the branch's pairs rather than on all of them.  Eleven properties. -/
 def checkSameRandomizer : IO Unit := do
   ensure "the FORS-perturbed forgery splits to the logged signature's digest"
     (schemeParts toy toyPrimitives msgP forgeryFors honestPk ==
@@ -561,14 +607,25 @@ def checkSameRandomizer : IO Unit := do
     (forgeryFors.fors != sigP1.fors && forgeryFors.hypertree == sigP1.hypertree)
   ensure "and another the second"
     (forgeryHt.hypertree != sigP1.hypertree && forgeryHt.fors == sigP1.fors)
+  ensure "moving the hypertree half alone leaves the recovered FORS public key where it was"
+    (recoveredForsPk forgeryHt msgP == recoveredForsPk sigP1 msgP)
+  ensure "and moving the FORS half need not move it either"
+    (recoveredForsPk forgeryFors msgP == recoveredForsPk sigP1 msgP &&
+      forgeryFors.fors != sigP1.fors)
+  ensure "though another FORS half does move it: the second tree's secret bumped by one"
+    (recoveredForsPk
+        { sigP1 with
+            fors := sigP1.fors.set 1
+              { sigP1.fors[1] with sk := node (byteOf sigP1.fors[1].sk + 1) } } msgP !=
+      recoveredForsPk sigP1 msgP)
 
 /-- The formulation difference the module is about, measured.  Under FIPS 205's hedged default the
 log at a twice-signed message carries two randomizers, so pair freshness there is two disequalities
 and the residual's second branch is reachable; under its deterministic variant, which is the shape
 the EasyCrypt development's message-keyed signer has, the same three queries leave one.  The
-deterministic log's transcript is pinned too, and it is the only place in the file where
-`logQueries` meets a log with a repeated entry: on `signingLog` all three pairs are distinct, so a
-`logQueries` that de-duplicated would be invisible there.  The same holds of `loggedRandomizers`,
+deterministic log's transcript is pinned too, because `signingLog`'s three pairs are distinct and a
+`logQueries` that de-duplicated would be invisible on it; this log and `thriceSignedLog` are the two
+that carry a repeated entry.  The same holds of `loggedRandomizers`,
 whose two deterministic entries at that message are equal, so that list is pinned by value rather
 than only through `eraseDups`.  Seven properties. -/
 def checkVariants : IO Unit := do

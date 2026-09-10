@@ -553,9 +553,10 @@ are sent through the residual's dichotomy: one whose randomizer is new at its me
 the recorded pair fresh, one whose randomizer was logged at a *different* message and so also leaves
 it fresh, and two carrying a logged randomizer at that message, for which the pair is a recorded
 target, the winning condition fails on freshness while coverage is asserted still to hold over an
-index list asserted non-empty, and the first-uncovered-index extractor returns nothing.  The same three queries under FIPS 205's
-deterministic variant are run alongside, and leave one randomizer where the hedged default leaves
-two. -/
+index list asserted non-empty, and the first-uncovered-index extractor returns nothing.  The same
+three queries under FIPS 205's deterministic variant are run alongside, and leave one randomizer
+where the hedged default leaves two; a third, longer log pins the signature list and the pair
+transcript at sizes neither of the other two reaches. -/
 lean_exe slhdsa_suf_residual_tests where
   root := `HashSigTest.SLHDSA.SufResidual
 

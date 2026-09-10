@@ -76,10 +76,18 @@ and its per-chain helper `findWotsChainWitness` are the lane's only two searches
 `(signature, message)` pairs; the partner is an arbitrary signature, and neither
 `findWotsWitness_sound` nor `findWotsWitness_isSome` mentions `sk`.  The chain helper is inert when
 the two messages agree — it returns nothing at an index unless the two chain-step counts differ
-there — but here the two messages need not agree.  They are the two recovered FORS public keys,
-which `verifyInternal` hands to the hypertree as its layer-0 WOTS+ message, and on this branch they
-are recovered from two *different* FORS halves.  So `findWotsWitness_isSome`'s guard `msg ≠ msg'`
-is satisfiable and the search does return a witness.
+there — so what decides its reach is whether this branch drives the two messages apart.  Those two
+messages are the FORS public keys the two signatures recover, which `verifyInternal` hands to the
+hypertree as its layer-0 WOTS+ message; by `schemeParts_eq_of_randomizer_eq` the pair splits to one
+digest against one public key, which leaves each of the two keys a function of that signature's FORS
+half and of nothing else.
+
+The branch does not drive them apart.  What it gives is a disjunction, and where only its hypertree
+disjunct holds the two FORS halves are equal and the two recovered keys are one key; two FORS halves
+that do differ may still recover one key, and the fixture's `forgeryFors` is a pair that does.  So
+`findWotsWitness_isSome`'s guard `msg ≠ msg'` is met on the branch's pairs whose recovered keys
+differ, and the search returns a witness on those; where the two keys coincide the guard fails and
+that theorem says nothing either way.
 
 What places the family out of scope is therefore not the guard but what a returned witness says.
 `findWotsWitness_sound` concludes `WotsWitness.Valid … sig' msg'` — validity against the *supplied*
