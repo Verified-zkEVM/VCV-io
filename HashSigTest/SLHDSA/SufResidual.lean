@@ -139,7 +139,7 @@ theorem toyValid : toyParams.Valid := by decide
 
 -- Exposed here, where the `H_msg` bridge fixture leaves it unexposed, because this file states
 -- three `DecidableEq` instances whose types are written at `toy.params`: without the attribute,
--- 45 errors, the first at the `ForsTreeSigCore` instance below, `Application type mismatch: the
+-- 49 errors, the first at the `ForsTreeSigCore` instance below, `Application type mismatch: the
 -- argument toyPrimitives.core has type CorePrimitives toyParams but is expected to have type
 -- CorePrimitives toy.params`.
 /-- The validated form of `toyParams`. -/
@@ -194,16 +194,18 @@ def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
     root.toNat * (14 * i + 89) + (byteFold msg).toNat * (22 * i + 149) + (30 * i + 7)) % 256))
 
 -- Exposed and `@[reducible]`, for two different reasons, each read off the errors that removing
--- that attribute alone produces in this file.  Exposed, for code generation: without it, 101
--- errors, the first at `instance : DecidableEq toyPrimitives.Y` just below, reading `Compilation
--- failed, locally inferred compilation type differs from type that would be inferred in other
--- modules` and naming `toyPrimitives ↦ 2`, with the rest following it down the compiled
--- declarations.  Reducible, because its carrier types have to unfold to `Bytes 1` for instance
--- resolution to reach them: without it, 11 errors and only these — `byteOf`'s `y[0]` finds no
--- `GetElem toyPrimitives.Y ℕ` instance and cannot prove its index valid, and nine sites in
--- `checkBranches` and in the pins find no `DecidableEq (HmsgITSRInput toyPrimitives.PkSeed
--- toyPrimitives.Y)` or no `DecidableEq toyPrimitives.PkSeed`.  Nothing outside this executable
--- consumes it.
+-- that attribute alone produces in this file.  Exposed, for code generation: without it the build
+-- runs into Lean's hundred-error ceiling — 100 errors and the line saying the ceiling was reached,
+-- so the count is a floor and not a total.  The first is at `instance : DecidableEq
+-- toyPrimitives.Y` just below: `Compilation failed, locally inferred compilation type differs from
+-- type that would be inferred in other modules`, naming `toyPrimitives ↦ 2`, with the rest after it
+-- down the compiled declarations.  Reducible, because its carrier types have to unfold to `Bytes 1`
+-- for instance resolution to reach them: without it, 11 errors and only these — two at `byteOf`,
+-- whose `y[0]` finds no `GetElem toyPrimitives.Y ℕ` instance and then cannot prove its index valid;
+-- four `Decidable (… ∈ embeddedTargets)` membership goals in `checkBranches`; three
+-- `DecidableEq (HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y)`, one in `checkBranches` and
+-- two in the pins; and two `DecidableEq toyPrimitives.PkSeed`, both in the pins.  Nothing outside
+-- this executable consumes it.
 /-- The toy bundle: one byte per node, a collapsing order- and address-sensitive `Thash`, and an
 `H_msg` that depends on all four of its arguments. -/
 @[expose, reducible] def toyPrimitives : Primitives toyParams where
