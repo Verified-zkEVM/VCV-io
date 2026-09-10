@@ -91,13 +91,26 @@ deviation this module is about — and `MCO_ITSR` clones its ITSR sub-theory at 
 That second `MCO_ITSR` substitution is the one place the Lean object does not follow the clone.
 `dmkey` is declared `op [lossless] dmkey : mkey distr` (`:310`); losslessness is the only
 assumption on it, `SPHINCS_PLUS.ec` re-declares it the same way (`:323`) and passes it through
-(`:501`, `:533`), and nothing in the development ever makes it uniform.  `hmsgNarrowItsrProblem`
-fixes the key distribution to `$ᵗ prims.Y`, as `hmsgItsrProblem` does.  So the narrow problem is
-the source's shape *up to the key distribution*, which it strengthens from an arbitrary lossless
-one to the uniform one — the instantiation at which the ITSR key is the randomizer an idealised
-`PRF_msg` produces, which is the reading the `KeyedHash.ITSR` module's own docstring gives the
-sampled key, and which is what `SPHINCS_PLUS.ec:422` sets when it clones that idealised `PRF_msg`
-at `doutm x <- dmkey`.
+(`:501`, `:533`), and nothing in the development ever makes it uniform.  What the source does set
+is an identification and not a distribution: the ITSR clone takes `dkey <- dmkey` (`:438`) and the
+`MKG.PRF` clone that idealises `PRF_msg` takes `doutm x <- dmkey` (`SPHINCS_PLUS.ec:422`) — the
+same `dmkey` on both sides, so the ITSR key and that idealised `PRF_msg`'s output are one
+distribution at *every* admissible `dmkey`, not at a distinguished one.  That identification is the
+reading the `KeyedHash.ITSR` module's own docstring gives the sampled key, and it carries over
+whichever distribution is chosen.
+
+Choosing one is this development's own step, and the choice is forced rather than argued.
+`KeyedHashFamily.keygen` is a `ProbComp` field, not a theory parameter carrying a losslessness
+proof obligation: omit it and Lean reports `Fields missing: keygen`, so the Lean object has to name
+a computation exactly where the clone can defer.  The only key distribution in scope is the ambient
+instance's — drop `[SampleableType prims.Y]` from `hmsgNarrowItsrProblem` and the single error is
+`failed to synthesize instance of type class SampleableType prims.Y`, at `$ᵗ prims.Y`; the
+`Primitives` bundle carries no distribution of any kind, its `PRFmsg` being a function rather than
+a sampler, so there is nothing weaker to inherit.  And `SampleableType`'s defining law is
+`Pr[= x | selectElem] = Pr[= y | selectElem]`, which *is* uniformity.  `hmsgItsrProblem` made the
+same forced choice already, and the two have to agree.  So `hmsgNarrowItsrProblem` fixes the key
+distribution to `$ᵗ prims.Y`, and the narrow problem is the source's shape *up to the key
+distribution*, which it strengthens from an arbitrary lossless one to the uniform one.
 
 The strengthening costs nothing for what is proved here, and that is derivable rather than
 asserted: `ITSRProblem.Wins` is built from `indexSet` and `targetIndexSet`, both of which read
