@@ -29,15 +29,18 @@ and adding one would edit merged, reviewed files from inside this pull request.
 Diffed against the `H_msg` bridge fixture's copy of the block, from its section heading to `pkRoot`,
 there are four hunks.  Three attribute comments carry this file's own measured error counts and
 error text — every attribute comment here was written by removing the attribute and reading what
-Lean said.  The counts are 43, a hundred errors plus the line saying the ceiling was reached, and
-13, where that file records 41, 51 and 3; none of the three matches the figure standing in the same
-place there, and the error text differs as well, because these comments quote the error rather than
-paraphrasing it.  Two docstrings in the copied block name the group in *this* file that asserts what
-they describe.  `toy` carries `@[expose]` here, where that file leaves it unexposed, because the
-three `DecidableEq` instances below are stated at `toy.params`.  And `otherPkSeed`, which exists
-there to move a candidate off the honest key pair, is dropped: every statement in the library module
-reads its public seed and published root off one `pk`, so there is no second key pair to move to,
-and testing that there is would be re-testing the `H_msg` bridge.
+Lean said.  There are four measured figures across those three comments, because the third carries
+one for each of its two attributes: 45, 61, a hundred errors plus the line saying the ceiling was
+reached, and 15.  Three of the four have a counterpart standing in the same place in that file — 45
+against its 41, the hundred-plus-ceiling against its 51, 15 against its 3 — and none of the three
+coincides; `toy`'s 61 has no counterpart at all, because that file leaves `toy` unexposed.  The
+error text differs as well, because these comments quote the error rather than paraphrasing it.  Two
+docstrings in the copied block name the group in *this* file that asserts what they describe.  `toy`
+carries `@[expose]` here, where that file leaves it unexposed, because the three `DecidableEq`
+instances below are stated at `toy.params`.  And `otherPkSeed`, which exists there to move a
+candidate off the honest key pair, is dropped: every statement in the library module reads its
+public seed and published root off one `pk`, so there is no second key pair to move to, and testing
+that there is would be re-testing the `H_msg` bridge.
 
 ## What this fixture adds
 
@@ -50,24 +53,39 @@ three queries, which is the shape the EasyCrypt development's message-keyed sign
 A third log, longer than either, whose only purpose is to be longer: it signs one message three
 times and repeats one of those entries.  Both other logs stop at two signatures per message and at
 three entries, so a reading that reordered or collapsed a list only once it grew past those sizes
-would be invisible to every check written against them.  Four pins on this log refuse it, one for
-each list this file reads a log into: the signatures at a message, their randomizers, the pair
-transcript, and that transcript embedded at the honest key pair.  Each of the four is a hand-written
-value that differs from its own reverse *and* carries a repeat, so each refuses reordering,
+would be invisible to every check written against them.  Six checks read this log.  Four are
+hand-written values, one for each list this file reads a log into: the signatures at a message,
+their randomizers, the pair transcript, and that transcript embedded at the honest key pair.  Each
+of the four differs from its own reverse *and* carries a repeat, so each refuses reordering,
 collapsing and truncation together, up to the longest list its own reader produces anywhere here —
-three entries for the first two, four for the other two.  No list this file reads a log into is
-longer than that, so a reading that waited for a fourth signature at one message, or for a fifth
-entry in a transcript, would need a longer log again.
+three entries for the first two, four for the other two.  The other two read the log through the two
+`Bool` predicates, at the one message it queries that its first entry does not and at the one pair
+it holds only in its last entry; between them they refuse every truncation of either predicate that
+a fourth entry makes visible, and `checkPredicates` records which truncations no log here makes
+visible at all.  No list this file reads a log into is longer than four, so a reading that waited
+for a fourth signature at one message, or for a fifth entry in a transcript, would need a longer log
+again.
 
 Four forgeries, and three `DecidableEq` instances.  The instances are the fixture's own: the library
 module carries `DecidableEq` on the signature type as a hypothesis because no such instance exists
 on this branch, and these build it field by field at this bundle and nowhere else.
 
-Two pins name their parameter set explicitly, as `(vp := toy) (prims := toyPrimitives)`.  Those two
-theorems carry `[SampleableType prims.Y]`, and instance synthesis is attempted before the expected
-type has pinned `prims`: without the named arguments Lean reports `failed to synthesize instance of
-type class` for `SampleableType (Primitives.toCorePrimitives ?m).Y`, with a metavariable where the
-bundle should be.  The other twenty pins need nothing.
+Two pins name their validated parameters explicitly, as `(vp := toy)`, and what that argument is for
+was read off the errors its removal produces.  Dropping it from both gives two errors, both
+`Type mismatch`, no synthesis failure at all, and a metavariable standing where `pk` should be.
+Naming the bundle in its place gives a different report — four errors, two
+`failed to synthesize instance of type class` for
+`SampleableType (Primitives.toCorePrimitives ?m).Y`, with a metavariable where the bundle should be,
+and two application type mismatches on the membership hypothesis — because a bundle at `toyParams`
+does not say which `vp` has `vp.params = toyParams`.  Naming the bundle as well changes nothing:
+with `(prims := toyPrimitives)` alongside, and without it, the file elaborates with no output.  The
+reason is not the `[SampleableType prims.Y]` binder these two theorems carry, because
+`findUncoveredIndex_eq_none_of_mem_loggedRandomizers` carries it too and is pinned below with no
+named argument; and on copies of that statement, giving it either or both of the two `DecidableEq`
+binders the other two carry leaves it needing nothing still.  What the two that do need it have in
+common is a conclusion stated through `hmsgItsrProblem`'s `Wins`: a copy carrying all three binders
+whose conclusion is about `findUncoveredIndex` needs no named argument, negated or not, and one
+whose conclusion is about `Wins` needs it, negated or not.  The other twenty pins need nothing.
 
 ## Which conjunct, and which combination, each canary falsifies
 
@@ -109,8 +127,9 @@ the reverse, and both are asserted in both directions.
   the first-uncovered-index extractor returns `none` — while for the fresh forgery it returns an
   index.
 * *That the digest agreement on the second branch is an artefact of the toy `H_msg`.*  Rejected by
-  asserting that the two forgeries built from a logged signature split to its digest and open its
-  two FORS leaves, and that the two whose randomizer is new do not.
+  asserting that the two forgeries which keep the first logged signature's randomizer split to its
+  digest and open its two FORS leaves, and that the two which carry a different randomizer do
+  neither.
 
 ## The pins
 
@@ -352,7 +371,8 @@ pair are four-entry transcripts.  No list either log above produces has both pro
 stop at two signatures per message and at three entries, their repeats are all palindromic, and
 `signingLog`'s three pairs are pairwise distinct.  All four lists are pinned by value on this log —
 the first two in `checkLoggedSignatures` and `checkRandomizers`, the transcript in
-`checkRandomizers`, its embedding in `checkBranches`. -/
+`checkRandomizers`, its embedding in `checkBranches` — and the two `Bool` predicates are read on it
+in `checkPredicates`, which is the only place either of them sees a log of four entries. -/
 def thriceSignedLog :
     QueryLog (List Byte →ₒ GeneralScheme.SignatureCore toy toyPrimitives.core) :=
   [⟨msgP, detSigP⟩, ⟨msgQ, detSigQ⟩, ⟨msgP, detSigP⟩, ⟨msgP, sigP1⟩]
@@ -496,7 +516,22 @@ log — is asserted unreachable over every entry of the log rather than omitted,
 makes the library's queried/unqueried split exhaustive.  The replay case names both signatures the
 log holds at that message, one of which is its first entry and the other its last, so a
 `signingLogContains` that read only one end of the log fails here.  The two conjuncts of the
-same-message condition are then falsified one at a time.  Eight properties. -/
+same-message condition are then falsified one at a time.
+
+The last two read the same two predicates on the four-entry log, the only log here either of them
+sees above three entries.  `wasQueried` is read at the one message that log queries and its first
+entry does not, and `signingLogContains` at the one pair it holds only in its last entry.  Three
+readings of the truncation family are refused there and nowhere else: a `wasQueried` that keeps only
+the head once the log reaches four, and a `signingLogContains` that keeps only the head or drops the
+last entry once it does.  Three more the file cannot reach at all, and the reason is the shape of
+the logs rather than the shape of the checks: a `wasQueried` that drops its last entry, and one that
+drops its first, are invisible at every threshold, because no log here carries a message at its
+first entry only or at its last entry only; and a `signingLogContains` that drops its first entry is
+invisible from four up, because this log's first pair is repeated at its third entry.  All three
+would need a further log.  Reordering and collapsing are invisible to both predicates everywhere,
+and no log could change that: `wasQueried` is non-emptiness of the entries at a message and
+`signingLogContains` is membership of one pair, and neither can depend on the order of a log or on
+repeats in it.  Ten properties. -/
 def checkPredicates : IO Unit := do
   ensure "an unqueried message with a fresh pair: an ordinary existential forgery"
     (!signingLog.wasQueried msgU &&
@@ -524,6 +559,11 @@ def checkPredicates : IO Unit := do
   ensure "and both hold at the residual"
     (decide (loggedSignatures signingLog msgP ≠ []) &&
       !decide (forgeryFresh ∈ loggedSignatures signingLog msgP))
+  ensure "the four-entry log queries the message its head does not carry"
+    (thriceSignedLog.wasQueried msgQ && !thriceSignedLog.wasQueried msgU)
+  ensure "and contains the pair only its last entry carries, and no signature it never held"
+    (SignatureAlg.signingLogContains thriceSignedLog msgP sigP1 &&
+      !SignatureAlg.signingLogContains thriceSignedLog msgP sigP2)
 
 /-- The randomizers, and the pair transcript.  The transcript is asserted against a hand-written
 list; membership in it is asserted to be per-message, not per-log, by the cross forgery, whose
@@ -572,13 +612,19 @@ def checkRandomizers : IO Unit := do
 /-- What each branch does at the embedded transcript.  The transcript itself is pinned by value
 first, which fixes its length, its order and its multiplicity together; and because embedding
 `signingLog`'s transcript cannot show a collapse — that transcript's three pairs are distinct — the
-embedding of `thriceSignedLog`'s four-entry transcript, which does carry a repeat, is pinned beside
-it.  Then, on the fresh branch the candidate is absent and the bridge's dichotomy is run to see
-which alternative it takes; on the logged branch the candidate is present, the winning condition
-fails, and — asserted separately, because otherwise "the winning condition fails" would not say
-*which* conjunct failed — the coverage conjunct still holds and the first-uncovered-index extractor
-returns nothing.  The index list the coverage check quantifies over is separately asserted to have
-length two, because `List.all` over `[]` is `true`.  Eleven properties. -/
+embeddings of the other two logs are pinned beside it: `thriceSignedLog`'s four-entry transcript,
+which carries a repeat and differs from its reverse, and `deterministicLog`'s three-entry one, which
+carries a repeat and is its own reverse.  None of the three subsumes another: the first is the only
+one that refuses a reversal at exactly three entries, the third the only one that refuses a collapse
+there, and the second the only one that reaches four.  Then, on the fresh branch the candidate is
+absent and the bridge's dichotomy is run to see which alternative it takes; on the logged branch the
+candidate is present, the winning condition fails, and — asserted separately, because otherwise "the
+winning condition fails" would not say *which* conjunct failed — the coverage conjunct still holds
+and the first-uncovered-index extractor returns nothing.  The index list the coverage check
+quantifies over is separately asserted to have length two, because `List.all` over `[]` is `true`.
+Every one of those is written with the FORS-perturbed forgery, and carry to the hypertree-perturbed
+one because the two are asserted to offer the same candidate, which they do because they carry the
+same randomizer: that is what makes this branch reachable twice.  Thirteen properties. -/
 def checkBranches : IO Unit := do
   ensure "the embedded transcript is the log's three queries at the honest key pair, in order"
     (embeddedTargets ==
@@ -588,6 +634,10 @@ def checkBranches : IO Unit := do
     (embedTargets toyPrimitives pkSeed pkRoot (logQueries thriceSignedLog) ==
       [(detSigP.randomness, ⟨pkSeed, pkRoot, msgP⟩), (detSigQ.randomness, ⟨pkSeed, pkRoot, msgQ⟩),
         (detSigP.randomness, ⟨pkSeed, pkRoot, msgP⟩), (sigP1.randomness, ⟨pkSeed, pkRoot, msgP⟩)])
+  ensure "and embedding the deterministic log's three-entry transcript keeps its repeat too"
+    (embedTargets toyPrimitives pkSeed pkRoot (logQueries deterministicLog) ==
+      [(detSigP.randomness, ⟨pkSeed, pkRoot, msgP⟩), (detSigQ.randomness, ⟨pkSeed, pkRoot, msgQ⟩),
+        (detSigP.randomness, ⟨pkSeed, pkRoot, msgP⟩)])
   ensure "the fresh forgery's candidate is not one of them"
     (!decide (candidateOf forgeryFresh msgP ∈ embeddedTargets))
   ensure "nor is any candidate at the unsigned message"
@@ -596,6 +646,8 @@ def checkBranches : IO Unit := do
         HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y)) ∈ embeddedTargets))
   ensure "the FORS-perturbed forgery's candidate is one of them"
     (decide (candidateOf forgeryFors msgP ∈ embeddedTargets))
+  ensure "and the hypertree-perturbed forgery offers that same candidate"
+    (candidateOf forgeryHt msgP == candidateOf forgeryFors msgP)
   ensure "so its winning condition fails"
     (!decide ((hmsgItsrProblem toyPrimitives).Wins embeddedTargets (candidateOf forgeryFors msgP)))
   ensure "the candidate selects two FORS leaves, so that quantification is not over nothing"
@@ -610,10 +662,11 @@ def checkBranches : IO Unit := do
   ensure "the fresh forgery's candidate selects an index no target covers"
     ((findUncoveredIndex toyPrimitives embeddedTargets (candidateOf forgeryFresh msgP)).isSome)
 
-/-- What two signatures with one randomizer share.  The digest split agrees for the two fabricated
-forgeries and disagrees for the fresh one, so the agreement is not an artefact of the profile; the
-list of FORS leaves the digest opens agrees with it; and the component disequality is exhibited on
-each of its two disjuncts by a different forgery.
+/-- What two signatures with one randomizer share.  The digest split agrees for the two forgeries
+that keep the logged signature's randomizer and disagrees for the two that carry a different one, so
+the agreement is not an artefact of the profile; the pair of FORS leaves that digest opens follows
+the split, and is asserted for all four; and the component disequality is exhibited on each of its
+two disjuncts by a different forgery.
 
 The last three are about what the pair hands the hypertree.  Neither disjunct of that disequality
 decides the recovered FORS public key: the forgery that moves only the hypertree half recovers the
@@ -633,12 +686,16 @@ def checkSameRandomizer : IO Unit := do
   ensure "nor does the cross forgery"
     (schemeParts toy toyPrimitives msgP forgeryCross honestPk !=
       schemeParts toy toyPrimitives msgP sigP1 honestPk)
-  ensure "a shared digest means the same two FORS leaves are opened"
+  ensure "a shared digest means the same two FORS leaves are opened, for both that share one"
     (hmsgIndices toyParams (toyPrimitives.Hmsg forgeryFors.randomness pkSeed pkRoot msgP) ==
-      hmsgIndices toyParams (toyPrimitives.Hmsg sigP1.randomness pkSeed pkRoot msgP))
-  ensure "and a different digest opens a different pair of them"
+        hmsgIndices toyParams (toyPrimitives.Hmsg sigP1.randomness pkSeed pkRoot msgP) &&
+      hmsgIndices toyParams (toyPrimitives.Hmsg forgeryHt.randomness pkSeed pkRoot msgP) ==
+        hmsgIndices toyParams (toyPrimitives.Hmsg sigP1.randomness pkSeed pkRoot msgP))
+  ensure "and a different digest opens a different pair, for both that carry one"
     (hmsgIndices toyParams (toyPrimitives.Hmsg forgeryFresh.randomness pkSeed pkRoot msgP) !=
-      hmsgIndices toyParams (toyPrimitives.Hmsg sigP1.randomness pkSeed pkRoot msgP))
+        hmsgIndices toyParams (toyPrimitives.Hmsg sigP1.randomness pkSeed pkRoot msgP) &&
+      hmsgIndices toyParams (toyPrimitives.Hmsg forgeryCross.randomness pkSeed pkRoot msgP) !=
+        hmsgIndices toyParams (toyPrimitives.Hmsg sigP1.randomness pkSeed pkRoot msgP))
   ensure "one forgery realises the first disjunct of the component disequality"
     (forgeryFors.fors != sigP1.fors && forgeryFors.hypertree == sigP1.hypertree)
   ensure "and another the second"
@@ -758,7 +815,7 @@ example (h : r ∈ loggedRandomizers log msg) :
     ¬ (hmsgItsrProblem toyPrimitives).Wins
       (embedTargets toyPrimitives pk.pkSeed pk.pkRoot (logQueries log))
       (r, ⟨pk.pkSeed, pk.pkRoot, msg⟩) :=
-  not_wins_of_mem_loggedRandomizers (vp := toy) (prims := toyPrimitives) pk h
+  not_wins_of_mem_loggedRandomizers (vp := toy) pk h
 
 example (h : r ∈ loggedRandomizers log msg) :
     findUncoveredIndex toyPrimitives
@@ -776,7 +833,7 @@ example (h : r ∉ loggedRandomizers log msg) :
         idx ∈ (hmsgItsrProblem toyPrimitives).indexSet (r, ⟨pk.pkSeed, pk.pkRoot, msg⟩) ∧
         idx ∉ (hmsgItsrProblem toyPrimitives).targetIndexSet
           (embedTargets toyPrimitives pk.pkSeed pk.pkRoot (logQueries log)) :=
-  wins_or_uncovered_of_notMem_loggedRandomizers (vp := toy) (prims := toyPrimitives) pk h
+  wins_or_uncovered_of_notMem_loggedRandomizers (vp := toy) pk h
 
 example (h : sig.randomness = sig'.randomness) :
     schemeParts toy toyPrimitives msg sig pk = schemeParts toy toyPrimitives msg sig' pk :=

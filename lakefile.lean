@@ -551,13 +551,15 @@ randomizers is read at each of its messages, the two log predicates of the gener
 exhibited at all four of their combinations with the fourth asserted unreachable, and four forgeries
 are sent through the residual's dichotomy: one whose randomizer is new at its message and so leaves
 the recorded pair fresh, one whose randomizer was logged at a *different* message and so also leaves
-it fresh, and two carrying a logged randomizer at that message, for which the pair is a recorded
-target, the winning condition fails on freshness while coverage is asserted still to hold over an
-index list asserted non-empty, and the first-uncovered-index extractor returns nothing.  The same
-three queries under FIPS 205's deterministic variant are run alongside, and leave one randomizer
-where the hedged default leaves two; a third, longer log pins all four lists the fixture reads a log
-into — the signatures at a message, their randomizers, the pair transcript and its embedding at the
-honest key pair — at sizes neither of the other two reaches. -/
+it fresh, and two carrying a logged randomizer at that message, which are asserted to read as one
+and the same ITSR candidate, for which the pair is a recorded target, the winning condition fails on
+freshness while coverage is asserted still to hold over an index list asserted non-empty, and the
+first-uncovered-index extractor returns nothing.  The same three queries under FIPS 205's
+deterministic variant are run alongside, and leave one randomizer where the hedged default leaves
+two; a third, longer log pins all four lists the fixture reads a log into — the signatures at a
+message, their randomizers, the pair transcript and its embedding at the honest key pair — at sizes
+neither of the other two reaches, and is where the two `Bool` log predicates of that generic surface
+are read at four entries. -/
 lean_exe slhdsa_suf_residual_tests where
   root := `HashSigTest.SLHDSA.SufResidual
 
