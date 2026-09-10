@@ -461,9 +461,10 @@ def checkFixture : IO Unit := do
 at each of the three messages, in query order, and the two entries at `msgP` are both required to be
 present: a reading that kept only the first, or only the last, fails here and is otherwise sound.
 `mem_loggedSignatures` is exercised in both directions.  The list is pinned once more on
-`thriceSignedLog`, where it is three long, which is the only place in this file where a reading of
-this list that reversed or collapsed only past the lengths the other two logs reach meets an input
-that shows it.  Ten properties. -/
+`thriceSignedLog`, where it is three long: that is the only reading of this list in the file long
+enough for a reader misbehaving past the lengths the other two logs reach to show itself, and this
+pin and `checkRandomizers`'s pin on the randomizers of the same list both refuse it.  Ten
+properties. -/
 def checkLoggedSignatures : IO Unit := do
   ensure "the log has three entries on two distinct messages"
     (signingLog.length == 3 && (signingLog.map fun e => e.1).eraseDups.length == 2)
@@ -529,8 +530,10 @@ list; membership in it is asserted to be per-message, not per-log, by the cross 
 randomizer is in the transcript but not paired with the message it is offered at.  Both lists are
 pinned again on `thriceSignedLog`: the randomizers at the thrice-signed message, which are three
 long and carry a repeat, and the transcript, whose four entries carry a repeat.  Those are the
-longest lists either reader produces in this file, so between them they refuse every reordering,
-collapsing or truncation of the two readers that this file's logs can reach.  Twelve properties. -/
+longest lists either reader produces in this file, and each differs from its own reverse, so between
+them these two pins refuse every reordering, collapsing and truncation of the two readers that any
+log here can reach.  What they do not reach is a reader that waits for a fourth randomizer at one
+message or a fifth entry in a transcript.  Twelve properties. -/
 def checkRandomizers : IO Unit := do
   ensure "the twice-signed message carries two distinct randomizers"
     (loggedRandomizers signingLog msgP == [sigP1.randomness, sigP2.randomness] &&
