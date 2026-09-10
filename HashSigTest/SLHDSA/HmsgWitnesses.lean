@@ -107,8 +107,9 @@ coverage.
   through the library until it elaborates clean moves nine declarations, and then fails at each of
   those six.  The *per-index* read of that `Adrs` table is not one of them: the shifted global leaf
   stands on both sides of its comparison, so with it alone the shift passes.  It pins how
-  `forsNodeAdrs` builds an address from a given global leaf, not which global leaf — and so does
-  the `Nodup` sweep over the sixty-four indices, which a shift merely permutes.
+  `forsNodeAdrs` builds an address from a given global leaf, not which global leaf.  The `Nodup`
+  sweep over the sixty-four indices lets the shift through for its own reason: a shift merely
+  permutes those sixty-four leaves, so they stay distinct.
 * *That `findUncoveredIndex` returns "an" uncovered index.*  Rejected by the empty-transcript case,
   where both are uncovered and the returned one is required to be the earlier.
 * *That the ITSR candidate may carry any `(PK.seed, PK.root)`.*  Rejected by the two off-fibre
@@ -151,9 +152,11 @@ Two hypertree layers of height two, two FORS trees of height one, `w = 16`, `len
 
 theorem toyValid : toyParams.Valid := by decide
 
-/-- The validated form of `toyParams`.  Unexposed: the only declaration that mentions it is the
-`BottomPosition.ofDigestParts` pin below, which is an `example` and so unfolds what it needs
-without exposure.  Removing the attribute gives no errors at all. -/
+/-- The validated form of `toyParams`.  Unexposed here, where the scheme-dispatch fixture exposes
+it.  Two declarations mention it: `pkRoot` below, which passes it to `GeneralHypertree.root`, and
+the `BottomPosition.ofDigestParts` pin, which is an `example`.  Neither needs its body — the file
+elaborates as it stands with no errors and no warnings, and putting `@[expose]` back gives no
+errors and no warnings either. -/
 def toy : ValidatedParams := ⟨toyParams, toyValid⟩
 
 example : toyParams.w = 16 := by decide
@@ -495,7 +498,15 @@ FORS tree, with the `k · 2 ^ a` bound, and with a hand-written pair of global l
 The per-index leaf-address check reads the same global leaf on both sides, so what it pins is how
 `forsNodeAdrs` builds an address from a given global leaf, not which global leaf; the pair check
 beside it reads that table at hand-written leaves instead, and so, unlike the per-index read, it
-moves under a shift of `globalLeaf`. -/
+moves under a shift of `globalLeaf`.
+
+On this profile the pair check also *implies* the per-index read: the two lists it compares are the
+same two indices the loop walks, so pointwise it gives exactly the per-index equation.  Measured
+both ways — with the per-index read deleted the executable still passes, and with it and the
+`range 4` sweep both deleted a leaf-address table shifted by one is still caught, at the pair
+check.  The per-index read is kept anyway, because it is the law about `forsNodeAdrs` quantified
+over the index that a reader checks the imported function against, rather than a statement about
+these two values. -/
 def checkCoordinates : IO Unit := do
   ensure "the forged instance address is the hand-written one"
     (partsC.forsAdrs == forgedForsAdrsTable)
@@ -588,8 +599,9 @@ def checkWins : IO Unit := do
         decide (idx ∈ (hmsgItsrProblem toyPrimitives).targetIndexSet (embed [qC, qBoth]))))
   ensure "coverage fails against a transcript at another instance, and freshness holds"
     (!wideWins [qOther] candidateC && decide (candidateC ∉ embed [qOther]))
-  ensure "coverage fails when only one of the two indices is covered"
-    (!wideWins [qFirst] candidateC && !wideWins [qSecond] candidateC)
+  ensure "coverage fails when only one of the two indices is covered, and freshness holds"
+    (!wideWins [qFirst] candidateC && decide (candidateC ∉ embed [qFirst]) &&
+      !wideWins [qSecond] candidateC && decide (candidateC ∉ embed [qSecond]))
   ensure "an off-fibre candidate is fresh and still does not win"
     (decide (candidateOffSeed ∉ embed [qC, qBoth]) && !wideWins [qC, qBoth] candidateOffSeed &&
       decide (candidateOffRoot ∉ embed [qC, qBoth]) && !wideWins [qC, qBoth] candidateOffRoot)
