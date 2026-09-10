@@ -494,8 +494,8 @@ FORS tree, with the `k · 2 ^ a` bound, and with a hand-written pair of global l
 
 The per-index leaf-address check reads the same global leaf on both sides, so what it pins is how
 `forsNodeAdrs` builds an address from a given global leaf, not which global leaf; the pair check
-beside it reads the hand-written table at hand-written leaves, and that is the one a shift of
-`globalLeaf` fails at. -/
+beside it reads that table at hand-written leaves instead, and so, unlike the per-index read, it
+moves under a shift of `globalLeaf`. -/
 def checkCoordinates : IO Unit := do
   ensure "the forged instance address is the hand-written one"
     (partsC.forsAdrs == forgedForsAdrsTable)

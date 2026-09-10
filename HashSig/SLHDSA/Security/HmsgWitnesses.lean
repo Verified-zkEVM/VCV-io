@@ -95,8 +95,9 @@ assumption on it, `SPHINCS_PLUS.ec` re-declares it the same way (`:323`) and pas
 fixes the key distribution to `$ᵗ prims.Y`, as `hmsgItsrProblem` does.  So the narrow problem is
 the source's shape *up to the key distribution*, which it strengthens from an arbitrary lossless
 one to the uniform one — the instantiation at which the ITSR key is the randomizer an idealised
-`PRF_msg` produces, which is what `KeyedHash.ITSRProblem`'s own docstring assumes and what
-`SPHINCS_PLUS.ec:422` sets when it clones that idealised `PRF_msg` at `doutm x <- dmkey`.
+`PRF_msg` produces, which is the reading the `KeyedHash.ITSR` module's own docstring gives the
+sampled key, and which is what `SPHINCS_PLUS.ec:422` sets when it clones that idealised `PRF_msg`
+at `doutm x <- dmkey`.
 
 The strengthening costs nothing for what is proved here, and that is derivable rather than
 asserted: `ITSRProblem.Wins` is built from `indexSet` and `targetIndexSet`, both of which read
