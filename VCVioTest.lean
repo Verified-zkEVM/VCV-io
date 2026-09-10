@@ -38,6 +38,7 @@ public import VCVioTest.SMDTTCRFinalValidity
 public import VCVioTest.SMDTUDFinalValidity
 public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
+public import VCVioTest.Tactic.Expectation
 public import VCVioTest.Tactic.Finiteness
 public import VCVioTest.Tactic.FunProp
 public import VCVioTest.Tactic.GCongr

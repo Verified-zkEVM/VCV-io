@@ -375,6 +375,7 @@ Use the tactic that matches the mathematical obligation:
 | Obligation | Interface |
 |---|---|
 | Ordered expectations or postconditions | `gcongr with x hx` on `expectedValue` or `OracleComp.ProgramLogic.wp` exposes support membership. |
+| An expectation of a mapped computation | `simp` precomposes the payoff using `expectedValue_map`, retaining the expectation head. |
 | A finite expectation on a finite result type | `finiteness` uses `expectedValue_ne_top_of_finite` / `wp_ne_top_of_finite` and asks for finite functional values. |
 | A supplied finite bound on an arbitrary result type | Apply `expectedValue_ne_top_of_le mx hc h`; the bound remains explicit. |
 | Nonnegative total variation arithmetic | Import `VCVio.EvalDist.TVDist.Positivity` and use `positivity`; this also arrives through `VCVio.ProgramLogic.Tactics`. |
@@ -388,6 +389,11 @@ of an expectation over an infinite result type merely from pointwise finiteness 
 The registrations and their failure boundaries are exercised in `VCVioTest/Tactic/` and
 `VCVioTest/ProgramLogic/GCongr.lean`. The expression-specific `fun_prop` rules avoid globally
 registering eliminator theorems whose conclusion is the unrestricted `Measurable f`.
+
+For a sum of `wp` bounds, rewrite with `wp_eq_expectedValue` and
+`← expectedValue_finsetSum`, then apply `expectedValue_le_of_support`. This avoids expanding
+probability sums and proving the zero-mass cases separately. To keep a whole sum as the next
+congruence obligation, use `gcongr (OracleComp.ProgramLogic.wp _ (fun _ => ?_)) with x`.
 
 ### Normalization discipline
 
