@@ -77,8 +77,28 @@ The message-compression function is `op mco : mkey -> msg -> msgFORSTW * index`
 tree: the flat instance index, the tree number, and the leaf that tree's chunk of the compressed
 message selects.  `MCO` clones the abstract keyed-hash theory at `key_t <- mkey`, `in_t <- msg`,
 `out_t <- msgFORSTW * index`, `f <- mco` (`:426-433`) — the `in_t <- msg` line (`:428`) is the
-deviation this module is about — and `MCO_ITSR` clones its ITSR sub-theory at `g <- g`
-(`:435-441`).
+deviation this module is about — and `MCO_ITSR` clones its ITSR sub-theory at `g <- g` and
+`dkey <- dmkey` (`:435-441`).
+
+That second `MCO_ITSR` substitution is the one place the Lean object does not follow the clone.
+`dmkey` is declared `op [lossless] dmkey : mkey distr` (`:310`); losslessness is the only
+assumption on it, `SPHINCS_PLUS.ec` re-declares it the same way (`:323`) and passes it through
+(`:501`, `:533`), and nothing in the development ever makes it uniform.  `hmsgNarrowItsrProblem`
+fixes the key distribution to `$ᵗ prims.Y`, as `hmsgItsrProblem` does.  So the narrow problem is
+the source's shape *up to the key distribution*, which it strengthens from an arbitrary lossless
+one to the uniform one — the instantiation at which the ITSR key is the randomizer an idealised
+`PRF_msg` produces, which is what `KeyedHash.ITSRProblem`'s own docstring assumes and what
+`SPHINCS_PLUS.ec:422` sets when it clones that idealised `PRF_msg` at `doutm x <- dmkey`.
+
+The strengthening costs nothing for what is proved here, and that is derivable rather than
+asserted: `ITSRProblem.Wins` is built from `indexSet` and `targetIndexSet`, both of which read
+`khf.hash` and `indices` and neither of which reads `khf.keygen`.  Of the thirty-five statements
+below exactly one — `hmsgNarrowItsrProblem_keygen` — mentions the key distribution, and replacing
+that distribution by a different computation of the same type leaves every other statement, and
+every check in `HashSigTest.SLHDSA.HmsgWitnesses`, unchanged.  Where the difference would cost
+something is the game-level hop, which needs both experiments to sample the key the same way;
+there the two Lean problems agree with *each other*, and what does not carry over is the source's
+quantification over an arbitrary lossless `dkey`.
 
 The winning condition is the ITSR game's own return, `KeyedHashFunctions.eca:1567`, with
 `h k x = g (f k x)` at `:1476`.  That is the definition `KeyedHash.ITSRProblem.Wins` mirrors, in the
@@ -334,8 +354,10 @@ that the difference between the two games can be *proved* rather than described.
 game: keyed on the message randomizer, hashing the message alone.
 
 The `pkSeed` and `pkRoot` arguments are parameters of the *problem*, not of the hashed input.  That
-is precisely the source's shape, where the message-compression function takes a key and a message
-and no public key material at all, and the clone sets its input type to the message type. -/
+is the source's shape on the hashed input, where the message-compression function takes a key and
+a message and no public key material at all, and the clone sets its input type to the message type.
+It is not the source's shape on the key distribution: the correspondence section above records the
+one place the two part, and why it costs nothing here. -/
 def hmsgNarrowItsrProblem (prims : Primitives p) [SampleableType prims.Y] (pkSeed : prims.PkSeed)
     (pkRoot : prims.Y) : ITSRProblem prims.Y (List Byte) (Bytes p.m) (HmsgIndex p) where
   khf := { keygen := $ᵗ prims.Y, hash := fun randomizer request =>
