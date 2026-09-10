@@ -434,6 +434,7 @@ private lemma probOutput_noGuardComp_eq_tsum_factored (s : Fin (qb i + 1)) :
       (σ.takeAtIndex i ↑s) i main) cf (some s)
 
 omit [spec.DecidableEq] in
+omit [unifSpec ˡ⊂ₒ spec] in
 private lemma sq_tsum_seed_weighted_le_tsum_factored (s : Fin (qb i + 1)) :
     (∑' σ, Pr[= σ | generateSeed spec qb js] *
       Pr[= (some s : Option (Fin (qb i + 1))) |

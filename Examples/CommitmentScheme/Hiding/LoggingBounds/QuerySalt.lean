@@ -175,9 +175,9 @@ lemma log_length_le_of_mem_support_counting_simulate_run_logging [Fintype M] [Fi
         simpa using Nat.succ_le_of_lt hlt
       simpa [hzlog] using hcons
 
-omit [Finite C] in
+omit [Finite C] [Inhabited C] in
 lemma log_length_le_of_mem_support_run_cached_logging
-    [Finite M] [Finite S] [Finite C]
+    [Finite M] [Finite S]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
     (cache₀ : QueryCache (CMOracle M S C))

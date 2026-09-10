@@ -21,6 +21,7 @@ variable {M S C : Type}
 
 attribute [local instance] Fintype.ofFinite
 
+omit [Finite C] [Inhabited C] in
 lemma hidingImplCountAll_run_totalBound_current {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     IsTotalQueryBound
@@ -92,9 +93,9 @@ lemma sum_counts_step_le_succ_hidingImplCountAll [Fintype S] (ms : M × S)
       rw [hx]
       simp [sum_update_succ_count]
 
-omit [Finite C] in
+omit [Finite C] [Inhabited C] in
 lemma hiding_distinguish_totalBound_of_choose_count_support
-    [Fintype S] [Inhabited S] [Finite M] [Finite C]
+    [Fintype S] [Inhabited S] [Finite M]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {x : (M × AUX) × (QueryCache (CMOracle M S C) × (S → ℕ))}

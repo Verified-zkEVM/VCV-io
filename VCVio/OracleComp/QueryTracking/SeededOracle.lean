@@ -123,7 +123,7 @@ namespace OracleComp
 
 variable {ι' : Type u} {spec' : OracleSpec ι'} {α : Type u}
 
-theorem IsQueryBoundP.simulateQ_run_withPregen [IsUniformSpec spec']
+theorem IsQueryBoundP.simulateQ_run_withPregen
     {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
     (so : QueryImpl spec (OracleComp spec'))
     {oa : OracleComp spec α} {n : ℕ}
@@ -137,7 +137,7 @@ theorem IsQueryBoundP.simulateQ_run_withPregen [IsUniformSpec spec']
     (fun t hnp s' => QueryImpl.isQueryBoundP_run_withPregen so t (hstep_np t hnp) s')
     seed
 
-theorem IsTotalQueryBound.simulateQ_run_withPregen [IsUniformSpec spec]
+theorem IsTotalQueryBound.simulateQ_run_withPregen
     (so : QueryImpl spec (OracleComp spec))
     {oa : OracleComp spec α} {n : ℕ}
     (h : IsTotalQueryBound oa n)
@@ -236,7 +236,7 @@ of `prependValues` with a single head value at `t`, provided `t` is queried at l
 Used to reparametrize seed sums over `generateSeed` by a popped head value. -/
 private lemma support_generateSeed_mul_subset_range_prependValues_aux {ι₀ : Type}
     {spec₀ : OracleSpec ι₀} [DecidableEq ι₀] [∀ i, SampleableType (spec₀.Range i)]
-    [unifSpec ⊂ₒ spec₀] [unifSpec ˡ⊂ₒ spec₀] [IsUniformSpec spec₀]
+    [unifSpec ⊂ₒ spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀) (t : ι₀) (hcount : 0 < qc t * js.count t)
     (g : QuerySeed spec₀ → ENNReal) :
     Function.support (fun s => Pr[= s | generateSeed spec₀ qc js] * g s) ⊆
@@ -724,7 +724,7 @@ private lemma takeAtIndex_zero_prependValues_singleton_aux {ι₀ : Type} {spec�
 
 private lemma tsum_probOutput_generateSeed_prependValues_weight_aux {ι₀ : Type}
     {spec₀ : OracleSpec ι₀} [DecidableEq ι₀] [∀ i, SampleableType (spec₀.Range i)]
-    [unifSpec ⊂ₒ spec₀] [unifSpec ˡ⊂ₒ spec₀] [IsUniformSpec spec₀]
+    [unifSpec ⊂ₒ spec₀] [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀) (t : ι₀) (i₀ jdx : ι₀) (k jk : ℕ)
     {α : Type} (ob : OracleComp spec₀ α) (u₀ : spec₀.Range t) (x : α)
     (hcount : 0 < qc t * js.count t)
@@ -758,7 +758,6 @@ by an arbitrary function of the seed prefix `σ.takeAtIndex i₀ k`. -/
 lemma tsum_probOutput_generateSeed_weight_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [unifSpec ˡ⊂ₒ spec₀]
     [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) (x : α)
@@ -893,7 +892,7 @@ identifies the second moment with their product. -/
 lemma sq_tsum_probOutput_generateSeed_le_tsum_mul_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [unifSpec ˡ⊂ₒ spec₀] [IsUniformSpec spec₀]
+    [IsUniformSpec spec₀]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) (x : α) :
     (∑' σ, Pr[= σ | generateSeed spec₀ qc js] *
@@ -1056,7 +1055,6 @@ end queryBounds
 Forward only — the reverse fails because pregenerated values strictly reduce the count. -/
 
 theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
-    [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α} {n : ℕ}
     (h : OracleComp.IsTotalQueryBound oa n) (seed : QuerySeed spec₀) :
     OracleComp.IsTotalQueryBound ((simulateQ spec₀.seededOracle oa).run seed) n := by
@@ -1065,7 +1063,6 @@ theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec
     (fun t => (OracleComp.isQueryBound_query_iff t 1 _ _).mpr Nat.one_pos) seed
 
 theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec ι₀}
-    [IsUniformSpec spec₀]
     {α : Type} {oa : OracleComp spec₀ α}
     {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
     (h : OracleComp.IsQueryBoundP oa p n) (seed : QuerySeed spec₀) :

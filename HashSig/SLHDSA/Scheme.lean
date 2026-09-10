@@ -144,8 +144,8 @@ def slhVerifyInternal (prims : Primitives p) [DecidableEq prims.Y] (msg : List B
 /-! ### Naturality -/
 
 private theorem queryHom_hmsg (core : CorePrimitives p)
-    {m n : Type → Type*} [Monad m] [LawfulMonad m]
-    [Monad n] [LawfulMonad n] [HasQuery (publicHashSpec core) m]
+    {m n : Type → Type*} [Monad m]
+    [Monad n] [HasQuery (publicHashSpec core) m]
     [HasQuery (publicHashSpec core) n]
     (F : HasQuery.QueryHom (publicHashSpec core) m n)
     (r : core.Y) (pkSeed : core.PkSeed) (pkRoot : core.Y) (msg : List Byte) :

@@ -150,7 +150,7 @@ theorem neverFail_simulateQ_randomOracle_run
 /-- Running the lazy random oracle on an uncached query `t` and binding the result samples the
 fresh answer uniformly, so the support of the bound computation is the union over all answers of
 the support obtained after caching that answer. -/
-private lemma support_randomOracle_run_bind_of_uncached [DecidableEq ι] [spec.Inhabited]
+private lemma support_randomOracle_run_bind_of_uncached [DecidableEq ι]
     [(t : spec.Domain) → SampleableType (spec.Range t)] {β : Type} (t : spec.Domain)
     {cache : spec.QueryCache} (hcache : cache t = none)
     (g : spec.Range t × spec.QueryCache → ProbComp β) :
