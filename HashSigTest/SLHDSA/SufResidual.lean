@@ -46,7 +46,7 @@ the twice-signed message's two entries separated by the other message's, so that
 show up.  Alongside it, the log FIPS 205 §9.2's deterministic variant would produce for the same
 three queries, which is the shape the EasyCrypt development's message-keyed signer has.
 
-Five forgeries, and three `DecidableEq` instances.  The instances are the fixture's own: the library
+Four forgeries, and three `DecidableEq` instances.  The instances are the fixture's own: the library
 module carries `DecidableEq` on the signature type as a hypothesis because no such instance exists
 on this branch, and these build it field by field at this bundle and nowhere else.
 
@@ -329,10 +329,11 @@ def deterministicLog :
 
 /-! ## The forgeries
 
-Five, all offered against the honest public key.  None of the library module's statements has a
-verification hypothesis, so a forgery here does not have to verify; two of them do, and
-`checkFixture` asserts it, so that the branch the residual sends them to is not an artefact of
-offering nonsense. -/
+Four, all offered against the honest public key.  None of the library module's statements has a
+verification hypothesis, so a forgery here does not have to verify; one of them does, and
+`checkFixture` asserts it, so that the branch the residual sends it to is not an artefact of
+offering nonsense.  The other three are built by perturbing a logged signature and none is asserted
+to verify. -/
 
 /-- A strong forgery on the *queried* message `msgP`: the honest signer run again under randomness
 the log does not carry.  It verifies, and its exact pair is not in the log, which is the whole of
@@ -505,7 +506,9 @@ def checkRandomizers : IO Unit := do
 and the bridge's dichotomy is run to see which alternative it takes; on the logged branch the
 candidate is present, the winning condition fails, and — asserted separately, because otherwise
 "the winning condition fails" would not say *which* conjunct failed — the coverage conjunct still
-holds and the first-uncovered-index extractor returns nothing.  Nine properties. -/
+holds and the first-uncovered-index extractor returns nothing.  The index list the coverage check
+quantifies over is separately asserted to have length two, because `List.all` over `[]` is `true`.
+Ten properties. -/
 def checkBranches : IO Unit := do
   ensure "the embedded transcript has one target per logged query"
     (embeddedTargets.length == 3)
@@ -519,6 +522,8 @@ def checkBranches : IO Unit := do
     (decide (candidateOf forgeryFors msgP ∈ embeddedTargets))
   ensure "so its winning condition fails"
     (!decide ((hmsgItsrProblem toyPrimitives).Wins embeddedTargets (candidateOf forgeryFors msgP)))
+  ensure "the candidate selects two FORS leaves, so that quantification is not over nothing"
+    (((hmsgItsrProblem toyPrimitives).indexSet (candidateOf forgeryFors msgP)).length == 2)
   ensure "and it fails on freshness alone: every index it selects is covered"
     (((hmsgItsrProblem toyPrimitives).indexSet (candidateOf forgeryFors msgP)).all
       fun i => decide (i ∈ (hmsgItsrProblem toyPrimitives).targetIndexSet embeddedTargets))
@@ -560,8 +565,10 @@ def checkSameRandomizer : IO Unit := do
 /-- The formulation difference the module is about, measured.  Under FIPS 205's hedged default the
 log at a twice-signed message carries two randomizers, so pair freshness there is two disequalities
 and the residual's second branch is reachable; under its deterministic variant, which is the shape
-the EasyCrypt development's message-keyed signer has, the same three queries leave one.  Five
-properties. -/
+the EasyCrypt development's message-keyed signer has, the same three queries leave one.  The
+deterministic log's transcript is pinned too, and it is the only place in the file where
+`logQueries` meets a log with a repeated entry: on `signingLog` all three pairs are distinct, so a
+`logQueries` that de-duplicated would be invisible there.  Six properties. -/
 def checkVariants : IO Unit := do
   ensure "the deterministic variant's two queries on one message are one signature"
     (loggedSignatures deterministicLog msgP == [detSigP, detSigP])
@@ -574,6 +581,9 @@ def checkVariants : IO Unit := do
       (loggedSignatures signingLog msgP).length)
   ensure "and the deterministic variant's own randomizer differs from both hedged ones"
     (detSigP.randomness != sigP1.randomness && detSigP.randomness != sigP2.randomness)
+  ensure "the deterministic variant's transcript still records both queries at that message"
+    (logQueries deterministicLog ==
+      [(detSigP.randomness, msgP), (detSigQ.randomness, msgQ), (detSigP.randomness, msgP)])
 
 /-! ## The library statements, pinned at this bundle
 
