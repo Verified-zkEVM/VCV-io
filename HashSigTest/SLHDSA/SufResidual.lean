@@ -688,6 +688,7 @@ example (hfresh : SignatureAlg.signingLogContains log msg sig = false) :
 
 end Pins
 
+/-- Run the seven check groups in order, then report. -/
 def main : IO Unit := do
   checkFixture
   checkLoggedSignatures
@@ -700,4 +701,5 @@ def main : IO Unit := do
 
 end SLHDSA.SufResidualTest
 
+/-- Entry point for `slhdsa_suf_residual_tests`. -/
 def main : IO Unit := SLHDSA.SufResidualTest.main
