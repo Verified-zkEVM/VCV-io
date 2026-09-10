@@ -32,13 +32,12 @@ error text — every attribute comment here was written by removing the attribut
 Lean said.  The counts are 43, a hundred errors plus the line saying the ceiling was reached, and
 13, where that file records 41, 51 and 3; none of the three matches the figure standing in the same
 place there, and the error text differs as well, because these comments quote the error rather than
-paraphrasing it.  Two docstrings in the copied
-block name the group in *this* file that asserts what they describe.  `toy` carries `@[expose]`
-here, where that file leaves it unexposed, because the three `DecidableEq` instances below are
-stated at `toy.params`.  And `otherPkSeed`, which exists there to move a candidate off the honest
-key pair, is dropped: every statement in the library module reads its public seed and published root
-off one `pk`, so there is no second key pair to move to, and testing that there is would be
-re-testing the `H_msg` bridge.
+paraphrasing it.  Two docstrings in the copied block name the group in *this* file that asserts what
+they describe.  `toy` carries `@[expose]` here, where that file leaves it unexposed, because the
+three `DecidableEq` instances below are stated at `toy.params`.  And `otherPkSeed`, which exists
+there to move a candidate off the honest key pair, is dropped: every statement in the library module
+reads its public seed and published root off one `pk`, so there is no second key pair to move to,
+and testing that there is would be re-testing the `H_msg` bridge.
 
 ## What this fixture adds
 
