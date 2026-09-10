@@ -63,19 +63,59 @@ textbook `Commit(m) = (H(m, s), s)` scheme — exercising `cachingOracle`,
 and the
 [ROM commitment scheme walkthrough](end-to-end-examples.md#rom-commitment-scheme).
 
-### Sigma protocols (`SigmaProtocol`)
+### Challenge-verify protocols and sigma protocols (`ChallengeVerifyProtocol`, `SigmaProtocol`)
 
 ```lean
-structure SigmaProtocol
-    (Stmt Wit Commit PrvState Chal Resp : Type) (rel : Stmt → Wit → Bool) where
-  commit (stmt : Stmt) (wit : Wit) : ProbComp (Commit × PrvState)
-  respond (stmt : Stmt) (wit : Wit) (prvState : PrvState) (chal : Chal) : ProbComp Resp
+structure ChallengeVerifyProtocol
+    (Stmt Wit Commit PrvState Chal Resp : Type) (rel : Stmt → Wit → Bool)
+    (m : Type → Type) where
+  commit (stmt : Stmt) (wit : Wit) : m (Commit × PrvState)
+  respond (stmt : Stmt) (wit : Wit) (prvState : PrvState) (chal : Chal) : m Resp
   verify (stmt : Stmt) (commit : Commit) (chal : Chal) (resp : Resp) : Bool
-  sim (stmt : Stmt) : ProbComp Commit
-  extract (chal₁ : Chal) (resp₁ : Resp) (chal₂ : Chal) (resp₂ : Resp) : ProbComp Wit
+
+structure SigmaProtocol
+    (Stmt Wit Commit PrvState Chal Resp : Type) (rel : Stmt → Wit → Bool)
+    (m : Type → Type)
+    extends ChallengeVerifyProtocol Stmt Wit Commit PrvState Chal Resp rel m where
+  sim (stmt : Stmt) : m Commit
+  extract (chal₁ : Chal) (resp₁ : Resp) (chal₂ : Chal) (resp₂ : Resp) : m Wit
 ```
 
-Every `SigmaProtocol` coerces to `IdenSchemeWithAbort` via `toIdenSchemeWithAbort` (wraps `respond` with `some`).
+`ChallengeVerifyProtocol` is the bare commit-challenge-response interaction; take it when the
+extractor is irrelevant. `SigmaProtocol` adds the simulator and extractor as data, so consumers
+such as the Fischlin transform and the Fiat-Shamir Σ-layer can run them. Dot notation resolves
+through the parent projection, so a `SigmaProtocol` uses the interaction properties directly.
+
+The monad `m` carries the participants' computations: `m := ProbComp` is the usual protocol whose
+only randomness is uniform sampling, while a general `m` lets the prover query oracles.
+Probability-bearing properties (`PerfectlyComplete`, `HVZK`, `PerfectHVZK`,
+`simCommitPredictability`, `simChalUniformGivenCommit`) are measure-native: they assume
+`[EvalDistSemantics m]` and read the protocol through `discreteEvalDist` / `discreteTVDist`
+(the canonical top-σ-algebra measure reading, since the protocol's type parameters carry no
+ambient measurable structure). Support-bearing notions (`SpeciallySound`) assume only
+`[MonadLiftT m SetM]`. At `m := ProbComp` every property is restated through the traditional
+`Pr[…]` / `tvDist` surface by a companion bridge lemma (`perfectlyComplete_iff_probOutput`,
+`hvzk_iff_tvDist`, `perfectHVZK_iff_evalSPMF_eq`, `simCommitPredictability_iff_probOutput`,
+`simChalUniformGivenCommit_iff_probEvent`) with application-shaped forms such as
+`PerfectlyComplete.probOutput_eq_one` and `HVZK.tvDist_le`; the discrete developments prove and
+consume the definitions exclusively through these bridges
+(`VCVio/EvalDist/DiscreteMeasureCompat.lean` supplies the underlying dictionary). Caveat for
+oracle-querying provers: the probability denotation of `OracleComp spec` samples a fresh
+independent response per query, so a shared random oracle (equal inputs must get equal answers)
+must be interpreted through the caching layer (`OracleSpec.cachingOracle` / `withCacheOverlay`)
+before taking its probability denotation. `PerfectlyComplete` quantifies over the verifier's
+challenge pointwise, so it needs no sampling structure on `m`; at `m := ProbComp` it is
+equivalent to the sampled form (`perfectlyComplete_iff_probOutput_uniform_challenge_eq_one`,
+directions `PerfectlyComplete.probOutput_uniform_challenge_eq_one` and
+`perfectlyComplete_of_probOutput_uniform_challenge_eq_one`). The transcript-facing properties
+(`realTranscript`, `HVZK`, `PerfectHVZK`) draw the challenge as `liftM ($ᵗ Chal)` and so ask for
+`[SampleableType Chal] [MonadLiftT ProbComp m]`; at `m := ProbComp` that is definitionally the
+plain `$ᵗ Chal` (`realTranscript_probComp`).
+`PerfectlyComplete`, `HVZK`, `UniqueResponses`, and `realTranscript` live on
+`ChallengeVerifyProtocol`; `SpeciallySound` lives on `SigmaProtocol`, since it consumes `extract`.
+
+Every `ProbComp`-valued `ChallengeVerifyProtocol` coerces to `IdenSchemeWithAbort` via
+`toIdenSchemeWithAbort` (wraps `respond` with `some`).
 
 ### Identification scheme with aborts (`IdenSchemeWithAbort`)
 

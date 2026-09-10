@@ -48,7 +48,7 @@ attribute [fs_simp]
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
@@ -201,7 +201,7 @@ private abbrev SimLoggedState (M Commit Chal : Type)
   (fsRoSpec M Commit Chal).QueryCache × List M
 
 @[fs_simp] private noncomputable def simLoggedVerifyFreshComp
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (pk : Stmt) (x : M × (Commit × Resp))
     (s : SimLoggedState M Commit Chal) : ProbComp Bool := do
   let msg := x.1
@@ -1166,7 +1166,7 @@ private lemma forkPoint_isSome_of_mem_verified_length {qH : ℕ}
     (uniformSampleImpl (spec := (Unit →ₒ Chal)))
 
 @[fs_simp] private noncomputable def forkVerifyFreshComp
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (pk : Stmt) (x : M × (Commit × Resp))
     (s : ForkBaseState M Commit Chal × List M) :
     OracleComp (Fork.wrappedSpec Chal) Bool := do
@@ -1207,7 +1207,7 @@ private lemma forkVerifyFreshComp_project
       exact simulateQ_id_add_uniform_query_inr (Unit →ₒ Chal) ()
 
 private noncomputable def forkFinalQueryTrace
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (pk : Stmt) (x : M × (Commit × Resp))
     (s : ForkBaseState M Commit Chal × List M) :
     OracleComp (Fork.wrappedSpec Chal)

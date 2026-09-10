@@ -176,7 +176,7 @@ section security
 variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal]
 
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel)
   (ρ b S : ℕ) (M : Type) [DecidableEq M]
 
@@ -208,7 +208,7 @@ uniform draw from `Fin (2^b)`, and the full best triple `(challenge, response, h
 (on early exit at hash `0`, the current `(ω, resp, h)` is returned). -/
 private def fischlinUnifSearch {Stmt Wit Commit PrvState Chal Resp : Type}
     {rel : Stmt → Wit → Bool} {b : ℕ}
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (pk : Stmt) (sk : Wit) (sc : PrvState) :
     List Chal → Option (Chal × Resp × Fin (2 ^ b)) →
       ProbComp (Option (Chal × Resp × Fin (2 ^ b)))
@@ -230,7 +230,7 @@ discarded by the hash projection, and they can only lose probability mass throug
 hash-only model `minUnifAux` dominates. Proved by induction on the challenge list. -/
 private lemma fischlinUnifSearch_probEvent_minGt_le
     {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool} {b : ℕ}
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (k : ℕ)
     (cs : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
     Pr[fun o => minGt k (o.map (fun t => t.2.2)) | fischlinUnifSearch σ pk sk sc cs best]
@@ -1206,7 +1206,7 @@ challenge drawn from the search list `cs` (or from the seed `best`), and its res
 support of `σ.respond pk sk sc ω`. This lets perfect completeness apply to the chosen transcript. -/
 private lemma fischlinUnifSearch_mem_support {Stmt Wit Commit PrvState Chal Resp : Type}
     {rel : Stmt → Wit → Bool} {b : ℕ}
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (pk : Stmt) (sk : Wit) (sc : PrvState) :
     ∀ (cs : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
       (ω : Chal) (resp : Resp) (h : Fin (2 ^ b)),
@@ -1250,25 +1250,21 @@ private lemma fischlinUnifSearch_mem_support {Stmt Wit Commit PrvState Chal Resp
 /-- Pointwise corollary of perfect completeness: on a valid `(pk, sk)` pair, for any commitment
 `(pc, sc)` in the support of `σ.commit`, any challenge `ω`, and any response `resp` in the support
 of `σ.respond _ _ sc ω`, the verifier accepts. Extracted from the `Pr[= true | …] = 1` statement
-via `probEvent_eq_one_iff` (the uniform challenge ranges over all of `Chal`). -/
+at the given challenge via `probOutput_eq_one_iff_forall`. -/
 private lemma verify_of_perfectlyComplete
     {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
-    [SampleableType Chal]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hc : σ.PerfectlyComplete) (pk : Stmt) (sk : Wit) (hrel : rel pk sk = true)
     (pc : Commit) (sc : PrvState) (hpc : (pc, sc) ∈ support (σ.commit pk sk))
     (ω : Chal) (resp : Resp) (hresp : resp ∈ support (σ.respond pk sk sc ω)) :
     σ.verify pk pc ω resp = true := by
-  have h1 := (probOutput_eq_one_iff_forall _ true |>.mp (hc pk sk hrel)).2
+  have h1 := (probOutput_eq_one_iff_forall _ true |>.mp (hc.probOutput_eq_one pk sk hrel ω)).2
   have hmem : (σ.verify pk pc ω resp) ∈ support (do
       let (pc, sc) ← σ.commit pk sk
-      let ω ← $ᵗ Chal
       let π ← σ.respond pk sk sc ω
       return σ.verify pk pc ω π) := by
     rw [mem_support_bind_iff]
     refine ⟨(pc, sc), hpc, ?_⟩
-    rw [mem_support_bind_iff]
-    refine ⟨ω, mem_support_uniformSample Chal, ?_⟩
     rw [mem_support_bind_iff]
     exact ⟨resp, hresp, by simp⟩
   exact h1 _ hmem
@@ -1291,7 +1287,7 @@ the search over a non-empty challenge list returns `some (ω, resp, _)` whose re
 private lemma fischlinUnifSearch_match_verify
     {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool} {b : ℕ}
     [SampleableType Chal] [Inhabited Chal] [Inhabited Resp]
-    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
     (hc : σ.PerfectlyComplete) (pk : Stmt) (sk : Wit) (hrel : rel pk sk = true)
     (pc : Commit) (sc : PrvState) (hpc : (pc, sc) ∈ support (σ.commit pk sk))
     (cs : List Chal) (hcs : cs ≠ [])

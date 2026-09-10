@@ -43,7 +43,7 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
     {rel : Stmt → Wit → Bool}
 
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 omit [Fintype Chal] in

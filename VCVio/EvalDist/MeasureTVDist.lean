@@ -100,39 +100,59 @@ theorem measure_absDiff_apply_le_measureETVDist [EvalDistSemantics m] [Measurabl
     ENNReal.absDiff (𝒟[mx] s) (𝒟[my] s) ≤ measureETVDist mx my :=
   Measure.absDiff_apply_le_etvDist _ _ hs
 
-/-- The measure and executable `SPMF` TV distances have the same zero-distance relation on a
-discrete space. In particular, transporting a perfect-indistinguishability proof across
-`SPMF.toMeasure` is lossless. -/
-theorem SPMF.toMeasure_tvDist_eq_zero_iff [MeasurableSpace α] [DiscreteMeasurableSpace α]
-    (p q : SPMF α) :
-    Measure.tvDist p.toMeasure q.toMeasure = 0 ↔ SPMF.tvDist p q = 0 := by
-  rw [Measure.tvDist_eq_zero_iff _ _ (SPMF.toMeasure_apply_univ_le_one p)
-    (SPMF.toMeasure_apply_univ_le_one q), SPMF.tvDist_eq_zero_iff]
-  constructor
-  · intro h
-    exact congrArg SPMF.toPMF (SPMF.toMeasure_injective h)
-  · intro h
-    exact congrArg SPMF.toMeasure ((SPMF.toPMF_inj p q).mp h)
+/-! ## Total variation of canonical discrete readings
 
-/-- Exact compatibility for the `Unit` observation space used by bundled UC semantics. -/
-theorem SPMF.toMeasure_tvDist_punit (p q : SPMF PUnit.{1}) :
-    Measure.tvDist p.toMeasure q.toMeasure = SPMF.tvDist p q := by
-  apply congrArg ENNReal.toReal
-  rw [PMF.etvDist_option_punit p.toPMF q.toPMF]
-  apply le_antisymm
-  · refine iSup_le fun s => ?_
-    by_cases hunit : PUnit.unit ∈ s.1
-    · have hs : s.1 = Set.univ := by
-        apply Set.eq_univ_of_forall
-        intro x
-        simpa [Subsingleton.elim x PUnit.unit] using hunit
-      rw [hs]
-      simp [SPMF.toMeasure_apply_univ, SPMF.apply_eq_toPMF_some]
-    · have hs : s.1 = ∅ := by
-        apply Set.eq_empty_iff_forall_notMem.mpr
-        intro x
-        simpa [Subsingleton.elim x PUnit.unit] using hunit
-      rw [hs]
-      simp
-  · refine le_iSup_of_le ⟨Set.univ, MeasurableSet.univ⟩ ?_
-    simp [SPMF.toMeasure_apply_univ, SPMF.apply_eq_toPMF_some]
+Definitions stated on bare result types carry no ambient measurable structure, so the primary
+measure notation cannot be applied to them directly. `discreteETVDist` and `discreteTVDist`
+read both computations at the top σ-algebra via `discreteEvalDist`, mirroring how the
+traditional point/event probability notation selects its σ-algebra implicitly. -/
+
+/-- Extended total variation between the canonical discrete measure readings of two
+computations. -/
+noncomputable def discreteETVDist [EvalDistSemantics m] (mx my : m α) : ℝ≥0∞ :=
+  @Measure.etvDist α ⊤ (discreteEvalDist mx) (discreteEvalDist my)
+
+/-- Total variation between the canonical discrete measure readings of two computations.
+
+This is the measure-native distance for developments whose result types carry no ambient
+measurable structure. -/
+noncomputable def discreteTVDist [EvalDistSemantics m] (mx my : m α) : ℝ :=
+  @Measure.tvDist α ⊤ (discreteEvalDist mx) (discreteEvalDist my)
+
+section discreteTVDist
+
+variable [EvalDistSemantics m]
+
+@[simp]
+theorem discreteTVDist_self (mx : m α) : discreteTVDist mx mx = 0 :=
+  @Measure.tvDist_self α ⊤ (discreteEvalDist mx)
+
+theorem discreteTVDist_comm (mx my : m α) : discreteTVDist mx my = discreteTVDist my mx :=
+  @Measure.tvDist_comm α ⊤ (discreteEvalDist mx) (discreteEvalDist my)
+
+theorem discreteTVDist_nonneg (mx my : m α) : 0 ≤ discreteTVDist mx my :=
+  @Measure.tvDist_nonneg α ⊤ (discreteEvalDist mx) (discreteEvalDist my)
+
+theorem discreteTVDist_triangle (mx my mz : m α) :
+    discreteTVDist mx mz ≤ discreteTVDist mx my + discreteTVDist my mz :=
+  @Measure.tvDist_triangle α ⊤ (discreteEvalDist mx) (discreteEvalDist my)
+    (discreteEvalDist mz) (discreteEvalDist_apply_univ_le_one mx)
+    (discreteEvalDist_apply_univ_le_one my) (discreteEvalDist_apply_univ_le_one mz)
+
+theorem discreteTVDist_le_one (mx my : m α) : discreteTVDist mx my ≤ 1 :=
+  @Measure.tvDist_le_one α ⊤ (discreteEvalDist mx) (discreteEvalDist my)
+    (discreteEvalDist_apply_univ_le_one mx) (discreteEvalDist_apply_univ_le_one my)
+
+@[simp]
+theorem discreteTVDist_eq_zero_iff (mx my : m α) :
+    discreteTVDist mx my = 0 ↔ discreteEvalDist mx = discreteEvalDist my :=
+  @Measure.tvDist_eq_zero_iff α ⊤ (discreteEvalDist mx) (discreteEvalDist my)
+    (discreteEvalDist_apply_univ_le_one mx) (discreteEvalDist_apply_univ_le_one my)
+
+end discreteTVDist
+
+/-! The exact dictionary between the measure total variation of successful-output measures and
+the executable `SPMF` total variation on discrete spaces — including the zero-distance relation
+and the one-point observation space used by bundled UC semantics — lives in
+`VCVio.EvalDist.DiscreteMeasureCompat` as corollaries of the general agreement theorem
+`SPMF.toMeasure_etvDist`. -/

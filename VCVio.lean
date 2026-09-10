@@ -137,6 +137,7 @@ public import VCVio.EvalDist.Defs.Measure
 public import VCVio.EvalDist.Defs.NeverFails
 public import VCVio.EvalDist.Defs.Semantics
 public import VCVio.EvalDist.Defs.Support
+public import VCVio.EvalDist.DiscreteMeasureCompat
 public import VCVio.EvalDist.Divergence.KLDivergence
 public import VCVio.EvalDist.Expectation
 public import VCVio.EvalDist.ExpectationMeasure

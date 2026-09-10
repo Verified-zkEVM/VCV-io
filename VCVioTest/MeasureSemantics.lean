@@ -8,7 +8,7 @@ module
 public import VCVio.EvalDist.ResumptionMeasure
 public import VCVio.EvalDist.Divergence.KLDivergence
 public import VCVio.EvalDist.ExpectationMeasure
-public import VCVio.EvalDist.MeasureTVDist
+public import VCVio.EvalDist.DiscreteMeasureCompat
 public import VCVio.ProgramLogic.Relational.Measure
 public import ToMathlib.Probability.Divergence.RenyiDiscrete
 public import Mathlib.Probability.Distributions.Gaussian.Real
@@ -207,10 +207,10 @@ example (p q : SPMF Bool) :
     Measure.tvDist p.toMeasure q.toMeasure = 0 ↔ SPMF.tvDist p q = 0 :=
   SPMF.toMeasure_tvDist_eq_zero_iff p q
 
-/-- On the one-point observation space, the two TV distances agree numerically as well. -/
+/-- On any discrete observation space, the two TV distances agree numerically as well. -/
 example (p q : SPMF.{0} PUnit.{1}) :
     Measure.tvDist p.toMeasure q.toMeasure = SPMF.tvDist p q :=
-  SPMF.toMeasure_tvDist_punit p q
+  SPMF.toMeasure_tvDist p q
 
 /-- Mapping a discrete program pushes its denoted measure forward. -/
 example (program : FreeM coinSpec Bool) :

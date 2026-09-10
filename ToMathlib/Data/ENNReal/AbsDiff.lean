@@ -84,6 +84,16 @@ lemma absDiff_add_two_mul_min (a b : ℝ≥0∞) :
       = (a - b + a ⊓ b) + ((b - a) + b ⊓ a) := by rw [inf_comm b a]; ac_rfl
     _ = a + b := by rw [h1, h2]
 
+/-- `|a - b| + (a + b) = 2 · max a b`, the truncated-subtraction form of the identity that
+recovers the larger of two masses from their discrepancy and their total. -/
+lemma absDiff_add_add_eq_two_mul_sup (a b : ℝ≥0∞) :
+    ENNReal.absDiff a b + (a + b) = 2 * (a ⊔ b) := by
+  rcases le_total a b with hab | hab
+  · rw [ENNReal.absDiff, tsub_eq_zero_of_le hab, zero_add, ← add_assoc,
+      tsub_add_cancel_of_le hab, sup_eq_right.mpr hab, two_mul]
+  · rw [ENNReal.absDiff, tsub_eq_zero_of_le hab, add_zero, add_comm a b, ← add_assoc,
+      tsub_add_cancel_of_le hab, sup_eq_left.mpr hab, two_mul]
+
 lemma absDiff_toReal {a b : ℝ≥0∞} (ha : a ≠ ⊤) (hb : b ≠ ⊤) :
     (ENNReal.absDiff a b).toReal = |a.toReal - b.toReal| := by
   rcases le_total a b with hab | hab
@@ -95,6 +105,20 @@ lemma absDiff_toReal {a b : ℝ≥0∞} (ha : a ≠ ⊤) (hb : b ≠ ⊤) :
     have h2 : b.toReal ≤ a.toReal := (toReal_le_toReal hb ha).mpr hab
     simp only [ENNReal.absDiff, h1, add_zero, abs_of_nonneg (sub_nonneg.mpr h2)]
     exact toReal_sub_of_le hab ha
+
+/-- Two pairs of finite values with equal "cross" totals have equal absolute differences. -/
+lemma absDiff_eq_absDiff_of_add_eq_add {a b c d : ℝ≥0∞}
+    (ha : a ≠ ⊤) (hb : b ≠ ⊤) (hc : c ≠ ⊤) (hd : d ≠ ⊤) (h : a + d = b + c) :
+    ENNReal.absDiff a b = ENNReal.absDiff c d := by
+  have hab : ENNReal.absDiff a b ≠ ⊤ :=
+    ne_top_of_le_ne_top (ENNReal.add_ne_top.mpr ⟨ha, hb⟩) (absDiff_le_add a b)
+  have hcd : ENNReal.absDiff c d ≠ ⊤ :=
+    ne_top_of_le_ne_top (ENNReal.add_ne_top.mpr ⟨hc, hd⟩) (absDiff_le_add c d)
+  rw [← ENNReal.toReal_eq_toReal_iff' hab hcd, absDiff_toReal ha hb, absDiff_toReal hc hd]
+  have h' : a.toReal + d.toReal = b.toReal + c.toReal := by
+    rw [← ENNReal.toReal_add ha hd, ← ENNReal.toReal_add hb hc, h]
+  have : a.toReal - b.toReal = c.toReal - d.toReal := by linarith
+  rw [this]
 
 lemma absDiff_tsub_tsub {a b c : ℝ≥0∞} (ha : a ≤ c) (hb : b ≤ c) (hc : c ≠ ⊤) :
     ENNReal.absDiff (c - a) (c - b) = ENNReal.absDiff a b := by

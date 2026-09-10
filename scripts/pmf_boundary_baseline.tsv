@@ -51,6 +51,7 @@ VCVio/EvalDist/Defs/Measure.lean	33
 VCVio/EvalDist/Defs/NeverFails.lean	13
 VCVio/EvalDist/Defs/Semantics.lean	12
 VCVio/EvalDist/Defs/Support.lean	1
+VCVio/EvalDist/DiscreteMeasureCompat.lean	5
 VCVio/EvalDist/Expectation.lean	4
 VCVio/EvalDist/ExpectationMeasure.lean	1
 VCVio/EvalDist/FailureMeasure.lean	8
@@ -63,7 +64,6 @@ VCVio/EvalDist/Instances/FinRatPMF.lean	24
 VCVio/EvalDist/Instances/OptionT.lean	32
 VCVio/EvalDist/Instances/ReaderT.lean	14
 VCVio/EvalDist/List.lean	10
-VCVio/EvalDist/MeasureTVDist.lean	18
 VCVio/EvalDist/Monad/Basic.lean	87
 VCVio/EvalDist/Monad/Disagreement.lean	2
 VCVio/EvalDist/Monad/Map.lean	14

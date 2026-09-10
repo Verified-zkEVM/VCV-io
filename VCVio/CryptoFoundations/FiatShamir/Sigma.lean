@@ -43,12 +43,18 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
-commitment), and then responds to the challenge. -/
+commitment), and then responds to the challenge.
+
+The Σ-protocol's own monad `mσ` is separate from the signature scheme's monad `m`, and is
+required only to lift into it: the transform never samples a challenge from the Σ-protocol, so
+a prover that queries oracles of its own (as the Kilian transform's does) is admissible here.
+Every result below is stated at `mσ := ProbComp`. -/
 def FiatShamir
     {m : Type → Type v} [Monad m]
-    (sigmaAlg : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    {mσ : Type → Type} [Monad mσ]
+    (sigmaAlg : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel mσ)
     (hr : GenerableRelation Stmt Wit rel) (M : Type)
-    [MonadLiftT ProbComp m] [HasQuery (M × Commit →ₒ Chal) m] :
+    [MonadLiftT ProbComp m] [MonadLiftT mσ m] [HasQuery (M × Commit →ₒ Chal) m] :
     SignatureAlg m
       (M := M) (PK := Stmt) (SK := Wit) (S := Commit × Resp) where
   keygen := monadLift hr.gen
@@ -170,7 +176,7 @@ end semantics
 section naturality
 
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 variable {m : Type → Type u} [Monad m]
@@ -210,7 +216,7 @@ end naturality
 section costAccounting
 
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
@@ -392,7 +398,7 @@ end costAccounting
 section correctness
 
 variable [SampleableType Stmt] [SampleableType Wit]
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel ProbComp)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 open scoped Classical in
@@ -504,7 +510,7 @@ theorem perfectlyCorrect [SampleableType Chal]
             let r ← $ᵗ Chal
             let s ← σ.respond pk sk e r
             pure (σ.verify pk c r s))
-          (x := true) (h := by simpa using hc pk sk hrel))
+          (x := true) (h := by simpa using hc.probOutput_uniform_challenge_eq_one hrel))
     · simpa [OracleComp.ProgramLogic.propInd, hx] using
         (OracleComp.ProgramLogic.triple_zero
           (oa := do
