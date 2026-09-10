@@ -211,11 +211,11 @@ def toyDigestByte (r seed root : UInt8) (msg : List Byte) (i : ℕ) : UInt8 :=
 -- for instance resolution to reach them: without it, 13 errors and only these — two at `byteOf`,
 -- whose `y[0]` finds no `GetElem toyPrimitives.Y ℕ` instance and then cannot prove its index valid;
 -- two `BEq (ITSRTranscript toyPrimitives.Y (HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y))`,
--- one for each embedded-transcript value pin in `checkBranches`; four
--- `Decidable (… ∈ embeddedTargets)` membership goals in the same group; three
--- `DecidableEq (HmsgITSRInput toyPrimitives.PkSeed toyPrimitives.Y)`, one in `checkBranches` and
--- two in the pins; and two `DecidableEq toyPrimitives.PkSeed`, both in the pins.  Nothing outside
--- this executable consumes it.
+-- one for each embedded-transcript value pin in `checkBranches`; four `Decidable (… ∈
+-- embeddedTargets)` membership goals in the same group; three `DecidableEq (HmsgITSRInput
+-- toyPrimitives.PkSeed toyPrimitives.Y)`, one in `checkBranches` and two in the pins; and two
+-- `DecidableEq toyPrimitives.PkSeed`, both in the pins.  Nothing outside this executable
+-- consumes it.
 /-- The toy bundle: one byte per node, a collapsing order- and address-sensitive `Thash`, and an
 `H_msg` that depends on all four of its arguments. -/
 @[expose, reducible] def toyPrimitives : Primitives toyParams where
@@ -350,9 +350,9 @@ into differs from its own reverse and carries a repeat here: `loggedSignatures` 
 `loggedRandomizers` at that message are three long, `logQueries` and its embedding at the honest key
 pair are four-entry transcripts.  No list either log above produces has both properties: those two
 stop at two signatures per message and at three entries, their repeats are all palindromic, and
-`signingLog`'s three pairs are pairwise distinct.
-All four lists are pinned by value on this log — the first two in `checkLoggedSignatures` and
-`checkRandomizers`, the transcript in `checkRandomizers`, its embedding in `checkBranches`. -/
+`signingLog`'s three pairs are pairwise distinct.  All four lists are pinned by value on this log —
+the first two in `checkLoggedSignatures` and `checkRandomizers`, the transcript in
+`checkRandomizers`, its embedding in `checkBranches`. -/
 def thriceSignedLog :
     QueryLog (List Byte →ₒ GeneralScheme.SignatureCore toy toyPrimitives.core) :=
   [⟨msgP, detSigP⟩, ⟨msgQ, detSigQ⟩, ⟨msgP, detSigP⟩, ⟨msgP, sigP1⟩]
