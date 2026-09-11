@@ -12,7 +12,9 @@ public import LatticeCrypto.Falcon.Concrete.NTRUSolver
 public import LatticeCrypto.Falcon.Concrete.NTT
 public import LatticeCrypto.Falcon.Concrete.PolyBigInt
 public import LatticeCrypto.Falcon.Concrete.SmallPrimeNTT
+public import LatticeCrypto.Falcon.Coset
 public import LatticeCrypto.Falcon.Encoding
+public import LatticeCrypto.Falcon.PackedFFT
 public import LatticeCrypto.Falcon.Params
 public import LatticeCrypto.Falcon.Primitives
 public import LatticeCrypto.Falcon.Scheme

@@ -19,8 +19,6 @@
   "Falcon.euf_cma_security",
   "Falcon.euf_cma_security_bytes40",
   "Falcon.keyGenFromSeed",
-  "Falcon.sign",
-  "Falcon.verify_sign_correct",
   "FiatShamirWithAbort.euf_cma_bound",
   "FiatShamirWithAbort.euf_cma_bound_perfectHVZK",
   "GPVHashAndSign.euf_cma_collision_bound",
