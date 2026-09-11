@@ -9,10 +9,10 @@ public import Batteries.Data.Float.Rat
 public import Mathlib.Algebra.Order.Floor.Ring
 public import Mathlib.Analysis.SpecialFunctions.Exp
 public import LatticeCrypto.Falcon.Primitives
+public import LatticeCrypto.Falcon.PackedFFT
 public import LatticeCrypto.Falcon.Concrete.FloatLike
 public import LatticeCrypto.Falcon.Concrete.NTT
 public import LatticeCrypto.Falcon.Concrete.Encoding
-public import LatticeCrypto.Falcon.Concrete.FXR
 public import Extern.Falcon.SamplerZ
 public import Extern.Falcon.Sampling
 public import VCVio.OracleComp.Constructions.SampleableType
@@ -31,9 +31,14 @@ function for testing.
    the testable surface.
 
 2. **`concretePrimitives`**: Fills the abstract `Primitives` structure with
-   concrete implementations for the executable fields and a concrete FXR-backed
-   bridge for the FFT conversion fields. Used to connect the proof-level Falcon
-   interface to the concrete packed FFT representation.
+   concrete implementations for the executable fields (hash, codec, sampler, NTT)
+   and with the exact packed FFT of the specification for the three FFT
+   conversion fields (`Primitives.exactFftTarget`, `exactFftInt`, `exactIfftRound`).
+   The FFT fields are real-valued and never executed; the executable signing path
+   in `Extern.Falcon.Sign` carries its own floating-point FFT over `FloatLike`, as
+   the reference implementation signs in floating point (`sign_fpr.c`) and uses
+   32.32 fixed point only inside key generation (`kgen_fxp.c`). Relating that
+   floating-point pipeline to the exact one is the remaining bridge obligation.
 -/
 
 public section
@@ -143,44 +148,6 @@ private def sampleSamplerSeed : ProbComp ByteArray := do
   let bytes ← ProbComp.sampleIID samplerSeedBytes ($ᵗ UInt8)
   return ByteArray.mk <| Array.ofFn fun i : Fin samplerSeedBytes => bytes i
 
-private noncomputable def fxrScale : ℝ := (2 : ℝ) ^ (32 : Nat)
-
-/-- Interpret an `FXR` word as its signed 32.32 fixed-point real value. -/
-private noncomputable def fxrToReal (x : FXR.FXR) : ℝ :=
-  (x.toInt64.toInt : ℝ) / fxrScale
-
-/-- Encode a real number into Falcon's signed 32.32 fixed-point format by rounding
-to the nearest scaled integer. -/
-private noncomputable def realToFXR (x : ℝ) : FXR.FXR :=
-  (round (x * fxrScale)).toInt64.toUInt64
-
-/-- Convert an `R_q` polynomial to the coefficient array expected by the concrete FFT code. -/
-private def rqToInt32Array (p : Params) (f : Rq p.n) : Array Int32 :=
-  (Array.range p.n).map fun i => (ZMod.val (f.getD i 0)).toInt32
-
-/-- Convert an integer polynomial to the coefficient array expected by the concrete FFT code. -/
-private def intPolyToInt32Array (p : Params) (f : IntPoly p.n) : Array Int32 :=
-  (Array.range p.n).map fun i => (f.getD i 0).toInt32
-
-/-- Read Falcon's packed FXR FFT layout into the proof-level packed real vector. -/
-private noncomputable def fxrArrayToRealFFTPoly (p : Params) (f : Array FXR.FXR) :
-    RealFFTPoly p.fftDepth :=
-  Vector.ofFn fun i => fxrToReal (f.getD i.1 0)
-
-/-- Re-encode a proof-level packed FFT vector into Falcon's concrete FXR layout. -/
-private noncomputable def realFFTPolyToFXRArray (p : Params) (f : RealFFTPoly p.fftDepth) :
-    Array FXR.FXR :=
-  (Array.range p.n).map fun i =>
-    if h : i < 2 * 2 ^ p.fftDepth then
-      realToFXR (f.get ⟨i, h⟩)
-    else
-      0
-
-/-- Convert concrete FXR coefficients back to an integer polynomial via Falcon's
-reference fixed-point rounding rule. -/
-private def fxrArrayToIntPoly (p : Params) (f : Array FXR.FXR) : IntPoly p.n :=
-  Vector.ofFn fun i => (FXR.fxr_round (f.getD i.1 0)).toInt
-
 /-- Concrete Falcon primitive bundle used to connect the executable code to the abstract
 Falcon interfaces. -/
 noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
@@ -193,12 +160,9 @@ noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
     letI : FloatLike ℝ := realSamplerFloatLike
     let (z, _) := SamplerZ.samplerZ p.logn state μ σ⁻¹
     return z.toInt
-  fftTarget := fun c =>
-    fxrArrayToRealFFTPoly p <| FXR.vect_FFT p.logn <| FXR.vect_set p.logn (rqToInt32Array p c)
-  fftInt := fun f =>
-    fxrArrayToRealFFTPoly p <| FXR.vect_FFT p.logn <| FXR.vect_set p.logn (intPolyToInt32Array p f)
-  ifftRound := fun f =>
-    fxrArrayToIntPoly p <| FXR.vect_iFFT p.logn (realFFTPolyToFXRArray p f)
+  fftTarget := Primitives.exactFftTarget p
+  fftInt := Primitives.exactFftInt p
+  ifftRound := Primitives.exactIfftRound p
   compress := compress p.n
   decompress := decompress p.n
   nttOps := hn ▸ concreteNTTRingOps p.logn
@@ -207,6 +171,11 @@ noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
 @[simp] theorem concretePrimitives_publicKeyBytes_eq
     (p : Params) (hn : p.n = 2 ^ p.logn) (h : Rq p.n) :
     (concretePrimitives p hn).publicKeyBytes h = publicKeyBytes p.logn h := by rfl
+
+/-- The FFT fields of `concretePrimitives` are the exact packed FFT of the specification. -/
+theorem concretePrimitives_exactFFT (p : Params) (hn : p.n = 2 ^ p.logn)
+    (h : 2 * 2 ^ p.fftDepth = p.n) : (concretePrimitives p hn).ExactFFT h :=
+  Primitives.exactFFT_of_eq _ h rfl rfl
 
 /-- `hashToPointForPublicKey` for `concretePrimitives` unfolds to the concrete FN-DSA hash path. -/
 @[simp] theorem concretePrimitives_hashToPointForPublicKey_eq

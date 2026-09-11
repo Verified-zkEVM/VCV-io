@@ -214,19 +214,54 @@ noncomputable def signAttempt (pk : PublicKey p) (sk : SecretKey p) (c : Rq p.n)
   else
     return none
 
-/-- Falcon signing (Falcon+, Algorithm 10).
+/-- The centered integer lift of an element of `R_q`: coefficientwise the representative in
+`(-q/2, q/2]`. This is the polynomial the signer hands to `compress`. -/
+noncomputable def rqToIntPolyCentered {n : ℕ} (f : Rq n) : IntPoly n :=
+  LatticeCrypto.Poly.ofPi fun i => LatticeCrypto.centeredRepr (f.get i)
 
-On each attempt:
+/-- The coefficients of the reduction of an integer polynomial modulo `q`. -/
+theorem toRq_get {n : ℕ} (a : IntPoly n) (i : Fin n) :
+    (IntPoly.toRq a : Rq n).get i = ((a.get i : ℤ) : Coeff) := by
+  simp [IntPoly.toRq, integralLift, LatticeCrypto.vectorIntegralLift,
+    LatticeCrypto.PolyBackend.mapCoeffs, LatticeCrypto.vectorBackend]
+
+/-- Reducing the centered integer lift modulo `q` recovers the original element. -/
+theorem toRq_rqToIntPolyCentered {n : ℕ} (f : Rq n) :
+    IntPoly.toRq (rqToIntPolyCentered f) = f := by
+  apply LatticeCrypto.Poly.ext_get_eq
+  intro i
+  rw [toRq_get, rqToIntPolyCentered, LatticeCrypto.Poly.get_ofPi]
+  exact (LatticeCrypto.centeredRepr_intCast (f.get i)).symm
+
+/-- Falcon signing (Falcon+, Algorithm 10), as a fuel-bounded rejection loop.
+
+On each of up to `maxAttempts` attempts:
 1. Sample a fresh 40-byte salt `r`.
 2. Hash `c = HashToPoint(r, pk, message)` to get the target in `R_q`.
 3. Use the secret key to sample a short preimage `(s₁, s₂)` via `signAttempt`.
-4. If the norm check passes and compression succeeds, return `(r, compress(s₂))`.
+4. If the norm check passes and compression succeeds, return `some (r, compress(s₂))`.
 5. Otherwise retry with a new salt.
 
+Returns `none` once the attempt budget is exhausted. Compression is a separate gate from
+the norm check: a preimage can pass the `ℓ₂` bound and still have a coefficient too large for
+`compress` at `p.sbytelen`, so the loop retries on either failure. The compression length is
+`p.sbytelen`, the length `verify` decompresses at.
+
 The fresh-salt-per-retry structure matches the Falcon+ convention and the concrete
-executable signer in `LatticeCrypto.Falcon.Concrete.Sign.concreteSign`. -/
+executable signer in `Extern.Falcon.Sign`. -/
 noncomputable def sign (pk : PublicKey p) (sk : SecretKey p) (msg : List Byte) :
-    ProbComp Signature := sorry
+    ℕ → ProbComp (Option Signature)
+  | 0 => return none
+  | maxAttempts + 1 => do
+    let salt ← ($ᵗ (Bytes 40) : ProbComp (Bytes 40))
+    let c := prims.hashToPointForPublicKey pk.h salt msg
+    let r ← signAttempt p prims pk sk c
+    match r with
+    | some (_, s₂) =>
+        match prims.compress (rqToIntPolyCentered s₂) p.sbytelen with
+        | some comp => return (some ⟨salt, comp⟩)
+        | none => sign pk sk msg maxAttempts
+    | none => sign pk sk msg maxAttempts
 
 /-- Falcon verification (Algorithm 16).
 
