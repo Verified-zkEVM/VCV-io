@@ -84,7 +84,7 @@ lemma simulateQ_add_liftM_query_right (t : spec₂'.Domain) :
   rw [simulateQ_spec_query, QueryImpl.add_apply_inr]
 
 /-- A query formed directly against the sum specification routes to its left handler. -/
-@[simp, grind =]
+@[grind =]
 lemma simulateQ_add_query_left (t : spec₁'.Domain) :
     simulateQ (impl₁' + impl₂')
         (liftM ((spec₁' + spec₂').query (Sum.inl t))) =
@@ -92,7 +92,7 @@ lemma simulateQ_add_query_left (t : spec₁'.Domain) :
   rw [simulateQ_spec_query, QueryImpl.add_apply_inl]
 
 /-- A query formed directly against the sum specification routes to its right handler. -/
-@[simp, grind =]
+@[grind =]
 lemma simulateQ_add_query_right (t : spec₂'.Domain) :
     simulateQ (impl₁' + impl₂')
         (liftM ((spec₁' + spec₂').query (Sum.inr t))) =
@@ -121,7 +121,7 @@ lemma simulateQ_add_query_bind_right (t : spec₂'.Domain)
 
 /- Also `@[grind =]`: without it, bare `grind` on a routed `simulateQ (impl₁ + impl₂)` goal over a
 lifted computation saturates (times out) instead of failing fast; with it, the shape closes. -/
-@[simp, grind =]
+@[grind =]
 lemma simulateQ_add_liftComp_left (oa : OracleComp spec₁' α) :
     simulateQ (impl₁' + impl₂') (OracleComp.liftComp oa (spec₁' + spec₂')) =
       simulateQ impl₁' oa := by
@@ -129,7 +129,7 @@ lemma simulateQ_add_liftComp_left (oa : OracleComp spec₁' α) :
   congr 1 with t
   exact simulateQ_add_liftM_query_left impl₁' impl₂' t
 
-@[simp, grind =]
+@[grind =]
 lemma simulateQ_add_liftComp_right (ob : OracleComp spec₂' α) :
     simulateQ (impl₁' + impl₂') (OracleComp.liftComp ob (spec₁' + spec₂')) =
       simulateQ impl₂' ob := by

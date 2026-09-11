@@ -114,7 +114,6 @@ theorem leakageBound_triangle
   exact (SPMF.tvDist_triangle _ _ _).trans (add_le_add h₁₂ h₂₃)
 
 /-- `ProbLeakFree` is reflexive. -/
-@[simp]
 theorem probLeakFree_refl [IsUniformSpec spec₁]
     (oa : OracleComp spec₁ (α × ω)) :
     ProbLeakFree oa oa := rfl

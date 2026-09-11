@@ -64,6 +64,7 @@ jobs:
       - name: Check generated umbrella modules
         run: |
           python3 scripts/test-check-imports.py
+          python3 scripts/test-validation.py
           bash scripts/check-imports.sh
 
   complexity_backend:

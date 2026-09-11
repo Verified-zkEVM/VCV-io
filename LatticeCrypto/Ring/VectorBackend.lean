@@ -63,7 +63,7 @@ def ofPi (f : Fin n → Coeff) : Poly Coeff n :=
 /-- `Vector.get` after `Vector.ofFn`, stated at the concrete carrier boundary.
 Lean's core `ofFn` API is phrased using `GetElem`; this bridge keeps proof casts
 out of users of the polynomial representation. -/
-@[simp] theorem get_vectorOfFn (f : Fin n → Coeff) (i : Fin n) :
+theorem get_vectorOfFn (f : Fin n → Coeff) (i : Fin n) :
     (Vector.ofFn f).get i = f i := by
   change (Vector.ofFn f)[i.val] = f i
   rw [Vector.getElem_ofFn]
@@ -217,7 +217,7 @@ omit [CommRing Coeff] in
 @[simp] theorem vectorRing_zero :
     (vectorNegacyclicRing Coeff n).zero = (0 : Poly Coeff n) := rfl
 
-@[simp] theorem vectorRing_zero_get (i : Fin n) :
+theorem vectorRing_zero_get (i : Fin n) :
     ((vectorNegacyclicRing Coeff n).zero).get i = (0 : Coeff) := by
   exact Poly.get_zero i
 
@@ -243,7 +243,7 @@ omit [CommRing Coeff] in
 /-- Coefficient of a sum through the concrete vector backend (`Vector.instAdd`).
 Paired with `vectorNegacyclicRing_backend` so that both variants of `+` on
 `Poly Coeff n` are handled after the backend is normalised. -/
-@[simp] theorem vectorBackend_add_coeff (f g : Poly Coeff n) (i : Fin n) :
+theorem vectorBackend_add_coeff (f g : Poly Coeff n) (i : Fin n) :
     (vectorBackend Coeff n).coeff (f + g) i =
       (vectorBackend Coeff n).coeff f i + (vectorBackend Coeff n).coeff g i := by
   exact Poly.get_add f g i
@@ -268,7 +268,7 @@ theorem vectorRing_mul_add_right (f g h : Poly Coeff n) :
   rw [← Finset.sum_add_distrib]; congr 1; ext ij
   split_ifs <;> ring
 
-@[simp] theorem vectorBackend_sub_coeff (f g : Poly Coeff n) (i : Fin n) :
+theorem vectorBackend_sub_coeff (f g : Poly Coeff n) (i : Fin n) :
     (vectorBackend Coeff n).coeff (f - g) i =
       (vectorBackend Coeff n).coeff f i - (vectorBackend Coeff n).coeff g i := by
   exact Poly.get_sub f g i

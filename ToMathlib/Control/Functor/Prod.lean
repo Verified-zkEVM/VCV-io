@@ -17,13 +17,13 @@ public section
 
 universe u v w x
 
-@[simp, grind =]
+@[grind =]
 lemma fst_map_prod_map {m : Type u → Type v} [Functor m] [LawfulFunctor m] {α β γ δ : Type u}
     (mx : m (α × β)) (f : α → γ) (g : β → δ) :
     Prod.fst <$> Prod.map f g <$> mx = (f ∘ Prod.fst) <$> mx := by
   simp [Functor.map_map]; rfl
 
-@[simp, grind =]
+@[grind =]
 lemma snd_map_prod_map {m : Type u → Type v} [Functor m] [LawfulFunctor m] {α β γ δ : Type u}
     (mx : m (α × β)) (f : α → γ) (g : β → δ) :
     Prod.snd <$> Prod.map f g <$> mx = (g ∘ Prod.snd) <$> mx := by

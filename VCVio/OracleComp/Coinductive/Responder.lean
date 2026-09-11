@@ -576,7 +576,7 @@ responder/challenger state first. -/
 
 /-- Wiring against a deterministic responder is the (Dirac lift of the) upstream closed
 game `PFunctor.DynSystem.closedGame`. -/
-@[simp] theorem stepAgainst_ofDet (A : OracleStrategy S spec) {σ : Type u}
+theorem stepAgainst_ofDet (A : OracleStrategy S spec) {σ : Type u}
     (C : PFunctor.Responder σ spec.toPFunctor) (p : σ × S) :
     stepAgainst A (.ofDet C) p = pure ((PFunctor.DynSystem.closedGame C A).step p) := by
   obtain ⟨r, s⟩ := p
@@ -590,7 +590,7 @@ setup-indexed family form of the upstream `PFunctor.DynSystem.stepWith_lift` /
 `iterWith_lift` collapses (the family handler is state-dependent, so it is not literally
 a `StateT.lift`; the same induction applies). -/
 
-@[simp] theorem stepAgainst_ofHandlerFamily {Γ : Type u} (h : Γ → ProbHandler spec)
+theorem stepAgainst_ofHandlerFamily {Γ : Type u} (h : Γ → ProbHandler spec)
     (A : OracleStrategy S spec) (p : Γ × S) :
     stepAgainst A (ProbResponder.ofHandlerFamily h) p =
       (fun s' => (p.1, s')) <$> kleisliStep (h p.1) A p.2 := by
@@ -623,14 +623,14 @@ a `StateT.lift`; the same induction applies). -/
           simp only [map_eq_bind_pure_comp, bind_assoc]
 
 /-- Against a memoryless oracle the wired step is the memoryless Kleisli step. -/
-@[simp] theorem stepAgainst_ofHandler (H : ProbHandler spec) (A : OracleStrategy S spec)
+theorem stepAgainst_ofHandler (H : ProbHandler spec) (A : OracleStrategy S spec)
     (p : PUnit × S) :
     stepAgainst A (ProbResponder.ofHandler H) p =
       (fun s' => (p.1, s')) <$> kleisliStep H A p.2 :=
   stepAgainst_ofHandlerFamily (fun _ => H) A p
 
 /-- Against a memoryless oracle the wired run is the memoryless Kleisli run. -/
-@[simp] theorem iterateAgainst_ofHandler (H : ProbHandler spec) (A : OracleStrategy S spec)
+theorem iterateAgainst_ofHandler (H : ProbHandler spec) (A : OracleStrategy S spec)
     (n : ℕ) (p : PUnit × S) :
     iterateAgainst A (ProbResponder.ofHandler H) n p =
       (fun s' => (p.1, s')) <$> kleisliIterate H A n p.2 :=

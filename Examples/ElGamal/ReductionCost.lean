@@ -89,7 +89,7 @@ noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
         + profile distinguish := by
   simp [reductionTransform, reductionProfile, add_assoc]
 
-@[simp] lemma instantiate_reductionTransform {ω κ κ' : Type} [AddCommMonoid ω]
+lemma instantiate_reductionTransform {ω κ κ' : Type} [AddCommMonoid ω]
     (intrinsic : ω)
     (profile : OneTimeINDCPACapability → ResourceProfile ω κ)
     (impl : κ → ResourceProfile ω κ') :
@@ -103,7 +103,7 @@ noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
       intrinsic + weights chooseMessages + weights distinguish := by
   simp [reductionProfile, add_assoc, add_left_comm, add_comm]
 
-@[simp] lemma eval_reductionTransform {ω κ : Type} [AddCommMonoid ω]
+lemma eval_reductionTransform {ω κ : Type} [AddCommMonoid ω]
     (intrinsic : ω)
     (profile : OneTimeINDCPACapability → ResourceProfile ω κ)
     (weights : κ → ω) :
@@ -113,7 +113,7 @@ noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
         + (profile distinguish).eval weights := by
   simp [reductionTransform_eq, add_assoc, add_left_comm, add_comm]
 
-@[simp] lemma reductionTransform_ofIntrinsic {ω κ : Type} [AddCommMonoid ω]
+lemma reductionTransform_ofIntrinsic {ω κ : Type} [AddCommMonoid ω]
   (intrinsic chooseCost distinguishCost : ω) :
     reductionTransform (κ := κ) intrinsic
       (fun

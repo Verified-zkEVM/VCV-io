@@ -118,21 +118,21 @@ candidate function (real: `prf.eval k`; ideal: the lazy random oracle). -/
 
 /-- The real PRF handler is transparent on a computation lifted in from `unifSpec`: its
 `unifSpec` side is the identity handler and the function oracle is never consulted. -/
-@[simp] lemma simulateQ_prfRealQueryImpl_liftComp (prf : PRFScheme K D R) (k : K)
+lemma simulateQ_prfRealQueryImpl_liftComp (prf : PRFScheme K D R) (k : K)
     {β : Type} (ob : OracleComp unifSpec β) :
     simulateQ (prf.prfRealQueryImpl k) (OracleComp.liftComp ob (PRFOracleSpec D R)) = ob := by
   simp [prfRealQueryImpl, QueryImpl.simulateQ_add_liftM_left, QueryImpl.simulateQ_toQueryImpl]
 
 /-- The ideal (lazy random oracle) PRF handler is transparent on a computation lifted in from
 `unifSpec`, threading the cache: the result is just `ob` lifted into the cache state monad. -/
-@[simp] lemma simulateQ_prfIdealQueryImpl_liftComp [DecidableEq D] [SampleableType R]
+lemma simulateQ_prfIdealQueryImpl_liftComp [DecidableEq D] [SampleableType R]
     {β : Type} (ob : OracleComp unifSpec β) :
     simulateQ (prfIdealQueryImpl (D := D) (R := R)) (OracleComp.liftComp ob (PRFOracleSpec D R))
       = (liftM ob : StateT ((D →ₒ R).QueryCache) ProbComp β) := by
   simp [prfIdealQueryImpl, QueryImpl.simulateQ_add_liftM_left, QueryImpl.simulateQ_toQueryImpl]
 
 /-- A function query (`Sum.inr`) under the real PRF handler evaluates the PRF. -/
-@[simp] lemma simulateQ_prfRealQueryImpl_inr (prf : PRFScheme K D R) (k : K) (d : D) :
+lemma simulateQ_prfRealQueryImpl_inr (prf : PRFScheme K D R) (k : K) (d : D) :
     simulateQ (prf.prfRealQueryImpl k)
         (liftM (OracleSpec.query (Sum.inr d) : OracleQuery (PRFOracleSpec D R) R))
       = pure (prf.eval k d) := by
@@ -140,7 +140,7 @@ candidate function (real: `prf.eval k`; ideal: the lazy random oracle). -/
 
 /-- A function query (`Sum.inr`) under the ideal PRF handler is the lazy random oracle at that
 point. -/
-@[simp] lemma simulateQ_prfIdealQueryImpl_inr [DecidableEq D] [SampleableType R] (q : D) :
+lemma simulateQ_prfIdealQueryImpl_inr [DecidableEq D] [SampleableType R] (q : D) :
     simulateQ (prfIdealQueryImpl (D := D) (R := R))
         (liftM (OracleSpec.query (Sum.inr q) : OracleQuery (PRFOracleSpec D R) R))
       = (D →ₒ R).randomOracle q := by

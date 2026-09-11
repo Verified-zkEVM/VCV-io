@@ -53,7 +53,8 @@ fi
 
 PROOF_LIBS=(ToMathlib VCVio LatticeCrypto Extern HashSig Examples VCVioWidgets)
 BUILD_LOG="$(mktemp "${TMPDIR:-/tmp}/vcvio-validate-build.XXXXXX")"
-trap 'rm -f "$BUILD_LOG"' EXIT
+TEST_LOG="$(mktemp "${TMPDIR:-/tmp}/vcvio-validate-test.XXXXXX")"
+trap 'rm -f "$BUILD_LOG" "$TEST_LOG"' EXIT
 
 echo "# Building the proof libraries"
 lake build "${PROOF_LIBS[@]}" 2>&1 | tee "$BUILD_LOG"
@@ -71,6 +72,7 @@ python3 ./scripts/check-warning-log.py "$BUILD_LOG" "${warning_args[@]}" \
 echo ""
 echo "# Checking generated umbrella modules"
 python3 ./scripts/test-check-imports.py
+python3 ./scripts/test-validation.py
 ./scripts/check-imports.sh
 
 echo ""
@@ -98,7 +100,8 @@ while IFS= read -r module; do
   test_modules+=("$module")
 done < <(git ls-files 'VCVioTest/*.lean' 'LatticeCryptoTest/*.lean' \
   'HashSigTest/*.lean' | sed -e 's/\.lean$//' -e 's#/#.#g')
-lake exe lint-style "${PROOF_LIBS[@]}" Interop "${test_modules[@]}"
+# Bash 3.2 treats an empty array as unset under nounset.
+lake exe lint-style "${PROOF_LIBS[@]}" Interop ${test_modules[@]+"${test_modules[@]}"}
 
 echo ""
 echo "# Checking the agent documentation"
@@ -120,10 +123,14 @@ if (( run_test )); then
   echo "# Running lake test"
   if (( run_ffi )); then
     git submodule update --init --recursive
-    lake test -- --ffi
+    lake test -- --ffi 2>&1 | tee "$TEST_LOG"
   else
-    lake test
+    lake test 2>&1 | tee "$TEST_LOG"
   fi
+  python3 ./scripts/check-warning-log.py "$TEST_LOG" \
+    --path-prefix VCVioTest/ --path-prefix VCVioTest.lean \
+    --path-prefix LatticeCryptoTest/ --path-prefix LatticeCryptoTest.lean \
+    --path-prefix HashSigTest/ --label 'test-library warnings'
 fi
 
 if (( run_axioms )); then

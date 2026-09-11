@@ -150,7 +150,6 @@ theorem closeHandler_pure (handler : ∀ position : p.A, FreeM q (p.B position))
     (result : α) : closeHandler handler (pure result : FreeM p α) = pure result :=
   rfl
 
-@[simp]
 theorem closeHandler_liftBind (handler : ∀ position : p.A, FreeM q (p.B position))
     (position : p.A) (next : p.B position → FreeM p α) :
     closeHandler handler (FreeM.liftBind position next) =

@@ -61,37 +61,31 @@ section run'
 
 variable [Monad m] [LawfulMonad m]
 
-@[simp]
 lemma run'_pure' (x : α) (s : σ) :
     (pure x : StateT σ m α).run' s = pure x := by
   simp [StateT.run'_eq]
 
-@[simp]
 lemma run'_bind' (x : StateT σ m α) (f : α → StateT σ m β) (s : σ) :
     (x >>= f).run' s = x.run s >>= fun ⟨a, s'⟩ => (f a).run' s' := by
   simp only [StateT.run'_eq, StateT.run, monad_bind_def, StateT.bind,
     map_eq_bind_pure_comp, bind_assoc]
 
-@[simp]
 lemma run'_map' (x : StateT σ m α) (f : α → β) (s : σ) :
     (f <$> x).run' s = f <$> x.run' s := by
   simp [StateT.run'_eq, Functor.map_map]
 
-@[simp]
 lemma run'_lift' (x : m α) (s : σ) :
     (StateT.lift x : StateT σ m α).run' s = x := by
   simp [StateT.run'_eq, map_eq_bind_pure_comp, bind_assoc]
 
 /-- A lifted base computation can be sampled before running a stateful continuation from the
 unchanged initial state. -/
-@[simp]
 lemma run'_liftM_bind (x : m α) (f : α → StateT σ m β) (s : σ) :
     ((liftM x : StateT σ m α) >>= f).run' s = x >>= fun a => (f a).run' s := by
   rw [run'_bind', run_liftM]
   simp
 
 /-- A lifted base-monad continuation can be moved outside a discarded-state run. -/
-@[simp]
 lemma run'_bind_liftM (x : StateT σ m α) (f : α → m β) (s : σ) :
     (x >>= fun a => (liftM (f a) : StateT σ m β)).run' s = x.run' s >>= f := by
   simp [StateT.run'_eq, bind_map_left]

@@ -146,7 +146,7 @@ def useHint (p : Params) (h : Hint) (r : Rq) : High :=
 def hintWeight (h : Hint) : ℕ :=
   h.toList.foldl (fun acc b => acc + cond b 1 0) 0
 
-@[simp] theorem Rq.get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 :=
+theorem Rq.get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 :=
   NegacyclicRing.coeff_zero coeffRing i
 
 @[simp] theorem Rq.get_add (a b : Rq) (i : Fin ringDegree) :
@@ -177,19 +177,19 @@ private theorem BalancedDecomp.ofApproved {p : Params} (hp : p.isApproved) :
 namespace BalancedDecomp
 variable {alpha m : ℕ}
 
-@[simp] private lemma h2α {ctx : BalancedDecomp alpha m} : 2 * (alpha / 2) = alpha :=
+private lemma h2α {ctx : BalancedDecomp alpha m} : 2 * (alpha / 2) = alpha :=
   Nat.two_mul_div_two_of_even ctx.heven
 
-@[simp] private lemma hγ {ctx : BalancedDecomp alpha m} : 0 < alpha / 2 := by
+private lemma hγ {ctx : BalancedDecomp alpha m} : 0 < alpha / 2 := by
   have := ctx.hα; rw[← ctx.h2α] at this; omega
 
-@[simp] private lemma hmdef {ctx : BalancedDecomp alpha m} : (modulus - 1) / alpha = m :=
+private lemma hmdef {ctx : BalancedDecomp alpha m} : (modulus - 1) / alpha = m :=
   Nat.div_eq_of_eq_mul_right ctx.hα ctx.hqm1.symm
 
-@[simp] private lemma hq {ctx : BalancedDecomp alpha m} : alpha < modulus := by
+private lemma hq {ctx : BalancedDecomp alpha m} : alpha < modulus := by
   have := ctx.hsmall; omega
 
-@[simp] private lemma hm {ctx : BalancedDecomp alpha m} : 0 < m := by
+private lemma hm {ctx : BalancedDecomp alpha m} : 0 < m := by
   have h : 0 < modulus - 1 := by decide
   rw [← ctx.hqm1, mul_comm] at h
   exact Nat.pos_of_mul_pos_right h
@@ -203,9 +203,8 @@ end BalancedDecomp
 
 private theorem natCast_div_add_mod (r : Coeff) (s : ℕ) :
     s * ((r.val / s):Coeff) + ((r.val % s): Coeff) = r := by
-  rw [← Nat.cast_mul, ← Nat.cast_add]
-  nth_rewrite 3 [← ZMod.natCast_zmod_val r]
-  congr 1; exact Nat.div_add_mod r.val s
+  simpa only [Nat.cast_add, Nat.cast_mul, ZMod.natCast_zmod_val] using
+    congrArg (Nat.cast : ℕ → Coeff) (Nat.div_add_mod r.val s)
 
 private theorem power2RoundCoeff_eq (r : Coeff) {r1 : ℕ} {r0 : ℤ}
   (hdecomp : power2RoundCoeff r = (r1, r0)) :

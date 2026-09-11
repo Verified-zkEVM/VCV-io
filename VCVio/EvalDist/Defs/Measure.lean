@@ -178,7 +178,7 @@ theorem lintegral_toMeasure {g : α → ENNReal} (hg : Measurable g) :
     ∫⁻ x, g x ∂p.toMeasure = ∑' x, p x * g x := by
   rw [toMeasure, Measure.lintegral_dropNone _ hg]
   refine (PMF.lintegral_toMeasure p.toPMF (g := fun o => o.elim 0 g)
-    (Option.measurable_elim (f := fun o => o.elim 0 g) measurable_const fun s hs => hg hs)).trans ?_
+    (by fun_prop)).trans ?_
   rw [tsum_option _ ENNReal.summable]
   simp [SPMF.apply_eq_toPMF_some]
 
@@ -208,8 +208,7 @@ theorem toMeasure_injective [MeasurableSingletonClass α] :
 /-- The successful-output measure commutes with measurable maps. -/
 theorem toMeasure_map {β : Type u} [MeasurableSpace β] (f : α → β) (hf : Measurable f) :
     (f <$> p).toMeasure = p.toMeasure.map f := by
-  have hOptionMap : Measurable (Option.map f) :=
-    Option.measurable_elim measurable_const (Option.measurable_some.comp hf)
+  have hOptionMap : Measurable (Option.map f) := by fun_prop
   ext s hs
   rw [toMeasure, SPMF.toPMF_map]
   change (p.toPMF.map (Option.map f)).toMeasure.dropNone s = _
@@ -280,7 +279,6 @@ theorem toSPMF_apply [Countable α] [DiscreteMeasurableSpace α]
   rw [toSPMF, SPMF.apply_eq_toPMF_some, SPMF.toPMF_mk, Measure.toPMF_apply,
     Measure.withFailure_apply_some]
 
-@[simp]
 theorem toSPMF_apply_none [Countable α] [DiscreteMeasurableSpace α]
     (μ : Measure α) (hμ : μ Set.univ ≤ 1) :
     (μ.toSPMF hμ).run none = 1 - μ Set.univ := by

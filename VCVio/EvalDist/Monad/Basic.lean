@@ -61,7 +61,7 @@ lemma mem_finSupport_pure_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [Has
 lemma mem_finSupport_pure_iff' [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [HasEvalFinset m]
     [DecidableEq α] (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
-@[simp, grind =, game_rule]
+@[grind =, game_rule]
 lemma evalSPMF_pure [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] {α : Type u} (x : α) :
     𝒮[(pure x : m α)] = pure x := by simp [evalSPMF]
 
@@ -177,7 +177,7 @@ lemma mem_finSupport_bind_iff [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [Has
     [DecidableEq α] [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
 
-@[simp, grind =, game_rule]
+@[grind =, game_rule]
 lemma evalSPMF_bind [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF] (mx : m α) (my : α → m β) :
     𝒮[mx >>= my] = 𝒮[mx] >>= fun x => 𝒮[my x] :=
   monadLift_bind mx my
@@ -385,19 +385,16 @@ section support
 
 variable [MonadLiftT m SetM] [LawfulMonadLiftT m SetM]
 
-@[simp]
 lemma support_bind_const (mx : m α) (my : m β) :
     support (mx >>= fun _ => my) = {y ∈ support my | (support mx).Nonempty} := by
   grind [= Set.Nonempty]
 
-@[simp]
 lemma finSupport_bind_const [HasEvalFinset m]
     [DecidableEq β] [DecidableEq α] (mx : m α) (my : m β) :
     finSupport (mx >>= fun _ => my) = if (finSupport mx).Nonempty then finSupport my else ∅ := by
-  split_ifs with h
-  · obtain ⟨x, hx⟩ := h
-    aesop
-  · aesop
+  ext x
+  simp only [finSupport_bind, Finset.mem_biUnion]
+  split_ifs <;> simp_all [Finset.nonempty_def]
 
 end support
 
@@ -420,11 +417,8 @@ instance instLawfulEvalDistSemanticsOfMonadLiftTSPMF : LawfulEvalDistSemantics m
 lemma probOutput_bind_of_const (mx : m α)
     {my : α → m β} {y : β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[= y | my x] = r) :
     Pr[= y | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
-  rw [probOutput_bind_eq_tsum, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
-  refine tsum_congr fun x => ?_
-  by_cases hx : x ∈ support mx
-  · aesop
-  · aesop
+  rw [probOutput_bind_eq_expectedValue, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
+  exact expectedValue_congr_of_support h
 
 @[simp, grind =_]
 lemma probOutput_bind_const (mx : m α) (my : m β) (y : β) :
@@ -435,11 +429,8 @@ lemma probEvent_bind_of_const (mx : m α)
     {my : α → m β} {p : β → Prop} {r : ℝ≥0∞}
     (h : ∀ x ∈ support mx, Pr[ p | my x] = r) :
     Pr[ p | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
-  rw [probEvent_bind_eq_tsum, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
-  refine tsum_congr fun x => ?_
-  by_cases hx : x ∈ support mx
-  · aesop
-  · aesop
+  rw [probEvent_bind_eq_expectedValue, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
+  exact expectedValue_congr_of_support h
 
 @[simp, grind =_]
 lemma probEvent_bind_const (mx : m α) (my : m β) (p : β → Prop) :
@@ -951,9 +942,8 @@ variable [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
 @[simp]
 lemma tsum_probOutput_pure_mul (y : α) (f : α → ℝ≥0∞) :
     ∑' z, Pr[= z | (pure y : m α)] * f z = f y := by
-  have : DecidableEq α := Classical.decEq α
-  rw [tsum_eq_single y fun z hz => by rw [probOutput_pure, if_neg hz, zero_mul]]
-  rw [probOutput_pure_self, one_mul]
+  classical
+  simp
 
 /-- Tonelli-style rearrangement: the expectation of a nonnegative functional under a
 `bind` is the outer expectation of the inner expectations. -/
@@ -968,10 +958,8 @@ lemma tsum_probOutput_bind_mul (mx : m α) (g : α → m β) (f : β → ℝ≥0
 precomposed with the map. -/
 lemma tsum_probOutput_map_mul [LawfulMonad m] (mx : m α) (f : α → β) (g : β → ℝ≥0∞) :
     ∑' z, Pr[= z | f <$> mx] * g z = ∑' x, Pr[= x | mx] * g (f x) := by
-  rw [map_eq_bind_pure_comp, tsum_probOutput_bind_mul]
-  refine tsum_congr fun x => ?_
-  simp only [Function.comp_apply]
-  rw [tsum_probOutput_pure_mul]
+  simp only [map_eq_bind_pure_comp, tsum_probOutput_bind_mul, Function.comp_apply,
+    tsum_probOutput_pure_mul]
 
 omit [Monad m] [LawfulMonadLiftT m SPMF] in
 /-- Expectation is monotone in the functional. -/
@@ -994,11 +982,8 @@ lemma tsum_probOutput_mul_of_const_on_support [MonadLiftT m SetM] [EvalDistCompa
     (mx : m α) {c : ℝ≥0∞}
     {F : α → ℝ≥0∞} (hconst : ∀ z ∈ support mx, F z = c) (hmass : Pr[⊥ | mx] = 0) :
     ∑' z, Pr[= z | mx] * F z = c := by
-  have hsum : (∑' z, Pr[= z | mx] * F z) = ∑' z, Pr[= z | mx] * c := by
-    refine tsum_congr fun z => ?_
-    by_cases hz : z ∈ support mx
-    · rw [hconst z hz]
-    · rw [probOutput_eq_zero_of_not_mem_support hz, zero_mul, zero_mul]
-  rw [hsum, ENNReal.tsum_mul_right, tsum_probOutput_eq_one' hmass, one_mul]
+  change expectedValue mx F = c
+  rw [expectedValue_congr_of_support hconst]
+  rw [expectedValue_def, ENNReal.tsum_mul_right, tsum_probOutput_eq_one' hmass, one_mul]
 
 end tsum_probOutput_mul

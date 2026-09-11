@@ -19,7 +19,6 @@ postcondition, also under a finite sum, and `wp_eq_expectedValue` is the bridge 
 public section
 
 open ENNReal OracleSpec OracleComp
-open Lean.Order
 open OracleComp.ProgramLogic
 open scoped OracleComp.ProgramLogic
 
@@ -42,5 +41,30 @@ example (oa : OracleComp spec α) (f g : Fin 3 → α → ℝ≥0∞) (h : ∀ s
 example (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp oa post = OracleComp.EvalDist.expectedValue oa post :=
   wp_eq_expectedValue oa post
+
+/-- Support-aware descent exposes exactly the hypothesis needed by the continuation. -/
+example (oa : OracleComp spec α) (f g : α → ℝ≥0∞)
+    (h : ∀ x ∈ support oa, f x ≤ g x) : wp oa f ≤ wp oa g := by
+  gcongr with x hx
+  guard_hyp hx : x ∈ support oa
+  guard_target = f x ≤ g x
+  exact h x hx
+
+example (oa : OracleComp spec α) (f g : Fin 3 → α → ℝ≥0∞)
+    (h : ∀ i, ∀ x ∈ support oa, f i x ≤ g i x) :
+    ∑ i, wp oa (f i) ≤ ∑ i, wp oa (g i) := by
+  gcongr with i _ x hx
+  exact h i x hx
+
+/-- Raw Loom syntax needs an explicit façade change before congruence descent. -/
+example (oa : OracleComp spec α) (f g : α → ℝ≥0∞)
+    (h : ∀ x ∈ support oa, f x ≤ g x) :
+    Std.Do'.wp oa f Lean.Order.bot ≤ Std.Do'.wp oa g Lean.Order.bot := by
+  change wp oa f ≤ wp oa g
+  gcongr with x hx
+  exact h x hx
+
+example [Finite α] (oa : OracleComp spec α) (post : α → ℝ≥0∞)
+    (hpost : ∀ x, post x ≠ ⊤) : wp oa post ≠ ⊤ := by finiteness
 
 end VCVioTest.ProgramLogicGCongr

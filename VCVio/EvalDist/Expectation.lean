@@ -6,6 +6,7 @@ Authors: Devon Tuma
 module
 
 public import VCVio.EvalDist.Monad.Map
+public import ToMathlib.Data.ENNReal.Finiteness
 
 /-!
 # Expected values of `ℝ≥0∞`-valued functionals
@@ -41,28 +42,18 @@ variable [LawfulMonadLiftT m SPMF]
 @[simp] theorem expectedValue_pure (x : α) (g : α → ℝ≥0∞) :
     expectedValue (pure x : m α) g = g x := by
   classical
-  rw [expectedValue]
-  refine (tsum_eq_single x fun y hy => ?_).trans ?_
-  · rw [probOutput_pure, if_neg hy, zero_mul]
-  · rw [probOutput_pure_self, one_mul]
+  simp [expectedValue_def]
 
 /-- The tower property: averaging a bind is averaging the inner averages. -/
 theorem expectedValue_bind (mx : m α) (my : α → m β) (g : β → ℝ≥0∞) :
     expectedValue (mx >>= my) g = expectedValue mx fun x => expectedValue (my x) g := by
-  simp only [expectedValue, probOutput_bind_eq_tsum]
-  calc ∑' y : β, (∑' x : α, Pr[= x | mx] * Pr[= y | my x]) * g y
-      = ∑' (y : β) (x : α), Pr[= x | mx] * (Pr[= y | my x] * g y) := by
-        refine tsum_congr fun y => ?_
-        rw [← ENNReal.tsum_mul_right]
-        exact tsum_congr fun x => by ring
-    _ = ∑' (x : α) (y : β), Pr[= x | mx] * (Pr[= y | my x] * g y) := ENNReal.tsum_comm
-    _ = ∑' x : α, Pr[= x | mx] * ∑' y : β, Pr[= y | my x] * g y :=
-        tsum_congr fun _ => ENNReal.tsum_mul_left
+  simp only [expectedValue_def, probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_right,
+    ← ENNReal.tsum_mul_left, mul_assoc]
+  exact ENNReal.tsum_comm
 
-theorem expectedValue_map [LawfulMonad m] (mx : m α) (f : α → β)
+@[simp] theorem expectedValue_map [LawfulMonad m] (mx : m α) (f : α → β)
     (g : β → ℝ≥0∞) : expectedValue (f <$> mx) g = expectedValue mx fun x => g (f x) := by
-  rw [map_eq_bind_pure_comp, expectedValue_bind]
-  exact tsum_congr fun x => by simp only [Function.comp_apply, expectedValue_pure]
+  simp only [map_eq_bind_pure_comp, expectedValue_bind, Function.comp_apply, expectedValue_pure]
 
 /-- A bound that holds for every inner average bounds the bind. -/
 theorem expectedValue_bind_le_of_le {mx : m α} {my : α → m β}
@@ -71,6 +62,22 @@ theorem expectedValue_bind_le_of_le {mx : m α} {my : α → m β}
   rw [expectedValue_bind]; exact expectedValue_le_of_le mx h
 
 end lawful
+
+omit [Monad m] in
+/-- A finite-valued functional on a finite result type has finite expectation. -/
+@[aesop (rule_sets := [finiteness]) safe apply]
+theorem expectedValue_ne_top_of_finite [Finite α] (mx : m α) {g : α → ℝ≥0∞}
+    (hg : ∀ x, g x ≠ ⊤) : expectedValue mx g ≠ ⊤ := by
+  classical
+  let := Fintype.ofFinite α
+  rw [expectedValue_def, tsum_fintype]
+  exact ENNReal.sum_ne_top.mpr fun x _ => ENNReal.mul_ne_top probOutput_ne_top (hg x)
+
+omit [Monad m] in
+/-- A supplied finite uniform bound on a functional gives a finite expectation. -/
+theorem expectedValue_ne_top_of_le (mx : m α) {g : α → ℝ≥0∞} {c : ℝ≥0∞}
+    (hc : c ≠ ⊤) (hg : ∀ x, g x ≤ c) : expectedValue mx g ≠ ⊤ :=
+  ne_top_of_le_ne_top hc (expectedValue_le_of_le mx hg)
 
 omit [Monad m] in
 /-- A constant functional averages to itself, provided no mass is lost to failure. -/

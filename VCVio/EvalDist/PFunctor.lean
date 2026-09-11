@@ -103,7 +103,6 @@ theorem evalSPMF_lift [P.IsProbabilitySpec] (operation : P.A) :
 
 /-- A single operation on a uniform polynomial interface evaluates to the
 canonical uniform distribution on its directions. -/
-@[simp]
 theorem evalSPMF_lift_eq_uniform [h : P.IsUniformSpec] (operation : P.A) :
     𝒮[(FreeM.lift operation : FreeM P (P.B operation))] =
       (PMF.uniformOfFintype (P.B operation) : SPMF (P.B operation)) := by

@@ -232,7 +232,6 @@ lemma roImpl_run_none [DecidableEq M] [DecidableEq Commit]
   simp [roImpl, StateT.run_bind, StateT.run_get, StateT.run_set, hcache]
 
 /-- A forwarded uniform query preserves the simulator state throughout its support. -/
-@[simp]
 lemma mem_support_unifForward_run_iff
     (n : unifSpec.Domain) (st : SimState M Commit Chal)
     (z : unifSpec.Range n × SimState M Commit Chal) :
@@ -247,7 +246,6 @@ lemma mem_support_unifForward_run_iff
     exact Prod.ext (Eq.refl _) hz
 
 /-- A forwarded uniform query runs in the wrapped target without changing simulator state. -/
-@[simp]
 lemma simulateQ_unifForward_add_roImpl_query_inl_run
     [DecidableEq M] [DecidableEq Commit]
     (n : unifSpec.Domain) (st : SimState M Commit Chal) :

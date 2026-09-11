@@ -683,7 +683,7 @@ private theorem simulateQ_ofFnM {ι α : Type} {spec : OracleSpec ι} {k : ℕ}
 
 /-- Every authentication path produced by honest FORS signing has the FIPS-prescribed length
 `a`. -/
-@[simp] theorem forsSign_authPath_length (prims : Primitives p) (md : List Byte)
+theorem forsSign_authPath_length (prims : Primitives p) (md : List Byte)
     (sk : prims.SkSeed) (pk : prims.PkSeed) (adrs : Adrs) (i : Fin p.k) :
     ((forsSign prims md sk pk adrs)[i.val]).auth.toList.length = p.a := by
   simp
