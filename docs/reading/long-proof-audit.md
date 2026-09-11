@@ -29,7 +29,7 @@ The work is split into the following review stages:
 | BR93 | Shared transcript experiment, observation identities, and event inclusion | [#693](https://github.com/Verified-zkEVM/VCVio/pull/693) |
 | PRF tag/reader | Native table laws, composed lazy/eager bridges, and shared observations | [#694](https://github.com/Verified-zkEVM/VCVio/pull/694) |
 | KEM–DEM | Probability-free games and shared native hybrid argument | [#695](https://github.com/Verified-zkEVM/VCVio/pull/695) |
-| Stateful Fiat–Shamir | Shared structural outcome relation and pure invariant preservation | [Chain.lean](../../VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain.lean) |
+| Stateful Fiat–Shamir | Shared structural outcome relation and pure invariant preservation | [Chain/Simulation.lean](../../VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Chain/Simulation.lean) |
 
 Using the same lexical body measurement as the initial audit:
 
