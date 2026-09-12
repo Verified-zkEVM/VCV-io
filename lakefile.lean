@@ -410,7 +410,8 @@ script test (args) do
     #["exe", "slhdsa_fors_witness_tests"],
     #["exe", "slhdsa_xmss_witness_tests"],
     #["exe", "slhdsa_hypertree_witness_tests"],
-    #["exe", "slhdsa_scheme_witness_tests"]]
+    #["exe", "slhdsa_scheme_witness_tests"],
+    #["exe", "slhdsa_hmsg_witness_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -538,6 +539,18 @@ is required to fail at the other forgery *site*, and the arm selection is pinned
 signatures that share a digest and take different arms. -/
 lean_exe slhdsa_scheme_witness_tests where
   root := `HashSigTest.SLHDSA.SchemeWitnesses
+
+/-- `H_msg` interleaved-target-subset-resilience bridge: over the scheme-dispatch fixture's own
+two-layer profile, with two FORS trees and an `H_msg` that reads all four of its FIPS arguments, the
+two coordinate maps an ITSR index supplies are matched against hand-written `Adrs` tables and shown
+jointly injective over all sixty-four indices of the profile while neither is injective alone; the
+two conjuncts of the winning condition are falsified separately and one candidate wins; the
+first-uncovered-index extractor is run against four target sets that leave the first index
+uncovered, the second, both and neither; and the widening of the hashed input is exhibited in both
+directions — equivalent to the source's shape inside one key pair, and broken by one target query
+for a bundle whose `H_msg` ignores the key pair, which the fixture's own bundle refuses. -/
+lean_exe slhdsa_hmsg_witness_tests where
+  root := `HashSigTest.SLHDSA.HmsgWitnesses
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
