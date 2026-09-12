@@ -7,6 +7,7 @@ Authors: Quang Dao
 module
 public import VCVio.OracleComp.Runtime
 public import VCVio.EvalDist.WithFailure
+public import VCVio.EvalDist.FailureMeasure
 
 /-! # Stateful runtime producer regressions
 
@@ -56,5 +57,17 @@ theorem counter_observations :
   simp [program,
     QueryImpl.Stateful.runState, OracleComp.withQueryLog, monad_norm]
   rfl
+
+/-- Returning `none` is a successful return, distinct from missing runtime mass. -/
+theorem returnedNone_is_not_runtimeFailure :
+    evalDistWithFailure (pure none : SPMF (Option Bool)) {some none} = 1 ∧
+      evalDistWithFailure (pure none : SPMF (Option Bool)) {none} = 0 := by
+  simp [evalDistWithFailure_some, evalDistWithFailure_none, evalDist_pure]
+
+/-- Runtime failure does not masquerade as a successfully returned `none`. -/
+theorem runtimeFailure_has_no_returnedValue :
+    evalDistWithFailure (failure : SPMF (Option Bool)) {some none} = 0 ∧
+      evalDistWithFailure (failure : SPMF (Option Bool)) {none} = 1 := by
+  simp [evalDistWithFailure_some, evalDistWithFailure_none, evalDist_failure]
 
 end VCVioTest.Runtime
