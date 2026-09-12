@@ -316,7 +316,7 @@ theorem euf_cma_security
         ((qSign + qHash : ℕ) : ENNReal) *
           GPVHashAndSign.programmedPreimageAdvantage
             (falconPSF p prims) hr exactMatchReduction +
-        GPVHashAndSign.collisionBound Salt qSign +
+        GPVHashAndSign.collisionBound Salt qSign qHash +
         samplerLoss := by
   let _ := qSign
   let _ := qHash
@@ -327,8 +327,8 @@ theorem euf_cma_security
 /-- Concrete instantiation of `euf_cma_security` with the Falcon-specified 40-byte
 (320-bit) salt.
 
-The collision term specializes to `qSign² / (2 · 2^320)`. For the Falcon-specified
-maximum of `qSign = 2^64` signing queries, this is `≤ 2^{-193}`. -/
+The collision term specializes to `(qSign + qHash)² / (2 · 2^320)`; for the Falcon-specified
+maximum of `qSign = 2^64` signing queries it remains negligible. -/
 theorem euf_cma_security_bytes40
     [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
@@ -353,7 +353,7 @@ theorem euf_cma_security_bytes40
         ((qSign + qHash : ℕ) : ENNReal) *
           GPVHashAndSign.programmedPreimageAdvantage
             (falconPSF p prims) hr exactMatchReduction +
-        GPVHashAndSign.collisionBound (Bytes 40) qSign +
+        GPVHashAndSign.collisionBound (Bytes 40) qSign qHash +
         samplerLoss :=
   euf_cma_security p prims (Bytes 40) hr qSign qHash samplerLoss hSamplerLoss adv hQ
 
