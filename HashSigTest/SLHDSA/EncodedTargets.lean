@@ -6,6 +6,7 @@ Authors: Alexander Hicks
 
 module
 public import HashSig.SLHDSA.Security.EncodedTargets
+public import HashSigTest.SLHDSA.EncoderFixtures
 
 /-!
 # SLH-DSA encoded target-ledger canaries
@@ -35,21 +36,17 @@ public section
 
 namespace SLHDSA.EncodedTargetsTest
 
-open Security Concrete
+open Security Concrete EncoderFixtures
 
 def ensure (label : String) (condition : Bool) : IO Unit :=
   unless condition do
     throw (IO.userError s!"encoded target-ledger check failed: {label}")
 
-/-! ## The encoders each bundle installs -/
+/-! ## Profiles
 
-theorem adrsToKey_sha2 (p : Params) (a : Adrs) :
-    (sha2Primitives p).adrsToKey a = sha2AdrsKey a := rfl
-
-theorem adrsToKey_shake (p : Params) (a : Adrs) :
-    (shakePrimitives p).adrsToKey a = Adrs.toVector a := rfl
-
-/-! ## Profiles -/
+The two tweak-map bridges `adrsToKey_sha2` / `adrsToKey_shake` and the deep separating profile
+come from `HashSigTest.SLHDSA.EncoderFixtures`, which shares them with the WOTS+ witness
+canaries. -/
 
 /-- Two layers of height two, two FORS trees of height two. -/
 def twoLayerParams : Params :=
@@ -80,13 +77,9 @@ theorem oneLayerApprovedAddressBounds : ApprovedAddressBounds oneLayerParams :=
 
 /-! ### A profile SHA-2's compressed layout cannot hold
 
-The two encoders need different amounts of the parameter set, and this profile separates them: its
-hypertree carries ninety tree-index bits, which the canonical twelve-byte tree word holds and the
-compressed eight-byte one does not. -/
-
-def deepParams : Params := { n := 16, h := 99, d := 11, hp := 9, a := 12, k := 14, lgw := 4 }
-
-def deep : ValidatedParams := ⟨deepParams, by decide⟩
+The two encoders need different amounts of the parameter set, and `EncoderFixtures.deep`
+separates them: its hypertree carries ninety tree-index bits, which the canonical twelve-byte tree
+word holds and the compressed eight-byte one does not. -/
 
 theorem deepCanonicalBounds : CanonicalAddressBounds deepParams :=
   ⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩
@@ -109,16 +102,10 @@ internal-node targets, and the total SHA-2 key projection maps both to the all-z
 theorem deep_sha2_conditions_false :
     ¬ EncodedTargetLedgerConditions deep (sha2Primitives deep.params) := by
   intro hconditions
-  have hbound : ∀ t : ℕ, t < 2 ^ 64 + 2 → t < 2 ^ layerTreeHeight deep 0 := by
-    intro t ht
-    have hle : (2 : ℕ) ^ 64 + 2 ≤ 2 ^ layerTreeHeight deep 0 := by
-      rw [show layerTreeHeight deep 0 = 90 from by decide]
-      norm_num
-    omega
   let c₁ : LayerTreeCoord deep :=
-    ⟨⟨0, by decide⟩, ⟨2 ^ 64, hbound _ (by norm_num)⟩⟩
+    ⟨⟨0, by decide⟩, ⟨2 ^ 64, deep_tree_bound _ (by norm_num)⟩⟩
   let c₂ : LayerTreeCoord deep :=
-    ⟨⟨0, by decide⟩, ⟨2 ^ 64 + 1, hbound _ (by norm_num)⟩⟩
+    ⟨⟨0, by decide⟩, ⟨2 ^ 64 + 1, deep_tree_bound _ (by norm_num)⟩⟩
   have hz : (0 : ℕ) < 1 := by norm_num
   have hzh : (1 : ℕ) ≤ deepParams.hp := by decide
   have hidx : (0 : ℕ) < 2 ^ (deepParams.hp - 1) := Nat.two_pow_pos _
@@ -126,20 +113,13 @@ theorem deep_sha2_conditions_false :
   have hm₂ := mem_xmssNodeAddresses deep c₂ hz hzh hidx
   have hinj := (encodeTargets_nodup_iff_injOn (sha2Primitives deepParams)
     (xmssNodeAddresses deep) (xmssNodeAddresses_nodup deep)).1 hconditions.xmssH
-  have hzero : ∀ a : Adrs, Adrs.Fits 8 a.tree = false → sha2AdrsKey a = zeroBytes 22 := by
-    intro a ha
-    unfold sha2AdrsKey Adrs.compressSha2Checked
-    by_cases h1 : a.isCanonical = false
-    · simp [h1]
-    · by_cases h2 : Adrs.Fits 1 a.layer = false
-      · simp [h1, h2]
-      · simp [h1, h2, ha]
   have htree₁ : (xmssNodeAdrs c₁.toAdrs 1 0).tree = 2 ^ 64 := rfl
   have htree₂ : (xmssNodeAdrs c₂.toAdrs 1 0).tree = 2 ^ 64 + 1 := rfl
   have heq : xmssNodeAdrs c₁.toAdrs 1 0 = xmssNodeAdrs c₂.toAdrs 1 0 := by
     refine hinj _ hm₁ _ hm₂ ?_
-    rw [adrsToKey_sha2, adrsToKey_sha2, hzero _ (by rw [htree₁]; decide),
-      hzero _ (by rw [htree₂]; decide)]
+    rw [adrsToKey_sha2, adrsToKey_sha2,
+      sha2AdrsKey_eq_zero_of_tree_overflow _ (by rw [htree₁]; decide),
+      sha2AdrsKey_eq_zero_of_tree_overflow _ (by rw [htree₂]; decide)]
   have hcontra := congrArg Adrs.tree heq
   rw [htree₁, htree₂] at hcontra
   omega
