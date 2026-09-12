@@ -140,6 +140,7 @@ public import VCVio.EvalDist.Defs.AlternativeMonad
 public import VCVio.EvalDist.Defs.Basic
 public import VCVio.EvalDist.Defs.Instances
 public import VCVio.EvalDist.Defs.Measure
+public import VCVio.EvalDist.Defs.Measure.Core
 public import VCVio.EvalDist.Defs.NeverFails
 public import VCVio.EvalDist.Defs.Semantics
 public import VCVio.EvalDist.Defs.Support
@@ -162,6 +163,7 @@ public import VCVio.EvalDist.MeasureTVDist
 public import VCVio.EvalDist.Monad.Basic
 public import VCVio.EvalDist.Monad.Disagreement
 public import VCVio.EvalDist.Monad.Map
+public import VCVio.EvalDist.Monad.Measure
 public import VCVio.EvalDist.Monad.Seq
 public import VCVio.EvalDist.Option
 public import VCVio.EvalDist.PFunctor

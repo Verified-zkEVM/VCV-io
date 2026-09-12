@@ -9,7 +9,14 @@ Mathlib measures for closed denotations, kernels for environment/state-indexed c
 effect-preserving outcome types for transformers, and keep `Pr[...]` as the discrete compatibility
 surface. [`docs/reading/`](../reading/README.md) indexes the full design record.
 
-The primary notation is measure-valued: `𝒟[mx] : Measure α`. The finite distribution API is
+The primary notation is measure-valued: `𝒟[mx] : Measure α`. The generic classes and Giry laws
+live in `VCVio.EvalDist.Defs.Measure.Core`; the direct free-program instances live in
+`VCVio.EvalDist.PFunctorMeasure.Core`. These core modules do not import a PMF/SPMF backend.
+`VCVio.EvalDist.Monad.Measure` provides `evalDist_bind_bind_swap` for jointly measurable
+continuations and `evalDist_bind_bind_bind_rotate` for discrete intermediate results. Their
+measure-level proofs use Tonelli's theorem and preserve subprobability mass.
+
+The finite distribution API is
 explicit as `evalSPMF mx` / `𝒮[mx]`, and `Pr[...]` remains the discrete compatibility façade. One
 class connects the two: `DiscreteEvalDistCompatible m` says that integrating a measurable
 functional against `𝒟[mx]` is the façade expectation `∑' x, Pr[= x | mx] * g x`. Everything else
@@ -45,7 +52,7 @@ with `{none}` mass `Pr[⊥ | mx]`, the success mass of `bind`/`map` in `expected
 
 | Definition | Type | Notation | Defined in |
 |-----------|------|----------|------------|
-| `evalDist mx` | `Measure α` | `𝒟[mx]` | `EvalDist/Defs/Measure.lean` |
+| `evalDist mx` | `Measure α` | `𝒟[mx]` | `EvalDist/Defs/Measure/Core.lean` |
 | `evalSPMF mx` | `SPMF α` | `𝒮[mx]` | `EvalDist/Defs/Basic.lean` |
 | `probOutput mx x` | `ℝ≥0∞` | `Pr[= x \| mx]` | `EvalDist/Defs/Basic.lean` |
 | `probEvent mx p` | `ℝ≥0∞` | `Pr[p \| mx]` | `EvalDist/Defs/Basic.lean` |
