@@ -638,7 +638,7 @@ theorem findForsTreeCollision_eq_none_imp (prims : Primitives p) [DecidableEq pr
   exact absurd this (by simp)
 
 /-- **Extractor soundness.**  The witness `findForsWitness` returns satisfies `ForsWitness.Valid`
-against the honest tree at `adrs` and the forged digest `md`.
+against the honest tree at `adrs` and the digest `md`.
 
 The public-key hypothesis is used only by the `T_k` branch, where it supplies the equality of the
 two compressions; the other two branches are guarded by the root-vector test the extractor

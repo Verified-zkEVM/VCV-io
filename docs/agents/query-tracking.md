@@ -19,6 +19,18 @@ stopping-time argument used when an adaptive prefix and a transcript-dependent s
 lazy random function. Protocol-specific files should instantiate this theorem rather than copy its
 cache/log induction.
 
+`measure_adaptivePrefixRunFrom_le` proves this bound for any lawful measure semantics with
+uniform query measures and a measurable terminal event. Its proof uses a bad-event decomposition
+of a Lebesgue integral. The original `probEvent_adaptivePrefixRunFrom_le` is a compatibility
+corollary. The online-target counterpart is
+`MerkleTreeMultiExtractability.measure_onlineAdaptivePrefixRunFrom_logged_le`; its target set
+is evaluated on the pre-query log.
+
+The structural `QueryCache.log_consistent_append`, `log_consistent_cacheQuery_append`,
+`cache_covered_append`, `cache_covered_cacheQuery_append`, and `domain_bound_cacheQuery` lemmas
+in `CachingLoggingOracle.lean` transport cache/log hypotheses without probability assumptions
+or decidable equality on responses.
+
 ## Main Files
 
 | File | Role |
@@ -280,6 +292,25 @@ ExpectedQueries[ oa in runtime ]
 ```
 
 ## Worked Examples
+
+### Weakening a cost bound
+
+Import `Mathlib.Tactic.GRewrite` to rewrite through `AddWriterT.PathwiseCostAtMost` and
+`AddWriterT.QueryBoundedAboveBy`. Given `h : a ≤ b`, `grw [h] at hcost` weakens a certificate
+with upper bound `a` to one with upper bound `b`. On a goal with upper bound `b`, use
+`grw [← h]` to reduce it to the stronger obligation with upper bound `a`. The computation
+stays fixed; these are implication rules, so `gcongr` also handles an implication between
+the two cost predicates.
+
+`Fischlin/CostAccounting.lean` uses this for early returns and a weighted query charge;
+`OracleComp/QueryTracking/CostModel.lean` uses it for the pure branch of the total-query bound.
+The rule also applies to function-valued cost vectors: `gcongr` leaves the pointwise order goal,
+which can be supplied with `exact h`. Normalize equal bounds with `simpa only` when no weakening
+is needed.
+Lower-bound registrations remain local experiments; use `pathwiseCostAtLeast_mono` or
+`queryBoundedBelowBy_mono` explicitly. The
+[generalized-relation investigation](../reading/generalized-relation-automation.md) records the
+tests and the promotion criteria for additional rules.
 
 ### Fiat-Shamir
 

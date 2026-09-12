@@ -26,7 +26,7 @@ lake exe cache get && lake build
 
 `lake build` covers the seven proof libraries. `./scripts/validate.sh` runs the fast per-PR
 checks locally; add `--lint`, `--test`, or `--axioms` for those CI passes. `lake test` builds the
-test libraries and runs the test executables, and `lake lint` runs the environment linters
+test libraries and runs the test executables, and `lake lint` runs source-style and environment checks
 (see `AGENTS.md`, *Building*).
 
 CI's timed build covers the non-test Lean libraries `ToMathlib`, `VCVio`,

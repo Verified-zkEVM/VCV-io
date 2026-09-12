@@ -52,8 +52,8 @@ structure RelativeMonad (J : C ⥤ D) where
   assoc : ∀ {X Y Z}, ∀ f : (J.obj X) ⟶ (T Y), ∀ g : (J.obj Y) ⟶ (T Z),
     μ (f ≫ μ g) = (μ f) ≫ (μ g) := by aesop_cat
 
-attribute [reassoc (attr := simp)] RelativeMonad.left_unit RelativeMonad.right_unit
-attribute [reassoc (attr := simp)] RelativeMonad.assoc
+attribute [simp, reassoc] RelativeMonad.left_unit RelativeMonad.assoc
+attribute [reassoc (attr := simp)] RelativeMonad.right_unit
 
 namespace RelativeMonad
 

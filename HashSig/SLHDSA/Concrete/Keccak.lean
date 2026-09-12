@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Vitalik Buterin, Nicolas Consigny. All rights reserved.
+Copyright (c) 2026 Vitalik Buterin, Nicolas Consigny, Alexander Hicks. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Vitalik Buterin, Nicolas Consigny
+Authors: Vitalik Buterin, Nicolas Consigny, Alexander Hicks
 -/
 
 module

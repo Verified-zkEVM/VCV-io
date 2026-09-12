@@ -2,6 +2,7 @@
 """Check umbrella validation and restoration without invoking Lake."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -68,6 +69,38 @@ class CheckImportsTests(unittest.TestCase):
         result = self.run_check("printf 'generated\\n' > VCVio.lean\n")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.root / "VCVio.lean").read_text(), dirty)
+
+    def run_real_generator(self, body):
+        source = Path(__file__).with_name("update-lib.sh")
+        shutil.copyfile(source, self.root / "scripts/update-lib.sh")
+        binary = self.root / "bin"
+        binary.mkdir()
+        lake = binary / "lake"
+        lake.write_text("#!/usr/bin/env python3\n" + body)
+        lake.chmod(0o755)
+        env = {**os.environ, "PATH": str(binary) + os.pathsep + os.environ["PATH"]}
+        return subprocess.run(["bash", "scripts/update-lib.sh"], cwd=self.root,
+                              env=env, text=True, capture_output=True, timeout=10)
+
+    def test_generator_continues_after_successful_update_status(self):
+        result = self.run_real_generator('''import pathlib, sys
+args = sys.argv[1:]
+library = args[args.index("--lib") + 1]
+if "--check" in args:
+    assert pathlib.Path(library + ".checked").exists()
+    sys.exit(0)
+pathlib.Path(library + ".checked").touch()
+sys.exit(1)
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual({p.stem for p in self.root.glob("*.checked")},
+                         {Path(p).stem for p in UMBRELLAS})
+
+    def test_generator_does_not_swallow_failed_verification(self):
+        result = self.run_real_generator('''import sys
+sys.exit(7 if "--check" in sys.argv else 1)
+''')
+        self.assertEqual(result.returncode, 7, result.stderr)
 
 
 if __name__ == "__main__":

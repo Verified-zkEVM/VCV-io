@@ -74,11 +74,11 @@ modulus uses the positive representative at the midpoint. For `q = 0`, `ZMod 0` 
 returns the integer itself, following `ZMod.valMinAbs`. -/
 def centeredRepr (x : ZMod q) : ℤ := x.valMinAbs
 
-@[simp] theorem centeredRepr_of_le {x : ZMod q} (h : (x.val : ℤ) ≤ (q : ℤ) / 2) :
+theorem centeredRepr_of_le {x : ZMod q} (h : (x.val : ℤ) ≤ (q : ℤ) / 2) :
     centeredRepr x = x.val := by
   rw [centeredRepr, ZMod.valMinAbs_def_pos, if_pos (by omega)]
 
-@[simp] theorem centeredRepr_of_gt {x : ZMod q} (h : (q : ℤ) / 2 < (x.val : ℤ)) :
+theorem centeredRepr_of_gt {x : ZMod q} (h : (q : ℤ) / 2 < (x.val : ℤ)) :
     centeredRepr x = (x.val : ℤ) - q := by
   rw [centeredRepr, ZMod.valMinAbs_def_pos, if_neg (by omega)]
 

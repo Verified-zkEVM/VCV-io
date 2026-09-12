@@ -7,6 +7,7 @@ Authors: Oleksandr Vovkotrub
 module
 
 public import VCVio.CryptoFoundations.Fischlin.Defs
+import Mathlib.Tactic.GRewrite
 
 /-!
 # Fischlin Transform: Query-Cost Accounting
@@ -125,10 +126,9 @@ private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
           (fun h => ?_))
         (by omega)
       by_cases hh : h.val = 0
-      · simpa [hashStep, hh] using
-          AddWriterT.queryBoundedAboveBy_mono
-            (AddWriterT.queryBoundedAboveBy_pure ((some (ω, resp)) : Option (Chal × Resp)))
-            (Nat.zero_le rest.length)
+      · grw [← Nat.zero_le rest.length]
+        simpa [hashStep, hh] using
+          AddWriterT.queryBoundedAboveBy_pure ((some (ω, resp)) : Option (Chal × Resp))
       · let newBest : Option (Chal × Resp × Fin (2 ^ b)) := match best with
           | none => some (ω, resp, h)
           | some (ω', resp', h') =>
@@ -225,11 +225,9 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
         have htell :
             AddWriterT.PathwiseCostAtMost
               (AddWriterT.addTell (M := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩))
-              w :=
-          AddWriterT.pathwiseCostAtMost_mono
-            (AddWriterT.pathwiseCostAtMost_addTell
-              (m := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩))
-            (hcost _)
+              w := by
+          grw [← hcost ⟨pk, msg, comList, i, chal, resp⟩]
+          exact AddWriterT.pathwiseCostAtMost_addTell _
         refine AddWriterT.pathwiseCostAtMost_bind (w₁ := w) (w₂ := rest.length • w) htell ?_
         intro _
         have hhash :
@@ -251,16 +249,15 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
               (m := m) (runtime ⟨pk, msg, comList, i, chal, resp⟩)) ?_
           intro h
           by_cases hh : h.val = 0
-          · simpa [hh] using
-              AddWriterT.pathwiseCostAtMost_mono
-                (AddWriterT.pathwiseCostAtMost_pure ((some (chal, resp)) : Option (Chal × Resp)))
-                (zero_le)
+          · grw [← (zero_le : 0 ≤ rest.length • w)]
+            simpa [hh] using
+              AddWriterT.pathwiseCostAtMost_pure ((some (chal, resp)) : Option (Chal × Resp))
           · let newBest : Option (Chal × Resp × Fin (2 ^ b)) := match best with
               | none => some (chal, resp, h)
               | some (ω', resp', h') =>
                   if h.val < h'.val then some (chal, resp, h) else some (ω', resp', h')
             simpa [hh, newBest] using ih (best := newBest)
-        exact AddWriterT.pathwiseCostAtMost_mono hhash (by simp [zero_add])
+        simpa only [zero_add] using hhash
       simpa [succ_nsmul'] using
         (AddWriterT.pathwiseCostAtMost_bind (w₁ := 0) (w₂ := w + rest.length • w)
           (AddWriterT.pathwiseCostAtMost_monadLift (m := m) (σ.respond pk sk sc chal))
@@ -436,10 +433,9 @@ theorem sign_usesAtMostRhoCardOmegaQueries
           rcases pair with ⟨ω, resp⟩
           simpa [finish] using AddWriterT.queryBoundedAboveBy_pure
             (m := m) ((comVec i, ω, resp) : Commit × Chal × Resp)
-    exact AddWriterT.queryBoundedAboveBy_mono
+    simpa only [add_zero, hlen] using
       (AddWriterT.queryBoundedAboveBy_bind (n₁ := (FinEnum.toList Chal).length) (n₂ := 0)
         hsearch hcont)
-      (by simp [hlen])
   let commitComp : AddWriterT ℕ m (Fin ρ → Commit × PrvState) :=
     Fin.mOfFn ρ fun _ => (liftM (σ.commit pk sk) : AddWriterT ℕ m (Commit × PrvState))
   have hcommit :
@@ -552,10 +548,9 @@ theorem sign_usesWeightedQueryCostAtMost
           rcases pair with ⟨ω, resp⟩
           simpa [finish] using AddWriterT.pathwiseCostAtMost_pure
             (m := m) ((comVec i, ω, resp) : Commit × Chal × Resp)
-    refine AddWriterT.pathwiseCostAtMost_mono
+    simpa only [add_zero, hlen] using
       (AddWriterT.pathwiseCostAtMost_bind (w₁ := (FinEnum.toList Chal).length • w) (w₂ := 0)
-        hsearch hcont) ?_
-    simp [hlen]
+        hsearch hcont)
   let commitComp : AddWriterT κ m (Fin ρ → Commit × PrvState) :=
     Fin.mOfFn ρ fun _ => (liftM (σ.commit pk sk) : AddWriterT κ m (Commit × PrvState))
   have hcommit :
@@ -611,7 +606,7 @@ theorem sign_usesWeightedQueryCostAtMost
 
 end signCostAccounting
 
-section expectedWeightedQueryCost
+section expectedQueryCost
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
@@ -638,16 +633,6 @@ theorem sign_expectedQueryCost_le
       (costFn := costFn) (w := w) hcost)
     hval
 
-end expectedWeightedQueryCost
-
-section expectedQueries
-
-variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
-  (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
-  [DecidableEq M] [MonadLiftT m SPMF]
-  [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
-
 /-- Fischlin signing has expected query count at most `ρ * |Ω|` in the unit-cost runtime model.
 
 This is the expectation-level counterpart of
@@ -662,7 +647,7 @@ theorem sign_expectedQueries_le_rhoCardOmega
       (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)
       (runtime := runtime) (pk := pk) (sk := sk) (msg := msg))
 
-end expectedQueries
+end expectedQueryCost
 
 section expectedQueriesPMF
 

@@ -135,7 +135,7 @@ theorem extractabilityInner_isTotalQueryBound [DecidableEq α] {s : Skeleton}
     MerkleTreeExtractability.extractabilityInner_isTotalQueryBound
       unitAddressQueryModel (fun _ => ()) 𝒜.toGeneric qb h
 
-theorem extractabilityGame_isTotalQueryBound [DecidableEq α] [IsUniformSpec (spec α)]
+theorem extractabilityGame_isTotalQueryBound [DecidableEq α]
     {s : Skeleton} (𝒜 : Adversary α s) (qb : ℕ) (h : 𝒜.IsTwoPhaseTotalQueryBound qb) :
     IsTotalQueryBound (extractabilityGame 𝒜) (qb + s.depth) := by
   simpa [extractabilityGame, extractabilityInner,
