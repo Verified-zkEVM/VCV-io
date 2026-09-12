@@ -49,6 +49,7 @@ public import HashSig.SLHDSA.Security.ReachableTargets
 public import HashSig.SLHDSA.Security.TargetCounts
 public import HashSig.SLHDSA.Security.TraceTargets
 public import HashSig.SLHDSA.Security.WotsWitnesses
+public import HashSig.SLHDSA.Security.XmssWitnesses
 public import HashSig.SLHDSA.Wots
 public import HashSig.SLHDSA.WotsChecksum
 public import HashSig.SLHDSA.WotsEncoding
