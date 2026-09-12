@@ -171,7 +171,7 @@ theorem queriesWithinConstructionTargets_iff_isQueryBound {vp : ValidatedParams}
     (program : OracleComp (publicHashSpec core) α) :
     QueriesWithinConstructionTargets core program ↔
       program.IsQueryBound () (fun q _ => ConstructionQueryReachable vp core q) (fun _ _ => ()) :=
-  Iff.rfl
+  allQueriesSatisfy_def program _
 
 @[simp]
 theorem QueriesWithinConstructionTargets.pure {vp : ValidatedParams}

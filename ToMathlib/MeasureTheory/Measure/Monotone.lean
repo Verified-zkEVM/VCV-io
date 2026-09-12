@@ -38,6 +38,14 @@ theorem bind_mono_right {μ : Measure α} {f g : α → Measure β}
   rw [Measure.bind_apply hs hf, Measure.bind_apply hs hg]
   exact lintegral_mono_ae <| hfg.mono fun _ hx => hx s
 
+/-- Giry bind preserves pointwise order of almost-everywhere measurable continuations.
+The pointwise hypothesis lets generalized congruence descend into the continuations. -/
+@[gcongr]
+theorem bind_mono_right_of_forall {μ : Measure α} {f g : α → Measure β}
+    (hf : AEMeasurable f μ) (hg : AEMeasurable g μ) (hfg : ∀ x, f x ≤ g x) :
+    μ.bind f ≤ μ.bind g :=
+  bind_mono_right hf hg (Filter.Eventually.of_forall hfg)
+
 private theorem iSup_tsum_of_monotone (f : ℕ → ℕ → ENNReal)
     (hf : ∀ i, Monotone fun n => f n i) :
     (⨆ n, ∑' i, f n i) = ∑' i, ⨆ n, f n i := by

@@ -174,13 +174,20 @@ lemma relTriple_pure_pure {a : α} {b : β} {R : RelPost α β} (h : R a b) :
   · obtain rfl : z = (a, b) := by simpa [support_pure] using hz
     exact h
 
+/-- A computation is related to itself by every postcondition that is reflexive on its support. -/
+lemma relTriple_refl_of_mem_support (oa : OracleComp spec₁ α) {R : RelPost α α}
+    (hR : ∀ a ∈ support oa, R a a) :
+    RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa R := by
+  refine relTriple_iff_relWP.2 ⟨_root_.SPMF.Coupling.refl (𝒮[oa]), fun z hz => ?_⟩
+  obtain ⟨a, ha, hz'⟩ := (mem_support_bind_iff (𝒮[oa]) (fun a => pure (a, a)) z).1 hz
+  obtain rfl : z = (a, a) := by simpa using hz'
+  apply hR a
+  simpa [mem_support_iff, probOutput_def] using ha
+
 /-- Reflexivity rule for relational triples on equality. -/
 lemma relTriple_refl (oa : OracleComp spec₁ α) :
-    RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
-  refine relTriple_iff_relWP.2 ⟨_root_.SPMF.Coupling.refl (𝒮[oa]), fun z hz => ?_⟩
-  obtain ⟨a, -, rfl⟩ : ∃ a ∈ support (𝒮[oa]), (a, a) = z := by
-    simpa [_root_.SPMF.Coupling.refl, support_pure] using hz
-  rfl
+    RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
+  relTriple_refl_of_mem_support oa fun _ _ => rfl
 
 /-- Postcondition monotonicity for relational triples. -/
 lemma relTriple_post_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β} {R R' : RelPost α β}

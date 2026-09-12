@@ -257,7 +257,6 @@ lemma simulateQ_unifForward_add_roImpl_query_inl_run
   exact unifForward_run (M := M) (Commit := Commit) (Chal := Chal) n st
 
 /-- A cached random-oracle query returns its stored answer without changing simulator state. -/
-@[simp]
 lemma simulateQ_unifForward_add_roImpl_query_inr_run_some
     [DecidableEq M] [DecidableEq Commit]
     (mc : M × Commit) (cache : (M × Commit →ₒ Chal).QueryCache)
@@ -271,7 +270,6 @@ lemma simulateQ_unifForward_add_roImpl_query_inr_run_some
 
 /-- An uncached random-oracle query samples a wrapped challenge, caches it, and records its
 input in the simulator log. -/
-@[simp]
 lemma simulateQ_unifForward_add_roImpl_query_inr_run_none
     [DecidableEq M] [DecidableEq Commit]
     (mc : M × Commit) (cache : (M × Commit →ₒ Chal).QueryCache)
@@ -285,7 +283,6 @@ lemma simulateQ_unifForward_add_roImpl_query_inr_run_none
   exact roImpl_run_none (M := M) (Commit := Commit) (Chal := Chal) mc cache log hcache
 
 /-- A routed cached random-oracle query has the unique cached outcome in its support. -/
-@[simp]
 lemma mem_support_simulateQ_unifForward_add_roImpl_query_inr_run_some_iff
     [DecidableEq M] [DecidableEq Commit]
     (mc : M × Commit) (cache : (M × Commit →ₒ Chal).QueryCache)
@@ -303,7 +300,6 @@ lemma mem_support_simulateQ_unifForward_add_roImpl_query_inr_run_some_iff
 
 /-- A routed uncached random-oracle query has exactly the freshly sampled cache-and-log
 updates in its support. -/
-@[simp]
 lemma mem_support_simulateQ_unifForward_add_roImpl_query_inr_run_none_iff
     [DecidableEq M] [DecidableEq Commit]
     (mc : M × Commit) (cache : (M × Commit →ₒ Chal).QueryCache)
