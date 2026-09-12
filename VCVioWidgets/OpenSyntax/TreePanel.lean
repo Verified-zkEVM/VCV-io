@@ -298,6 +298,7 @@ private def latestReadySnap?
   let ⟨ready, _, _⟩ ← snaps.getFinishedPrefix
   return ready.getLast?
 
+/-- Render the selected composition as a tree for a widget request. -/
 @[server_rpc_method]
 def rpc (_props : PanelWidgetProps) : RequestM (RequestTask Html) := do
   let doc ← RequestM.readDoc
@@ -318,6 +319,7 @@ def rpc (_props : PanelWidgetProps) : RequestM (RequestTask Html) := do
 
 end TreePanelWidget
 
+/-- Editor panel displaying the structure of an open-system composition as a tree. -/
 @[widget_module]
 def TreePanel : Component PanelWidgetProps :=
   mk_rpc_widget% TreePanelWidget.rpc

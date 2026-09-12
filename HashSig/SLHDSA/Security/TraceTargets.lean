@@ -172,7 +172,7 @@ theorem queriesWithinConstructionTargets_iff_isQueryBound {vp : ValidatedParams}
     (program : OracleComp (publicHashSpec core) α) :
     QueriesWithinConstructionTargets core program ↔
       program.IsQueryBound () (fun q _ => ConstructionQueryReachable vp core q) (fun _ _ => ()) :=
-  Iff.rfl
+  allQueriesSatisfy_def program _
 
 @[simp]
 theorem QueriesWithinConstructionTargets.pure {vp : ValidatedParams}
@@ -270,7 +270,7 @@ theorem chainM_queriesWithinConstructionTargets {vp : ValidatedParams}
       (chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val) x i s :
         OracleComp (publicHashSpec core) core.Y) := by
   induction s with
-  | zero => trivial
+  | zero => exact QueriesWithinConstructionTargets.pure core x
   | succ s ih =>
       change QueriesWithinConstructionTargets core
         (chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val) x i s >>= fun y =>

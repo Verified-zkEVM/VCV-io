@@ -42,7 +42,7 @@ noncomputable local instance instIsUniformSpecChalFn (M Commit : Type) :
   IsUniformSpec.ofFintypeInhabited _
 
 omit [Fintype Stmt] [Fintype Commit] [Fintype Resp] [Fintype Chal]
-  [Inhabited Stmt] [Inhabited Chal] in
+  [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal] in
 /-- CMA-to-NMA reduction for Fiat-Shamir signatures built from a Sigma protocol.
 
 The reduction runs the CMA adversary with simulated signing transcripts and a
@@ -84,34 +84,34 @@ theorem cma_to_nma_advantage_bound
         (Stateful.statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
           (σ := σ) (hr := hr) (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv))⟩
 
-section evalSPMFBridge
+section probabilityPreservation
 
 variable [SampleableType Chal]
 
-/-- The `ofLift + uniformSampleImpl` simulation on `unifSpec + (Unit →ₒ Chal)` preserves
-`evalSPMF`. Both oracle components sample uniformly from their range. -/
-private lemma evalSPMF_simulateQ_unifChalImpl {α : Type}
-    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) :
-    evalSPMF (simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa) = evalSPMF oa := by
-  apply OracleComp.evalSPMF_simulateQ_eq_evalSPMF
-  rintro (n | u)
-  · simp only [QueryImpl.add_apply_inl, QueryImpl.ofLift_eq_id', QueryImpl.id'_apply]
-    rw [evalSPMF_query (spec := unifSpec + (Unit →ₒ Chal))]
-    exact evalSPMF_query (spec := unifSpec) n
-  · simp only [QueryImpl.add_apply_inr, uniformSampleImpl]
-    exact show (evalSPMF ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
-        SPMF ((ofFn fun _ : Unit => Chal).Range u)) = _ by
-      rw [evalSPMF_uniformSample, evalSPMF_query]; rfl
-
-/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+/-- Forwarding uniform queries and sampling challenge responses preserves event probabilities. -/
 private lemma probEvent_simulateQ_unifChalImpl {α : Type}
     (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
     Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] :=
-  probEvent_congr' (fun _ _ => Iff.rfl) (evalSPMF_simulateQ_unifChalImpl oa)
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
+  classical
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp only [simulateQ_pure, probEvent_pure]
+  | query_bind t cont ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, id_map,
+        OracleQuery.input_query, probEvent_bind_eq_tsum, ih]
+      refine tsum_congr fun u => ?_
+      congr 1
+      cases t with
+      | inl n =>
+          simp only [QueryImpl.add_apply_inl, QueryImpl.ofLift_eq_id', QueryImpl.id'_apply,
+            probOutput_query, ← Nat.card_eq_fintype_card]
+          rfl
+      | inr t =>
+          simp only [QueryImpl.add_apply_inr, uniformSampleImpl]
+          exact probOutput_uniformSample_eq_query (spec := unifSpec + (Unit →ₒ Chal))
+            (.inr t) u
 
-end evalSPMFBridge
+end probabilityPreservation
 
 section nmaToExtraction
 

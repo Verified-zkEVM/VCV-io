@@ -22,6 +22,8 @@ private structure RenderCache where
   resolvedSnippets : Std.HashMap CodeSnippet ResolvedSnippet := {}
   deriving Inhabited
 
+attribute [inherit_doc Inhabited.default] instInhabitedRenderCache.default
+
 private abbrev RenderM := StateT RenderCache MetaM
 
 private def nodeAccent : NodeKind → String
@@ -394,6 +396,7 @@ private def renderHtmlCached (currentModule : Name) (diagram : GameDiagram) : Re
     </div>
   </div>
 
+/-- Render a game diagram with resolved code snippets and editor navigation links. -/
 def GameDiagram.renderHtml (currentModule : Name) (diagram : GameDiagram) : MetaM Html := do
   let (html, _) ← (renderHtmlCached currentModule diagram).run {}
   pure html

@@ -180,7 +180,7 @@ commitment value, which directly witnesses a cache collision. -/
 When `CMExtract` finds an entry `(m', s')` in the commit trace with `H(m', s') = cm`,
 and verification gives `H(m, s) = cm` with `(m', s') ≠ (m, s)`, both distinct inputs
 map to `cm` in the final cache. -/
-private lemma extractability_someWin_implies_collision {t : ℕ} [Finite C] [Inhabited C]
+private lemma extractability_someWin_implies_collision {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     ∀ z ∈ support ((simulateQ cachingOracle (extractabilityInner_tagged A)).run ∅),
       z.1.1 = true → z.1.2 = false → CacheHasCollision z.2 := by
