@@ -30,7 +30,8 @@ encoded union.
 The programs certified here are the WOTS+ ones: `chainM` over any step interval inside
 `[0, w - 1)`, and `wotsPkGenM`, `wotsSignM`, and `wotsPkFromSigM` at any reachable
 `LayerPosition`, the latter three each paired with their total query bounds.  The FORS, XMSS,
-hypertree, and scheme programs are not certified by this module.  The logged-execution theorem
+hypertree, and scheme programs are certified in `HashSig.SLHDSA.Security.ComponentTraces`, which
+builds on the predicate and bridges defined here.  The logged-execution theorem
 applies to any pathwise-certified program interpreted through `QueryImpl.withLogging` over an
 arbitrary deterministic handler `QueryImpl (publicHashSpec core) Id`, and in particular through the
 canonical `PublicHash.impl` of a primitive bundle.  It is the SLH-DSA instance of

@@ -46,10 +46,11 @@ characterizes the node coordinates `mem_forsTreeAddresses` and `mem_xmssNodeAddr
 over.  Whether the construction's free programs query only listed addresses is a separate,
 trace-level statement: `HashSig.SLHDSA.Security.TraceTargets` names the union of the six
 structural ledgers (`constructionAddresses`) and proves it (`QueriesWithinConstructionTargets`)
-for the WOTS+ programs; the FORS, XMSS, hypertree, and scheme programs remain open there.  The
-runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean` checks, for one fixed digest per
-profile, addresses assembled from the construction's address helpers against the ledgers rather
-than running its signing or verification programs.
+for the WOTS+ programs, and `HashSig.SLHDSA.Security.ComponentTraces` proves it for the FORS,
+XMSS, hypertree, and scheme programs.  The runtime canary in
+`HashSigTest/SLHDSA/ReachableTargets.lean` checks, for one fixed digest per profile, addresses
+assembled from the construction's address helpers against the ledgers rather than running its
+signing or verification programs.
 
 The address lists remain structural `Adrs` values.  A concrete primitive maps them to its
 `AdrsKey` only after proving injectivity on the listed reachable family; no global injectivity of
@@ -84,6 +85,11 @@ namespace LayerTreeCoord
 /-- Forget the leaf of a canonical position and retain its containing XMSS tree. -/
 def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord vp :=
   ⟨pos.layer, pos.tree⟩
+
+/-- The unique XMSS tree at the final layer `d - 1`, tree zero, whose root Algorithm 18 publishes
+as the public key. -/
+def top (vp : ValidatedParams) : LayerTreeCoord vp :=
+  ⟨⟨vp.params.d - 1, Nat.sub_one_lt (Nat.pos_iff_ne_zero.mp vp.valid.d_pos)⟩, ⟨0, by positivity⟩⟩
 
 end LayerTreeCoord
 
@@ -206,6 +212,11 @@ theorem toAdrs_tree {vp : ValidatedParams} (coord : LayerTreeCoord vp) :
 @[simp]
 theorem ofPosition_toAdrs {vp : ValidatedParams} (pos : LayerPosition vp) :
     (ofPosition pos).toAdrs = pos.toAdrs := by rfl
+
+/-- The base address of the top tree: layer `d - 1`, tree zero. -/
+@[simp]
+theorem top_toAdrs (vp : ValidatedParams) :
+    (top vp).toAdrs = (Adrs.zero.setLayerAddress (vp.params.d - 1)).setTreeAddress 0 := by rfl
 
 end LayerTreeCoord
 

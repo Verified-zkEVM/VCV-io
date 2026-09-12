@@ -403,7 +403,8 @@ script test (args) do
     #["exe", "slhdsa_external_tests"],
     #["exe", "slhdsa_target_ledger_tests"],
     #["exe", "slhdsa_encoded_ledger_tests"],
-    #["exe", "slhdsa_trace_target_tests"]]
+    #["exe", "slhdsa_trace_target_tests"],
+    #["exe", "slhdsa_component_trace_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -475,6 +476,12 @@ lean_exe slhdsa_encoded_ledger_tests where
 logged by the WOTS+ programs under both approved primitive bundles lands in the encoded ledger. -/
 lean_exe slhdsa_trace_target_tests where
   root := `HashSigTest.SLHDSA.TraceTargets
+
+/-- FORS, XMSS, hypertree, and internal scheme trace provenance: every `thash` query those programs
+log under both approved primitive bundles lands in the encoded ledger, and the FORS, XMSS, and
+hypertree programs and key generation hit exactly the tweak set the FIPS 205 algorithm visits. -/
+lean_exe slhdsa_component_trace_tests where
+  root := `HashSigTest.SLHDSA.ComponentTraces
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
