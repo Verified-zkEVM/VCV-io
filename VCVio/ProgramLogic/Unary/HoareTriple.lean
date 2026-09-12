@@ -208,19 +208,32 @@ theorem triple_toLE
   rw [List.foldlM_cons, wp_bind]
 
 /-- `wp` is monotone in the postcondition; `gcongr` descends through it. -/
-@[gcongr]
+@[gcongr low]
 theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
     (hpost : ∀ x, post x ≤ post' x) :
     wp oa post ≤ wp oa post' := by
   rw [wp_eq_expectedValue, wp_eq_expectedValue]
   exact OracleComp.EvalDist.expectedValue_mono oa hpost
 
+/-- `wp` is monotone when the postconditions are ordered on the computation's support. -/
+@[gcongr]
+theorem wp_mono_of_support (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
+    (hpost : ∀ x ∈ support oa, post x ≤ post' x) :
+    wp oa post ≤ wp oa post' := by
+  rw [wp_eq_expectedValue, wp_eq_expectedValue]
+  exact OracleComp.EvalDist.expectedValue_mono_of_support hpost
+
+/-- Finite postconditions over a finite result type have finite weakest precondition. -/
+@[aesop (rule_sets := [finiteness]) safe apply]
+theorem wp_ne_top_of_finite [Finite α] (oa : OracleComp spec α) {post : α → ℝ≥0∞}
+    (hpost : ∀ x, post x ≠ ⊤) : wp oa post ≠ ⊤ := by
+  rw [wp_eq_expectedValue]
+  exact OracleComp.EvalDist.expectedValue_ne_top_of_finite oa hpost
+
 @[game_rule] theorem wp_map (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
     wp (f <$> oa) post =
       wp oa (post ∘ f) := by
-  rw [map_eq_bind_pure_comp]
-  rw [wp_bind]
-  simp [Function.comp_def]
+  simp [wp_eq_expectedValue, Function.comp_def]
 
 /-- General unfolding: `wp` as weighted sum over output probabilities. -/
 theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :

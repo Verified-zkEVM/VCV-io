@@ -49,15 +49,21 @@ private def declSearchPatterns (declName : Name) : List String :=
     s!"class {base}"
   ]
 
+/-- Source location that a rendered text or code fragment can reveal in the editor. -/
 structure RevealTarget where
+  /-- URI of the source document to reveal. -/
   uri : Lsp.DocumentUri
+  /-- Source range to select in the editor. -/
   range : Lsp.Range
+  /-- Optional tooltip describing the navigation target. -/
   title? : Option String := none
 
+/-- Plain or Markdown explanatory text with an optional editor navigation target. -/
 inductive ResolvedText where
   | text (contents : String) (target? : Option RevealTarget := none)
   | markdown (contents : String) (target? : Option RevealTarget := none)
 
+/-- Resolved code or documentation content ready for rendering in a diagram. -/
 inductive ResolvedSnippet where
   | interactiveCode (fmt : Widget.CodeWithInfos) (target? : Option RevealTarget := none)
   | code (contents : String) (target? : Option RevealTarget := none)
@@ -66,6 +72,7 @@ inductive ResolvedSnippet where
 
 namespace RevealTarget
 
+/-- Construct an editor navigation target from a resolved declaration anchor. -/
 def ofAnchor (anchor : AnchorRef) (resolved : ResolvedAnchor) : RevealTarget :=
   { uri := resolved.uri, range := anchor.targetRange resolved, title? := some anchor.declName.toString }
 
@@ -110,6 +117,7 @@ private def unresolvedDeclTarget? (currentModule : Name) (declName : Name) :
         | none => searchLines (lineNo + 1) rest
   return searchLines 0 (contents.splitOn "\n")
 
+/-- Locate a declaration in the environment or in the current document's pending source. -/
 def declTarget? (currentModule : Name) (declName : Name) : MetaM (Option RevealTarget) := do
   let anchor := AnchorRef.withSelection <| AnchorRef.result declName
   match (← anchor.resolve? (← Lean.Server.documentUriFromModule? currentModule)) with
@@ -172,6 +180,7 @@ private def prettyExprCode (expr : Expr) : MetaM Widget.CodeWithInfos := do
           |>.set `pp.fullNames false) do
     Widget.ppExprTagged expr
 
+/-- Read explanatory text from its configured source and attach available navigation metadata. -/
 def resolveTextSource (currentModule : Name) (anchor? : Option AnchorRef) (source : TextSource) :
     MetaM (Option ResolvedText) := do
   match source with
@@ -203,6 +212,7 @@ def resolveTextSource (currentModule : Name) (anchor? : Option AnchorRef) (sourc
       | none =>
           return none
 
+/-- Resolve a snippet's code, signature, documentation, or literal text for display. -/
 def resolveSnippet (currentModule : Name) (snippet : CodeSnippet) :
     MetaM ResolvedSnippet := do
   match snippet with

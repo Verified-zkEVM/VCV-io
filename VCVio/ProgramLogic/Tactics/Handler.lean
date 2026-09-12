@@ -24,7 +24,8 @@ open Lean Elab Tactic
 
 namespace OracleComp.ProgramLogic
 
-syntax "handler_step" : tactic
+/-- Normalize one handler layer with the `handler_nf` and `handler_simp` rule sets. -/
+syntax (name := handlerStep) "handler_step" : tactic
 
 elab_rules : tactic
   | `(tactic| handler_step) => do

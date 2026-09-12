@@ -9,6 +9,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "${1:-}" == "--ffi" ]]; then
-  exec "$REPO_ROOT/scripts/validate.sh" --test --ffi
+  shift
+  exec "$REPO_ROOT/scripts/validate.sh" --test --ffi "$@"
 fi
 exec "$REPO_ROOT/scripts/validate.sh" --test "$@"

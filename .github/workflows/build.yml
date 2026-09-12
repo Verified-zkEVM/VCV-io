@@ -64,6 +64,7 @@ jobs:
       - name: Check generated umbrella modules
         run: |
           python3 scripts/test-check-imports.py
+          python3 scripts/test-validation.py
           bash scripts/check-imports.sh
 
   complexity_backend:
@@ -476,7 +477,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Batteries' environment linters over the seven proof libraries (the `lintDriver` in
+        with:
+          fetch-depth: 0
+      # Batteries' environment linters over the seven proof libraries (the lint driver in
       # `lakefile.lean`) import one whole environment per library; run inside `Build Project`
       # they pushed the hosted runner into a shutdown, so they get a fresh runner and the
       # oleans that job saved. `fail-on-cache-miss` keeps a missing cache from turning into a
@@ -498,11 +501,14 @@ jobs:
           use-mathlib-cache: false
       - name: Fetch Mathlib cache
         run: lake exe cache get
-      # One driver process per library bounds peak memory to one environment; `--no-build`
-      # because the oleans come from the restored cache. `scripts/nolints.json` is read from
-      # the repository root by every invocation.
-      - name: Lint each library
+      - name: Test lint orchestration
+        run: python3 scripts/test-lint.py
+      - name: Lint each library and check exact baseline
+        env:
+          LINT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || '' }}
         run: |
-          for lib in ToMathlib VCVio LatticeCrypto Extern HashSig Examples VCVioWidgets; do
-            lake exe runLinter --no-build "$lib"
-          done
+          args=(--env-only --no-build)
+          if [[ -n "$LINT_BASE_REF" ]]; then
+            args+=(--base-ref "$LINT_BASE_REF")
+          fi
+          lake lint -- "${args[@]}"
