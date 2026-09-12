@@ -30,6 +30,7 @@ section or the pinned source tree.
 | [`upstream-alignment.md`](upstream-alignment.md) | Living ledger, re-run at each pin bump | Which of VCVio's general-purpose machinery and tooling does Lean core, Mathlib, Batteries, cslib, or PolyFun already own, and what is the verdict (adopt / keep / upstream / track) for each, with the evidence? Includes a broad reading of the adjacent Mathlib areas and the idioms they suggest. |
 | [`internal-duplication.md`](internal-duplication.md) | Living record | Where does VCVio say the same thing twice *inside* the repository (cost layers, invariant predicates, the two Merkle engines, `OracleSpec` operations versus PolyFun's), which spelling is canonical, and what blocks folding the rest? |
 | [`generalized-relation-automation.md`](generalized-relation-automation.md) | Investigation with tested pilots | How do `gcongr`, `grw`, and related tactics apply to VCVio's relations, which registrations simplify current proofs, and which candidates should remain experimental? |
+| [`long-proof-audit.md`](long-proof-audit.md) | Source audit with compiled experiments | What drives the longest proofs, how much can small automation or shared lemmas remove, and which arguments need deeper refactoring? |
 
 ## Keeping these honest
 
