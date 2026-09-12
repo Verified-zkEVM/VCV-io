@@ -85,7 +85,7 @@ theorem Adversary.runCommitmentsThenAccounting_opening_eq_prefixProgram
 the supplied residual adversarial budget; honest verification contributes only its separately
 justified support-wise overhead. Query logging itself is resource-transparent. -/
 theorem Adversary.terminalExecution_isTotalQueryBound_of_opening
-    [DecidableEq Y] [IsUniformSpec (Query →ₒ Y)]
+    [DecidableEq Y]
     (model : MerkleTreeExtractability.NodeQueryModel Query Address Y)
     {config : Configuration Cfg Address}
     (adversary : Adversary Cfg Query Address Y config)
@@ -121,7 +121,7 @@ theorem Adversary.terminalExecution_isTotalQueryBound_of_opening
 
 /-- Uniform specialization of pointwise terminal accounting. -/
 theorem Adversary.terminalExecution_isTotalQueryBound
-    [DecidableEq Y] [IsUniformSpec (Query →ₒ Y)]
+    [DecidableEq Y]
     (model : MerkleTreeExtractability.NodeQueryModel Query Address Y)
     {config : Configuration Cfg Address}
     (adversary : Adversary Cfg Query Address Y config)

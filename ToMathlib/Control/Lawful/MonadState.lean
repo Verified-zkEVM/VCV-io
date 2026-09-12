@@ -18,7 +18,7 @@ helper lemmas that are still locally useful under the `ToMathlib` import path.
 
 universe u v
 
-@[simp] theorem toMonadState_get_eq_monadStateOf_get {m : Type u → Type v} {σ : Type u}
+theorem toMonadState_get_eq_monadStateOf_get {m : Type u → Type v} {σ : Type u}
     [MonadStateOf σ m] : (MonadState.get : m σ) = MonadStateOf.get :=
   (monadStateOf_get_eq_get (σ := σ) (m := m)).symm
 

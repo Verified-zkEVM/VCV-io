@@ -12,17 +12,27 @@ open Lean Elab Meta
 
 /-- Dormant proof-local hint vocabulary for refining raw game-hop inference. -/
 structure GameHopHint where
+  /-- Exclude the declaration from inferred diagrams. -/
   hide : Bool := false
+  /-- Prefer this declaration when selecting the main game path. -/
   focus : Bool := false
+  /-- Optional replacement for the inferred display title. -/
   title? : Option String := none
+  /-- Optional replacement for the inferred node kind. -/
   kind? : Option NodeKind := none
   deriving Inhabited
 
+/-- A partial update to the diagram hints associated with one declaration. -/
 structure GameHopHintUpdate where
+  /-- Declaration whose hints are updated. -/
   declName : Name
+  /-- Optional update to the declaration's visibility in diagrams. -/
   hide? : Option Bool := none
+  /-- Optional update to the declaration's main-path preference. -/
   focus? : Option Bool := none
+  /-- Optional update to the declaration's display title. -/
   title? : Option String := none
+  /-- Optional update to the declaration's node kind. -/
   kind? : Option NodeKind := none
   deriving Inhabited
 
@@ -32,6 +42,7 @@ private def GameHopHint.applyUpdate (hint : GameHopHint) (update : GameHopHintUp
     title? := update.title? <|> hint.title?
     kind? := update.kind? <|> hint.kind? }
 
+/-- Scoped index of diagram hints, combining updates by declaration name. -/
 initialize gameHopHintExt :
     SimpleScopedEnvExtension GameHopHintUpdate (NameMap GameHopHint) ←
   registerSimpleScopedEnvExtension {
@@ -43,9 +54,13 @@ initialize gameHopHintExt :
     initial := {}
   }
 
+/-- Mark a declaration as hidden from inferred game diagrams. -/
 syntax (name := gameHopHideAttr) "game_hop_hide" : attr
+/-- Prefer a declaration when choosing the main path of an inferred diagram. -/
 syntax (name := gameHopFocusAttr) "game_hop_focus" : attr
+/-- Set the title used to display a declaration in a game diagram. -/
 syntax (name := gameHopTitleAttr) "game_hop_title" str : attr
+/-- Set the node kind used to display a declaration in a game diagram. -/
 syntax (name := gameHopKindAttr) "game_hop_kind" ("game" <|> "hybrid" <|> "endpoint" <|> "result") : attr
 
 private def addHintUpdate (update : GameHopHintUpdate) (kind : AttributeKind) :
