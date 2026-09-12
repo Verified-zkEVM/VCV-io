@@ -13,8 +13,8 @@ public import VCVio.EvalDist.PFunctorMeasure.Core
 # Primary and discrete compatibility for free-program measure semantics
 
 The dependency-light native fold lives in `VCVio.EvalDist.PFunctorMeasure.Core`. This module
-installs that fold as VCVio's primary `EvalDistSemantics` when an `IsMeasureSpec` is available and
-connects it to the legacy discrete `IsProbabilitySpec` evaluator.
+reexports the fold's primary `EvalDistSemantics` and connects it to the legacy discrete
+`IsProbabilitySpec` evaluator.
 
 ## Main statements
 
@@ -40,56 +40,7 @@ namespace FreeM
 variable {P : PFunctor.{uA, u}} [∀ a, MeasurableSpace (P.B a)] [P.IsMeasureSpec]
   {α β : Type u}
 
-/-- Every free program denotes a subprobability measure, even before a measurability invariant is
-available for its continuations. `Measure.bind_apply_le` gives exactly the one-sided bound needed
-here; measurability is only needed to strengthen this to a probability-measure equality. -/
-theorem denote_apply_univ_le_one [MeasurableSpace α] (program : FreeM P α) :
-    denote program Set.univ ≤ 1 := by
-  induction program with
-  | pure _ => simp
-  | lift_bind a cont ih =>
-      refine (Measure.bind_apply_le _ MeasurableSet.univ).trans ?_
-      calc
-        (∫⁻ b, denote (cont b) Set.univ ∂IsMeasureSpec.toMeasure a) ≤
-            ∫⁻ _b, 1 ∂IsMeasureSpec.toMeasure a := lintegral_mono ih
-        _ = 1 := by simp
-
-/-- The direct free-monad fold supplies the primary measure semantics whenever an
-`IsMeasureSpec` is available. Its priority is above the generic finite-distribution adapter, so
-installing a measure specification makes `𝒟[…]` unfold to `denote`; computations that only have
-the legacy probability specification continue to use the adapter. -/
-noncomputable instance (priority := 20) instEvalDistSemanticsFreeM :
-    EvalDistSemantics (FreeM P) where
-  denote := denote
-  apply_univ_le_one := denote_apply_univ_le_one
-
-/-- With a measure specification in scope, primary notation is definitionally the direct
-free-monad measure fold. `𝒟[…]` is the public head: this is a transport lemma, not a simp rule,
-so the `𝒟`-keyed laws below and in `Defs.Measure` are the ones `simp` uses. -/
-theorem evalDist_eq_denote [MeasurableSpace α] (program : FreeM P α) :
-    𝒟[program] = denote program := rfl
-
-/-- A one-operation program denotes its configured answer measure. -/
-@[simp]
-theorem evalDist_lift (a : P.A) :
-    𝒟[(FreeM.lift a : FreeM P (P.B a))] = IsMeasureSpec.toMeasure a :=
-  denote_lift a
-
-/-- An operation followed by a continuation denotes the Giry bind of its answer measure with
-the denotation of the continuation. -/
-@[simp]
-theorem evalDist_liftBind [MeasurableSpace α] (a : P.A) (cont : P.B a → FreeM P α) :
-    𝒟[FreeM.liftBind a cont] = Measure.bind (IsMeasureSpec.toMeasure a) fun b => 𝒟[cont b] :=
-  rfl
-
 variable [∀ a, DiscreteMeasurableSpace (P.B a)]
-
-/-- Over a discrete-answer interface, the direct measure semantics satisfies the Giry monad
-laws. -/
-noncomputable instance (priority := 20) instLawfulEvalDistSemanticsFreeM :
-    LawfulEvalDistSemantics (FreeM P) where
-  denote_pure := denote_pure
-  denote_bind := denote_bind
 
 /-! ### Agreement with the `PMF` denotation
 
@@ -129,7 +80,7 @@ site; it is `IsMeasureSpec.Compatible` by `rfl`. -/
 noncomputable def _root_.PFunctor.IsProbabilitySpec.toMeasureSpec (P : PFunctor.{uA, u})
     [∀ a, MeasurableSpace (P.B a)] [P.IsProbabilitySpec] : P.IsMeasureSpec where
   toMeasure a := (IsProbabilitySpec.toPMF a).toMeasure
-  isProbabilityMeasure _ := PMF.toMeasure.isProbabilityMeasure _
+  isProbabilityMeasure _ := inferInstance
 
 instance _root_.PFunctor.IsProbabilitySpec.toMeasureSpec_compatible (P : PFunctor.{uA, u})
     [∀ a, MeasurableSpace (P.B a)] [P.IsProbabilitySpec] :

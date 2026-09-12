@@ -7,6 +7,7 @@ Authors: Quang Dao
 module
 
 public meta import VCVio.ProgramLogic.Tactics.Handler
+public meta import VCVio.EvalDist.TVDist.Positivity
 public meta import VCVio.ProgramLogic.Tactics.Unary
 public meta import VCVio.ProgramLogic.Tactics.Relational
 

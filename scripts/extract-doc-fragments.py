@@ -11,6 +11,8 @@ Usage:
   python scripts/extract-doc-fragments.py --check    # check if docs are up to date
 """
 
+from __future__ import annotations
+
 import re
 import sys
 from pathlib import Path

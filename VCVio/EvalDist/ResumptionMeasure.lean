@@ -130,10 +130,10 @@ theorem outputMeasure_le_succ [∀ a, DiscreteMeasurableSpace (P.B a)]
           eq_of_dest_eq (by simpa using hdest)
         subst computation
         rw [outputMeasure_query_succ, outputMeasure_query_succ]
-        exact Measure.bind_mono_right
-          Measurable.of_discrete.aemeasurable
-          Measurable.of_discrete.aemeasurable
-          (Filter.Eventually.of_forall fun direction => ih (next direction))
+        gcongr with direction
+        · exact Measurable.of_discrete.aemeasurable
+        · exact Measurable.of_discrete.aemeasurable
+        · exact ih (next direction)
 
 /-- The finite returned-output observations form an increasing sequence of measures. -/
 theorem monotone_outputMeasure [∀ a, DiscreteMeasurableSpace (P.B a)]

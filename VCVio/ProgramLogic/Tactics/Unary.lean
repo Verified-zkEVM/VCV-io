@@ -183,10 +183,15 @@ Variants:
 
 Use `@[vcspec]` on unary `Triple` or raw `wp` theorems to opt them into bounded lookup. -/
 syntax "vcstep" ("using" term)? : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" "with" term : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" "as" "⟨" binderIdent,* "⟩" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" "with" term "as" "⟨" binderIdent,* "⟩" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep?" : tactic
 
 elab_rules : tactic
@@ -220,14 +225,23 @@ elab_rules : tactic
       addTryThisTextSuggestion (← getRef) step.replayText
       logPlannerNotes #[step]
 
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" " under " num : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" &"normalize" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" &"congr" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" &"congr'" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" "as" "⟨" binderIdent,* "⟩" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" " under " num "as" "⟨" binderIdent,* "⟩" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" &"congr" "as" "⟨" binderIdent,* "⟩" : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"rw" &"congr'" "as" "⟨" binderIdent,* "⟩" : tactic
 
 elab_rules : tactic
@@ -271,7 +285,9 @@ elab_rules : tactic
       if ← TacticInternals.Unary.runProbEqAction .congrNoSupport then return
       TacticInternals.Unary.throwVCGenStepRwCongrError false
 
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"inv" term : tactic
+@[inherit_doc tacticVcstepUsing_, tactic_alt tacticVcstepUsing_]
 syntax "vcstep" &"inv" term "as" "⟨" binderIdent,* "⟩" : tactic
 
 elab_rules : tactic
@@ -319,8 +335,11 @@ Variants:
 - `vcgen inv I` applies an explicit loop invariant `I` to the first `replicate`/`foldlM`/`mapM`
   goal, then continues with exhaustive decomposition. -/
 syntax (name := vcgenBasic) "vcgen" : tactic
+@[inherit_doc vcgenBasic, tactic_alt vcgenBasic]
 syntax (name := vcgenUsing) "vcgen" "using" term : tactic
+@[inherit_doc vcgenBasic, tactic_alt vcgenBasic]
 syntax (name := vcgenInv) "vcgen" &"inv" term : tactic
+@[inherit_doc vcgenBasic, tactic_alt vcgenBasic]
 syntax (name := vcgenSuggestion) "vcgen?" : tactic
 
 elab_rules (kind := vcgenBasic) : tactic
@@ -388,7 +407,7 @@ elab_rules (kind := vcgenInv) : tactic
 
 Rewrites using linearity of expectation (`wp_add`, `wp_mul_const`), indicator algebra
 (`propInd_true`, `propInd_false`, `propInd_and`), and standard WP step rules. -/
-macro "exp_norm" : tactic =>
+macro (name := expNorm) "exp_norm" : tactic =>
   `(tactic| simp only [
     OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false,
     OracleComp.ProgramLogic.propInd_and, OracleComp.ProgramLogic.propInd_eq_ite,
@@ -404,7 +423,7 @@ macro "exp_norm" : tactic =>
     game_rule])
 
 /-- `by_hoare` transforms a probability goal into a quantitative WP goal. -/
-macro "by_hoare" : tactic =>
+macro (name := byHoare) "by_hoare" : tactic =>
   `(tactic|
     first
       | rw [OracleComp.ProgramLogic.probEvent_eq_wp_indicator]

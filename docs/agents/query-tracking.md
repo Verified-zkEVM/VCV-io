@@ -281,6 +281,25 @@ ExpectedQueries[ oa in runtime ]
 
 ## Worked Examples
 
+### Weakening a cost bound
+
+Import `Mathlib.Tactic.GRewrite` to rewrite through `AddWriterT.PathwiseCostAtMost` and
+`AddWriterT.QueryBoundedAboveBy`. Given `h : a ≤ b`, `grw [h] at hcost` weakens a certificate
+with upper bound `a` to one with upper bound `b`. On a goal with upper bound `b`, use
+`grw [← h]` to reduce it to the stronger obligation with upper bound `a`. The computation
+stays fixed; these are implication rules, so `gcongr` also handles an implication between
+the two cost predicates.
+
+`Fischlin/CostAccounting.lean` uses this for early returns and a weighted query charge;
+`OracleComp/QueryTracking/CostModel.lean` uses it for the pure branch of the total-query bound.
+The rule also applies to function-valued cost vectors: `gcongr` leaves the pointwise order goal,
+which can be supplied with `exact h`. Normalize equal bounds with `simpa only` when no weakening
+is needed.
+Lower-bound registrations remain local experiments; use `pathwiseCostAtLeast_mono` or
+`queryBoundedBelowBy_mono` explicitly. The
+[generalized-relation investigation](../reading/generalized-relation-automation.md) records the
+tests and the promotion criteria for additional rules.
+
 ### Fiat-Shamir
 
 See `VCVio/CryptoFoundations/FiatShamir/Sigma.lean`.

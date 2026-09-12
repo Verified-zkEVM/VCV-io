@@ -47,30 +47,45 @@ abbrev ResourcePolynomial (label : Type x) := PFunctor.ExecutionCostPolynomial l
 
 namespace ResourcePolynomial
 
+@[inherit_doc PFunctor.ExecutionCostPolynomial.ofFirstOrder]
 abbrev ofFirstOrder := @PFunctor.ExecutionCostPolynomial.ofFirstOrder
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval]
 abbrev eval {label : Type x} (bound : ResourcePolynomial label)
     (length : label → ℕ → ℕ) (inputSize : ℕ) :=
   PFunctor.ExecutionCostPolynomial.eval bound length inputSize
+@[inherit_doc PFunctor.ExecutionCostPolynomial.const]
 abbrev const := @PFunctor.ExecutionCostPolynomial.const
+@[inherit_doc PFunctor.ExecutionCostPolynomial.add]
 abbrev add {label : Type x} (left right : ResourcePolynomial label) :=
   PFunctor.ExecutionCostPolynomial.add left right
+@[inherit_doc PFunctor.ExecutionCostPolynomial.comp]
 abbrev comp {label : Type x} (bound : ResourcePolynomial label)
     (inputBound : _root_.Complexity.SecondOrderPolynomial label) :=
   PFunctor.ExecutionCostPolynomial.comp bound inputBound
+@[inherit_doc PFunctor.ExecutionCostPolynomial.reindex]
 abbrev reindex {label : Type x} {target : Type y} (bound : ResourcePolynomial label)
     (map : label → target) :=
   PFunctor.ExecutionCostPolynomial.reindex bound map
+@[inherit_doc PFunctor.ExecutionCostPolynomial.subst]
 abbrev subst {label : Type x} {target : Type y} (bound : ResourcePolynomial label)
     (replacement : label → _root_.Complexity.SecondOrderPolynomial target) :=
   PFunctor.ExecutionCostPolynomial.subst bound replacement
-abbrev eval_ofFirstOrder := @PFunctor.ExecutionCostPolynomial.eval_ofFirstOrder
-abbrev eval_const := @PFunctor.ExecutionCostPolynomial.eval_const
-abbrev eval_comp := @PFunctor.ExecutionCostPolynomial.eval_comp
-abbrev eval_reindex := @PFunctor.ExecutionCostPolynomial.eval_reindex
-abbrev eval_subst := @PFunctor.ExecutionCostPolynomial.eval_subst
-abbrev add_eval_le_eval_add := @PFunctor.ExecutionCostPolynomial.add_eval_le_eval_add
-abbrev eval_mono_input := @PFunctor.ExecutionCostPolynomial.eval_mono_input
-abbrev eval_mono_lengths := @PFunctor.ExecutionCostPolynomial.eval_mono_lengths
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval_ofFirstOrder]
+alias eval_ofFirstOrder := PFunctor.ExecutionCostPolynomial.eval_ofFirstOrder
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval_const]
+alias eval_const := PFunctor.ExecutionCostPolynomial.eval_const
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval_comp]
+alias eval_comp := PFunctor.ExecutionCostPolynomial.eval_comp
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval_reindex]
+alias eval_reindex := PFunctor.ExecutionCostPolynomial.eval_reindex
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval_subst]
+alias eval_subst := PFunctor.ExecutionCostPolynomial.eval_subst
+@[inherit_doc PFunctor.ExecutionCostPolynomial.add_eval_le_eval_add]
+alias add_eval_le_eval_add := PFunctor.ExecutionCostPolynomial.add_eval_le_eval_add
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval_mono_input]
+alias eval_mono_input := PFunctor.ExecutionCostPolynomial.eval_mono_input
+@[inherit_doc PFunctor.ExecutionCostPolynomial.eval_mono_lengths]
+alias eval_mono_lengths := PFunctor.ExecutionCostPolynomial.eval_mono_lengths
 
 end ResourcePolynomial
 
@@ -92,14 +107,16 @@ abbrev OracleContract {p : PFunctor.{u, u}} {C : StepClass.{u, v}}
 
 namespace OracleResourceModel
 
+@[inherit_doc PFunctor.DynSystem.DynComputation.ResponseResourceModel.modulus]
 abbrev modulus := @PFunctor.DynSystem.DynComputation.ResponseResourceModel.modulus
-abbrev modulus_monotone :=
-  @PFunctor.DynSystem.DynComputation.ResponseResourceModel.modulus_monotone
+@[inherit_doc PFunctor.DynSystem.DynComputation.ResponseResourceModel.modulus_monotone]
+alias modulus_monotone := PFunctor.DynSystem.DynComputation.ResponseResourceModel.modulus_monotone
 
 end OracleResourceModel
 
 namespace OracleContract
 
+@[inherit_doc PFunctor.DynSystem.DynComputation.ResponseResourceContract.Model]
 abbrev Model {p : PFunctor.{u, u}} {C : StepClass.{u, v}}
     {Q : QuantitativeStepClass.{u, v, w} C} {interface : InterfaceBoundary C p}
     {label : Type x} (contract : OracleContract Q interface label) :=
@@ -111,8 +128,10 @@ variable {p : PFunctor.{u, u}} {C : StepClass.{u, v}}
   {Q : QuantitativeStepClass.{u, v, w} C} {interface : InterfaceBoundary C p}
   {label : Type x} {contract : OracleContract Q interface label}
 
+@[inherit_doc PFunctor.DynSystem.DynComputation.ResponseResourceContract.Model.resourceModel]
 abbrev resourceModel (model : contract.Model) :=
   PFunctor.DynSystem.DynComputation.ResponseResourceContract.Model.resourceModel model
+@[inherit_doc PFunctor.DynSystem.DynComputation.ResponseResourceContract.Model.modulus]
 abbrev modulus (model : contract.Model) :=
   PFunctor.DynSystem.DynComputation.ResponseResourceContract.Model.modulus model
 theorem modulus_monotone (model : contract.Model) :
@@ -145,14 +164,19 @@ abbrev PureCertificate
 
 namespace PureCertificate
 
+@[inherit_doc PFunctor.DynSystem.DynComputation.PureResourceCertificate.ofPolyRealizer]
 abbrev ofPolyRealizer :=
   @PFunctor.DynSystem.DynComputation.PureResourceCertificate.ofPolyRealizer
+@[inherit_doc PFunctor.DynSystem.DynComputation.PureResourceCertificate.realization]
 abbrev realization :=
   @PFunctor.DynSystem.DynComputation.PureResourceCertificate.realization
+@[inherit_doc PFunctor.DynSystem.DynComputation.PureResourceCertificate.polynomial]
 abbrev polynomial :=
   @PFunctor.DynSystem.DynComputation.PureResourceCertificate.polynomial
+@[inherit_doc PFunctor.DynSystem.DynComputation.PureResourceCertificate.implements]
 abbrev implements :=
   @PFunctor.DynSystem.DynComputation.PureResourceCertificate.implements
+@[inherit_doc PFunctor.DynSystem.DynComputation.PureResourceCertificate.runsWithin]
 abbrev runsWithin :=
   @PFunctor.DynSystem.DynComputation.PureResourceCertificate.runsWithin
 
@@ -198,12 +222,14 @@ theorem runsWithin (witness : StrictPPTWitness Q bd contract program)
       witness.polynomial.eval model.modulus (Q.size bd.input value) :=
   witness.runBound.runsWithin model
 
+@[inherit_doc PFunctor.DynSystem.DynComputation.PolynomialProgramWitness.outputSizePolynomial]
 abbrev outputSizePolynomial :=
   @PFunctor.DynSystem.DynComputation.PolynomialProgramWitness.outputSizePolynomial
-abbrev eval_outputSizePolynomial :=
-  @PFunctor.DynSystem.DynComputation.PolynomialProgramWitness.eval_outputSizePolynomial
-abbrev returnedSize_le :=
-  @PFunctor.DynSystem.DynComputation.PolynomialProgramWitness.returnedSize_le
+@[inherit_doc PolynomialProgramWitness.eval_outputSizePolynomial]
+alias eval_outputSizePolynomial := PolynomialProgramWitness.eval_outputSizePolynomial
+@[inherit_doc PolynomialProgramWitness.returnedSize_le]
+alias returnedSize_le := PolynomialProgramWitness.returnedSize_le
+@[inherit_doc PFunctor.DynSystem.DynComputation.PolynomialProgramWitness.congrProgram]
 def congrProgram {program' : input → FreeM p output}
     (witness : StrictPPTWitness Q bd contract program) (hprogram : program = program') :
     StrictPPTWitness Q bd contract program' :=

@@ -228,8 +228,10 @@ noncomputable abbrev expectedCostNat
     (oa : AddWriterT ℕ m α) : ENNReal :=
   expectedCost oa (fun n ↦ ↑n)
 
+section tailBounds
+
 omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SPMF] [EvalDistCompatible m]
-    in
+
 /-- Tail-sum formula for the natural-valued expected cost of an `AddWriterT` computation:
 
 `E[cost] = ∑ i, Pr[i < cost]`.
@@ -245,8 +247,6 @@ lemma expectedCostNat_eq_tsum_tail_probs
   refine tsum_congr fun n ↦ ?_
   by_cases h : i < n <;> simp [Set.indicator, h]
 
-omit [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [LawfulMonadLiftT m SPMF] [EvalDistCompatible m]
-    in
 /-- Tail domination bounds the expected natural-valued writer cost.
 
 If the tail probability `Pr[i < cost]` is bounded by `a i` for every `i`, then
@@ -256,6 +256,8 @@ lemma expectedCostNat_le_tsum_of_tail_probs_le
     (h : ∀ i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] ≤ a i) :
     expectedCostNat oa ≤ ∑' i : ℕ, a i :=
   (expectedCostNat_eq_tsum_tail_probs oa).trans_le (ENNReal.tsum_le_tsum h)
+
+end tailBounds
 
 omit [LawfulMonadLiftT m SPMF] in
 /-- Finite tail-sum formula for natural-valued writer cost under a pathwise upper bound.
@@ -435,6 +437,7 @@ lemma pathwiseHasCost_probCompLift_of_supportNonempty [LawfulMonad m] [MonadLift
   pathwiseHasCost_monadLift_of_supportNonempty (m := m) (ω := ω) (x := (liftM x : m α)) hx
 
 omit [Monad m] [LawfulMonadLiftT m SetM] in
+@[gcongr]
 lemma pathwiseCostAtMost_mono {oa : AddWriterT ω m α} {w₁ w₂ : ω}
     (h : PathwiseCostAtMost oa w₁) (hw : w₁ ≤ w₂) :
     PathwiseCostAtMost oa w₂ :=
@@ -644,6 +647,7 @@ lemma queryBoundedBelowBy_monadLift [LawfulMonad m] (x : m α) :
   pathwiseCostAtLeast_monadLift x
 
 omit [Monad m] [LawfulMonadLiftT m SetM] in
+@[gcongr]
 lemma queryBoundedAboveBy_mono {oa : AddWriterT ℕ m α} {n₁ n₂ : ℕ}
     (h : QueryBoundedAboveBy oa n₁) (hn : n₁ ≤ n₂) :
     QueryBoundedAboveBy oa n₂ :=
