@@ -165,6 +165,7 @@ public import VCVio.EvalDist.Monad.Disagreement
 public import VCVio.EvalDist.Monad.Map
 public import VCVio.EvalDist.Monad.Measure
 public import VCVio.EvalDist.Monad.Seq
+public import VCVio.EvalDist.Notation
 public import VCVio.EvalDist.Option
 public import VCVio.EvalDist.PFunctor
 public import VCVio.EvalDist.PFunctorMeasure

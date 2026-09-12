@@ -20,11 +20,36 @@
 | `Pr[p \| mx]` | `probEvent mx p` | `VCVio/EvalDist/Defs/Basic.lean` |
 | `Pr[⊥ \| mx]` | `probFailure mx` | `VCVio/EvalDist/Defs/Basic.lean` |
 | `Pr[cond \| var ← src]` | `probEvent src (fun var => cond)` | `VCVio/EvalDist/Defs/Basic.lean` |
+| `Pr_{let x ← mx}[p x]` | event probability using an ordinary Lean sampling block | `VCVio/EvalDist/Notation.lean` |
+
+Import `VCVio.EvalDist.Notation` and use `open scoped ProbabilityTheory` for
+`Pr_{...}[...]`. The braces accept Lean's standard `doSeq` grammar, including multiple dependent
+samples, pattern bindings, local declarations, and mutable variables. The event is appended as the
+final return of the same `do` block; it can use all bindings still in scope. Early returns have their
+ordinary Lean meaning and return a proposition directly, skipping the appended event. The notation
+is an alias of `Pr{...}[...]`; it preserves failure mass and does not select an interpretation or
+initial state. `probOutput_true_eq_probEvent` connects a single-sample block to `Pr[p | mx]`.
 
 **NOTE**: Legacy code and comments may still use the old `[= x | comp]` notation (without `Pr` prefix). Always use `Pr[...]` in new code.
 
 `Pr[...]` is a discrete compatibility notation. Use `probOutput_eq_evalDist`,
 `probEvent_eq_evalDist`, or `probFailure_eq_evalDist` to move a scalar statement to `𝒟[...]`.
+
+### Coordinated ArkLib adoption
+
+ArkLib's `ArkLib/Data/Probability/Notation.lean` defines the same `Pr_{...}[...]` spelling in
+the `ProbabilityTheory` scope. Its local parser and macro must be removed when its VCVio dependency
+is updated to include this module: enabling both definitions produces ambiguous terms.
+Keep ArkLib's existing import path as a compatibility module importing `VCVio.EvalDist.Notation`
+and `VCVio.EvalDist.Defs.Instances`. Retain `$ᵖ` and the mathematical helper lemmas in ArkLib.
+Existing call sites and `open scoped ProbabilityTheory` declarations can keep their spelling.
+
+The probability is unchanged, but the expansion is no longer definitionally a raw distribution
+application. At a proof boundary, `PMF.probOutput_eq_apply` identifies the new observation with
+`(do ...; return event) True`. Use that public equation where an old `rfl` or restricted unfolding
+proof depended on the expansion; generic event proofs can use `probOutput_true_eq_probEvent`.
+Validate the combined dependency/import change and the ArkLib probability and coding-theory
+callers before coordinating the merge. The notation PR remains draft pending that validation.
 
 ## Sampling Notations
 
