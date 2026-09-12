@@ -32,6 +32,7 @@ public import VCVioTest.ProgramLogic.GCongr
 public import VCVioTest.QueryBounds
 public import VCVioTest.QueryHom
 public import VCVioTest.RoundByRound.OneRound
+public import VCVioTest.Runtime
 public import VCVioTest.SMDTDSPRFinalValidity
 public import VCVioTest.SMDTOpenPREFinalValidity
 public import VCVioTest.SMDTPRE

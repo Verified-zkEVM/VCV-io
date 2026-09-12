@@ -175,6 +175,7 @@ public import VCVio.EvalDist.RenyiDivergence
 public import VCVio.EvalDist.ResumptionMeasure
 public import VCVio.EvalDist.TVDist
 public import VCVio.EvalDist.TVDist.Positivity
+public import VCVio.EvalDist.WithFailure
 public import VCVio.Interaction.UC.AsyncRuntime
 public import VCVio.Interaction.UC.AsyncSecurity
 public import VCVio.Interaction.UC.Computational
@@ -237,6 +238,7 @@ public import VCVio.OracleComp.QueryTracking.Tracing
 public import VCVio.OracleComp.QueryTracking.Unpredictability
 public import VCVio.OracleComp.QueryTracking.WriterCost
 public import VCVio.OracleComp.RunIO
+public import VCVio.OracleComp.Runtime
 public import VCVio.OracleComp.SimSemantics.Append
 public import VCVio.OracleComp.SimSemantics.OptionT.Basic
 public import VCVio.OracleComp.SimSemantics.QueryImpl.Basic
