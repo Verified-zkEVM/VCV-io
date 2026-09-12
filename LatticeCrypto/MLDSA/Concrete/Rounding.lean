@@ -203,9 +203,8 @@ end BalancedDecomp
 
 private theorem natCast_div_add_mod (r : Coeff) (s : ℕ) :
     s * ((r.val / s):Coeff) + ((r.val % s): Coeff) = r := by
-  rw [← Nat.cast_mul, ← Nat.cast_add]
-  nth_rewrite 3 [← ZMod.natCast_zmod_val r]
-  congr 1; exact Nat.div_add_mod r.val s
+  simpa only [Nat.cast_add, Nat.cast_mul, ZMod.natCast_zmod_val] using
+    congrArg (Nat.cast : ℕ → Coeff) (Nat.div_add_mod r.val s)
 
 private theorem power2RoundCoeff_eq (r : Coeff) {r1 : ℕ} {r0 : ℤ}
   (hdecomp : power2RoundCoeff r = (r1, r0)) :

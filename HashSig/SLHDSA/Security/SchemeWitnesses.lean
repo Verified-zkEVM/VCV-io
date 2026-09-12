@@ -12,9 +12,9 @@ public import HashSig.SLHDSA.GeneralScheme
 /-!
 # Scheme-level witness dispatch
 
-An SLH-DSA signature that verifies against a public key routes into exactly one of two witness
-families, and which one is decided by a single equality: whether the FORS public key the signature
-recovers at the position its *own* digest names is the honest FORS public key there.  When it is,
+An SLH-DSA signature that verifies against the honest public key generated from `sk` routes into
+exactly one of two witness families, decided by whether the FORS public key it recovers at the
+position its *own* digest names is the honest FORS public key there.  When it is,
 that equality is exactly the hypothesis `HashSig.SLHDSA.Security.ForsWitnesses`' extractor takes at
 that instance address, and the FORS half goes there.  When it is not, the hypertree half recovers
 the published root from a layer-zero message differing from the honest one at that leaf, which is
@@ -49,8 +49,10 @@ value with `forsPkGen prims sk pk.pkSeed`'s at the same address is a decidable e
 Branch **(A)** — the two FORS public keys agree — is exactly `findForsWitness_sound`'s hypothesis,
 so the FORS extractor applies at the digest-derived address and digest.
 
-Branch **(B)** — they differ — supplies the layer walk with both of its hypotheses.  The forged
-layer-zero message is the recovered FORS public key; the honest one is
+Branch **(B)** — they differ — supplies the layer walk with both of its hypotheses when the
+published root is the honest hypertree root generated from `sk`.  Verification supplies equality
+with the published root; the honest-key condition identifies it with the root the walk requires.
+The forged layer-zero message is the recovered FORS public key; the honest one is
 `forsPkGen prims sk pk.pkSeed (schemeParts …).forsAdrs`.  **Why that honest message is well
 defined** is the one step here that is not immediate: `forsPkGen` at an instance address depends on
 the digest only through the FORS address, which carries `idxTree` and `idxLeaf` and not `md`.  The
@@ -75,8 +77,8 @@ the hypertree.
 `EUF_CMA_SPHINCSPLUSTWFS_NPRFNPRF_V` (`:2186`), which is reached *after* both PRF hops have replaced
 the secret-key and message-key derivations by random sampling.  `verifyInternal_cases` is stated at
 `forsPkGen prims sk pk.pkSeed`, with the FORS secret values still derived from the secret seed by
-`prims.PRF` — before either hop.  The correspondence is "the same case split, one game earlier", and
-`verifyInternal_cases` is not `valid_MFORSTWESNPRF`.
+`prims.PRF` — before either hop.  The correspondence is the same case split at the deterministic
+construction level, before those two PRF hops; `verifyInternal_cases` is not `valid_MFORSTWESNPRF`.
 
 ## What branch (A) inherits from the FORS reordering
 

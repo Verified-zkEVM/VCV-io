@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Quang Dao. All rights reserved.
+Copyright (c) 2026 Quang Dao, Alexander Hicks. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Quang Dao
+Authors: Quang Dao, Alexander Hicks
 -/
 
 module
@@ -216,10 +216,9 @@ theorem keygenInternal_fst (vp : ValidatedParams) (prims : Primitives vp.params)
 produces against the public key, recover the FORS public key from the FORS half of the signature at
 the digest-derived FORS address, and hand that to the general hypertree verifier at the same digest.
 
-The randomizer is the forged signature's, not a queried one, and the public key is whatever the
-verifier was handed; nothing here is honest.  Only the `H_msg` query is discharged by this
-equation — the FORS and hypertree halves stay in their own pure interpretations, which have their
-own equations. -/
+The randomizer is the signature's own, and the public key is whatever the verifier was handed;
+no honesty assumption is required.  Only the `H_msg` query is discharged by this equation — the
+FORS and hypertree halves stay in their own pure interpretations, which have their own equations. -/
 theorem verifyInternal_eq (vp : ValidatedParams) (prims : Primitives vp.params)
     [DecidableEq prims.Y] (msg : List Byte) (sig : SignatureCore vp prims.core)
     (pk : PublicKeyCore prims.core) :

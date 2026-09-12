@@ -36,6 +36,7 @@ to see the composition diagram.
 
 /-! ## Intermediate tree representation -/
 
+/-- Display tree for open-system composition, preserving map, parallel, wire, and plug nodes. -/
 inductive CompTree where
   | atom (label : String)
   | mapNode (child : CompTree)
@@ -49,6 +50,7 @@ inductive CompTree where
 
 private def rawPrefix : Name := `Interaction.UC.OpenSyntax.Raw
 
+/-- Extract the composition structure of an expression, using opaque labels for unrecognized nodes. -/
 partial def extractCompTree (e : Expr) : MetaM CompTree := do
   match e with
   | .mdata _ inner => extractCompTree inner
@@ -281,11 +283,15 @@ private def compTreeToGraph (tree : CompTree) : ForceGraphDisplay.Props :=
 
 /-! ## Attribute registry -/
 
+/-- A declaration registered for display as an open-system composition. -/
 structure RegisteredComp where
+  /-- Module containing the registered composition. -/
   modName : Name
+  /-- Name of the declaration whose composition is displayed. -/
   declName : Name
   deriving Inhabited, Repr
 
+/-- Scoped index of registered composition declarations by module. -/
 initialize compositionExt :
     SimpleScopedEnvExtension RegisteredComp (NameMap (Array Name)) ←
   registerSimpleScopedEnvExtension {
@@ -310,6 +316,7 @@ initialize registerBuiltinAttribute {
     compositionExt.add { modName, declName := decl } kind
 }
 
+/-- Return the composition declarations registered in a module. -/
 def getRegisteredCompositions (modName : Name) : CoreM (Array Name) := do
   return match (compositionExt.getState (← getEnv)).find? modName with
     | some names => names
@@ -414,6 +421,7 @@ private def latestReadySnap?
   let ⟨ready, _, _⟩ ← snaps.getFinishedPrefix
   return ready.getLast?
 
+/-- Render the current module's registered open-system compositions for a widget request. -/
 @[server_rpc_method]
 def rpc (_props : PanelWidgetProps) : RequestM (RequestTask Html) := do
   let doc ← RequestM.readDoc
@@ -435,6 +443,7 @@ def rpc (_props : PanelWidgetProps) : RequestM (RequestTask Html) := do
 
 end CompositionPanel
 
+/-- Editor panel displaying registered open-system compositions as graphs. -/
 @[widget_module]
 def CompositionPanel : Component PanelWidgetProps :=
   mk_rpc_widget% CompositionPanel.rpc

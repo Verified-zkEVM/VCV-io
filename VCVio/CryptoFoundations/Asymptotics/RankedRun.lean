@@ -49,11 +49,12 @@ abbrev terminalCost :=
 abbrev queryStepCost :=
   @PFunctor.DynSystem.DynComputation.RankedResource.queryStepCost
 
-abbrev executionTrace_cost_query :=
-  @PFunctor.DynSystem.DynComputation.RankedResource.executionTrace_cost_query
+@[inherit_doc RankedResource.executionTrace_cost_query]
+alias executionTrace_cost_query := RankedResource.executionTrace_cost_query
 
-abbrev executionCost_eq_init_add_trace_add_terminal :=
-  @PFunctor.DynSystem.DynComputation.RankedResource.executionCost_eq_init_add_trace_add_terminal
+@[inherit_doc RankedResource.executionCost_eq_init_add_trace_add_terminal]
+alias executionCost_eq_init_add_trace_add_terminal :=
+  RankedResource.executionCost_eq_init_add_trace_add_terminal
 
 /-- VCVio's historical name for PolyFun's generic ranked resource-potential certificate. -/
 abbrev ResourcePotentialCertificate (R : QuantitativeRealization Q bd)

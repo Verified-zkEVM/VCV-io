@@ -6,6 +6,7 @@ Authors: Devon Tuma
 module
 
 public import PolyFun.PFunctor.Free.Basic
+public import VCVio.EvalDist.Defs.Measure.Core
 public import Mathlib.MeasureTheory.Measure.ProbabilityMeasure
 public import Mathlib.MeasureTheory.Measure.Prod
 public import Mathlib.Probability.UniformOn
@@ -180,6 +181,60 @@ theorem denote_bind_bind_prod_mk_eq_prod [MeasurableSpace α] [DiscreteMeasurabl
         Measure.bind_dirac_eq_map (denote right) (by fun_prop)
     · change Measurable (Measure.dirac ∘ Prod.mk x)
       exact Measure.measurable_dirac.comp (by fun_prop))
+
+end FreeM
+
+namespace FreeM
+
+variable {P : PFunctor.{uA, u}} [∀ a, MeasurableSpace (P.B a)] [P.IsMeasureSpec]
+  {α : Type u}
+
+/-- Every free program denotes a subprobability measure, even before a measurability invariant is
+available for its continuations. `Measure.bind_apply_le` gives exactly the one-sided bound needed
+here; measurability is only needed to strengthen this to a probability-measure equality. -/
+theorem denote_apply_univ_le_one [MeasurableSpace α] (program : FreeM P α) :
+    denote program Set.univ ≤ 1 := by
+  induction program with
+  | pure _ => simp
+  | lift_bind a cont ih =>
+      refine (Measure.bind_apply_le _ MeasurableSet.univ).trans ?_
+      calc
+        (∫⁻ b, denote (cont b) Set.univ ∂IsMeasureSpec.toMeasure a) ≤
+            ∫⁻ _b, 1 ∂IsMeasureSpec.toMeasure a := lintegral_mono ih
+        _ = 1 := by simp
+
+/-- The direct free-monad fold supplies measure semantics for a measure-valued specification. -/
+noncomputable instance (priority := 20) instEvalDistSemanticsFreeM :
+    EvalDistSemantics (FreeM P) where
+  denote := denote
+  apply_univ_le_one := denote_apply_univ_le_one
+
+/-- With a measure specification in scope, primary notation is definitionally the direct
+free-monad measure fold. `𝒟[…]` is the public head: this is a transport lemma, not a simp rule,
+so the `𝒟`-keyed laws below and in `Defs.Measure` are the ones `simp` uses. -/
+theorem evalDist_eq_denote [MeasurableSpace α] (program : FreeM P α) :
+    𝒟[program] = denote program := rfl
+
+/-- A one-operation program denotes its configured answer measure. -/
+@[simp]
+theorem evalDist_lift (a : P.A) :
+    𝒟[(FreeM.lift a : FreeM P (P.B a))] = IsMeasureSpec.toMeasure a :=
+  denote_lift a
+
+/-- An operation followed by a continuation denotes the Giry bind of its answer measure with
+the denotation of the continuation. -/
+theorem evalDist_liftBind [MeasurableSpace α] (a : P.A) (cont : P.B a → FreeM P α) :
+    𝒟[FreeM.liftBind a cont] = Measure.bind (IsMeasureSpec.toMeasure a) fun b => 𝒟[cont b] :=
+  rfl
+
+variable [∀ a, DiscreteMeasurableSpace (P.B a)]
+
+/-- Over a discrete-answer interface, the direct measure semantics satisfies the Giry monad
+laws. -/
+noncomputable instance (priority := 20) instLawfulEvalDistSemanticsFreeM :
+    LawfulEvalDistSemantics (FreeM P) where
+  denote_pure := denote_pure
+  denote_bind := denote_bind
 
 end FreeM
 end PFunctor

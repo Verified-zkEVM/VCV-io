@@ -179,7 +179,7 @@ private noncomputable def realFFTPolyToFXRArray (p : Params) (f : RealFFTPoly p.
 /-- Convert concrete FXR coefficients back to an integer polynomial via Falcon's
 reference fixed-point rounding rule. -/
 private def fxrArrayToIntPoly (p : Params) (f : Array FXR.FXR) : IntPoly p.n :=
-  Vector.ofFn fun i => (FXR.fxr_round (f.getD i.1 0)).toInt
+  Vector.ofFn fun i => (FXR.fxrRound (f.getD i.1 0)).toInt
 
 /-- Concrete Falcon primitive bundle used to connect the executable code to the abstract
 Falcon interfaces. -/
@@ -194,11 +194,11 @@ noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
     let (z, _) := SamplerZ.samplerZ p.logn state μ σ⁻¹
     return z.toInt
   fftTarget := fun c =>
-    fxrArrayToRealFFTPoly p <| FXR.vect_FFT p.logn <| FXR.vect_set p.logn (rqToInt32Array p c)
+    fxrArrayToRealFFTPoly p <| FXR.vectFFT p.logn <| FXR.vectSet p.logn (rqToInt32Array p c)
   fftInt := fun f =>
-    fxrArrayToRealFFTPoly p <| FXR.vect_FFT p.logn <| FXR.vect_set p.logn (intPolyToInt32Array p f)
+    fxrArrayToRealFFTPoly p <| FXR.vectFFT p.logn <| FXR.vectSet p.logn (intPolyToInt32Array p f)
   ifftRound := fun f =>
-    fxrArrayToIntPoly p <| FXR.vect_iFFT p.logn (realFFTPolyToFXRArray p f)
+    fxrArrayToIntPoly p <| FXR.vectIFFT p.logn (realFFTPolyToFXRArray p f)
   compress := compress p.n
   decompress := decompress p.n
   nttOps := hn ▸ concreteNTTRingOps p.logn

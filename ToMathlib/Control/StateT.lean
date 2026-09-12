@@ -22,7 +22,7 @@ namespace StateT
 variable {m : Type u → Type v} {m' : Type u → Type w}
   {σ α β : Type u}
 
-instance [MonadLift m m'] : MonadLift (StateT σ m) (StateT σ m') where
+instance (priority := low) [MonadLift m m'] : MonadLift (StateT σ m) (StateT σ m') where
   monadLift x := StateT.mk fun s => liftM ((x.run) s)
 
 @[simp]

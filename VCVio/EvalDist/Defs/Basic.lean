@@ -1049,14 +1049,12 @@ theorem expectedValue_add (mx : m α) (g h : α → ℝ≥0∞) :
 /-- The expectation of an indicator is the event probability. -/
 theorem expectedValue_ite_one (mx : m α) (p : α → Prop) [DecidablePred p] :
     expectedValue mx (fun x => if p x then 1 else 0) = Pr[ p | mx] := by
-  rw [expectedValue_def, probEvent_eq_tsum_ite]
-  exact tsum_congr fun x => by split_ifs <;> simp
+  simp only [expectedValue_def, probEvent_eq_tsum_ite, mul_ite, mul_one, mul_zero]
 
 /-- A constant factor scales the expectation. -/
 theorem expectedValue_mul_const (mx : m α) (g : α → ℝ≥0∞) (c : ℝ≥0∞) :
     expectedValue mx (fun x => g x * c) = expectedValue mx g * c := by
-  rw [expectedValue_def, expectedValue_def, ← ENNReal.tsum_mul_right]
-  exact tsum_congr fun x => (mul_assoc _ _ _).symm
+  simp only [expectedValue_def, ← mul_assoc, ENNReal.tsum_mul_right]
 
 variable [MonadLiftT m SetM] [EvalDistCompatible m]
 
