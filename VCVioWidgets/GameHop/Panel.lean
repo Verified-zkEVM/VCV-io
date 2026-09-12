@@ -123,6 +123,7 @@ private def waitForFinalSnapAndRender
       let html ← renderInferenceResult snap doc.meta.mod inferenceResult
       return ServerTask.mk <| Task.pure <| Except.ok html)
 
+/-- Handle a widget request by inferring and rendering the current module's game diagram. -/
 @[server_rpc_method]
 def rpc (_props : PanelWidgetProps) : RequestM (RequestTask Html) := do
   let doc ← RequestM.readDoc
@@ -139,6 +140,7 @@ def rpc (_props : PanelWidgetProps) : RequestM (RequestTask Html) := do
 
 end GameHopPanel
 
+/-- Editor panel displaying the game-hopping argument inferred from registered root theorems. -/
 @[widget_module]
 def GameHopPanel : Component PanelWidgetProps :=
   mk_rpc_widget% GameHopPanel.rpc

@@ -46,6 +46,12 @@ theorem measurable_elim [MeasurableSpace ε] [MeasurableSpace α] [MeasurableSpa
     (MeasurableSpace.comap_le_iff_le_map.2 hError)
     (MeasurableSpace.comap_le_iff_le_map.2 hOk)
 
+/-- Mapping the successful value of an exception preserves measurability. -/
+@[fun_prop]
+theorem measurable_map [MeasurableSpace ε] [MeasurableSpace α] [MeasurableSpace β]
+    {f : α → β} (hf : Measurable f) : Measurable (Except.map (ε := ε) f) :=
+  measurable_elim measurable_error (measurable_ok.comp hf)
+
 instance instDiscreteMeasurableSpace [MeasurableSpace ε] [MeasurableSpace α]
     [DiscreteMeasurableSpace ε] [DiscreteMeasurableSpace α] :
     DiscreteMeasurableSpace (Except ε α) where

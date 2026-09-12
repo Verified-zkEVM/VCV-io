@@ -23,7 +23,7 @@ Default fast checks (shared with per-PR CI):
   - ./scripts/check-imports.sh (generated umbrella modules are current)
   - the boundary ratchets: PolyFun, PMF/SPMF, broad expose, complexity backend,
     Extern and Interop isolation
-  - lake exe lint-style on every library and test module
+  - lake lint -- --style-only on every library and test module
   - python3 ./scripts/check-agent-docs.py and extract-doc-fragments.py --check
 
 Optional checks:
@@ -53,7 +53,8 @@ fi
 
 PROOF_LIBS=(ToMathlib VCVio LatticeCrypto Extern HashSig Examples VCVioWidgets)
 BUILD_LOG="$(mktemp "${TMPDIR:-/tmp}/vcvio-validate-build.XXXXXX")"
-trap 'rm -f "$BUILD_LOG"' EXIT
+TEST_LOG="$(mktemp "${TMPDIR:-/tmp}/vcvio-validate-test.XXXXXX")"
+trap 'rm -f "$BUILD_LOG" "$TEST_LOG"' EXIT
 
 echo "# Building the proof libraries"
 lake build "${PROOF_LIBS[@]}" 2>&1 | tee "$BUILD_LOG"
@@ -71,6 +72,8 @@ python3 ./scripts/check-warning-log.py "$BUILD_LOG" "${warning_args[@]}" \
 echo ""
 echo "# Checking generated umbrella modules"
 python3 ./scripts/test-check-imports.py
+python3 ./scripts/test-validation.py
+python3 ./scripts/test-lint.py
 ./scripts/check-imports.sh
 
 echo ""
@@ -90,15 +93,7 @@ bash scripts/check-interop-isolation.sh
 
 echo ""
 echo "# Running the text-based style linters"
-# `lake exe lint-style` resolves to Mathlib's linter (the project defines no `lint-style` exe, so
-# no FFI backend is linked). Libraries are passed by name; the test modules are expanded from git
-# because `HashSigTest` has no umbrella and `LatticeCryptoTest.lean` is curated.
-test_modules=()
-while IFS= read -r module; do
-  test_modules+=("$module")
-done < <(git ls-files 'VCVioTest/*.lean' 'LatticeCryptoTest/*.lean' \
-  'HashSigTest/*.lean' | sed -e 's/\.lean$//' -e 's#/#.#g')
-lake exe lint-style "${PROOF_LIBS[@]}" Interop "${test_modules[@]}"
+lake lint -- --style-only
 
 echo ""
 echo "# Checking the agent documentation"
@@ -108,11 +103,7 @@ python3 ./scripts/extract-doc-fragments.py --check
 if (( run_lint )); then
   echo ""
   echo "# Running the environment linters"
-  # One process per library bounds peak memory. A single `lake lint` process retains each imported
-  # environment and has exceeded the hosted runner's memory after a full build.
-  for lib in "${PROOF_LIBS[@]}"; do
-    lake exe runLinter --no-build "$lib"
-  done
+  lake lint -- --env-only --no-build
 fi
 
 if (( run_test )); then
@@ -120,10 +111,14 @@ if (( run_test )); then
   echo "# Running lake test"
   if (( run_ffi )); then
     git submodule update --init --recursive
-    lake test -- --ffi
+    lake test -- --ffi 2>&1 | tee "$TEST_LOG"
   else
-    lake test
+    lake test 2>&1 | tee "$TEST_LOG"
   fi
+  python3 ./scripts/check-warning-log.py "$TEST_LOG" \
+    --path-prefix VCVioTest/ --path-prefix VCVioTest.lean \
+    --path-prefix LatticeCryptoTest/ --path-prefix LatticeCryptoTest.lean \
+    --path-prefix HashSigTest/ --label 'test-library warnings'
 fi
 
 if (( run_axioms )); then

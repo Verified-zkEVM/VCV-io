@@ -6,6 +6,7 @@ Authors: Devon Tuma
 
 module
 public import VCVio.EvalDist.Option
+public import VCVio.EvalDist.Expectation
 public import VCVio.OracleComp.Constructions.SampleableType
 public import Mathlib.Tactic.Positivity.Finset
 public import ToMathlib.Data.ENNReal.Finiteness
@@ -59,6 +60,29 @@ example : Pr[= (true, 0) | coinDie] * 3 + Pr[⊥ | coinDie] / 2 ≠ ⊤ := by fi
 so the bound is supplied by hand. -/
 example (mx : m α) (g : α → ℝ≥0∞) (c : ℝ≥0∞) (hc : c ≠ ⊤) (h : ∀ x, g x ≤ c) :
     OracleComp.EvalDist.expectedValue mx g ≠ ⊤ :=
-  ne_top_of_le_ne_top hc (OracleComp.EvalDist.expectedValue_le_of_le mx h)
+  OracleComp.EvalDist.expectedValue_ne_top_of_le mx hc h
+
+example [Finite α] (mx : m α) (g : α → ℝ≥0∞) (hg : ∀ x, g x ≠ ⊤) :
+    OracleComp.EvalDist.expectedValue mx g + 1 ≠ ⊤ := by finiteness
+
+/-- A finite output type still requires finiteness of the functional. -/
+example [Finite α] (mx : m α) (g : α → ℝ≥0∞) (hg : ∀ x, g x ≠ ⊤) :
+    OracleComp.EvalDist.expectedValue mx g ≠ ⊤ := by
+  fail_if_success solve | clear hg; finiteness
+  finiteness
+
+/-- Pointwise finiteness alone does not bound an infinite sum. -/
+example (mx : ProbComp ℕ) (g : ℕ → ℝ≥0∞) (hg : ∀ x, g x ≠ ⊤) :
+    (∀ x, g x ≠ ⊤) ∧
+      OracleComp.EvalDist.expectedValue mx g = OracleComp.EvalDist.expectedValue mx g := by
+  fail_if_success have : OracleComp.EvalDist.expectedValue mx g ≠ ⊤ := by finiteness
+  exact ⟨hg, rfl⟩
+
+/-- Local abbreviations can be exposed explicitly without changing global unfolding. -/
+example (mx : m α) (p : α → Prop) :
+    let mass := Pr[ p | mx]
+    mass + 1 ≠ ⊤ := by
+  dsimp only
+  finiteness
 
 end VCVioTest.Finiteness

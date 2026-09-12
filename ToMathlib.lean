@@ -45,7 +45,9 @@ public import ToMathlib.Logic.Basic
 public import ToMathlib.MeasureTheory.DiscreteInstances
 public import ToMathlib.MeasureTheory.MeasurableSpace.Except
 public import ToMathlib.MeasureTheory.MeasurableSpace.Option
+public import ToMathlib.MeasureTheory.Measure.Bounds
 public import ToMathlib.MeasureTheory.Measure.Coupling
+public import ToMathlib.MeasureTheory.Measure.IndependentDraws
 public import ToMathlib.MeasureTheory.Measure.Monotone
 public import ToMathlib.MeasureTheory.Measure.Option
 public import ToMathlib.MeasureTheory.Measure.Subprobability

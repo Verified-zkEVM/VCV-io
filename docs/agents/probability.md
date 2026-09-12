@@ -9,7 +9,14 @@ Mathlib measures for closed denotations, kernels for environment/state-indexed c
 effect-preserving outcome types for transformers, and keep `Pr[...]` as the discrete compatibility
 surface. [`docs/reading/`](../reading/README.md) indexes the full design record.
 
-The primary notation is measure-valued: `𝒟[mx] : Measure α`. The finite distribution API is
+The primary notation is measure-valued: `𝒟[mx] : Measure α`. The generic classes and Giry laws
+live in `VCVio.EvalDist.Defs.Measure.Core`; the direct free-program instances live in
+`VCVio.EvalDist.PFunctorMeasure.Core`. These core modules do not import a PMF/SPMF backend.
+`VCVio.EvalDist.Monad.Measure` provides `evalDist_bind_bind_swap` for jointly measurable
+continuations and `evalDist_bind_bind_bind_rotate` for discrete intermediate results. Their
+measure-level proofs use Tonelli's theorem and preserve subprobability mass.
+
+The finite distribution API is
 explicit as `evalSPMF mx` / `𝒮[mx]`, and `Pr[...]` remains the discrete compatibility façade. One
 class connects the two: `DiscreteEvalDistCompatible m` says that integrating a measurable
 functional against `𝒟[mx]` is the façade expectation `∑' x, Pr[= x | mx] * g x`. Everything else
@@ -45,7 +52,7 @@ with `{none}` mass `Pr[⊥ | mx]`, the success mass of `bind`/`map` in `expected
 
 | Definition | Type | Notation | Defined in |
 |-----------|------|----------|------------|
-| `evalDist mx` | `Measure α` | `𝒟[mx]` | `EvalDist/Defs/Measure.lean` |
+| `evalDist mx` | `Measure α` | `𝒟[mx]` | `EvalDist/Defs/Measure/Core.lean` |
 | `evalSPMF mx` | `SPMF α` | `𝒮[mx]` | `EvalDist/Defs/Basic.lean` |
 | `probOutput mx x` | `ℝ≥0∞` | `Pr[= x \| mx]` | `EvalDist/Defs/Basic.lean` |
 | `probEvent mx p` | `ℝ≥0∞` | `Pr[p \| mx]` | `EvalDist/Defs/Basic.lean` |
@@ -367,6 +374,42 @@ disable a rule per call (`grind [-bind_pure]`), ignore the default set entirely
 closes, which is the easiest way to make a fragile call site independent of the default set.
 
 ## Normal forms and the tactic contract
+
+### Registered interfaces
+
+Use the tactic that matches the mathematical obligation:
+
+| Obligation | Interface |
+|---|---|
+| Ordered expectations or postconditions | `gcongr with x hx` on `expectedValue` or `OracleComp.ProgramLogic.wp` exposes support membership. |
+| An expectation of a mapped computation | `simp` precomposes the payoff using `expectedValue_map`, retaining the expectation head. |
+| Directed replacement inside a probability bound | Import `Mathlib.Tactic.GRewrite`; use `grw [h]` for inequalities and `apply_rw [h]` for event implications. A support-restricted rewrite theorem can leave membership as a side goal. |
+| Measure bind ordered in its continuation | `Measure.bind_mono_right_of_forall` supports `gcongr` and `grw`, with explicit `AEMeasurable` side conditions. Use `Measure.bind_mono_right` directly for an almost-everywhere bound. |
+| A finite expectation on a finite result type | `finiteness` uses `expectedValue_ne_top_of_finite` / `wp_ne_top_of_finite` and asks for finite functional values. |
+| A supplied finite bound on an arbitrary result type | Apply `expectedValue_ne_top_of_le mx hc h`; the bound remains explicit. |
+| Nonnegative total variation arithmetic | Import `VCVio.EvalDist.TVDist.Positivity` and use `positivity`; this also arrives through `VCVio.ProgramLogic.Tactics`. |
+| Measurability through optional or exception-valued maps | `fun_prop` uses `Option.measurable_map`, `Except.measurable_map`, and `Option.measurable_elim'` on arbitrary measurable spaces. |
+
+For a local abbreviation hiding a probability, use a targeted `change` or `dsimp only` before
+`finiteness`. For named definitions, `finiteness (add unfold [name])` is also available.
+`finiteness [proof]` supplies an explicit finiteness fact. The tactic does not infer finiteness
+of an expectation over an infinite result type merely from pointwise finiteness of its functional.
+
+The registrations and their failure boundaries are exercised in `VCVioTest/Tactic/` and
+`VCVioTest/ProgramLogic/GCongr.lean`. The expression-specific `fun_prop` rules avoid globally
+registering eliminator theorems whose conclusion is the unrestricted `Measurable f`.
+
+For a sum of `wp` bounds, rewrite with `wp_eq_expectedValue` and
+`← expectedValue_finsetSum`, then apply `expectedValue_le_of_support`. This avoids expanding
+probability sums and proving the zero-mass cases separately. To keep a whole sum as the next
+congruence obligation, use `gcongr (OracleComp.ProgramLogic.wp _ (fun _ => ?_)) with x`.
+
+See the [generalized-relation investigation](../reading/generalized-relation-automation.md) for
+tested rewrite directions, theorem-shape requirements, and the distinction between `gcongr`
+and `grw` registrations. Measure-bind rewriting requires importing
+`ToMathlib.MeasureTheory.Measure.Monotone`; pointwise order does not discharge measurability.
+
+### Normalization discipline
 
 The simp, grind and `gcongr` sets of the probability layer are designed around one *normal-form
 ladder*: one canonical spelling per rung, mass-left throughout, each rung reached from the one
