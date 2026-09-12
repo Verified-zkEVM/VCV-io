@@ -30,12 +30,15 @@ public import VCVioTest.ProbabilityTactics
 public import VCVioTest.ProgramLogic.GCongr
 public import VCVioTest.QueryHom
 public import VCVioTest.RoundByRound.OneRound
+public import VCVioTest.SMDTDSPR
 public import VCVioTest.SMDTDSPRFinalValidity
 public import VCVioTest.SMDTOpenPREFinalValidity
 public import VCVioTest.SMDTPRE
 public import VCVioTest.SMDTPREFinalValidity
+public import VCVioTest.SMDTRTCR
 public import VCVioTest.SMDTTCR
 public import VCVioTest.SMDTTCRFinalValidity
+public import VCVioTest.SMDTUD
 public import VCVioTest.SMDTUDFinalValidity
 public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
@@ -47,6 +50,7 @@ public import VCVioTest.Tactic.GCongr
 public import VCVioTest.Tactic.GeneralizedRelations
 public import VCVioTest.Tactic.GeneralizedRelationsExperiments
 public import VCVioTest.Tactic.Positivity
+public import VCVioTest.ToFinalValidity
 public import VCVioTest.ToMathlib.AbsDiff
 public import VCVioTest.UniformOn
 public import VCVioTest.UniversePolymorphism

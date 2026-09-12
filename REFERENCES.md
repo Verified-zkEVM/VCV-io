@@ -1,8 +1,8 @@
 # References
 
-This file centralizes public external references cited in `README.md` and `docs/agents/`.
-When adding new references to shared docs, prefer linking here instead of duplicating partial
-citations inline.
+This file centralizes public external references cited in `README.md`, `docs/agents/`, and the
+module docstrings of the Lean libraries. When adding new references to shared docs, prefer
+linking here instead of duplicating partial citations inline.
 
 ## Papers
 
@@ -54,6 +54,77 @@ Public abstract: <https://arxiv.org/abs/1410.3735>
 
 Used in:
 - `README.md`
+
+### BDHMS24
+
+Manuel Barbosa, François Dupressoir, Andreas Hülsing, Matthias Meijers, and Pierre-Yves Strub.
+*A Tight Security Proof for SPHINCS+, Formally Verified*.
+Cryptology ePrint Archive, Report 2024/910, 2024.
+Preprint: <https://eprint.iacr.org/2024/910>
+
+Used in:
+- `docs/design/slh-dsa-fips205-generalization.md`
+- `VCVio/CryptoFoundations/TweakableHash.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/Collection.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCRFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTPRE.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTPREFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTDSPR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTDSPRFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTOpenPREFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/ToFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/ToFinalValidity/Core.lean`
+
+### DKKW25
+
+Justin Drake, Dmitry Khovratovich, Mikhail Kudinov, and Benedikt Wagner.
+*Hash-Based Multi-Signatures for Post-Quantum Ethereum*.
+Cryptology ePrint Archive, Report 2025/055, 2025.
+Preprint: <https://eprint.iacr.org/2025/055>
+
+Used in:
+- `VCVio/CryptoFoundations/TweakableHash.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTPRE.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTDSPR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTDSPRFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTRTCR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTUD.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTUDFinalValidity.lean`
+
+### GHHM21
+
+Alex B. Grilo, Kathrin Hövelmanns, Andreas Hülsing, and Christian Majenz.
+*Tight Adaptive Reprogramming in the QROM*.
+In *Advances in Cryptology — ASIACRYPT 2021*, Lecture Notes in Computer Science 13090.
+DOI: <https://doi.org/10.1007/978-3-030-92062-3_22>
+Preprint: <https://eprint.iacr.org/2020/1361>
+
+Used in:
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTRTCR.lean`
+
+### HK22
+
+Andreas Hülsing and Mikhail Kudinov.
+*Recovering the Tight Security Proof of SPHINCS+*.
+Cryptology ePrint Archive, Report 2022/346, 2022.
+Preprint: <https://eprint.iacr.org/2022/346>
+
+Used in:
+- `VCVio/CryptoFoundations/TweakableHash.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/Collection.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCRFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTPRE.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTPREFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTDSPR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTDSPRFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTRTCR.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTUD.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTUDFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/ToFinalValidity.lean`
+- `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/ToFinalValidity/Core.lean`
 
 ## Projects and Repositories
 
