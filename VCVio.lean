@@ -165,6 +165,7 @@ public import VCVio.EvalDist.Monad.Disagreement
 public import VCVio.EvalDist.Monad.Map
 public import VCVio.EvalDist.Monad.Measure
 public import VCVio.EvalDist.Monad.Seq
+public import VCVio.EvalDist.Monad.UniformTable
 public import VCVio.EvalDist.Option
 public import VCVio.EvalDist.PFunctor
 public import VCVio.EvalDist.PFunctorMeasure
@@ -195,8 +196,10 @@ public import VCVio.OracleComp.Constructions.Fork
 public import VCVio.OracleComp.Constructions.GenerateSeed
 public import VCVio.OracleComp.Constructions.Replicate
 public import VCVio.OracleComp.Constructions.SampleableType
+public import VCVio.OracleComp.Constructions.SampleableType.MeasureCompatibility
 public import VCVio.OracleComp.Constructions.WithoutReplacement
 public import VCVio.OracleComp.EvalDist
+public import VCVio.OracleComp.EvalDist.Measure
 public import VCVio.OracleComp.FinRatPMF
 public import VCVio.OracleComp.HasQuery.Basic
 public import VCVio.OracleComp.HasQuery.Morphism

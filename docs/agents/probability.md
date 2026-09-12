@@ -16,6 +16,15 @@ live in `VCVio.EvalDist.Defs.Measure.Core`; the direct free-program instances li
 continuations and `evalDist_bind_bind_bind_rotate` for discrete intermediate results. Their
 measure-level proofs use Tonelli's theorem and preserve subprobability mass.
 
+`VCVio.EvalDist.Monad.UniformTable` supplies cell resampling/extraction, permutation,
+and injective restriction laws with explicit uniform-measure hypotheses. Its native counting
+proofs live in `ToMathlib.MeasureTheory.Measure.UniformTable`. The continuation may lose mass.
+`VCVio.OracleComp.EvalDist.Measure` gives `evalDist_bind_congr_of_support` by structural
+induction, without a probability/support bridge. These laws power the PRF tag/reader cache,
+composed-handler, and shared-observation proofs. `SampleableType.MeasureCompatibility`
+calibrates the existing sampler at the compatibility boundary; native proofs take that
+calibration as an explicit hypothesis.
+
 The finite distribution API is
 explicit as `evalSPMF mx` / `𝒮[mx]`, and `Pr[...]` remains the discrete compatibility façade. One
 class connects the two: `DiscreteEvalDistCompatible m` says that integrating a measurable
