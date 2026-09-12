@@ -6,6 +6,7 @@ public import VCVioTest.CryptoFoundations.BR93Measure
 public import VCVioTest.CryptoFoundations.ComplexityAdapters
 public import VCVioTest.CryptoFoundations.ComplexityTactics
 public import VCVioTest.CryptoFoundations.ComputationalComplexitySoundness
+public import VCVioTest.CryptoFoundations.KEMDEMMeasure
 public import VCVioTest.CryptoFoundations.OracleClosure
 public import VCVioTest.CryptoFoundations.PRFTableMeasure
 public import VCVioTest.CryptoFoundations.SignatureAlg

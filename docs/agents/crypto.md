@@ -140,6 +140,19 @@ structure BoundedAdversary {ι : Type u} [DecidableEq ι]
 
 All return `ℝ` via `.toReal` conversion from `ℝ≥0∞`. This is essential since subtraction on `ℝ≥0∞` is truncated.
 
+### KEM–DEM hybrid composition
+
+`VCVio.CryptoFoundations.KEMDEM.Measure` defines the preparation, encapsulation, and final
+observation games independently of probability. `KEMDEM.bias_compose_le` proves the
+composition bound with native measures. Both KEM message branches use `evalDist_kemGame`;
+`evalDist_demGame` performs independent-key interchange. Supply a fair coin, a lossless key
+sampler, and total Boolean hybrid outputs explicitly. Preparation and encapsulation effects
+retain their order. The `ProbCompRuntime` theorem in `KEMDEM.lean` is a compatibility adapter.
+
+`ToMathlib.MeasureTheory.Measure.Bool` provides Boolean event distance and bias algebra.
+`Measure.boolBias_bind_coin` requires total branches: missing mass is distinct from returning
+`false`, so the assumption cannot be dropped.
+
 ### Forking bounds and measure semantics
 
 `VCVio/CryptoFoundations/SeededFork.lean` and `ReplayFork.lean` prove the
