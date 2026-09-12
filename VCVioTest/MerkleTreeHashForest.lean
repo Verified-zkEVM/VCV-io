@@ -15,7 +15,7 @@ These examples pin mixed input roles, variable operation arity, ordered cap outp
 query order, query-free provided digests, and agreement with the addressed binary Merkle engine.
 -/
 
-@[expose] public section
+public section
 
 namespace VCVioTest.MerkleHashForestCanary
 

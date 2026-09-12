@@ -26,7 +26,7 @@ an intrinsically sized ordered vector of roots; one root specializes to an ordin
 commitment, while several roots model a cap without adding a synthetic parent hash.
 -/
 
-@[expose] public section
+public section
 
 namespace MerkleHashForest
 
@@ -42,7 +42,7 @@ inductive OperationInput (Payload : Type u) (Digest : Type v) (Child : Type w) w
   | payload (value : Payload)
   | child (value : Child)
   | publicConstant (value : Digest)
-deriving DecidableEq
+deriving @[expose] DecidableEq
 
 /-- A fully evaluated, variadic hash request. -/
 structure Query (OperationKind : Type u) (Context : Type v) (Address : Type w)
@@ -55,10 +55,10 @@ structure Query (OperationKind : Type u) (Context : Type v) (Address : Type w)
   address : Address
   /-- Ordered, role-tagged inputs to the operation. -/
   inputs : List (OperationInput Payload Digest Digest)
-deriving DecidableEq
+deriving @[expose] DecidableEq
 
 /-- Homogeneous oracle specification for hash-forest operations. -/
-@[reducible]
+@[expose, reducible]
 def spec (OperationKind : Type u) (Context : Type v) (Address : Type w)
     (Payload : Type x) (Digest : Type y) :
     OracleSpec (Query OperationKind Context Address Payload Digest) :=
@@ -85,6 +85,7 @@ variable {OperationKind : Type u} {Context : Type v} {Address : Type w}
   {Payload : Type x} {Digest : Type y}
 
 /-- Expose one computation tree as an ordinary single-root commitment boundary. -/
+@[expose]
 def Tree.toForest
     (tree : Tree OperationKind Context Address Payload Digest) :
     Forest OperationKind Context Address Payload Digest 1 :=
@@ -97,6 +98,8 @@ an exposed definition to depend on private implementation declarations. Keep cal
 documented `evaluateTreeWithHash` and `evaluateTree` entry points. -/
 mutual
 
+/-- Fold one tree into a lifted digest, retaining the payload universe. -/
+@[expose]
 def evaluateTreeWithHash
     (answer : Query OperationKind Context Address Payload Digest → Digest)
     (tree : Tree OperationKind Context Address Payload Digest) : ULift.{x} Digest := match tree with
@@ -108,6 +111,8 @@ def evaluateTreeWithHash
       inputs := evaluateInputsWithHash answer inputs
     })
 
+/-- Evaluate an ordered list of operation inputs under a deterministic handler. -/
+@[expose]
 def evaluateInputsWithHash
     (answer : Query OperationKind Context Address Payload Digest → Digest) :
     List (OperationInput Payload Digest
@@ -116,6 +121,8 @@ def evaluateInputsWithHash
   | [] => []
   | input :: inputs => evaluateInputWithHash answer input :: evaluateInputsWithHash answer inputs
 
+/-- Evaluate a recursive child while preserving payload and constant input roles. -/
+@[expose]
 def evaluateInputWithHash
     (answer : Query OperationKind Context Address Payload Digest → Digest) :
     OperationInput Payload Digest (Tree OperationKind Context Address Payload Digest) →
@@ -128,6 +135,8 @@ end
 
 mutual
 
+/-- Evaluate one tree with queries after its ordered recursive inputs. -/
+@[expose]
 def evaluateTree {OperationKind : Type u} {Context : Type v} {Address : Type w}
     {Payload : Type x} {Digest : Type y} {m : Type y → Type z} [Monad m]
     [HasQuery (spec OperationKind Context Address Payload Digest) m]
@@ -142,6 +151,8 @@ def evaluateTree {OperationKind : Type u} {Context : Type v} {Address : Type w}
           inputs := evaluatedInputs
         }
 
+/-- Evaluate inputs left to right before invoking the continuation. -/
+@[expose]
 def evaluateInputs {OperationKind : Type u} {Context : Type v} {Address : Type w}
     {Payload : Type x} {Digest : Type y} {m : Type y → Type z} [Monad m]
     [HasQuery (spec OperationKind Context Address Payload Digest) m] :
@@ -155,6 +166,8 @@ def evaluateInputs {OperationKind : Type u} {Context : Type v} {Address : Type w
         evaluateInputs inputs fun evaluatedInputs =>
           next (evaluatedInput :: evaluatedInputs)
 
+/-- Evaluate a child, or pass through a payload or constant, to the continuation. -/
+@[expose]
 def evaluateInput {OperationKind : Type u} {Context : Type v} {Address : Type w}
     {Payload : Type x} {Digest : Type y} {m : Type y → Type z} [Monad m]
     [HasQuery (spec OperationKind Context Address Payload Digest) m] :
@@ -173,12 +186,14 @@ end
 end Internal
 
 /-- Evaluate one hash-computation tree under a deterministic query implementation. -/
+@[expose]
 def evaluateTreeWithHash
     (answer : Query OperationKind Context Address Payload Digest → Digest)
     (tree : Tree OperationKind Context Address Payload Digest) : Digest :=
   (Internal.evaluateTreeWithHash answer tree).down
 
 /-- Evaluate an ordered forest under a deterministic query implementation. -/
+@[expose]
 def evaluateForestWithHash {rootCount : Nat}
     (answer : Query OperationKind Context Address Payload Digest → Digest)
     (forest : Forest OperationKind Context Address Payload Digest rootCount) :
@@ -190,6 +205,7 @@ left to right.
 
 Only child digests are bound inside the monad; higher-universe payloads are threaded through
 continuations without becoming monadic result values. -/
+@[expose]
 def evaluateTree {OperationKind : Type u} {Context : Type v} {Address : Type w}
     {Payload : Type x} {Digest : Type y} {m : Type y → Type*} [Monad m]
     [HasQuery (spec OperationKind Context Address Payload Digest) m]
@@ -197,6 +213,7 @@ def evaluateTree {OperationKind : Type u} {Context : Type v} {Address : Type w}
   Internal.evaluateTree tree
 
 /-- Evaluate the roots of a forest from left to right. -/
+@[expose]
 def evaluateForest {OperationKind : Type u} {Context : Type v} {Address : Type w}
     {Payload : Type x} {Digest : Type y} {m : Type y → Type*} [Monad m]
     [HasQuery (spec OperationKind Context Address Payload Digest) m] :

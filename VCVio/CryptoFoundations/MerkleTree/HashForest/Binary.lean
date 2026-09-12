@@ -20,7 +20,7 @@ engine a proved specialization of the variadic forest semantics rather than a se
 implementation of binary Merkle construction.
 -/
 
-@[expose] public section
+public section
 
 namespace MerkleHashForest
 
@@ -32,18 +32,19 @@ universe u v w x y
 inductive BinaryOperationKind where
   | leaf
   | node
-deriving DecidableEq
+deriving @[expose] DecidableEq
 
 /-- Leaf and internal addresses remain disjoint in an embedded binary tree. -/
 inductive BinaryAddress (LeafAddress : Type u) (NodeAddress : Type v) where
   | leaf (address : LeafAddress)
   | node (address : NodeAddress)
-deriving DecidableEq
+deriving @[expose] DecidableEq
 
 variable {LeafAddress : Type u} {NodeAddress : Type v}
   {Payload : Type w} {EncodedLeaf : Type x} {Digest : Type y}
 
 /-- Translate one tagged binary Merkle query into the general operation-query language. -/
+@[expose]
 def binaryQuery :
     HashQuery LeafAddress NodeAddress EncodedLeaf Digest →
       Query BinaryOperationKind Unit (BinaryAddress LeafAddress NodeAddress) EncodedLeaf Digest
@@ -71,6 +72,7 @@ theorem binaryQuery_injective :
   all_goals simp_all
 
 /-- Restrict a general hash-forest implementation to the translated binary query language. -/
+@[expose]
 def binaryAnswer
     (answer : Query BinaryOperationKind Unit (BinaryAddress LeafAddress NodeAddress)
       EncodedLeaf Digest → Digest) :
@@ -79,6 +81,7 @@ def binaryAnswer
 
 /-- Interpret binary Merkle queries by issuing their injective translations in the general
 hash-forest oracle. -/
+@[expose]
 def binaryQueryImpl :
     QueryImpl (MerkleTreeHashing.spec LeafAddress NodeAddress EncodedLeaf Digest)
       (OracleComp (spec BinaryOperationKind Unit (BinaryAddress LeafAddress NodeAddress)
@@ -88,6 +91,7 @@ def binaryQueryImpl :
       EncodedLeaf Digest) (binaryQuery query)
 
 /-- Recursively translate a binary Merkle computation at an arbitrary subtree position. -/
+@[expose]
 def binaryTreeAt {s : Skeleton}
     (leafAddress : SkeletonLeafIndex s → LeafAddress)
     (nodeAddress : SkeletonInternalIndex s → NodeAddress)
@@ -110,6 +114,7 @@ def binaryTreeAt {s : Skeleton}
       .operation .node () (.node (nodeAddress .ofInternal)) [.child leftTree, .child rightTree]
 
 /-- Translate an addressed binary Merkle construction into one hash-computation tree. -/
+@[expose]
 def binaryTree {s : Skeleton}
     (addressing : Addressing s LeafAddress NodeAddress)
     (leafHashing : LeafHashing Payload EncodedLeaf Digest)
@@ -118,6 +123,7 @@ def binaryTree {s : Skeleton}
   binaryTreeAt addressing.leaf addressing.node leafHashing payloads
 
 /-- The one-root forest corresponding to an ordinary binary Merkle commitment. -/
+@[expose]
 def binaryForest {s : Skeleton}
     (addressing : Addressing s LeafAddress NodeAddress)
     (leafHashing : LeafHashing Payload EncodedLeaf Digest)
