@@ -13,6 +13,7 @@ public import VCVio.OracleComp.Coercions.SubSpec
 public import VCVio.OracleComp.QueryTracking.LoggingOracle
 public import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 public import VCVio.OracleComp.SimSemantics.Append
+public import VCVio.EvalDist.Monad.Measure
 
 /-!
 # Bellare-Rogaway 1993 Encryption
@@ -35,8 +36,9 @@ The security proof follows the standard three-step outline:
    probability `1/2`.
 
 The bad event is then reduced to the repo's trapdoor-preimage experiment
-(`tdpAdvantage`) by inspecting the adversary's random-oracle queries. The proof
-bodies remain `sorry` for now.
+(`tdpAdvantage`) by inspecting the adversary's random-oracle queries. The bad-event
+reduction uses a shared transcript and measure-event inclusion. The up-to-bad game
+hop is the remaining proof obligation.
 -/
 
 @[expose] public section
@@ -223,9 +225,9 @@ omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
   [Inhabited M] [AddCommGroup M] [Inhabited Rand] in
 /-- A logged run of a lifted `ProbComp` sample whose transcript is discarded collapses to the
 plain sample threading the cache unchanged: only the sampled value and resulting cache survive. -/
-private lemma bind_logged_lift_of_log_unused {β : Type} (p : ProbComp β)
+private lemma bind_logged_lift_of_log_unused {β γ : Type} (p : ProbComp β)
     (s : (Rand →ₒ M).QueryCache)
-    (cont : β → (Rand →ₒ M).QueryCache → ProbComp Bool) :
+    (cont : β → (Rand →ₒ M).QueryCache → ProbComp γ) :
     ((simulateQ roQueryImpl.withLogging (liftM p)).run.run s >>=
         fun x => cont x.1.1 x.2) = p >>= fun a => cont a s := by
   have hfst : (fun x => (x.1.1, x.2)) <$>
@@ -244,6 +246,77 @@ private lemma bind_logged_lift_of_log_unused {β : Type} (p : ProbComp β)
             fun q => cont q.1 q.2 := by rw [bind_map_left]
     _ = (p >>= fun a => pure (a, s)) >>= fun q => cont q.1 q.2 := by rw [hfst]
     _ = p >>= fun a => cont a s := by rw [bind_assoc]; simp only [pure_bind]
+
+/-! ## Random-oracle transcript observations -/
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] in
+private def rightLog (log : QueryLog (RO_Spec Rand M)) : QueryLog (RO_Spec Rand M) :=
+  log.filter fun entry => entry.1.isRight
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] in
+private def runRightLog {α : Type} (mx : OracleComp (RO_Spec Rand M) α)
+    (cache : (Rand →ₒ M).QueryCache) :
+    ProbComp ((α × QueryLog (RO_Spec Rand M)) × (Rand →ₒ M).QueryCache) :=
+  (fun x => ((x.1.1, rightLog x.1.2), x.2)) <$>
+    (simulateQ roQueryImpl.withLogging mx).run.run cache
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] in
+private lemma runRightLog_bind {α β : Type} (mx : OracleComp (RO_Spec Rand M) α)
+    (f : α → OracleComp (RO_Spec Rand M) β) (cache : (Rand →ₒ M).QueryCache) :
+    runRightLog (mx >>= f) cache = (do
+      let x ← runRightLog mx cache
+      let y ← runRightLog (f x.1.1) x.2
+      pure ((y.1.1, x.1.2 ++ y.1.2), y.2)) := by
+  simp only [runRightLog, run_run_withLogging_bind, map_bind, map_pure, bind_map_left,
+    rightLog, List.filter_append]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] in
+private lemma runRightLog_pure {α : Type} (a : α) (cache : (Rand →ₒ M).QueryCache) :
+    runRightLog (pure a) cache = pure ((a, []), cache) := by
+  simp [runRightLog, rightLog, StateT.run_pure]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] in
+private lemma runRightLog_lift {α : Type} (p : ProbComp α)
+    (cache : (Rand →ₒ M).QueryCache) :
+    runRightLog (liftM p) cache = p >>= fun a => pure ((a, []), cache) := by
+  unfold runRightLog
+  rw [map_eq_pure_bind]
+  trans (simulateQ roQueryImpl.withLogging (liftM p)).run.run cache >>=
+    fun x => pure ((x.1.1, []), x.2)
+  · apply bind_congr_of_forall_mem_support
+    intro x hx
+    have hlog : rightLog x.1.2 = [] := by
+      apply List.filter_eq_nil_iff.mpr
+      intro e he
+      obtain ⟨a, ha⟩ := forall_inl_of_mem_support_liftLog p cache x hx e he
+      simp [ha]
+    rw [hlog]
+  · exact bind_logged_lift_of_log_unused p cache (fun a s => pure ((a, []), s))
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] [DecidableEq Rand] [SampleableType M] in
+private lemma any_rightLog (log : QueryLog (RO_Spec Rand M)) (p : Rand → Bool) :
+    (rightLog log).any (fun e => match e.1 with | .inl _ => false | .inr r => p r) =
+      log.any (fun e => match e.1 with | .inl _ => false | .inr r => p r) := by
+  simp only [rightLog, List.any_filter]
+  congr 1
+  funext ⟨t, u⟩
+  cases t <;> simp
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand]
+  [Inhabited M] [AddCommGroup M] [Inhabited Rand] [DecidableEq Rand] [SampleableType M] in
+private lemma find?_rightLog (log : QueryLog (RO_Spec Rand M)) (p : Rand → Bool) :
+    (rightLog log).find? (fun e => match e.1 with | .inl _ => false | .inr r => p r) =
+      log.find? (fun e => match e.1 with | .inl _ => false | .inr r => p r) := by
+  simp only [rightLog, List.find?_filter]
+  congr 1
+  funext ⟨t, u⟩
+  cases t <;> simp
 
 omit [Fintype Rand] [Fintype M] [DecidableEq M] [SampleableType Rand] [Inhabited Rand]
   [Inhabited M] in
@@ -459,372 +532,173 @@ private lemma find?_inr_of_anyInr (pk : PK) (r : Rand)
     simp only [decide_eq_true_eq] at hr'
     exact ⟨r', u, rfl, hr'⟩
 
+/-- Whether a transcript contains a query at the hidden challenge input. -/
+private def transcriptBad (r : Rand) (log : QueryLog (RO_Spec Rand M)) : Bool :=
+  log.any fun entry => match entry.1 with
+    | .inl _ => false
+    | .inr r' => decide (r' = r)
+
+/-- The first logged preimage of the challenge, with the inverter's default on failure. -/
+private def transcriptPreimage (pk : PK) (y : Rand) (log : QueryLog (RO_Spec Rand M)) : Rand :=
+  match log.find? (fun entry => match entry.1 with
+    | .inl _ => false
+    | .inr r => decide (tdp.forward pk r = y)) with
+  | some entry => match entry.1 with
+    | .inl _ => default
+    | .inr r => r
+  | none => default
+
+/-- The logged challenge interaction, including the cache threaded from selection to guessing. -/
+private def challengeTranscript (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M))
+    (pk : PK) (y : Rand) : ProbComp (QueryLog (RO_Spec Rand M)) := do
+  let choice ← runRightLog (adv.choose pk) ∅
+  let b ← $ᵗ Bool
+  let h ← $ᵗ M
+  let guess ← runRightLog (adv.guess choice.1.1.2.2
+    (y, h + if b then choice.1.1.1 else choice.1.1.2.1)) choice.2
+  return choice.1.2 ++ guess.1.2
+
+/-- One shared challenge and transcript for the bad-event and inversion observations. -/
+private def challengeTranscriptExp (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
+    ProbComp (PK × Rand × QueryLog (RO_Spec Rand M)) := do
+  let (pk, _) ← tdp.keygen
+  let r ← $ᵗ Rand
+  let log ← challengeTranscript adv pk (tdp.forward pk r)
+  return (pk, r, log)
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] [Inhabited Rand] in
+private lemma badEventExp_eq (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
+    badEventExp tdp adv = (do
+      let (pk, _) ← tdp.keygen
+      let choice ← runRightLog (adv.choose pk) ∅
+      let b ← $ᵗ Bool
+      let r ← $ᵗ Rand
+      let h ← $ᵗ M
+      let guess ← runRightLog (adv.guess choice.1.1.2.2
+        (tdp.forward pk r, h + if b then choice.1.1.1 else choice.1.1.2.1)) choice.2
+      return transcriptBad r (choice.1.2 ++ guess.1.2)) := by
+  have projected : badEventExp tdp adv = (do
+      let x ← runRightLog (show OracleComp (RO_Spec Rand M) Rand from do
+        let (pk, _) ← liftM tdp.keygen
+        let (m₁, m₂, st) ← adv.choose pk
+        let b ← liftM ($ᵗ Bool)
+        let r ← liftM ($ᵗ Rand)
+        let h ← liftM ($ᵗ M)
+        let _ ← adv.guess st (tdp.forward pk r, h + if b then m₁ else m₂)
+        return r) ∅
+      return transcriptBad x.1.1 x.1.2) := by
+    simp only [badEventExp, runRightLog, StateT.run'_eq, bind_map_left]
+    apply bind_congr
+    intro x
+    simp only [transcriptBad, any_rightLog, Bool.decide_eq_true]
+    rfl
+  rw [projected]
+  simp only [runRightLog_bind, runRightLog_lift, runRightLog_pure, bind_assoc,
+    pure_bind, List.nil_append, List.append_nil]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] [SampleableType Rand] in
+private lemma inverter_eq (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) (pk : PK)
+    (y : Rand) :
+    inverter tdp adv pk y = transcriptPreimage (tdp := tdp) pk y <$>
+      challengeTranscript adv pk y := by
+  have projected : inverter tdp adv pk y = (do
+      let x ← runRightLog (show OracleComp (RO_Spec Rand M) Unit from do
+        let (m₁, m₂, st) ← adv.choose pk
+        let b ← liftM ($ᵗ Bool)
+        let h ← liftM ($ᵗ M)
+        let _ ← adv.guess st (y, h + if b then m₁ else m₂)
+        return ()) ∅
+      return transcriptPreimage (tdp := tdp) pk y x.1.2) := by
+    simp only [inverter, runRightLog, StateT.run'_eq, bind_map_left]
+    apply bind_congr
+    intro x
+    simp only [transcriptPreimage, find?_rightLog]
+    have hpure (found : Option ((t : (RO_Spec Rand M).Domain) ×
+        (RO_Spec Rand M).Range t)) :
+        (match found with
+        | some entry => match entry.1 with
+          | .inl _ => (pure default : ProbComp Rand)
+          | .inr r => pure r
+        | none => pure default) = pure (match found with
+        | some entry => match entry.1 with
+          | .inl _ => default
+          | .inr r => r
+        | none => default) := by
+      rcases found with _ | ⟨t, u⟩
+      · rfl
+      · cases t <;> rfl
+    exact hpure _
+  rw [projected]
+  simp only [challengeTranscript, runRightLog_bind, runRightLog_lift, runRightLog_pure,
+    bind_assoc, pure_bind, List.nil_append, List.append_nil, map_bind, map_pure]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] in
+private lemma tdpExp_eq_observation (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
+    tdpExp tdp (inverter tdp adv) = (fun x : PK × Rand × QueryLog (RO_Spec Rand M) =>
+      decide (tdp.forward x.1 (transcriptPreimage (tdp := tdp) x.1
+        (tdp.forward x.1 x.2.1) x.2.2) = tdp.forward x.1 x.2.1)) <$>
+      challengeTranscriptExp (tdp := tdp) adv := by
+  simp only [tdpExp, inverter_eq, challengeTranscriptExp, map_bind, map_pure,
+    bind_map_left]
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] [Inhabited Rand] in
+/-- The bad-event experiment observes the shared challenge transcript under any lawful
+measure semantics. Only independent challenge draws are reordered. -/
+private theorem measure_badEventExp_eq_observation
+    [EvalDistSemantics ProbComp] [LawfulEvalDistSemantics ProbComp]
+    (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
+    𝒟[badEventExp tdp adv] = 𝒟[(fun x : PK × Rand × QueryLog (RO_Spec Rand M) =>
+      transcriptBad x.2.1 x.2.2) <$> challengeTranscriptExp (tdp := tdp) adv] := by
+  let : MeasurableSpace (PK × SK) := ⊤
+  let : MeasurableSpace Rand := ⊤
+  let : MeasurableSpace
+      (((M × M × adv.State) × QueryLog (RO_Spec Rand M)) × (Rand →ₒ M).QueryCache) := ⊤
+  rw [badEventExp_eq]
+  simp only [challengeTranscriptExp, challengeTranscript, map_bind, map_pure,
+    bind_assoc, pure_bind, evalDist_bind_of_discrete tdp.keygen]
+  apply MeasureTheory.Measure.bind_congr_right
+  apply Filter.Eventually.of_forall
+  intro pksk
+  exact evalDist_bind_bind_bind_rotate _ _ _ _
+    (measurable_from_prod_countable_left fun _ => .of_discrete)
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] [SampleableType Rand]
+  [SampleableType M] [AddCommGroup M] in
+private lemma transcriptBad_implies_preimage (pk : PK) (r : Rand)
+    (log : QueryLog (RO_Spec Rand M)) (hbad : transcriptBad r log = true) :
+    tdp.forward pk (transcriptPreimage (tdp := tdp) pk (tdp.forward pk r) log) =
+      tdp.forward pk r := by
+  obtain ⟨r₀, m₀, hfind, hforward⟩ :=
+    find?_inr_of_anyInr (tdp := tdp) pk r log hbad
+  unfold transcriptPreimage
+  rw [hfind]
+  exact hforward
+
+omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] in
+/-- Bad BR93 challenge transcripts are a subevent of successful trapdoor inversion.
+The proof uses the shared transcript's measure and pointwise event inclusion. -/
+theorem measure_badEventExp_le_tdpExp
+    [EvalDistSemantics ProbComp] [LawfulEvalDistSemantics ProbComp]
+    (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
+    𝒟[badEventExp tdp adv] {true} ≤ 𝒟[tdpExp tdp (inverter tdp adv)] {true} := by
+  let : MeasurableSpace (PK × Rand × QueryLog (RO_Spec Rand M)) := ⊤
+  rw [measure_badEventExp_eq_observation, tdpExp_eq_observation,
+    evalDist_map_of_discrete, evalDist_map_of_discrete,
+    MeasureTheory.Measure.map_apply .of_discrete (by measurability),
+    MeasureTheory.Measure.map_apply .of_discrete (by measurability)]
+  apply MeasureTheory.measure_mono
+  intro x hx
+  change decide (_ = _) = true
+  exact decide_eq_true (transcriptBad_implies_preimage (tdp := tdp) x.1 x.2.1 x.2.2 hx)
+
 omit [Fintype Rand] [Fintype M] [DecidableEq M] [Inhabited M] in
 /-- The bad event is bounded by the trapdoor-preimage advantage of the inverter
 constructed from the adversary's random-oracle transcript. -/
 theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
-    badEventProb tdp adv ≤
-      (tdpAdvantage tdp (inverter tdp adv)).toReal := by
+    badEventProb tdp adv ≤ (tdpAdvantage tdp (inverter tdp adv)).toReal := by
   rw [badEventProb, tdpAdvantage]
-  refine (ENNReal.toReal_le_toReal (ne_top_of_le_ne_top ENNReal.one_ne_top probOutput_le_one)
-    (ne_top_of_le_ne_top ENNReal.one_ne_top probOutput_le_one)).mpr ?_
-  -- Couple the bad-event experiment with the trapdoor-inversion experiment by identifying the
-  -- freshly sampled challenge randomness `r` of `badEventExp` with the inversion challenge `x`.
-  -- Both experiments run the same logged guessing game; peel each logged run into a plain
-  -- `ProbComp` via `run_run_withLogging_bind`, drop the uniform-sample (`Sum.inl`) transcript
-  -- entries from the bad/inverter predicates using `forall_inl_of_mem_support_liftLog` (they are
-  -- invisible to the right-oracle `List.any`/`List.find?`), and align the challenge randomness.
-  -- On every transcript where the bad event fires, `find?_inr_of_anyInr` exhibits a logged query
-  -- whose forward image matches the challenge, so the inverter returns a valid preimage and the
-  -- inversion experiment succeeds; hence `bad ⟹ win` pointwise and the probabilities compare.
-  have hbad : Pr[= true | badEventExp tdp adv] = Pr[= true | (do
-      let x ← (simulateQ roQueryImpl.withLogging (liftM tdp.keygen)).run.run ∅
-      let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose x.1.1.1)).run.run x.2
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run x_2.2
-      let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
-      let x_5 ← (simulateQ roQueryImpl.withLogging
-        (adv.guess x_1.1.1.2.2
-          (tdp.forward x.1.1.1 x_3.1.1,
-            x_4.1.1 + if x_2.1.1 = true then x_1.1.1.1 else x_1.1.1.2.1))).run.run x_4.2
-      pure (decide ((List.any (x_1.1.2 ++ x_5.1.2) fun entry =>
-        match entry.fst with
-        | Sum.inl _ => false
-        | Sum.inr r' => decide (r' = x_3.1.1)) = true)) : ProbComp Bool)] := by
-    unfold badEventExp
-    simp only [StateT.run'_eq, run_run_withLogging_bind, map_bind, map_pure, bind_assoc, pure_bind,
-      simulateQ_pure, WriterT.run_pure', StateT.run_pure]
-    refine probOutput_bind_congr fun x hx => ?_
-    refine probOutput_bind_congr fun x_1 _ => ?_
-    refine probOutput_bind_congr fun x_2 hx2 => ?_
-    refine probOutput_bind_congr fun x_3 hx3 => ?_
-    refine probOutput_bind_congr fun x_4 hx4 => ?_
-    refine probOutput_bind_congr fun x_5 _ => ?_
-    have inlFalse : ∀ {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache)
-        (y : (β × QueryLog (RO_Spec Rand M)) × (Rand →ₒ M).QueryCache),
-        y ∈ support ((simulateQ roQueryImpl.withLogging (liftM p)).run.run s) →
-        ∀ e ∈ y.1.2, (match e.fst with
-          | Sum.inl _ => false
-          | Sum.inr r' => decide (r' = x_3.1.1)) = false := by
-      intro β p s y hy e he
-      obtain ⟨a, ha⟩ := forall_inl_of_mem_support_liftLog p s y hy e he
-      rw [ha]
-    have hkg := inlFalse _ _ _ hx
-    have hb := inlFalse _ _ _ hx2
-    have hr := inlFalse _ _ _ hx3
-    have hh := inlFalse _ _ _ hx4
-    simp only [probOutput_pure]
-    congr 2
-    have toFalse : ∀ (l : QueryLog (RO_Spec Rand M)),
-        (∀ e ∈ l, (match e.fst with
-          | Sum.inl _ => false
-          | Sum.inr r' => decide (r' = x_3.1.1)) = false) →
-        (List.any l fun entry => match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r' => decide (r' = x_3.1.1)) = false :=
-      fun l hl => List.any_eq_false.2 fun e he => by rw [hl e he]; exact Bool.false_ne_true
-    simp only [List.any_append, toFalse _ hkg, toFalse _ hb, toFalse _ hr,
-      toFalse _ hh, Bool.false_or, Bool.or_false,
-      show (∅ : QueryLog (RO_Spec Rand M)) = [] from rfl, List.any_nil]
-  have hbadCollapse : Pr[= true | (do
-      let x ← (simulateQ roQueryImpl.withLogging (liftM tdp.keygen)).run.run ∅
-      let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose x.1.1.1)).run.run x.2
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run x_2.2
-      let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
-      let x_5 ← (simulateQ roQueryImpl.withLogging
-        (adv.guess x_1.1.1.2.2
-          (tdp.forward x.1.1.1 x_3.1.1,
-            x_4.1.1 + if x_2.1.1 = true then x_1.1.1.1 else x_1.1.1.2.1))).run.run x_4.2
-      pure (decide ((List.any (x_1.1.2 ++ x_5.1.2) fun entry =>
-        match entry.fst with
-        | Sum.inl _ => false
-        | Sum.inr r' => decide (r' = x_3.1.1)) = true)) : ProbComp Bool)] =
-      Pr[= true | (do
-      let pksk ← tdp.keygen
-      let cR ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run ∅
-      let b ← ($ᵗ Bool)
-      let r ← ($ᵗ Rand)
-      let h ← ($ᵗ M)
-      let gR ← (simulateQ roQueryImpl.withLogging
-        (adv.guess cR.1.1.2.2
-          (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run cR.2
-      pure (decide ((List.any (cR.1.2 ++ gR.1.2) fun entry =>
-        match entry.fst with
-        | Sum.inl _ => false
-        | Sum.inr r' => decide (r' = r)) = true)) : ProbComp Bool)] := by
-    rw [bind_logged_lift_of_log_unused (p := tdp.keygen) (s := ∅)
-      (cont := fun pksk cache => do
-        let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run cache
-        let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
-        let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run x_2.2
-        let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
-        let x_5 ← (simulateQ roQueryImpl.withLogging
-          (adv.guess x_1.1.1.2.2
-            (tdp.forward pksk.1 x_3.1.1,
-              x_4.1.1 + if x_2.1.1 = true then x_1.1.1.1 else x_1.1.1.2.1))).run.run x_4.2
-        pure (decide ((List.any (x_1.1.2 ++ x_5.1.2) fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r' => decide (r' = x_3.1.1)) = true)))]
-    refine probOutput_bind_congr fun pksk _ => ?_
-    refine probOutput_bind_congr fun cR _ => ?_
-    rw [bind_logged_lift_of_log_unused (p := ($ᵗ Bool)) (s := cR.2)
-      (cont := fun b cache_b => do
-        let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Rand))).run.run cache_b
-        let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_3.2
-        let x_5 ← (simulateQ roQueryImpl.withLogging
-          (adv.guess cR.1.1.2.2
-            (tdp.forward pksk.1 x_3.1.1,
-              x_4.1.1 + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run x_4.2
-        pure (decide ((List.any (cR.1.2 ++ x_5.1.2) fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r' => decide (r' = x_3.1.1)) = true)))]
-    refine probOutput_bind_congr fun b _ => ?_
-    rw [bind_logged_lift_of_log_unused (p := ($ᵗ Rand)) (s := cR.2)
-      (cont := fun r cache_r => do
-        let x_4 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run cache_r
-        let x_5 ← (simulateQ roQueryImpl.withLogging
-          (adv.guess cR.1.1.2.2
-            (tdp.forward pksk.1 r,
-              x_4.1.1 + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run x_4.2
-        pure (decide ((List.any (cR.1.2 ++ x_5.1.2) fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r' => decide (r' = r)) = true)))]
-    refine probOutput_bind_congr fun r _ => ?_
-    rw [bind_logged_lift_of_log_unused (p := ($ᵗ M)) (s := cR.2)
-      (cont := fun h cache_h => do
-        let x_5 ← (simulateQ roQueryImpl.withLogging
-          (adv.guess cR.1.1.2.2
-            (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run cache_h
-        pure (decide ((List.any (cR.1.2 ++ x_5.1.2) fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r' => decide (r' = r)) = true)))]
-  have hbadReloc : Pr[= true | (do
-      let pksk ← tdp.keygen
-      let cR ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run ∅
-      let b ← ($ᵗ Bool)
-      let r ← ($ᵗ Rand)
-      let h ← ($ᵗ M)
-      let gR ← (simulateQ roQueryImpl.withLogging
-        (adv.guess cR.1.1.2.2
-          (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run cR.2
-      pure (decide ((List.any (cR.1.2 ++ gR.1.2) fun entry =>
-        match entry.fst with
-        | Sum.inl _ => false
-        | Sum.inr r' => decide (r' = r)) = true)) : ProbComp Bool)] =
-      Pr[= true | (do
-      let pksk ← tdp.keygen
-      let r ← ($ᵗ Rand)
-      let cR ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run ∅
-      let b ← ($ᵗ Bool)
-      let h ← ($ᵗ M)
-      let gR ← (simulateQ roQueryImpl.withLogging
-        (adv.guess cR.1.1.2.2
-          (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run cR.2
-      pure (decide ((List.any (cR.1.2 ++ gR.1.2) fun entry =>
-        match entry.fst with
-        | Sum.inl _ => false
-        | Sum.inr r' => decide (r' = r)) = true)) : ProbComp Bool)] := by
-    calc Pr[= true | (do
-          let pksk ← tdp.keygen
-          let cR ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run ∅
-          let b ← ($ᵗ Bool)
-          let r ← ($ᵗ Rand)
-          let h ← ($ᵗ M)
-          let gR ← (simulateQ roQueryImpl.withLogging
-            (adv.guess cR.1.1.2.2
-              (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run cR.2
-          pure (decide ((List.any (cR.1.2 ++ gR.1.2) fun entry =>
-            match entry.fst with
-            | Sum.inl _ => false
-            | Sum.inr r' => decide (r' = r)) = true)) : ProbComp Bool)]
-        = Pr[= true | (do
-          let pksk ← tdp.keygen
-          let cR ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run ∅
-          let r ← ($ᵗ Rand)
-          let b ← ($ᵗ Bool)
-          let h ← ($ᵗ M)
-          let gR ← (simulateQ roQueryImpl.withLogging
-            (adv.guess cR.1.1.2.2
-              (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run cR.2
-          pure (decide ((List.any (cR.1.2 ++ gR.1.2) fun entry =>
-            match entry.fst with
-            | Sum.inl _ => false
-            | Sum.inr r' => decide (r' = r)) = true)) : ProbComp Bool)] := by
-          refine probOutput_bind_congr fun pksk _ => ?_
-          refine probOutput_bind_congr fun cR _ => ?_
-          exact probOutput_bind_bind_swap ($ᵗ Bool) ($ᵗ Rand) _ _
-      _ = _ := by
-          refine probOutput_bind_congr fun pksk _ => ?_
-          exact probOutput_bind_bind_swap
-            ((simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run ∅) ($ᵗ Rand) _ _
-  rw [hbad, hbadCollapse, hbadReloc]
-  have hinv : Pr[= true | tdpExp tdp (inverter tdp adv)] = Pr[= true | (do
-      let __discr ← tdp.keygen
-      let x ← ($ᵗ Rand)
-      let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose __discr.1)).run.run ∅
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_2.2
-      let x_4 ← (simulateQ roQueryImpl.withLogging
-        (adv.guess x_1.1.1.2.2
-          (tdp.forward __discr.1 x, x_3.1.1 + if x_2.1.1 = true then x_1.1.1.1 else x_1.1.1.2.1)
-          )).run.run x_3.2
-      let x' ← (match List.find? (fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x))
-          (x_1.1.2 ++ x_4.1.2) with
-        | some entry =>
-          match entry.fst with
-          | Sum.inl _ => (pure default : ProbComp Rand)
-          | Sum.inr r'' => pure r''
-        | none => pure default)
-      pure (decide (tdp.forward __discr.1 x' = tdp.forward __discr.1 x)) : ProbComp Bool)] := by
-    unfold tdpExp inverter
-    simp only [StateT.run'_eq, run_run_withLogging_bind, map_bind, map_pure, bind_assoc, pure_bind,
-      simulateQ_pure, WriterT.run_pure', StateT.run_pure]
-    refine probOutput_bind_congr fun __discr _ => ?_
-    refine probOutput_bind_congr fun x _ => ?_
-    refine probOutput_bind_congr fun x_1 _ => ?_
-    refine probOutput_bind_congr fun x_2 hx2 => ?_
-    refine probOutput_bind_congr fun x_3 hx3 => ?_
-    refine probOutput_bind_congr fun x_4 _ => ?_
-    have inlFalseF : ∀ {β : Type} (p : ProbComp β) (s : (Rand →ₒ M).QueryCache)
-        (y : (β × QueryLog (RO_Spec Rand M)) × (Rand →ₒ M).QueryCache),
-        y ∈ support ((simulateQ roQueryImpl.withLogging (liftM p)).run.run s) →
-        ∀ e ∈ y.1.2, (match e.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x))
-          = false := by
-      intro β p s y hy e he
-      obtain ⟨a, ha⟩ := forall_inl_of_mem_support_liftLog p s y hy e he
-      rw [ha]
-    have hb := inlFalseF _ _ _ hx2
-    have hh := inlFalseF _ _ _ hx3
-    have toNone : ∀ (l : QueryLog (RO_Spec Rand M)),
-        (∀ e ∈ l, (match e.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x)) = false) →
-        (List.find? (fun entry => match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x)) l)
-          = none :=
-      fun l hl => List.find?_eq_none.2 fun e he => by rw [hl e he]; exact Bool.false_ne_true
-    have hfind : (x_1.1.2 ++ (x_2.1.2 ++ (x_3.1.2 ++ (x_4.1.2 ++
-        (∅ : QueryLog (RO_Spec Rand M)))))).find? (fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x))
-        = (x_1.1.2 ++ x_4.1.2).find? (fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x)) := by
-      simp only [List.find?_append, toNone _ hb, toNone _ hh, Option.none_or, Option.or_none,
-        show (∅ : QueryLog (RO_Spec Rand M)) = [] from rfl, List.find?_nil]
-    rw [hfind]
-  have hinvCollapse : Pr[= true | (do
-      let __discr ← tdp.keygen
-      let x ← ($ᵗ Rand)
-      let x_1 ← (simulateQ roQueryImpl.withLogging (adv.choose __discr.1)).run.run ∅
-      let x_2 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ Bool))).run.run x_1.2
-      let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run x_2.2
-      let x_4 ← (simulateQ roQueryImpl.withLogging
-        (adv.guess x_1.1.1.2.2
-          (tdp.forward __discr.1 x, x_3.1.1 + if x_2.1.1 = true then x_1.1.1.1 else x_1.1.1.2.1)
-          )).run.run x_3.2
-      let x' ← (match List.find? (fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward __discr.1 r'' = tdp.forward __discr.1 x))
-          (x_1.1.2 ++ x_4.1.2) with
-        | some entry =>
-          match entry.fst with
-          | Sum.inl _ => (pure default : ProbComp Rand)
-          | Sum.inr r'' => pure r''
-        | none => pure default)
-      pure (decide (tdp.forward __discr.1 x' = tdp.forward __discr.1 x)) : ProbComp Bool)] =
-      Pr[= true | (do
-      let pksk ← tdp.keygen
-      let r ← ($ᵗ Rand)
-      let cR ← (simulateQ roQueryImpl.withLogging (adv.choose pksk.1)).run.run ∅
-      let b ← ($ᵗ Bool)
-      let h ← ($ᵗ M)
-      let gR ← (simulateQ roQueryImpl.withLogging
-        (adv.guess cR.1.1.2.2
-          (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1))).run.run cR.2
-      let x' ← (match List.find? (fun entry =>
-          match entry.fst with
-          | Sum.inl _ => false
-          | Sum.inr r'' => decide (tdp.forward pksk.1 r'' = tdp.forward pksk.1 r))
-          (cR.1.2 ++ gR.1.2) with
-        | some entry =>
-          match entry.fst with
-          | Sum.inl _ => (pure default : ProbComp Rand)
-          | Sum.inr r'' => pure r''
-        | none => pure default)
-      pure (decide (tdp.forward pksk.1 x' = tdp.forward pksk.1 r)) : ProbComp Bool)] := by
-    refine probOutput_bind_congr fun pksk _ => ?_
-    refine probOutput_bind_congr fun r _ => ?_
-    refine probOutput_bind_congr fun cR _ => ?_
-    rw [bind_logged_lift_of_log_unused (p := ($ᵗ Bool)) (s := cR.2)
-      (cont := fun b cache_b => do
-        let x_3 ← (simulateQ roQueryImpl.withLogging (liftM ($ᵗ M))).run.run cache_b
-        let x_4 ← (simulateQ roQueryImpl.withLogging
-          (adv.guess cR.1.1.2.2
-            (tdp.forward pksk.1 r, x_3.1.1 + if b = true then cR.1.1.1 else cR.1.1.2.1)
-            )).run.run x_3.2
-        let x' ← (match List.find? (fun entry =>
-            match entry.fst with
-            | Sum.inl _ => false
-            | Sum.inr r'' => decide (tdp.forward pksk.1 r'' = tdp.forward pksk.1 r))
-            (cR.1.2 ++ x_4.1.2) with
-          | some entry =>
-            match entry.fst with
-            | Sum.inl _ => (pure default : ProbComp Rand)
-            | Sum.inr r'' => pure r''
-          | none => pure default)
-        pure (decide (tdp.forward pksk.1 x' = tdp.forward pksk.1 r)))]
-    refine probOutput_bind_congr fun b _ => ?_
-    rw [bind_logged_lift_of_log_unused (p := ($ᵗ M)) (s := cR.2)
-      (cont := fun h cache_h => do
-        let x_4 ← (simulateQ roQueryImpl.withLogging
-          (adv.guess cR.1.1.2.2
-            (tdp.forward pksk.1 r, h + if b = true then cR.1.1.1 else cR.1.1.2.1)
-            )).run.run cache_h
-        let x' ← (match List.find? (fun entry =>
-            match entry.fst with
-            | Sum.inl _ => false
-            | Sum.inr r'' => decide (tdp.forward pksk.1 r'' = tdp.forward pksk.1 r))
-            (cR.1.2 ++ x_4.1.2) with
-          | some entry =>
-            match entry.fst with
-            | Sum.inl _ => (pure default : ProbComp Rand)
-            | Sum.inr r'' => pure r''
-          | none => pure default)
-        pure (decide (tdp.forward pksk.1 x' = tdp.forward pksk.1 r)))]
-  rw [hinv, hinvCollapse]
-  refine probOutput_bind_mono fun pksk _ => ?_
-  refine probOutput_bind_mono fun r _ => ?_
-  refine probOutput_bind_mono fun cR _ => ?_
-  refine probOutput_bind_mono fun b _ => ?_
-  refine probOutput_bind_mono fun h _ => ?_
-  refine probOutput_bind_mono fun gR _ => ?_
-  rw [probOutput_pure]
-  by_cases hbadfire : (List.any (cR.1.2 ++ gR.1.2) fun entry =>
-      match entry.fst with
-      | Sum.inl _ => false
-      | Sum.inr r' => decide (r' = r)) = true
-  · obtain ⟨r₀, m₀, hf, hfwd⟩ :=
-      find?_inr_of_anyInr (tdp := tdp) pksk.1 r (cR.1.2 ++ gR.1.2) hbadfire
-    rw [hf]
-    simp only [pure_bind, probOutput_pure, hfwd, hbadfire, decide_true, if_pos, le_refl]
-  · rw [Bool.not_eq_true] at hbadfire
-    simp only [hbadfire]
-    exact bot_le
+  apply ENNReal.toReal_mono (ne_top_of_le_ne_top ENNReal.one_ne_top probOutput_le_one)
+  simpa only [evalDist_apply_singleton] using measure_badEventExp_le_tdpExp (tdp := tdp) adv
 
 omit [Fintype Rand] [Fintype M] [DecidableEq M] in
 /-- Main BR93 bound for this file's custom one-time ROM CPA game: the distinguishing
