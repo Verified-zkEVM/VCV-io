@@ -26,9 +26,12 @@ VCVio/CryptoFoundations/DataEncapMech.lean	2
 VCVio/CryptoFoundations/FiatShamir/Sigma.lean	4
 VCVio/CryptoFoundations/FiatShamir/Sigma/Reductions.lean	1
 VCVio/CryptoFoundations/FiatShamir/Sigma/Stateful/Hops.lean	1
-VCVio/CryptoFoundations/FiatShamir/WithAbort.lean	1
 VCVio/CryptoFoundations/FiatShamir/WithAbort/Cost.lean	6
 VCVio/CryptoFoundations/FiatShamir/WithAbort/ExpectedCost.lean	3
+VCVio/CryptoFoundations/FiatShamir/WithAbort.lean	1
+VCVio/CryptoFoundations/FiatShamir/WithAbort/Security/CouplingEngine.lean	2
+VCVio/CryptoFoundations/FiatShamir/WithAbort/Security.lean	1
+VCVio/CryptoFoundations/FiatShamir/WithAbort/Security/NMAReduction.lean	3
 VCVio/CryptoFoundations/Fischlin/CostAccounting.lean	3
 VCVio/CryptoFoundations/FujisakiOkamoto/Defs.lean	1
 VCVio/CryptoFoundations/FujisakiOkamoto/TTransform.lean	6
@@ -103,8 +106,8 @@ VCVio/ProgramLogic/NotationCore.lean	1
 VCVio/ProgramLogic/Relational/Basic.lean	29
 VCVio/ProgramLogic/Relational/FromUnary.lean	5
 VCVio/ProgramLogic/Relational/Leakage.lean	8
-VCVio/ProgramLogic/Relational/Quantitative.lean	269
 VCVio/ProgramLogic/Relational/QuantitativeDefs.lean	1
+VCVio/ProgramLogic/Relational/Quantitative.lean	269
 VCVio/ProgramLogic/Relational/SimulateQ.lean	3
 VCVio/ProgramLogic/Unary/HoareTriple.lean	1
 VCVio/ProgramLogic/Unary/SimulateQ.lean	1

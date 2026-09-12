@@ -29,6 +29,7 @@ public import LatticeCrypto.MLDSA.Params
 public import LatticeCrypto.MLDSA.Primitives
 public import LatticeCrypto.MLDSA.Scheme
 public import LatticeCrypto.MLDSA.Security
+public import LatticeCrypto.MLDSA.SecurityExpandARO
 public import LatticeCrypto.MLDSA.SecurityHVZK
 public import LatticeCrypto.MLDSA.SecurityNMA
 public import LatticeCrypto.MLDSA.Signature
