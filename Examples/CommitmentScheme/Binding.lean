@@ -100,7 +100,7 @@ private def bindingInner {t : ℕ} (A : BindingAdversary M S C t) :
 private lemma bindingGame_eq {t : ℕ} (A : BindingAdversary M S C t) :
     bindingGame A = (simulateQ cachingOracle (bindingInner A)).run ∅ := rfl
 
-private lemma binding_win_implies_collision {t : ℕ} [Finite C] [Inhabited C]
+private lemma binding_win_implies_collision {t : ℕ}
     (A : BindingAdversary M S C t) :
     ∀ z ∈ support ((simulateQ cachingOracle (bindingInner A)).run ∅),
       z.1 = true → CacheHasCollision z.2 := by
@@ -158,7 +158,7 @@ private lemma bindingInner_totalBound {t : ℕ} (A : BindingAdversary M S C t) :
 
 /- In a collision-free cache, a value determines at most one query input. -/
 private lemma binding_rest_noCollision_le_inv [Finite M] [Finite S] [Fintype C]
-    [Inhabited M] [Inhabited S] [Inhabited C]
+      [Inhabited C]
     (c : C) (m₀ m₁ : M) (s₀ s₁ : S)
     (cache₁ : QueryCache (CMOracle M S C))
     (hno : ¬ CacheHasCollision cache₁) :
@@ -281,7 +281,7 @@ private lemma binding_rest_noCollision_le_inv [Finite M] [Finite S] [Fintype C]
  - Case 1 (collision in adversary's cache): ≤ `t(t-1)/(2|C|)` by tight birthday bound
  - Case 2 (no collision, fresh query matches `c`): ≤ `1/|C|` by unpredictability -/
 private lemma binding_win_le_advCollision_add_fresh {t : ℕ}
-    [Finite M] [Finite S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C]
+    [Finite M] [Finite S] [Fintype C] [Inhabited C]
     (A : BindingAdversary M S C t) :
     Pr[fun z => z.1 = true | bindingGame A] ≤
     Pr[fun z => CacheHasCollision z.2 | (simulateQ cachingOracle A.run).run ∅] +

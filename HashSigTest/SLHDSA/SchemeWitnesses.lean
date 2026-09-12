@@ -72,14 +72,14 @@ canary re-evaluates its witness at the other site and requires that to fail.
 * **N** perturbs the top-layer component as well, so no layer's recovered root is that layer's
   honest root.  It does not verify and the extractor returns nothing.
 
-`sigD` and `sigB` share a randomizer and a message, hence a digest, an instance address and every
+`sigD` and `sigE` share a randomizer and a message, hence a digest, an instance address and every
 honest value; they differ only in their FORS halves, and they take different arms.  That pair is
 what pins that the arm is decided by the FORS public-key comparison and by nothing else.
 
 ## What `Witness.Valid` cannot see, and what is checked instead
 
 `Witness.Valid` reads the signature only through the digest its randomizer produces.  A FORS witness
-extracted from `sigD` therefore *does* satisfy `Witness.Valid` against `sigB`, and
+extracted from `sigD` therefore *does* satisfy `Witness.Valid` against `sigE`, and
 `checkArmSelection` asserts that it holds rather than pretending it should not: the arm selection is
 a property of `findWitness`, not of the predicate.  What the canaries falsify about the predicate
 is the *arguments* each arm is evaluated at — the FORS instance address and FORS message for one
@@ -520,7 +520,8 @@ def describe : Witness toy toyPrimitives → String
 
 Seven in all.  Six verify against the honest public key: three route to the FORS arm, one to each of
 that arm's three constructors, and three to the hypertree arm, which split between the two layers.
-The seventh verifies against nothing and is the case where the extractor returns `none`. -/
+The seventh does not verify at site B against the honest public key, and its extractor returns
+`none`. -/
 
 /-- **Forgery A**, the honest signature on `msgA`.  Its recovered FORS public key is the honest one,
 so it routes to the FORS arm; the toy `H_msg` reads the message only through the exclusive-or of its
@@ -611,6 +612,9 @@ at layer one, where the extractor returns an XMSS `H`-collision rather than a WO
 def sigE : GeneralScheme.SignatureCore toy toyPrimitives.core :=
   ⟨rB, forgedFors,
     GeneralHypertree.sign toy toyPrimitives honestForsPkB skSeed pkSeed partsB⟩
+
+/-- The arm-selection fixtures hold the entire hypertree signature fixed. -/
+example : sigD.hypertree = sigE.hypertree := rfl
 
 /-- The layer-zero root `sigE`'s own hypertree half recovers, which is neither layer's honest
 running message.  `checkHypertreeCollision` offers it to an XMSS `H`-collision witness as a running
@@ -950,12 +954,12 @@ def checkNoWitness : IO Unit := do
 
 /-! ## Arm selection, and what the composite predicate can and cannot see -/
 
-/-- Two signatures at one digest.  `sigD` and `sigB` share a randomizer and a message, so they share
+/-- Two signatures at one digest.  `sigD` and `sigE` share a randomizer and a message, so they share
 a digest, an instance address, a FORS message, a layer-zero position and every honest value; they
 differ only in their FORS halves.  One routes to the FORS arm and the other to the hypertree arm, so
 the arm is decided by the FORS public-key comparison and by nothing else.
 
-The second half of this canary pins what `Witness.Valid` does *not* see.  Offered against `sigB`,
+The second half of this canary pins what `Witness.Valid` does *not* see.  Offered against `sigE`,
 the FORS witness extracted from `sigD` still holds — and it must, because `Witness.Valid` reads the
 signature only through the digest its randomizer produces, and the two digests are equal.  The arm
 selection is a property of `findWitness`, not of the predicate, and the pin above is what checks it;
@@ -963,16 +967,16 @@ asserting a rejection here would be asserting something false. -/
 def checkArmSelection : IO Unit := do
   ensure "the two site-B signatures share a digest"
     (schemeParts toy toyPrimitives msgB sigD honestPk ==
-      schemeParts toy toyPrimitives msgB sigB honestPk)
+      schemeParts toy toyPrimitives msgB sigE honestPk)
   ensure "they differ only in the FORS half"
-    (sigD.randomness == sigB.randomness && forsBytes sigD.fors != forsBytes sigB.fors)
+    (sigD.randomness == sigE.randomness && forsBytes sigD.fors != forsBytes sigE.fors)
   match findWitness skSeed honestPk msgB sigD tree0,
-      findWitness skSeed honestPk msgB sigB tree0 with
-  | some (.fors wD), some (.hypertree wB) => do
+      findWitness skSeed honestPk msgB sigE tree0 with
+  | some (.fors wD), some (.hypertree wE) => do
       ensure "the FORS witness of one holds against the other, at the shared digest"
         (holdsB (.fors wD))
-      ensure "and so does the hypertree witness" (holdsB (.hypertree wB))
-      ensure "each fails at the other site" (!holdsA (.fors wD) && !holdsA (.hypertree wB))
+      ensure "and so does the hypertree witness" (holdsB (.hypertree wE))
+      ensure "each fails at the other site" (!holdsA (.fors wD) && !holdsA (.hypertree wE))
   | _, _ => throw (IO.userError "Scheme witness check failed: arm selection: wrong arms")
 
 /-- The honest layer-zero partner is the honest FORS public key at the digest's *position*, and not

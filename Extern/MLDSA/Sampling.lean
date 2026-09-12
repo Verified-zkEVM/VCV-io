@@ -250,7 +250,7 @@ consumed by the `concrete_*` theorems in `Extern/MLDSA/Laws.lean`. -/
 open LatticeCrypto in
 /-- After a `set!`, the defaulted lookup at any index is either the freshly written value or the
 prior defaulted lookup. -/
-private theorem getD_set!_or {α : Type*} [Inhabited α] (a : Array α) (i : ℕ) (v d : α) (j : ℕ) :
+private theorem getD_set!_or {α : Type*} (a : Array α) (i : ℕ) (v d : α) (j : ℕ) :
     (a.set! i v).getD j d = v ∨ (a.set! i v).getD j d = a.getD j d := by
   simp only [Array.set!, Array.getD_eq_getD_getElem?, Array.getElem?_setIfInBounds]
   by_cases heq : i = j <;> by_cases hj : j < a.size <;> simp [heq, hj]
@@ -498,7 +498,7 @@ theorem sampleInBall_l1Norm (p : Params) (seed : CommitHashBytes p) :
 
 /-- After a `push`, the defaulted lookup at any index is either the pushed value or the prior
 defaulted lookup. -/
-private theorem getD_push_or {α : Type*} [Inhabited α] (a : Array α) (v d : α) (j : ℕ) :
+private theorem getD_push_or {α : Type*} (a : Array α) (v d : α) (j : ℕ) :
     (a.push v).getD j d = v ∨ (a.push v).getD j d = a.getD j d := by
   simp only [Array.getD_eq_getD_getElem?, Array.getElem?_push]
   by_cases h : j < a.size <;> by_cases h2 : j = a.size <;> simp [h, h2]

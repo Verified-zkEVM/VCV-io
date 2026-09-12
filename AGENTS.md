@@ -230,9 +230,12 @@ lake exe cache get && lake build
 the fast path for framework-only work. `./scripts/validate.sh` runs the fast per-PR CI checks
 locally in CI's order (build and warning budget, umbrella check, boundary ratchets, style
 linters, agent-docs checks); `--lint` adds Batteries' environment linters, one process per
-proof library as in CI. `lake lint` is the direct Lake driver over the same libraries. Findings
-are compared against the grandfathered entries in `scripts/nolints.json`, a shrink-only baseline
-like the axiom one: a fixed finding is removed from the file and a new one fails the lint.
+proof library as in CI. `lake lint` runs both source-style and environment checks;
+`-- --style-only` and `-- --env-only` select either pass, and `-- --no-build` requires existing
+proof oleans. Findings must exactly match `scripts/nolints.json`: obsolete entries and unlisted
+findings fail. After fixing findings, `lake lint -- --prune-baseline` safely removes obsolete
+entries across all seven libraries and refuses additions. PR CI also checks that the baseline
+only shrinks against the merge base.
 `--test` adds `lake test` (the three test libraries, the smoke test,
 and the SLH-DSA test executables), `--ffi` adds the native ML-KEM / ML-DSA / Falcon
 executables to `--test`, and `--axioms` adds the axiom sweep.
@@ -265,10 +268,9 @@ After adding new `.lean` files: `./scripts/update-lib.sh` (CI's `scripts/check-i
 fails when a regenerated umbrella would differ from the committed one).
 
 Lean toolchain and Mathlib must stay in sync (both currently `v4.33.1`); the bump procedure
-is in `CONTRIBUTING.md`. Keep files reasonably sized: Mathlib's file-length linter is on at
-its default of 1500 lines, and each file above that carries a trailing
-`set_option linter.style.longFile <ceiling>` (the linter's own ratchet: the ceiling only
-moves down as the file is split, and the linter rejects a ceiling that is too generous).
+is in `CONTRIBUTING.md`. Mathlib's file-length linter is enabled at 1500 lines. Split
+files by responsibility before crossing that limit; retain an import façade when an existing
+module path forms part of the public API.
 
 ## Further Reading
 

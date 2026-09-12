@@ -61,7 +61,8 @@ lemma probFailure_eq_zero' [MonadLiftT m SPMF]
   NeverFail.probFailure_eq_zero
 
 /-- A computation in a monad with a total `PMF` lift can't fail. -/
-instance [MonadLiftT m PMF] [LawfulMonadLiftT m PMF] (mx : m α) : NeverFail mx where
+instance instNeverFailOfLawfulMonadLiftTPMF [MonadLiftT m PMF] [LawfulMonadLiftT m PMF]
+    (mx : m α) : NeverFail mx where
   probFailure_eq_zero := probFailure_of_liftM_PMF mx
 
 section neverFail_lemmas
@@ -86,7 +87,7 @@ lemma neverFail_map_iff [LawfulMonad m] (mx : m α) (f : α → β) :
 
 @[simp]
 lemma neverFail_seq_iff [LawfulMonad m]
-    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
     (mf : m (α → β)) (mx : m α) :
     NeverFail (mf <*> mx) ↔ NeverFail mf ∧ NeverFail mx := by
   simp only [seq_eq_bind_map, neverFail_bind_iff, neverFail_map_iff]
@@ -97,7 +98,7 @@ lemma neverFail_seq_iff [LawfulMonad m]
 
 @[simp]
 lemma not_neverFail_failure {m : Type u → Type v} [AlternativeMonad m]
-    [MonadLiftT m SPMF] [LawfulMonadLiftT m SPMF]
+    [MonadLiftT m SPMF]
     [MonadLiftT m SetM] [EvalDistCompatible m] [HasEvalSet.LawfulFailure m] :
     ¬ NeverFail (failure : m α) := by
   simp [neverFail_iff]
@@ -118,7 +119,7 @@ This follows since `evalSPMF pure x` is the Dirac distribution on `some x`.
 -/
 @[simp, grind .]
 instance instPure {x} : NeverFail (pure x : m α) where
-  probFailure_eq_zero := by simp [probFailure_def]
+  probFailure_eq_zero := probFailure_pure _
 
 /--
 Precise bind lemma: if `mx` never fails and for all `x` in the support of `mx` the continuation
@@ -161,7 +162,7 @@ instance instMap [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
 
 /-- If both the function computation and the argument computation never fail,
 then their applicative sequencing also never fails. -/
-@[simp, grind .]
+@[grind .]
 instance instSeq [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
     {mf : m (α → β)} {mx : m α}
     [hf : NeverFail mf] [hx : NeverFail mx] :
@@ -170,14 +171,14 @@ instance instSeq [LawfulMonad m] [MonadLiftT m SetM] [EvalDistCompatible m]
 /-- If `mx` and `my` never fail, then `mx <* my` never fails. -/
 @[simp, grind .]
 instance instSeqLeft [LawfulMonad m]
-    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
     {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx <* my) := by aesop
 
 /-- If `mx` and `my` never fail, then `mx *> my` never fails. -/
 @[simp, grind .]
 instance instSeqRight [LawfulMonad m]
-    [MonadLiftT m SetM] [LawfulMonadLiftT m SetM] [EvalDistCompatible m]
+    [MonadLiftT m SetM] [EvalDistCompatible m]
     {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx *> my) := by aesop
 
