@@ -89,6 +89,8 @@ public import VCVio.CryptoFoundations.MerkleTree.BatchExtractability
 public import VCVio.CryptoFoundations.MerkleTree.Extractability
 public import VCVio.CryptoFoundations.MerkleTree.ExtractionKernel
 public import VCVio.CryptoFoundations.MerkleTree.Extractor
+public import VCVio.CryptoFoundations.MerkleTree.HashForest.Binary
+public import VCVio.CryptoFoundations.MerkleTree.HashForest.Defs
 public import VCVio.CryptoFoundations.MerkleTree.Hashing.Binding
 public import VCVio.CryptoFoundations.MerkleTree.Hashing.Defs
 public import VCVio.CryptoFoundations.MerkleTree.Inductive.Batch.Addressed
