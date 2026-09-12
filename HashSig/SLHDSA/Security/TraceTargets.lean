@@ -269,7 +269,7 @@ theorem chainM_queriesWithinConstructionTargets {vp : ValidatedParams}
       (chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val) x i s :
         OracleComp (publicHashSpec core) core.Y) := by
   induction s with
-  | zero => trivial
+  | zero => exact QueriesWithinConstructionTargets.pure core x
   | succ s ih =>
       change QueriesWithinConstructionTargets core
         (chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val) x i s >>= fun y =>
