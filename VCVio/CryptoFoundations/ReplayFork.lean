@@ -659,6 +659,7 @@ theorem probOutput_contextForkViewCollision_le_collision [IsUniformSpec spec]
         (P := spec.toPFunctor) i main path s with _ | located
     · rfl
     · simp [PFunctor.FreeM.Cursor.Located.fork]
+      rfl
   have hinner : ∀ path : PFunctor.FreeM.Path main,
       Pr[= (some s : Option (Fin (qb i + 1))) | viewCollision path] ≤
         Pr[= (some s : Option (Fin (qb i + 1))) | answerCollision path] := by
