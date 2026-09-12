@@ -384,11 +384,8 @@ theorem observedCompEmulates_realSmcSemantics (sp : ℕ)
   have hreal :
       (realSmcSemantics sp readMsg P).evalDist (T.close W_real K) =
         (realSmcSemantics sp readMsg P).evalDist (T.close W_ideal K) := by
-    change (𝒮[realCipherObserve sp (readMsg (T.close W_real K)) P]).toMeasure =
-      (𝒮[realCipherObserve sp (readMsg (T.close W_ideal K)) P]).toMeasure
-    exact congrArg SPMF.toMeasure
-      ((evalSPMF_realCipherObserve_eq sp (readMsg (T.close W_real K)) P).trans
-        (evalSPMF_realCipherObserve_eq sp (readMsg (T.close W_ideal K)) P).symm)
+    exact (realSmcSemantics_eq_idealSmcSemantics sp readMsg P (T.close W_real K)).trans
+      (realSmcSemantics_eq_idealSmcSemantics sp readMsg P (T.close W_ideal K)).symm
   change Semantics.distAdvantage _ _ _ ≤ (0 : ℝ)
   unfold Semantics.distAdvantage
   rw [hreal]
@@ -603,7 +600,7 @@ theorem realOtp_boundaryTrace (sp : ℕ) (msg k : BitVec sp) :
   change Interaction.UC.OpenNodeContext.boundaryTrace (otpTree sp)
     (otpDecoration sp (realEmit sp msg)) ⟨k, ⟨⟩⟩ = _
   rw [Interaction.UC.OpenNodeContext.boundaryTrace_node]
-  simp only [otpDecoration, otpOpenNode, realEmit, id_eq,
+  simp only [otpDecoration, otpOpenNode, realEmit,
     Interaction.UC.OpenNodeContext.boundaryTrace_done]
   exact mul_one _
 
@@ -618,7 +615,7 @@ theorem idealOtp_boundaryTrace (sp : ℕ) (c : BitVec sp) :
   change Interaction.UC.OpenNodeContext.boundaryTrace (otpTree sp)
     (otpDecoration sp (idealEmit sp)) ⟨c, ⟨⟩⟩ = _
   rw [Interaction.UC.OpenNodeContext.boundaryTrace_node]
-  simp only [otpDecoration, otpOpenNode, idealEmit, id_eq,
+  simp only [otpDecoration, otpOpenNode, idealEmit,
     Interaction.UC.OpenNodeContext.boundaryTrace_done]
   exact mul_one _
 

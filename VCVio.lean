@@ -181,6 +181,7 @@ public import VCVio.EvalDist.WithFailure
 public import VCVio.Interaction.UC.AsyncRuntime
 public import VCVio.Interaction.UC.AsyncSecurity
 public import VCVio.Interaction.UC.Computational
+public import VCVio.Interaction.UC.ProportionalScheduler
 public import VCVio.Interaction.UC.Runtime
 public import VCVio.Interaction.UC.Standard
 public import VCVio.Interaction.UC.StdDoBridge

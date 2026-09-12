@@ -143,12 +143,15 @@ applicable to the same goal. -/
 instance (priority := 100) instEvalDistCompatible [uniform : P.IsUniformSpec] :
     EvalDistCompatible (FreeM P) where
   support_eq_SPMF_support program := by
-    change support program = SPMF.support 𝒮[program]
+    change support program = (𝒮[program]).support
     induction program with
     | pure result => simp
     | lift_bind operation next ih =>
+        change support (FreeM.lift operation >>= next) =
+          (𝒮[FreeM.lift operation >>= next]).support
         ext result
-        simp [support_lift_eq_univ, uniform.toPMF_eq_uniform, ih]
+        simp [-FreeM.lift_bind, -FreeM.lift_bind_eq_liftBind,
+          support_lift_eq_univ, uniform.toPMF_eq_uniform, ih]
 
 end FreeM
 end PFunctor
