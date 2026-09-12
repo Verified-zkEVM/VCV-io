@@ -376,6 +376,8 @@ Use the tactic that matches the mathematical obligation:
 |---|---|
 | Ordered expectations or postconditions | `gcongr with x hx` on `expectedValue` or `OracleComp.ProgramLogic.wp` exposes support membership. |
 | An expectation of a mapped computation | `simp` precomposes the payoff using `expectedValue_map`, retaining the expectation head. |
+| Directed replacement inside a probability bound | Import `Mathlib.Tactic.GRewrite`; use `grw [h]` for inequalities and `apply_rw [h]` for event implications. A support-restricted rewrite theorem can leave membership as a side goal. |
+| Measure bind ordered in its continuation | `Measure.bind_mono_right_of_forall` supports `gcongr` and `grw`, with explicit `AEMeasurable` side conditions. Use `Measure.bind_mono_right` directly for an almost-everywhere bound. |
 | A finite expectation on a finite result type | `finiteness` uses `expectedValue_ne_top_of_finite` / `wp_ne_top_of_finite` and asks for finite functional values. |
 | A supplied finite bound on an arbitrary result type | Apply `expectedValue_ne_top_of_le mx hc h`; the bound remains explicit. |
 | Nonnegative total variation arithmetic | Import `VCVio.EvalDist.TVDist.Positivity` and use `positivity`; this also arrives through `VCVio.ProgramLogic.Tactics`. |
@@ -394,6 +396,11 @@ For a sum of `wp` bounds, rewrite with `wp_eq_expectedValue` and
 `← expectedValue_finsetSum`, then apply `expectedValue_le_of_support`. This avoids expanding
 probability sums and proving the zero-mass cases separately. To keep a whole sum as the next
 congruence obligation, use `gcongr (OracleComp.ProgramLogic.wp _ (fun _ => ?_)) with x`.
+
+See the [generalized-relation investigation](../reading/generalized-relation-automation.md) for
+tested rewrite directions, theorem-shape requirements, and the distinction between `gcongr`
+and `grw` registrations. Measure-bind rewriting requires importing
+`ToMathlib.MeasureTheory.Measure.Monotone`; pointwise order does not discharge measurability.
 
 ### Normalization discipline
 

@@ -40,6 +40,14 @@ pointwise finite. An arbitrary quantitative postcondition may still take the val
 The regression module `VCVioTest/ProgramLogic/GCongr.lean` checks the support binders and the
 explicit raw-WP script, so these examples can be pasted into ordinary-import proofs.
 
+For directional rewriting, explicitly import `Mathlib.Tactic.GRewrite`. With
+`h : ∀ x, f x ≤ g x`, `grw [h]` rewrites through `wp` and `expectedValue`. If `h` is restricted
+to `support oa`, the rewrite leaves that support premise as a side goal; `grw [h]; assumption`
+closes the direct comparison. `gcongr with x hx` remains useful when the pointwise proof needs
+the support fact explicitly. The [generalized-relation investigation](../reading/generalized-relation-automation.md)
+compares these tactics with `mono`, equality congruence, and relational VCGen, and records which
+candidate registrations are experimental.
+
 ### Proof Mode Entry
 
 | Tactic | Goal shape | What it does |

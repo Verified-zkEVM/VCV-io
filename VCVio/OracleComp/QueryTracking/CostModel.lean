@@ -9,6 +9,7 @@ public import Mathlib.Algebra.Polynomial.Eval.Defs
 public import VCVio.OracleComp.QueryTracking.QueryBound
 public import VCVio.OracleComp.QueryTracking.QueryCost
 public import VCVio.ProgramLogic.Unary.HoareTriple
+import Mathlib.Tactic.GRewrite
 
 /-!
 # Cost Models for Oracle Computations
@@ -151,12 +152,9 @@ theorem expectedCost_le_of_support_bound (oa : OracleComp spec α) (cm : CostMod
     (val : ω → ℝ≥0∞) (c : ℝ≥0∞)
     (h : ∀ z ∈ support (costDist oa cm), val (Multiplicative.toAdd z.2) ≤ c) :
     expectedCost oa cm val ≤ c := by
-  rw [expectedCost_eq_wp_costDist, ← wp_const (costDist oa cm) c, wp_eq_tsum, wp_eq_tsum]
-  refine ENNReal.tsum_le_tsum fun z => ?_
-  by_cases hz : z ∈ support (costDist oa cm)
-  · gcongr
-    exact h z hz
-  · simp [probOutput_eq_zero_of_not_mem_support hz]
+  rw [expectedCost_eq_wp_costDist, ← wp_const (costDist oa cm) c]
+  gcongr with z hz
+  exact h z hz
 
 end ExpectedCost
 
@@ -336,10 +334,8 @@ theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
     induction oa using OracleComp.inductionOn with
     | pure x =>
         intro qb _
-        exact AddWriterT.queryBoundedAboveBy_mono
-          (by simpa [instrumentedRun] using
-            (AddWriterT.queryBoundedAboveBy_pure (m := OracleComp spec) x))
-          (Nat.zero_le _)
+        grw [← Nat.zero_le (∑ i, qb i)]
+        simpa [instrumentedRun] using AddWriterT.queryBoundedAboveBy_pure x
     | query_bind t mx ih =>
         intro qb hqb
         rw [isPerIndexQueryBound_query_bind_iff] at hqb
