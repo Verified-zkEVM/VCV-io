@@ -189,7 +189,7 @@ private instance : HasQuery
   query query := fun trace => (deepBinaryAnswer query, trace ++ [query])
 
 private def deepBinaryRun := Id.run ((evaluateTree (m := DeepBinaryTraceM)
-    (binaryTree deepBinaryAddressing (.hash id) deepBinaryPayloads)).run [])
+    (binaryTree (Digest := Nat) deepBinaryAddressing (.hash id) deepBinaryPayloads)).run [])
 
 /-- The binary embedding preserves distinct internal addresses and postorder query evaluation. -/
 example : (deepBinaryRun.1, deepBinaryRun.2) =
@@ -203,10 +203,13 @@ example : (deepBinaryRun.1, deepBinaryRun.2) =
         { kind := .node, context := (), address := .node .root,
           inputs := [.child 122, .child 23] }
       ]) := by
-  decide
+  simp [deepBinaryRun, binaryTree, binaryTreeAt, deepBinaryAddressing, deepBinaryPayloads,
+    evaluateTree, Internal.evaluateTree, Internal.evaluateInputs, Internal.evaluateInput,
+    deepBinaryAnswer, StateT.run, Id.run, bind, StateT.bind]
 
 private def providedDigestBinaryRun := Id.run ((evaluateTree (m := DeepBinaryTraceM)
-    (binaryTree deepBinaryAddressing (.providedDigest fun payload => payload + 30)
+    (binaryTree (EncodedLeaf := Nat) deepBinaryAddressing
+      (.providedDigest fun payload => payload + 30)
       deepBinaryPayloads)).run [])
 
 /-- Caller-provided binary leaf digests bypass leaf queries while node queries remain. -/
@@ -218,7 +221,10 @@ example : (providedDigestBinaryRun.1, providedDigestBinaryRun.2) =
         { kind := .node, context := (), address := .node .root,
           inputs := [.child 442, .child 33] }
       ]) := by
-  decide
+  simp [providedDigestBinaryRun, binaryTree, binaryTreeAt, deepBinaryAddressing,
+    deepBinaryPayloads, evaluateTree, Internal.evaluateTree, Internal.evaluateInputs,
+    Internal.evaluateInput, deepBinaryAnswer, StateT.run, Id.run, bind, StateT.bind,
+    pure, StateT.pure]
 
 /-- Operation payloads and output digests remain universe-independent. -/
 example {LargePayload : Type 1} (payload : LargePayload) :
