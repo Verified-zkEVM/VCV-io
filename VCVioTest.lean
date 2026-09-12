@@ -30,12 +30,14 @@ public import VCVioTest.ProbabilityTactics
 public import VCVioTest.ProgramLogic.GCongr
 public import VCVioTest.QueryHom
 public import VCVioTest.RoundByRound.OneRound
+public import VCVioTest.SMDTDSPR
 public import VCVioTest.SMDTDSPRFinalValidity
 public import VCVioTest.SMDTOpenPREFinalValidity
 public import VCVioTest.SMDTPRE
 public import VCVioTest.SMDTPREFinalValidity
 public import VCVioTest.SMDTTCR
 public import VCVioTest.SMDTTCRFinalValidity
+public import VCVioTest.SMDTUD
 public import VCVioTest.SMDTUDFinalValidity
 public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
