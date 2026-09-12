@@ -39,7 +39,7 @@ namespace FiatShamir
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type}
     [Finite Stmt] [Finite Commit] [Finite Resp] [Fintype Chal]
-    [Inhabited Stmt] [Inhabited Commit] [Inhabited Resp] [Inhabited Chal]
+    [Inhabited Stmt] [Inhabited Chal]
     {rel : Stmt → Wit → Bool}
 
 variable [SampleableType Stmt] [SampleableType Wit]
@@ -83,8 +83,8 @@ theorem euf_cma_to_nma
           (qS : ENNReal) * (qS + qH) * β :=
   cma_to_nma_advantage_bound σ hr M simTranscript ζ_zk hζ_zk hHVZK β hPredSim adv qS qH hQ
 
-omit [Finite Stmt] [Finite Commit] [Finite Resp] [Inhabited Stmt] [Inhabited Commit]
-  [Inhabited Resp] [Fintype Chal] [Inhabited Chal] in
+omit [Finite Stmt] [Finite Commit] [Finite Resp] [Inhabited Stmt]
+  [Fintype Chal] [Inhabited Chal] in
 omit [SampleableType Stmt] in
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 

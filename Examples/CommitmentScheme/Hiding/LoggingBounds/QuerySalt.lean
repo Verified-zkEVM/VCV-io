@@ -175,9 +175,9 @@ lemma log_length_le_of_mem_support_counting_simulate_run_logging [Fintype M] [Fi
         simpa using Nat.succ_le_of_lt hlt
       simpa [hzlog] using hcons
 
-omit [Finite C] in
+omit [Finite C] [Inhabited C] in
 lemma log_length_le_of_mem_support_run_cached_logging
-    [Finite M] [Finite S] [Finite C]
+    [Finite M] [Finite S]
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
     (cache₀ : QueryCache (CMOracle M S C))
@@ -1042,4 +1042,5 @@ theorem sum_probEvent_hidingBad_le [Fintype S] [Inhabited S] [Finite M] {AUX : T
                 · rw [probOutput_eq_zero_of_not_mem_support hqchoose]
                   simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]

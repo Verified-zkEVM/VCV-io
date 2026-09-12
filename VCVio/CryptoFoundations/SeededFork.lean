@@ -434,6 +434,7 @@ private lemma probOutput_noGuardComp_eq_tsum_factored (s : Fin (qb i + 1)) :
       (σ.takeAtIndex i ↑s) i main) cf (some s)
 
 omit [spec.DecidableEq] in
+omit [unifSpec ˡ⊂ₒ spec] in
 private lemma sq_tsum_seed_weighted_le_tsum_factored (s : Fin (qb i + 1)) :
     (∑' σ, Pr[= σ | generateSeed spec qb js] *
       Pr[= (some s : Option (Fin (qb i + 1))) |
@@ -616,7 +617,7 @@ theorem probOutput_none_seededFork_le :
   set acc := ∑ s, ps s
   set h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
   have htotal := probOutput_none_add_tsum_some (mx := seededFork main qb js i cf)
-  rw [probFailure_of_liftM_PMF, tsub_zero] at htotal
+  rw [probFailure_eq_zero, tsub_zero] at htotal
   calc Pr[= none | seededFork main qb js i cf]
     _ = 1 - ∑' p, Pr[= some p | seededFork main qb js i cf] :=
         ENNReal.eq_sub_of_add_eq

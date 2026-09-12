@@ -21,6 +21,7 @@ variable {M S C : Type}
 
 attribute [local instance] Fintype.ofFinite
 
+omit [Finite C] [Inhabited C] in
 lemma hidingImplCountAll_run_totalBound_current {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     IsTotalQueryBound
@@ -92,9 +93,9 @@ lemma sum_counts_step_le_succ_hidingImplCountAll [Fintype S] (ms : M × S)
       rw [hx]
       simp [sum_update_succ_count]
 
-omit [Finite C] in
+omit [Finite C] [Inhabited C] in
 lemma hiding_distinguish_totalBound_of_choose_count_support
-    [Fintype S] [Inhabited S] [Finite M] [Finite C]
+    [Fintype S] [Inhabited S] [Finite M]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {x : (M × AUX) × (QueryCache (CMOracle M S C) × (S → ℕ))}
@@ -692,7 +693,8 @@ lemma wp_choose_sumCounts_le_queryBound [Fintype S] [Inhabited S]
             · rw [probOutput_eq_zero_of_not_mem_support hqchoose]
               simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]
 
 omit [Finite C] [Inhabited C] in
 /-- Every support point of `simulateQ hidingImplCountAll` is dominated by some
@@ -1184,7 +1186,8 @@ lemma sum_wp_countIncrementIndicators_le_queryBound_of_run_hidingImplCountAll
           · rw [probOutput_eq_zero_of_not_mem_support hz]
             simp
     _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]
 
 /-- A selected final count decomposes into the initial selected count plus the
 new increments made during the run. -/

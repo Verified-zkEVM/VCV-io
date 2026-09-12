@@ -250,7 +250,7 @@ private lemma exists_mem_support [IsUniformSpec spec] (oa : OracleComp spec α) 
       exact ⟨x, (mem_support_bind_iff _ _ _).2 ⟨default, mem_support_query t default, hx⟩⟩
 
 private lemma exists_mem_support_costDist_of_mem_support
-    [AddCommMonoid ω] [IsUniformSpec spec]
+    [AddCommMonoid ω]
     (oa : OracleComp spec α) (cm : CostModel spec ω) {x : α}
     (hx : x ∈ support oa) :
     ∃ c, (x, c) ∈ support (costDist oa cm) := by
@@ -261,7 +261,6 @@ private lemma exists_mem_support_costDist_of_mem_support
   exact ⟨c, hz⟩
 
 private lemma mem_support_costDist_unit_query_bind_of_mem_support
-    [IsUniformSpec spec]
     (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (u : spec.Range t)
     {z : α × Multiplicative ℕ} (hz : z ∈ support (costDist (mx u) CostModel.unit)) :
     (z.1, Multiplicative.ofAdd (Multiplicative.toAdd z.2 + 1)) ∈ support

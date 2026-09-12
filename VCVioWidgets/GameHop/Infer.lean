@@ -15,6 +15,7 @@ open Lean Meta
 private def gameEquivConst : Name :=
   Name.str (Name.str (Name.str .anonymous "OracleComp") "ProgramLogic") "GameEquiv"
 
+/-- Failure to choose a unique root or infer a diagram from its proof. -/
 inductive DiagramInferenceError where
   | multipleRoots (roots : Array Name)
   | inferenceFailed (root : Name) (message : String)
@@ -22,6 +23,7 @@ inductive DiagramInferenceError where
 
 namespace DiagramInferenceError
 
+/-- Explain a diagram inference failure for display in the widget panel. -/
 def message : DiagramInferenceError → String
   | .multipleRoots roots =>
       let names := String.intercalate ", " <| roots.toList.map toString
@@ -119,6 +121,8 @@ private structure CompRef where
   anchor? : Option AnchorRef := none
   snippets : Array CodeSnippet := #[]
   deriving Inhabited, Repr
+
+attribute [inherit_doc Inhabited.default] instInhabitedCompRef.default
 
 private def compTitleFromExpr (expr : Expr) : MetaM String := do
   let some head := expr.consumeMData.getAppFn.constName?
@@ -224,6 +228,8 @@ private inductive CandidateKind where
   | consequence
   deriving Inhabited, Repr, DecidableEq
 
+attribute [inherit_doc Inhabited.default] instInhabitedCandidateKind.default
+
 private structure CandidateDecl where
   declName : Name
   depth : Nat
@@ -233,6 +239,8 @@ private structure CandidateDecl where
   compRefs : Array CompRef
   directDeps : Array Name
   deriving Inhabited, Repr
+
+attribute [inherit_doc Inhabited.default] instInhabitedCandidateDecl.default
 
 private def scoreNameBonus (declName : Name) : Nat :=
   Id.run do
@@ -350,6 +358,8 @@ private structure BuildState where
   primaryNodes : Std.HashMap Name NodeId := {}
   rootNode : NodeId := ""
   deriving Inhabited
+
+attribute [inherit_doc Inhabited.default] instInhabitedBuildState.default
 
 private abbrev BuildM := StateT BuildState MetaM
 
@@ -562,12 +572,14 @@ private def inferDiagramCore (rootModule root : Name) : MetaM GameDiagram := do
   }
   applyDormantHintRefinement diagram
 
+/-- Infer the game sequence and supporting transitions from a root theorem's proof. -/
 def inferDiagramForRoot (root : Name) : MetaM GameDiagram := do
   let rootModule ← match (← Lean.findModuleOf? root) with
     | some rootModule => pure rootModule
     | none => pure (← getEnv).mainModule
   inferDiagramCore rootModule root
 
+/-- Infer a diagram from a module's registered root, reporting ambiguous roots or inference errors. -/
 def inferDiagramForModule? (modName : Name) : MetaM (Except DiagramInferenceError (Option GameDiagram)) := do
   let roots ← getRegisteredGameHopRoots modName
   if roots.isEmpty then

@@ -44,6 +44,8 @@ private inductive PPTPrimitiveKind where
   | oraclePPT
   deriving BEq, Inhabited
 
+attribute [inherit_doc Inhabited.default] instInhabitedPPTPrimitiveKind.default
+
 private def PPTPrimitiveKind.description : PPTPrimitiveKind → String
   | .polyRealizer => "PolyRealizer"
   | .oraclePPT => "IsOraclePPTBy"
@@ -62,6 +64,8 @@ private structure PPTPrimitiveEntry where
   declaration : Name
   kind : PPTPrimitiveKind
   deriving Inhabited
+
+attribute [inherit_doc Inhabited.default] instInhabitedPPTPrimitiveEntry.default
 
 private structure PPTPrimitiveRegistry where
   entries : Array PPTPrimitiveEntry := #[]

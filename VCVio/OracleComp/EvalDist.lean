@@ -281,8 +281,8 @@ lemma support_eq_evalSPMF_support :
 /-- An output has non-zero probability in `evalSPMF` iff it is in computation support. -/
 lemma mem_support_evalSPMF_iff :
     some x ∈ (𝒮[oa]).run.support ↔ x ∈ support oa := by
-  rw [support_eq_evalSPMF_support, PMF.mem_support_iff, SPMF.mem_support_iff,
-    SPMF.apply_eq_toPMF_some, SPMF.run_eq_toPMF]
+  rw [support_eq_evalSPMF_support, SPMF.support_eq_preimage_some]
+  rfl
 
 alias ⟨mem_support_of_mem_support_evalSPMF, mem_support_evalSPMF⟩ := mem_support_evalSPMF_iff
 
@@ -369,7 +369,6 @@ lemma probOutput_guard {p : Prop} [Decidable p] :
     -- post-refactor diamond. Compute directly.
     simp [OptionT.probOutput_eq, OptionT.run_failure, probOutput_pure]
 
-@[simp]
 lemma probFailure_guard {p : Prop} [Decidable p] :
     Pr[⊥ | (guard p : OptionT (OracleComp spec) Unit)] = if p then 0 else 1 := by
   rw [OracleComp.guard_eq]
