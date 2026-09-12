@@ -22,6 +22,7 @@ public import VCVioTest.MerkleTreeExtractability
 public import VCVioTest.MerkleTreeMonadic
 public import VCVioTest.MerkleTreeMultiExtractability
 public import VCVioTest.MonadProbability
+public import VCVioTest.OracleComp.AdaptiveMeasure
 public import VCVioTest.OracleComp.PreservesInv
 public import VCVioTest.OracleComp.SecurityFamily
 public import VCVioTest.PFunctorFacade

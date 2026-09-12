@@ -286,14 +286,15 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
           exact (Nat.mul_div_le (n * (n - 1)) 2).trans (by gcongr; lia))
 
 open Classical in
-omit [spec.DecidableEq] in
+omit [spec.DecidableEq] [IsUniformSpec spec] in
 /-- At a fresh query, the number of responses that would create a cache collision is at most
 the number of keys known to be populated in the current collision-free cache.
 
 The finite set `S` need only cover the populated keys; it may be a convenient external bound
 rather than the cache's exact support. This form is intended for adaptive birthday arguments,
 where `S` grows by one after each cache miss. -/
-theorem card_responses_creating_cacheCollision_le {cache₀ : QueryCache spec} {t : spec.Domain}
+theorem card_responses_creating_cacheCollision_le [spec.Fintype]
+    {cache₀ : QueryCache spec} {t : spec.Domain}
     {S : Finset spec.Domain} (hnocoll : ¬CacheHasCollision cache₀)
     (hSmem : ∀ t', cache₀ t' ≠ none → t' ∈ S) :
     (Finset.univ.filter (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card ≤ S.card := by

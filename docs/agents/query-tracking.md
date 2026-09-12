@@ -19,6 +19,18 @@ stopping-time argument used when an adaptive prefix and a transcript-dependent s
 lazy random function. Protocol-specific files should instantiate this theorem rather than copy its
 cache/log induction.
 
+`measure_adaptivePrefixRunFrom_le` proves this bound for any lawful measure semantics with
+uniform query measures and a measurable terminal event. Its proof uses a bad-event decomposition
+of a Lebesgue integral. The original `probEvent_adaptivePrefixRunFrom_le` is a compatibility
+corollary. The online-target counterpart is
+`MerkleTreeMultiExtractability.measure_onlineAdaptivePrefixRunFrom_logged_le`; its target set
+is evaluated on the pre-query log.
+
+The structural `QueryCache.log_consistent_append`, `log_consistent_cacheQuery_append`,
+`cache_covered_append`, `cache_covered_cacheQuery_append`, and `domain_bound_cacheQuery` lemmas
+in `CachingLoggingOracle.lean` transport cache/log hypotheses without probability assumptions
+or decidable equality on responses.
+
 ## Main Files
 
 | File | Role |
