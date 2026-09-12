@@ -18,11 +18,12 @@ to at least one of three abstraction boundaries:
 2. two distinct encoded leaves collide under the leaf-domain query at that address; or
 3. two distinct ordered child pairs collide under a node-domain query.
 
-The theorem below exposes this trichotomy constructively.  It reuses the addressed collision walk
-for the third case and does not package the result as a probabilistic hash assumption.
+The theorem below proves this trichotomy using classical equality decisions. It reuses the
+addressed collision walk for the third case and does not package the result as a probabilistic
+hash assumption.
 -/
 
-@[expose] public section
+public section
 
 namespace MerkleTreeHashing
 
@@ -34,14 +35,17 @@ variable {LeafAddress : Type u} {NodeAddress : Type v}
   {Payload : Type w} {EncodedLeaf : Type x} {Digest : Type y}
 
 /-- Two distinct payloads have the same committed leaf encoding. -/
+@[expose]
 def EncodingCollision (encode : Payload → EncodedLeaf) (left right : Payload) : Prop :=
   left ≠ right ∧ encode left = encode right
 
 /-- Two distinct payloads receive the same caller-provided digest. -/
+@[expose]
 def DigestMapCollision (digest : Payload → Digest) (left right : Payload) : Prop :=
   left ≠ right ∧ digest left = digest right
 
 /-- Two distinct encoded leaves have the same leaf-domain digest at one concrete address. -/
+@[expose]
 def LeafHashCollision
     (answer : HashQuery LeafAddress NodeAddress EncodedLeaf Digest → Digest)
     (address : LeafAddress) (left right : EncodedLeaf) : Prop :=
@@ -50,6 +54,7 @@ def LeafHashCollision
 /-- An internal position at which two distinct ordered child pairs have the same node-domain
 digest.  The intrinsic position is retained as part of the witness and mapped to the concrete
 hash address by `addressing.node`. -/
+@[expose]
 def NodeHashCollision {s : Skeleton} (addressing : Addressing s LeafAddress NodeAddress)
     (answer : HashQuery LeafAddress NodeAddress EncodedLeaf Digest → Digest)
     (witness : SkeletonInternalIndex s × Digest × Digest × Digest × Digest) : Prop :=

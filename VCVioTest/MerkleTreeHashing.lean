@@ -15,7 +15,7 @@ These examples pin the executable distinction between leaf and node hash domains
 addresses, ordered child digests, and the query-free prehashed-leaf specialization.
 -/
 
-@[expose] public section
+public section
 
 namespace VCVioTest.MerkleTreeHashingCanary
 
@@ -73,6 +73,11 @@ example : verifyWithHash addressing (.hash fun payload => payload + 1)
     (.ofLeft .ofLeaf) 3 1246 (List.Vector.cons 206 .nil) answer = true := by
   decide
 
+/-- A wrong root is rejected rather than accepted after the same reconstruction. -/
+example : verifyWithHash addressing (.hash fun payload => payload + 1)
+    (.ofLeft .ofLeaf) 3 1247 (List.Vector.cons 206 .nil) answer = false := by
+  decide
+
 /-- Prehashed leaves bypass the leaf domain and retain their supplied digest labels. -/
 example : (buildWithHash addressing .prehashed payloads answer).getRootValue = 35 := by
   decide
@@ -101,5 +106,90 @@ example {LargeEncoding : Type 1} (encode : Nat → LargeEncoding)
 example : (buildWithHash addressing (.providedDigest fun payload => payload + 7)
     payloads answer).getRootValue = 112 := by
   decide
+
+/-! ## Internal-node addressing -/
+
+private def threeLeaves : Skeleton := .internal (.internal .leaf .leaf) .leaf
+
+private inductive DeepNodeAddress where
+  | root
+  | left
+deriving DecidableEq
+
+private def deepAddressing : Addressing threeLeaves (Fin 3) DeepNodeAddress where
+  leaf
+    | .ofLeft (.ofLeft .ofLeaf) => 0
+    | .ofLeft (.ofRight .ofLeaf) => 1
+    | .ofRight .ofLeaf => 2
+  node
+    | .ofInternal => .root
+    | .ofLeft .ofInternal => .left
+
+private def deepPayloads : LeafData Nat threeLeaves :=
+  .internal (.internal (.leaf 1) (.leaf 2)) (.leaf 3)
+
+private def deepAnswer : HashQuery (Fin 3) DeepNodeAddress Nat Nat → Nat
+  | .leaf address input => 10 * address.val + input
+  | .node .left left right => 100 + 10 * left + right
+  | .node .root left right => 1000 + 10 * left + right
+
+private abbrev DeepTraceM :=
+  StateM (List (HashQuery (Fin 3) DeepNodeAddress Nat Nat))
+
+private instance : HasQuery (spec (Fin 3) DeepNodeAddress Nat Nat) DeepTraceM where
+  query query := fun trace => (deepAnswer query, trace ++ [query])
+
+private def deepBuildRun := Id.run ((build (m := DeepTraceM)
+    (LeafAddress := Fin 3) (NodeAddress := DeepNodeAddress) (Payload := Nat)
+    (EncodedLeaf := Nat) (Digest := Nat) deepAddressing (.hash id) deepPayloads).run [])
+
+/-- A depth-two build forwards distinct internal addresses and retains postorder query order. -/
+example : (deepBuildRun.1.getRootValue, deepBuildRun.2) =
+    (2243,
+      [HashQuery.leaf 0 1, HashQuery.leaf 1 2, HashQuery.node .left 1 12,
+       HashQuery.leaf 2 3, HashQuery.node .root 122 23]) := by
+  decide
+
+/-! ## Degenerate collision boundaries -/
+
+private def leafCollisionAnswer : HashQuery Bool Unit Nat Nat → Nat
+  | .leaf _ _ => 7
+  | .node _ left right => 10 * left + right
+
+private def nodeCollisionAnswer : HashQuery Bool Unit Nat Nat → Nat
+  | .leaf _ input => input
+  | .node _ _ _ => 0
+
+/-- A constant encoding is reported at the caller-owned encoding boundary. -/
+example : EncodingCollision (fun _ : Bool => 0) false true := by
+  unfold EncodingCollision
+  decide
+
+/-- A constant caller-provided digest is reported at the digest-map boundary. -/
+example : DigestMapCollision (fun _ : Bool => 7) false true := by
+  unfold DigestMapCollision
+  decide
+
+/-- Distinct encoded leaves can collide within one concrete leaf domain. -/
+example : LeafHashCollision leafCollisionAnswer false 1 2 := by
+  unfold LeafHashCollision
+  decide
+
+/-- Distinct ordered pairs can collide within one concrete internal-node domain. -/
+example : NodeHashCollision addressing nodeCollisionAnswer
+    ((.ofInternal, 1, 9, 2, 8) :
+      SkeletonInternalIndex twoLeaves × Nat × Nat × Nat × Nat) := by
+  unfold NodeHashCollision
+  decide
+
+/-- The public binding theorem reaches the node-collision branch in a concrete model where
+encoding is injective and leaf hashing is collision-free on the two openings. -/
+example : ∃ witness, NodeHashCollision addressing nodeCollisionAnswer witness := by
+  obtain leafCollision | nodeCollision :=
+    hashed_binding_of_injective addressing id Function.injective_id nodeCollisionAnswer
+      (.ofLeft .ofLeaf) (List.Vector.cons 9 .nil) (List.Vector.cons 8 .nil)
+      1 2 (by decide) (by decide)
+  · simp [LeafHashCollision, nodeCollisionAnswer] at leafCollision
+  · exact nodeCollision
 
 end VCVioTest.MerkleTreeHashingCanary

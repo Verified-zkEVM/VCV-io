@@ -23,9 +23,12 @@ must be accounted for separately.  The `LeafHashing.hash` case first applies an 
 encoding and then issues a leaf-domain query.  All cases reuse
 `AddressedMerkleTree` for tree construction and root reconstruction, so this layer adds no second
 Merkle-tree recursion.
+
+The query specification and computational entry points expose their bodies for ordinary-import
+execution checks and the hash-forest translation proofs. Exposure is selected per definition.
 -/
 
-@[expose] public section
+public section
 
 namespace MerkleTreeHashing
 
@@ -41,10 +44,10 @@ inductive HashQuery (LeafAddress : Type u) (NodeAddress : Type v)
     (EncodedLeaf : Type w) (Digest : Type x) where
   | leaf (address : LeafAddress) (input : EncodedLeaf)
   | node (address : NodeAddress) (left right : Digest)
-deriving DecidableEq
+deriving @[expose] DecidableEq
 
 /-- The homogeneous oracle specification for tagged Merkle hash queries. -/
-@[reducible]
+@[expose, reducible]
 def spec (LeafAddress : Type u) (NodeAddress : Type v)
     (EncodedLeaf : Type w) (Digest : Type x) :
     OracleSpec (HashQuery LeafAddress NodeAddress EncodedLeaf Digest) :=
@@ -62,6 +65,7 @@ inductive LeafHashing (Payload : Type u) (EncodedLeaf : Type v) (Digest : Type w
 namespace LeafHashing
 
 /-- Raw-digest leaves: the payload already is the Merkle leaf label, so no leaf query is issued. -/
+@[expose]
 def prehashed {EncodedLeaf : Type v} {Digest : Type w} :
     LeafHashing Digest EncodedLeaf Digest :=
   .providedDigest id
@@ -79,6 +83,7 @@ variable {LeafAddress : Type u} {NodeAddress : Type v}
   {Payload : Type w} {EncodedLeaf : Type x} {Digest : Type y}
 
 /-- Interpret one leaf payload under a deterministic hash-query implementation. -/
+@[expose]
 def leafDigestWith (answer : HashQuery LeafAddress NodeAddress EncodedLeaf Digest → Digest)
     (leafHashing : LeafHashing Payload EncodedLeaf Digest) (address : LeafAddress)
     (payload : Payload) : Digest :=
@@ -87,11 +92,13 @@ def leafDigestWith (answer : HashQuery LeafAddress NodeAddress EncodedLeaf Diges
   | .hash encode => answer (.leaf address (encode payload))
 
 /-- Interpret one internal-node hash under a deterministic hash-query implementation. -/
+@[expose]
 def nodeDigestWith (answer : HashQuery LeafAddress NodeAddress EncodedLeaf Digest → Digest)
     (address : NodeAddress) (left right : Digest) : Digest :=
   answer (.node address left right)
 
 /-- Produce a leaf digest, issuing a query exactly in the encoded-and-hashed case. -/
+@[expose]
 def leafDigest {m : Type y → Type*} [Monad m]
     [HasQuery (spec LeafAddress NodeAddress EncodedLeaf Digest) m]
     (leafHashing : LeafHashing Payload EncodedLeaf Digest) (address : LeafAddress)
@@ -103,6 +110,7 @@ def leafDigest {m : Type y → Type*} [Monad m]
       (HashQuery.leaf address (encode payload))
 
 /-- Hash an ordered pair of child digests in the internal-node domain. -/
+@[expose]
 def nodeDigest {m : Type y → Type*} [Monad m]
     [HasQuery (spec LeafAddress NodeAddress EncodedLeaf Digest) m]
     (address : NodeAddress) (left right : Digest) : m Digest :=
@@ -110,6 +118,7 @@ def nodeDigest {m : Type y → Type*} [Monad m]
     (HashQuery.node address left right)
 
 /-- Build a Merkle cache from payloads using explicit leaf hashing and address maps. -/
+@[expose]
 def build {m : Type y → Type*} [Monad m]
     [HasQuery (spec LeafAddress NodeAddress EncodedLeaf Digest) m]
     {s : Skeleton} (addressing : Addressing s LeafAddress NodeAddress)
@@ -122,6 +131,7 @@ def build {m : Type y → Type*} [Monad m]
       (EncodedLeaf := EncodedLeaf) (addressing.node i) left right)
 
 /-- Recompute a putative root from a payload and authentication path. -/
+@[expose]
 def getPutativeRoot {m : Type y → Type*} [Monad m]
     [HasQuery (spec LeafAddress NodeAddress EncodedLeaf Digest) m]
     {s : Skeleton} (addressing : Addressing s LeafAddress NodeAddress)
@@ -139,6 +149,7 @@ def getPutativeRoot {m : Type y → Type*} [Monad m]
 The result type is `Bool`, so this operational wrapper is stated for ordinary `Type`-valued
 digests.  The underlying builder, root reconstruction, and deterministic verifier remain fully
 universe-polymorphic. -/
+@[expose]
 def verify {LeafAddress : Type u} {NodeAddress : Type v} {Payload : Type w}
     {EncodedLeaf : Type x} {Digest : Type} [DecidableEq Digest]
     {m : Type → Type*} [Monad m]
@@ -150,6 +161,7 @@ def verify {LeafAddress : Type u} {NodeAddress : Type v} {Payload : Type w}
   return (← getPutativeRoot addressing leafHashing idx payload proof) == root
 
 /-- Deterministic interpretation of `build`. -/
+@[expose]
 def buildWithHash {s : Skeleton} (addressing : Addressing s LeafAddress NodeAddress)
     (leafHashing : LeafHashing Payload EncodedLeaf Digest)
     (payloads : LeafData Payload s)
@@ -161,6 +173,7 @@ def buildWithHash {s : Skeleton} (addressing : Addressing s LeafAddress NodeAddr
     (fun i left right => nodeDigestWith answer (addressing.node i) left right)
 
 /-- Deterministic interpretation of `getPutativeRoot`. -/
+@[expose]
 def getPutativeRootWithHash {s : Skeleton}
     (addressing : Addressing s LeafAddress NodeAddress)
     (leafHashing : LeafHashing Payload EncodedLeaf Digest)
@@ -172,6 +185,7 @@ def getPutativeRootWithHash {s : Skeleton}
     (leafDigestWith answer leafHashing (addressing.leaf idx) payload) proof
 
 /-- Verify a payload opening under a deterministic hash-query implementation. -/
+@[expose]
 def verifyWithHash [DecidableEq Digest] {s : Skeleton}
     (addressing : Addressing s LeafAddress NodeAddress)
     (leafHashing : LeafHashing Payload EncodedLeaf Digest)
@@ -180,6 +194,7 @@ def verifyWithHash [DecidableEq Digest] {s : Skeleton}
     (answer : HashQuery LeafAddress NodeAddress EncodedLeaf Digest → Digest) : Bool :=
   getPutativeRootWithHash addressing leafHashing idx payload proof answer == root
 
+/-- Deterministic simulation agrees with the selected leaf interpretation. -/
 @[simp]
 theorem simulateQ_leafDigest
     (answer : QueryImpl (spec LeafAddress NodeAddress EncodedLeaf Digest) Id)
@@ -194,6 +209,7 @@ theorem simulateQ_leafDigest
   | providedDigest => rfl
   | hash => simp [leafDigest, leafDigestWith]
 
+/-- Deterministic simulation preserves the tagged, ordered internal-node query. -/
 @[simp]
 theorem simulateQ_nodeDigest
     (answer : QueryImpl (spec LeafAddress NodeAddress EncodedLeaf Digest) Id)
@@ -205,6 +221,7 @@ theorem simulateQ_nodeDigest
       nodeDigestWith answer address left right := by
   simp [nodeDigest, nodeDigestWith]
 
+/-- Deterministic simulation of the builder produces the deterministic Merkle cache. -/
 @[simp]
 theorem simulateQ_build {s : Skeleton}
     (answer : QueryImpl (spec LeafAddress NodeAddress EncodedLeaf Digest) Id)
@@ -218,6 +235,7 @@ theorem simulateQ_build {s : Skeleton}
   simp [build, buildWithHash]
   rfl
 
+/-- Deterministic simulation agrees with root reconstruction under the same hash. -/
 @[simp]
 theorem simulateQ_getPutativeRoot {s : Skeleton}
     (answer : QueryImpl (spec LeafAddress NodeAddress EncodedLeaf Digest) Id)
@@ -232,6 +250,7 @@ theorem simulateQ_getPutativeRoot {s : Skeleton}
   simp [getPutativeRoot, getPutativeRootWithHash]
   rfl
 
+/-- Deterministic simulation preserves the verifier result. -/
 @[simp]
 theorem simulateQ_verify {LeafAddress : Type u} {NodeAddress : Type v}
     {Payload : Type w} {EncodedLeaf : Type x} {Digest : Type} [DecidableEq Digest]
@@ -289,7 +308,8 @@ theorem simulateQ_verify_completeness {LeafAddress : Type u} {NodeAddress : Type
         addressing leafHashing idx (payloads.get idx)
         (buildWithHash addressing leafHashing payloads answer).getRootValue
         (generateProof (buildWithHash addressing leafHashing payloads answer) idx)) = true := by
-  simp
+  rw [simulateQ_verify]
+  exact verifyWithHash_completeness addressing leafHashing payloads idx answer
 
 /-- Prehashed identity leaves recover the existing addressed raw-digest builder. -/
 theorem buildWithHash_prehashed_id {s : Skeleton}
