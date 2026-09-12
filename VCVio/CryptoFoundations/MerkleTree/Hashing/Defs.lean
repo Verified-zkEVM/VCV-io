@@ -111,7 +111,7 @@ def leafDigest {m : Type y → Type*} [Monad m]
 
 /-- Hash an ordered pair of child digests in the internal-node domain. -/
 @[expose]
-def nodeDigest {m : Type y → Type*} [Monad m]
+def nodeDigest {m : Type y → Type*}
     [HasQuery (spec LeafAddress NodeAddress EncodedLeaf Digest) m]
     (address : NodeAddress) (left right : Digest) : m Digest :=
   HasQuery.query (spec := spec LeafAddress NodeAddress EncodedLeaf Digest)
@@ -296,7 +296,6 @@ theorem verifyWithHash_completeness [DecidableEq Digest] {s : Skeleton}
   simp [verifyWithHash, functional_completeness]
 
 /-- The monadic verifier accepts an honest opening under every deterministic oracle handler. -/
-@[simp]
 theorem simulateQ_verify_completeness {LeafAddress : Type u} {NodeAddress : Type v}
     {Payload : Type w} {EncodedLeaf : Type x} {Digest : Type} [DecidableEq Digest]
     {s : Skeleton} (addressing : Addressing s LeafAddress NodeAddress)

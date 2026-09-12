@@ -107,6 +107,16 @@ example : (buildWithHash addressing (.providedDigest fun payload => payload + 7)
     payloads answer).getRootValue = 112 := by
   decide
 
+/-- Ordinary imports simplify honest verification through the general simulation and
+completeness rules, without a separate overlapping simp rule. -/
+example {s : Skeleton} (a : Addressing s Bool Unit) (p : LeafData Nat s)
+    (i : SkeletonLeafIndex s) (impl : QueryImpl (spec Bool Unit Nat Nat) Id) :
+    simulateQ impl
+      (verify (m := OracleComp (spec Bool Unit Nat Nat)) a (.hash id) i (p.get i)
+        (buildWithHash a (.hash id) p impl).getRootValue
+        (InductiveMerkleTree.generateProof (buildWithHash a (.hash id) p impl) i)) = true := by
+  simp only [simulateQ_verify, verifyWithHash_completeness]
+
 /-! ## Internal-node addressing -/
 
 private def threeLeaves : Skeleton := .internal (.internal .leaf .leaf) .leaf
