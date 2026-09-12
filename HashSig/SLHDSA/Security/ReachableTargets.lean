@@ -44,8 +44,10 @@ restate the same formula.  The rest apply the same address term their ledger doe
 is that the coordinate enumeration behind it is exhaustive.  `mem_perfectInternalCoords`
 characterizes the node coordinates `mem_forsTreeAddresses` and `mem_xmssNodeAddresses` quantify
 over.  Whether the construction's free programs query only listed addresses is a separate,
-trace-level statement left to the next slice; the only mechanical evidence for it today is the
-runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean`, which checks, for one fixed digest per
+trace-level statement: `HashSig.SLHDSA.Security.TraceTargets` names the union of the six
+structural ledgers (`constructionAddresses`) and proves it (`QueriesWithinConstructionTargets`)
+for the WOTS+ programs; the FORS, XMSS, hypertree, and scheme programs remain open there.  The
+runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean` checks, for one fixed digest per
 profile, addresses assembled from the construction's address helpers against the ledgers rather
 than running its signing or verification programs.
 
@@ -84,21 +86,6 @@ def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord 
   ⟨pos.layer, pos.tree⟩
 
 end LayerTreeCoord
-
-/-- The product representation of a reachable layer position.  This equivalence is the explicit
-owner bridge used to enumerate the existing dependent structure. -/
-def layerPositionEquiv (vp : ValidatedParams) :
-    LayerPosition vp ≃
-      (Σ layer : Fin vp.params.d,
-        Fin (2 ^ layerTreeHeight vp layer.val) × Fin (2 ^ vp.params.hp)) where
-  toFun pos := ⟨pos.layer, pos.tree, pos.leaf⟩
-  invFun coord := ⟨coord.1, coord.2.1, coord.2.2⟩
-  left_inv pos := by cases pos; rfl
-  right_inv coord := by cases coord; rfl
-
-/-- Reachable layer positions form a finite type because all three FIPS coordinates are bounded. -/
-instance (vp : ValidatedParams) : Fintype (LayerPosition vp) :=
-  Fintype.ofEquiv _ (layerPositionEquiv vp).symm
 
 /-- The target-count exponent agrees with the canonical `LayerPosition` exponent. -/
 theorem treesAtLayer_eq_layerTreeHeight (vp : ValidatedParams) (layer : Fin vp.params.d) :
@@ -1190,8 +1177,8 @@ theorem disjoint_wotsPkAddresses_xmssNodeAddresses (vp : ValidatedParams) :
     (fun _ => type_of_mem_xmssNodeAddresses vp)
 
 /-- The six structural ledgers, concatenated in the order of the table above with the two
-selection-dependent ledgers left out, are duplicate-free.  A named union ledger belongs to the
-trace-level slice. -/
+selection-dependent ledgers left out, are duplicate-free.  `HashSig.SLHDSA.Security.TraceTargets`
+names this concatenation as the union ledger `constructionAddresses`. -/
 theorem nodup_structuralLedgers_append (vp : ValidatedParams) :
     (forsLeafAddresses vp ++ forsTreeAddresses vp ++ forsRootAddresses vp ++
       wotsStepAddresses vp ++ wotsPkAddresses vp ++ xmssNodeAddresses vp).Nodup := by

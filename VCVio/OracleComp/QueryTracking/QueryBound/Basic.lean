@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Devon Tuma
+Authors: Devon Tuma, Alexander Hicks
 -/
 
 module
@@ -219,7 +219,8 @@ section IsQueryBoundP
 indices where `p` fails.
 
 This is built on the generic `IsQueryBound` with the validity check `¬ p t ∨ 0 < qb` and the cost
-function that decrements the budget only on `p`-indices. -/
+function that decrements the budget only on `p`-indices. At `n = 0` it forbids all `p`-queries;
+`isQueryBoundP_zero_iff` identifies this with `AllQueriesSatisfy` on the complementary predicate. -/
 @[expose]
 def IsQueryBoundP (oa : OracleComp spec α) (p : ι → Prop) [DecidablePred p] (n : ℕ) : Prop :=
   IsQueryBound oa n (fun t qb => ¬ p t ∨ 0 < qb)
@@ -433,6 +434,91 @@ theorem IsQueryBoundP.and_isQueryBound_pair
       exact ih u (h₁.2 u) (h₂.2 u)
 
 end IsQueryBoundP
+
+/-! ### Predicate-only bounds
+
+`AllQueriesSatisfy oa P` is `IsQueryBound` at the unit budget: it restricts which oracle indices
+`oa` may query without counting queries at all.  `allQueriesSatisfy_def` recovers the generic
+form, and `isQueryBoundP_zero_iff` identifies it with `IsQueryBoundP` at budget zero, so the
+predicate-targeted API applies to it as well.  The structural laws below restate the generic
+`@[simp]` lemmas at the new head symbol; `allQueriesSatisfy_bind` and `allQueriesSatisfy_ofFnM`
+additionally discharge the `combine` side conditions of `isQueryBound_bind`, which the unit
+budget makes trivial. -/
+
+section AllQueriesSatisfy
+
+/-- Predicate-only query bound: every query `oa` can make, on every response path, is to an
+oracle index satisfying `P`.
+
+This is `IsQueryBound` with the unit budget `()`, the validity check `fun t _ => P t`, and the
+trivial cost, so nothing is counted and only the reachable oracle indices are constrained.  It
+is the `DecidablePred`-free presentation of `IsQueryBoundP oa (fun t => ¬ P t) 0`
+(`isQueryBoundP_zero_iff`), through which `IsQueryBoundP.mono`, `IsQueryBoundP.of_imp`,
+`isQueryBoundP_bind`, and the predicate-targeted simulation transfers apply to it. -/
+def AllQueriesSatisfy (oa : OracleComp spec α) (P : ι → Prop) : Prop :=
+  IsQueryBound oa () (fun t _ => P t) (fun _ _ => ())
+
+/-- `AllQueriesSatisfy` is the unit-budget `IsQueryBound`: this is the equation through which the
+generic laws (`isQueryBound_map_iff`, `isQueryBound_iff_of_map_eq`,
+`IsQueryBound.simulateQ_run_of_step`) reach the predicate-only form. -/
+@[grind =]
+lemma allQueriesSatisfy_def (oa : OracleComp spec α) (P : ι → Prop) :
+    AllQueriesSatisfy oa P ↔ IsQueryBound oa () (fun t _ => P t) (fun _ _ => ()) :=
+  Iff.rfl
+
+/-- The predicate-only bound is the predicate-targeted bound at budget zero on the complementary
+predicate: spending no budget on `¬ P`-queries is exactly querying only `P`-indices.  This is the
+bridge that makes the `IsQueryBoundP` API available to `AllQueriesSatisfy`. -/
+theorem isQueryBoundP_zero_iff (oa : OracleComp spec α) (P : ι → Prop) [DecidablePred P] :
+    IsQueryBoundP oa (fun t => ¬ P t) 0 ↔ AllQueriesSatisfy oa P := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp [AllQueriesSatisfy]
+  | query_bind t mx ih =>
+      rw [isQueryBoundP_query_bind_iff, allQueriesSatisfy_def, isQueryBound_query_bind_iff]
+      simp only [not_not, Nat.lt_irrefl, or_false]
+      constructor
+      · rintro ⟨h₁, h₂⟩
+        exact ⟨h₁, fun u => (ih u).1 (by simpa using h₂ u)⟩
+      · rintro ⟨h₁, h₂⟩
+        exact ⟨h₁, fun u => by simpa using (ih u).2 (h₂ u)⟩
+
+@[simp]
+lemma allQueriesSatisfy_pure (x : α) (P : ι → Prop) :
+    AllQueriesSatisfy (pure x : OracleComp spec α) P := trivial
+
+@[simp]
+lemma allQueriesSatisfy_query_iff (t : ι) (P : ι → Prop) :
+    AllQueriesSatisfy (liftM (spec.query t) : OracleComp spec _) P ↔ P t :=
+  isQueryBound_query_iff t () _ _
+
+@[simp]
+lemma allQueriesSatisfy_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
+    (P : ι → Prop) :
+    AllQueriesSatisfy (liftM (spec.query t) >>= mx) P ↔
+      P t ∧ ∀ u, AllQueriesSatisfy (mx u) P :=
+  Iff.rfl
+
+/-- A predicate-only bound composes through monadic sequencing.  The unit budget discharges both
+side conditions of `isQueryBound_bind`. -/
+lemma allQueriesSatisfy_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {P : ι → Prop} (h₁ : AllQueriesSatisfy oa P) (h₂ : ∀ x, AllQueriesSatisfy (ob x) P) :
+    AllQueriesSatisfy (oa >>= ob) P :=
+  isQueryBound_bind (fun _ _ => ()) (fun _ _ _ _ h => ⟨h, h⟩) (fun _ _ _ _ _ => ⟨rfl, rfl⟩) h₁ h₂
+
+/-- A predicate-only bound passes through `Vector.ofFnM` when every component has it. -/
+lemma allQueriesSatisfy_ofFnM {n : ℕ} (f : Fin n → OracleComp spec α) {P : ι → Prop}
+    (h : ∀ i, AllQueriesSatisfy (f i) P) :
+    AllQueriesSatisfy (Vector.ofFnM f) P := by
+  induction n with
+  | zero =>
+      rw [Vector.ofFnM_zero]
+      exact allQueriesSatisfy_pure _ _
+  | succ n ih =>
+      rw [Vector.ofFnM_succ]
+      exact allQueriesSatisfy_bind (ih (fun i => f i.castSucc) (fun i => h i.castSucc))
+        fun _ => allQueriesSatisfy_bind (h (Fin.last n)) fun _ => allQueriesSatisfy_pure _ _
+
+end AllQueriesSatisfy
 
 section IsPerIndexQueryBound
 

@@ -166,16 +166,19 @@ def twoLayerDigest : Bytes twoLayerParams.m :=
 
 def twoLayerParts : DigestParts twoLayerParams := splitDigest twoLayerParams twoLayerDigest
 
-/-- Address-helper outputs for the fixed digest have the layouts prescribed by Algorithms 18--20
-and are members of the ledgers; structurally near addresses are not.  This canary does not run the
-three algorithms. -/
+/-- Address-helper outputs for the fixed digest have the layouts Algorithms 19--20 prescribe, the
+root address Algorithm 18 commits to is listed, and all of them are members of the ledgers;
+structurally near addresses are not.  This canary does not run the three algorithms. -/
 def checkTwoLayerContent : IO Unit := do
   ensure "two-layer digest: idx_tree = 2" (twoLayerParts.idxTree.val == 2)
   ensure "two-layer digest: idx_leaf = 1" (twoLayerParts.idxLeaf.val == 1)
   let forsBase := twoLayerParts.forsAdrs
   let bottom := BottomPosition.ofDigestParts twoLayer twoLayerParts
-  ensure "typed bottom position reproduces Algorithm 19's FORS address"
-    (bottom.forsAdrs == forsBase)
+  -- `BottomPosition.forsAdrs_ofDigestParts` already makes `bottom.forsAdrs = forsBase` a `rfl`, so
+  -- the independent reference is the field layout Algorithm 19 prescribes: layer `0`, tree
+  -- `idx_tree`, type code `3` (`FORS_TREE`), key pair `idx_leaf`, tree height and index zero.
+  ensure "typed bottom position has the FIPS FORS_TREE layout of Algorithm 19's address"
+    (bottom.forsAdrs == { layer := 0, tree := 2, type := 3, word1 := 1, word2 := 0, word3 := 0 })
   -- FORS leaf `(tree 1, leaf 3)` sits at global index `1 * 4 + 3 = 7`, height `0`.
   ensure "FORS leaf (1, 3) is a leaf target"
     ((forsLeafAddresses twoLayer).contains (forsNodeAdrs forsBase 0 7))

@@ -85,6 +85,8 @@ inductive TargetRole
   | xmssH
   deriving DecidableEq, Repr
 
+-- Hand-rolled rather than `deriving Fintype`: on this toolchain the enum derive handler's
+-- `enumList` coercion to `Multiset` is rejected under the `.implicit` transparency check.
 instance : Fintype TargetRole where
   elems := {.forsF, .forsH, .forsTl, .wotsFUd, .wotsFTcr, .wotsFPre, .wotsTl, .xmssH}
   complete role := by cases role <;> simp

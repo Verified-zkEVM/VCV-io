@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Devon Tuma
+Authors: Devon Tuma, Alexander Hicks
 -/
 
 module
@@ -23,5 +23,6 @@ The definition is structural via `OracleComp.construct`: `pure` satisfies any bo
 satisfies the bound with the updated budget `cost t b`.
 
 The classical per-index and total query bounds are recovered by `IsPerIndexQueryBound`
-and `IsTotalQueryBound`.
+and `IsTotalQueryBound`. `IsQueryBoundP` counts queries satisfying a predicate;
+`AllQueriesSatisfy` constrains the allowed indices without counting queries.
 -/
