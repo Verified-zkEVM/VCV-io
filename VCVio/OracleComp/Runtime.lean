@@ -21,8 +21,11 @@ public section
 
 /-- An explicitly initialized, persistent interpretation of a surface oracle. -/
 structure OracleRuntime {ι κ : Type} (Import : OracleSpec ι) (Surface : OracleSpec κ) where
+  /-- Private world state retained between completed execution phases. -/
   State : Type
+  /-- Initialization, performed once by `run` before interpreting the program. -/
   setup : OracleComp Import State
+  /-- Stateful implementation of surface queries using the import interface. -/
   handler : QueryImpl.Stateful Import Surface State
 
 /-- Paired runner output. Construction is controlled by the runtime API; sampling provenance
@@ -30,8 +33,11 @@ is a separate support-membership obligation. -/
 structure RunResult {ι κ : Type} {Import : OracleSpec ι} {Surface : OracleSpec κ}
     (Γ : OracleRuntime Import Surface) (α : Type) where
   private mk ::
+  /-- Returned value of the completed phase. -/
   output : α
+  /-- World state after the completed phase. -/
   state : Γ.State
+  /-- Ordered surface queries and answers, accumulated across resumed phases. -/
   trace : OracleSpec.QueryLog Surface
 
 /-- Run results agree when all three paired observations agree. -/
