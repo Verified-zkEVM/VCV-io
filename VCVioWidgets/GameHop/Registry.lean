@@ -11,10 +11,13 @@ open Lean Elab Meta
 
 /-- Root theorem registrations used by the game-hop widget inference pipeline. -/
 structure RegisteredRoot where
+  /-- Module containing the registered root theorem. -/
   modName : Name
+  /-- Name of the theorem used as a diagram root. -/
   declName : Name
   deriving Inhabited, Repr
 
+/-- Scoped index of registered game-hopping root theorems by module. -/
 initialize gameHopRootExt :
     SimpleScopedEnvExtension RegisteredRoot (NameMap (Array Name)) ←
   registerSimpleScopedEnvExtension {

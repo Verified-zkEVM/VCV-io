@@ -13,22 +13,30 @@ computations, probability semantics, program logic, and lattice- and hash-based 
     ⟨`relaxedAutoImplicit, false⟩,
     -- Mathlib's standard linter set (it already includes `linter.style.whitespace`).
     ⟨`weak.linter.mathlibStandardSet, true⟩,
-    ⟨`weak.linter.modulesUpperCamelCase, true⟩,
     -- Flag `public`/`private` modifiers that repeat the enclosing section's visibility.
     ⟨`weak.linter.redundantVisibility, true⟩,
-    -- Mathlib's file-length linter at its default; a file above 1500 lines carries its own
-    -- trailing `set_option linter.style.longFile <ceiling>`, which only ratchets down.
+    -- Use Mathlib's 1500-line limit downstream too; split files before exceeding it.
     ⟨`weak.linter.style.longFile, .ofNat 1500⟩,
     -- Disable the unicode allowlist linter: VCVio docstrings legitimately use
     -- FIPS-204 math notation (combining tilde `c̃`) and cited author names with
     -- diacritics (e.g. `Cătălin Hriţcu`).
     ⟨`weak.linter.unicodeLinter, false⟩
   ]
-  -- `lake test` runs the `@[test_driver]` script below; `lake lint` runs Batteries' environment
-  -- linters over the proof libraries (oleans only, so no native backend is linked).
-  lintDriver := "batteries/runLinter"
-  lintDriverArgs := #["ToMathlib", "VCVio", "LatticeCrypto", "Extern", "HashSig", "Examples",
-    "VCVioWidgets"]
+
+/-- Run Mathlib's source-style checks and Batteries' environment linters, with an exact
+exception baseline. The Python coordinator invokes the upstream executables through Lake;
+each library is imported in a separate process and no native FFI executable is linked. -/
+@[lint_driver]
+script lint (args) do
+  let root ← getRootPackage
+  let libraries := root.defaultTargets.filterMap fun library =>
+    (root.findLeanLib? library).map fun _ => library.toString
+  let child ← IO.Process.spawn {
+    cmd := "lake"
+    args := #["env", "python3", "scripts/lint.py", "--libraries",
+      String.intercalate "," libraries.toList] ++ args.toArray
+  }
+  child.wait
 
 /-
 Interop backends are intentionally disabled for the Lean 4.33 baseline. Their

@@ -69,6 +69,19 @@ theorem measurable_elim [MeasurableSpace α] [MeasurableSpace β] {f : Option α
     (MeasurableSpace.comap_le_iff_le_map.2 hSome)
     (MeasurableSpace.comap_le_iff_le_map.2 hNone)
 
+/-- Eliminating an optional value with a measurable success branch is measurable. -/
+@[fun_prop]
+theorem measurable_elim' [MeasurableSpace α] [MeasurableSpace β] (b : β)
+    {f : α → β} (hf : Measurable f) :
+    Measurable (fun x : Option α => x.elim b f) :=
+  measurable_elim measurable_const hf
+
+/-- Mapping a measurable function over an optional value is measurable. -/
+@[fun_prop]
+theorem measurable_map [MeasurableSpace α] [MeasurableSpace β]
+    {f : α → β} (hf : Measurable f) : Measurable (Option.map f) :=
+  measurable_elim measurable_const (measurable_some.comp hf)
+
 instance instDiscreteMeasurableSpace [MeasurableSpace α] [DiscreteMeasurableSpace α] :
     DiscreteMeasurableSpace (Option α) where
   forall_measurableSet s := by

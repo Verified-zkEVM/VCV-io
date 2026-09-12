@@ -21,6 +21,7 @@ variable {M S C : Type}
 
 attribute [local instance] Fintype.ofFinite
 
+omit [Finite C] [Inhabited C] in
 lemma hidingImplCountAll_run_totalBound_current {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     IsTotalQueryBound
@@ -92,9 +93,9 @@ lemma sum_counts_step_le_succ_hidingImplCountAll [Fintype S] (ms : M × S)
       rw [hx]
       simp [sum_update_succ_count]
 
-omit [Finite C] in
+omit [Finite C] [Inhabited C] in
 lemma hiding_distinguish_totalBound_of_choose_count_support
-    [Fintype S] [Inhabited S] [Finite M] [Finite C]
+    [Fintype S] [Inhabited S] [Finite M]
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
     {x : (M × AUX) × (QueryCache (CMOracle M S C) × (S → ℕ))}
@@ -692,7 +693,8 @@ lemma wp_choose_sumCounts_le_queryBound [Fintype S] [Inhabited S]
             · rw [probOutput_eq_zero_of_not_mem_support hqchoose]
               simp
     _ = t := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]
 
 omit [Finite C] [Inhabited C] in
 /-- Every support point of `simulateQ hidingImplCountAll` is dominated by some
@@ -1044,8 +1046,7 @@ lemma probEvent_countAll_bad_le_wp_countPred
     OracleComp.ProgramLogic.wp
       ((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0))
       (fun z : Bool × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - 1 : ℝ≥0∞)) := by
-  rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd, OracleComp.ProgramLogic.wp_eq_expectedValue,
-    OracleComp.ProgramLogic.wp_eq_expectedValue]
+  rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd]
   gcongr with z hz
   simp only [OracleComp.ProgramLogic.propInd_eq_ite]
   exact bad_indicator_le_count_pred_of_mem_support_run_hidingImplCountAll
@@ -1060,29 +1061,11 @@ lemma wp_countPred_le_queryBound_of_run_hidingImplCountAll
       ((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0))
       (fun z : Bool × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
         (z.2.2 s - 1 : ℝ≥0∞)) ≤ t := by
-  have : Fintype S := Fintype.ofFinite S
-  rw [OracleComp.ProgramLogic.wp_eq_tsum]
-  calc
-    ∑' z, Pr[= z | (simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0)] *
-        (z.2.2 s - 1 : ℝ≥0∞)
-      ≤
-        ∑' z,
-          Pr[= z | (simulateQ hidingImplCountAll (hidingOa A s)).run
-            (∅, fun _ => 0)] * t := by
-          refine ENNReal.tsum_le_tsum fun z => ?_
-          by_cases hz :
-              z ∈ support ((simulateQ hidingImplCountAll
-                (hidingOa A s)).run (∅, fun _ => 0))
-          · exact mul_le_mul'
-              le_rfl
-              (by
-                exact_mod_cast
-                  (count_pred_le_queryBound_of_mem_support_run_hidingImplCountAll
-                    (M := M) (S := S) (C := C) A s hz))
-          · rw [probOutput_eq_zero_of_not_mem_support hz]
-            simp
-    _ = t := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+  rw [OracleComp.ProgramLogic.wp_eq_expectedValue]
+  apply OracleComp.EvalDist.expectedValue_le_of_support
+  intro z hz
+  exact_mod_cast count_pred_le_queryBound_of_mem_support_run_hidingImplCountAll
+    (M := M) (S := S) (C := C) A s hz
 
 /-- For a fixed computation under the shared counted implementation, the sum of
 expected per-salt count increments is bounded by the total query bound. -/
@@ -1095,64 +1078,19 @@ lemma sum_wp_countIncrements_le_queryBound_of_run_hidingImplCountAll [Fintype S]
         ((simulateQ hidingImplCountAll oa).run st₀)
         (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
           (z.2.2 s - st₀.2 s : ℝ≥0∞))) ≤ n := by
-  classical
-  let run := ((simulateQ hidingImplCountAll oa).run st₀)
-  have hsum :
-      (∑ s : S,
-        OracleComp.ProgramLogic.wp run
-          (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
-            (z.2.2 s - st₀.2 s : ℝ≥0∞))) =
-      OracleComp.ProgramLogic.wp run
-        (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
-          ∑ s : S, (z.2.2 s - st₀.2 s : ℝ≥0∞)) := by
-    have hsumFin :
-        ∀ ss : Finset S,
-          (ss.sum fun s =>
-            OracleComp.ProgramLogic.wp run
-              (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
-                (z.2.2 s - st₀.2 s : ℝ≥0∞))) =
-          OracleComp.ProgramLogic.wp run
-            (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
-              ss.sum fun s => (z.2.2 s - st₀.2 s : ℝ≥0∞)) := by
-      intro ss
-      refine Finset.induction_on ss ?_ ?_
-      · simp [OracleComp.ProgramLogic.wp_const]
-      · intro s ss hs ih
-        simp [hs, ih, OracleComp.ProgramLogic.wp_add]
-    simpa [run] using hsumFin Finset.univ
-  rw [hsum, OracleComp.ProgramLogic.wp_eq_tsum]
-  calc
-    ∑' z, Pr[= z | run] * (∑ s : S, (z.2.2 s - st₀.2 s : ℝ≥0∞))
-      ≤ ∑' z, Pr[= z | run] * (n : ℝ≥0∞) := by
-          refine ENNReal.tsum_le_tsum fun z => ?_
-          by_cases hz : z ∈ support run
-          · have hmono :
-                ∀ s : S, st₀.2 s ≤ z.2.2 s :=
-              fun s =>
-                count_mono_of_mem_support_run_hidingImplCountAll
-                  (M := M) (S := S) (C := C) (oa := oa) (st₀ := st₀) (z := z) hz s
-            have hsum_counts :
-                (∑ s : S, z.2.2 s) ≤ n + ∑ s : S, st₀.2 s :=
-              sum_counts_le_of_mem_support_run_hidingImplCountAll
-                (M := M) (S := S) (C := C) (oa := oa) hbound (st₀ := st₀) (z := z) hz
-            have hdecomp :
-                (∑ s : S, (z.2.2 s - st₀.2 s)) + ∑ s : S, st₀.2 s =
-                  ∑ s : S, z.2.2 s := by
-              rw [← Finset.sum_add_distrib]
-              refine Finset.sum_congr rfl ?_
-              intro s hs
-              exact Nat.sub_add_cancel (hmono s)
-            have hdiff :
-                (∑ s : S, (z.2.2 s - st₀.2 s)) ≤ n := by
-              omega
-            exact mul_le_mul'
-              le_rfl
-              (by
-                exact_mod_cast hdiff)
-          · rw [probOutput_eq_zero_of_not_mem_support hz]
-            simp
-    _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+  simp only [OracleComp.ProgramLogic.wp_eq_expectedValue]
+  rw [← OracleComp.EvalDist.expectedValue_finsetSum]
+  apply OracleComp.EvalDist.expectedValue_le_of_support
+  intro z hz
+  have hmono : ∀ s, st₀.2 s ≤ z.2.2 s :=
+    count_mono_of_mem_support_run_hidingImplCountAll
+      (M := M) (S := S) (C := C) oa st₀ z hz
+  have htotal := sum_counts_le_of_mem_support_run_hidingImplCountAll
+    (M := M) (S := S) (C := C) hbound hz
+  have hdiff : (∑ s : S, (z.2.2 s - st₀.2 s)) ≤ n := by
+    rw [Finset.sum_tsub_distrib _ (fun s _ => hmono s)]
+    omega
+  exact_mod_cast hdiff
 
 /-- For a fixed computation under the shared counted implementation, the sum of
 expected indicators of whether each salt counter ever increases is bounded by the
@@ -1248,7 +1186,8 @@ lemma sum_wp_countIncrementIndicators_le_queryBound_of_run_hidingImplCountAll
           · rw [probOutput_eq_zero_of_not_mem_support hz]
             simp
     _ = (n : ℝ≥0∞) := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+        rw [ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, probFailure_eq_zero,
+          tsub_zero, one_mul]
 
 /-- A selected final count decomposes into the initial selected count plus the
 new increments made during the run. -/
@@ -1264,34 +1203,13 @@ lemma wp_countPred_le_initialPred_add_wp_countIncrement
       OracleComp.ProgramLogic.wp
         ((simulateQ hidingImplCountAll oa).run st₀)
         (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - st₀.2 s : ℝ≥0∞)) := by
-  let run := ((simulateQ hidingImplCountAll oa).run st₀)
-  calc
-    OracleComp.ProgramLogic.wp run
-      (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - 1 : ℝ≥0∞))
-      ≤
-        OracleComp.ProgramLogic.wp run
-          (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
-            ((st₀.2 s - 1 : ℝ≥0∞) + (z.2.2 s - st₀.2 s : ℝ≥0∞))) := by
-              rw [OracleComp.ProgramLogic.wp_eq_tsum, OracleComp.ProgramLogic.wp_eq_tsum]
-              refine ENNReal.tsum_le_tsum fun z => ?_
-              by_cases hz : z ∈ support run
-              · have hmono :
-                    st₀.2 s ≤ z.2.2 s :=
-                  count_mono_of_mem_support_run_hidingImplCountAll
-                    (M := M) (S := S) (C := C) (oa := oa) (st₀ := st₀) (z := z) hz s
-                have hnat :
-                    z.2.2 s - 1 ≤ (st₀.2 s - 1) + (z.2.2 s - st₀.2 s) := by
-                  omega
-                exact mul_le_mul'
-                  le_rfl
-                  (by exact_mod_cast hnat)
-              · rw [probOutput_eq_zero_of_not_mem_support hz]
-                simp
-    _ =
-      (st₀.2 s - 1 : ℝ≥0∞) +
-        OracleComp.ProgramLogic.wp run
-          (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - st₀.2 s : ℝ≥0∞)) := by
-            rw [OracleComp.ProgramLogic.wp_add, OracleComp.ProgramLogic.wp_const]
+  rw [← OracleComp.ProgramLogic.wp_const
+    ((simulateQ hidingImplCountAll oa).run st₀) (st₀.2 s - 1 : ℝ≥0∞),
+    ← OracleComp.ProgramLogic.wp_add]
+  gcongr with z hz
+  have hmono := count_mono_of_mem_support_run_hidingImplCountAll
+    (M := M) (S := S) (C := C) oa st₀ z hz s
+  exact_mod_cast (show z.2.2 s - 1 ≤ (st₀.2 s - 1) + (z.2.2 s - st₀.2 s) by omega)
 
 lemma sum_wp_countPred_le_sum_initialPred_add_sum_wp_countIncrements [Fintype S]
     {α : Type}
@@ -1306,30 +1224,9 @@ lemma sum_wp_countPred_le_sum_initialPred_add_sum_wp_countIncrements [Fintype S]
         OracleComp.ProgramLogic.wp
           ((simulateQ hidingImplCountAll oa).run st₀)
           (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - st₀.2 s : ℝ≥0∞)) := by
-  calc
-    (∑ s : S,
-      OracleComp.ProgramLogic.wp
-        ((simulateQ hidingImplCountAll oa).run st₀)
-        (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) => (z.2.2 s - 1 : ℝ≥0∞)))
-      ≤
-        ∑ s : S,
-          ((st₀.2 s - 1 : ℝ≥0∞) +
-            OracleComp.ProgramLogic.wp
-              ((simulateQ hidingImplCountAll oa).run st₀)
-              (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
-                (z.2.2 s - st₀.2 s : ℝ≥0∞))) := by
-                refine Finset.sum_le_sum ?_
-                intro s hs
-                exact wp_countPred_le_initialPred_add_wp_countIncrement
-                  (M := M) (S := S) (C := C) oa st₀ s
-    _ =
-      (∑ s : S, (st₀.2 s - 1 : ℝ≥0∞)) +
-        ∑ s : S,
-          OracleComp.ProgramLogic.wp
-            ((simulateQ hidingImplCountAll oa).run st₀)
-            (fun z : α × (QueryCache (CMOracle M S C) × (S → ℕ)) =>
-              (z.2.2 s - st₀.2 s : ℝ≥0∞)) := by
-              rw [Finset.sum_add_distrib]
+  rw [← Finset.sum_add_distrib]
+  exact Finset.sum_le_sum fun s _ =>
+    wp_countPred_le_initialPred_add_wp_countIncrement oa st₀ s
 
 /-- The simulated hiding game, parametrized by salt `s`.
 

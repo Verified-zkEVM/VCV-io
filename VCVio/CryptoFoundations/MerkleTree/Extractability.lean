@@ -373,7 +373,7 @@ theorem extractabilityInner_isTotalQueryBound
 /-- The shared-cache random-oracle experiment makes at most as many underlying fresh
 queries as `extractabilityInner`. Cache hits skip the underlying query, so the implication
 is intentionally one-way. -/
-theorem extractabilityGame_isTotalQueryBound [IsUniformSpec (Query →ₒ Y)]
+theorem extractabilityGame_isTotalQueryBound
     (model : NodeQueryModel Query Address Y) {s : Skeleton}
     (addressKey : SkeletonInternalIndex s → Address)
     (𝒜 : Adversary Query Y s) (qb : ℕ)
