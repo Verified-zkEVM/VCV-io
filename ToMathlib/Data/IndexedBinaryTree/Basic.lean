@@ -349,7 +349,7 @@ theorem LeafData.get_ofRight {s_left s_right : Skeleton} {α : Type _}
   | LeafData.internal _ right =>
     rfl
 
-@[simp, grind =]
+@[grind =]
 theorem LeafData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (idxLeft : SkeletonLeafIndex s_left) :
@@ -357,7 +357,7 @@ theorem LeafData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
       left.get idxLeft := by
   rfl
 
-@[simp, grind =]
+@[grind =]
 theorem LeafData.get_internal_ofRight {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (idxRight : SkeletonLeafIndex s_right) :
@@ -396,7 +396,7 @@ theorem InternalData.get_ofRight {s_left s_right : Skeleton} {α}
   | InternalData.internal _ _ right =>
     rfl
 
-@[simp, grind =]
+@[grind =]
 theorem InternalData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
     (value : α) (left : InternalData α s_left) (right : InternalData α s_right)
     (idxLeft : SkeletonInternalIndex s_left) :
@@ -404,7 +404,7 @@ theorem InternalData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
       left.get idxLeft := by
   rfl
 
-@[simp, grind =]
+@[grind =]
 theorem InternalData.get_internal_ofRight {α} {s_left s_right : Skeleton}
     (value : α) (left : InternalData α s_left) (right : InternalData α s_right)
     (idxRight : SkeletonInternalIndex s_right) :
@@ -438,7 +438,7 @@ theorem FullData.get_ofRight {s_left s_right : Skeleton} {α}
   | FullData.internal _ _ right =>
     rfl
 
-@[simp, grind =]
+@[grind =]
 theorem FullData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right)
     (idxLeft : SkeletonNodeIndex s_left) :
@@ -446,7 +446,7 @@ theorem FullData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
       left.get idxLeft := by
   rfl
 
-@[simp, grind =]
+@[grind =]
 theorem FullData.get_internal_ofRight {α} {s_left s_right : Skeleton}
     (value : α) (left : FullData α s_left) (right : FullData α s_right)
     (idxRight : SkeletonNodeIndex s_right) :
@@ -851,7 +851,7 @@ theorem populateUp_internal {α} {s_left s_right : Skeleton}
         (populateUp right compose) := by
   rfl
 
-@[simp, grind =]
+@[grind =]
 theorem populateUp_getRootValue {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :

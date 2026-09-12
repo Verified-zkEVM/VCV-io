@@ -8,6 +8,7 @@ public import VCVioTest.CryptoFoundations.ComputationalComplexitySoundness
 public import VCVioTest.CryptoFoundations.OracleClosure
 public import VCVioTest.CryptoFoundations.SignatureAlg
 public import VCVioTest.CryptoFoundations.SymmEncAlgMeasure
+public import VCVioTest.EvalDist.IndependentDraws
 public import VCVioTest.EvalDist.MeasureBridge
 public import VCVioTest.ForkMeasure
 public import VCVioTest.Forking.WithoutReplacement
@@ -21,12 +22,14 @@ public import VCVioTest.MerkleTreeExtractability
 public import VCVioTest.MerkleTreeMonadic
 public import VCVioTest.MerkleTreeMultiExtractability
 public import VCVioTest.MonadProbability
+public import VCVioTest.OracleComp.AdaptiveMeasure
 public import VCVioTest.OracleComp.PreservesInv
 public import VCVioTest.OracleComp.SecurityFamily
 public import VCVioTest.PFunctorFacade
 public import VCVioTest.PerfectMerkleTree
 public import VCVioTest.ProbabilityTactics
 public import VCVioTest.ProgramLogic.GCongr
+public import VCVioTest.QueryBounds
 public import VCVioTest.QueryHom
 public import VCVioTest.RoundByRound.OneRound
 public import VCVioTest.Runtime
@@ -39,8 +42,14 @@ public import VCVioTest.SMDTTCRFinalValidity
 public import VCVioTest.SMDTUDFinalValidity
 public import VCVioTest.SampleableType
 public import VCVioTest.Smoke
+public import VCVioTest.StateTLift
+public import VCVioTest.Tactic.Expectation
 public import VCVioTest.Tactic.Finiteness
+public import VCVioTest.Tactic.FunProp
 public import VCVioTest.Tactic.GCongr
+public import VCVioTest.Tactic.GeneralizedRelations
+public import VCVioTest.Tactic.GeneralizedRelationsExperiments
+public import VCVioTest.Tactic.Positivity
 public import VCVioTest.ToMathlib.AbsDiff
 public import VCVioTest.UniformOn
 public import VCVioTest.UniversePolymorphism

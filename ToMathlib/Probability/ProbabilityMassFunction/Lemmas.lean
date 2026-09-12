@@ -10,8 +10,8 @@ public import Mathlib.Probability.Distributions.Uniform
 /-!
 # Lemmas about `PMF`
 
-The monad-instance unfolding equations, extensionality off a single point, the
-`cast`/`HEq` transport lemmas, and uniform distributions under bijections.
+The monad-instance unfolding equations, extensionality off a single point, and uniform
+distributions under bijections.
 -/
 
 public section
@@ -47,23 +47,6 @@ lemma PMF.monad_pure_eq_pure {α : Type u} (x : α) :
 @[simp]
 lemma PMF.monad_bind_eq_bind {α β : Type u}
       (p : PMF α) (q : α → PMF β) : p >>= q = p.bind q := rfl
-
-theorem PMF.bind_eq_zero {α β : Type _} {p : PMF α} {f : α → PMF β} {b : β} :
-    (p >>= f) b = 0 ↔ ∀ a, p a = 0 ∨ f a b = 0 := by simp
-
-theorem PMF.heq_iff {α β : Type u} {pa : PMF α} {pb : PMF β} (h : α = β) :
-    HEq pa pb ↔ ∀ x, pa x = pb (cast h x) := by
-  subst h; simp only [heq_eq_eq, cast_eq]; constructor <;> intro h'
-  · intro x; rw [h']
-  · ext x; rw [h' x]
-
-theorem PMF.uniformOfFintype_cast (α β : Type _) [ha : Fintype α] [Nonempty α]
-    [hb : Fintype β] [Nonempty β] (h : α = β) :
-      cast (congrArg PMF h) (PMF.uniformOfFintype α) = @PMF.uniformOfFintype β _ _ := by
-  subst h
-  ext x
-  simp only [cast_eq, uniformOfFintype_apply, inv_inj, Nat.cast_inj]
-  exact @Fintype.card_congr α α ha hb (Equiv.refl α)
 
 open Classical in
 lemma PMF.uniformOfFintype_map_of_bijective {α β : Type*} [Fintype α] [Fintype β]

@@ -104,7 +104,7 @@ class SubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
 | `onQuery : spec.Domain → superSpec.Domain` | `toFunA : P.A → Q.A` |
 | `onResponse t : superSpec.Range (onQuery t) → spec.Range t` | `toFunB t : Q.B (toFunA t) → P.B t` |
 
-By the Yoneda lemma for polynomial functors this lens data is in bijection with natural transformations `OracleQuery spec ⟹ OracleQuery superSpec`. The `MonadLift` parent records that natural transformation; the `liftM_eq_lift` field is the propositional coherence axiom forcing it to agree with the lens. Concrete `SubSpec` instances spell `monadLift` out *by hand* (rather than letting it default from the lens data), so that the lifted query reduces fully under `isDefEq` — this is what makes pattern-matching simp lemmas like `probEvent_liftComp` actually fire.
+By the Yoneda lemma for polynomial functors this lens data is in bijection with natural transformations `OracleQuery spec ⟹ OracleQuery superSpec`. The `MonadLift` parent records that natural transformation; the `liftM_eq_lift` field is the propositional coherence axiom forcing it to agree with the lens. Concrete `SubSpec` instances spell `monadLift` out *by hand* (rather than letting it default from the lens data), so that the lifted query reduces fully under `isDefEq` — this lets pattern-matching equations such as `probEvent_liftComp` apply through their registered automation or explicitly by name.
 
 `SubSpec.toLens` exposes the underlying lens; `SubSpec.trans` is composition of these lenses; `MonadLiftT.refl` covers the identity.
 

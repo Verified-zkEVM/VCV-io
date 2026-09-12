@@ -39,6 +39,17 @@ def ensure (label : String) (condition : Bool) : IO Unit :=
   unless condition do
     throw (IO.userError s!"trace-target check failed: {label}")
 
+/-! ## Public proof interface -/
+
+/-- An ordinary importer can transport target provenance through a result map using the generic
+query-bound API. This exercises the equation out of the opaque SLH-DSA wrapper. -/
+example {vp : ValidatedParams} (core : CorePrimitives vp.params) {α β : Type}
+    (program : OracleComp (publicHashSpec core) α) (f : α → β)
+    (h : QueriesWithinConstructionTargets core program) :
+    QueriesWithinConstructionTargets core (f <$> program) := by
+  rw [queriesWithinConstructionTargets_iff_isQueryBound] at h ⊢
+  exact (isQueryBound_map_iff program f () _ _).2 h
+
 /-! ## Small validated profiles -/
 
 /-- Two layers of height two, two FORS trees of height two, `w = 16`, `len = 4`. -/
@@ -170,7 +181,6 @@ def checkRejectedChainStep (vp : ValidatedParams) (label : String)
 
 def fixedBytes (n salt : ℕ) : Bytes n :=
   Vector.ofFn fun i => UInt8.ofNat (salt + 17 * i.val)
-
 
 /-- Run the three WOTS+ programs at `pos` under `prims` and compare their logs with the tweaks the
 WOTS+ address helpers name for that instance: the `len * (w - 1)` executed steps and the

@@ -307,7 +307,7 @@ variable {ι : Type u} {τ : Type v}
 variable [spec.IsUniformSpec] [superSpec.IsUniformSpec]
     [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
-@[simp, grind =] lemma evalSPMF_liftComp (mx : OracleComp spec α) :
+@[grind =] lemma evalSPMF_liftComp (mx : OracleComp spec α) :
     𝒮[liftComp mx superSpec] = 𝒮[mx] := by
   induction mx using OracleComp.inductionOn with
   | pure x => simp
@@ -320,11 +320,11 @@ variable [spec.IsUniformSpec] [superSpec.IsUniformSpec]
       evalSPMF_liftM, evalSPMF_query]
     exact congrArg liftM (LawfulSubSpec.evalSPMF_liftM_query t)
 
-@[simp, grind =] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
+@[grind =] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
     Pr[= x | liftComp mx superSpec] = Pr[= x | mx] := by
   rw [probOutput_def, probOutput_def, evalSPMF_liftComp]
 
-@[simp, grind =] lemma probEvent_liftComp (mx : OracleComp spec α) (p : α → Prop) :
+@[grind =] lemma probEvent_liftComp (mx : OracleComp spec α) (p : α → Prop) :
     Pr[ p | liftComp mx superSpec] = Pr[ p | mx] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_liftComp]
 
@@ -344,7 +344,7 @@ variable {ι : Type u} {τ : Type v}
 /-- Support is preserved by `liftComp`: lifting a computation to a larger oracle spec
 does not change which outputs are reachable. This is the support analogue of
 `evalSPMF_liftComp`. -/
-@[simp] lemma support_liftComp (mx : OracleComp spec α) :
+lemma support_liftComp (mx : OracleComp spec α) :
     support (liftComp mx superSpec) = support mx := by
   simp only [liftComp]
   induction mx using OracleComp.inductionOn with
@@ -360,7 +360,7 @@ does not change which outputs are reachable. This is the support analogue of
       exact (LawfulSubSpec.onResponse_bijective (h := h) t).surjective.range_eq
     rw [hs]; simp
 
-@[simp, grind =] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
+@[grind =] lemma mem_support_liftComp_iff (mx : OracleComp spec α) (x : α) :
     x ∈ support (liftComp mx superSpec) ↔ x ∈ support mx := by
   simp [support_liftComp]
 
@@ -462,7 +462,6 @@ lemma liftM_OptionT_eq [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
       let impl : QueryImpl spec (OracleComp superSpec) := fun t => liftM (query t)
       simulateQ impl mx := rfl
 
-@[simp]
 lemma liftM_failure [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     (liftM (failure : OptionT (OracleComp spec) α) : OptionT (OracleComp superSpec) α) =
       failure := rfl

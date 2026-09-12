@@ -109,7 +109,7 @@ abbrev toMachine {α β : Type u} (program : α → OracleComp spec β) :
   DynComputation.ofFreeM program
 
 /-- Every program family is implemented by its residual-program machine. -/
-@[simp] theorem toMachine_implements {α β : Type u} (program : α → OracleComp spec β) :
+theorem toMachine_implements {α β : Type u} (program : α → OracleComp spec β) :
     (toMachine program).Implements program :=
   DynComputation.implements_ofFreeM program
 

@@ -342,7 +342,7 @@ def advance (h : OracleHandler spec) (oa : OracleComp spec α) : OracleComp spec
 @[simp] theorem advance_pure (h : OracleHandler spec) (x : α) :
     advance h (pure x : OracleComp spec α) = pure x := rfl
 
-@[simp] theorem advance_queryBind (h : OracleHandler spec) (t : spec.Domain)
+theorem advance_queryBind (h : OracleHandler spec) (t : spec.Domain)
     (k : spec.Range t → OracleComp spec α) : advance h (queryBind t k) = k (h t) := rfl
 
 /-- The number of handler-answered query steps until the program halts. -/
@@ -352,11 +352,11 @@ def stepsToHalt (h : OracleHandler spec) (oa : OracleComp spec α) : ℕ :=
 @[simp] theorem stepsToHalt_pure (h : OracleHandler spec) (x : α) :
     stepsToHalt h (pure x : OracleComp spec α) = 0 := rfl
 
-@[simp] theorem stepsToHalt_queryBind (h : OracleHandler spec) (t : spec.Domain)
+theorem stepsToHalt_queryBind (h : OracleHandler spec) (t : spec.Domain)
     (k : spec.Range t → OracleComp spec α) :
     stepsToHalt h (queryBind t k) = stepsToHalt h (k (h t)) + 1 := rfl
 
-@[simp] theorem evalWithAnswerFn_queryBind (f : QueryImpl spec Id) (t : spec.Domain)
+theorem evalWithAnswerFn_queryBind (f : QueryImpl spec Id) (t : spec.Domain)
     (k : spec.Range t → OracleComp spec α) :
     evalWithAnswerFn f (queryBind t k) = evalWithAnswerFn f (k (f t)) := by
   change simulateQ f (queryBind t k) = simulateQ f (k (f t))
@@ -432,7 +432,7 @@ noncomputable def advanceK (H : ProbHandler spec) (oa : OracleComp spec α) :
 @[simp] theorem advanceK_pure (H : ProbHandler spec) (x : α) :
     advanceK H (pure x : OracleComp spec α) = pure (pure x) := rfl
 
-@[simp] theorem advanceK_queryBind (H : ProbHandler spec) (t : spec.Domain)
+theorem advanceK_queryBind (H : ProbHandler spec) (t : spec.Domain)
     (k : spec.Range t → OracleComp spec α) : advanceK H (queryBind t k) = k <$> H t := rfl
 
 /-- **Probabilistic headline.** The `SPMF` semantics of a program is one randomized coalgebra step
@@ -468,7 +468,7 @@ def transcript (h : OracleHandler spec) (oa : OracleComp spec α) : QueryLog spe
 @[simp] theorem transcript_pure (h : OracleHandler spec) (x : α) :
     transcript h (pure x : OracleComp spec α) = [] := rfl
 
-@[simp] theorem transcript_queryBind (h : OracleHandler spec) (t : spec.Domain)
+theorem transcript_queryBind (h : OracleHandler spec) (t : spec.Domain)
     (k : spec.Range t → OracleComp spec α) :
     transcript h (queryBind t k) = ⟨t, h t⟩ :: transcript h (k (h t)) := rfl
 
@@ -486,7 +486,7 @@ a program that makes at most `n` queries has a transcript of length at most `n`.
   | queryBind t k ih =>
       simp only [transcript_queryBind, List.length_cons, stepsToHalt_queryBind, ih]
 
-@[simp] theorem transcript_countQ_pure (h : OracleHandler spec) (p : ι → Prop) [DecidablePred p]
+theorem transcript_countQ_pure (h : OracleHandler spec) (p : ι → Prop) [DecidablePred p]
     (x : α) : (transcript h (pure x : OracleComp spec α)).countQ p = 0 := rfl
 
 /-- `countQ` recurrence on the transcript: a query to `t` contributes one iff `p t`. -/

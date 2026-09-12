@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Quang Dao. All rights reserved.
+Copyright (c) 2026 Quang Dao, Alexander Hicks. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao, Alexander Hicks
 -/
@@ -44,10 +44,13 @@ restate the same formula.  The rest apply the same address term their ledger doe
 is that the coordinate enumeration behind it is exhaustive.  `mem_perfectInternalCoords`
 characterizes the node coordinates `mem_forsTreeAddresses` and `mem_xmssNodeAddresses` quantify
 over.  Whether the construction's free programs query only listed addresses is a separate,
-trace-level statement left to the next slice; the only mechanical evidence for it today is the
-runtime canary in `HashSigTest/SLHDSA/ReachableTargets.lean`, which checks, for one fixed digest per
-profile, addresses assembled from the construction's address helpers against the ledgers rather
-than running its signing or verification programs.
+trace-level statement: `HashSig.SLHDSA.Security.TraceTargets` names the union of the six
+structural ledgers (`constructionAddresses`) and proves it (`QueriesWithinConstructionTargets`)
+for the WOTS+ programs, and `HashSig.SLHDSA.Security.ComponentTraces` proves it for the FORS,
+XMSS, hypertree, and scheme programs.  The runtime canary in
+`HashSigTest/SLHDSA/ReachableTargets.lean` checks, for one fixed digest per profile, addresses
+assembled from the construction's address helpers against the ledgers rather than running its
+signing or verification programs.
 
 The address lists remain structural `Adrs` values.  A concrete primitive maps them to its
 `AdrsKey` only after proving injectivity on the listed reachable family; no global injectivity of
@@ -83,22 +86,12 @@ namespace LayerTreeCoord
 def ofPosition {vp : ValidatedParams} (pos : LayerPosition vp) : LayerTreeCoord vp :=
   ⟨pos.layer, pos.tree⟩
 
+/-- The unique XMSS tree at the final layer `d - 1`, tree zero, whose root Algorithm 18 publishes
+as the public key. -/
+def top (vp : ValidatedParams) : LayerTreeCoord vp :=
+  ⟨⟨vp.params.d - 1, Nat.sub_one_lt (Nat.pos_iff_ne_zero.mp vp.valid.d_pos)⟩, ⟨0, by positivity⟩⟩
+
 end LayerTreeCoord
-
-/-- The product representation of a reachable layer position.  This equivalence is the explicit
-owner bridge used to enumerate the existing dependent structure. -/
-def layerPositionEquiv (vp : ValidatedParams) :
-    LayerPosition vp ≃
-      (Σ layer : Fin vp.params.d,
-        Fin (2 ^ layerTreeHeight vp layer.val) × Fin (2 ^ vp.params.hp)) where
-  toFun pos := ⟨pos.layer, pos.tree, pos.leaf⟩
-  invFun coord := ⟨coord.1, coord.2.1, coord.2.2⟩
-  left_inv pos := by cases pos; rfl
-  right_inv coord := by cases coord; rfl
-
-/-- Reachable layer positions form a finite type because all three FIPS coordinates are bounded. -/
-instance (vp : ValidatedParams) : Fintype (LayerPosition vp) :=
-  Fintype.ofEquiv _ (layerPositionEquiv vp).symm
 
 /-- The target-count exponent agrees with the canonical `LayerPosition` exponent. -/
 theorem treesAtLayer_eq_layerTreeHeight (vp : ValidatedParams) (layer : Fin vp.params.d) :
@@ -219,6 +212,11 @@ theorem toAdrs_tree {vp : ValidatedParams} (coord : LayerTreeCoord vp) :
 @[simp]
 theorem ofPosition_toAdrs {vp : ValidatedParams} (pos : LayerPosition vp) :
     (ofPosition pos).toAdrs = pos.toAdrs := by rfl
+
+/-- The base address of the top tree: layer `d - 1`, tree zero. -/
+@[simp]
+theorem top_toAdrs (vp : ValidatedParams) :
+    (top vp).toAdrs = (Adrs.zero.setLayerAddress (vp.params.d - 1)).setTreeAddress 0 := by rfl
 
 end LayerTreeCoord
 
@@ -1190,8 +1188,8 @@ theorem disjoint_wotsPkAddresses_xmssNodeAddresses (vp : ValidatedParams) :
     (fun _ => type_of_mem_xmssNodeAddresses vp)
 
 /-- The six structural ledgers, concatenated in the order of the table above with the two
-selection-dependent ledgers left out, are duplicate-free.  A named union ledger belongs to the
-trace-level slice. -/
+selection-dependent ledgers left out, are duplicate-free.  `HashSig.SLHDSA.Security.TraceTargets`
+names this concatenation as the union ledger `constructionAddresses`. -/
 theorem nodup_structuralLedgers_append (vp : ValidatedParams) :
     (forsLeafAddresses vp ++ forsTreeAddresses vp ++ forsRootAddresses vp ++
       wotsStepAddresses vp ++ wotsPkAddresses vp ++ xmssNodeAddresses vp).Nodup := by

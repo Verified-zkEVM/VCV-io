@@ -30,10 +30,24 @@ encoded union.
 The programs certified here are the WOTS+ ones: `chainM` over any step interval inside
 `[0, w - 1)`, and `wotsPkGenM`, `wotsSignM`, and `wotsPkFromSigM` at any reachable
 `LayerPosition`, the latter three each paired with their total query bounds.  The FORS, XMSS,
-hypertree, and scheme programs are not certified by this module.  The logged-execution theorem
+hypertree, and scheme programs are certified in `HashSig.SLHDSA.Security.ComponentTraces`, which
+builds on the predicate and bridges defined here.  The logged-execution theorem
 applies to any pathwise-certified program interpreted through `QueryImpl.withLogging` over an
 arbitrary deterministic handler `QueryImpl (publicHashSpec core) Id`, and in particular through the
-canonical `PublicHash.impl` of a primitive bundle.
+canonical `PublicHash.impl` of a primitive bundle.  It is the SLH-DSA instance of
+`OracleComp.holds_of_mem_run_simulateQ_withLogging`, whose `support`-based companion
+`OracleComp.holds_of_mem_log_of_mem_support_run_simulateQ` covers `loggingOracle`; a stateful
+probabilistic handler such as `PublicHash.randomOracle` needs its own bridge, which this module
+does not provide.
+
+The definitions are opaque to importers.  What a downstream slice uses are the public equations:
+`mem_constructionAddresses_iff` and `constructionAddresses_length` for the union ledger,
+`mem_encodedConstructionAddresses_iff` and `encodeTargets_constructionAddresses` for its encoded
+image, `constructionQueryReachable_thash_iff` and `constructionQueryReachable_hmsg` for the query
+predicate, the structural laws `QueriesWithinConstructionTargets.pure`, `.bind`, `.query_iff`,
+and `.ofFnM` for assembling the predicate along a program, and
+`queriesWithinConstructionTargets_iff_isQueryBound` to reach the generic `IsQueryBound` laws (for
+example `isQueryBound_map_iff`) from the wrapper.
 
 The union is a complete structural ledger, not the partial, source-shaped WOTS+ target selection
 used by the undetectability reduction.  These provenance theorems neither execute the ledger's
@@ -53,7 +67,15 @@ open OracleComp OracleSpec
 namespace SLHDSA.Security
 
 /-- The union of the six structural address ledgers, in the order FORS leaves, FORS internal nodes,
-FORS roots, WOTS+ hash steps, WOTS+ public-key compressions, XMSS internal nodes. -/
+FORS roots, WOTS+ hash steps, WOTS+ public-key compressions, XMSS internal nodes.
+
+Two of the eight role ledgers are deliberately absent: every address the selection-dependent
+WOTS+ ledgers `selectedWotsAddresses` and `optionalWotsAddresses` list is already a
+`wotsStepAddresses` entry (`selectedWotsAddresses_subset`, `optionalWotsAddresses_subset`), so
+nothing is lost.  No secret-key
+derivation address (`wotsSkAdrs`, `forsSkAdrs`, type codes `WOTS_PRF` and `FORS_PRF`) is listed,
+because `CorePrimitives.PRF` and `PRFmsg` are pure fields of the primitives and never
+`publicHashSpec` queries. -/
 def constructionAddresses (vp : ValidatedParams) : List Adrs :=
   forsLeafAddresses vp ++ forsTreeAddresses vp ++ forsRootAddresses vp ++
     wotsStepAddresses vp ++ wotsPkAddresses vp ++ xmssNodeAddresses vp
@@ -61,6 +83,25 @@ def constructionAddresses (vp : ValidatedParams) : List Adrs :=
 /-- The union ledger is duplicate-free: each role ledger is, and the roles are pairwise disjoint. -/
 theorem constructionAddresses_nodup (vp : ValidatedParams) : (constructionAddresses vp).Nodup :=
   nodup_structuralLedgers_append vp
+
+/-- An address is in the union ledger exactly when it is in one of the six role ledgers. -/
+theorem mem_constructionAddresses_iff {vp : ValidatedParams} (adrs : Adrs) :
+    adrs ∈ constructionAddresses vp ↔
+      adrs ∈ forsLeafAddresses vp ∨ adrs ∈ forsTreeAddresses vp ∨
+        adrs ∈ forsRootAddresses vp ∨ adrs ∈ wotsStepAddresses vp ∨
+          adrs ∈ wotsPkAddresses vp ∨ adrs ∈ xmssNodeAddresses vp := by
+  simp [constructionAddresses]
+
+/-- The union ledger has the summed length of its six components: the five exact role counts and
+the `wotsInstanceCount * len * (w - 1)` executed WOTS+ steps. -/
+theorem constructionAddresses_length (vp : ValidatedParams) :
+    (constructionAddresses vp).length =
+      targetCount vp.params .forsF + targetCount vp.params .forsH + targetCount vp.params .forsTl +
+        wotsInstanceCount vp.params * vp.params.len * (vp.params.w - 1) +
+        targetCount vp.params .wotsTl + targetCount vp.params .xmssH := by
+  simp only [constructionAddresses, List.length_append, forsLeafAddresses_length,
+    forsTreeAddresses_length, forsRootAddresses_length, wotsStepAddresses_length,
+    wotsPkAddresses_length, xmssNodeAddresses_length]
 
 /-- The encoded image of the complete structural construction-address ledger. -/
 def encodedConstructionAddresses (vp : ValidatedParams)
@@ -73,6 +114,24 @@ theorem encodedConstructionAddresses_core {vp : ValidatedParams} (prims : Primit
       encodeTargets prims (constructionAddresses vp) := by
   simp only [encodedConstructionAddresses, encodeTargets]
 
+/-- An encoded tweak is in the encoded union ledger exactly when it is the encoding of a listed
+structural address. -/
+theorem mem_encodedConstructionAddresses_iff {vp : ValidatedParams}
+    (core : CorePrimitives vp.params) (adrsKey : core.AdrsKey) :
+    adrsKey ∈ encodedConstructionAddresses vp core ↔
+      ∃ adrs ∈ constructionAddresses vp, core.adrsToKey adrs = adrsKey := by
+  simp [encodedConstructionAddresses]
+
+/-- The encoded union ledger is the concatenation of the six encoded role ledgers, in the order of
+`constructionAddresses`.  This is the equation through which a statement about the union composes
+with the per-role fields of `EncodedTargetLedgerConditions`. -/
+theorem encodeTargets_constructionAddresses {vp : ValidatedParams} (prims : Primitives vp.params) :
+    encodeTargets prims (constructionAddresses vp) =
+      encodeTargets prims (forsLeafAddresses vp) ++ encodeTargets prims (forsTreeAddresses vp) ++
+        encodeTargets prims (forsRootAddresses vp) ++ encodeTargets prims (wotsStepAddresses vp) ++
+        encodeTargets prims (wotsPkAddresses vp) ++ encodeTargets prims (xmssNodeAddresses vp) := by
+  simp only [constructionAddresses, encodeTargets, List.map_append]
+
 /-- A public-hash query is construction-reachable when its encoded tweak occurs in the structural
 ledger. `H_msg` carries no tweak and is always accepted by this address predicate. -/
 def ConstructionQueryReachable (vp : ValidatedParams)
@@ -80,19 +139,47 @@ def ConstructionQueryReachable (vp : ValidatedParams)
   | .thash _ adrsKey _ => adrsKey ∈ encodedConstructionAddresses vp core
   | .hmsg _ _ _ _ => True
 
+/-- A `thash` query is construction-reachable exactly when its tweak is in the encoded union
+ledger. -/
+theorem constructionQueryReachable_thash_iff {vp : ValidatedParams}
+    (core : CorePrimitives vp.params) (pkSeed : core.PkSeed) (adrsKey : core.AdrsKey)
+    (xs : List core.Y) :
+    ConstructionQueryReachable vp core (.thash pkSeed adrsKey xs) ↔
+      adrsKey ∈ encodedConstructionAddresses vp core :=
+  Iff.rfl
+
+/-- Every `hmsg` query is construction-reachable: it carries no address. -/
+@[simp]
+theorem constructionQueryReachable_hmsg {vp : ValidatedParams}
+    (core : CorePrimitives vp.params) (r : core.Y) (pkSeed : core.PkSeed) (pkRoot : core.Y)
+    (msg : List Byte) :
+    ConstructionQueryReachable vp core (.hmsg r pkSeed pkRoot msg) :=
+  trivial
+
 /-- Every syntactically reachable path through `program` uses only construction-ledger tweaks.
-The unit budget does not count queries; it turns `IsQueryBound` into a pathwise query predicate. -/
+This is the predicate-only query bound `AllQueriesSatisfy`: it counts no queries and constrains
+only which public-hash inputs the program can reach. -/
 def QueriesWithinConstructionTargets {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {α : Type}
     (program : OracleComp (publicHashSpec core) α) : Prop :=
-  program.IsQueryBound () (fun q _ => ConstructionQueryReachable vp core q) (fun _ _ => ())
+  program.AllQueriesSatisfy (ConstructionQueryReachable vp core)
+
+/-- The wrapper is the predicate-only `IsQueryBound`; this is the equation an importer uses to
+reach the generic query-bound laws (`isQueryBound_map_iff`, `isQueryBound_iff_of_map_eq`, and the
+`allQueriesSatisfy_*` family, which `allQueriesSatisfy_def` connects to this form). -/
+theorem queriesWithinConstructionTargets_iff_isQueryBound {vp : ValidatedParams}
+    (core : CorePrimitives vp.params) {α : Type}
+    (program : OracleComp (publicHashSpec core) α) :
+    QueriesWithinConstructionTargets core program ↔
+      program.IsQueryBound () (fun q _ => ConstructionQueryReachable vp core q) (fun _ _ => ()) :=
+  allQueriesSatisfy_def program _
 
 @[simp]
-theorem queriesWithinConstructionTargets_pure {vp : ValidatedParams}
+theorem QueriesWithinConstructionTargets.pure {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {α : Type} (x : α) :
     QueriesWithinConstructionTargets core
-      (pure x : OracleComp (publicHashSpec core) α) := by
-  trivial
+      (pure x : OracleComp (publicHashSpec core) α) :=
+  allQueriesSatisfy_pure x _
 
 /-- Pathwise target provenance composes through monadic sequencing. -/
 theorem QueriesWithinConstructionTargets.bind {vp : ValidatedParams}
@@ -101,20 +188,18 @@ theorem QueriesWithinConstructionTargets.bind {vp : ValidatedParams}
     {continuation : α → OracleComp (publicHashSpec core) β}
     (hprogram : QueriesWithinConstructionTargets core program)
     (hcontinuation : ∀ x, QueriesWithinConstructionTargets core (continuation x)) :
-    QueriesWithinConstructionTargets core (program >>= continuation) := by
-  exact OracleComp.isQueryBound_bind (fun _ _ => ())
-    (fun _ _ _ _ h => ⟨h, h⟩) (fun _ _ _ _ _ => ⟨rfl, rfl⟩)
-    hprogram hcontinuation
+    QueriesWithinConstructionTargets core (program >>= continuation) :=
+  allQueriesSatisfy_bind hprogram hcontinuation
 
 /-- A single public-hash query is within the construction ledger exactly when its query input is. -/
 @[simp]
-theorem queriesWithinConstructionTargets_query_iff {vp : ValidatedParams}
+theorem QueriesWithinConstructionTargets.query_iff {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (q : (publicHashSpec core).Domain) :
     QueriesWithinConstructionTargets core
         (liftM ((publicHashSpec core).query q) :
           OracleComp (publicHashSpec core) ((publicHashSpec core).Range q)) ↔
-      ConstructionQueryReachable vp core q := by
-  simp [QueriesWithinConstructionTargets]
+      ConstructionQueryReachable vp core q :=
+  allQueriesSatisfy_query_iff q _
 
 /-- Any structural address in the union ledger has a reachable encoded tweak. -/
 theorem constructionQueryReachable_thash_of_mem {vp : ValidatedParams}
@@ -133,7 +218,7 @@ theorem publicHash_f_queriesWithinConstructionTargets_of_mem {vp : ValidatedPara
     (hadrs : adrs ∈ constructionAddresses vp) :
     QueriesWithinConstructionTargets core
       (PublicHash.f core pkSeed adrs x : OracleComp (publicHashSpec core) core.Y) := by
-  apply (queriesWithinConstructionTargets_query_iff core _).2
+  apply (QueriesWithinConstructionTargets.query_iff core _).2
   exact constructionQueryReachable_thash_of_mem core pkSeed adrs [x] hadrs
 
 /-- An explicit `H` call at any address in the structural union is pathwise certified. -/
@@ -143,7 +228,7 @@ theorem publicHash_h_queriesWithinConstructionTargets_of_mem {vp : ValidatedPara
     QueriesWithinConstructionTargets core
       (PublicHash.h core pkSeed adrs left right :
         OracleComp (publicHashSpec core) core.Y) := by
-  apply (queriesWithinConstructionTargets_query_iff core _).2
+  apply (QueriesWithinConstructionTargets.query_iff core _).2
   exact constructionQueryReachable_thash_of_mem core pkSeed adrs [left, right] hadrs
 
 /-- An explicit `T_l` call at any address in the structural union is pathwise certified. -/
@@ -152,7 +237,7 @@ theorem publicHash_tl_queriesWithinConstructionTargets_of_mem {vp : ValidatedPar
     (xs : List core.Y) (hadrs : adrs ∈ constructionAddresses vp) :
     QueriesWithinConstructionTargets core
       (PublicHash.tl core pkSeed adrs xs : OracleComp (publicHashSpec core) core.Y) := by
-  apply (queriesWithinConstructionTargets_query_iff core _).2
+  apply (QueriesWithinConstructionTargets.query_iff core _).2
   exact constructionQueryReachable_thash_of_mem core pkSeed adrs xs hadrs
 
 /-- One typed WOTS chain step is an actual `F` query at an address in the WOTS-step ledger. -/
@@ -175,8 +260,9 @@ theorem publicHash_tl_wotsPk_queriesWithinConstructionTargets {vp : ValidatedPar
   apply publicHash_tl_queriesWithinConstructionTargets_of_mem core pkSeed _ xs
   simp [constructionAddresses, mem_wotsPkAddresses]
 
-/-- A WOTS chain whose interval stays in `[0, w - 1)` issues only queries in the complete
-all-layer WOTS-step ledger. -/
+/-- A WOTS+ chain whose interval stays in `[0, w - 1)` uses only union-ledger tweaks.  Each query
+is routed through `mem_wotsStepAddresses`, so the addresses are WOTS-step addresses, but the
+predicate itself records only membership in the union. -/
 theorem chainM_queriesWithinConstructionTargets {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (pkSeed : core.PkSeed) (pos : LayerPosition vp)
     (chain : Fin vp.params.len) (x : core.Y) (i s : ℕ) (hinterval : i + s ≤ vp.params.w - 1) :
@@ -184,7 +270,7 @@ theorem chainM_queriesWithinConstructionTargets {vp : ValidatedParams}
       (chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val) x i s :
         OracleComp (publicHashSpec core) core.Y) := by
   induction s with
-  | zero => trivial
+  | zero => exact QueriesWithinConstructionTargets.pure core x
   | succ s ih =>
       change QueriesWithinConstructionTargets core
         (chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val) x i s >>= fun y =>
@@ -197,26 +283,17 @@ theorem chainM_queriesWithinConstructionTargets {vp : ValidatedParams}
         publicHash_f_wotsStep_queriesWithinConstructionTargets core pkSeed pos chain
           ⟨i + s, hstep⟩ y
 
-private theorem queriesWithinConstructionTargets_ofFnM {vp : ValidatedParams}
+/-- Pathwise target provenance passes through `Vector.ofFnM` when every component has it. -/
+theorem QueriesWithinConstructionTargets.ofFnM {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {Y : Type} {k : ℕ}
     (program : Fin k → OracleComp (publicHashSpec core) Y)
     (hprogram : ∀ i, QueriesWithinConstructionTargets core (program i)) :
-    QueriesWithinConstructionTargets core (Vector.ofFnM program) := by
-  induction k with
-  | zero =>
-      rw [Vector.ofFnM_zero]
-      trivial
-  | succ k ih =>
-      rw [Vector.ofFnM_succ]
-      apply QueriesWithinConstructionTargets.bind
-        (ih (fun i => program i.castSucc) (fun i => hprogram i.castSucc))
-      intro xs
-      apply QueriesWithinConstructionTargets.bind (hprogram (Fin.last k))
-      intro x
-      trivial
+    QueriesWithinConstructionTargets core (Vector.ofFnM program) :=
+  allQueriesSatisfy_ofFnM program hprogram
 
-/-- Actual WOTS public-key generation at a typed arbitrary-depth position stays inside the
-WOTS-step and WOTS-compression ledgers. -/
+/-- WOTS+ public-key generation at a reachable position uses only union-ledger tweaks.  Its queries
+are routed through `mem_wotsStepAddresses` and `mem_wotsPkAddresses`; the predicate records only
+union membership, not the role of each query. -/
 theorem wotsPkGenM_queriesWithinConstructionTargets {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (skSeed : core.SkSeed) (pkSeed : core.PkSeed)
     (pos : LayerPosition vp) :
@@ -224,7 +301,7 @@ theorem wotsPkGenM_queriesWithinConstructionTargets {vp : ValidatedParams}
       (wotsPkGenM core skSeed pkSeed (wotsInstanceAdrs pos) :
         OracleComp (publicHashSpec core) core.Y) := by
   apply QueriesWithinConstructionTargets.bind
-    (queriesWithinConstructionTargets_ofFnM core
+    (QueriesWithinConstructionTargets.ofFnM core
       (fun chain : Fin vp.params.len =>
         chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val)
           (core.PRF pkSeed skSeed (wotsSkAdrs (wotsInstanceAdrs pos) chain.val))
@@ -234,20 +311,22 @@ theorem wotsPkGenM_queriesWithinConstructionTargets {vp : ValidatedParams}
   intro tops
   exact publicHash_tl_wotsPk_queriesWithinConstructionTargets core pkSeed pos tops.toList
 
-/-- Actual WOTS signing at a typed arbitrary-depth position stays inside the WOTS-step ledger. -/
+/-- WOTS+ signing at a reachable position uses only union-ledger tweaks.  Its queries are routed
+through `mem_wotsStepAddresses`; the predicate records only union membership. -/
 theorem wotsSignM_queriesWithinConstructionTargets {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (msg : core.Y) (skSeed : core.SkSeed)
     (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
     QueriesWithinConstructionTargets core
       (wotsSignM core msg skSeed pkSeed (wotsInstanceAdrs pos) :
         OracleComp (publicHashSpec core) (WotsSig vp.params core)) := by
-  exact queriesWithinConstructionTargets_ofFnM core _ fun chain =>
+  exact QueriesWithinConstructionTargets.ofFnM core _ fun chain =>
     chainM_queriesWithinConstructionTargets core pkSeed pos chain _ 0
       (chainStepsCore core msg chain.val) (by
         simpa using chainStepsCore_le core msg chain.val)
 
-/-- Actual WOTS recovery at a typed arbitrary-depth position stays inside the WOTS-step and
-WOTS-compression ledgers. -/
+/-- WOTS+ public-key recovery at a reachable position uses only union-ledger tweaks.  Its queries
+are routed through `mem_wotsStepAddresses` and `mem_wotsPkAddresses`; the predicate records only
+union membership. -/
 theorem wotsPkFromSigM_queriesWithinConstructionTargets {vp : ValidatedParams}
     (core : CorePrimitives vp.params) (sig : WotsSig vp.params core) (msg : core.Y)
     (pkSeed : core.PkSeed) (pos : LayerPosition vp) :
@@ -255,7 +334,7 @@ theorem wotsPkFromSigM_queriesWithinConstructionTargets {vp : ValidatedParams}
       (wotsPkFromSigM core sig msg pkSeed (wotsInstanceAdrs pos) :
         OracleComp (publicHashSpec core) core.Y) := by
   apply QueriesWithinConstructionTargets.bind
-    (queriesWithinConstructionTargets_ofFnM core
+    (QueriesWithinConstructionTargets.ofFnM core
       (fun chain : Fin vp.params.len =>
         chainM core pkSeed (wotsChainAdrs (wotsInstanceAdrs pos) chain.val) sig[chain.val]
           (chainStepsCore core msg chain.val)
@@ -331,56 +410,37 @@ theorem publicHash_hmsg_queriesWithinConstructionTargets {vp : ValidatedParams}
 /-- A deterministic logged interpretation of a pathwise-certified program contains only encoded
 tweaks from the construction ledger.  This is the execution-level bridge: the conclusion talks
 about the concrete `QueryLog` returned by `withLogging`, while the premise remains independent of
-the answer function. -/
-theorem mem_logged_query_isConstructionReachable {vp : ValidatedParams}
+the answer function.  It is `OracleComp.holds_of_mem_run_simulateQ_withLogging` at the
+construction predicate. -/
+theorem constructionQueryReachable_of_mem_run_withLogging {vp : ValidatedParams}
     (core : CorePrimitives vp.params) {α : Type}
     (answer : QueryImpl (publicHashSpec core) Id)
     (program : OracleComp (publicHashSpec core) α)
     (hprogram : QueriesWithinConstructionTargets core program) :
     ∀ entry ∈ (simulateQ answer.withLogging program).run.run.2,
-      ConstructionQueryReachable vp core entry.1 := by
-  induction program using OracleComp.inductionOn with
-  | pure x =>
-      change ∀ entry ∈ ([] : QueryLog (publicHashSpec core)),
-        ConstructionQueryReachable vp core entry.1
-      simp
-  | query_bind q continuation ih =>
-      unfold QueriesWithinConstructionTargets at hprogram
-      rw [OracleComp.isQueryBound_query_bind_iff] at hprogram
-      rw [simulateQ_query_bind]
-      simp only [OracleQuery.input_query, monadLift_self,
-        WriterT.run_bind', QueryImpl.run_withLogging_apply]
-      simp only [Id.run_bind, Id.run_map, Prod.map_snd, List.mem_append]
-      simp only [Id.run_pure, List.mem_singleton]
-      intro entry hentry
-      rcases hentry with hentry | hentry
-      · subst entry
-        exact hprogram.1
-      · apply ih (answer q).run
-        · show QueriesWithinConstructionTargets core (continuation (answer q).run)
-          exact hprogram.2 (answer q).run
-        · exact hentry
+      ConstructionQueryReachable vp core entry.1 :=
+  holds_of_mem_run_simulateQ_withLogging (P := ConstructionQueryReachable vp core) answer
+    hprogram
 
 /-- The logged-execution bridge at the canonical deterministic interpretation of a primitive
-bundle: every `thash` entry (an `F`, `H`, or `T_l` call) the log records carries a tweak from the
-bundle's encoded union ledger.  The conclusion uses the same `encodeTargets` notation as
-`EncodedTargetLedgerConditions`, but does not identify a query's component role or prove encoded
-duplicate-freedom across roles. -/
-theorem mem_logged_query_impl_isConstructionReachable {vp : ValidatedParams}
+bundle: every `thash` entry (an `F`, `H`, or `T_l` call) the log records carries a tweak from
+`encodeTargets prims (constructionAddresses vp)`.  `encodeTargets_constructionAddresses` splits
+that list into the six encoded role ledgers whose distinctness `EncodedTargetLedgerConditions`
+states; the bridge itself does not identify a query's role or prove encoded duplicate-freedom
+across roles.  The conclusion is stated as an equation hypothesis on the entry rather than a
+`match`, so a consumer applies it to a `thash` entry directly. -/
+theorem constructionQueryReachable_of_mem_run_withLogging_impl {vp : ValidatedParams}
     (prims : Primitives vp.params) {α : Type}
     (program : OracleComp (publicHashSpec prims.core) α)
     (hprogram : QueriesWithinConstructionTargets prims.core program) :
     ∀ entry ∈ (simulateQ (PublicHash.impl prims).withLogging program).run.run.2,
-      match entry.1 with
-      | .thash _ adrsKey _ => adrsKey ∈ encodeTargets prims (constructionAddresses vp)
-      | .hmsg _ _ _ _ => True := by
-  intro entry hentry
-  have h := mem_logged_query_isConstructionReachable prims.core (PublicHash.impl prims)
+      ∀ (pkSeed : prims.core.PkSeed) (adrsKey : prims.core.AdrsKey) (xs : List prims.core.Y),
+        entry.1 = .thash pkSeed adrsKey xs →
+          adrsKey ∈ encodeTargets prims (constructionAddresses vp) := by
+  intro entry hentry pkSeed adrsKey xs hquery
+  have h := constructionQueryReachable_of_mem_run_withLogging prims.core (PublicHash.impl prims)
     program hprogram entry hentry
-  rcases entry with ⟨q, _⟩
-  cases q with
-  | thash pkSeed adrsKey xs =>
-      simpa [ConstructionQueryReachable, encodedConstructionAddresses_core] using h
-  | hmsg _ _ _ _ => trivial
+  rw [hquery, constructionQueryReachable_thash_iff, encodedConstructionAddresses_core] at h
+  exact h
 
 end SLHDSA.Security

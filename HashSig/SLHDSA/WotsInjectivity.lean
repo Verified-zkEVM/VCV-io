@@ -72,10 +72,13 @@ theorem chainLengthsCore_incomparable (valid : p.Valid) (laws : core.ByteLaws)
 
 /-- Two distinct nodes have a chain index at which the first node's step count is strictly
 smaller than the second's. This is the combinatorial ingredient a WOTS+ unforgeability
-reduction consumes: a forger who only advances the honest signer's chains cannot reach the
-encoding of a different message. It is the index-wise reading of the second conjunct of
-`chainLengthsCore_incomparable`, and the Lean counterpart of the EasyCrypt `two_encodings`
-axiom. -/
+reduction consumes, instantiated with the forgery target as `msg` and the honestly signed
+message as `msg'`: at the witnessing index the target's step count is strictly below the
+signed one, so a forger who only advances the honest signer's chains cannot reach the target's
+encoding. The EasyCrypt SPHINCS+ proof's forgery-side use of its axiom is exactly this swapped
+form (`two_encodings m' m` in `nhchwcoll_hchwpre`, `WOTS_TW_ES.ec`). The statement is the
+index-wise reading of the second conjunct of `chainLengthsCore_incomparable`, and the Lean
+counterpart of the EasyCrypt `two_encodings` axiom. -/
 theorem chainStepsCore_two_encodings (valid : p.Valid) (laws : core.ByteLaws)
     {msg msg' : core.Y} (hne : msg ≠ msg') :
     ∃ i, i < p.len ∧ chainStepsCore core msg i < chainStepsCore core msg' i := by

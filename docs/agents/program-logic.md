@@ -27,6 +27,27 @@ compatibility layer while measure-native tactic support is developed.
 
 ## Tactic Quick Reference
 
+### Postcondition bounds
+
+For `wp oa f ≤ wp oa g`, `gcongr with x hx` exposes `hx : x ∈ support oa` and the
+pointwise obligation `f x ≤ g x`. The unrestricted `wp_mono` theorem remains available as a
+lower-priority fallback. On raw `Std.Do'.wp` expressions, first write
+`change OracleComp.ProgramLogic.wp oa f ≤ OracleComp.ProgramLogic.wp oa g` to expose the
+head that `gcongr` indexes. `wp_eq_expectedValue` is an explicit bridge, not a global simp rule.
+
+Use `finiteness` for `wp oa post ≠ ⊤` when the result type is finite and the postcondition is
+pointwise finite. An arbitrary quantitative postcondition may still take the value `⊤`.
+The regression module `VCVioTest/ProgramLogic/GCongr.lean` checks the support binders and the
+explicit raw-WP script, so these examples can be pasted into ordinary-import proofs.
+
+For directional rewriting, explicitly import `Mathlib.Tactic.GRewrite`. With
+`h : ∀ x, f x ≤ g x`, `grw [h]` rewrites through `wp` and `expectedValue`. If `h` is restricted
+to `support oa`, the rewrite leaves that support premise as a side goal; `grw [h]; assumption`
+closes the direct comparison. `gcongr with x hx` remains useful when the pointwise proof needs
+the support fact explicitly. The [generalized-relation investigation](../reading/generalized-relation-automation.md)
+compares these tactics with `mono`, equality congruence, and relational VCGen, and records which
+candidate registrations are experimental.
+
 ### Proof Mode Entry
 
 | Tactic | Goal shape | What it does |

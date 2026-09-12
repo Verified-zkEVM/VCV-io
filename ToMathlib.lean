@@ -2,7 +2,6 @@ module  -- shake: keep-all --deprecated_module: ignore
 
 public import ToMathlib.Algebra.BigOperators.Finset
 public import ToMathlib.Algebra.BigOperators.List
-public import ToMathlib.Algebra.Order.Ring.Abs
 public import ToMathlib.Analysis.MeanInequalities
 public import ToMathlib.Analysis.SumIntegralComparisons
 public import ToMathlib.Control.AlternativeMonad
@@ -25,7 +24,6 @@ public import ToMathlib.Control.StateT
 public import ToMathlib.Control.WriterT
 public import ToMathlib.Data.BitVec
 public import ToMathlib.Data.ENNReal.AbsDiff
-public import ToMathlib.Data.ENNReal.Basic
 public import ToMathlib.Data.ENNReal.Finiteness
 public import ToMathlib.Data.ENNReal.Gauss
 public import ToMathlib.Data.ENNReal.SumSquares
@@ -47,7 +45,9 @@ public import ToMathlib.Logic.Basic
 public import ToMathlib.MeasureTheory.DiscreteInstances
 public import ToMathlib.MeasureTheory.MeasurableSpace.Except
 public import ToMathlib.MeasureTheory.MeasurableSpace.Option
+public import ToMathlib.MeasureTheory.Measure.Bounds
 public import ToMathlib.MeasureTheory.Measure.Coupling
+public import ToMathlib.MeasureTheory.Measure.IndependentDraws
 public import ToMathlib.MeasureTheory.Measure.Monotone
 public import ToMathlib.MeasureTheory.Measure.Option
 public import ToMathlib.MeasureTheory.Measure.Subprobability

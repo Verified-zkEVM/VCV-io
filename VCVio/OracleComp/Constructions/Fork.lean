@@ -171,7 +171,7 @@ private theorem probOutput_pair_eq_observedForkPair_missing [spec.DecidableEq] [
   rw [hforkNone, hcomplete]
   simp [hne']
 
-private theorem probOutput_pair_eq_observedForkPair_found [spec.DecidableEq] [IsUniformSpec spec]
+private theorem probOutput_pair_eq_observedForkPair_found [IsUniformSpec spec]
     {main : OracleComp spec α} {i : ι} {n : Nat} {observe : α → Option β} {value : β}
     (occurrence : PFunctor.FreeM.Cursor.Occurrence i main n) :
     (Pr[= (some value, some value) | (do

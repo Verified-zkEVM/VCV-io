@@ -41,7 +41,7 @@ A functional form of the batch completeness theorem: the honest batch proof gene
 an honestly built tree, together with the true selected leaf values, recomputes the tree's
 root — under any hash function and any selector opening at least one leaf.
 -/
-@[simp, grind =]
+@[grind =]
 theorem functional_batch_completeness {s : Skeleton}
     (leaves : LeafData α s) (sel : LeafData Bool s) (h : sel.anySelected = true)
     (hash : α → α → α) :
@@ -72,7 +72,6 @@ root succeeds with probability `1` under the random oracle.
 The proof reduces to `functional_batch_completeness` through `simulateQ`, exactly as the
 single-index `completeness` theorem reduces to `functional_completeness`.
 -/
-@[simp]
 theorem batch_completeness [DecidableEq α] [Inhabited α] [SampleableType α] {s : Skeleton}
     (leaf_data_tree : LeafData α s) (sel : LeafData Bool s) (h : sel.anySelected = true)
     (preexisting_cache : (spec α).QueryCache) :

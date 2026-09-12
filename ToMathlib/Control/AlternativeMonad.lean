@@ -23,10 +23,10 @@ section liftM
 
 variable {α β}
 
-@[simp] theorem liftM_failure [Alternative m] [Alternative n] [MonadLift m n]
+theorem liftM_failure [Alternative m] [Alternative n] [MonadLift m n]
     [LawfulAlternativeLift m n] : liftM (failure : m α) = (failure : n α) := monadLift_failure
 
-@[simp] theorem liftM_orElse [Alternative m] [Alternative n] [MonadLift m n]
+theorem liftM_orElse [Alternative m] [Alternative n] [MonadLift m n]
     [LawfulAlternativeLift m n] (x y : m α) : liftM (x <|> y) = (liftM x <|> liftM y : n α) :=
   monadLift_orElse x y
 

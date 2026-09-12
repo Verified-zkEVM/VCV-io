@@ -374,20 +374,11 @@ theorem hidingImpl₁_counter_le_succ (s : S) (ms : M × S)
     st.2 ≤ x.2.2 ∧ x.2.2 ≤ st.2 + 1 := by
   obtain ⟨cache, cnt⟩ := st
   simp only [hidingImpl₁, StateT.run_bind, StateT.run_get, pure_bind] at hx
-  cases hcache : cache ms with
-  | some u =>
-    simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]
-    exact ⟨Nat.le_refl _, Nat.le_succ _⟩
-  | none =>
-    simp only [hcache, StateT.run_bind] at hx
-    rw [mem_support_bind_iff] at hx
-    obtain ⟨u, _, hx⟩ := hx
-    simp only [StateT.run_set, StateT.run_pure, pure_bind,
-      support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]
-    simp
-    split <;> omega
+  cases hcache : cache ms <;>
+    simp_all [StateT.run_bind, StateT.run_set, StateT.run_pure]
+  obtain ⟨_, rfl⟩ := hx
+  dsimp only
+  split_ifs <;> omega
 
 omit [Finite C] [Inhabited C] in
 /-- Bad is monotone for `hidingImpl₁`: once the counter reaches 2, it stays ≥ 2. -/
@@ -421,20 +412,11 @@ theorem hidingImplSim_counter_le_succ [Inhabited M] [Inhabited S] (s : S) (ms : 
     st.2 ≤ x.2.2 ∧ x.2.2 ≤ st.2 + 1 := by
   obtain ⟨cache, cnt⟩ := st
   simp only [hidingImplSim, StateT.run_bind, StateT.run_get, pure_bind] at hx
-  cases hcache : cache ms with
-  | some u =>
-    simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]
-    exact ⟨Nat.le_refl _, Nat.le_succ _⟩
-  | none =>
-    simp only [hcache, StateT.run_bind] at hx
-    rw [mem_support_bind_iff] at hx
-    obtain ⟨u, _, hx⟩ := hx
-    simp only [StateT.run_set, StateT.run_pure, pure_bind,
-      support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]
-    simp
-    split <;> omega
+  cases hcache : cache ms <;>
+    simp_all [StateT.run_bind, StateT.run_set, StateT.run_pure]
+  obtain ⟨_, rfl⟩ := hx
+  dsimp only
+  split_ifs <;> omega
 
 omit [Finite C] [Inhabited C] in
 /-- Bad is monotone for `hidingImplSim`: once cnt ≥ 2, it stays ≥ 2. -/
@@ -541,11 +523,8 @@ lemma wp_finset_sum {α : Type}
     (oa : OracleComp (CMOracle M S C) α) (ss : Finset S) (f : S → α → ℝ≥0∞) :
     (ss.sum fun s => OracleComp.ProgramLogic.wp oa (f s)) =
       OracleComp.ProgramLogic.wp oa (fun z => ss.sum fun s => f s z) := by
-  let := Classical.decEq S
-  refine Finset.induction_on ss ?_ ?_
-  · simp
-  · intro s ss hs ih
-    simp [Finset.sum_insert, hs, ih, OracleComp.ProgramLogic.wp_add]
+  simp only [OracleComp.ProgramLogic.wp_eq_expectedValue,
+    OracleComp.EvalDist.expectedValue_finsetSum]
 
 lemma sum_wp_hidingOa_eq_wp_choose [Fintype S]
     {AUX : Type} {t : ℕ}
@@ -635,29 +614,11 @@ lemma wp_challenge_countPred_le_initialCount
     OracleComp.ProgramLogic.wp
       ((hidingImplCountAll (M := M) (S := S) (C := C) (m, s)).run st)
       (fun qch : C × HidingCountState M S C => (qch.2.2 s - 1 : ℝ≥0∞)) ≤ st.2 s := by
-  rw [OracleComp.ProgramLogic.wp_eq_tsum]
-  calc
-    ∑' qch,
-        Pr[= qch |
-          (hidingImplCountAll (M := M) (S := S) (C := C) (m, s)).run st] *
-          (qch.2.2 s - 1 : ℝ≥0∞)
-      ≤
-        ∑' qch,
-          Pr[= qch |
-            (hidingImplCountAll (M := M) (S := S) (C := C) (m, s)).run st] * st.2 s := by
-            refine ENNReal.tsum_le_tsum fun qch => ?_
-            by_cases hqch :
-                qch ∈ support ((hidingImplCountAll (M := M) (S := S) (C := C) (m, s)).run st)
-            · exact mul_le_mul'
-                le_rfl
-                (by
-                  exact_mod_cast
-                    (challenge_countPred_le_initialCount_of_mem_support_step_hidingImplCountAll
-                      (M := M) (S := S) (C := C) m s st hqch))
-            · rw [probOutput_eq_zero_of_not_mem_support hqch]
-              simp
-    _ = st.2 s := by
-        rw [ENNReal.tsum_mul_right, tsum_probOutput_of_liftM_PMF, one_mul]
+  rw [OracleComp.ProgramLogic.wp_eq_expectedValue]
+  apply OracleComp.EvalDist.expectedValue_le_of_support
+  intro qch hqch
+  exact_mod_cast challenge_countPred_le_initialCount_of_mem_support_step_hidingImplCountAll
+    (M := M) (S := S) (C := C) m s st hqch
 
 lemma sum_wp_challenge_countPred_le_initialCount [Fintype S]
     (m : M) (st : HidingCountState M S C) :

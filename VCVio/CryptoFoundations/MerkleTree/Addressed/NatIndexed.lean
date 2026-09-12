@@ -100,6 +100,16 @@ theorem merkleRoot_succ (leaf : ℕ → Y) (nodeHash : ℕ → ℕ → Y → Y �
 /-- Flip the least-significant bit of a heap-style node index. -/
 def sibling (i : ℕ) : ℕ := if i % 2 = 0 then i + 1 else i - 1
 
+/-- A node and its sibling share their parent. -/
+theorem sibling_div_two (i : ℕ) : sibling i / 2 = i / 2 := by
+  unfold sibling
+  split_ifs <;> omega
+
+/-- A node and its sibling share every ancestor at positive height. -/
+theorem sibling_div_pow (i k : ℕ) (hk : 0 < k) : sibling i / 2 ^ k = i / 2 ^ k := by
+  obtain ⟨k, rfl⟩ := Nat.exists_eq_succ_of_ne_zero hk.ne'
+  rw [pow_succ', ← Nat.div_div_eq_div_mul, ← Nat.div_div_eq_div_mul, sibling_div_two]
+
 /-- The authentication path of leaf `idx` over `z` levels, listed from the leaf level upwards:
 entry `j` is the root of the sibling subtree at height `j`. -/
 def authPath (leaf : ℕ → Y) (nodeHash : ℕ → ℕ → Y → Y → Y) (idx z : ℕ) : List Y :=

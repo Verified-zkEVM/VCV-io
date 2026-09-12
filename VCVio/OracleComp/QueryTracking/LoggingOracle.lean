@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Devon Tuma, Quang Dao
+Authors: Devon Tuma, Quang Dao, Alexander Hicks
 -/
 
 module
@@ -152,7 +152,6 @@ lemma appendInputLog_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
     appendInputLog so t = (do modify (· ++ [t]); liftM (so t)) := by
   exact preInsert_apply so (fun t => modify (· ++ [t])) t
 
-@[simp]
 lemma run_withLogging_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
     (t : loggedSpec.Domain) :
     (so.withLogging t).run =
@@ -274,7 +273,6 @@ def OracleSpec.loggingOracle {ι : Type u} {spec : OracleSpec.{u, u} ι} :
 namespace loggingOracle
 
 /-- Specialization of `QueryImpl.probFailure_run_simulateQ_withLogging` to `loggingOracle`. -/
-@[simp]
 lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec]
     (oa : OracleComp spec α) :
@@ -311,7 +309,6 @@ lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
   rw [show (fun z : α × spec.QueryLog => p z.1) = p ∘ Prod.fst from rfl,
     ← probEvent_map, fst_map_run_simulateQ]
 
-@[simp]
 lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec]
     (oa : OracleComp spec α) (x : α) :
@@ -319,13 +316,11 @@ lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
       Pr[= x | oa] := by
   rw [fst_map_run_simulateQ]
 
-@[simp]
 lemma evalSPMF_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec] (oa : OracleComp spec α) :
     𝒮[Prod.fst <$> (simulateQ spec.loggingOracle oa).run] = 𝒮[oa] := by
   rw [fst_map_run_simulateQ]
 
-@[simp]
 lemma support_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [IsUniformSpec spec] (oa : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ spec.loggingOracle oa).run) = support oa := by
@@ -422,6 +417,60 @@ theorem log_length_le_of_mem_support_run_simulateQ
       have := ih u (hrest u) hz'
       simp only [List.length_cons]
       omega
+
+/-- A predicate-only query bound controls every entry of a deterministic logged execution: if
+every query `oa` can make is to an index satisfying `P`, then under any handler
+`so : QueryImpl spec Id` each entry of the resulting log records a `P`-index at its input.
+The premise quantifies over all response paths, so it is independent of `so`, while the
+conclusion is about the single execution `so` produces.
+`holds_of_mem_log_of_mem_support_run_simulateQ` is the probabilistic analogue. -/
+theorem holds_of_mem_run_simulateQ_withLogging
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type} {P : ι → Prop}
+    (so : QueryImpl spec Id) {oa : OracleComp spec α}
+    (hbound : AllQueriesSatisfy oa P) :
+    ∀ e ∈ (simulateQ so.withLogging oa).run.run.2, P e.1 := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      change ∀ e ∈ ([] : QueryLog spec), P e.1
+      simp
+  | query_bind t mx ih =>
+      rw [allQueriesSatisfy_query_bind_iff] at hbound
+      rw [simulateQ_query_bind]
+      simp only [OracleQuery.input_query, monadLift_self, WriterT.run_bind',
+        QueryImpl.run_withLogging_apply, Id.run_bind, Id.run_map, Prod.map_snd, List.mem_append,
+        Id.run_pure, List.mem_singleton]
+      intro e he
+      rcases he with rfl | he
+      · exact hbound.1
+      · exact ih (so t).run (hbound.2 _) e he
+
+/-- A predicate-only query bound controls every entry of every `loggingOracle` trace in support:
+if every query `oa` can make is to an index satisfying `P`, then each entry of each support
+point's log records a `P`-index at its input.  This is the probabilistic analogue of
+`holds_of_mem_run_simulateQ_withLogging`, in the `support` idiom of
+`log_length_le_of_mem_support_run_simulateQ`. -/
+theorem holds_of_mem_log_of_mem_support_run_simulateQ
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type} {P : ι → Prop}
+    {oa : OracleComp spec α}
+    (hbound : AllQueriesSatisfy oa P)
+    {z : α × QueryLog spec}
+    (hz : z ∈ support ((simulateQ loggingOracle oa).run)) :
+    ∀ e ∈ z.2, P e.1 := by
+  induction oa using OracleComp.inductionOn generalizing z with
+  | pure x =>
+      simp only [simulateQ_pure] at hz
+      subst hz
+      simp
+  | query_bind t mx ih =>
+      rw [allQueriesSatisfy_query_bind_iff] at hbound
+      rw [run_simulateQ_loggingOracle_query_bind, support_bind] at hz
+      simp only [Set.mem_iUnion, support_map] at hz
+      obtain ⟨u, _, z', hz', rfl⟩ := hz
+      intro e he
+      simp only [List.mem_cons] at he
+      rcases he with rfl | he
+      · exact hbound.1
+      · exact ih u (hbound.2 u) hz' e he
 
 end isQueryBound
 

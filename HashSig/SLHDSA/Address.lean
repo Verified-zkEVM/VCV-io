@@ -1,7 +1,7 @@
 /-
-Copyright (c) 2026 Nicolas Consigny. All rights reserved.
+Copyright (c) 2026 Nicolas Consigny, Alexander Hicks. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Nicolas Consigny
+Authors: Nicolas Consigny, Alexander Hicks
 -/
 
 module
@@ -22,7 +22,7 @@ Two type-dependent words alias by name exactly as in FIPS 205:
 `setChainAddress = setTreeHeight` (word 2) and `setHashAddress = setTreeIndex` (word 3).
 
 `toBytes` / `compressSha2` give the 32-byte serialization and the 22-byte SHA-2 `ADRSc`
-compression (§11.2.1) as byte lists. `encodeChecked`, `compressSha2Checked`, and `decode` enforce
+compression (§11.2) as byte lists. `encodeChecked`, `compressSha2Checked`, and `decode` enforce
 representability, recognized types, and type-specific canonical padding at external boundaries.
 
 ## References
@@ -337,37 +337,6 @@ theorem fits_of_isCanonical (a : Adrs) (h : a.isCanonical = true) :
       Fits 4 a.word1 = true ∧ Fits 4 a.word2 = true ∧ Fits 4 a.word3 = true := by
   simp only [isCanonical, Bool.and_eq_true] at h
   aesop
-
-/-- Field-level sufficient condition for canonicality at an address type with no unused words. -/
-theorem isCanonical_of_fields_free {a : Adrs} {ty : AddrType}
-    (hfree : ty = .wotsHash ∨ ty = .forsTree)
-    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
-    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
-    a.isCanonical = true := by
-  rcases hfree with rfl | rfl <;>
-    simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
-      Fits, decide_eq_true_eq, Option.isSome_some] <;>
-    and_intros <;> first | omega | decide
-
-/-- Field-level sufficient condition at a compression type, whose last two words are unused. -/
-theorem isCanonical_of_fields_compress {a : Adrs} {ty : AddrType}
-    (hcompress : ty = .wotsPk ∨ ty = .forsRoots)
-    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = ty.toCode)
-    (hword1 : a.word1 < 2 ^ 32) (hword2 : a.word2 = 0) (hword3 : a.word3 = 0) :
-    a.isCanonical = true := by
-  rcases hcompress with rfl | rfl <;>
-    simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
-      Fits, decide_eq_true_eq, Option.isSome_some, hword2, hword3] <;>
-    and_intros <;> first | omega | decide
-
-/-- Field-level sufficient condition at the tree type, whose first word is unused. -/
-theorem isCanonical_of_fields_tree {a : Adrs}
-    (hlayer : a.layer < 2 ^ 32) (htree : a.tree < 2 ^ 96) (hty : a.type = AddrType.tree.toCode)
-    (hword1 : a.word1 = 0) (hword2 : a.word2 < 2 ^ 32) (hword3 : a.word3 < 2 ^ 32) :
-    a.isCanonical = true := by
-  simp only [isCanonical, hty, AddrType.toCode, AddrType.ofCode, Bool.and_eq_true,
-    Fits, decide_eq_true_eq, Option.isSome_some, hword1]
-  and_intros <;> first | omega | decide
 
 /-- Only the seven FIPS type codes decode, so a canonical address has a type below seven. -/
 theorem type_le_six_of_isCanonical {a : Adrs} (h : a.isCanonical = true) : a.type ≤ 6 := by
