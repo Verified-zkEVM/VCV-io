@@ -18,7 +18,9 @@ This file states the high-level security theorems for ML-DSA, following the CRYP
 et al., ePrint 2023/246).
 
 The main result (Theorem 4) is that the ML-DSA signature scheme is EUF-CMA secure, reducing
-to two computational assumptions plus a statistical loss from the CMA-to-NMA reduction:
+to two computational assumptions plus a statistical loss from the CMA-to-NMA reduction. This file
+defines the hardness problems and the loss; the theorems themselves are assembled in
+`LatticeCrypto.MLDSA.SecurityNMA` (see the final section). The shape is:
 
   `Adv^{EUF-CMA}_{ML-DSA}(A) ≤ Adv^{MLWE}_{k,l,Sη}(B) + Adv^{SelfTargetMSIS}_{G,k,l+1,ζ}(C) + L`
 
@@ -31,7 +33,7 @@ The two computational assumptions are:
 
 The statistical loss `L` from the CMA-to-NMA reduction via Fiat-Shamir with aborts is:
 
-  `L = 2·qS·(qH + qS + 1)·ε/(1-p) + qS·ε·(qS+1)/(2·(1-p)²) + qS·ζ_zk + δ`
+  `L = 2·qS·(qH + qS + 1)·ε/(1-p) + qS·ε·(qS+1)/(2·(1-p)²) + qS·ζ_zk/(1-p) + δ`
 
 The proof follows the structure:
 1. EUF-CMA → EUF-NMA via the Fiat-Shamir with aborts CMA-to-NMA reduction (Theorem 3)
@@ -275,7 +277,7 @@ effective random-oracle budget, yielding:
 
   `L = 2·qS·(qH + qS + 1)·ε/(1-p)
      + qS·ε·(qS+1)/(2·(1-p)²)
-     + qS·ζ_zk
+     + qS·ζ_zk/(1-p)
      + δ`
 
 This is exactly `FiatShamirWithAbort.cmaToNmaLoss qS (qH + qS) ...`. -/
@@ -285,81 +287,19 @@ noncomputable def cmaToNmaLoss
 
 end CMAtoNMA
 
-/-! ### Main Security Theorem (Theorem 4) -/
+/-! ### Main Security Theorem (Theorem 4)
 
-section MainTheorem
+The EUF-CMA security theorems for ML-DSA are assembled downstream in
+`LatticeCrypto.MLDSA.SecurityNMA`, composing the Fiat-Shamir-with-aborts CMA-to-NMA reduction
+(at the loss `cmaToNmaLoss` above) with the EUF-NMA bound:
 
-variable {M : Type} [SampleableType (CommitHashBytes p)] [IsUniformSpec unifSpec]
+- `MLDSA.euf_cma_security_of_nma_fips`: the seed-tagged FIPS scheme, with the EUF-NMA leg
+  `MLDSA.nma_security_fips`; `MLDSA.euf_cma_security_of_nma_fips_hvzkReal` discharges its HVZK
+  hypothesis with the proved simulator `idsWithAbort_hvzk_real`.
+- `MLDSA.euf_cma_security_of_nma_short`: the short-secret model, with the EUF-NMA leg
+  `MLDSA.nma_security_short`.
 
-open scoped Classical in
-/-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**
-
-**WARNING: this is a placeholder statement, not the final theorem.** The current shape is
-unsound as written: `ε`, `p_abort`, and `δ : ℝ` are unconstrained signed reals (only
-`hp : p_abort < 1` is assumed). Inherited from
-`FiatShamirWithAbort.cmaToNmaLoss`, the loss term
-`2qS(qH+1)ε/(1-p) + qS·ε(qS+1)/(2(1-p)²) + qS·ζ_zk + δ` can be made arbitrarily negative
-by taking `ε`, `δ` very negative; `ENNReal.ofReal` then clamps it to `0`, collapsing the
-bound to `adv.advantage ≤ Adv^MLWE + Adv^SelfTargetMSIS` with no statistical slack, which
-is generally false. In the final statement `ε`, `p_abort`, `δ` should be nonnegative
-(e.g. `ℝ≥0` or constrained by `0 ≤ ε`, `0 ≤ p_abort`, `0 ≤ δ` hypotheses) and identified
-with the concrete commitment guessing probability, abort probability, and regularity
-failure probability of the ML-DSA identification scheme.
-
-The proof is intentionally deferred. The statement also needs to be specialized to the
-actual ML-DSA parameters (eliminating the explicit quantitative HVZK simulator hypothesis)
-once that derivation is finalized.
-
-For any classical EUF-CMA adversary `A` making at most `qS` signing queries and `qH` random
-oracle queries, and for the adversaries `B` (against MLWE) and `C` (against SelfTargetMSIS)
-constructed in the proof of Lemma 7:
-
-  `Adv^{EUF-CMA}_{ML-DSA}(A) ≤ Adv^{MLWE}_{k,l,Sη}(B) + Adv^{SelfTargetMSIS}_{G,k,l+1,ζ}(C) + L`
-
-where:
-- `L = 2·qS·(qH+qS+1)·ε/(1-p) + qS·ε·(qS+1)/(2·(1-p)²) + qS·ζ_zk + δ` is
-  `MLDSA.cmaToNmaLoss`
-- `ε` is the commitment guessing probability
-- `p` is the effective abort probability
-- `sim` is an HVZK simulator for the underlying identification scheme
-- `ζ_zk` is a nonnegative bound such that `HVZK sim ζ_zk`
-- `δ` is the regularity failure probability
-- `ζ = max(γ₁ - β, 2γ₂ + 1 + τ · 2^{d-1})`
-
-The proof composes:
-1. **CMA → NMA** (Theorem 3): the Fiat-Shamir with aborts CMA-to-NMA reduction, using the
-   HVZK simulator for the ML-DSA identification scheme to answer signing queries and
-   commitment recoverability to embed the challenge. Because ML-DSA compresses signatures,
-   this step incurs `qS` extra random-oracle queries on top of the adversary's `qH`
-   queries, yielding `MLDSA.cmaToNmaLoss`.
-2. **NMA → MLWE + SelfTargetMSIS** (Lemma 7): replace `keygen` with uniform `t` (MLWE gap),
-   then extract a SelfTargetMSIS solution from any forgery. -/
-theorem euf_cma_security
-    (mlwe : LearningWithErrors.Problem (TqMatrix p.k p.l) (RqVec p.l) (RqVec p.k))
-    (stmsis : SelfTargetMSIS.Problem
-      (TqMatrix p.k p.l) (Response p prims)
-      (PublicKey p prims) (M × Commitment p prims) (CommitHashBytes p))
-    (maxAttempts : ℕ)
-    (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
-      (validKeyPair p prims))
-    (sim : PublicKey p prims →
-      ProbComp (Option (Commitment p prims × CommitHashBytes p × Response p prims)))
-    (ζ_zk : ℝ) (_hζ : 0 ≤ ζ_zk)
-    (_hhvzk : (identificationScheme p prims).HVZK sim ζ_zk)
-    (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1) :
-    ∀ (adv : SignatureAlg.unforgeableAdv
-      (FiatShamirWithAbort (identificationScheme p prims)
-        hr M maxAttempts)),
-    ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
-      (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
-      adv.advantage
-          (FiatShamirWithAbort.runtime
-            (Commit := Commitment p prims) (Chal := CommitHashBytes p) M) ≤
-        ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
-        SelfTargetMSIS.advantage stmsisReduction +
-        ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
-  sorry
-
-end MainTheorem
+Both are stated with nonnegativity side conditions on the statistical-loss parameters, so the
+bound cannot collapse. -/
 
 end MLDSA
