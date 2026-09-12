@@ -8,6 +8,7 @@ module
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.FinalValidity
 public import VCVio.OracleComp.Constructions.SampleableType
 public import VCVio.OracleComp.SimSemantics.Append
+public import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 
 /-!
 # Source-final-validity SM-DT-OpenPRE
@@ -159,6 +160,55 @@ noncomputable def Advantage [DecidableEq Tweak] [DecidableEq Y] [Inhabited M]
     {prob : Problem ι PkSeed Tweak M Y}
     (adv : Adversary prob) : ℝ≥0∞ :=
   Pr[= true | Experiment adv]
+
+/-! ## Run-level final-validity correspondence -/
+
+section Reachable
+
+variable [DecidableEq Tweak]
+
+/-- Both summands of the commitment-phase oracle implementation maintain the monitor invariant:
+private randomness leaves the state untouched, and the collection oracle records through
+`SourceFinalValidity.State.recordCollection`. -/
+theorem pickOracles_preservesInv (prob : Problem ι PkSeed Tweak M Y) (pk : PkSeed) :
+    QueryImpl.PreservesInv (pickOracles prob pk)
+      (SourceFinalValidity.Invariant prob.numTargets Prod.fst) :=
+  (SourceFinalValidity.preservesInv_privateRandomness _).add
+    (SourceFinalValidity.preservesInv_collectionOracle _ _ _ _)
+
+/-- Target sampling maintains the monitor invariant: every retained tweak is recorded through
+`SourceFinalValidity.State.recordTarget`, so a duplicate or collection-clashing tweak in the
+committed list poisons the monitor exactly as an adversarial target query would. -/
+theorem initializeTargets_preservesInv (prob : Problem ι PkSeed Tweak M Y) (pk : PkSeed)
+    (ts : List Tweak) :
+    StateT.PreservesInv (initializeTargets prob pk ts)
+      (SourceFinalValidity.Invariant prob.numTargets Prod.fst) := by
+  induction ts with
+  | nil => exact StateT.preservesInv_pure _ _
+  | cons t ts ih =>
+      refine StateT.preservesInv_bind _ _ _ (StateT.preservesInv_monadLift _ _) fun x => ?_
+      refine StateT.preservesInv_get_bind _ fun st hst => ?_
+      refine StateT.preservesInv_bind _ _ _
+        (StateT.preservesInv_set_of _ (hst.recordTarget prob.numTargets Prod.fst st (t, x)))
+        fun _ => StateT.preservesInv_bind _ _ _ ih fun _ => StateT.preservesInv_pure _ _
+
+/-- The sticky bit decides the final predicate on every state reachable through both monitor
+phases: the commitment phase's collection queries followed by target sampling on the retained
+prefix. The inversion phase carries its own opening state and never reaches the monitor, so this is
+exactly the state whose `valid` field `Experiment` reads. -/
+theorem valid_eq_decide_valid_of_reachable {prob : Problem ι PkSeed Tweak M Y}
+    (adv : Adversary prob) (pk : PkSeed)
+    {w : (adv.State × List Tweak) × State Tweak M}
+    (hw : w ∈ support ((simulateQ (pickOracles prob pk) adv.pick).run .initial))
+    {z : List Y × State Tweak M}
+    (hz : z ∈ support ((initializeTargets prob pk (w.1.2.take prob.numTargets)).run w.2)) :
+    z.2.valid = decide (SourceFinalValidity.Valid prob.numTargets Prod.fst z.2) :=
+  (initializeTargets_preservesInv prob pk _ w.2
+    (OracleComp.simulateQ_run_preservesInv (pickOracles prob pk) _
+      (pickOracles_preservesInv prob pk) adv.pick .initial
+      (SourceFinalValidity.invariant_initial _ _) w hw) z hz).eq_decide _ _ _
+
+end Reachable
 
 /-! ## Oracle behavior pins -/
 

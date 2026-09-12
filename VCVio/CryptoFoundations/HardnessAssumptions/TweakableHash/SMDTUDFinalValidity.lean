@@ -8,6 +8,7 @@ module
 public import VCVio.CryptoFoundations.HardnessAssumptions.TweakableHash.FinalValidity
 public import VCVio.OracleComp.Constructions.SampleableType
 public import VCVio.OracleComp.SimSemantics.Append
+public import VCVio.OracleComp.SimSemantics.StateT.PreservesInv
 public import ToMathlib.Data.ENNReal.AbsDiff
 
 /-!
@@ -239,6 +240,46 @@ theorem challengeOracle_run :
       (fun y => (y, st.recordTarget prob.numTargets id t)) <$>
         response world prob pk t := by
   simp [challengeOracle, Functor.map_map]
+
+/-! ## Run-level final-validity correspondence -/
+
+section Reachable
+
+/-- The target summand draws its response before writing the state, so the post-state is the same in
+both worlds and the argument does not branch on `world`. -/
+theorem challengeOracle_preservesInv (world : World) (prob : Problem ι PkSeed Tweak M M' Y)
+    (pk : PkSeed) :
+    QueryImpl.PreservesInv (challengeOracle world prob pk)
+      (SourceFinalValidity.Invariant prob.numTargets id) :=
+  fun t st hst z hz => by
+    rw [challengeOracle_run, support_map, Set.mem_image] at hz
+    obtain ⟨y, -, rfl⟩ := hz
+    exact hst.recordTarget prob.numTargets id st t
+
+/-- Every summand of the first-phase oracle implementation maintains the monitor invariant:
+private randomness leaves the state untouched, and the challenge and collection oracles record
+through `SourceFinalValidity.State.recordTarget` and
+`SourceFinalValidity.State.recordCollection`. -/
+theorem oracles_preservesInv (world : World) (prob : Problem ι PkSeed Tweak M M' Y) (pk : PkSeed) :
+    QueryImpl.PreservesInv (oracles world prob pk)
+      (SourceFinalValidity.Invariant prob.numTargets id) :=
+  (SourceFinalValidity.preservesInv_privateRandomness _).add
+    ((challengeOracle_preservesInv world prob pk).add
+      (SourceFinalValidity.preservesInv_collectionOracle _ _ _ _))
+
+/-- The sticky bit decides the final predicate on every reachable state: the run-level form of the
+monitor invariant, obtained from the initial state and the two recording steps. This is what lets a
+winning condition read `gameState.valid` and mean `SourceFinalValidity.Valid`. -/
+theorem valid_eq_decide_valid_of_reachable (world : World)
+    {prob : Problem ι PkSeed Tweak M M' Y} (adv : Adversary prob) (pk : PkSeed)
+    {z : adv.State × State Tweak}
+    (hz : z ∈ support ((simulateQ (oracles world prob pk) adv.pick).run .initial)) :
+    z.2.valid = decide (SourceFinalValidity.Valid prob.numTargets id z.2) :=
+  (OracleComp.simulateQ_run_preservesInv (oracles world prob pk) _
+    (oracles_preservesInv world prob pk) adv.pick .initial
+    (SourceFinalValidity.invariant_initial _ _) z hz).eq_decide _ _ _
+
+end Reachable
 
 end SM_DT_UD_SourceFinalValidity
 
