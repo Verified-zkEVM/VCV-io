@@ -408,7 +408,8 @@ script test (args) do
     #["exe", "slhdsa_canonical_game_tests"],
     #["exe", "slhdsa_wots_witness_tests"],
     #["exe", "slhdsa_fors_witness_tests"],
-    #["exe", "slhdsa_xmss_witness_tests"]]
+    #["exe", "slhdsa_xmss_witness_tests"],
+    #["exe", "slhdsa_hypertree_witness_tests"]]
   if args.contains "--ffi" then
     steps := steps ++ #[#["exe", "mlkem_test"], #["exe", "mldsa_test"], #["exe", "falcon_test"]]
   for cmdArgs in steps do
@@ -515,6 +516,18 @@ honest-signature and malformed-input canaries and eighteen fabricated witnesses,
 fourteen rejected. -/
 lean_exe slhdsa_xmss_witness_tests where
   root := `HashSigTest.SLHDSA.XmssWitnesses
+
+/-- Hypertree layer-walk extraction: over a three-layer toy profile whose trajectory changes tree,
+leaf and honest running message at every layer, the extractor reports the layer at which the
+forgery meets the honest hypertree and returns an XMSS witness there.  For the three WOTS+
+extractions each re-evaluation at a neighbouring layer's address, leaf and honest running message
+is required to fail; a fourth extraction returns an `H`-collision, whose branch reads the leaf only
+as a node index that layers zero and one share and never reads the honest running message at all,
+so it makes four re-evaluations rather than six — two on the address and two on the leaf, one of
+which is required to hold instead of to fail.  Plus the no-match, early-match and nine
+fabricated-witness canaries, three accepted and six rejected. -/
+lean_exe slhdsa_hypertree_witness_tests where
+  root := `HashSigTest.SLHDSA.HypertreeWitnesses
 
 /-- Kernel-level axiom / `sorry` accounting across the non-test libraries, with a
 committed regression baseline (`scripts/axiom_baseline.json`). Complements the Interop
