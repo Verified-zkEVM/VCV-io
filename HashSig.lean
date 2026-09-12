@@ -44,6 +44,7 @@ public import HashSig.SLHDSA.Security
 public import HashSig.SLHDSA.Security.CanonicalGames
 public import HashSig.SLHDSA.Security.ComponentTraces
 public import HashSig.SLHDSA.Security.EncodedTargets
+public import HashSig.SLHDSA.Security.ForsWitnesses
 public import HashSig.SLHDSA.Security.ReachableTargets
 public import HashSig.SLHDSA.Security.TargetCounts
 public import HashSig.SLHDSA.Security.TraceTargets
